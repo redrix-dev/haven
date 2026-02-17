@@ -1,5 +1,6 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const packageJson = require('./package.json');
 
 module.exports = {
   packagerConfig: {
@@ -31,6 +32,9 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
+        name: 'haven',
+        exe: 'Haven.exe',
+        setupExe: `haven-${packageJson.version}.Setup.exe`,
         setupIcon: './assets/icon.ico',
         iconUrl: 'https://github.com/redrix-dev/haven/raw/main/assets/icon.ico',
       },
