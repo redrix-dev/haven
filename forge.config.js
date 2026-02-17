@@ -4,6 +4,14 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: './assets/icon',
+    win32metadata: {
+      CompanyName: 'Haven',
+      FileDescription: 'Haven',
+      InternalName: 'Haven',
+      OriginalFilename: 'Haven.exe',
+      ProductName: 'Haven',
+    },
   },
   publishers: [
     {
@@ -22,7 +30,10 @@ module.exports = {
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        setupIcon: './assets/icon.ico',
+        iconUrl: 'https://github.com/redrix-dev/haven/raw/main/assets/icon.ico',
+      },
     },
     {
       name: '@electron-forge/maker-zip',
