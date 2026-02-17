@@ -13,7 +13,7 @@ I wanted a Discord-like app that feels focused again.
 - Clear ownership and moderation controls
 - Voice channels that work in a practical MVP setup
 
-This project started as a personal build to prove that a modern chat app can still be clean, predictable, and user respectful.
+This project started as a personal build to prove that a modern chat app can still be clean, predictable, and user respectful. Given the latest information about Discords plan for age verification and identity tracking. I chose to prove to myself mainly, that an alternative could be built.
 
 ## Why I built it this way
 
@@ -57,16 +57,9 @@ Haven is early and actively evolving. The focus right now is MVP completeness, p
 
 ## Local development
 
-```bash
-npm install
-cp .env.example .env
-# fill .env values
-npm start
-```
+Local dev currently assumes a compatible Supabase project with the full migration set and required secrets configured.
 
-Package build:
+If you do not have that setup, use packaged builds instead.
 
-```bash
-npm run make
-```
+Full local bootstrap docs are not finalized yet.
 
