@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { User, Session } from '@supabase/supabase-js';
+import { getErrorMessage } from '@/shared/lib/errors';
+import type { AuthError, PostgrestError, User, Session } from '@supabase/supabase-js';
 
 type AuthStatus = 'initializing' | 'authenticated' | 'unauthenticated' | 'error';
 
@@ -10,8 +11,12 @@ interface AuthContextType {
   status: AuthStatus;
   error: string | null;
   loading: boolean;
-  signUp: (email: string, password: string, username: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (
+    email: string,
+    password: string,
+    username: string
+  ) => Promise<{ error: AuthError | PostgrestError | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -41,12 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         setStatus(session?.user ? 'authenticated' : 'unauthenticated');
         setError(null);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!isMounted) return;
         setSession(null);
         setUser(null);
         setStatus('error');
-        setError(err?.message ?? 'Failed to initialize authentication.');
+        setError(getErrorMessage(err, 'Failed to initialize authentication.'));
       }
     };
 

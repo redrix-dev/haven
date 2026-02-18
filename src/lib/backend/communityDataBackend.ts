@@ -1,5 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/types/database';
 import type {
   AuthorProfile,
   Channel,
@@ -9,11 +10,37 @@ import type {
   ChannelPermissionState,
   ChannelPermissionsSnapshot,
   ChannelRolePermissionItem,
+  PermissionCatalogItem,
+  MessageReportKind,
+  MessageReportTarget,
   Message,
+  ServerMemberRoleItem,
   ServerPermissions,
+  ServerRoleItem,
+  ServerRoleManagementSnapshot,
   ServerSettingsSnapshot,
   ServerSettingsUpdate,
 } from './types';
+
+type CommunityMemberWithProfile = Pick<
+  Database['public']['Tables']['community_members']['Row'],
+  'id' | 'nickname' | 'is_owner' | 'user_id'
+> & {
+  profiles:
+    | Pick<Database['public']['Tables']['profiles']['Row'], 'username' | 'avatar_url'>
+    | Array<Pick<Database['public']['Tables']['profiles']['Row'], 'username' | 'avatar_url'>>
+    | null;
+};
+
+const getRealtimeRowChannelId = (value: unknown): string | null => {
+  if (!value || typeof value !== 'object') return null;
+  const maybeChannelId = (value as { channel_id?: unknown }).channel_id;
+  return typeof maybeChannelId === 'string' ? maybeChannelId : null;
+};
+
+// Incident toggle for channel-create debugging.
+// Keep disabled by default. Re-enable by setting `HAVEN_DEBUG_CHANNEL_CREATE=1`.
+const ENABLE_CHANNEL_CREATE_DIAGNOSTICS = process.env.HAVEN_DEBUG_CHANNEL_CREATE === '1';
 
 export interface CommunityDataBackend {
   fetchServerPermissions(communityId: string): Promise<ServerPermissions>;
@@ -33,6 +60,31 @@ export interface CommunityDataBackend {
     userId: string;
     values: ServerSettingsUpdate;
     canManageDeveloperAccess: boolean;
+  }): Promise<void>;
+  fetchServerRoleManagement(communityId: string): Promise<ServerRoleManagementSnapshot>;
+  createServerRole(input: {
+    communityId: string;
+    name: string;
+    color: string;
+    position: number;
+  }): Promise<void>;
+  updateServerRole(input: {
+    communityId: string;
+    roleId: string;
+    name: string;
+    color: string;
+    position: number;
+  }): Promise<void>;
+  deleteServerRole(input: { communityId: string; roleId: string }): Promise<void>;
+  saveServerRolePermissions(input: {
+    roleId: string;
+    permissionKeys: string[];
+  }): Promise<void>;
+  saveServerMemberRoles(input: {
+    communityId: string;
+    memberId: string;
+    roleIds: string[];
+    assignedByUserId: string;
   }): Promise<void>;
   createChannel(input: ChannelCreateInput): Promise<Channel>;
   fetchChannelPermissions(input: {
@@ -64,6 +116,25 @@ export interface CommunityDataBackend {
     channelId: string;
     userId: string;
     content: string;
+    replyToMessageId?: string;
+  }): Promise<void>;
+  editUserMessage(input: {
+    communityId: string;
+    messageId: string;
+    content: string;
+  }): Promise<void>;
+  deleteMessage(input: {
+    communityId: string;
+    messageId: string;
+  }): Promise<void>;
+  reportMessage(input: {
+    communityId: string;
+    channelId: string;
+    messageId: string;
+    reporterUserId: string;
+    target: MessageReportTarget;
+    kind: MessageReportKind;
+    comment: string;
   }): Promise<void>;
   postHavenDeveloperMessage(input: {
     communityId: string;
@@ -77,8 +148,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const [
       { data: isOwner },
       { data: canManageServer },
+      { data: canManageRoles },
+      { data: canManageMembers },
       { data: canCreateChannels },
       { data: canManageChannels },
+      { data: canManageMessages },
       { data: canManageDeveloperAccess },
       { data: canManageInvites },
     ] = await Promise.all([
@@ -89,11 +163,23 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       }),
       supabase.rpc('user_has_permission', {
         p_community_id: communityId,
+        p_permission_key: 'manage_roles',
+      }),
+      supabase.rpc('user_has_permission', {
+        p_community_id: communityId,
+        p_permission_key: 'manage_members',
+      }),
+      supabase.rpc('user_has_permission', {
+        p_community_id: communityId,
         p_permission_key: 'create_channels',
       }),
       supabase.rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_channels',
+      }),
+      supabase.rpc('user_has_permission', {
+        p_community_id: communityId,
+        p_permission_key: 'manage_messages',
       }),
       supabase.rpc('user_has_permission', {
         p_community_id: communityId,
@@ -111,8 +197,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return {
       isOwner: owner,
       canManageServer: owner || Boolean(canManageServer),
+      canManageRoles: owner || Boolean(canManageRoles),
+      canManageMembers: owner || Boolean(canManageMembers),
       canCreateChannels: owner || Boolean(canCreateChannels) || manageChannels,
       canManageChannels: manageChannels,
+      canManageMessages: owner || Boolean(canManageMessages),
       canManageDeveloperAccess: owner || Boolean(canManageDeveloperAccess),
       canManageInvites: owner || Boolean(canManageInvites),
     };
@@ -163,12 +252,38 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'messages',
           filter: `channel_id=eq.${channelId}`,
         },
         onChange
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        onChange
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          // DELETE payloads can omit non-primary-key fields unless replica identity is FULL.
+          // Fall back to firing on every delete so UI never lags stale rows.
+          const deletedChannelId = getRealtimeRowChannelId(payload.old);
+          if (!deletedChannelId || deletedChannelId === channelId) {
+            onChange();
+          }
+        }
       )
       .subscribe();
   },
@@ -366,23 +481,294 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     }
   },
 
-  async createChannel(input) {
-    const { data, error } = await supabase
-      .from('channels')
-      .insert({
-        community_id: input.communityId,
-        name: input.name,
-        topic: input.topic,
-        created_by_user_id: input.createdByUserId,
-        position: input.position,
-        kind: input.kind,
+  async fetchServerRoleManagement(communityId) {
+    const [
+      { data: roles, error: rolesError },
+      { data: members, error: membersError },
+      { data: memberRoles, error: memberRolesError },
+      { data: permissionsCatalog, error: permissionsCatalogError },
+    ] = await Promise.all([
+      supabase
+        .from('roles')
+        .select('id, name, color, position, is_default, is_system')
+        .eq('community_id', communityId)
+        .order('position', { ascending: false }),
+      supabase
+        .from('community_members')
+        .select('id, user_id, nickname, is_owner, profiles(username, avatar_url)')
+        .eq('community_id', communityId),
+      supabase
+        .from('member_roles')
+        .select('member_id, role_id')
+        .eq('community_id', communityId),
+      supabase.from('permissions_catalog').select('key, description').order('key', { ascending: true }),
+    ]);
+
+    if (rolesError) throw rolesError;
+    if (membersError) throw membersError;
+    if (memberRolesError) throw memberRolesError;
+    if (permissionsCatalogError) throw permissionsCatalogError;
+
+    const roleIds = (roles ?? []).map((role) => role.id);
+    let rolePermissions: Array<{ role_id: string; permission_key: string }> = [];
+
+    if (roleIds.length > 0) {
+      const { data: rolePermissionRows, error: rolePermissionsError } = await supabase
+        .from('role_permissions')
+        .select('role_id, permission_key')
+        .in('role_id', roleIds);
+
+      if (rolePermissionsError) throw rolePermissionsError;
+      rolePermissions = rolePermissionRows ?? [];
+    }
+
+    const rolePermissionsByRoleId = new Map<string, Set<string>>();
+    for (const rolePermission of rolePermissions) {
+      const current = rolePermissionsByRoleId.get(rolePermission.role_id) ?? new Set<string>();
+      current.add(rolePermission.permission_key);
+      rolePermissionsByRoleId.set(rolePermission.role_id, current);
+    }
+
+    const memberRoleIdsByMemberId = new Map<string, string[]>();
+    const memberCountByRoleId = new Map<string, number>();
+    for (const memberRole of memberRoles ?? []) {
+      const currentRoles = memberRoleIdsByMemberId.get(memberRole.member_id) ?? [];
+      currentRoles.push(memberRole.role_id);
+      memberRoleIdsByMemberId.set(memberRole.member_id, currentRoles);
+      memberCountByRoleId.set(
+        memberRole.role_id,
+        (memberCountByRoleId.get(memberRole.role_id) ?? 0) + 1
+      );
+    }
+
+    const roleRows: ServerRoleItem[] = (roles ?? [])
+      .map((role) => ({
+        id: role.id,
+        name: role.name,
+        color: role.color,
+        position: role.position,
+        isDefault: role.is_default,
+        isSystem: role.is_system,
+        permissionKeys: Array.from(rolePermissionsByRoleId.get(role.id) ?? []).sort(),
+        memberCount: memberCountByRoleId.get(role.id) ?? 0,
+      }))
+      .sort((a, b) => {
+        if (a.position !== b.position) return b.position - a.position;
+        return a.name.localeCompare(b.name);
+      });
+
+    const rolePositionByRoleId = new Map(roleRows.map((role) => [role.id, role.position]));
+
+    const memberRows: ServerMemberRoleItem[] = ((members ?? []) as CommunityMemberWithProfile[])
+      .map((member) => {
+        const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+        const displayName = member.nickname?.trim() || profile?.username || member.user_id.substring(0, 12);
+        const roleIds = (memberRoleIdsByMemberId.get(member.id) ?? [])
+          .slice()
+          .sort(
+            (leftRoleId, rightRoleId) =>
+              (rolePositionByRoleId.get(rightRoleId) ?? Number.NEGATIVE_INFINITY) -
+              (rolePositionByRoleId.get(leftRoleId) ?? Number.NEGATIVE_INFINITY)
+          );
+
+        return {
+          memberId: member.id,
+          userId: member.user_id,
+          displayName,
+          avatarUrl: profile?.avatar_url ?? null,
+          isOwner: Boolean(member.is_owner),
+          roleIds,
+        };
       })
-      .select('*')
-      .single();
+      .sort((a, b) => {
+        if (a.isOwner !== b.isOwner) return a.isOwner ? -1 : 1;
+        return a.displayName.localeCompare(b.displayName);
+      });
+
+    const permissionRows: PermissionCatalogItem[] = (permissionsCatalog ?? []).map((permission) => ({
+      key: permission.key,
+      description: permission.description,
+    }));
+
+    return {
+      roles: roleRows,
+      members: memberRows,
+      permissionsCatalog: permissionRows,
+    };
+  },
+
+  async createServerRole({ communityId, name, color, position }) {
+    const { error } = await supabase.from('roles').insert({
+      community_id: communityId,
+      name,
+      color,
+      position,
+    });
 
     if (error) throw error;
-    if (!data) throw new Error('Failed to create channel.');
-    return data;
+  },
+
+  async updateServerRole({ communityId, roleId, name, color, position }) {
+    const { error } = await supabase
+      .from('roles')
+      .update({
+        name,
+        color,
+        position,
+      })
+      .eq('community_id', communityId)
+      .eq('id', roleId);
+
+    if (error) throw error;
+  },
+
+  async deleteServerRole({ communityId, roleId }) {
+    const { error } = await supabase
+      .from('roles')
+      .delete()
+      .eq('community_id', communityId)
+      .eq('id', roleId);
+
+    if (error) throw error;
+  },
+
+  async saveServerRolePermissions({ roleId, permissionKeys }) {
+    const uniquePermissionKeys = Array.from(new Set(permissionKeys));
+
+    const { error: deleteError } = await supabase
+      .from('role_permissions')
+      .delete()
+      .eq('role_id', roleId);
+    if (deleteError) throw deleteError;
+
+    if (uniquePermissionKeys.length === 0) return;
+
+    const rowsToInsert = uniquePermissionKeys.map((permissionKey) => ({
+      role_id: roleId,
+      permission_key: permissionKey,
+    }));
+
+    const { error: insertError } = await supabase.from('role_permissions').insert(rowsToInsert);
+    if (insertError) throw insertError;
+  },
+
+  async saveServerMemberRoles({ communityId, memberId, roleIds, assignedByUserId }) {
+    const uniqueRoleIds = Array.from(new Set(roleIds));
+
+    const { data: existingRows, error: existingRowsError } = await supabase
+      .from('member_roles')
+      .select('role_id')
+      .eq('community_id', communityId)
+      .eq('member_id', memberId);
+    if (existingRowsError) throw existingRowsError;
+
+    const existingRoleIds = (existingRows ?? []).map((row) => row.role_id);
+    const existingRoleIdSet = new Set(existingRoleIds);
+    const desiredRoleIdSet = new Set(uniqueRoleIds);
+
+    const roleIdsToDelete = existingRoleIds.filter((roleId) => !desiredRoleIdSet.has(roleId));
+    const roleIdsToInsert = uniqueRoleIds.filter((roleId) => !existingRoleIdSet.has(roleId));
+
+    if (roleIdsToDelete.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('member_roles')
+        .delete()
+        .eq('community_id', communityId)
+        .eq('member_id', memberId)
+        .in('role_id', roleIdsToDelete);
+      if (deleteError) throw deleteError;
+    }
+
+    if (roleIdsToInsert.length > 0) {
+      const rowsToInsert = roleIdsToInsert.map((roleId) => ({
+        community_id: communityId,
+        member_id: memberId,
+        role_id: roleId,
+        assigned_by_user_id: assignedByUserId,
+      }));
+
+      const { error: insertError } = await supabase.from('member_roles').insert(rowsToInsert);
+      if (insertError) throw insertError;
+    }
+  },
+
+  async createChannel(input) {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    if (!user?.id) throw new Error('Not authenticated.');
+
+    if (ENABLE_CHANNEL_CREATE_DIAGNOSTICS) {
+      const [{ data: ownerCheck }, { data: canCreateChannels }, { data: canManageChannels }] =
+        await Promise.all([
+          supabase.rpc('is_community_owner', {
+            p_community_id: input.communityId,
+          }),
+          supabase.rpc('user_has_permission', {
+            p_community_id: input.communityId,
+            p_permission_key: 'create_channels',
+          }),
+          supabase.rpc('user_has_permission', {
+            p_community_id: input.communityId,
+            p_permission_key: 'manage_channels',
+          }),
+        ]);
+
+      console.info('[createChannel] diagnostics', {
+        authUserId: user.id,
+        communityId: input.communityId,
+        channelName: input.name,
+        channelKind: input.kind,
+        channelPosition: input.position,
+        isCommunityOwner: Boolean(ownerCheck),
+        canCreateChannels: Boolean(canCreateChannels),
+        canManageChannels: Boolean(canManageChannels),
+      });
+    }
+
+    const insertPayload = {
+      community_id: input.communityId,
+      name: input.name,
+      topic: input.topic,
+      created_by_user_id: user.id,
+      position: input.position,
+      kind: input.kind,
+    };
+
+    const { error } = await supabase
+      .from('channels')
+      .insert(insertPayload);
+
+    if (error) {
+      if (ENABLE_CHANNEL_CREATE_DIAGNOSTICS) {
+        console.error('[createChannel] insert failed', {
+          authUserId: user.id,
+          communityId: input.communityId,
+          channelName: input.name,
+          channelKind: input.kind,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+      }
+      throw error;
+    }
+    const { data: fallbackChannel, error: fallbackError } = await supabase
+      .from('channels')
+      .select('*')
+      .eq('community_id', input.communityId)
+      .eq('name', input.name)
+      .maybeSingle();
+
+    if (fallbackError) throw fallbackError;
+    if (!fallbackChannel) {
+      throw new Error('Channel was created but is not visible to the current user.');
+    }
+
+    return fallbackChannel;
   },
 
   async fetchChannelPermissions({ communityId, channelId, userId }) {
@@ -426,8 +812,8 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (memberOverwritesError) throw memberOverwritesError;
     if (myMemberError) throw myMemberError;
 
-    const allMemberOptions: ChannelMemberOption[] = (members ?? [])
-      .map((member: any) => {
+    const allMemberOptions: ChannelMemberOption[] = ((members ?? []) as CommunityMemberWithProfile[])
+      .map((member) => {
         const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
         const displayName = member.nickname?.trim() || profile?.username || member.user_id.substring(0, 12);
 
@@ -606,15 +992,84 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
-  async sendUserMessage({ communityId, channelId, userId, content }) {
+  async sendUserMessage({ communityId, channelId, userId, content, replyToMessageId }) {
+    const nextMetadata =
+      replyToMessageId && replyToMessageId.trim().length > 0
+        ? { replyToMessageId: replyToMessageId.trim() }
+        : {};
+
     const { error } = await supabase.from('messages').insert({
       community_id: communityId,
       channel_id: channelId,
       author_type: 'user',
       author_user_id: userId,
       content,
+      metadata: nextMetadata,
     });
     if (error) throw error;
+  },
+
+  async editUserMessage({ communityId, messageId, content }) {
+    const { error } = await supabase
+      .from('messages')
+      .update({
+        content,
+        edited_at: new Date().toISOString(),
+      })
+      .eq('community_id', communityId)
+      .eq('id', messageId);
+    if (error) throw error;
+  },
+
+  async deleteMessage({ communityId, messageId }) {
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('community_id', communityId)
+      .eq('id', messageId);
+    if (error) throw error;
+  },
+
+  async reportMessage({ communityId, channelId, messageId, reporterUserId, target, kind, comment }) {
+    const reportTitle =
+      kind === 'bug' ? 'Message Report: Bug' : 'Message Report: Content Abuse';
+
+    const reportNotes = JSON.stringify({
+      type: 'message_report',
+      messageId,
+      channelId,
+      target,
+      kind,
+      comment,
+    });
+
+    const reportId = crypto.randomUUID();
+
+    const { error: reportError } = await supabase
+      .from('support_reports')
+      .insert({
+        id: reportId,
+        community_id: communityId,
+        reporter_user_id: reporterUserId,
+        title: reportTitle,
+        notes: reportNotes,
+        include_last_n_messages: null,
+      });
+
+    if (reportError) throw reportError;
+
+    const { error: channelLinkError } = await supabase.from('support_report_channels').insert({
+      report_id: reportId,
+      community_id: communityId,
+      channel_id: channelId,
+    });
+    if (channelLinkError) throw channelLinkError;
+
+    const { error: messageLinkError } = await supabase.from('support_report_messages').insert({
+      report_id: reportId,
+      message_id: messageId,
+    });
+    if (messageLinkError) throw messageLinkError;
   },
 
   async postHavenDeveloperMessage({ communityId, channelId, content }) {

@@ -27,7 +27,7 @@ export type UpdaterStatus = {
   repository: string;
 };
 
-export type DesktopBridgeApi = {
+export type DesktopAPI = {
   getAppSettings: () => Promise<AppSettings>;
   setAutoUpdateEnabled: (enabled: boolean) => Promise<{
     settings: AppSettings;
@@ -39,7 +39,6 @@ export type DesktopBridgeApi = {
 
 declare global {
   interface Window {
-    havenDesktop?: DesktopBridgeApi;
+    desktop?: DesktopAPI;
   }
 }
-

@@ -1,10 +1,10 @@
 import React from 'react';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
-import { VoiceChannelPane } from './VoiceChannelPane';
 import { Database } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Headphones } from 'lucide-react';
+import type { MessageReportKind, MessageReportTarget } from '@/lib/backend/types';
 
 type Message = Database['public']['Tables']['messages']['Row'];
 type ChannelKind = Database['public']['Enums']['channel_kind'];
@@ -23,11 +23,20 @@ interface ChatAreaProps {
   messages: Message[];
   authorProfiles: Record<string, AuthorProfile>;
   currentUserId: string;
-  accessToken?: string | null;
   canSpeakInVoiceChannel: boolean;
+  canManageMessages: boolean;
   showVoiceDiagnostics?: boolean;
   onOpenChannelSettings?: () => void;
-  onSendMessage: (content: string) => Promise<void>;
+  onOpenVoiceControls?: () => void;
+  onSendMessage: (content: string, options?: { replyToMessageId?: string }) => Promise<void>;
+  onEditMessage: (messageId: string, content: string) => Promise<void>;
+  onDeleteMessage: (messageId: string) => Promise<void>;
+  onReportMessage: (input: {
+    messageId: string;
+    target: MessageReportTarget;
+    kind: MessageReportKind;
+    comment: string;
+  }) => Promise<void>;
   onSendHavenDeveloperMessage?: (content: string) => Promise<void>;
 }
 
@@ -40,14 +49,27 @@ export function ChatArea({
   messages,
   authorProfiles,
   currentUserId,
-  accessToken = null,
   canSpeakInVoiceChannel,
+  canManageMessages,
   showVoiceDiagnostics = false,
   onOpenChannelSettings,
+  onOpenVoiceControls,
   onSendMessage,
+  onEditMessage,
+  onDeleteMessage,
+  onReportMessage,
   onSendHavenDeveloperMessage,
 }: ChatAreaProps) {
   const isVoiceChannel = channelKind === 'voice';
+  const [replyTarget, setReplyTarget] = React.useState<{
+    id: string;
+    authorLabel: string;
+    preview: string;
+  } | null>(null);
+
+  React.useEffect(() => {
+    setReplyTarget(null);
+  }, [channelId]);
 
   return (
     <div className="flex-1 flex flex-col bg-[#111a2b]">
@@ -77,16 +99,33 @@ export function ChatArea({
       </div>
 
       {isVoiceChannel ? (
-        <VoiceChannelPane
-          communityId={communityId}
-          channelId={channelId}
-          channelName={channelName}
-          currentUserId={currentUserId}
-          currentUserDisplayName={currentUserDisplayName}
-          canSpeak={canSpeakInVoiceChannel}
-          showDiagnostics={showVoiceDiagnostics}
-          accessToken={accessToken}
-        />
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+          <Headphones className="size-7 text-[#8ea4c7]" />
+          <p className="text-white font-semibold">Voice channel selected: {channelName}</p>
+          <p className="text-sm text-[#a9b8cf] max-w-xl">
+            Voice stays connected while you browse text channels. Open voice controls from the sidebar
+            panel.
+          </p>
+          {onOpenVoiceControls && (
+            <Button
+              type="button"
+              onClick={onOpenVoiceControls}
+              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+            >
+              Open Voice Controls
+            </Button>
+          )}
+          {!canSpeakInVoiceChannel && (
+            <p className="text-xs text-[#d6a24a]">
+              You can join as listener only in this voice channel.
+            </p>
+          )}
+          {showVoiceDiagnostics && (
+            <p className="text-xs text-[#8ea4c7]">
+              Staff diagnostics are available in voice controls.
+            </p>
+          )}
+        </div>
       ) : (
         <>
           {/* Messages */}
@@ -94,6 +133,11 @@ export function ChatArea({
             messages={messages}
             authorProfiles={authorProfiles}
             currentUserId={currentUserId}
+            canManageMessages={canManageMessages}
+            onDeleteMessage={onDeleteMessage}
+            onEditMessage={onEditMessage}
+            onReplyToMessage={setReplyTarget}
+            onReportMessage={onReportMessage}
           />
 
           {/* Input */}
@@ -101,6 +145,8 @@ export function ChatArea({
             onSendMessage={onSendMessage}
             onSendHavenDeveloperMessage={onSendHavenDeveloperMessage}
             channelName={channelName}
+            replyTarget={replyTarget}
+            onClearReplyTarget={() => setReplyTarget(null)}
           />
         </>
       )}

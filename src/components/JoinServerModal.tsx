@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getErrorMessage } from '@/shared/lib/errors';
 import {
   Dialog,
   DialogContent,
@@ -31,8 +32,8 @@ export function JoinServerModal({ onClose, onJoin }: JoinServerModalProps) {
     try {
       await onJoin(inviteInput.trim());
       onClose();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to join server from invite.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to join server from invite.'));
     } finally {
       setLoading(false);
     }
@@ -41,7 +42,8 @@ export function JoinServerModal({ onClose, onJoin }: JoinServerModalProps) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="bg-[#18243a] border-[#142033] text-white sm:max-w-md"
+        size="sm"
+        className="bg-[#18243a] border-[#142033] text-white"
         showCloseButton={false}
       >
         <DialogHeader>

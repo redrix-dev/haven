@@ -1,5 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/types/database';
 import type { RedeemedInvite, ServerInvite, ServerSummary } from './types';
 
 export type PlatformStaffInfo = {
@@ -30,7 +31,16 @@ export interface ControlPlaneBackend {
   revokeCommunityInvite(communityId: string, inviteId: string): Promise<void>;
 }
 
-const mapInvite = (invite: any): ServerInvite => ({
+type InviteRecord = Pick<
+  Database['public']['Tables']['invites']['Row'],
+  'id' | 'code' | 'current_uses' | 'max_uses' | 'expires_at' | 'is_active'
+>;
+
+type CommunityMemberCommunityRow = {
+  communities: ServerSummary | null;
+};
+
+const mapInvite = (invite: InviteRecord): ServerInvite => ({
   id: invite.id,
   code: invite.code,
   currentUses: invite.current_uses,
@@ -91,8 +101,8 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
 
     if (error) throw error;
 
-    return (data ?? [])
-      .map((item: any) => item.communities)
+    return ((data ?? []) as CommunityMemberCommunityRow[])
+      .map((item) => item.communities)
       .filter(
         (community): community is ServerSummary =>
           community !== null && community !== undefined

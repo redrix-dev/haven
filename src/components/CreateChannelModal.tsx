@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Database } from '@/types/database';
+import { getErrorMessage } from '@/shared/lib/errors';
 
 type ChannelKind = Database['public']['Enums']['channel_kind'];
 
@@ -50,8 +51,8 @@ export function CreateChannelModal({ onClose, onCreate }: CreateChannelModalProp
         kind,
       });
       onClose();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to create channel.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to create channel.'));
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,8 @@ export function CreateChannelModal({ onClose, onCreate }: CreateChannelModalProp
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="bg-[#18243a] border-[#142033] text-white sm:max-w-md"
+        size="sm"
+        className="bg-[#18243a] border-[#142033] text-white"
         showCloseButton={false}
       >
         <DialogHeader>

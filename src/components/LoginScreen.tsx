@@ -10,6 +10,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
+import { getErrorMessage } from '@/shared/lib/errors';
 
 export function LoginScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -39,8 +40,8 @@ export function LoginScreen() {
         const { error } = await signIn(email, password);
         if (error) throw error;
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'An error occurred'));
     } finally {
       setLoading(false);
     }

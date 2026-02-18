@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { fetchIceConfig } from '@/lib/voice/ice';
+import { getErrorMessage } from '@/shared/lib/errors';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +58,8 @@ type VoicePeerDiagnostics = {
   bytesReceived: number | null;
 };
 
+type RTCStatsRecord = RTCStats & Record<string, unknown>;
+
 interface VoiceChannelPaneProps {
   communityId: string;
   channelId: string;
@@ -65,7 +68,27 @@ interface VoiceChannelPaneProps {
   currentUserDisplayName: string;
   canSpeak: boolean;
   showDiagnostics?: boolean;
-  accessToken?: string | null;
+  autoJoin?: boolean;
+  onParticipantsChange?: (participants: Array<{ userId: string; displayName: string }>) => void;
+  onConnectionChange?: (connected: boolean) => void;
+  onLeave?: () => void;
+  onSessionStateChange?: (state: {
+    joined: boolean;
+    joining: boolean;
+    isMuted: boolean;
+    isDeafened: boolean;
+    listenOnly: boolean;
+  }) => void;
+  onControlActionsReady?: (
+    actions:
+      | {
+          join: () => void;
+          leave: () => void;
+          toggleMute: () => void;
+          toggleDeafen: () => void;
+        }
+      | null
+  ) => void;
 }
 
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
@@ -88,7 +111,12 @@ export function VoiceChannelPane({
   currentUserDisplayName,
   canSpeak,
   showDiagnostics = false,
-  accessToken = null,
+  autoJoin = false,
+  onParticipantsChange,
+  onConnectionChange,
+  onLeave,
+  onSessionStateChange,
+  onControlActionsReady,
 }: VoiceChannelPaneProps) {
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -117,6 +145,12 @@ export function VoiceChannelPane({
   const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const audioElementRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE_SERVERS);
+  const autoJoinAttemptedChannelKeyRef = useRef<string | null>(null);
+  const autoEnableMicAttemptedChannelKeyRef = useRef<string | null>(null);
+  const joinVoiceChannelActionRef = useRef<(() => Promise<void>) | null>(null);
+  const leaveVoiceChannelActionRef = useRef<(() => Promise<void>) | null>(null);
+  const toggleMuteActionRef = useRef<(() => void) | null>(null);
+  const toggleDeafenActionRef = useRef<(() => void) | null>(null);
 
   const remoteParticipantIds = useMemo(
     () => participants.map((participant) => participant.userId),
@@ -265,21 +299,26 @@ export function VoiceChannelPane({
 
           try {
             const stats = await peerConnection.getStats();
-            const statsById = new Map<string, any>();
+            const statsById = new Map<string, RTCStatsRecord>();
 
-            stats.forEach((report: any) => {
-              statsById.set(report.id, report);
+            stats.forEach((report) => {
+              const statsRecord = report as RTCStatsRecord;
+              statsById.set(statsRecord.id, statsRecord);
 
               if (
                 !selectedCandidatePairId &&
-                report.type === 'transport' &&
-                typeof report.selectedCandidatePairId === 'string'
+                statsRecord.type === 'transport' &&
+                typeof statsRecord.selectedCandidatePairId === 'string'
               ) {
-                selectedCandidatePairId = report.selectedCandidatePairId;
+                selectedCandidatePairId = statsRecord.selectedCandidatePairId;
               }
 
-              if (!selectedCandidatePairId && report.type === 'candidate-pair' && report.selected) {
-                selectedCandidatePairId = report.id;
+              if (
+                !selectedCandidatePairId &&
+                statsRecord.type === 'candidate-pair' &&
+                statsRecord.selected === true
+              ) {
+                selectedCandidatePairId = statsRecord.id;
               }
             });
 
@@ -621,6 +660,7 @@ export function VoiceChannelPane({
     setListenOnly(!canSpeak);
     setIceSource(null);
     setDiagnosticsUpdatedAt(null);
+    autoEnableMicAttemptedChannelKeyRef.current = null;
 
     if (channel) {
       try {
@@ -639,8 +679,18 @@ export function VoiceChannelPane({
     setError(null);
     setNotice(null);
 
-    const iceConfig = await fetchIceConfig({ communityId, channelId, accessToken });
-    iceServersRef.current = iceConfig.iceServers;
+    const iceConfig = await fetchIceConfig({ communityId, channelId });
+    if (iceConfig.blockedReason) {
+      setError(iceConfig.blockedReason);
+      if (iceConfig.warning) {
+        setNotice(iceConfig.warning);
+      }
+      setJoining(false);
+      return;
+    }
+
+    iceServersRef.current =
+      iceConfig.iceServers.length > 0 ? iceConfig.iceServers : FALLBACK_ICE_SERVERS;
     setIceSource(iceConfig.source);
     if (iceConfig.warning) setNotice(iceConfig.warning);
 
@@ -705,10 +755,10 @@ export function VoiceChannelPane({
           }
         });
       });
-    } catch (joinError: any) {
+    } catch (joinError: unknown) {
       console.error('Failed to join voice channel:', joinError);
       await cleanupVoiceSession();
-      setError(joinError?.message ?? 'Failed to join voice channel.');
+      setError(getErrorMessage(joinError, 'Failed to join voice channel.'));
     } finally {
       setJoining(false);
     }
@@ -723,9 +773,9 @@ export function VoiceChannelPane({
     try {
       const newStream = await requestLocalAudioStream(deviceId);
       await applyOutgoingTrackToPeers(newStream, false);
-    } catch (switchError: any) {
+    } catch (switchError: unknown) {
       console.error('Failed to switch input device:', switchError);
-      setError(switchError?.message ?? 'Failed to switch input device.');
+      setError(getErrorMessage(switchError, 'Failed to switch input device.'));
     } finally {
       setSwitchingInput(false);
     }
@@ -741,9 +791,9 @@ export function VoiceChannelPane({
       setIsMuted(false);
       await applyOutgoingTrackToPeers(stream, true);
       await refreshAudioDevices();
-    } catch (micError: any) {
+    } catch (micError: unknown) {
       console.error('Failed to enable microphone:', micError);
-      setError(micError?.message ?? 'Failed to enable microphone.');
+      setError(getErrorMessage(micError, 'Failed to enable microphone.'));
     }
   };
 
@@ -775,13 +825,11 @@ export function VoiceChannelPane({
     return () => {
       mediaDevices.removeEventListener('devicechange', onDeviceChange);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     applyLocalTrackState();
     void trackPresenceState();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMuted, isDeafened, listenOnly, joined, currentUserDisplayName]);
 
   useEffect(() => {
@@ -814,8 +862,65 @@ export function VoiceChannelPane({
       audioElement.volume = (remoteVolumes[remoteUserId] ?? 100) / 100;
       void applySinkId(audioElement);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDeafened, remoteVolumes, remoteStreams, selectedOutputDeviceId, supportsOutputSelection]);
+
+  useEffect(() => {
+    onConnectionChange?.(joined);
+  }, [joined, onConnectionChange]);
+
+  useEffect(() => {
+    onSessionStateChange?.({
+      joined,
+      joining,
+      isMuted,
+      isDeafened,
+      listenOnly,
+    });
+  }, [joined, joining, isMuted, isDeafened, listenOnly, onSessionStateChange]);
+
+  useEffect(() => {
+    if (joined || joining) return;
+    setListenOnly(!canSpeak);
+  }, [canSpeak, joined, joining]);
+
+  useEffect(() => {
+    if (!joined || !listenOnly || !canSpeak) return;
+
+    const channelKey = `${communityId}:${channelId}`;
+    if (autoEnableMicAttemptedChannelKeyRef.current === channelKey) {
+      return;
+    }
+
+    autoEnableMicAttemptedChannelKeyRef.current = channelKey;
+    void enableMicrophone();
+  }, [canSpeak, channelId, communityId, joined, listenOnly, enableMicrophone]);
+
+  useEffect(() => {
+    if (!onParticipantsChange) return;
+    if (!joined) {
+      onParticipantsChange([]);
+      return;
+    }
+
+    onParticipantsChange(
+      participants.map((participant) => ({
+        userId: participant.userId,
+        displayName: participant.displayName,
+      }))
+    );
+  }, [joined, onParticipantsChange, participants]);
+
+  useEffect(() => {
+    if (!autoJoin) return;
+
+    const channelKey = `${communityId}:${channelId}`;
+    if (joined || joining || autoJoinAttemptedChannelKeyRef.current === channelKey) {
+      return;
+    }
+
+    autoJoinAttemptedChannelKeyRef.current = channelKey;
+    void joinVoiceChannel();
+  }, [autoJoin, channelId, communityId, joined, joining]);
 
   useEffect(() => {
     if (!showDiagnostics) {
@@ -833,14 +938,12 @@ export function VoiceChannelPane({
     return () => {
       window.clearInterval(intervalId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDiagnostics, joined, participants]);
 
   useEffect(() => {
     return () => {
       void cleanupVoiceSession();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityId, channelId, currentUserId]);
 
   const toggleMute = () => {
@@ -858,8 +961,42 @@ export function VoiceChannelPane({
     });
   };
 
+  const leaveVoiceChannel = async () => {
+    await cleanupVoiceSession();
+    onLeave?.();
+  };
+
+  joinVoiceChannelActionRef.current = joinVoiceChannel;
+  leaveVoiceChannelActionRef.current = leaveVoiceChannel;
+  toggleMuteActionRef.current = toggleMute;
+  toggleDeafenActionRef.current = toggleDeafen;
+
+  useEffect(() => {
+    if (!onControlActionsReady) return;
+    onControlActionsReady({
+      join: () => {
+        const action = joinVoiceChannelActionRef.current;
+        if (action) void action();
+      },
+      leave: () => {
+        const action = leaveVoiceChannelActionRef.current;
+        if (action) void action();
+      },
+      toggleMute: () => {
+        toggleMuteActionRef.current?.();
+      },
+      toggleDeafen: () => {
+        toggleDeafenActionRef.current?.();
+      },
+    });
+
+    return () => {
+      onControlActionsReady(null);
+    };
+  }, [onControlActionsReady]);
+
   return (
-    <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
+    <div className="scrollbar-inset flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
       <Card className="bg-[#1c2a43] border-[#263a58] text-white">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -929,7 +1066,7 @@ export function VoiceChannelPane({
                 </Button>
                 <Button
                   type="button"
-                  onClick={() => void cleanupVoiceSession()}
+                  onClick={() => void leaveVoiceChannel()}
                   variant="outline"
                 >
                   <PhoneOff className="size-4" />

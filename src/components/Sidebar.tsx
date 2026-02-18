@@ -14,6 +14,10 @@ interface SidebarProps {
   channels: Array<{ id: string; name: string; kind: ChannelKind }>;
   currentChannelId: string | null;
   onChannelClick: (channelId: string) => void;
+  onVoiceChannelClick?: (channelId: string) => void;
+  activeVoiceChannelId?: string | null;
+  voiceChannelParticipants?: Record<string, Array<{ userId: string; displayName: string }>>;
+  voiceStatusPanel?: React.ReactNode;
   onCreateChannel?: () => void;
   onOpenServerSettings?: () => void;
 }
@@ -24,6 +28,10 @@ export function Sidebar({
   channels,
   currentChannelId,
   onChannelClick,
+  onVoiceChannelClick,
+  activeVoiceChannelId = null,
+  voiceChannelParticipants = {},
+  voiceStatusPanel,
   onCreateChannel,
   onOpenServerSettings,
 }: SidebarProps) {
@@ -106,20 +114,57 @@ export function Sidebar({
                 Voice Channels
               </p>
               {voiceChannels.map((channel) => (
-                <Button
-                  key={channel.id}
-                  type="button"
-                  variant="ghost"
-                  onClick={() => onChannelClick(channel.id)}
-                  className={`w-full px-2 py-1.5 rounded text-left text-sm transition-colors justify-start ${
-                    currentChannelId === channel.id
-                      ? 'bg-[#3f79d8] text-white'
-                      : 'text-[#95a5bf] hover:bg-[#22334f] hover:text-[#e6edf7]'
-                  }`}
-                >
-                  <Headphones className="size-4" />
-                  <span>{channel.name}</span>
-                </Button>
+                <div key={channel.id} className="mb-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() =>
+                      onVoiceChannelClick ? onVoiceChannelClick(channel.id) : onChannelClick(channel.id)
+                    }
+                    className={`w-full px-2 py-1.5 rounded text-left text-sm transition-colors justify-start ${
+                      activeVoiceChannelId === channel.id || currentChannelId === channel.id
+                        ? 'bg-[#3f79d8] text-white'
+                        : 'text-[#95a5bf] hover:bg-[#22334f] hover:text-[#e6edf7]'
+                    }`}
+                  >
+                    <Headphones className="size-4" />
+                    <span>{channel.name}</span>
+                  </Button>
+
+                  {voiceChannelParticipants[channel.id] && voiceChannelParticipants[channel.id].length > 0 && (
+                    <div className="px-2 pt-1 flex items-center gap-1">
+                      {voiceChannelParticipants[channel.id].slice(0, 4).map((participant) => {
+                        const initial = participant.displayName.trim().charAt(0).toUpperCase() || '?';
+                        return (
+                          <Tooltip key={participant.userId}>
+                            <TooltipTrigger asChild>
+                              <span className="size-5 rounded-full bg-[#304867] text-[10px] text-white font-semibold flex items-center justify-center">
+                                {initial}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" sideOffset={6}>
+                              {participant.displayName}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                      {voiceChannelParticipants[channel.id].length > 4 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="size-5 rounded-full bg-[#22334f] text-[10px] text-[#d1dff4] font-semibold flex items-center justify-center">
+                              ...
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" sideOffset={6}>
+                            {voiceChannelParticipants[channel.id]
+                              .map((participant) => participant.displayName)
+                              .join(', ')}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -128,10 +173,13 @@ export function Sidebar({
 
       <Separator />
 
-      <div className="h-14 px-2 flex items-center bg-[#172338] text-xs" data-component="sidebar">
-        <div className="flex-1">
-          <div className="font-semibold text-white">{userName}</div>
-          <div className="text-[#44b894]">Online</div>
+      <div className="bg-[#172338]" data-component="sidebar">
+        {voiceStatusPanel}
+        <div className="h-14 px-2 flex items-center text-xs">
+          <div className="flex-1">
+            <div className="font-semibold text-white">{userName}</div>
+            <div className="text-[#44b894]">Online</div>
+          </div>
         </div>
       </div>
     </div>

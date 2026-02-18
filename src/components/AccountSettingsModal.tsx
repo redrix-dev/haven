@@ -25,7 +25,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import type { UpdaterStatus } from '@/types/desktop-api';
+import { getErrorMessage } from '@/shared/lib/errors';
+import type { UpdaterStatus } from '@/shared/desktop/types';
 
 interface AccountSettingsModalProps {
   userEmail: string;
@@ -102,8 +103,8 @@ export function AccountSettingsModal({
 
     try {
       await onAutoUpdateChange(enabled);
-    } catch (err: any) {
-      setAutoUpdateError(err?.message ?? 'Failed to update auto-update preference.');
+    } catch (err: unknown) {
+      setAutoUpdateError(getErrorMessage(err, 'Failed to update auto-update preference.'));
     } finally {
       setUpdatingAutoUpdatePreference(false);
     }
@@ -126,8 +127,8 @@ export function AccountSettingsModal({
         avatarUrl: avatarUrl.trim() ? avatarUrl.trim() : null,
       });
       onClose();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to save account settings.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to save account settings.'));
     } finally {
       setSaving(false);
     }
@@ -161,8 +162,8 @@ export function AccountSettingsModal({
     setAutoUpdateError(null);
     try {
       await onCheckForUpdates();
-    } catch (err: any) {
-      setAutoUpdateError(err?.message ?? 'Failed to check for updates.');
+    } catch (err: unknown) {
+      setAutoUpdateError(getErrorMessage(err, 'Failed to check for updates.'));
     }
   };
 
@@ -170,7 +171,8 @@ export function AccountSettingsModal({
     <>
       <Dialog open onOpenChange={(open) => !open && onClose()}>
         <DialogContent
-          className="bg-[#18243a] border-[#142033] text-white sm:max-w-md"
+          size="sm"
+          className="bg-[#18243a] border-[#142033] text-white"
           showCloseButton={false}
         >
           <DialogHeader>

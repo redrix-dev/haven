@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getErrorMessage } from '@/shared/lib/errors';
 
 export type PermissionValue = boolean | null;
 
@@ -83,9 +84,9 @@ type PermissionKey = keyof ChannelPermissionState;
 type TabKey = 'general' | 'permissions';
 
 const PERMISSION_COLUMNS: Array<{ key: PermissionKey; label: string }> = [
-  { key: 'canView', label: 'View' },
-  { key: 'canSend', label: 'Send' },
-  { key: 'canManage', label: 'Manage' },
+  { key: 'canView', label: 'View Channel' },
+  { key: 'canSend', label: 'Send Messages' },
+  { key: 'canManage', label: 'Manage Channel' },
 ];
 
 function nextPermissionValue(value: PermissionValue): PermissionValue {
@@ -196,8 +197,8 @@ export function ChannelSettingsModal({
         topic: topic.trim() ? topic.trim() : null,
       });
       onClose();
-    } catch (err: any) {
-      setGeneralError(err?.message ?? 'Failed to save channel settings.');
+    } catch (err: unknown) {
+      setGeneralError(getErrorMessage(err, 'Failed to save channel settings.'));
     } finally {
       setSaving(false);
     }
@@ -209,8 +210,8 @@ export function ChannelSettingsModal({
     try {
       await onDelete();
       onClose();
-    } catch (err: any) {
-      setGeneralError(err?.message ?? 'Failed to delete channel.');
+    } catch (err: unknown) {
+      setGeneralError(getErrorMessage(err, 'Failed to delete channel.'));
     } finally {
       setDeleting(false);
       setConfirmDeleteOpen(false);
@@ -260,11 +261,11 @@ export function ChannelSettingsModal({
         canSend: nextRow.canSend,
         canManage: nextRow.canManage,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setRoleRows((prev) =>
         prev.map((roleRow) => (roleRow.roleId === roleId ? previousRow : roleRow))
       );
-      setPermissionError(err?.message ?? 'Failed to update role permissions.');
+      setPermissionError(getErrorMessage(err, 'Failed to update role permissions.'));
     } finally {
       setPermissionSavingKey(null);
     }
@@ -293,11 +294,11 @@ export function ChannelSettingsModal({
         canSend: nextRow.canSend,
         canManage: nextRow.canManage,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMemberRows((prev) =>
         prev.map((memberRow) => (memberRow.memberId === memberId ? previousRow : memberRow))
       );
-      setPermissionError(err?.message ?? 'Failed to update member permissions.');
+      setPermissionError(getErrorMessage(err, 'Failed to update member permissions.'));
     } finally {
       setPermissionSavingKey(null);
     }
@@ -306,7 +307,8 @@ export function ChannelSettingsModal({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="bg-[#18243a] border-[#142033] text-white w-full max-w-4xl max-h-[85vh] overflow-y-auto"
+        size="xl"
+        className="scrollbar-inset bg-[#18243a] border-[#142033] text-white max-h-[85vh] overflow-y-auto"
         showCloseButton={false}
       >
         <DialogHeader>
@@ -392,9 +394,14 @@ export function ChannelSettingsModal({
           </TabsContent>
 
           <TabsContent value="permissions" className="space-y-5">
-            <p className="text-sm text-[#a9b8cf]">
-              Each value cycles through Inherit -&gt; Allow -&gt; Deny. Changes save immediately.
-            </p>
+            <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-1">
+              <p className="text-sm font-medium text-white">How channel permissions work</p>
+              <p className="text-xs text-[#a9b8cf]">Each value cycles: Inherit -&gt; Allow -&gt; Deny.</p>
+              <p className="text-xs text-[#a9b8cf]">
+                Priority: Member overwrites, then role overwrites, then server role permissions.
+              </p>
+              <p className="text-xs text-[#a9b8cf]">At each layer, Deny overrides Allow.</p>
+            </div>
 
             {permissionsLoadError && <p className="text-sm text-red-400">{permissionsLoadError}</p>}
             {permissionError && <p className="text-sm text-red-400">{permissionError}</p>}
@@ -407,6 +414,9 @@ export function ChannelSettingsModal({
               <>
                 <section className="space-y-3">
                   <h3 className="text-white font-semibold">Role Overwrites</h3>
+                  <p className="text-xs text-[#8ea4c7]">
+                    Applies to everyone with that role in this channel.
+                  </p>
                   <div className="space-y-2">
                     {roleRows.map((roleRow) => (
                       <div
@@ -453,6 +463,9 @@ export function ChannelSettingsModal({
 
                 <section className="space-y-3">
                   <h3 className="text-white font-semibold">Member Overwrites</h3>
+                  <p className="text-xs text-[#8ea4c7]">
+                    Member-specific settings take priority over role overwrites.
+                  </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <Input

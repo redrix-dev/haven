@@ -11,6 +11,9 @@ const FALLBACK_ICE_SERVERS = [
   },
 ];
 
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 type XirsysResponse = {
   s?: string;
   v?: {
@@ -31,6 +34,9 @@ const normalizeIceServers = (value: unknown): RTCIceServer[] => {
   if (isIceServer(value)) return [value];
   return [];
 };
+
+const isUuid = (value: unknown): value is string =>
+  typeof value === 'string' && UUID_V4_PATTERN.test(value);
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -86,6 +92,100 @@ Deno.serve(async (req) => {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+  }
+
+  let payload: unknown;
+  try {
+    payload = await req.json();
+  } catch {
+    return new Response(
+      JSON.stringify({
+        code: 400,
+        message: 'Invalid JSON payload',
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  const candidatePayload =
+    payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : null;
+  const communityId = candidatePayload?.communityId;
+  const channelId = candidatePayload?.channelId;
+
+  if (!isUuid(communityId) || !isUuid(channelId)) {
+    return new Response(
+      JSON.stringify({
+        code: 400,
+        message: 'communityId and channelId must be valid UUIDs',
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+
+  const { data: channelRow, error: channelError } = await userClient
+    .from('channels')
+    .select('id, community_id, kind')
+    .eq('id', channelId)
+    .eq('community_id', communityId)
+    .maybeSingle();
+
+  if (channelError) {
+    console.error('voice-ice channel lookup failed:', channelError.message);
+    return new Response(
+      JSON.stringify({
+        code: 500,
+        message: 'Failed to validate channel access',
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  if (!channelRow) {
+    return new Response(
+      JSON.stringify({
+        code: 403,
+        message: 'Not authorized for this channel',
+      }),
+      {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  if (channelRow.kind !== 'voice') {
+    return new Response(
+      JSON.stringify({
+        code: 400,
+        message: 'Requested channel is not a voice channel',
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 
   const ident = Deno.env.get('XIRSYS_IDENT');

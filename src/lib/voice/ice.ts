@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getErrorMessage } from '@/shared/lib/errors';
 
 export type IceConfigSource = 'xirsys' | 'fallback';
 
@@ -6,6 +7,7 @@ export type IceConfigResult = {
   source: IceConfigSource;
   iceServers: RTCIceServer[];
   warning?: string;
+  blockedReason?: string;
 };
 
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
@@ -34,7 +36,6 @@ const normalizeIceServers = (value: unknown): RTCIceServer[] => {
 export async function fetchIceConfig(params: {
   communityId: string;
   channelId: string;
-  accessToken?: string | null;
 }): Promise<IceConfigResult> {
   try {
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -51,13 +52,13 @@ export async function fetchIceConfig(params: {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    const accessToken = params.accessToken ?? session?.access_token ?? null;
+    const accessToken = session?.access_token ?? null;
 
     if (!accessToken) {
       return {
         source: 'fallback',
-        iceServers: FALLBACK_ICE_SERVERS,
-        warning: 'No authenticated session token available for voice relay. Using STUN fallback.',
+        iceServers: [],
+        blockedReason: 'No authenticated session token available for voice.',
       };
     }
 
@@ -76,6 +77,14 @@ export async function fetchIceConfig(params: {
 
     if (!response.ok) {
       const errorBody = await response.text();
+      if (response.status === 401 || response.status === 403) {
+        return {
+          source: 'fallback',
+          iceServers: [],
+          blockedReason: 'You are not authorized to join this voice channel.',
+          warning: `Voice relay request rejected (${response.status}). ${errorBody || ''}`.trim(),
+        };
+      }
       return {
         source: 'fallback',
         iceServers: FALLBACK_ICE_SERVERS,
@@ -101,13 +110,12 @@ export async function fetchIceConfig(params: {
       iceServers,
       warning: typeof data?.warning === 'string' ? data.warning : undefined,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = getErrorMessage(error);
     return {
       source: 'fallback',
       iceServers: FALLBACK_ICE_SERVERS,
-      warning: error?.message
-        ? `Failed to fetch ICE config (${error.message}). Using STUN fallback.`
-        : 'Failed to fetch ICE config. Using STUN fallback.',
+      warning: `Failed to fetch ICE config (${message}). Using STUN fallback.`,
     };
   }
 }

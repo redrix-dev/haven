@@ -1,17 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { getErrorMessage } from '@/shared/lib/errors';
 
 interface MessageInputProps {
-  onSendMessage: (content: string) => Promise<void>;
+  onSendMessage: (content: string, options?: { replyToMessageId?: string }) => Promise<void>;
   onSendHavenDeveloperMessage?: (content: string) => Promise<void>;
   channelName: string;
+  replyTarget?: {
+    id: string;
+    authorLabel: string;
+    preview: string;
+  } | null;
+  onClearReplyTarget?: () => void;
 }
 
 export function MessageInput({
   onSendMessage,
   onSendHavenDeveloperMessage,
   channelName,
+  replyTarget = null,
+  onClearReplyTarget,
 }: MessageInputProps) {
   const [input, setInput] = useState('');
   const [isDeveloperMode, setIsDeveloperMode] = useState(false);
@@ -67,12 +76,15 @@ export function MessageInput({
         }
         await onSendHavenDeveloperMessage(content);
       } else {
-        await onSendMessage(content);
+        await onSendMessage(content, {
+          replyToMessageId: replyTarget?.id,
+        });
       }
       setInput('');
-    } catch (error: any) {
+      onClearReplyTarget?.();
+    } catch (error: unknown) {
       console.error('Failed to send message:', error);
-      setSendError(error?.message ?? 'Failed to send message.');
+      setSendError(getErrorMessage(error, 'Failed to send message.'));
     } finally {
       setSendingMode(null);
     }
@@ -80,6 +92,23 @@ export function MessageInput({
 
   return (
     <div className="p-4 space-y-2">
+      {replyTarget && (
+        <div className="rounded-md border border-[#304867] bg-[#142033] px-3 py-2 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Replying to {replyTarget.authorLabel}</p>
+            <p className="text-xs text-[#d2dcef] truncate">{replyTarget.preview}</p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClearReplyTarget}
+            className="text-[#a9b8cf] hover:text-white"
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Input
           value={input}

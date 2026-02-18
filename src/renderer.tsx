@@ -21,23 +21,75 @@ import {
 } from '@/components/ChannelSettingsModal';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatArea } from '@/components/ChatArea';
+import { VoiceChannelPane } from '@/components/VoiceChannelPane';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useServers } from '@/lib/hooks/useServers';
 import { getCommunityDataBackend, getControlPlaneBackend } from '@/lib/backend';
-import type { AppSettings, UpdaterStatus } from '@/types/desktop-api';
+import { supabase } from '@/lib/supabase';
+import { desktopClient } from '@/shared/desktop/client';
+import { getErrorMessage } from '@/shared/lib/errors';
+import type { AppSettings, UpdaterStatus } from '@/shared/desktop/types';
 import type {
   AuthorProfile,
   Channel,
   ChannelKind,
   DeveloperAccessMode,
+  PermissionCatalogItem,
+  MessageReportKind,
+  MessageReportTarget,
   Message,
+  ServerMemberRoleItem,
   ServerPermissions,
+  ServerRoleItem,
 } from '@/lib/backend/types';
+import { Headphones, Mic, MicOff, PhoneOff, Settings2, VolumeX } from 'lucide-react';
 import '@/styles/globals.css';
+
+type VoiceSidebarParticipant = {
+  userId: string;
+  displayName: string;
+};
+
+type VoicePresenceStateRow = {
+  user_id?: string | null;
+  display_name?: string | null;
+  joined_at?: string | null;
+};
+
+const areVoiceParticipantListsEqual = (
+  left: VoiceSidebarParticipant[],
+  right: VoiceSidebarParticipant[]
+) => {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+
+  for (let index = 0; index < left.length; index += 1) {
+    if (
+      left[index].userId !== right[index].userId ||
+      left[index].displayName !== right[index].displayName
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
 
 function ChatApp() {
   const controlPlaneBackend = getControlPlaneBackend();
-  const { user, session, status: authStatus, error: authError, signOut } = useAuth();
+  const { user, status: authStatus, error: authError, signOut } = useAuth();
   const {
     servers,
     status: serversStatus,
@@ -65,11 +117,38 @@ function ChatApp() {
   const [canPostHavenDevMessage, setCanPostHavenDevMessage] = useState(false);
   const [canSendHavenDeveloperMessage, setCanSendHavenDeveloperMessage] = useState(false);
   const [canSpeakInVoiceChannel, setCanSpeakInVoiceChannel] = useState(false);
+  const [activeVoiceChannelId, setActiveVoiceChannelId] = useState<string | null>(null);
+  const [voicePanelOpen, setVoicePanelOpen] = useState(false);
+  const [voiceConnected, setVoiceConnected] = useState(false);
+  const [voiceParticipants, setVoiceParticipants] = useState<VoiceSidebarParticipant[]>([]);
+  const [voicePresenceByChannelId, setVoicePresenceByChannelId] = useState<
+    Record<string, VoiceSidebarParticipant[]>
+  >({});
+  const [voiceSessionState, setVoiceSessionState] = useState({
+    joined: false,
+    joining: false,
+    isMuted: false,
+    isDeafened: false,
+    listenOnly: true,
+  });
+  const [voiceControlActions, setVoiceControlActions] = useState<{
+    join: () => void;
+    leave: () => void;
+    toggleMute: () => void;
+    toggleDeafen: () => void;
+  } | null>(null);
+  const [voiceJoinPrompt, setVoiceJoinPrompt] = useState<{
+    channelId: string;
+    mode: 'join' | 'switch';
+  } | null>(null);
   const [serverPermissions, setServerPermissions] = useState<ServerPermissions>({
     isOwner: false,
     canManageServer: false,
+    canManageRoles: false,
+    canManageMembers: false,
     canCreateChannels: false,
     canManageChannels: false,
+    canManageMessages: false,
     canManageDeveloperAccess: false,
     canManageInvites: false,
   });
@@ -80,6 +159,13 @@ function ChatApp() {
   const [serverInvites, setServerInvites] = useState<ServerInviteItem[]>([]);
   const [serverInvitesLoading, setServerInvitesLoading] = useState(false);
   const [serverInvitesError, setServerInvitesError] = useState<string | null>(null);
+  const [serverRoles, setServerRoles] = useState<ServerRoleItem[]>([]);
+  const [serverMembers, setServerMembers] = useState<ServerMemberRoleItem[]>([]);
+  const [serverPermissionCatalog, setServerPermissionCatalog] = useState<PermissionCatalogItem[]>(
+    []
+  );
+  const [serverRoleManagementLoading, setServerRoleManagementLoading] = useState(false);
+  const [serverRoleManagementError, setServerRoleManagementError] = useState<string | null>(null);
   const [channelRolePermissions, setChannelRolePermissions] = useState<ChannelRolePermissionItem[]>(
     []
   );
@@ -112,12 +198,29 @@ function ChatApp() {
       setPlatformStaffPrefix(null);
       setCanPostHavenDevMessage(false);
       setCanSpeakInVoiceChannel(false);
+      setActiveVoiceChannelId(null);
+      setVoicePanelOpen(false);
+      setVoiceConnected(false);
+      setVoiceParticipants([]);
+      setVoicePresenceByChannelId({});
+      setVoiceSessionState({
+        joined: false,
+        joining: false,
+        isMuted: false,
+        isDeafened: false,
+        listenOnly: true,
+      });
+      setVoiceControlActions(null);
+      setVoiceJoinPrompt(null);
       setAuthorProfiles({});
       setServerPermissions({
         isOwner: false,
         canManageServer: false,
+        canManageRoles: false,
+        canManageMembers: false,
         canCreateChannels: false,
         canManageChannels: false,
+        canManageMessages: false,
         canManageDeveloperAccess: false,
         canManageInvites: false,
       });
@@ -131,6 +234,11 @@ function ChatApp() {
       setServerInvites([]);
       setServerInvitesLoading(false);
       setServerInvitesError(null);
+      setServerRoles([]);
+      setServerMembers([]);
+      setServerPermissionCatalog([]);
+      setServerRoleManagementLoading(false);
+      setServerRoleManagementError(null);
       setChannelRolePermissions([]);
       setChannelMemberPermissions([]);
       setChannelPermissionMemberOptions([]);
@@ -184,9 +292,7 @@ function ChatApp() {
     let isMounted = true;
 
     const loadDesktopSettings = async () => {
-      const desktopBridge = window.havenDesktop;
-
-      if (!desktopBridge) {
+      if (!desktopClient.isAvailable()) {
         if (!isMounted) return;
         setAppSettingsLoading(false);
         setUpdaterStatusLoading(false);
@@ -206,8 +312,8 @@ function ChatApp() {
       }
 
       const [settingsResult, updaterResult] = await Promise.allSettled([
-        desktopBridge.getAppSettings(),
-        desktopBridge.getUpdaterStatus(),
+        desktopClient.getAppSettings(),
+        desktopClient.getUpdaterStatus(),
       ]);
 
       if (!isMounted) return;
@@ -261,8 +367,11 @@ function ChatApp() {
       setServerPermissions({
         isOwner: false,
         canManageServer: false,
+        canManageRoles: false,
+        canManageMembers: false,
         canCreateChannels: false,
         canManageChannels: false,
+        canManageMessages: false,
         canManageDeveloperAccess: false,
         canManageInvites: false,
       });
@@ -282,8 +391,11 @@ function ChatApp() {
         setServerPermissions({
           isOwner: false,
           canManageServer: false,
+          canManageRoles: false,
+          canManageMembers: false,
           canCreateChannels: false,
           canManageChannels: false,
+          canManageMessages: false,
           canManageDeveloperAccess: false,
           canManageInvites: false,
         });
@@ -306,6 +418,20 @@ function ChatApp() {
       setChannelsLoading(false);
       setChannelsError(null);
       setCurrentChannelId(null);
+      setActiveVoiceChannelId(null);
+      setVoicePanelOpen(false);
+      setVoiceConnected(false);
+      setVoiceParticipants([]);
+      setVoicePresenceByChannelId({});
+      setVoiceSessionState({
+        joined: false,
+        joining: false,
+        isMuted: false,
+        isDeafened: false,
+        listenOnly: true,
+      });
+      setVoiceControlActions(null);
+      setVoiceJoinPrompt(null);
       setMessages([]);
       setAuthorProfiles({});
       setCanSpeakInVoiceChannel(false);
@@ -318,6 +444,11 @@ function ChatApp() {
       setServerInvites([]);
       setServerInvitesLoading(false);
       setServerInvitesError(null);
+      setServerRoles([]);
+      setServerMembers([]);
+      setServerPermissionCatalog([]);
+      setServerRoleManagementLoading(false);
+      setServerRoleManagementError(null);
       setChannelRolePermissions([]);
       setChannelMemberPermissions([]);
       setChannelPermissionMemberOptions([]);
@@ -340,14 +471,15 @@ function ChatApp() {
         setCurrentChannelId((prev) => {
           if (channelList.length === 0) return null;
           if (prev && channelList.some((channel) => channel.id === prev)) return prev;
-          return channelList[0].id;
+          const firstTextChannel = channelList.find((channel) => channel.kind === 'text');
+          return firstTextChannel?.id ?? channelList[0].id;
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (!isMounted) return;
         console.error('Error loading channels:', error);
         setChannels([]);
         setCurrentChannelId(null);
-        setChannelsError(error?.message ?? 'Failed to load channels.');
+        setChannelsError(getErrorMessage(error, 'Failed to load channels.'));
       }
 
       setChannelsLoading(false);
@@ -364,6 +496,147 @@ function ChatApp() {
       void subscription.unsubscribe();
     };
   }, [currentServerId]);
+
+  useEffect(() => {
+    if (!activeVoiceChannelId) return;
+
+    const activeVoiceChannel = channels.find(
+      (channel) => channel.id === activeVoiceChannelId && channel.kind === 'voice'
+    );
+
+    if (!activeVoiceChannel) {
+      setActiveVoiceChannelId(null);
+      setVoiceConnected(false);
+      setVoiceParticipants([]);
+      setVoicePanelOpen(false);
+    }
+  }, [activeVoiceChannelId, channels]);
+
+  useEffect(() => {
+    if (!activeVoiceChannelId) return;
+    setVoicePanelOpen(false);
+  }, [activeVoiceChannelId]);
+
+  useEffect(() => {
+    if (!currentServerId || !user?.id) {
+      setVoicePresenceByChannelId({});
+      return;
+    }
+
+    const voiceChannelIds = channels
+      .filter((channel) => channel.kind === 'voice')
+      .map((channel) => channel.id)
+      .filter((channelId) => channelId !== activeVoiceChannelId);
+
+    setVoicePresenceByChannelId((prev) => {
+      const nextEntries = Object.entries(prev).filter(([channelId]) =>
+        voiceChannelIds.includes(channelId)
+      );
+      if (nextEntries.length === Object.keys(prev).length) return prev;
+      return Object.fromEntries(nextEntries);
+    });
+
+    if (voiceChannelIds.length === 0) {
+      return;
+    }
+
+    let disposed = false;
+
+    const subscriptionChannels = voiceChannelIds.map((voiceChannelId) => {
+      const subscriptionChannel = supabase.channel(`voice:${currentServerId}:${voiceChannelId}`);
+
+      const syncPresenceState = () => {
+        if (disposed) return;
+
+        const presenceState = subscriptionChannel.presenceState() as Record<
+          string,
+          VoicePresenceStateRow[]
+        >;
+        const participantsByUserId = new Map<string, VoiceSidebarParticipant>();
+
+        for (const [presenceKey, presenceRows] of Object.entries(presenceState)) {
+          const latestPresence = presenceRows[presenceRows.length - 1];
+          if (!latestPresence) continue;
+
+          const userId = latestPresence.user_id ?? presenceKey;
+          if (!userId) continue;
+
+          const trimmedDisplayName = latestPresence.display_name?.trim() ?? '';
+          const displayName = trimmedDisplayName.length > 0 ? trimmedDisplayName : userId.slice(0, 12);
+
+          if (!participantsByUserId.has(userId)) {
+            participantsByUserId.set(userId, {
+              userId,
+              displayName,
+            });
+          }
+        }
+
+        const nextParticipants = Array.from(participantsByUserId.values()).sort((left, right) =>
+          left.displayName.localeCompare(right.displayName)
+        );
+
+        setVoicePresenceByChannelId((prev) => {
+          const previousParticipants = prev[voiceChannelId] ?? [];
+          if (areVoiceParticipantListsEqual(previousParticipants, nextParticipants)) {
+            return prev;
+          }
+          return {
+            ...prev,
+            [voiceChannelId]: nextParticipants,
+          };
+        });
+      };
+
+      subscriptionChannel
+        .on('presence', { event: 'sync' }, syncPresenceState)
+        .on('presence', { event: 'join' }, syncPresenceState)
+        .on('presence', { event: 'leave' }, syncPresenceState);
+
+      subscriptionChannel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          syncPresenceState();
+          return;
+        }
+        if (status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT') {
+          return;
+        }
+
+        if (disposed) return;
+        setVoicePresenceByChannelId((prev) => {
+          const previousParticipants = prev[voiceChannelId];
+          if (!previousParticipants || previousParticipants.length === 0) {
+            return prev;
+          }
+          return {
+            ...prev,
+            [voiceChannelId]: [],
+          };
+        });
+      });
+
+      return subscriptionChannel;
+    });
+
+    return () => {
+      disposed = true;
+      for (const subscriptionChannel of subscriptionChannels) {
+        void supabase.removeChannel(subscriptionChannel);
+      }
+    };
+  }, [activeVoiceChannelId, channels, currentServerId, user?.id]);
+
+  useEffect(() => {
+    if (!currentChannelId) return;
+
+    const selectedChannel = channels.find((channel) => channel.id === currentChannelId);
+    if (!selectedChannel || selectedChannel.kind !== 'voice') return;
+
+    const firstTextChannel = channels.find((channel) => channel.kind === 'text');
+    if (firstTextChannel) {
+      setCurrentChannelId(firstTextChannel.id);
+    }
+  }, [currentChannelId, channels]);
 
   // Load messages when channel changes
   useEffect(() => {
@@ -468,13 +741,14 @@ function ChatApp() {
   // Resolve whether current user can speak in the selected voice channel.
   useEffect(() => {
     let isMounted = true;
+    const voicePermissionChannelId = activeVoiceChannelId ?? currentChannelId;
 
-    if (!user || !currentServerId || !currentChannelId) {
+    if (!user || !currentServerId || !voicePermissionChannelId) {
       setCanSpeakInVoiceChannel(false);
       return;
     }
 
-    const selectedChannel = channels.find((channel) => channel.id === currentChannelId);
+    const selectedChannel = channels.find((channel) => channel.id === voicePermissionChannelId);
     if (!selectedChannel || selectedChannel.kind !== 'voice') {
       setCanSpeakInVoiceChannel(false);
       return;
@@ -484,7 +758,7 @@ function ChatApp() {
 
     const resolveVoiceSpeakPermission = async () => {
       try {
-        const canSpeak = await communityBackend.canSendInChannel(currentChannelId);
+        const canSpeak = await communityBackend.canSendInChannel(voicePermissionChannelId);
         if (!isMounted) return;
         setCanSpeakInVoiceChannel(canSpeak);
       } catch (error) {
@@ -499,7 +773,7 @@ function ChatApp() {
     return () => {
       isMounted = false;
     };
-  }, [user, currentServerId, currentChannelId, channels]);
+  }, [user, currentServerId, currentChannelId, activeVoiceChannelId, channels]);
 
   async function loadServerSettings() {
     if (!currentServerId) {
@@ -552,6 +826,28 @@ function ChatApp() {
     }
   }
 
+  async function loadServerRoleManagement() {
+    if (!currentServerId) {
+      setServerRoles([]);
+      setServerMembers([]);
+      setServerPermissionCatalog([]);
+      return;
+    }
+
+    setServerRoleManagementLoading(true);
+    setServerRoleManagementError(null);
+
+    try {
+      const communityBackend = getCommunityDataBackend(currentServerId);
+      const snapshot = await communityBackend.fetchServerRoleManagement(currentServerId);
+      setServerRoles(snapshot.roles);
+      setServerMembers(snapshot.members);
+      setServerPermissionCatalog(snapshot.permissionsCatalog);
+    } finally {
+      setServerRoleManagementLoading(false);
+    }
+  }
+
   const normalizeInviteCode = (value: string): string => {
     const trimmed = value.trim();
     if (!trimmed) return '';
@@ -571,19 +867,33 @@ function ChatApp() {
     setServerSettingsInitialValues(null);
     setServerSettingsLoadError(null);
     setServerInvitesError(null);
+    setServerRoleManagementError(null);
 
     try {
       await loadServerSettings();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load server settings:', error);
-      setServerSettingsLoadError(error?.message ?? 'Failed to load server settings.');
+      setServerSettingsLoadError(getErrorMessage(error, 'Failed to load server settings.'));
+    }
+
+    if (serverPermissions.canManageInvites) {
+      try {
+        await loadServerInvites();
+      } catch (error: unknown) {
+        console.error('Failed to load server invites:', error);
+        setServerInvitesError(getErrorMessage(error, 'Failed to load server invites.'));
+      }
+    } else {
+      setServerInvites([]);
+      setServerInvitesLoading(false);
+      setServerInvitesError(null);
     }
 
     try {
-      await loadServerInvites();
-    } catch (error: any) {
-      console.error('Failed to load server invites:', error);
-      setServerInvitesError(error?.message ?? 'Failed to load server invites.');
+      await loadServerRoleManagement();
+    } catch (error: unknown) {
+      console.error('Failed to load server role management:', error);
+      setServerRoleManagementError(getErrorMessage(error, 'Failed to load server roles and members.'));
     }
   };
 
@@ -665,6 +975,78 @@ function ChatApp() {
     await loadServerSettings();
   }
 
+  async function createServerRole(input: { name: string; color: string; position: number }) {
+    if (!currentServerId) throw new Error('No server selected.');
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+    await communityBackend.createServerRole({
+      communityId: currentServerId,
+      name: input.name,
+      color: input.color,
+      position: input.position,
+    });
+
+    await loadServerRoleManagement();
+  }
+
+  async function updateServerRole(input: {
+    roleId: string;
+    name: string;
+    color: string;
+    position: number;
+  }) {
+    if (!currentServerId) throw new Error('No server selected.');
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+    await communityBackend.updateServerRole({
+      communityId: currentServerId,
+      roleId: input.roleId,
+      name: input.name,
+      color: input.color,
+      position: input.position,
+    });
+
+    await loadServerRoleManagement();
+  }
+
+  async function deleteServerRole(roleId: string) {
+    if (!currentServerId) throw new Error('No server selected.');
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+    await communityBackend.deleteServerRole({
+      communityId: currentServerId,
+      roleId,
+    });
+
+    await loadServerRoleManagement();
+  }
+
+  async function saveServerRolePermissions(roleId: string, permissionKeys: string[]) {
+    if (!currentServerId) throw new Error('No server selected.');
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+    await communityBackend.saveServerRolePermissions({
+      roleId,
+      permissionKeys,
+    });
+
+    await loadServerRoleManagement();
+  }
+
+  async function saveServerMemberRoles(memberId: string, roleIds: string[]) {
+    if (!currentServerId || !user) throw new Error('Not authenticated');
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+    await communityBackend.saveServerMemberRoles({
+      communityId: currentServerId,
+      memberId,
+      roleIds,
+      assignedByUserId: user.id,
+    });
+
+    await loadServerRoleManagement();
+  }
+
   async function createChannel(values: {
     name: string;
     topic: string | null;
@@ -680,7 +1062,6 @@ function ChatApp() {
       communityId: currentServerId,
       name: values.name,
       topic: values.topic,
-      createdByUserId: user.id,
       position: nextPosition,
       kind: values.kind,
     });
@@ -723,9 +1104,9 @@ function ChatApp() {
     setChannelPermissionsLoadError(null);
     try {
       await loadChannelPermissions();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load channel permissions:', error);
-      setChannelPermissionsLoadError(error?.message ?? 'Failed to load channel permissions.');
+      setChannelPermissionsLoadError(getErrorMessage(error, 'Failed to load channel permissions.'));
     }
   };
 
@@ -831,7 +1212,7 @@ function ChatApp() {
     });
   }
 
-  async function sendMessage(content: string) {
+  async function sendMessage(content: string, options?: { replyToMessageId?: string }) {
     if (!user || !currentChannelId || !currentServerId) return;
 
     const communityBackend = getCommunityDataBackend(currentServerId);
@@ -840,6 +1221,104 @@ function ChatApp() {
       channelId: currentChannelId,
       userId: user.id,
       content,
+      replyToMessageId: options?.replyToMessageId,
+    });
+  }
+
+  async function editMessage(messageId: string, content: string) {
+    if (!currentServerId) throw new Error('No server selected.');
+    const trimmedContent = content.trim();
+    if (!trimmedContent) throw new Error('Message content is required.');
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+    await communityBackend.editUserMessage({
+      communityId: currentServerId,
+      messageId,
+      content: trimmedContent,
+    });
+  }
+
+  async function deleteMessage(messageId: string) {
+    if (!currentServerId) throw new Error('No server selected.');
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+    await communityBackend.deleteMessage({
+      communityId: currentServerId,
+      messageId,
+    });
+    setMessages((prev) => prev.filter((message) => message.id !== messageId));
+  }
+
+  async function reportMessage(input: {
+    messageId: string;
+    target: MessageReportTarget;
+    kind: MessageReportKind;
+    comment: string;
+  }) {
+    if (!user || !currentServerId || !currentChannelId) throw new Error('No channel selected.');
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+    await communityBackend.reportMessage({
+      communityId: currentServerId,
+      channelId: currentChannelId,
+      messageId: input.messageId,
+      reporterUserId: user.id,
+      target: input.target,
+      kind: input.kind,
+      comment: input.comment,
+    });
+  }
+
+  function requestVoiceChannelJoin(channelId: string) {
+    const targetChannel = channels.find(
+      (channel) => channel.id === channelId && channel.kind === 'voice'
+    );
+    if (!targetChannel) return;
+
+    if (!activeVoiceChannelId) {
+      setVoiceJoinPrompt({
+        channelId,
+        mode: 'join',
+      });
+      return;
+    }
+
+    if (activeVoiceChannelId === channelId) {
+      return;
+    }
+
+    setVoiceJoinPrompt({
+      channelId,
+      mode: 'switch',
+    });
+  }
+
+  function confirmVoiceChannelJoin() {
+    if (!voiceJoinPrompt) return;
+    setActiveVoiceChannelId(voiceJoinPrompt.channelId);
+    setVoicePanelOpen(false);
+    setVoiceJoinPrompt(null);
+  }
+
+  function cancelVoiceChannelJoinPrompt() {
+    setVoiceJoinPrompt(null);
+  }
+
+  function disconnectVoiceSession(options?: { triggerPaneLeave?: boolean }) {
+    if (options?.triggerPaneLeave !== false) {
+      voiceControlActions?.leave();
+    }
+    setActiveVoiceChannelId(null);
+    setVoicePanelOpen(false);
+    setVoiceConnected(false);
+    setVoiceParticipants([]);
+    setVoiceControlActions(null);
+    setVoiceSessionState({
+      joined: false,
+      joining: false,
+      isMuted: false,
+      isDeafened: false,
+      listenOnly: true,
     });
   }
 
@@ -868,25 +1347,15 @@ function ChatApp() {
   }
 
   async function setAutoUpdateEnabled(enabled: boolean) {
-    const desktopBridge = window.havenDesktop;
-    if (!desktopBridge) {
-      throw new Error('Desktop bridge unavailable.');
-    }
-
-    const result = await desktopBridge.setAutoUpdateEnabled(enabled);
+    const result = await desktopClient.setAutoUpdateEnabled(enabled);
     setAppSettings(result.settings);
     setUpdaterStatus(result.updaterStatus);
   }
 
   async function checkForUpdatesNow() {
-    const desktopBridge = window.havenDesktop;
-    if (!desktopBridge) {
-      throw new Error('Desktop bridge unavailable.');
-    }
-
     setCheckingForUpdates(true);
     try {
-      const status = await desktopBridge.checkForUpdates();
+      const status = await desktopClient.checkForUpdates();
       setUpdaterStatus(status);
     } finally {
       setCheckingForUpdates(false);
@@ -916,10 +1385,48 @@ function ChatApp() {
   const isServersLoading = serversStatus === 'loading';
   const currentServer = servers.find((s) => s.id === currentServerId);
   const currentChannel = channels.find((channel) => channel.id === currentChannelId);
+  const currentRenderableChannel =
+    currentChannel && currentChannel.kind === 'text'
+      ? currentChannel
+      : channels.find((channel) => channel.kind === 'text') ?? currentChannel ?? null;
+  const activeVoiceChannel = channels.find(
+    (channel) => channel.id === activeVoiceChannelId && channel.kind === 'voice'
+  );
   const baseUserDisplayName = profileUsername || user.email?.split('@')[0] || 'User';
   const userDisplayName = isPlatformStaff
     ? `${platformStaffPrefix ?? 'Haven'}-${baseUserDisplayName}`
     : baseUserDisplayName;
+  const activeVoiceParticipantsForSidebar: VoiceSidebarParticipant[] = activeVoiceChannelId
+    ? [
+        ...(voiceSessionState.joined
+          ? [
+              {
+                userId: user.id,
+                displayName: userDisplayName,
+              },
+            ]
+          : []),
+        ...voiceParticipants,
+      ].filter(
+        (participant, participantIndex, participantList) =>
+          participantList.findIndex((candidate) => candidate.userId === participant.userId) ===
+          participantIndex
+      )
+    : [];
+  const voiceChannelParticipants = {
+    ...voicePresenceByChannelId,
+    ...(activeVoiceChannelId
+      ? {
+          [activeVoiceChannelId]: activeVoiceParticipantsForSidebar,
+        }
+      : {}),
+  };
+  const canOpenServerSettings =
+    serverPermissions.canManageServer ||
+    serverPermissions.canManageRoles ||
+    serverPermissions.canManageMembers ||
+    serverPermissions.canManageInvites ||
+    serverPermissions.canManageDeveloperAccess;
 
   return (
     <>
@@ -951,36 +1458,139 @@ function ChatApp() {
               }))}
               currentChannelId={currentChannelId}
               onChannelClick={setCurrentChannelId}
+              onVoiceChannelClick={requestVoiceChannelJoin}
+              activeVoiceChannelId={activeVoiceChannelId}
+              voiceChannelParticipants={voiceChannelParticipants}
+              voiceStatusPanel={
+                activeVoiceChannel ? (
+                  <div className="px-2 pt-2 pb-1 border-b border-[#22334f]">
+                    <div className="rounded-md border border-[#304867] bg-[#142033] px-2 py-2 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[11px] uppercase tracking-wide text-[#8ea4c7]">Voice Connected</p>
+                          <p className="text-xs font-semibold text-white truncate flex items-center gap-1">
+                            <Headphones className="size-3.5" />
+                            {activeVoiceChannel.name}
+                          </p>
+                          <p className="text-[11px] text-[#95a5bf] truncate">{currentServer.name}</p>
+                        </div>
+                        <span
+                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                            voiceConnected
+                              ? 'bg-[#2f9f73]/20 text-[#6dd5a6]'
+                              : 'bg-[#44546f]/40 text-[#b5c4de]'
+                          }`}
+                        >
+                          {voiceConnected ? 'Live' : 'Connecting'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {!voiceSessionState.joined ? (
+                          <Button
+                            type="button"
+                            size="icon-xs"
+                            variant="ghost"
+                            onClick={() => voiceControlActions?.join()}
+                            disabled={voiceSessionState.joining || !voiceControlActions}
+                            className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
+                          >
+                            <Headphones className="size-4" />
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              type="button"
+                              size="icon-xs"
+                              variant="ghost"
+                              onClick={() => voiceControlActions?.toggleMute()}
+                              disabled={voiceSessionState.listenOnly || !voiceControlActions}
+                              className={`hover:bg-[#22334f] ${
+                                voiceSessionState.isMuted
+                                  ? 'text-[#f3a2a2] hover:text-[#ffd2d2]'
+                                  : 'text-[#a9b8cf] hover:text-white'
+                              }`}
+                            >
+                              {voiceSessionState.isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon-xs"
+                              variant="ghost"
+                              onClick={() => voiceControlActions?.toggleDeafen()}
+                              disabled={!voiceControlActions}
+                              className={`hover:bg-[#22334f] ${
+                                voiceSessionState.isDeafened
+                                  ? 'text-[#f3a2a2] hover:text-[#ffd2d2]'
+                                  : 'text-[#a9b8cf] hover:text-white'
+                              }`}
+                            >
+                              <VolumeX className="size-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          type="button"
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => setVoicePanelOpen((prev) => !prev)}
+                          className={`hover:text-white hover:bg-[#22334f] ${
+                            voicePanelOpen ? 'text-white' : 'text-[#a9b8cf]'
+                          }`}
+                        >
+                          <Settings2 className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => disconnectVoiceSession()}
+                          className="text-[#f0b0b0] hover:text-[#ffd1d1] hover:bg-[#3b2535]"
+                        >
+                          <PhoneOff className="size-4" />
+                        </Button>
+                        <div className="ml-auto text-[11px] text-[#95a5bf]">
+                          {voiceParticipants.length + (voiceConnected ? 1 : 0)} in call
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null
+              }
               onCreateChannel={
                 serverPermissions.canCreateChannels ? () => setShowCreateChannelModal(true) : undefined
               }
               onOpenServerSettings={
-                serverPermissions.canManageServer ? () => void openServerSettingsModal() : undefined
+                canOpenServerSettings ? () => void openServerSettingsModal() : undefined
               }
             />
             {channelsLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <p className="text-[#a9b8cf]">Loading channels...</p>
               </div>
-            ) : currentChannel ? (
+            ) : currentRenderableChannel ? (
               <ChatArea
                 communityId={currentServer.id}
-                channelId={currentChannel.id}
-                channelName={currentChannel.name}
-                channelKind={currentChannel.kind}
+                channelId={currentRenderableChannel.id}
+                channelName={currentRenderableChannel.name}
+                channelKind={currentRenderableChannel.kind}
                 currentUserDisplayName={userDisplayName}
                 messages={messages}
                 authorProfiles={authorProfiles}
                 currentUserId={user.id}
-                accessToken={session?.access_token ?? null}
                 canSpeakInVoiceChannel={canSpeakInVoiceChannel}
+                canManageMessages={serverPermissions.canManageMessages}
                 showVoiceDiagnostics={isPlatformStaff}
                 onOpenChannelSettings={
                   serverPermissions.canManageChannels
                     ? () => void openChannelSettingsModal()
                     : undefined
                 }
+                onOpenVoiceControls={() => setVoicePanelOpen(true)}
                 onSendMessage={sendMessage}
+                onEditMessage={editMessage}
+                onDeleteMessage={deleteMessage}
+                onReportMessage={reportMessage}
                 onSendHavenDeveloperMessage={
                   canSendHavenDeveloperMessage ? sendHavenDeveloperMessage : undefined
                 }
@@ -1001,6 +1611,73 @@ function ChatApp() {
           </div>
         )}
       </div>
+
+      {currentServer && activeVoiceChannel && (
+        <div
+          className={`fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-6 transition-opacity duration-200 ${
+            voicePanelOpen
+              ? 'opacity-100 pointer-events-auto'
+              : 'opacity-0 pointer-events-none'
+          }`}
+          aria-hidden={!voicePanelOpen}
+        >
+          <div
+            className={`absolute inset-0 bg-black/60 transition-opacity duration-200 ${
+              voicePanelOpen ? 'opacity-100' : 'opacity-0'
+            }`}
+            onClick={() => setVoicePanelOpen(false)}
+          />
+          <div
+            className={`relative z-10 w-full max-w-4xl max-h-[88vh] rounded-lg border border-[#304867] bg-[#111a2b] shadow-2xl overflow-hidden transition-all duration-200 ${
+              voicePanelOpen ? 'translate-y-0 scale-100' : 'translate-y-3 scale-[0.98]'
+            }`}
+          >
+            <div className="scrollbar-inset max-h-[88vh] overflow-y-auto">
+              <VoiceChannelPane
+                communityId={currentServer.id}
+                channelId={activeVoiceChannel.id}
+                channelName={activeVoiceChannel.name}
+                currentUserId={user.id}
+                currentUserDisplayName={userDisplayName}
+                canSpeak={canSpeakInVoiceChannel}
+                showDiagnostics={isPlatformStaff}
+                autoJoin
+                onParticipantsChange={setVoiceParticipants}
+                onConnectionChange={setVoiceConnected}
+                onSessionStateChange={setVoiceSessionState}
+                onControlActionsReady={setVoiceControlActions}
+                onLeave={() => disconnectVoiceSession({ triggerPaneLeave: false })}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={Boolean(voiceJoinPrompt)} onOpenChange={(open) => !open && cancelVoiceChannelJoinPrompt()}>
+        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {voiceJoinPrompt?.mode === 'switch' ? 'Switch voice channel?' : 'Join voice channel?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a9b8cf]">
+              {voiceJoinPrompt?.mode === 'switch'
+                ? 'You are already connected to voice. Switching will move your session to the new channel.'
+                : 'Join this voice channel now? You can keep browsing text channels while connected.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmVoiceChannelJoin}
+              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+            >
+              {voiceJoinPrompt?.mode === 'switch' ? 'Switch' : 'Join'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {showCreateModal && (
         <CreateServerModal
@@ -1023,12 +1700,21 @@ function ChatApp() {
         />
       )}
 
-      {showServerSettingsModal && currentServerId && serverPermissions.canManageServer && (
+      {showServerSettingsModal && currentServerId && canOpenServerSettings && (
         <ServerSettingsModal
           channels={channels.map((channel) => ({ id: channel.id, name: channel.name }))}
           initialValues={serverSettingsInitialValues}
           loadingInitialValues={serverSettingsLoading}
           initialLoadError={serverSettingsLoadError}
+          canManageServer={serverPermissions.canManageServer}
+          canManageRoles={serverPermissions.canManageRoles}
+          canManageMembers={serverPermissions.canManageMembers}
+          isOwner={serverPermissions.isOwner}
+          roles={serverRoles}
+          members={serverMembers}
+          permissionsCatalog={serverPermissionCatalog}
+          roleManagementLoading={serverRoleManagementLoading}
+          roleManagementError={serverRoleManagementError}
           canManageDeveloperAccess={serverPermissions.canManageDeveloperAccess}
           canManageInvites={serverPermissions.canManageInvites}
           invites={serverInvites}
@@ -1037,6 +1723,11 @@ function ChatApp() {
           inviteBaseUrl="haven://invite/"
           onClose={() => setShowServerSettingsModal(false)}
           onSave={saveServerSettings}
+          onCreateRole={createServerRole}
+          onUpdateRole={updateServerRole}
+          onDeleteRole={deleteServerRole}
+          onSaveRolePermissions={saveServerRolePermissions}
+          onSaveMemberRoles={saveServerMemberRoles}
           onCreateInvite={createServerInvite}
           onRevokeInvite={revokeServerInvite}
         />

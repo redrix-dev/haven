@@ -1,6 +1,8 @@
 const { app, BrowserWindow, session, ipcMain, autoUpdater } = require('electron');
 const { createSettingsStore } = require('./main/settings-store');
 const { createUpdaterService } = require('./main/updater-service');
+const { DESKTOP_IPC_KEYS } = require('./shared/ipc/keys');
+const { parseSetAutoUpdatePayload } = require('./shared/ipc/validators');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -21,12 +23,12 @@ const registerIpcHandler = (channel, handler) => {
 };
 
 const registerIpcHandlers = () => {
-  registerIpcHandler('haven:settings:get', async () => settingsStore.getSettings());
+  registerIpcHandler(DESKTOP_IPC_KEYS.SETTINGS_GET, async () => settingsStore.getSettings());
 
-  registerIpcHandler('haven:settings:set-auto-update', async (_event, payload) => {
-    const enabled = Boolean(payload?.enabled);
+  registerIpcHandler(DESKTOP_IPC_KEYS.SETTINGS_SET_AUTO_UPDATE, async (_event, payload) => {
+    const { enabled } = parseSetAutoUpdatePayload(payload);
     const settings = settingsStore.updateSettings({
-      autoUpdateEnabled: enabled,
+      autoUpdateEnabled: Boolean(enabled),
     });
     const updaterStatus = updaterService.syncWithSettings();
 
@@ -36,9 +38,11 @@ const registerIpcHandlers = () => {
     };
   });
 
-  registerIpcHandler('haven:updater:status', async () => updaterService.getStatus());
+  registerIpcHandler(DESKTOP_IPC_KEYS.UPDATER_STATUS_GET, async () => updaterService.getStatus());
 
-  registerIpcHandler('haven:updater:check', async () => updaterService.checkForUpdatesNow());
+  registerIpcHandler(DESKTOP_IPC_KEYS.UPDATER_CHECK_NOW, async () =>
+    updaterService.checkForUpdatesNow()
+  );
 };
 
 const createWindow = () => {

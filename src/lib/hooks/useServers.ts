@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getControlPlaneBackend } from '@/lib/backend';
+import { getErrorMessage } from '@/shared/lib/errors';
 import type { ServerSummary } from '@/lib/backend/types';
 
 const controlPlaneBackend = getControlPlaneBackend();
@@ -29,10 +30,10 @@ export function useServers() {
       const serverList = await controlPlaneBackend.listUserCommunities(user.id);
       setServers(serverList);
       setStatus('success');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error loading servers:', err);
       setStatus('error');
-      setError(err?.message ?? 'Failed to load servers.');
+      setError(getErrorMessage(err, 'Failed to load servers.'));
     }
   }, [user]);
 

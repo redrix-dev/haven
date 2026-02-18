@@ -20,8 +20,11 @@ export type AuthorProfile = {
 export type ServerPermissions = {
   isOwner: boolean;
   canManageServer: boolean;
+  canManageRoles: boolean;
+  canManageMembers: boolean;
   canCreateChannels: boolean;
   canManageChannels: boolean;
+  canManageMessages: boolean;
   canManageDeveloperAccess: boolean;
   canManageInvites: boolean;
 };
@@ -44,6 +47,37 @@ export type ServerSettingsUpdate = {
   developerAccessEnabled: boolean;
   developerAccessMode: DeveloperAccessMode;
   developerAccessChannelIds: string[];
+};
+
+export type PermissionCatalogItem = {
+  key: string;
+  description: string;
+};
+
+export type ServerRoleItem = {
+  id: string;
+  name: string;
+  color: string;
+  position: number;
+  isDefault: boolean;
+  isSystem: boolean;
+  permissionKeys: string[];
+  memberCount: number;
+};
+
+export type ServerMemberRoleItem = {
+  memberId: string;
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isOwner: boolean;
+  roleIds: string[];
+};
+
+export type ServerRoleManagementSnapshot = {
+  roles: ServerRoleItem[];
+  members: ServerMemberRoleItem[];
+  permissionsCatalog: PermissionCatalogItem[];
 };
 
 export type ServerInvite = {
@@ -72,7 +106,6 @@ export type ChannelCreateInput = {
   name: string;
   topic: string | null;
   kind: ChannelKind;
-  createdByUserId: string;
   position: number;
 };
 
@@ -107,3 +140,7 @@ export type ChannelPermissionsSnapshot = {
   memberPermissions: ChannelMemberPermissionItem[];
   memberOptions: ChannelMemberOption[];
 };
+
+export type MessageReportTarget = 'server_admins' | 'haven_developers' | 'both';
+
+export type MessageReportKind = 'content_abuse' | 'bug';

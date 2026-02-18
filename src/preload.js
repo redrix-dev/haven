@@ -1,10 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { DESKTOP_IPC_KEYS } = require('./shared/ipc/keys');
 
-contextBridge.exposeInMainWorld('havenDesktop', {
-  getAppSettings: () => ipcRenderer.invoke('haven:settings:get'),
+contextBridge.exposeInMainWorld('desktop', {
+  getAppSettings: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.SETTINGS_GET),
   setAutoUpdateEnabled: (enabled) =>
-    ipcRenderer.invoke('haven:settings:set-auto-update', { enabled }),
-  getUpdaterStatus: () => ipcRenderer.invoke('haven:updater:status'),
-  checkForUpdates: () => ipcRenderer.invoke('haven:updater:check'),
+    ipcRenderer.invoke(DESKTOP_IPC_KEYS.SETTINGS_SET_AUTO_UPDATE, { enabled }),
+  getUpdaterStatus: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_STATUS_GET),
+  checkForUpdates: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_CHECK_NOW),
 });
-

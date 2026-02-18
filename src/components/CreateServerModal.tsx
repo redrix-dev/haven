@@ -13,7 +13,7 @@ import {
 
 interface CreateServerModalProps {
   onClose: () => void;
-  onCreate: (name: string) => Promise<any>;
+  onCreate: (name: string) => Promise<{ id: string }>;
 }
 
 export function CreateServerModal({ onClose, onCreate }: CreateServerModalProps) {
@@ -38,7 +38,8 @@ export function CreateServerModal({ onClose, onCreate }: CreateServerModalProps)
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="bg-[#18243a] border-[#142033] text-white sm:max-w-md"
+        size="sm"
+        className="bg-[#18243a] border-[#142033] text-white"
         showCloseButton={false}
       >
         <DialogHeader>

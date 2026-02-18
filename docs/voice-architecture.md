@@ -43,6 +43,9 @@
 - Xirsys credentials live only in Supabase secrets.
 - Renderer never receives Xirsys secret/ident directly.
 - Renderer only receives normalized `iceServers` from `voice-ice`.
+- `voice-ice` validates JWT + channel access (`communityId`, `channelId`, `kind='voice'`) before
+  returning relay credentials.
+- Client treats `401/403` from `voice-ice` as hard auth failures (no STUN fallback on auth deny).
 
 ## Why This Is SFU-Friendly
 - Signaling envelope is already abstract enough to route through SFU flows.

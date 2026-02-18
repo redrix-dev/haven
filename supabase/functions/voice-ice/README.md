@@ -32,3 +32,12 @@ supabase secrets set XIRSYS_IDENT=... XIRSYS_SECRET=... XIRSYS_CHANNEL=...
 - Function currently returns `source: "xirsys"` or `source: "fallback"` plus `iceServers`.
 - This function performs its own bearer-token validation with `auth.getUser(token)`.
   `--no-verify-jwt` is used to bypass gateway JWT verification issues while keeping auth enforced in function code.
+- Request payload must include:
+  - `communityId` (UUID)
+  - `channelId` (UUID)
+- Function now validates that:
+  - JWT is valid
+  - user can access the target channel via RLS
+  - target channel belongs to the provided community and is `kind = 'voice'`
+- Clients should treat `401`/`403` from this function as authorization failures and must not
+  silently continue with public STUN fallback for those responses.
