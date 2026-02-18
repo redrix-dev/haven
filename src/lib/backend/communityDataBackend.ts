@@ -40,7 +40,7 @@ const getRealtimeRowChannelId = (value: unknown): string | null => {
 
 // Incident toggle for channel-create debugging.
 // Keep disabled by default. Re-enable by setting `HAVEN_DEBUG_CHANNEL_CREATE=1`.
-const ENABLE_CHANNEL_CREATE_DIAGNOSTICS = process.env.HAVEN_DEBUG_CHANNEL_CREATE === '1';
+// const ENABLE_CHANNEL_CREATE_DIAGNOSTICS = process.env.HAVEN_DEBUG_CHANNEL_CREATE === '1';
 
 export interface CommunityDataBackend {
   fetchServerPermissions(communityId: string): Promise<ServerPermissions>;
@@ -700,7 +700,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (authError) throw authError;
     if (!user?.id) throw new Error('Not authenticated.');
 
-    if (ENABLE_CHANNEL_CREATE_DIAGNOSTICS) {
+    /*if (ENABLE_CHANNEL_CREATE_DIAGNOSTICS)*/ {
       const [{ data: ownerCheck }, { data: canCreateChannels }, { data: canManageChannels }] =
         await Promise.all([
           supabase.rpc('is_community_owner', {
@@ -742,7 +742,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .insert(insertPayload);
 
     if (error) {
-      if (ENABLE_CHANNEL_CREATE_DIAGNOSTICS) {
+      /*if (ENABLE_CHANNEL_CREATE_DIAGNOSTICS)*/ {
         console.error('[createChannel] insert failed', {
           authUserId: user.id,
           communityId: input.communityId,
