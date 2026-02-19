@@ -619,6 +619,17 @@ export function VoiceChannelPane({
         .find((sender) => !sender.track || sender.track.kind === 'audio');
 
       if (audioSender) {
+        // If the peer was created in listen-only mode, the audio transceiver can remain recvonly.
+        // Flip it before renegotiation so replacing the track actually sends microphone audio.
+        const audioTransceiver = peerConnection
+          .getTransceivers()
+          .find((transceiver) => transceiver.sender === audioSender);
+        if (
+          audioTransceiver &&
+          (audioTransceiver.direction === 'recvonly' || audioTransceiver.direction === 'inactive')
+        ) {
+          audioTransceiver.direction = 'sendrecv';
+        }
         await audioSender.replaceTrack(nextTrack);
       } else {
         peerConnection.addTrack(nextTrack, stream);
@@ -1285,10 +1296,18 @@ export function VoiceChannelPane({
             ref={(element) => {
               audioElementRefs.current[participant.userId] = element;
               if (!element) return;
-              element.srcObject = remoteStreams[participant.userId] ?? null;
+              const nextRemoteStream = remoteStreams[participant.userId] ?? null;
+              element.srcObject = nextRemoteStream;
               element.muted = isDeafened;
               element.volume = (remoteVolumes[participant.userId] ?? 100) / 100;
               void applySinkId(element);
+              if (nextRemoteStream) {
+                void element.play().catch((playError) => {
+                  const errorName = playError instanceof Error ? playError.name : '';
+                  if (errorName === 'AbortError') return;
+                  console.error('Failed to start remote audio playback:', playError);
+                });
+              }
             }}
           />
         ))}
