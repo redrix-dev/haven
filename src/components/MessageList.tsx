@@ -21,9 +21,15 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Database } from '@/types/database';
 import { getErrorMessage } from '@/shared/lib/errors';
-import type { MessageReportKind, MessageReportTarget } from '@/lib/backend/types';
+import type {
+  MessageAttachment,
+  MessageReaction,
+  MessageReportKind,
+  MessageReportTarget,
+} from '@/lib/backend/types';
 
 type Message = Database['public']['Tables']['messages']['Row'];
+const QUICK_REACTION_EMOJI = ['👍', '❤️', '😂', '🎉'] as const;
 type AuthorProfile = {
   username: string;
   isPlatformStaff: boolean;
@@ -31,12 +37,16 @@ type AuthorProfile = {
 };
 
 interface MessageListProps {
+  channelId: string;
   messages: Message[];
+  messageReactions: MessageReaction[];
+  messageAttachments: MessageAttachment[];
   authorProfiles: Record<string, AuthorProfile>;
   currentUserId: string;
   canManageMessages: boolean;
   onDeleteMessage: (messageId: string) => Promise<void>;
   onEditMessage: (messageId: string, content: string) => Promise<void>;
+  onToggleMessageReaction: (messageId: string, emoji: string) => Promise<void>;
   onReplyToMessage: (target: { id: string; authorLabel: string; preview: string }) => void;
   onReportMessage: (input: {
     messageId: string;
@@ -89,12 +99,16 @@ const getAuthorColor = (
 };
 
 export function MessageList({
+  channelId,
   messages,
+  messageReactions,
+  messageAttachments,
   authorProfiles,
   currentUserId,
   canManageMessages,
   onDeleteMessage,
   onEditMessage,
+  onToggleMessageReaction,
   onReplyToMessage,
   onReportMessage,
 }: MessageListProps) {
@@ -104,6 +118,7 @@ export function MessageList({
   const [editingContent, setEditingContent] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusyMessageId, setActionBusyMessageId] = useState<string | null>(null);
+  const [reactionBusyKeys, setReactionBusyKeys] = useState<Record<string, boolean>>({});
   const [reportDialogMessageId, setReportDialogMessageId] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<MessageReportTarget>('server_admins');
   const [reportKind, setReportKind] = useState<MessageReportKind>('content_abuse');
@@ -116,22 +131,56 @@ export function MessageList({
     }
   }, [messages]);
 
+  const visibleMessages = useMemo(
+    () => messages.filter(canCurrentUserViewMessage),
+    [messages]
+  );
+
   const messageById = useMemo(() => {
     const next = new Map<string, Message>();
-    for (const message of messages.filter(canCurrentUserViewMessage)) {
+    for (const message of visibleMessages) {
       next.set(message.id, message);
     }
     return next;
-  }, [messages]);
+  }, [visibleMessages]);
 
-  const replyGroups = useMemo(() => {
+  const attachmentsByMessageId = useMemo(() => {
+    const next = new Map<string, MessageAttachment[]>();
+    for (const attachment of messageAttachments) {
+      if (!messageById.has(attachment.messageId)) continue;
+      const existing = next.get(attachment.messageId) ?? [];
+      existing.push(attachment);
+      next.set(attachment.messageId, existing);
+    }
+    return next;
+  }, [messageAttachments, messageById]);
+
+  const reactionsByMessageId = useMemo(() => {
+    const next = new Map<string, Map<string, { count: number; reactedByCurrentUser: boolean }>>();
+    for (const reaction of messageReactions) {
+      if (!messageById.has(reaction.messageId)) continue;
+      const byEmoji = next.get(reaction.messageId) ?? new Map<string, { count: number; reactedByCurrentUser: boolean }>();
+      const current = byEmoji.get(reaction.emoji) ?? { count: 0, reactedByCurrentUser: false };
+      current.count += 1;
+      if (reaction.userId === currentUserId) {
+        current.reactedByCurrentUser = true;
+      }
+      byEmoji.set(reaction.emoji, current);
+      next.set(reaction.messageId, byEmoji);
+    }
+    return next;
+  }, [currentUserId, messageById, messageReactions]);
+
+  const replyTree = useMemo(() => {
     const repliesByParentId = new Map<string, Message[]>();
-    const topLevelMessages: Message[] = [];
+    const rootMessages: Message[] = [];
 
-    for (const message of messages.filter(canCurrentUserViewMessage)) {
+    for (const message of visibleMessages) {
       const parentId = getReplyToMessageId(message);
-      if (!parentId || !messageById.has(parentId)) {
-        topLevelMessages.push(message);
+      const parentExists = Boolean(parentId && parentId !== message.id && messageById.has(parentId));
+
+      if (!parentExists || !parentId) {
+        rootMessages.push(message);
         continue;
       }
 
@@ -140,10 +189,113 @@ export function MessageList({
       repliesByParentId.set(parentId, existing);
     }
 
-    return { topLevelMessages, repliesByParentId };
-  }, [messageById, messages]);
+    // Guard against malformed reply graphs that would otherwise render nothing.
+    if (rootMessages.length === 0 && visibleMessages.length > 0) {
+      return { rootMessages: visibleMessages, repliesByParentId: new Map<string, Message[]>() };
+    }
 
-  const renderMessageRow = (message: Message, isReply = false) => {
+    return { rootMessages, repliesByParentId };
+  }, [messageById, visibleMessages]);
+
+  useEffect(() => {
+    const validThreadParentIds = new Set(replyTree.repliesByParentId.keys());
+
+    setExpandedReplyThreads((prev) => {
+      let changed = false;
+      const next: Record<string, boolean> = {};
+
+      for (const [messageId, isExpanded] of Object.entries(prev)) {
+        if (!validThreadParentIds.has(messageId)) {
+          changed = true;
+          continue;
+        }
+        next[messageId] = isExpanded;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [replyTree]);
+
+  useEffect(() => {
+    if (!editingMessageId || messageById.has(editingMessageId)) return;
+    setEditingMessageId(null);
+    setEditingContent('');
+  }, [editingMessageId, messageById]);
+
+  useEffect(() => {
+    if (!actionBusyMessageId || messageById.has(actionBusyMessageId)) return;
+    setActionBusyMessageId(null);
+  }, [actionBusyMessageId, messageById]);
+
+  useEffect(() => {
+    if (!reportDialogMessageId || messageById.has(reportDialogMessageId)) return;
+    setReportDialogMessageId(null);
+    setReportSubmitting(false);
+  }, [messageById, reportDialogMessageId]);
+
+  useEffect(() => {
+    setExpandedReplyThreads({});
+    setEditingMessageId(null);
+    setEditingContent('');
+    setActionBusyMessageId(null);
+    setReactionBusyKeys({});
+    setReportDialogMessageId(null);
+    setReportSubmitting(false);
+    setActionError(null);
+  }, [channelId]);
+
+  useEffect(() => {
+    if (!actionError) return;
+    const timeoutId = window.setTimeout(() => {
+      setActionError(null);
+    }, 6000);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [actionError]);
+
+  useEffect(() => {
+    setReactionBusyKeys((prev) => {
+      let changed = false;
+      const next: Record<string, boolean> = {};
+
+      for (const [key, isBusy] of Object.entries(prev)) {
+        const separatorIndex = key.indexOf(':');
+        const messageId = separatorIndex > 0 ? key.slice(0, separatorIndex) : key;
+        if (!messageById.has(messageId)) {
+          changed = true;
+          continue;
+        }
+        next[key] = isBusy;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [messageById]);
+
+  const toggleReaction = React.useCallback(
+    async (messageId: string, emoji: string) => {
+      const reactionKey = `${messageId}:${emoji}`;
+      if (reactionBusyKeys[reactionKey]) return;
+
+      setReactionBusyKeys((prev) => ({ ...prev, [reactionKey]: true }));
+      setActionError(null);
+
+      try {
+        await onToggleMessageReaction(messageId, emoji);
+      } catch (error: unknown) {
+        setActionError(getErrorMessage(error, 'Failed to update reaction.'));
+      } finally {
+        setReactionBusyKeys((prev) => {
+          const { [reactionKey]: _removed, ...rest } = prev;
+          return rest;
+        });
+      }
+    },
+    [onToggleMessageReaction, reactionBusyKeys]
+  );
+
+  const renderMessageRow = (message: Message, depth = 0) => {
     const authorProfile = message.author_user_id ? authorProfiles[message.author_user_id] : undefined;
     const isStaffUserMessage = message.author_type === 'user' && Boolean(authorProfile?.isPlatformStaff);
     const isOwnMessage = message.author_type === 'user' && message.author_user_id === currentUserId;
@@ -152,11 +304,21 @@ export function MessageList({
     const authorLabel = getAuthorLabel(message, authorProfile, currentUserId);
     const authorColor = getAuthorColor(message, authorProfile, currentUserId);
     const isEditing = editingMessageId === message.id;
+    const isReply = depth > 0;
+    const replyIndent = Math.min(depth, 4) * 20;
+    const messageReactionMap = reactionsByMessageId.get(message.id) ?? new Map();
+    const reactionSummaries = Array.from(messageReactionMap.entries());
+    const messageAttachmentRows = attachmentsByMessageId.get(message.id) ?? [];
+    const trimmedMessageContent = message.content.trim();
+    const isInvisibleMediaPlaceholder = /^[\u200B\u200C\u200D\uFEFF]+$/.test(message.content);
+    const hideMediaPlaceholder =
+      messageAttachmentRows.length > 0 &&
+      (/^\[(media|image|file)\]$/i.test(trimmedMessageContent) || isInvisibleMediaPlaceholder);
 
     return (
       <div
-        key={message.id}
-        className={`group rounded-md ${isReply ? 'ml-5 border-l border-[#304867] pl-3 pt-2' : ''}`}
+        className={`group rounded-md ${isReply ? 'border-l border-[#304867] pl-3 pt-2' : ''}`}
+        style={isReply ? { marginLeft: `${replyIndent}px` } : undefined}
       >
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="flex items-baseline gap-2 min-w-0">
@@ -231,6 +393,22 @@ export function MessageList({
                 >
                   Reply
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {QUICK_REACTION_EMOJI.map((emoji) => {
+                  const reactionKey = `${message.id}:${emoji}`;
+                  return (
+                    <DropdownMenuItem
+                      key={reactionKey}
+                      onClick={() => {
+                        void toggleReaction(message.id, emoji);
+                      }}
+                      disabled={Boolean(reactionBusyKeys[reactionKey])}
+                    >
+                      React {emoji}
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => {
                     setReportDialogMessageId(message.id);
@@ -297,49 +475,147 @@ export function MessageList({
             </div>
           </div>
         ) : (
-          <div className="text-[#e6edf7] text-[15px] leading-[1.375] break-words">{message.content}</div>
+          <div className="space-y-2">
+            {!hideMediaPlaceholder && (
+              <div className="text-[#e6edf7] text-[15px] leading-[1.375] break-words">
+                {message.content}
+              </div>
+            )}
+
+            {messageAttachmentRows.length > 0 && (
+              <div className="space-y-2">
+                {messageAttachmentRows.map((attachment) => {
+                  const attachmentLabel = attachment.originalFilename ?? attachment.objectPath.split('/').pop() ?? 'media';
+                  const expiresAtLabel = new Date(attachment.expiresAt).toLocaleString();
+
+                  if (attachment.mediaKind === 'image' && attachment.signedUrl) {
+                    return (
+                      <div key={attachment.id} className="space-y-1">
+                        <img
+                          src={attachment.signedUrl}
+                          alt={attachmentLabel}
+                          className="max-h-64 rounded-md border border-[#304867] object-contain bg-[#0d1626]"
+                        />
+                        <p className="text-[11px] text-[#8ea4c7]">
+                          Expires {expiresAtLabel}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (attachment.mediaKind === 'video' && attachment.signedUrl) {
+                    return (
+                      <div key={attachment.id} className="space-y-1">
+                        <video
+                          controls
+                          src={attachment.signedUrl}
+                          className="max-h-72 rounded-md border border-[#304867] bg-[#0d1626]"
+                        />
+                        <p className="text-[11px] text-[#8ea4c7]">
+                          Expires {expiresAtLabel}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={attachment.id} className="space-y-1">
+                      {attachment.signedUrl ? (
+                        <a
+                          href={attachment.signedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-[#8fc1ff] hover:text-[#b4d6ff] underline"
+                        >
+                          {attachmentLabel}
+                        </a>
+                      ) : (
+                        <span className="text-sm text-[#a9b8cf]">{attachmentLabel}</span>
+                      )}
+                      <p className="text-[11px] text-[#8ea4c7]">Expires {expiresAtLabel}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {reactionSummaries.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {reactionSummaries.map(([emoji, summary]) => {
+                  const reactionKey = `${message.id}:${emoji}`;
+                  const isBusy = Boolean(reactionBusyKeys[reactionKey]);
+                  return (
+                    <Button
+                      key={reactionKey}
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      disabled={isBusy}
+                      onClick={() => {
+                        void toggleReaction(message.id, emoji);
+                      }}
+                      className={`h-6 rounded-full border px-2 text-xs ${
+                        summary.reactedByCurrentUser
+                          ? 'border-[#3f79d8] bg-[#3f79d8]/20 text-[#dbe9ff]'
+                          : 'border-[#304867] bg-[#142033] text-[#b8c7dd] hover:text-white'
+                      }`}
+                    >
+                      <span>{emoji}</span>
+                      <span>{summary.count}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
+      </div>
+    );
+  };
+
+  const renderMessageTree = (message: Message, depth = 0, ancestorIds = new Set<string>()) => {
+    const replies = replyTree.repliesByParentId.get(message.id) ?? [];
+    const repliesExpanded = Boolean(expandedReplyThreads[message.id]);
+    const nextAncestorIds = new Set(ancestorIds);
+    nextAncestorIds.add(message.id);
+    const renderableReplies = replies.filter((reply) => !nextAncestorIds.has(reply.id));
+
+    return (
+      <div key={message.id} className="space-y-2">
+        {renderMessageRow(message, depth)}
+
+        {renderableReplies.length > 0 && (
+          <div className="ml-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setExpandedReplyThreads((prev) => ({
+                  ...prev,
+                  [message.id]: !repliesExpanded,
+                }))
+              }
+              className="text-[#8ea4c7] hover:text-white hover:bg-[#22334f]"
+            >
+              {repliesExpanded
+                ? `Hide replies (${renderableReplies.length})`
+                : `View replies (${renderableReplies.length})`}
+            </Button>
+          </div>
+        )}
+
+        {repliesExpanded &&
+          renderableReplies.map((reply) => renderMessageTree(reply, depth + 1, nextAncestorIds))}
       </div>
     );
   };
 
   return (
     <>
-      <ScrollArea className="flex-1 p-4">
-        <div ref={scrollRef} className="space-y-4">
-          {replyGroups.topLevelMessages.map((message) => {
-            const replies = replyGroups.repliesByParentId.get(message.id) ?? [];
-            const repliesExpanded = Boolean(expandedReplyThreads[message.id]);
-
-            return (
-              <div key={message.id} className="space-y-2">
-                {renderMessageRow(message)}
-
-                {replies.length > 0 && (
-                  <div className="ml-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setExpandedReplyThreads((prev) => ({
-                          ...prev,
-                          [message.id]: !repliesExpanded,
-                        }))
-                      }
-                      className="text-[#8ea4c7] hover:text-white hover:bg-[#22334f]"
-                    >
-                      {repliesExpanded
-                        ? `Hide replies (${replies.length})`
-                        : `View replies (${replies.length})`}
-                    </Button>
-                  </div>
-                )}
-
-                {repliesExpanded && replies.map((reply) => renderMessageRow(reply, true))}
-              </div>
-            );
-          })}
+      <ScrollArea className="flex-1 min-h-0">
+        <div ref={scrollRef} className="space-y-4 p-4">
+          {replyTree.rootMessages.map((message) => renderMessageTree(message))}
         </div>
       </ScrollArea>
 

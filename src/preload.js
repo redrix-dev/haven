@@ -7,4 +7,19 @@ contextBridge.exposeInMainWorld('desktop', {
     ipcRenderer.invoke(DESKTOP_IPC_KEYS.SETTINGS_SET_AUTO_UPDATE, { enabled }),
   getUpdaterStatus: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_STATUS_GET),
   checkForUpdates: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_CHECK_NOW),
+  consumeNextProtocolUrl: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.PROTOCOL_URL_CONSUME_NEXT),
+  onProtocolUrl: (listener) => {
+    if (typeof listener !== 'function') {
+      return () => {};
+    }
+
+    const wrappedListener = (_event, url) => {
+      listener(url);
+    };
+
+    ipcRenderer.on(DESKTOP_IPC_KEYS.PROTOCOL_URL_EVENT, wrappedListener);
+    return () => {
+      ipcRenderer.removeListener(DESKTOP_IPC_KEYS.PROTOCOL_URL_EVENT, wrappedListener);
+    };
+  },
 });

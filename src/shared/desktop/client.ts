@@ -29,4 +29,10 @@ export const desktopClient = {
   async checkForUpdates(): Promise<UpdaterStatus> {
     return getDesktopApi().checkForUpdates();
   },
+  async consumeNextProtocolUrl(): Promise<string | null> {
+    return getDesktopApi().consumeNextProtocolUrl();
+  },
+  onProtocolUrl(listener: (url: string) => void): () => void {
+    return getDesktopApi().onProtocolUrl(listener);
+  },
 };

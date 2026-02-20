@@ -14,6 +14,8 @@ import type {
   MessageReportKind,
   MessageReportTarget,
   Message,
+  MessageAttachment,
+  MessageReaction,
   ServerMemberRoleItem,
   ServerPermissions,
   ServerRoleItem,
@@ -38,6 +40,55 @@ const getRealtimeRowChannelId = (value: unknown): string | null => {
   return typeof maybeChannelId === 'string' ? maybeChannelId : null;
 };
 
+const MESSAGE_MEDIA_BUCKET = 'message-media';
+const DEFAULT_MEDIA_EXPIRES_IN_HOURS = 24;
+const MAX_MEDIA_EXPIRES_IN_HOURS = 24 * 30;
+const MEDIA_ONLY_CONTENT_PLACEHOLDER = '\u200B';
+
+const sanitizeFileName = (value: string): string => {
+  const sanitized = value
+    .trim()
+    .replace(/[\s]+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]/g, '');
+
+  return sanitized.length > 0 ? sanitized.slice(0, 120) : 'media';
+};
+
+const resolveMediaKind = (mimeType: string): 'image' | 'video' | 'file' => {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  return 'file';
+};
+
+type MessageReactionRow = {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+};
+
+type MessageAttachmentRow = {
+  id: string;
+  message_id: string;
+  community_id: string;
+  channel_id: string;
+  owner_user_id: string;
+  bucket_name: string;
+  object_path: string;
+  original_filename: string | null;
+  mime_type: string;
+  media_kind: 'image' | 'video' | 'file';
+  size_bytes: number;
+  created_at: string;
+  expires_at: string;
+};
+
+type MessageAttachmentStorageRow = {
+  bucket_name: string;
+  object_path: string;
+};
+
 // Incident toggle for channel-create debugging.
 // Keep disabled by default. Re-enable by setting `HAVEN_DEBUG_CHANNEL_CREATE=1`.
 // const ENABLE_CHANNEL_CREATE_DIAGNOSTICS = process.env.HAVEN_DEBUG_CHANNEL_CREATE === '1';
@@ -48,6 +99,17 @@ export interface CommunityDataBackend {
   subscribeToChannels(communityId: string, onChange: () => void): RealtimeChannel;
   listMessages(communityId: string, channelId: string): Promise<Message[]>;
   subscribeToMessages(channelId: string, onChange: () => void): RealtimeChannel;
+  listMessageReactions(communityId: string, channelId: string): Promise<MessageReaction[]>;
+  subscribeToMessageReactions(channelId: string, onChange: () => void): RealtimeChannel;
+  toggleMessageReaction(input: {
+    communityId: string;
+    channelId: string;
+    messageId: string;
+    emoji: string;
+  }): Promise<void>;
+  listMessageAttachments(communityId: string, channelId: string): Promise<MessageAttachment[]>;
+  subscribeToMessageAttachments(channelId: string, onChange: () => void): RealtimeChannel;
+  cleanupExpiredMessageAttachments(limit?: number): Promise<number>;
   fetchAuthorProfiles(authorIds: string[]): Promise<Record<string, AuthorProfile>>;
   isHavenDeveloperMessagingAllowed(input: {
     communityId: string;
@@ -117,6 +179,10 @@ export interface CommunityDataBackend {
     userId: string;
     content: string;
     replyToMessageId?: string;
+    mediaUpload?: {
+      file: File;
+      expiresInHours?: number;
+    };
   }): Promise<void>;
   editUserMessage(input: {
     communityId: string;
@@ -140,6 +206,11 @@ export interface CommunityDataBackend {
     communityId: string;
     channelId: string;
     content: string;
+    replyToMessageId?: string;
+    mediaUpload?: {
+      file: File;
+      expiresInHours?: number;
+    };
   }): Promise<void>;
 }
 
@@ -286,6 +357,243 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         }
       )
       .subscribe();
+  },
+
+  async listMessageReactions(communityId, channelId) {
+    const { data, error } = await supabase
+      .from('message_reactions' as never)
+      .select('id, message_id, user_id, emoji, created_at')
+      .eq('community_id', communityId)
+      .eq('channel_id', channelId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    return ((data ?? []) as MessageReactionRow[]).map((row) => ({
+      id: row.id,
+      messageId: row.message_id,
+      userId: row.user_id,
+      emoji: row.emoji,
+      createdAt: row.created_at,
+    }));
+  },
+
+  subscribeToMessageReactions(channelId, onChange) {
+    return supabase
+      .channel(`message_reactions:${channelId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'message_reactions',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        onChange
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'message_reactions',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        onChange
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'message_reactions',
+        },
+        (payload) => {
+          const deletedChannelId = getRealtimeRowChannelId(payload.old);
+          if (!deletedChannelId || deletedChannelId === channelId) {
+            onChange();
+          }
+        }
+      )
+      .subscribe();
+  },
+
+  async toggleMessageReaction({ communityId, channelId, messageId, emoji }) {
+    const normalizedEmoji = emoji.trim();
+    if (normalizedEmoji.length === 0) {
+      throw new Error('Reaction emoji is required.');
+    }
+    if (normalizedEmoji.length > 32) {
+      throw new Error('Reaction emoji exceeds supported length.');
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    if (!user?.id) throw new Error('Not authenticated.');
+
+    const { data: messageRow, error: messageError } = await supabase
+      .from('messages')
+      .select('id, community_id, channel_id, deleted_at')
+      .eq('id', messageId)
+      .maybeSingle();
+    if (messageError) throw messageError;
+    if (!messageRow || messageRow.deleted_at) {
+      throw new Error('Message not found.');
+    }
+    if (messageRow.community_id !== communityId || messageRow.channel_id !== channelId) {
+      throw new Error('Message does not belong to this channel.');
+    }
+
+    const { data: existingReaction, error: existingReactionError } = await supabase
+      .from('message_reactions' as never)
+      .select('id')
+      .eq('message_id', messageId)
+      .eq('user_id', user.id)
+      .eq('emoji', normalizedEmoji)
+      .maybeSingle();
+    if (existingReactionError) throw existingReactionError;
+
+    if (existingReaction && typeof existingReaction === 'object' && 'id' in existingReaction) {
+      const { error: deleteError } = await supabase
+        .from('message_reactions' as never)
+        .delete()
+        .eq('id', (existingReaction as { id: string }).id);
+      if (deleteError) throw deleteError;
+      return;
+    }
+
+    const { error: insertError } = await supabase
+      .from('message_reactions' as never)
+      .insert({
+        message_id: messageId,
+        community_id: communityId,
+        channel_id: channelId,
+        user_id: user.id,
+        emoji: normalizedEmoji,
+      } as never);
+    if (!insertError) return;
+
+    // Concurrent toggles can race; treat duplicate insert as already-reacted.
+    if (insertError.code === '23505') return;
+    throw insertError;
+  },
+
+  async listMessageAttachments(communityId, channelId) {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('message_attachments' as never)
+      .select(
+        'id, message_id, community_id, channel_id, owner_user_id, bucket_name, object_path, original_filename, mime_type, media_kind, size_bytes, created_at, expires_at'
+      )
+      .eq('community_id', communityId)
+      .eq('channel_id', channelId)
+      .gt('expires_at', nowIso)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const attachmentRows = (data ?? []) as MessageAttachmentRow[];
+    if (attachmentRows.length === 0) return [];
+
+    const pathsByBucket = new Map<string, string[]>();
+    for (const row of attachmentRows) {
+      const existingPaths = pathsByBucket.get(row.bucket_name) ?? [];
+      existingPaths.push(row.object_path);
+      pathsByBucket.set(row.bucket_name, existingPaths);
+    }
+
+    const signedUrlByBucketAndPath = new Map<string, string>();
+    for (const [bucketName, paths] of pathsByBucket.entries()) {
+      const { data: signedRows, error: signedError } = await supabase.storage
+        .from(bucketName)
+        .createSignedUrls(paths, 60 * 60);
+
+      if (signedError) {
+        console.error('Failed to create signed URLs for message attachments:', signedError);
+        continue;
+      }
+
+      for (const signedRow of signedRows ?? []) {
+        if (!signedRow.signedUrl) continue;
+        signedUrlByBucketAndPath.set(
+          `${bucketName}/${signedRow.path}`,
+          signedRow.signedUrl
+        );
+      }
+    }
+
+    return attachmentRows.map((row) => ({
+      id: row.id,
+      messageId: row.message_id,
+      communityId: row.community_id,
+      channelId: row.channel_id,
+      ownerUserId: row.owner_user_id,
+      bucketName: row.bucket_name,
+      objectPath: row.object_path,
+      originalFilename: row.original_filename,
+      mimeType: row.mime_type,
+      mediaKind: row.media_kind,
+      sizeBytes: row.size_bytes,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+      signedUrl: signedUrlByBucketAndPath.get(`${row.bucket_name}/${row.object_path}`) ?? null,
+    }));
+  },
+
+  subscribeToMessageAttachments(channelId, onChange) {
+    return supabase
+      .channel(`message_attachments:${channelId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'message_attachments',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        onChange
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'message_attachments',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        onChange
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'message_attachments',
+        },
+        (payload) => {
+          const deletedChannelId = getRealtimeRowChannelId(payload.old);
+          if (!deletedChannelId || deletedChannelId === channelId) {
+            onChange();
+          }
+        }
+      )
+      .subscribe();
+  },
+
+  async cleanupExpiredMessageAttachments(limit = 100) {
+    const boundedLimit = Number.isFinite(limit)
+      ? Math.min(Math.max(Math.floor(limit), 1), 500)
+      : 100;
+
+    const { data, error } = await supabase.rpc(
+      'cleanup_expired_message_attachments' as never,
+      { p_limit: boundedLimit } as never
+    );
+    if (error) throw error;
+    return Number(data ?? 0);
   },
 
   async fetchAuthorProfiles(authorIds) {
@@ -992,21 +1300,107 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
-  async sendUserMessage({ communityId, channelId, userId, content, replyToMessageId }) {
-    const nextMetadata =
-      replyToMessageId && replyToMessageId.trim().length > 0
-        ? { replyToMessageId: replyToMessageId.trim() }
-        : {};
+  async sendUserMessage({ communityId, channelId, userId, content, replyToMessageId, mediaUpload }) {
+    const trimmedContent = content.trim();
+    const hasMediaUpload = Boolean(mediaUpload?.file);
+    if (!trimmedContent && !hasMediaUpload) {
+      throw new Error('Message content or media is required.');
+    }
 
-    const { error } = await supabase.from('messages').insert({
-      community_id: communityId,
-      channel_id: channelId,
-      author_type: 'user',
-      author_user_id: userId,
-      content,
-      metadata: nextMetadata,
-    });
-    if (error) throw error;
+    let uploadedMedia:
+      | {
+          bucketName: string;
+          objectPath: string;
+          originalFilename: string;
+          mimeType: string;
+          mediaKind: 'image' | 'video' | 'file';
+          sizeBytes: number;
+          expiresAt: string;
+        }
+      | null = null;
+
+    if (mediaUpload?.file) {
+      const nextFile = mediaUpload.file;
+      const expiresInHours = mediaUpload.expiresInHours ?? DEFAULT_MEDIA_EXPIRES_IN_HOURS;
+      const boundedExpiresInHours = Math.min(
+        Math.max(Math.floor(expiresInHours), 1),
+        MAX_MEDIA_EXPIRES_IN_HOURS
+      );
+      const originalFilename = sanitizeFileName(nextFile.name || 'media');
+      const objectPath = `${communityId}/${channelId}/${crypto.randomUUID()}-${originalFilename}`;
+      const mimeType = nextFile.type?.trim() || 'application/octet-stream';
+
+      const { error: uploadError } = await supabase.storage.from(MESSAGE_MEDIA_BUCKET).upload(
+        objectPath,
+        nextFile,
+        {
+          cacheControl: '3600',
+          contentType: mimeType,
+          upsert: false,
+        }
+      );
+      if (uploadError) throw uploadError;
+
+      uploadedMedia = {
+        bucketName: MESSAGE_MEDIA_BUCKET,
+        objectPath,
+        originalFilename,
+        mimeType,
+        mediaKind: resolveMediaKind(mimeType),
+        sizeBytes: nextFile.size,
+        expiresAt: new Date(Date.now() + boundedExpiresInHours * 60 * 60 * 1000).toISOString(),
+      };
+    }
+
+    const nextMetadata = {
+      ...(replyToMessageId && replyToMessageId.trim().length > 0
+        ? { replyToMessageId: replyToMessageId.trim() }
+        : {}),
+      ...(uploadedMedia ? { hasAttachment: true } : {}),
+    };
+
+    const { data: createdMessage, error: insertError } = await supabase
+      .from('messages')
+      .insert({
+        community_id: communityId,
+        channel_id: channelId,
+        author_type: 'user',
+        author_user_id: userId,
+        content: trimmedContent || MEDIA_ONLY_CONTENT_PLACEHOLDER,
+        metadata: nextMetadata,
+      })
+      .select('*')
+      .single();
+    if (insertError) {
+      if (uploadedMedia) {
+        await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+      }
+      throw insertError;
+    }
+
+    if (!uploadedMedia) return;
+
+    const { error: attachmentError } = await supabase
+      .from('message_attachments' as never)
+      .insert({
+        message_id: createdMessage.id,
+        community_id: communityId,
+        channel_id: channelId,
+        owner_user_id: userId,
+        bucket_name: uploadedMedia.bucketName,
+        object_path: uploadedMedia.objectPath,
+        original_filename: uploadedMedia.originalFilename,
+        mime_type: uploadedMedia.mimeType,
+        media_kind: uploadedMedia.mediaKind,
+        size_bytes: uploadedMedia.sizeBytes,
+        expires_at: uploadedMedia.expiresAt,
+      } as never);
+
+    if (!attachmentError) return;
+
+    await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+    await supabase.from('messages').delete().eq('id', createdMessage.id);
+    throw attachmentError;
   },
 
   async editUserMessage({ communityId, messageId, content }) {
@@ -1022,6 +1416,34 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async deleteMessage({ communityId, messageId }) {
+    // Storage objects must be removed through the Storage API, not direct SQL.
+    const { data: attachmentRows, error: attachmentRowsError } = await supabase
+      .from('message_attachments' as never)
+      .select('bucket_name, object_path')
+      .eq('community_id', communityId)
+      .eq('message_id', messageId);
+    if (attachmentRowsError) throw attachmentRowsError;
+
+    const attachmentPathsByBucket = new Map<string, string[]>();
+    for (const attachmentRow of (attachmentRows ?? []) as MessageAttachmentStorageRow[]) {
+      const existingPaths = attachmentPathsByBucket.get(attachmentRow.bucket_name) ?? [];
+      existingPaths.push(attachmentRow.object_path);
+      attachmentPathsByBucket.set(attachmentRow.bucket_name, existingPaths);
+    }
+
+    for (const [bucketName, paths] of attachmentPathsByBucket.entries()) {
+      if (paths.length === 0) continue;
+
+      const { error: removeError } = await supabase.storage.from(bucketName).remove(paths);
+      if (removeError) {
+        console.warn('Failed to remove message attachment objects before message delete:', {
+          messageId,
+          bucketName,
+          removeError,
+        });
+      }
+    }
+
     const { error } = await supabase
       .from('messages')
       .delete()
@@ -1072,15 +1494,130 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (messageLinkError) throw messageLinkError;
   },
 
-  async postHavenDeveloperMessage({ communityId, channelId, content }) {
-    const { error } = await supabase.rpc('post_haven_dev_message', {
+  async postHavenDeveloperMessage({
+    communityId,
+    channelId,
+    content,
+    replyToMessageId,
+    mediaUpload,
+  }) {
+    const trimmedContent = content.trim();
+    const hasMediaUpload = Boolean(mediaUpload?.file);
+    if (!trimmedContent && !hasMediaUpload) {
+      throw new Error('Message content or media is required.');
+    }
+
+    let uploadedMedia:
+      | {
+          bucketName: string;
+          objectPath: string;
+          originalFilename: string;
+          mimeType: string;
+          mediaKind: 'image' | 'video' | 'file';
+          sizeBytes: number;
+          expiresAt: string;
+        }
+      | null = null;
+
+    if (mediaUpload?.file) {
+      const nextFile = mediaUpload.file;
+      const expiresInHours = mediaUpload.expiresInHours ?? DEFAULT_MEDIA_EXPIRES_IN_HOURS;
+      const boundedExpiresInHours = Math.min(
+        Math.max(Math.floor(expiresInHours), 1),
+        MAX_MEDIA_EXPIRES_IN_HOURS
+      );
+      const originalFilename = sanitizeFileName(nextFile.name || 'media');
+      const objectPath = `${communityId}/${channelId}/${crypto.randomUUID()}-${originalFilename}`;
+      const mimeType = nextFile.type?.trim() || 'application/octet-stream';
+
+      const { error: uploadError } = await supabase.storage.from(MESSAGE_MEDIA_BUCKET).upload(
+        objectPath,
+        nextFile,
+        {
+          cacheControl: '3600',
+          contentType: mimeType,
+          upsert: false,
+        }
+      );
+      if (uploadError) throw uploadError;
+
+      uploadedMedia = {
+        bucketName: MESSAGE_MEDIA_BUCKET,
+        objectPath,
+        originalFilename,
+        mimeType,
+        mediaKind: resolveMediaKind(mimeType),
+        sizeBytes: nextFile.size,
+        expiresAt: new Date(Date.now() + boundedExpiresInHours * 60 * 60 * 1000).toISOString(),
+      };
+    }
+
+    const nextMetadata = {
+      source: 'renderer_dev_mode',
+      ...(replyToMessageId && replyToMessageId.trim().length > 0
+        ? { replyToMessageId: replyToMessageId.trim() }
+        : {}),
+      ...(uploadedMedia ? { hasAttachment: true } : {}),
+    };
+
+    const { data: createdMessage, error } = await supabase.rpc('post_haven_dev_message', {
       p_community_id: communityId,
       p_channel_id: channelId,
-      p_content: content,
-      p_metadata: {
-        source: 'renderer_dev_mode',
-      },
+      p_content: trimmedContent || MEDIA_ONLY_CONTENT_PLACEHOLDER,
+      p_metadata: nextMetadata,
     });
-    if (error) throw error;
+    if (error) {
+      if (uploadedMedia) {
+        await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+      }
+      throw error;
+    }
+
+    if (!uploadedMedia) return;
+
+    const createdMessageId =
+      createdMessage && typeof createdMessage === 'object' && 'id' in createdMessage
+        ? (createdMessage as { id: string }).id
+        : null;
+
+    if (!createdMessageId) {
+      await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+      throw new Error('Failed to create Haven developer message.');
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) {
+      await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+      throw authError;
+    }
+    if (!user?.id) {
+      await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+      throw new Error('Not authenticated.');
+    }
+
+    const { error: attachmentError } = await supabase
+      .from('message_attachments' as never)
+      .insert({
+        message_id: createdMessageId,
+        community_id: communityId,
+        channel_id: channelId,
+        owner_user_id: user.id,
+        bucket_name: uploadedMedia.bucketName,
+        object_path: uploadedMedia.objectPath,
+        original_filename: uploadedMedia.originalFilename,
+        mime_type: uploadedMedia.mimeType,
+        media_kind: uploadedMedia.mediaKind,
+        size_bytes: uploadedMedia.sizeBytes,
+        expires_at: uploadedMedia.expiresAt,
+      } as never);
+
+    if (!attachmentError) return;
+
+    await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+    await supabase.from('messages').delete().eq('id', createdMessageId);
+    throw attachmentError;
   },
 };

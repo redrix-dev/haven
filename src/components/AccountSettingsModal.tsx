@@ -41,6 +41,7 @@ interface AccountSettingsModalProps {
   onAutoUpdateChange: (enabled: boolean) => Promise<void>;
   onCheckForUpdates: () => Promise<void>;
   onSignOut: () => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
 }
 
 export function AccountSettingsModal({
@@ -56,13 +57,16 @@ export function AccountSettingsModal({
   onAutoUpdateChange,
   onCheckForUpdates,
   onSignOut,
+  onDeleteAccount,
 }: AccountSettingsModalProps) {
   const [username, setUsername] = useState(initialUsername);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? '');
   const [saving, setSaving] = useState(false);
   const [updatingAutoUpdatePreference, setUpdatingAutoUpdatePreference] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [showDisableAutoUpdateConfirm, setShowDisableAutoUpdateConfirm] = useState(false);
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoUpdateError, setAutoUpdateError] = useState<string | null>(null);
 
@@ -141,6 +145,21 @@ export function AccountSettingsModal({
       onClose();
     } finally {
       setSigningOut(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    setError(null);
+
+    try {
+      await onDeleteAccount();
+      setShowDeleteAccountConfirm(false);
+      onClose();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to delete account.'));
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -274,15 +293,26 @@ export function AccountSettingsModal({
             {autoUpdateError && <p className="text-sm text-red-400">{autoUpdateError}</p>}
 
             <DialogFooter className="justify-between sm:justify-between">
-              <Button
-                type="button"
-                onClick={handleSignOut}
-                disabled={signingOut}
-                variant="ghost"
-                className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
-              >
-                {signingOut ? 'Signing out...' : 'Sign Out'}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={handleSignOut}
+                  disabled={signingOut || deletingAccount}
+                  variant="ghost"
+                  className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
+                >
+                  {signingOut ? 'Signing out...' : 'Sign Out'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setShowDeleteAccountConfirm(true)}
+                  disabled={saving || signingOut || deletingAccount}
+                  variant="ghost"
+                  className="text-red-400 hover:text-red-200 hover:bg-red-900/20"
+                >
+                  Delete Account
+                </Button>
+              </div>
 
               <div className="flex gap-3">
                 <Button
@@ -295,7 +325,7 @@ export function AccountSettingsModal({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || deletingAccount}
                   className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
                 >
                   {saving ? 'Saving...' : 'Save'}
@@ -327,6 +357,39 @@ export function AccountSettingsModal({
               className="bg-[#b74a56] hover:bg-[#a6424d] text-white"
             >
               Disable updates
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showDeleteAccountConfirm}
+        onOpenChange={(open) => {
+          if (deletingAccount) return;
+          setShowDeleteAccountConfirm(open);
+        }}
+      >
+        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete account permanently?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a9b8cf]">
+              This cannot be undone. Your profile, memberships, messages, and owned communities will
+              be removed permanently.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]"
+              disabled={deletingAccount}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleDeleteAccount()}
+              className="bg-[#b74a56] hover:bg-[#a6424d] text-white"
+              disabled={deletingAccount}
+            >
+              {deletingAccount ? 'Deleting...' : 'Delete account'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

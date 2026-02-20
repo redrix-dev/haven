@@ -35,6 +35,8 @@ export type DesktopAPI = {
   }>;
   getUpdaterStatus: () => Promise<UpdaterStatus>;
   checkForUpdates: () => Promise<UpdaterStatus>;
+  consumeNextProtocolUrl: () => Promise<string | null>;
+  onProtocolUrl: (listener: (url: string) => void) => () => void;
 };
 
 declare global {

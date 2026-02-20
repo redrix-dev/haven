@@ -4,7 +4,12 @@ import { MessageInput } from './MessageInput';
 import { Database } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Headphones } from 'lucide-react';
-import type { MessageReportKind, MessageReportTarget } from '@/lib/backend/types';
+import type {
+  MessageAttachment,
+  MessageReaction,
+  MessageReportKind,
+  MessageReportTarget,
+} from '@/lib/backend/types';
 
 type Message = Database['public']['Tables']['messages']['Row'];
 type ChannelKind = Database['public']['Enums']['channel_kind'];
@@ -21,6 +26,8 @@ interface ChatAreaProps {
   channelKind: ChannelKind;
   currentUserDisplayName: string;
   messages: Message[];
+  messageReactions: MessageReaction[];
+  messageAttachments: MessageAttachment[];
   authorProfiles: Record<string, AuthorProfile>;
   currentUserId: string;
   canSpeakInVoiceChannel: boolean;
@@ -28,16 +35,31 @@ interface ChatAreaProps {
   showVoiceDiagnostics?: boolean;
   onOpenChannelSettings?: () => void;
   onOpenVoiceControls?: () => void;
-  onSendMessage: (content: string, options?: { replyToMessageId?: string }) => Promise<void>;
+  onSendMessage: (
+    content: string,
+    options?: {
+      replyToMessageId?: string;
+      mediaFile?: File;
+      mediaExpiresInHours?: number;
+    }
+  ) => Promise<void>;
   onEditMessage: (messageId: string, content: string) => Promise<void>;
   onDeleteMessage: (messageId: string) => Promise<void>;
+  onToggleMessageReaction: (messageId: string, emoji: string) => Promise<void>;
   onReportMessage: (input: {
     messageId: string;
     target: MessageReportTarget;
     kind: MessageReportKind;
     comment: string;
   }) => Promise<void>;
-  onSendHavenDeveloperMessage?: (content: string) => Promise<void>;
+  onSendHavenDeveloperMessage?: (
+    content: string,
+    options?: {
+      replyToMessageId?: string;
+      mediaFile?: File;
+      mediaExpiresInHours?: number;
+    }
+  ) => Promise<void>;
 }
 
 export function ChatArea({
@@ -47,6 +69,8 @@ export function ChatArea({
   channelKind,
   currentUserDisplayName,
   messages,
+  messageReactions,
+  messageAttachments,
   authorProfiles,
   currentUserId,
   canSpeakInVoiceChannel,
@@ -57,6 +81,7 @@ export function ChatArea({
   onSendMessage,
   onEditMessage,
   onDeleteMessage,
+  onToggleMessageReaction,
   onReportMessage,
   onSendHavenDeveloperMessage,
 }: ChatAreaProps) {
@@ -71,8 +96,52 @@ export function ChatArea({
     setReplyTarget(null);
   }, [channelId]);
 
+  React.useEffect(() => {
+    if (!replyTarget) return;
+    const replyTargetStillExists = messages.some((message) => message.id === replyTarget.id);
+    if (!replyTargetStillExists) {
+      setReplyTarget(null);
+    }
+  }, [messages, replyTarget]);
+
+  const handleSendMessage = React.useCallback(
+    async (
+      content: string,
+      options?: { replyToMessageId?: string; mediaFile?: File; mediaExpiresInHours?: number }
+    ) => {
+      const replyToMessageId = options?.replyToMessageId?.trim();
+      if (!replyToMessageId) {
+        await onSendMessage(content, {
+          mediaFile: options?.mediaFile,
+          mediaExpiresInHours: options?.mediaExpiresInHours,
+        });
+        return;
+      }
+
+      const replyTargetStillExists = messages.some((message) => message.id === replyToMessageId);
+      await onSendMessage(
+        content,
+        replyTargetStillExists
+          ? {
+              replyToMessageId,
+              mediaFile: options?.mediaFile,
+              mediaExpiresInHours: options?.mediaExpiresInHours,
+            }
+          : {
+              mediaFile: options?.mediaFile,
+              mediaExpiresInHours: options?.mediaExpiresInHours,
+            }
+      );
+
+      if (!replyTargetStillExists) {
+        setReplyTarget(null);
+      }
+    },
+    [messages, onSendMessage]
+  );
+
   return (
-    <div className="flex-1 flex flex-col bg-[#111a2b]">
+    <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col bg-[#111a2b]">
       {/* Channel header */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-[#263a58]">
         <span className="text-white font-semibold text-base">
@@ -130,20 +199,25 @@ export function ChatArea({
         <>
           {/* Messages */}
           <MessageList
+            channelId={channelId}
             messages={messages}
+            messageReactions={messageReactions}
+            messageAttachments={messageAttachments}
             authorProfiles={authorProfiles}
             currentUserId={currentUserId}
             canManageMessages={canManageMessages}
             onDeleteMessage={onDeleteMessage}
             onEditMessage={onEditMessage}
+            onToggleMessageReaction={onToggleMessageReaction}
             onReplyToMessage={setReplyTarget}
             onReportMessage={onReportMessage}
           />
 
           {/* Input */}
           <MessageInput
-            onSendMessage={onSendMessage}
+            onSendMessage={handleSendMessage}
             onSendHavenDeveloperMessage={onSendHavenDeveloperMessage}
+            channelId={channelId}
             channelName={channelName}
             replyTarget={replyTarget}
             onClearReplyTarget={() => setReplyTarget(null)}

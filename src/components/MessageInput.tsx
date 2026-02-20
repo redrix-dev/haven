@@ -4,8 +4,23 @@ import { Button } from '@/components/ui/button';
 import { getErrorMessage } from '@/shared/lib/errors';
 
 interface MessageInputProps {
-  onSendMessage: (content: string, options?: { replyToMessageId?: string }) => Promise<void>;
-  onSendHavenDeveloperMessage?: (content: string) => Promise<void>;
+  onSendMessage: (
+    content: string,
+    options?: {
+      replyToMessageId?: string;
+      mediaFile?: File;
+      mediaExpiresInHours?: number;
+    }
+  ) => Promise<void>;
+  onSendHavenDeveloperMessage?: (
+    content: string,
+    options?: {
+      replyToMessageId?: string;
+      mediaFile?: File;
+      mediaExpiresInHours?: number;
+    }
+  ) => Promise<void>;
+  channelId: string;
   channelName: string;
   replyTarget?: {
     id: string;
@@ -18,6 +33,7 @@ interface MessageInputProps {
 export function MessageInput({
   onSendMessage,
   onSendHavenDeveloperMessage,
+  channelId,
   channelName,
   replyTarget = null,
   onClearReplyTarget,
@@ -25,13 +41,25 @@ export function MessageInput({
   const [input, setInput] = useState('');
   const [isDeveloperMode, setIsDeveloperMode] = useState(false);
   const [sendingMode, setSendingMode] = useState<'user' | 'haven_dev' | null>(null);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaExpiresInHours, setMediaExpiresInHours] = useState(24);
   const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!onSendHavenDeveloperMessage && isDeveloperMode) {
-      setIsDeveloperMode(false);
-    }
-  }, [isDeveloperMode, onSendHavenDeveloperMessage]);
+    setMediaFile(null);
+    setMediaExpiresInHours(24);
+    setSendError(null);
+  }, [channelId]);
+
+  useEffect(() => {
+    if (!sendError) return;
+    const timeoutId = window.setTimeout(() => {
+      setSendError(null);
+    }, 6000);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [sendError]);
 
   const runCommand = (content: string) => {
     const command = content.trim().toLowerCase();
@@ -59,12 +87,11 @@ export function MessageInput({
 
   const handleSubmit = async () => {
     const content = input.trim();
-    if (!content || sendingMode) return;
+    if ((!content && !mediaFile) || sendingMode) return;
 
-    if (runCommand(content)) return;
+    if (content && !mediaFile && runCommand(content)) return;
 
-    const mode: 'user' | 'haven_dev' =
-      isDeveloperMode && onSendHavenDeveloperMessage ? 'haven_dev' : 'user';
+    const mode: 'user' | 'haven_dev' = isDeveloperMode ? 'haven_dev' : 'user';
 
     setSendingMode(mode);
     setSendError(null);
@@ -74,13 +101,21 @@ export function MessageInput({
         if (!onSendHavenDeveloperMessage) {
           throw new Error('Haven developer messaging is unavailable in this channel.');
         }
-        await onSendHavenDeveloperMessage(content);
+        await onSendHavenDeveloperMessage(content, {
+          replyToMessageId: replyTarget?.id,
+          mediaFile: mediaFile ?? undefined,
+          mediaExpiresInHours: mediaFile ? mediaExpiresInHours : undefined,
+        });
       } else {
         await onSendMessage(content, {
           replyToMessageId: replyTarget?.id,
+          mediaFile: mediaFile ?? undefined,
+          mediaExpiresInHours: mediaFile ? mediaExpiresInHours : undefined,
         });
       }
       setInput('');
+      setMediaFile(null);
+      setMediaExpiresInHours(24);
       onClearReplyTarget?.();
     } catch (error: unknown) {
       console.error('Failed to send message:', error);
@@ -91,7 +126,7 @@ export function MessageInput({
   };
 
   return (
-    <div className="p-4 space-y-2">
+    <div className="shrink-0 border-t border-[#263a58] bg-[#0f1728] px-4 py-3 space-y-2 shadow-[0_-8px_18px_rgba(3,9,20,0.35)]">
       {replyTarget && (
         <div className="rounded-md border border-[#304867] bg-[#142033] px-3 py-2 flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -109,7 +144,58 @@ export function MessageInput({
           </Button>
         </div>
       )}
+      {mediaFile && (
+        <div className="rounded-md border border-[#304867] bg-[#142033] px-3 py-2 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Media attached</p>
+            <p className="text-xs text-[#d2dcef] truncate">{mediaFile.name}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-[#a9b8cf]">
+              Expires
+              <select
+                value={mediaExpiresInHours}
+                onChange={(event) => setMediaExpiresInHours(Number(event.target.value))}
+                className="ml-2 rounded border border-[#304867] bg-[#18243a] px-2 py-1 text-xs text-white"
+              >
+                <option value={1}>1h</option>
+                <option value={24}>24h</option>
+                <option value={168}>7d</option>
+                <option value={720}>30d</option>
+              </select>
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setMediaFile(null)}
+              className="text-[#a9b8cf] hover:text-white"
+            >
+              Remove
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-2">
+        <label className="shrink-0">
+          <input
+            type="file"
+            accept="image/*,video/*,application/pdf"
+            className="hidden"
+            onChange={(event) => {
+              const nextFile = event.target.files?.[0] ?? null;
+              if (!nextFile) return;
+              setMediaFile(nextFile);
+              setSendError(null);
+              event.currentTarget.value = '';
+            }}
+          />
+          <span
+            className="inline-flex h-9 items-center rounded-md border border-[#304867] px-3 text-xs text-[#d2dcef] hover:bg-[#22334f] cursor-pointer"
+          >
+            Attach
+          </span>
+        </label>
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -129,7 +215,7 @@ export function MessageInput({
         <Button
           type="button"
           onClick={() => void handleSubmit()}
-          disabled={!input.trim() || sendingMode !== null}
+          disabled={(!input.trim() && !mediaFile) || sendingMode !== null}
           className={
             isDeveloperMode
               ? 'bg-[#d6a24a] hover:bg-[#d89f2c] text-[#142033]'

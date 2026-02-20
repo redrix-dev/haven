@@ -46,7 +46,9 @@ import type {
   Channel,
   ChannelKind,
   DeveloperAccessMode,
+  MessageAttachment,
   PermissionCatalogItem,
+  MessageReaction,
   MessageReportKind,
   MessageReportTarget,
   Message,
@@ -89,7 +91,7 @@ const areVoiceParticipantListsEqual = (
 
 function ChatApp() {
   const controlPlaneBackend = getControlPlaneBackend();
-  const { user, status: authStatus, error: authError, signOut } = useAuth();
+  const { user, status: authStatus, error: authError, signOut, deleteAccount } = useAuth();
   const {
     servers,
     status: serversStatus,
@@ -110,6 +112,8 @@ function ChatApp() {
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [channelsError, setChannelsError] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messageReactions, setMessageReactions] = useState<MessageReaction[]>([]);
+  const [messageAttachments, setMessageAttachments] = useState<MessageAttachment[]>([]);
   const [currentChannelId, setCurrentChannelId] = useState<string | null>(null);
   const [authorProfiles, setAuthorProfiles] = useState<Record<string, AuthorProfile>>({});
   const [isPlatformStaff, setIsPlatformStaff] = useState(false);
@@ -212,6 +216,9 @@ function ChatApp() {
       });
       setVoiceControlActions(null);
       setVoiceJoinPrompt(null);
+      setMessages([]);
+      setMessageReactions([]);
+      setMessageAttachments([]);
       setAuthorProfiles({});
       setServerPermissions({
         isOwner: false,
@@ -433,6 +440,8 @@ function ChatApp() {
       setVoiceControlActions(null);
       setVoiceJoinPrompt(null);
       setMessages([]);
+      setMessageReactions([]);
+      setMessageAttachments([]);
       setAuthorProfiles({});
       setCanSpeakInVoiceChannel(false);
       setShowCreateChannelModal(false);
@@ -644,25 +653,37 @@ function ChatApp() {
 
     if (!user || !currentServerId || !currentChannelId) {
       setMessages([]);
+      setMessageReactions([]);
+      setMessageAttachments([]);
       setAuthorProfiles({});
       return;
     }
 
     const selectedChannel = channels.find((channel) => channel.id === currentChannelId);
-    if (selectedChannel?.kind === 'voice') {
+    if (!selectedChannel || selectedChannel.kind !== 'text') {
       setMessages([]);
+      setMessageReactions([]);
+      setMessageAttachments([]);
       setAuthorProfiles({});
       return;
     }
 
     const communityBackend = getCommunityDataBackend(currentServerId);
+    let latestLoadId = 0;
 
     const loadMessages = async () => {
+      const loadId = ++latestLoadId;
       try {
-        const messageList = await communityBackend.listMessages(currentServerId, currentChannelId);
+        const [messageList, reactionList, attachmentList] = await Promise.all([
+          communityBackend.listMessages(currentServerId, currentChannelId),
+          communityBackend.listMessageReactions(currentServerId, currentChannelId),
+          communityBackend.listMessageAttachments(currentServerId, currentChannelId),
+        ]);
 
-        if (!isMounted) return;
+        if (!isMounted || loadId !== latestLoadId) return;
         setMessages(messageList);
+        setMessageReactions(reactionList);
+        setMessageAttachments(attachmentList);
 
         const authorIds = Array.from(
           new Set(
@@ -673,29 +694,56 @@ function ChatApp() {
         );
 
         if (authorIds.length === 0) {
+          if (!isMounted || loadId !== latestLoadId) return;
           setAuthorProfiles({});
           return;
         }
 
         const profileMap = await communityBackend.fetchAuthorProfiles(authorIds);
 
-        if (!isMounted) return;
+        if (!isMounted || loadId !== latestLoadId) return;
         setAuthorProfiles(profileMap);
       } catch (error) {
-        if (!isMounted) return;
+        if (!isMounted || loadId !== latestLoadId) return;
         console.error('Error loading messages:', error);
       }
     };
 
+    const cleanupExpiredAttachments = async () => {
+      try {
+        const deletedCount = await communityBackend.cleanupExpiredMessageAttachments(100);
+        if (!isMounted) return;
+        if (deletedCount > 0) {
+          void loadMessages();
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        console.warn('Failed to clean expired attachments:', error);
+      }
+    };
+
+    void cleanupExpiredAttachments();
     void loadMessages();
 
-    const channel = communityBackend.subscribeToMessages(currentChannelId, () => {
+    const messageChannel = communityBackend.subscribeToMessages(currentChannelId, () => {
       void loadMessages();
     });
+    const reactionsChannel = communityBackend.subscribeToMessageReactions(currentChannelId, () => {
+      void loadMessages();
+    });
+    const attachmentsChannel = communityBackend.subscribeToMessageAttachments(currentChannelId, () => {
+      void loadMessages();
+    });
+    const cleanupIntervalId = window.setInterval(() => {
+      void cleanupExpiredAttachments();
+    }, 60 * 1000);
 
     return () => {
       isMounted = false;
-      void channel.unsubscribe();
+      void messageChannel.unsubscribe();
+      void reactionsChannel.unsubscribe();
+      void attachmentsChannel.unsubscribe();
+      window.clearInterval(cleanupIntervalId);
     };
   }, [user, currentServerId, currentChannelId, channels]);
 
@@ -1212,7 +1260,10 @@ function ChatApp() {
     });
   }
 
-  async function sendMessage(content: string, options?: { replyToMessageId?: string }) {
+  async function sendMessage(
+    content: string,
+    options?: { replyToMessageId?: string; mediaFile?: File; mediaExpiresInHours?: number }
+  ) {
     if (!user || !currentChannelId || !currentServerId) return;
 
     const communityBackend = getCommunityDataBackend(currentServerId);
@@ -1222,6 +1273,24 @@ function ChatApp() {
       userId: user.id,
       content,
       replyToMessageId: options?.replyToMessageId,
+      mediaUpload: options?.mediaFile
+        ? {
+            file: options.mediaFile,
+            expiresInHours: options.mediaExpiresInHours,
+          }
+        : undefined,
+    });
+  }
+
+  async function toggleMessageReaction(messageId: string, emoji: string) {
+    if (!currentServerId || !currentChannelId) throw new Error('No channel selected.');
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+    await communityBackend.toggleMessageReaction({
+      communityId: currentServerId,
+      channelId: currentChannelId,
+      messageId,
+      emoji,
     });
   }
 
@@ -1247,6 +1316,8 @@ function ChatApp() {
       messageId,
     });
     setMessages((prev) => prev.filter((message) => message.id !== messageId));
+    setMessageReactions((prev) => prev.filter((reaction) => reaction.messageId !== messageId));
+    setMessageAttachments((prev) => prev.filter((attachment) => attachment.messageId !== messageId));
   }
 
   async function reportMessage(input: {
@@ -1322,7 +1393,10 @@ function ChatApp() {
     });
   }
 
-  async function sendHavenDeveloperMessage(content: string) {
+  async function sendHavenDeveloperMessage(
+    content: string,
+    options?: { replyToMessageId?: string; mediaFile?: File; mediaExpiresInHours?: number }
+  ) {
     if (!currentChannelId || !currentServerId) return;
 
     const communityBackend = getCommunityDataBackend(currentServerId);
@@ -1330,6 +1404,13 @@ function ChatApp() {
       communityId: currentServerId,
       channelId: currentChannelId,
       content,
+      replyToMessageId: options?.replyToMessageId,
+      mediaUpload: options?.mediaFile
+        ? {
+            file: options.mediaFile,
+            expiresInHours: options.mediaExpiresInHours,
+          }
+        : undefined,
     });
   }
 
@@ -1430,7 +1511,7 @@ function ChatApp() {
 
   return (
     <>
-      <div className="flex h-screen bg-[#111a2b] text-[#e6edf7]">
+      <div className="flex h-screen overflow-hidden bg-[#111a2b] text-[#e6edf7]">
         <ServerList
           servers={servers}
           currentServerId={currentServerId}
@@ -1576,6 +1657,8 @@ function ChatApp() {
                 channelKind={currentRenderableChannel.kind}
                 currentUserDisplayName={userDisplayName}
                 messages={messages}
+                messageReactions={messageReactions}
+                messageAttachments={messageAttachments}
                 authorProfiles={authorProfiles}
                 currentUserId={user.id}
                 canSpeakInVoiceChannel={canSpeakInVoiceChannel}
@@ -1590,6 +1673,7 @@ function ChatApp() {
                 onSendMessage={sendMessage}
                 onEditMessage={editMessage}
                 onDeleteMessage={deleteMessage}
+                onToggleMessageReaction={toggleMessageReaction}
                 onReportMessage={reportMessage}
                 onSendHavenDeveloperMessage={
                   canSendHavenDeveloperMessage ? sendHavenDeveloperMessage : undefined
@@ -1765,6 +1849,7 @@ function ChatApp() {
           onAutoUpdateChange={setAutoUpdateEnabled}
           onCheckForUpdates={checkForUpdatesNow}
           onSignOut={signOut}
+          onDeleteAccount={deleteAccount}
         />
       )}
     </>

@@ -9,6 +9,72 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
+let mainWindow = null;
+const pendingProtocolUrls = [];
+
+const isHavenProtocolUrl = (value) =>
+  typeof value === 'string' && value.toLowerCase().startsWith('haven://');
+
+const extractHavenProtocolUrl = (args) => {
+  if (!Array.isArray(args)) return null;
+  for (const arg of args) {
+    if (isHavenProtocolUrl(arg)) {
+      return arg;
+    }
+  }
+  return null;
+};
+
+const focusMainWindow = () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.focus();
+};
+
+const enqueueProtocolUrl = (url) => {
+  if (!isHavenProtocolUrl(url)) return;
+  if (
+    mainWindow &&
+    !mainWindow.isDestroyed() &&
+    !mainWindow.webContents.isLoadingMainFrame()
+  ) {
+    mainWindow.webContents.send(DESKTOP_IPC_KEYS.PROTOCOL_URL_EVENT, url);
+    return;
+  }
+
+  pendingProtocolUrls.push(url);
+};
+
+const handleProtocolArgs = (args) => {
+  const protocolUrl = extractHavenProtocolUrl(args);
+  if (!protocolUrl) return;
+  enqueueProtocolUrl(protocolUrl);
+};
+
+if (hasSingleInstanceLock) {
+  handleProtocolArgs(process.argv);
+}
+
+app.on('second-instance', (_event, commandLine) => {
+  if (!hasSingleInstanceLock) return;
+  handleProtocolArgs(commandLine);
+  focusMainWindow();
+});
+
+app.on('open-url', (event, url) => {
+  if (!hasSingleInstanceLock) return;
+  event.preventDefault();
+  enqueueProtocolUrl(url);
+  focusMainWindow();
+});
+
 const settingsStore = createSettingsStore(app);
 const updaterService = createUpdaterService({
   app,
@@ -43,10 +109,14 @@ const registerIpcHandlers = () => {
   registerIpcHandler(DESKTOP_IPC_KEYS.UPDATER_CHECK_NOW, async () =>
     updaterService.checkForUpdatesNow()
   );
+
+  registerIpcHandler(DESKTOP_IPC_KEYS.PROTOCOL_URL_CONSUME_NEXT, async () =>
+    pendingProtocolUrls.shift() ?? null
+  );
 };
 
 const createWindow = () => {
-  const mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 800,
@@ -58,9 +128,10 @@ const createWindow = () => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
+  mainWindow = window;
 
   // Set CSP for renderer + Supabase + local dev server websocket.
-  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+  window.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
@@ -80,18 +151,28 @@ const createWindow = () => {
     });
   });
   // and load the index.html of the app.
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  window.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
   if (!app.isPackaged) {
     // Open the DevTools only in development.
-    mainWindow.webContents.openDevTools();
+    window.webContents.openDevTools();
   }
+
+  window.on('closed', () => {
+    if (mainWindow === window) {
+      mainWindow = null;
+    }
+  });
+
+  return window;
 };
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return;
+  app.setAsDefaultProtocolClient('haven');
   settingsStore.initialize();
   updaterService.initialize();
   registerIpcHandlers();

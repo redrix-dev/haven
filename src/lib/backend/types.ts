@@ -4,6 +4,30 @@ export type Channel = Database['public']['Tables']['channels']['Row'];
 export type Message = Database['public']['Tables']['messages']['Row'];
 export type DeveloperAccessMode = Database['public']['Enums']['developer_access_mode'];
 export type ChannelKind = Database['public']['Enums']['channel_kind'];
+export type MessageReaction = {
+  id: string;
+  messageId: string;
+  userId: string;
+  emoji: string;
+  createdAt: string;
+};
+
+export type MessageAttachment = {
+  id: string;
+  messageId: string;
+  communityId: string;
+  channelId: string;
+  ownerUserId: string;
+  bucketName: string;
+  objectPath: string;
+  originalFilename: string | null;
+  mimeType: string;
+  mediaKind: 'image' | 'video' | 'file';
+  sizeBytes: number;
+  createdAt: string;
+  expiresAt: string;
+  signedUrl: string | null;
+};
 
 export type ServerSummary = {
   id: string;

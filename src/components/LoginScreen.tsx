@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -7,10 +7,32 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/shared/lib/errors';
+
+const isEmailNotConfirmedError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+
+  const maybeError = error as { code?: unknown; message?: unknown };
+  const code = typeof maybeError.code === 'string' ? maybeError.code.toLowerCase() : '';
+  const message = typeof maybeError.message === 'string' ? maybeError.message.toLowerCase() : '';
+
+  return (
+    code === 'email_not_confirmed' ||
+    message.includes('email not confirmed') ||
+    message.includes('confirm your email')
+  );
+};
 
 export function LoginScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -19,8 +41,69 @@ export function LoginScreen() {
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [verificationChecking, setVerificationChecking] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState('');
+  const [verificationError, setVerificationError] = useState('');
+  const [pendingVerificationCredentials, setPendingVerificationCredentials] = useState<{
+    email: string;
+    password: string;
+  } | null>(null);
 
   const { signIn, signUp } = useAuth();
+
+  const handleVerificationRecheck = useCallback(async () => {
+    if (verificationChecking) return;
+
+    const nextEmail = pendingVerificationCredentials?.email ?? email.trim();
+    const nextPassword = pendingVerificationCredentials?.password ?? password;
+    if (!nextEmail || !nextPassword) {
+      setVerificationError(
+        'Enter your email and password, then recheck verification status.'
+      );
+      setVerificationStatus('');
+      return;
+    }
+
+    setPendingVerificationCredentials({ email: nextEmail, password: nextPassword });
+    setVerificationChecking(true);
+    setVerificationError('');
+    setVerificationStatus('');
+
+    try {
+      const { error: signInError } = await signIn(nextEmail, nextPassword);
+
+      if (!signInError) {
+        setVerificationStatus('Email verified. Signing you in...');
+        return;
+      }
+
+      if (isEmailNotConfirmedError(signInError)) {
+        setVerificationStatus(
+          'Email is not verified yet. Open the verification email, then recheck.'
+        );
+        return;
+      }
+
+      throw signInError;
+    } catch (recheckError: unknown) {
+      setVerificationError(
+        getErrorMessage(recheckError, 'Failed to verify your email status.')
+      );
+    } finally {
+      setVerificationChecking(false);
+    }
+  }, [
+    email,
+    password,
+    pendingVerificationCredentials,
+    signIn,
+    verificationChecking,
+  ]);
+
+  const canRecheckVerification =
+    Boolean((pendingVerificationCredentials?.email ?? email.trim()).trim()) &&
+    Boolean(pendingVerificationCredentials?.password ?? password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +117,22 @@ export function LoginScreen() {
           setLoading(false);
           return;
         }
-        const { error } = await signUp(email, password, username);
+
+        const normalizedEmail = email.trim();
+        const { error } = await signUp(normalizedEmail, password, username);
         if (error) throw error;
+
+        setPendingVerificationCredentials({
+          email: normalizedEmail,
+          password,
+        });
+        setShowVerificationModal(true);
+        setVerificationChecking(false);
+        setVerificationError('');
+        setVerificationStatus(
+          `We sent a verification link to ${normalizedEmail}. Open it to finish verification.`
+        );
+        setIsSignUp(false);
       } else {
         const { error } = await signIn(email, password);
         if (error) throw error;
@@ -133,6 +230,55 @@ export function LoginScreen() {
         </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={showVerificationModal} onOpenChange={setShowVerificationModal}>
+        <DialogContent className="bg-[#1c2a43] border-[#142033] text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Check your email</DialogTitle>
+            <DialogDescription className="text-[#aebad0]">
+              Open the verification link from your email. Haven will complete sign-in automatically when possible.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <p className="text-xs text-[#aebad0]">
+              {pendingVerificationCredentials?.email
+                ? `Verification email sent to ${pendingVerificationCredentials.email}.`
+                : 'Verification email sent. Use the same credentials to recheck.'}
+            </p>
+
+            {verificationStatus && (
+              <p className="text-xs text-[#8fc1ff] bg-[#1c3352] rounded px-3 py-2">
+                {verificationStatus}
+              </p>
+            )}
+
+            {verificationError && (
+              <p className="text-xs text-[#fca5a5] bg-[#4a1f2c] rounded px-3 py-2">
+                {verificationError}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowVerificationModal(false)}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleVerificationRecheck()}
+              disabled={verificationChecking || !canRecheckVerification}
+              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+            >
+              {verificationChecking ? 'Checking...' : 'I verified, recheck now'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
