@@ -29,6 +29,57 @@ export type MessageAttachment = {
   signedUrl: string | null;
 };
 
+export type LinkPreviewStatus = 'pending' | 'ready' | 'unsupported' | 'failed';
+export type LinkPreviewEmbedProvider = 'none' | 'youtube' | 'vimeo';
+
+export type LinkPreviewEmbed = {
+  provider: 'youtube' | 'vimeo';
+  embedUrl: string;
+  aspectRatio: number;
+};
+
+export type LinkPreviewThumbnail = {
+  bucketName: string | null;
+  objectPath: string | null;
+  sourceUrl: string | null;
+  signedUrl: string | null;
+  width: number | null;
+  height: number | null;
+  mimeType: string | null;
+};
+
+export type LinkPreviewSnapshot = {
+  sourceUrl: string;
+  normalizedUrl: string;
+  finalUrl: string | null;
+  title: string | null;
+  description: string | null;
+  siteName: string | null;
+  canonicalUrl: string | null;
+  thumbnail: LinkPreviewThumbnail | null;
+  embed: LinkPreviewEmbed | null;
+};
+
+export type MessageLinkPreview = {
+  id: string;
+  messageId: string;
+  communityId: string;
+  channelId: string;
+  sourceUrl: string | null;
+  normalizedUrl: string | null;
+  status: LinkPreviewStatus;
+  cacheId: string | null;
+  snapshot: LinkPreviewSnapshot | null;
+  embedProvider: LinkPreviewEmbedProvider;
+  thumbnailBucketName: string | null;
+  thumbnailObjectPath: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FeatureFlagKey = string;
+export type FeatureFlagsSnapshot = Record<FeatureFlagKey, boolean>;
+
 export type ServerSummary = {
   id: string;
   name: string;
@@ -39,6 +90,7 @@ export type AuthorProfile = {
   username: string;
   isPlatformStaff: boolean;
   displayPrefix: string | null;
+  avatarUrl: string | null;
 };
 
 export type ServerPermissions = {
@@ -49,8 +101,39 @@ export type ServerPermissions = {
   canCreateChannels: boolean;
   canManageChannels: boolean;
   canManageMessages: boolean;
+  canManageBans: boolean;
+  canCreateReports: boolean;
+  canRefreshLinkPreviews: boolean;
   canManageDeveloperAccess: boolean;
   canManageInvites: boolean;
+};
+
+export type CommunityMemberListItem = {
+  memberId: string;
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isOwner: boolean;
+  joinedAt: string;
+};
+
+export type CommunityBanItem = {
+  id: string;
+  communityId: string;
+  bannedUserId: string;
+  bannedByUserId: string;
+  reason: string;
+  bannedAt: string;
+  revokedAt: string | null;
+  revokedByUserId: string | null;
+  revokedReason: string | null;
+  username: string;
+  avatarUrl: string | null;
+};
+
+export type BanEligibleServer = {
+  communityId: string;
+  communityName: string;
 };
 
 export type ServerSettingsSnapshot = {
@@ -163,6 +246,20 @@ export type ChannelPermissionsSnapshot = {
   rolePermissions: ChannelRolePermissionItem[];
   memberPermissions: ChannelMemberPermissionItem[];
   memberOptions: ChannelMemberOption[];
+};
+
+export type ChannelGroup = {
+  id: string;
+  communityId: string;
+  name: string;
+  position: number;
+  channelIds: string[];
+};
+
+export type ChannelGroupState = {
+  groups: ChannelGroup[];
+  ungroupedChannelIds: string[];
+  collapsedGroupIds: string[];
 };
 
 export type MessageReportTarget = 'server_admins' | 'haven_developers' | 'both';

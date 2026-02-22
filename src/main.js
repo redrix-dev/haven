@@ -1,8 +1,13 @@
-const { app, BrowserWindow, session, ipcMain, autoUpdater } = require('electron');
+const { app, BrowserWindow, Menu, dialog, session, ipcMain, autoUpdater } = require('electron');
+const fs = require('node:fs/promises');
+const path = require('node:path');
 const { createSettingsStore } = require('./main/settings-store');
 const { createUpdaterService } = require('./main/updater-service');
 const { DESKTOP_IPC_KEYS } = require('./shared/ipc/keys');
-const { parseSetAutoUpdatePayload } = require('./shared/ipc/validators');
+const {
+  parseSaveFileFromUrlPayload,
+  parseSetAutoUpdatePayload,
+} = require('./shared/ipc/validators');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -16,6 +21,19 @@ if (!hasSingleInstanceLock) {
 
 let mainWindow = null;
 const pendingProtocolUrls = [];
+const shouldDebugContextMenus =
+  !app.isPackaged && process.env.HAVEN_DEBUG_CONTEXT_MENUS === '1';
+const shouldDebugWindowFocus = process.env.HAVEN_DEBUG_WINDOW_FOCUS === '1';
+
+const debugContextMenu = (scope, eventName, details) => {
+  if (!shouldDebugContextMenus) return;
+  console.debug(`[context-menu:${scope}] ${eventName}`, details ?? {});
+};
+
+const debugWindowFocus = (eventName, details) => {
+  if (!shouldDebugWindowFocus) return;
+  console.debug(`[window-focus] ${eventName}`, details ?? {});
+};
 
 const isHavenProtocolUrl = (value) =>
   typeof value === 'string' && value.toLowerCase().startsWith('haven://');
@@ -110,6 +128,39 @@ const registerIpcHandlers = () => {
     updaterService.checkForUpdatesNow()
   );
 
+  registerIpcHandler(DESKTOP_IPC_KEYS.MEDIA_SAVE_FROM_URL, async (event, payload) => {
+    const { url, suggestedName } = parseSaveFileFromUrlPayload(payload);
+    const targetWindow = BrowserWindow.fromWebContents(event.sender) ?? mainWindow ?? undefined;
+    const defaultPath =
+      suggestedName && suggestedName.length > 0 ? path.basename(suggestedName) : undefined;
+
+    const { canceled, filePath } = await dialog.showSaveDialog(targetWindow, {
+      title: 'Save Media',
+      defaultPath,
+      properties: ['showOverwriteConfirmation'],
+    });
+
+    if (canceled || !filePath) {
+      return {
+        saved: false,
+        filePath: null,
+      };
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to download media (${response.status}).`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    await fs.writeFile(filePath, Buffer.from(arrayBuffer));
+
+    return {
+      saved: true,
+      filePath,
+    };
+  });
+
   registerIpcHandler(DESKTOP_IPC_KEYS.PROTOCOL_URL_CONSUME_NEXT, async () =>
     pendingProtocolUrls.shift() ?? null
   );
@@ -130,8 +181,43 @@ const createWindow = () => {
   });
   mainWindow = window;
 
-  // Set CSP for renderer + Supabase + local dev server websocket.
+  if (shouldDebugWindowFocus) {
+    window.on('focus', () => {
+      debugWindowFocus('focus', { minimized: window.isMinimized(), visible: window.isVisible() });
+    });
+    window.on('blur', () => {
+      debugWindowFocus('blur', { visible: window.isVisible() });
+    });
+    window.on('show', () => {
+      debugWindowFocus('show');
+    });
+    window.on('hide', () => {
+      debugWindowFocus('hide');
+    });
+    window.webContents.on('did-start-loading', () => {
+      debugWindowFocus('did-start-loading', { url: window.webContents.getURL() });
+    });
+    window.webContents.on('did-finish-load', () => {
+      debugWindowFocus('did-finish-load', { url: window.webContents.getURL() });
+    });
+  }
+
+  // Set CSP for the app renderer document only.
+  // Do not inject this into third-party iframe responses (YouTube/Vimeo), or Chromium will
+  // block them because our `frame-ancestors 'none'` policy would apply to the embedded page.
   window.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    const url = typeof details.url === 'string' ? details.url : '';
+    const isRendererDocument =
+      details.resourceType === 'mainFrame' &&
+      (url.startsWith('http://localhost:') ||
+        url.startsWith('http://127.0.0.1:') ||
+        url.startsWith('file://'));
+
+    if (!isRendererDocument) {
+      callback({ responseHeaders: details.responseHeaders });
+      return;
+    }
+
     callback({
       responseHeaders: {
         ...details.responseHeaders,
@@ -140,9 +226,11 @@ const createWindow = () => {
           "script-src 'self'; " +
           "style-src 'self' 'unsafe-inline'; " +
           "connect-src 'self' http://localhost:9000 ws://localhost:9000 https://*.supabase.co wss://*.supabase.co https://*.supabase.in wss://*.supabase.in stun: turn:; " +
-          "media-src 'self' blob: mediastream:; " +
+          "media-src 'self' blob: mediastream: https:; " +
           "img-src 'self' data: https: blob:; " +
           "font-src 'self' data:; " +
+          "child-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; " +
+          "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; " +
           "object-src 'none'; " +
           "base-uri 'self'; " +
           "frame-ancestors 'none';"
@@ -157,6 +245,41 @@ const createWindow = () => {
     // Open the DevTools only in development.
     window.webContents.openDevTools();
   }
+
+  window.webContents.on('context-menu', (_event, params) => {
+    const hasSelectedText =
+      typeof params.selectionText === 'string' && params.selectionText.trim().length > 0;
+
+    debugContextMenu('text-native', 'event', {
+      isEditable: params.isEditable,
+      hasSelectedText,
+      mediaType: params.mediaType,
+    });
+
+    if (!params.isEditable && !hasSelectedText) return;
+
+    const template = params.isEditable
+      ? [
+          { role: 'cut', enabled: Boolean(params.editFlags?.canCut) },
+          { role: 'copy', enabled: Boolean(params.editFlags?.canCopy) },
+          { role: 'paste', enabled: Boolean(params.editFlags?.canPaste) },
+          { type: 'separator' },
+          { role: 'selectAll' },
+        ]
+      : [
+          { role: 'copy', enabled: hasSelectedText },
+          { role: 'selectAll' },
+        ];
+
+    debugContextMenu('text-native', 'menu-open', {
+      isEditable: params.isEditable,
+      hasSelectedText,
+      itemCount: template.length,
+    });
+
+    const menu = Menu.buildFromTemplate(template);
+    menu.popup({ window });
+  });
 
   window.on('closed', () => {
     if (mainWindow === window) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { getErrorMessage } from '@/shared/lib/errors';
@@ -28,6 +28,7 @@ interface MessageInputProps {
     preview: string;
   } | null;
   onClearReplyTarget?: () => void;
+  onContainerHeightChange?: (height: number) => void;
 }
 
 export function MessageInput({
@@ -37,7 +38,9 @@ export function MessageInput({
   channelName,
   replyTarget = null,
   onClearReplyTarget,
+  onContainerHeightChange,
 }: MessageInputProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [input, setInput] = useState('');
   const [isDeveloperMode, setIsDeveloperMode] = useState(false);
   const [sendingMode, setSendingMode] = useState<'user' | 'haven_dev' | null>(null);
@@ -60,6 +63,38 @@ export function MessageInput({
       window.clearTimeout(timeoutId);
     };
   }, [sendError]);
+
+  useLayoutEffect(() => {
+    if (!onContainerHeightChange || !containerRef.current) return;
+
+    const node = containerRef.current;
+    let lastHeight = -1;
+
+    const emitHeight = () => {
+      const nextHeight = Math.ceil(node.getBoundingClientRect().height);
+      if (nextHeight === lastHeight) return;
+      lastHeight = nextHeight;
+      onContainerHeightChange(nextHeight);
+    };
+
+    emitHeight();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        onContainerHeightChange(0);
+      };
+    }
+
+    const observer = new ResizeObserver(() => {
+      emitHeight();
+    });
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+      onContainerHeightChange(0);
+    };
+  }, [onContainerHeightChange]);
 
   const runCommand = (content: string) => {
     const command = content.trim().toLowerCase();
@@ -126,7 +161,11 @@ export function MessageInput({
   };
 
   return (
-    <div className="shrink-0 border-t border-[#263a58] bg-[#0f1728] px-4 py-3 space-y-2 shadow-[0_-8px_18px_rgba(3,9,20,0.35)]">
+    <div
+      ref={containerRef}
+      data-message-input-root="true"
+      className="shrink-0 border-t border-[#263a58] bg-[#0f1728] px-4 py-3 space-y-2 shadow-[0_-8px_18px_rgba(3,9,20,0.35)]"
+    >
       {replyTarget && (
         <div className="rounded-md border border-[#304867] bg-[#142033] px-3 py-2 flex items-start justify-between gap-3">
           <div className="min-w-0">

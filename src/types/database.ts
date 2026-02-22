@@ -39,6 +39,162 @@ export type Database = {
   }
   public: {
     Tables: {
+      background_worker_cron_config: {
+        Row: {
+          created_at: string
+          cron_shared_secret: string | null
+          edge_base_url: string | null
+          enabled: boolean
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cron_shared_secret?: string | null
+          edge_base_url?: string | null
+          enabled?: boolean
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cron_shared_secret?: string | null
+          edge_base_url?: string | null
+          enabled?: boolean
+          id?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      channel_group_channels: {
+        Row: {
+          channel_id: string
+          community_id: string
+          created_at: string
+          group_id: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          channel_id: string
+          community_id: string
+          created_at?: string
+          group_id: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          channel_id?: string
+          community_id?: string
+          created_at?: string
+          group_id?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_group_channels_community_id_channel_id_fkey"
+            columns: ["community_id", "channel_id"]
+            isOneToOne: true
+            referencedRelation: "channels"
+            referencedColumns: ["community_id", "id"]
+          },
+          {
+            foreignKeyName: "channel_group_channels_community_id_group_id_fkey"
+            columns: ["community_id", "group_id"]
+            isOneToOne: false
+            referencedRelation: "channel_groups"
+            referencedColumns: ["community_id", "id"]
+          },
+        ]
+      }
+      channel_group_preferences: {
+        Row: {
+          community_id: string
+          created_at: string
+          group_id: string
+          is_collapsed: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          community_id: string
+          created_at?: string
+          group_id: string
+          is_collapsed?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          community_id?: string
+          created_at?: string
+          group_id?: string
+          is_collapsed?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_group_preferences_community_id_group_id_fkey"
+            columns: ["community_id", "group_id"]
+            isOneToOne: false
+            referencedRelation: "channel_groups"
+            referencedColumns: ["community_id", "id"]
+          },
+          {
+            foreignKeyName: "channel_group_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_groups: {
+        Row: {
+          community_id: string
+          created_at: string
+          created_by_user_id: string
+          id: string
+          name: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          community_id: string
+          created_at?: string
+          created_by_user_id: string
+          id?: string
+          name: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          community_id?: string
+          created_at?: string
+          created_by_user_id?: string
+          id?: string
+          name?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_groups_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_groups_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_member_overwrites: {
         Row: {
           can_manage: boolean | null
@@ -156,7 +312,7 @@ export type Database = {
         Insert: {
           community_id: string
           created_at?: string
-          created_by_user_id: string
+          created_by_user_id?: string
           id?: string
           kind?: Database["public"]["Enums"]["channel_kind"]
           name: string
@@ -261,6 +417,77 @@ export type Database = {
             columns: ["community_id"]
             isOneToOne: true
             referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_bans: {
+        Row: {
+          banned_at: string
+          banned_by_user_id: string
+          banned_user_id: string
+          community_id: string
+          created_at: string
+          id: string
+          reason: string
+          revoked_at: string | null
+          revoked_by_user_id: string | null
+          revoked_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          banned_at?: string
+          banned_by_user_id: string
+          banned_user_id: string
+          community_id: string
+          created_at?: string
+          id?: string
+          reason: string
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          revoked_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          banned_at?: string
+          banned_by_user_id?: string
+          banned_user_id?: string
+          community_id?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          revoked_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_bans_banned_by_user_id_fkey"
+            columns: ["banned_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_bans_banned_user_id_fkey"
+            columns: ["banned_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_bans_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_bans_revoked_by_user_id_fkey"
+            columns: ["revoked_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -470,6 +697,113 @@ export type Database = {
           },
         ]
       }
+      link_preview_cache: {
+        Row: {
+          created_at: string
+          etag: string | null
+          fetched_at: string | null
+          final_url: string | null
+          id: string
+          last_error_code: string | null
+          last_error_message: string | null
+          last_modified: string | null
+          normalized_url: string
+          payload: Json
+          stale_after: string | null
+          status: Database["public"]["Enums"]["link_preview_status"]
+          thumbnail_bucket_name: string | null
+          thumbnail_object_path: string | null
+          thumbnail_source_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          etag?: string | null
+          fetched_at?: string | null
+          final_url?: string | null
+          id?: string
+          last_error_code?: string | null
+          last_error_message?: string | null
+          last_modified?: string | null
+          normalized_url: string
+          payload?: Json
+          stale_after?: string | null
+          status?: Database["public"]["Enums"]["link_preview_status"]
+          thumbnail_bucket_name?: string | null
+          thumbnail_object_path?: string | null
+          thumbnail_source_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          etag?: string | null
+          fetched_at?: string | null
+          final_url?: string | null
+          id?: string
+          last_error_code?: string | null
+          last_error_message?: string | null
+          last_modified?: string | null
+          normalized_url?: string
+          payload?: Json
+          stale_after?: string | null
+          status?: Database["public"]["Enums"]["link_preview_status"]
+          thumbnail_bucket_name?: string | null
+          thumbnail_object_path?: string | null
+          thumbnail_source_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      link_preview_jobs: {
+        Row: {
+          attempts: number
+          available_at: string
+          created_at: string
+          id: string
+          last_error: string | null
+          lease_expires_at: string | null
+          locked_at: string | null
+          message_id: string
+          reason: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          locked_at?: string | null
+          message_id: string
+          reason: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          locked_at?: string | null
+          message_id?: string
+          reason?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "link_preview_jobs_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_roles: {
         Row: {
           assigned_at: string
@@ -513,6 +847,279 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "roles"
             referencedColumns: ["community_id", "id"]
+          },
+        ]
+      }
+      message_attachment_deletion_jobs: {
+        Row: {
+          attachment_id: string | null
+          attempts: number
+          available_at: string
+          bucket_name: string
+          community_id: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          lease_expires_at: string | null
+          locked_at: string | null
+          message_id: string | null
+          object_path: string
+          processed_at: string | null
+          reason: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attachment_id?: string | null
+          attempts?: number
+          available_at?: string
+          bucket_name: string
+          community_id?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          locked_at?: string | null
+          message_id?: string | null
+          object_path: string
+          processed_at?: string | null
+          reason?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attachment_id?: string | null
+          attempts?: number
+          available_at?: string
+          bucket_name?: string
+          community_id?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          locked_at?: string | null
+          message_id?: string | null
+          object_path?: string
+          processed_at?: string | null
+          reason?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      message_attachments: {
+        Row: {
+          bucket_name: string
+          channel_id: string
+          community_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          media_kind: string
+          message_id: string
+          mime_type: string
+          object_path: string
+          original_filename: string | null
+          owner_user_id: string
+          size_bytes: number
+        }
+        Insert: {
+          bucket_name?: string
+          channel_id: string
+          community_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          media_kind: string
+          message_id: string
+          mime_type: string
+          object_path: string
+          original_filename?: string | null
+          owner_user_id: string
+          size_bytes: number
+        }
+        Update: {
+          bucket_name?: string
+          channel_id?: string
+          community_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          media_kind?: string
+          message_id?: string
+          mime_type?: string
+          object_path?: string
+          original_filename?: string | null
+          owner_user_id?: string
+          size_bytes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_attachments_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_attachments_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_attachments_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_link_previews: {
+        Row: {
+          cache_id: string | null
+          channel_id: string
+          community_id: string
+          created_at: string
+          embed_provider: Database["public"]["Enums"]["link_embed_provider"]
+          id: string
+          message_id: string
+          normalized_url: string | null
+          snapshot: Json
+          source_url: string | null
+          status: Database["public"]["Enums"]["link_preview_status"]
+          thumbnail_bucket_name: string | null
+          thumbnail_object_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          cache_id?: string | null
+          channel_id: string
+          community_id: string
+          created_at?: string
+          embed_provider?: Database["public"]["Enums"]["link_embed_provider"]
+          id?: string
+          message_id: string
+          normalized_url?: string | null
+          snapshot?: Json
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["link_preview_status"]
+          thumbnail_bucket_name?: string | null
+          thumbnail_object_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cache_id?: string | null
+          channel_id?: string
+          community_id?: string
+          created_at?: string
+          embed_provider?: Database["public"]["Enums"]["link_embed_provider"]
+          id?: string
+          message_id?: string
+          normalized_url?: string | null
+          snapshot?: Json
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["link_preview_status"]
+          thumbnail_bucket_name?: string | null
+          thumbnail_object_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_link_previews_cache_id_fkey"
+            columns: ["cache_id"]
+            isOneToOne: false
+            referencedRelation: "link_preview_cache"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_link_previews_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_link_previews_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_link_previews_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_reactions: {
+        Row: {
+          channel_id: string
+          community_id: string
+          created_at: string
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          community_id: string
+          created_at?: string
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          community_id?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reactions_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -856,12 +1463,101 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ban_community_member: {
+        Args: {
+          p_community_id: string
+          p_reason: string
+          p_target_user_id: string
+        }
+        Returns: {
+          banned_at: string
+          banned_by_user_id: string
+          banned_user_id: string
+          community_id: string
+          created_at: string
+          id: string
+          reason: string
+          revoked_at: string | null
+          revoked_by_user_id: string | null
+          revoked_reason: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "community_bans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      can_manage_member_by_position: {
+        Args: { p_community_id: string; p_member_id: string }
+        Returns: boolean
+      }
+      can_manage_role_by_position: {
+        Args: { p_community_id: string; p_role_id: string }
+        Returns: boolean
+      }
       can_post_haven_dev_message: {
         Args: { p_user_id?: string }
         Returns: boolean
       }
       can_send_in_channel: { Args: { p_channel_id: string }; Returns: boolean }
+      can_set_role_position: {
+        Args: { p_community_id: string; p_position: number }
+        Returns: boolean
+      }
       can_view_channel: { Args: { p_channel_id: string }; Returns: boolean }
+      claim_link_preview_jobs: {
+        Args: { p_lease_seconds?: number; p_limit?: number }
+        Returns: {
+          attempts: number
+          available_at: string
+          created_at: string
+          id: string
+          message_id: string
+          reason: string
+          status: string
+        }[]
+      }
+      claim_message_attachment_deletion_jobs: {
+        Args: { p_lease_seconds?: number; p_limit?: number }
+        Returns: {
+          attachment_id: string
+          attempts: number
+          available_at: string
+          bucket_name: string
+          community_id: string
+          created_at: string
+          id: string
+          message_id: string
+          object_path: string
+          reason: string
+          status: string
+        }[]
+      }
+      cleanup_expired_message_attachments: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      complete_link_preview_job: {
+        Args: {
+          p_error?: string
+          p_job_id: string
+          p_outcome: string
+          p_retry_delay_seconds?: number
+        }
+        Returns: undefined
+      }
+      complete_message_attachment_deletion_job: {
+        Args: {
+          p_error?: string
+          p_job_id: string
+          p_outcome: string
+          p_retry_delay_seconds?: number
+        }
+        Returns: undefined
+      }
+      configure_haven_background_cron_jobs: { Args: never; Returns: undefined }
       create_community: {
         Args: { p_description?: string; p_name: string }
         Returns: {
@@ -903,12 +1599,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      current_user_highest_role_position: {
+        Args: { p_community_id: string }
+        Returns: number
+      }
+      delete_own_account: { Args: never; Returns: undefined }
+      enqueue_link_preview_jobs_for_messages: {
+        Args: { p_message_ids: string[]; p_reason?: string }
+        Returns: {
+          message_id: string
+          queued: boolean
+        }[]
+      }
+      extract_first_http_url: { Args: { p_content: string }; Returns: string }
       is_community_member: {
         Args: { p_community_id: string }
         Returns: boolean
       }
       is_community_owner: { Args: { p_community_id: string }; Returns: boolean }
       is_platform_staff: { Args: { p_user_id?: string }; Returns: boolean }
+      list_bannable_shared_communities: {
+        Args: { p_target_user_id: string }
+        Returns: {
+          community_id: string
+          community_name: string
+        }[]
+      }
+      member_highest_role_position: {
+        Args: { p_community_id: string; p_member_id: string }
+        Returns: number
+      }
       post_haven_dev_message: {
         Args: {
           p_channel_id: string
@@ -943,6 +1663,41 @@ export type Database = {
           joined: boolean
         }[]
       }
+      set_haven_background_cron_config: {
+        Args: {
+          p_cron_shared_secret: string
+          p_edge_base_url: string
+          p_enabled?: boolean
+        }
+        Returns: undefined
+      }
+      try_parse_uuid: { Args: { p_value: string }; Returns: string }
+      unban_community_member: {
+        Args: {
+          p_community_id: string
+          p_reason?: string
+          p_target_user_id: string
+        }
+        Returns: {
+          banned_at: string
+          banned_by_user_id: string
+          banned_user_id: string
+          community_id: string
+          created_at: string
+          id: string
+          reason: string
+          revoked_at: string | null
+          revoked_by_user_id: string | null
+          revoked_reason: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "community_bans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       user_has_permission: {
         Args: { p_community_id: string; p_permission_key: string }
         Returns: boolean
@@ -952,6 +1707,8 @@ export type Database = {
       channel_kind: "text" | "voice"
       community_backend_kind: "central_supabase" | "byo_supabase" | "byo_rest"
       developer_access_mode: "report_only" | "channel_scoped"
+      link_embed_provider: "none" | "youtube" | "vimeo"
+      link_preview_status: "pending" | "ready" | "unsupported" | "failed"
       message_author_type: "user" | "haven_dev" | "system"
       support_report_status: "open" | "in_review" | "resolved" | "closed"
     }
@@ -1087,6 +1844,8 @@ export const Constants = {
       channel_kind: ["text", "voice"],
       community_backend_kind: ["central_supabase", "byo_supabase", "byo_rest"],
       developer_access_mode: ["report_only", "channel_scoped"],
+      link_embed_provider: ["none", "youtube", "vimeo"],
+      link_preview_status: ["pending", "ready", "unsupported", "failed"],
       message_author_type: ["user", "haven_dev", "system"],
       support_report_status: ["open", "in_review", "resolved", "closed"],
     },

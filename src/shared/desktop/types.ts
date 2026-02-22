@@ -27,6 +27,11 @@ export type UpdaterStatus = {
   repository: string;
 };
 
+export type SaveFileFromUrlResult = {
+  saved: boolean;
+  filePath: string | null;
+};
+
 export type DesktopAPI = {
   getAppSettings: () => Promise<AppSettings>;
   setAutoUpdateEnabled: (enabled: boolean) => Promise<{
@@ -35,6 +40,10 @@ export type DesktopAPI = {
   }>;
   getUpdaterStatus: () => Promise<UpdaterStatus>;
   checkForUpdates: () => Promise<UpdaterStatus>;
+  saveFileFromUrl: (input: {
+    url: string;
+    suggestedName?: string | null;
+  }) => Promise<SaveFileFromUrlResult>;
   consumeNextProtocolUrl: () => Promise<string | null>;
   onProtocolUrl: (listener: (url: string) => void) => () => void;
 };
