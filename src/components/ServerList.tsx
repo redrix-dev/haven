@@ -2,7 +2,7 @@ import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bell, LogIn, Plus, ShieldAlert, Users } from 'lucide-react';
+import { Bell, LogIn, MessageCircle, Plus, ShieldAlert, Users } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   ContextMenu,
@@ -32,6 +32,8 @@ interface ServerListProps {
   onOpenNotifications?: () => void;
   notificationUnseenCount?: number;
   notificationHasUnseenPulse?: boolean;
+  onOpenDirectMessages?: () => void;
+  directMessagesActive?: boolean;
   onOpenFriends?: () => void;
   friendRequestIncomingCount?: number;
   friendRequestHasPendingPulse?: boolean;
@@ -58,6 +60,8 @@ export function ServerList({
   onOpenNotifications,
   notificationUnseenCount = 0,
   notificationHasUnseenPulse = false,
+  onOpenDirectMessages,
+  directMessagesActive = false,
   onOpenFriends,
   friendRequestIncomingCount = 0,
   friendRequestHasPendingPulse = false,
@@ -269,6 +273,27 @@ export function ServerList({
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={8}>
                 Friends
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {onOpenDirectMessages && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  onClick={onOpenDirectMessages}
+                  className={`${squareButtonBaseClass} ${
+                    directMessagesActive
+                      ? 'bg-[#3f79d8] hover:bg-[#3f79d8] text-white'
+                      : 'bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white'
+                  }`}
+                >
+                  <MessageCircle className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                Direct messages
               </TooltipContent>
             </Tooltip>
           )}

@@ -1,14 +1,16 @@
-function buildRendererCsp({ rendererOrigin }) {
-  const origin = typeof rendererOrigin === 'string' ? rendererOrigin : '';
-  let rendererWebsocketOrigin = '';
-
+function toWebsocketOrigin(origin) {
   try {
     const parsed = new URL(origin);
     const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
-    rendererWebsocketOrigin = `${wsProtocol}//${parsed.host}`;
+    return `${wsProtocol}//${parsed.host}`;
   } catch {
-    rendererWebsocketOrigin = '';
+    return '';
   }
+}
+
+function buildRendererCsp({ rendererOrigin, extraConnectSrc = [] }) {
+  const origin = typeof rendererOrigin === 'string' ? rendererOrigin : '';
+  const rendererWebsocketOrigin = toWebsocketOrigin(origin);
 
   const connectSrc = [
     "'self'",
@@ -24,6 +26,15 @@ function buildRendererCsp({ rendererOrigin }) {
 
   if (rendererWebsocketOrigin) {
     connectSrc.push(rendererWebsocketOrigin);
+  }
+
+  for (const entry of extraConnectSrc) {
+    if (typeof entry !== 'string') continue;
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    if (!connectSrc.includes(trimmed)) {
+      connectSrc.push(trimmed);
+    }
   }
 
   return (
@@ -44,5 +55,8 @@ function buildRendererCsp({ rendererOrigin }) {
 
 module.exports = {
   buildRendererCsp,
+  _private: {
+    toWebsocketOrigin,
+  },
 };
 

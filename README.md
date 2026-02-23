@@ -57,15 +57,33 @@ Haven is early and actively evolving. The focus right now is MVP completeness, p
 
 ## Local development
 
-Local dev currently assumes a compatible Supabase project with the full migration set and required secrets configured.
+Haven supports two practical local workflows:
 
-If you do not have that setup, use packaged builds instead.
+1. Code + UI work (no hosted backend access required)
+2. Full backend/runtime work with a compatible Supabase project and required secrets
 
-Full local bootstrap docs are not finalized yet.
+If you do not have a shared backend setup, you can still:
+- run packaged builds
+- run the local Supabase-backed test harness (for DB/RLS/backend tests)
+
+See:
+- `docs/collaborator-setup.md` (small-team collaborator setup + secrets guidance)
+- `docs/haven-workflow.md` (end-to-end dev and release workflow)
 
 ## Local testing (Phase 5 hardening pass)
 
 Haven now includes a local Supabase-backed regression harness for SQL/RLS and backend seam tests.
+
+Quick prerequisites (details in docs):
+- Docker Desktop running (Windows: WSL2 required)
+- `psql` installed (PostgreSQL client)
+- `npm ci`
+- `npx supabase start`
+
+Setup/help docs:
+- `docs/collaborator-setup.md` (collaborator-focused setup + secrets handling)
+- `docs/testing/rls-and-hardening-runbook.md` (operational runbook)
+- `docs/testing/test-suite-breakdown.md` (how the suite works end-to-end)
 
 Core commands:
 
@@ -80,9 +98,16 @@ Coverage summary:
 - `test:backend` -> backend seam contract/integration tests against local Supabase
 - `test:unit` -> minimal renderer/component tests for notification/DM UX flows
 
-Runbook and audit docs:
-- `docs/testing/rls-and-hardening-runbook.md`
+Additional testing docs:
 - `docs/testing/hardening-audit.md`
+
+You can also generate a local proof report (with logs + a human-readable learning breakdown):
+
+```bash
+npm run test:report
+```
+
+Outputs are written to git-ignored `test-reports/*.local/`.
 
 ## Packaged renderer parity (embedded media)
 
@@ -95,3 +120,20 @@ Important rollout note:
 
 Architecture doc:
 - `docs/architecture/renderer-entry-origin-parity.md`
+
+## Documentation map
+
+Use this repo as a doc hub, not just a README.
+
+- `docs/haven-workflow.md`
+  - End-to-end daily dev + release workflow (branches, commits, versioning, publish, hotfixes)
+- `docs/collaborator-setup.md`
+  - Small-team collaborator setup, prerequisites, and secrets/environment handling
+- `docs/AGENTS.md`
+  - Repo-wide engineering and safety rules
+- `docs/auto-updates.md`
+  - Auto-update behavior and publish notes
+- `docs/testing/rls-and-hardening-runbook.md`
+  - Operational runbook for local Supabase-backed DB/RLS/backend tests
+- `docs/testing/test-suite-breakdown.md`
+  - How the test stack works and how to read generated test reports

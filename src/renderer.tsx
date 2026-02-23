@@ -87,6 +87,7 @@ import type {
   SocialCounts,
 } from '@/lib/backend/types';
 import { Headphones, Mic, MicOff, PhoneOff, Settings2, VolumeX } from 'lucide-react';
+import { toast, Toaster as SonnerToaster } from 'sonner';
 import '@/styles/globals.css';
 
 type VoiceSidebarParticipant = {
@@ -351,6 +352,8 @@ function ChatApp() {
   const channelsByServerCacheRef = useRef<Record<string, Channel[]>>({});
   const lastSelectedChannelIdByServerRef = useRef<Record<string, string | null>>({});
   const messageBundleByChannelCacheRef = useRef<Record<string, ChannelMessageBundleCacheEntry>>({});
+  const dmReadMarkInFlightRef = useRef<Record<string, boolean>>({});
+  const dmLastReadMarkAtRef = useRef<Record<string, number>>({});
   const knownNotificationRecipientIdsRef = useRef<Set<string>>(new Set());
   const notificationsBootstrappedRef = useRef(false);
   const notificationAudioSettingsRef = useRef<NotificationAudioSettings>(
@@ -910,7 +913,19 @@ function ChatApp() {
         setDmMessages(messages);
 
         if (options?.markRead !== false) {
-          await directMessageBackend.markConversationRead(conversationId);
+          const now = Date.now();
+          const lastMarkedAt = dmLastReadMarkAtRef.current[conversationId] ?? 0;
+          const recentlyMarked = now - lastMarkedAt < 1500;
+          const inFlight = Boolean(dmReadMarkInFlightRef.current[conversationId]);
+          if (!recentlyMarked && !inFlight) {
+            dmReadMarkInFlightRef.current[conversationId] = true;
+            try {
+              await directMessageBackend.markConversationRead(conversationId);
+              dmLastReadMarkAtRef.current[conversationId] = Date.now();
+            } finally {
+              dmReadMarkInFlightRef.current[conversationId] = false;
+            }
+          }
         }
       } catch (error) {
         if (selectedDmConversationId !== conversationId) return;
@@ -969,14 +984,6 @@ function ChatApp() {
       void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
         console.error('Failed to refresh DM conversations after realtime update:', error);
       });
-      if (dmWorkspaceIsActive && selectedDmConversationId) {
-        void refreshDmMessages(selectedDmConversationId, {
-          suppressLoadingState: true,
-          markRead: false,
-        }).catch((error) => {
-          console.error('Failed to refresh selected DM after realtime update:', error);
-        });
-      }
     });
 
     return () => {
@@ -3274,6 +3281,33 @@ function ChatApp() {
     return controlPlaneBackend.listBanEligibleServersForUser(targetUserId);
   }
 
+  function openDirectMessagesWorkspace() {
+    if (!dmWorkspaceEnabled) {
+      const message = 'Direct messages are not enabled for your account.';
+      setDmConversationsError(message);
+      toast.error(message, { id: 'dm-workspace-disabled' });
+      return;
+    }
+
+    setWorkspaceMode('dm');
+    setNotificationsPanelOpen(false);
+    setFriendsPanelOpen(false);
+    setFriendsPanelRequestedTab(null);
+    setFriendsPanelHighlightedRequestId(null);
+    setDmConversationsError(null);
+
+    if (!selectedDmConversationId && dmConversations.length > 0) {
+      setSelectedDmConversationId(dmConversations[0].conversationId);
+    }
+
+    void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
+      const message = getErrorMessage(error, 'Failed to load direct messages.');
+      console.error('Failed to open direct messages workspace:', error);
+      setDmConversationsError(message);
+      toast.error(message, { id: 'dm-workspace-open-error' });
+    });
+  }
+
   async function openDirectMessageWithUser(targetUserId: string) {
     if (!user) {
       throw new Error('Not authenticated.');
@@ -3304,13 +3338,60 @@ function ChatApp() {
   }
 
   function directMessageUser(targetUserId: string) {
+    setDmConversationsError(null);
+
     if (!dmWorkspaceEnabled) {
-      window.alert('Direct messages are coming soon.');
+      const message = 'Direct messages are coming soon.';
+      setDmConversationsError(message);
+      toast.error(message, { id: 'dm-open-disabled' });
+      return;
+    }
+
+    if (!targetUserId) {
+      const message = 'Invalid DM target.';
+      setDmConversationsError(message);
+      toast.error(message, { id: 'dm-open-invalid-target' });
+      return;
+    }
+
+    if (user?.id && targetUserId === user.id) {
+      const message = 'You cannot direct message yourself.';
+      setDmConversationsError(message);
+      toast.error(message, { id: 'dm-open-self' });
       return;
     }
 
     void openDirectMessageWithUser(targetUserId).catch((error) => {
-      window.alert(getErrorMessage(error, 'Failed to open direct message.'));
+      const message = getErrorMessage(error, 'Failed to open direct message.');
+      const errorCode =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        typeof (error as { code?: unknown }).code === 'string'
+          ? ((error as { code: string }).code ?? null)
+          : null;
+
+      console.error('Failed to open direct message:', error);
+      setDmConversationsError(message);
+
+      if (errorCode === 'P0001' && message.includes('friends list')) {
+        toast.error(message, {
+          id: 'dm-open-friends-only',
+          action: friendsSocialPanelEnabled
+            ? {
+                label: 'Open Friends',
+                onClick: () => {
+                  setFriendsPanelRequestedTab('add');
+                  setFriendsPanelHighlightedRequestId(null);
+                  setFriendsPanelOpen(true);
+                },
+              }
+            : undefined,
+        });
+        return;
+      }
+
+      toast.error(message, { id: 'dm-open-error' });
     });
   }
 
@@ -3331,8 +3412,10 @@ function ChatApp() {
         refreshDmConversations({ suppressLoadingState: true }),
       ]);
     } catch (error) {
-      setDmMessagesError(getErrorMessage(error, 'Failed to send direct message.'));
-      throw error;
+      const message = getErrorMessage(error, 'Failed to send direct message.');
+      console.error('Failed to send direct message:', error);
+      setDmMessagesError(message);
+      throw new Error(message);
     } finally {
       setDmMessageSendPending(false);
     }
@@ -3817,6 +3900,8 @@ function ChatApp() {
           onOpenNotifications={() => setNotificationsPanelOpen(true)}
           notificationUnseenCount={notificationCounts.unseenCount}
           notificationHasUnseenPulse={notificationCounts.unseenCount > 0}
+          onOpenDirectMessages={dmWorkspaceEnabled ? openDirectMessagesWorkspace : undefined}
+          directMessagesActive={dmWorkspaceIsActive}
           onOpenFriends={
             friendsSocialPanelEnabled
               ? () => {
@@ -4358,6 +4443,7 @@ function ChatApp() {
 
       <ServerMembersModal
         open={showMembersModal}
+        currentUserId={user?.id ?? null}
         serverName={membersModalServerName}
         loading={membersModalLoading}
         error={membersModalError}
@@ -4474,7 +4560,39 @@ function App() {
 const root = createRoot(document.body);
 root.render(
   <TooltipProvider>
-    <App />
+    <>
+      <App />
+      <SonnerToaster
+        position="top-right"
+        theme="dark"
+        closeButton
+        toastOptions={{
+          className: '!bg-[#162238] !border !border-[#304867] !text-white !shadow-2xl',
+          descriptionClassName: '!text-[#a9b8cf]',
+          classNames: {
+            actionButton:
+              '!bg-[#3f79d8] !text-white !border !border-[#325fae] hover:!bg-[#325fae] focus:!ring-2 focus:!ring-[#6ea2ff] focus:!ring-offset-0',
+            cancelButton:
+              '!bg-[#1d2a42] !text-white !border !border-[#304867] hover:!bg-[#22324d]',
+          },
+          actionButtonStyle: {
+            background: '#3f79d8',
+            color: '#ffffff',
+            border: '1px solid #325fae',
+          },
+          cancelButtonStyle: {
+            background: '#1d2a42',
+            color: '#ffffff',
+            border: '1px solid #304867',
+          },
+          style: {
+            background: '#162238',
+            color: '#e6edf7',
+            border: '1px solid #304867',
+          },
+        }}
+      />
+    </>
   </TooltipProvider>
 );
 

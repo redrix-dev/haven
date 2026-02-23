@@ -1,4 +1,5 @@
 create schema if not exists test_support;
+grant usage on schema test_support to public;
 
 create or replace function test_support.note(p_message text)
 returns void
@@ -114,4 +115,6 @@ begin
   perform test_support.assert_eq_int(v_actual, p_expected, p_message);
 end;
 $$;
+
+grant execute on all functions in schema test_support to public;
 

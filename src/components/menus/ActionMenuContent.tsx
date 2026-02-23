@@ -25,11 +25,73 @@ interface ActionMenuContentProps {
 
 export function ActionMenuContent({ mode, actions, scope }: ActionMenuContentProps) {
   const submenuController = useSubmenuController({ scope });
-  const runAfterMenuClose = React.useCallback((callback: () => void) => {
-    window.setTimeout(() => {
-      callback();
-    }, 0);
+  const repairStuckMenuInteractionState = React.useCallback(() => {
+    const hasOpenMenu = Boolean(
+      document.querySelector(
+        [
+          '[data-slot="dropdown-menu-content"][data-state="open"]',
+          '[data-slot="dropdown-menu-sub-content"][data-state="open"]',
+          '[data-slot="context-menu-content"][data-state="open"]',
+          '[data-slot="context-menu-sub-content"][data-state="open"]',
+        ].join(', ')
+      )
+    );
+
+    if (hasOpenMenu) {
+      return;
+    }
+
+    const hasOpenModalOverlay = Boolean(
+      document.querySelector(
+        [
+          '[data-slot="dialog-overlay"][data-state="open"]',
+          '[data-slot="alert-dialog-overlay"][data-state="open"]',
+          '[data-slot="sheet-overlay"][data-state="open"]',
+        ].join(', ')
+      )
+    );
+
+    if (!hasOpenModalOverlay) {
+      if (document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+      }
+      if (document.documentElement.style.pointerEvents === 'none') {
+        document.documentElement.style.pointerEvents = '';
+      }
+    }
+
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLElement)) {
+      return;
+    }
+
+    const activeMenuLayer = activeElement.closest(
+      '[data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"], [data-slot="context-menu-content"], [data-slot="context-menu-sub-content"]'
+    );
+
+    if (activeMenuLayer) {
+      activeElement.blur();
+    }
   }, []);
+
+  const runAfterMenuClose = React.useCallback(
+    (callback: () => void) => {
+      submenuController.closeAllSubmenus();
+
+      // Wait until Radix has closed and cleaned up its dismissable layers before
+      // triggering actions that can navigate/unmount the current surface.
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          repairStuckMenuInteractionState();
+          callback();
+          window.requestAnimationFrame(() => {
+            repairStuckMenuInteractionState();
+          });
+        });
+      });
+    },
+    [repairStuckMenuInteractionState, submenuController]
+  );
 
   const renderContextNodes = React.useCallback(
     (nodes: MenuActionNode[], depth = 0): React.ReactNode =>

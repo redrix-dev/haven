@@ -3,7 +3,7 @@ import { centralDirectMessageBackend } from '@/lib/backend/directMessageBackend'
 import { centralModerationBackend } from '@/lib/backend/moderationBackend';
 import { centralSocialBackend } from '@/lib/backend/socialBackend';
 import { loadBootstrappedTestUsers } from '../../../../test/fixtures/users';
-import { signInAsTestUser, signOutTestUser } from '../../../../test/setup/supabaseLocal';
+import { resetFixtureDomainState, signInAsTestUser, signOutTestUser } from '../../../../test/setup/supabaseLocal';
 
 async function ensureDmReportFixture(memberAUsername: string) {
   await signInAsTestUser('member_b');
@@ -52,6 +52,7 @@ describe.sequential('ModerationBackend (contract)', () => {
   });
 
   beforeEach(async () => {
+    await resetFixtureDomainState();
     await signInAsTestUser('platform_staff_active');
   });
 

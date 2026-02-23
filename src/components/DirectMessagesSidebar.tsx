@@ -6,6 +6,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { DirectMessageConversationSummary } from '@/lib/backend/types';
 import { MessageCircle, RefreshCcw, VolumeX } from 'lucide-react';
 
+const DM_SIDEBAR_BASE_MIN_WIDTH = 280;
+const DM_SIDEBAR_MAX_WIDTH = 520;
+const DM_SIDEBAR_WIDTH_STORAGE_KEY = 'haven:dm-sidebar-width';
+
 type DirectMessagesSidebarProps = {
   currentUserDisplayName: string;
   conversations: DirectMessageConversationSummary[];
@@ -36,14 +40,90 @@ export function DirectMessagesSidebar({
   onSelectConversation,
   onRefresh,
 }: DirectMessagesSidebarProps) {
+  const sidebarRef = React.useRef<HTMLDivElement | null>(null);
+  const userTitleRef = React.useRef<HTMLParagraphElement | null>(null);
+  const [autoMinWidth, setAutoMinWidth] = React.useState(DM_SIDEBAR_BASE_MIN_WIDTH);
+  const [isResizing, setIsResizing] = React.useState(false);
+  const [sidebarWidth, setSidebarWidth] = React.useState<number>(() => {
+    if (typeof window === 'undefined') return 320;
+    const stored = Number(window.localStorage.getItem(DM_SIDEBAR_WIDTH_STORAGE_KEY));
+    if (!Number.isFinite(stored) || stored <= 0) return 320;
+    return Math.max(DM_SIDEBAR_BASE_MIN_WIDTH, Math.min(DM_SIDEBAR_MAX_WIDTH, stored));
+  });
+
+  const computedMinWidth = React.useMemo(
+    () => Math.max(DM_SIDEBAR_BASE_MIN_WIDTH, Math.min(DM_SIDEBAR_MAX_WIDTH, autoMinWidth)),
+    [autoMinWidth]
+  );
+
+  const clampSidebarWidth = React.useCallback(
+    (value: number) => Math.max(computedMinWidth, Math.min(DM_SIDEBAR_MAX_WIDTH, value)),
+    [computedMinWidth]
+  );
+
+  React.useLayoutEffect(() => {
+    const measure = () => {
+      const titleWidth = userTitleRef.current?.scrollWidth ?? 0;
+      const reservedHeaderWidth = 110;
+      setAutoMinWidth(Math.ceil(titleWidth + reservedHeaderWidth));
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === 'undefined' || !userTitleRef.current) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(userTitleRef.current);
+    return () => observer.disconnect();
+  }, [currentUserDisplayName]);
+
+  React.useEffect(() => {
+    if (sidebarWidth >= computedMinWidth) return;
+    setSidebarWidth(computedMinWidth);
+  }, [computedMinWidth, sidebarWidth]);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(DM_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  const handleResizePointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsResizing(true);
+  }, []);
+
+  const handleResizePointerMove = React.useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!isResizing || !sidebarRef.current) return;
+      const sidebarLeft = sidebarRef.current.getBoundingClientRect().left;
+      setSidebarWidth(clampSidebarWidth(event.clientX - sidebarLeft));
+    },
+    [clampSidebarWidth, isResizing]
+  );
+
+  const stopResizing = React.useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
   return (
-    <div className="w-[320px] min-w-[260px] max-w-[420px] border-r border-[#22334f] bg-[#162238] flex flex-col">
-      <div className="px-4 py-3 border-b border-[#22334f] bg-[#142033]">
-        <div className="flex items-center justify-between gap-2">
+    <div
+      ref={sidebarRef}
+      className={`relative shrink-0 border-r border-[#22334f] bg-[#162238] flex flex-col ${
+        isResizing ? 'select-none' : ''
+      }`}
+      style={{
+        width: `${sidebarWidth}px`,
+        minWidth: `${computedMinWidth}px`,
+        maxWidth: `${DM_SIDEBAR_MAX_WIDTH}px`,
+      }}
+    >
+      <div className="h-16 px-4 border-b border-[#22334f] bg-[#142033] flex items-center">
+        <div className="flex w-full items-center justify-between gap-2">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">Direct Messages</p>
-            <p className="text-sm font-semibold text-white truncate">
-              {currentUserDisplayName} Direct Messages
+            <p ref={userTitleRef} className="text-sm font-semibold text-white truncate">
+              {currentUserDisplayName}
             </p>
           </div>
           <Button
@@ -53,6 +133,7 @@ export function DirectMessagesSidebar({
             className="border-[#304867] text-white"
             onClick={onRefresh}
             disabled={loading || refreshing}
+            aria-label="Refresh direct messages"
           >
             <RefreshCcw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
@@ -129,6 +210,25 @@ export function DirectMessagesSidebar({
           )}
         </div>
       </ScrollArea>
+
+      <div
+        role="separator"
+        aria-label="Resize Direct Messages Sidebar"
+        aria-orientation="vertical"
+        className={`absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize ${
+          isResizing ? 'bg-[#3f79d8]/40' : 'bg-transparent hover:bg-[#3f79d8]/20'
+        }`}
+        onPointerDown={handleResizePointerDown}
+        onPointerMove={handleResizePointerMove}
+        onPointerUp={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+          stopResizing();
+        }}
+        onPointerCancel={stopResizing}
+        onLostPointerCapture={stopResizing}
+      />
     </div>
   );
 }

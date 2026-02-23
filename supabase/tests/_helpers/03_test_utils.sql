@@ -66,3 +66,6 @@ begin
 end;
 $$;
 
+grant usage on schema test_support to public;
+grant execute on all functions in schema test_support to public;
+

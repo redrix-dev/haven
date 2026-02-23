@@ -1,7 +1,7 @@
 {
   "name": "haven",
   "productName": "Haven",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Haven",
   "main": ".webpack/main",
   "private": true,
@@ -22,6 +22,7 @@
     "test:db:rls": "node scripts/test/run-supabase-sql-suite.mjs",
     "test:db:quick": "node scripts/test/run-supabase-sql-suite.mjs --skip-fixtures",
     "test:db": "node scripts/test/run-db-suite.mjs",
+    "test:report": "node scripts/test/generate-test-report.mjs",
     "test:all": "npm run lint && npx tsc --noEmit --project tsconfig.json && npm run test:unit && npm run test:db && npm run test:backend",
     "test:ci": "npm run lint && npx tsc --noEmit --project tsconfig.json && npm run test:unit && npm run test:db && npm run test:backend",
     "ci:verify": "npm run test:ci"

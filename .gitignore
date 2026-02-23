@@ -137,3 +137,6 @@ release/
 
 # Local planning docs
 mvp-roadmap/
+
+# Local test run reports (generated)
+test-reports/

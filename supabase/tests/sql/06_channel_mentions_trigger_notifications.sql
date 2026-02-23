@@ -7,6 +7,7 @@ create temp table if not exists mention_ids (
   key text primary key,
   id uuid not null
 ) on commit drop;
+grant all on mention_ids to public;
 
 -- member_a posts a message mentioning member_b twice, self, and a non-member.
 set local role authenticated;
@@ -96,6 +97,48 @@ select test_support.assert_true(
     limit 1
   ),
   'channel_mention payload should include route metadata'
+);
+
+-- Mention in a channel the target cannot view should not notify (privacy / permission leak check).
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('server_mod'));
+
+create temp table tmp_mention_message_hidden_channel on commit drop as
+with inserted as (
+  insert into public.messages (
+    community_id,
+    channel_id,
+    author_type,
+    author_user_id,
+    content
+  )
+  values (
+    test_support.fixture_community_id(),
+    test_support.fixture_channel_id('mods-only'),
+    'user',
+    test_support.fixture_user_id('server_mod'),
+    format('@%s hidden channel mention should not leak', test_support.fixture_username('member_a'))
+  )
+  returning id
+)
+select id from inserted;
+
+insert into mention_ids (key, id)
+select 'message_hidden_channel', id from tmp_mention_message_hidden_channel
+on conflict (key) do update set id = excluded.id;
+reset role;
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.notification_recipients nr
+    join public.notification_events ne on ne.id = nr.event_id
+    where ne.kind = 'channel_mention'
+      and ne.source_id = (select id from mention_ids where key = 'message_hidden_channel')
+      and nr.recipient_user_id = test_support.fixture_user_id('member_a')
+  ),
+  0,
+  'hidden channel mention should not notify a user who cannot view that channel'
 );
 
 -- Disable mention notifications for member_b via global prefs (Phase 4 overrides are backlogged).

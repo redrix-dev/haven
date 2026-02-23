@@ -201,12 +201,25 @@ const registerRendererDocumentHeaderPolicy = ({ sessionRef, rendererEntryService
       return;
     }
 
+    const responseHeaders = { ...(details.responseHeaders || {}) };
+    for (const headerName of Object.keys(responseHeaders)) {
+      const normalized = headerName.toLowerCase();
+      if (
+        normalized === 'content-security-policy' ||
+        normalized === 'content-security-policy-report-only' ||
+        normalized === 'referrer-policy'
+      ) {
+        delete responseHeaders[headerName];
+      }
+    }
+
     callback({
       responseHeaders: {
-        ...details.responseHeaders,
+        ...responseHeaders,
         'Content-Security-Policy': [
           buildRendererCsp({
             rendererOrigin: rendererEntryServiceRef.getCanonicalOrigin(),
+            extraConnectSrc: rendererEntryServiceRef.getCspConnectSrcOrigins(),
           }),
         ],
         'Referrer-Policy': ['origin'],

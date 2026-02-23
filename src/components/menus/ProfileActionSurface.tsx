@@ -15,6 +15,7 @@ export interface ProfileActionSurfaceProps {
   userId: string;
   username: string;
   avatarUrl: string | null;
+  canDirectMessage?: boolean;
   canReport: boolean;
   canBan: boolean;
   onDirectMessage: (userId: string) => void;
@@ -28,6 +29,7 @@ export function ProfileActionSurface({
   userId,
   username,
   avatarUrl,
+  canDirectMessage = true,
   canReport,
   canBan,
   onDirectMessage,
@@ -76,14 +78,21 @@ export function ProfileActionSurface({
         kind: 'item',
         key: 'direct-message',
         label: 'Direct Message',
-        onSelect: () => onDirectMessage(userId),
+        disabled: !canDirectMessage,
+        onSelect: () => {
+          setOpen(false);
+          onDirectMessage(userId);
+        },
       },
       {
         kind: 'item',
         key: 'report',
         label: 'Report',
         disabled: !canReport,
-        onSelect: () => onReport(userId),
+        onSelect: () => {
+          setOpen(false);
+          onReport(userId);
+        },
       },
     ];
 
@@ -112,7 +121,10 @@ export function ProfileActionSurface({
               kind: 'item',
               key: `ban-${server.communityId}`,
               label: server.communityName,
-              onSelect: () => onBan(userId, server.communityId),
+              onSelect: () => {
+                setOpen(false);
+                onBan(userId, server.communityId);
+              },
             }));
 
       next.push({
@@ -124,7 +136,7 @@ export function ProfileActionSurface({
     }
 
     return next;
-  }, [banServers, banServersLoading, canBan, canReport, onBan, onDirectMessage, onReport, userId]);
+  }, [banServers, banServersLoading, canBan, canDirectMessage, canReport, onBan, onDirectMessage, onReport, userId]);
 
   return (
     <DropdownMenu
@@ -170,6 +182,11 @@ export function ProfileActionSurface({
         align="start"
         sideOffset={6}
         className="bg-[#18243a] border-[#304867] text-white min-w-[220px]"
+        onCloseAutoFocus={(event) => {
+          // Prevent focus from being restored to a trigger that may be unmounted
+          // immediately after navigation-style actions (e.g. "Direct Message").
+          event.preventDefault();
+        }}
       >
         <div className="flex items-center gap-2 rounded-md bg-[#111a2b] px-2 py-2">
           <Avatar size="sm">

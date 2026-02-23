@@ -8,6 +8,7 @@ create temp table if not exists notification_test_rows (
   event_id uuid,
   recipient_id uuid
 ) on commit drop;
+grant all on notification_test_rows to public;
 
 insert into notification_test_rows (key, event_id)
 values (
@@ -88,6 +89,7 @@ select test_support.assert_eq_int(
 );
 
 reset role;
+select test_support.clear_jwt_claims();
 
 insert into notification_test_rows (key, event_id)
 values (
@@ -160,16 +162,20 @@ reset role;
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_b'));
 
-select test_support.expect_exception(
-  format(
-    $sql$
-      update public.user_notification_preferences
-      set mention_sound_enabled = false
-      where user_id = %L
-    $sql$,
-    test_support.fixture_user_id('member_a')
+update public.user_notification_preferences
+set mention_sound_enabled = true
+where user_id = test_support.fixture_user_id('member_a');
+
+reset role;
+select test_support.clear_jwt_claims();
+select test_support.assert_false(
+  (
+    select up.mention_sound_enabled
+    from public.user_notification_preferences up
+    where up.user_id = test_support.fixture_user_id('member_a')
+    limit 1
   ),
-  'row-level security'
+  'member_b should not be able to mutate member_a notification preferences'
 );
 
 rollback;

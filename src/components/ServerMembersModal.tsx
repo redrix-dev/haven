@@ -22,6 +22,7 @@ import { getErrorMessage } from '@/shared/lib/errors';
 
 interface ServerMembersModalProps {
   open: boolean;
+  currentUserId: string | null;
   serverName: string;
   loading: boolean;
   error: string | null;
@@ -37,6 +38,7 @@ interface ServerMembersModalProps {
 
 export function ServerMembersModal({
   open,
+  currentUserId,
   serverName,
   loading,
   error,
@@ -123,6 +125,7 @@ export function ServerMembersModal({
                         userId={member.userId}
                         username={member.displayName}
                         avatarUrl={member.avatarUrl}
+                        canDirectMessage={member.userId !== currentUserId}
                         canReport={canReportProfiles}
                         canBan={canBanProfiles}
                         onDirectMessage={onDirectMessage}

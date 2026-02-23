@@ -1,7 +1,7 @@
 import { describe, beforeAll, afterAll, beforeEach, expect, it } from 'vitest';
 import { centralNotificationBackend } from '@/lib/backend/notificationBackend';
 import { loadBootstrappedTestUsers } from '../../../../test/fixtures/users';
-import { signInAsTestUser, signOutTestUser } from '../../../../test/setup/supabaseLocal';
+import { resetFixtureDomainState, signInAsTestUser, signOutTestUser } from '../../../../test/setup/supabaseLocal';
 
 describe.sequential('NotificationBackend (contract)', () => {
   const users = loadBootstrappedTestUsers();
@@ -15,6 +15,7 @@ describe.sequential('NotificationBackend (contract)', () => {
   });
 
   beforeEach(async () => {
+    await resetFixtureDomainState();
     await signInAsTestUser('member_a');
   });
 

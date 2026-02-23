@@ -5,6 +5,7 @@ import { loadBootstrappedTestUsers } from '../../../../test/fixtures/users';
 import {
   getFixtureChannelByName,
   getFixtureCommunityByName,
+  resetFixtureDomainState,
   signInAsTestUser,
   signOutTestUser,
 } from '../../../../test/setup/supabaseLocal';
@@ -27,6 +28,7 @@ describe.sequential('CommunityDataBackend mention integration (contract)', () =>
   });
 
   beforeEach(async () => {
+    await resetFixtureDomainState();
     await signInAsTestUser('member_a');
   });
 

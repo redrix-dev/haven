@@ -7,6 +7,7 @@ create temp table if not exists moderation_ids (
   key text primary key,
   id uuid not null
 ) on commit drop;
+grant all on moderation_ids to public;
 
 -- Create a DM report via normal user flows.
 set local role authenticated;

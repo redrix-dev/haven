@@ -819,6 +819,7 @@ export function MessageList({
                     userId={message.author_user_id}
                     username={authorLabel}
                     avatarUrl={authorProfile?.avatarUrl ?? null}
+                    canDirectMessage={message.author_user_id !== currentUserId}
                     canReport={canCreateReports && message.author_user_id !== currentUserId}
                     canBan={canManageBans && message.author_user_id !== currentUserId}
                     onDirectMessage={onDirectMessageUser}

@@ -25,10 +25,15 @@ Note:
 
 ## Local Setup
 Prereqs:
-- Docker running
+- Docker Desktop running
+- WSL2 (Windows)
 - Supabase CLI installed
 - `psql` installed (PostgreSQL client)
 - `npm ci` completed
+
+Collaborator note:
+- For small-team onboarding + shared env/secrets expectations, see `docs/collaborator-setup.md`.
+- This runbook is the operational test runner reference after local setup is working.
 
 ## Core Commands
 
@@ -72,6 +77,14 @@ npm run test:unit
 npm run test:ci
 ```
 
+### Generate local test report + raw logs (git-ignored)
+```bash
+npm run test:report
+```
+Outputs:
+- `test-reports/<timestamp>.local/report.local.md`
+- raw per-step logs in the same folder
+
 ## Recommended Local Flow (Feature Work)
 1. `supabase start`
 2. `npm run test:db`
@@ -109,6 +122,8 @@ Checklist:
   - Ensure local stack is running (`supabase start`)
 - `psql` not found
   - Install PostgreSQL client tooling
+- Docker says virtualization is needed (Windows)
+  - Ensure WSL2 is installed and Docker Desktop is using the WSL2 backend
 
 ## Extension Path
 - Add more SQL suites as new RLS domains ship

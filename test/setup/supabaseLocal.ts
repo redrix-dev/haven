@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { execFileSync } from 'node:child_process';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 import { loadBootstrappedTestUsers, type TestUserKey } from '../fixtures/users';
@@ -78,4 +79,14 @@ export async function getFixtureChannelByName(input: { communityId: string; name
     throw new Error(`Fixture channel "${input.name}" not found in community ${input.communityId}.`);
   }
   return data;
+}
+
+export async function resetFixtureDomainState() {
+  const postgresUrl = process.env.POSTGRES_URL;
+  if (!postgresUrl) {
+    throw new Error('Missing POSTGRES_URL for backend contract tests.');
+  }
+  execFileSync('psql', [postgresUrl, '-v', 'ON_ERROR_STOP=1', '-c', 'select test_support.cleanup_fixture_domain_state();'], {
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
 }

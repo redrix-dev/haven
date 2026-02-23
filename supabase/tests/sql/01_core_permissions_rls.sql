@@ -7,6 +7,7 @@ create temp table if not exists test_ids (
   key text primary key,
   id uuid not null
 ) on commit drop;
+grant all on test_ids to public;
 
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('non_member'));

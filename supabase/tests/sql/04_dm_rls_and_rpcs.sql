@@ -7,6 +7,7 @@ create temp table if not exists dm_ids (
   key text primary key,
   id uuid not null
 ) on commit drop;
+grant all on dm_ids to public;
 
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
@@ -49,6 +50,8 @@ select * from public.send_dm_message(
 insert into dm_ids (key, id)
 select 'message_1', message_id from tmp_dm_message_sent
 on conflict (key) do update set id = excluded.id;
+reset role;
+select test_support.clear_jwt_claims();
 select test_support.assert_eq_int(
   (
     select count(*)::bigint
@@ -62,7 +65,6 @@ select test_support.assert_eq_int(
   'DM send should emit notification for recipient'
 );
 
-reset role;
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('non_member'));
 
@@ -108,6 +110,8 @@ select * from public.send_dm_message(
 insert into dm_ids (key, id)
 select 'message_2', message_id from tmp_dm_message_sent_2
 on conflict (key) do update set id = excluded.id;
+reset role;
+select test_support.clear_jwt_claims();
 select test_support.assert_eq_int(
   (
     select count(*)::bigint
@@ -120,6 +124,9 @@ select test_support.assert_eq_int(
   0,
   'muted DM conversation should suppress recipient notification rows for new messages'
 );
+
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 
 select public.block_user_social(test_support.fixture_user_id('member_b'));
 

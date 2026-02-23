@@ -1,4 +1,4 @@
-﻿-- Direct messages (Phase 2)
+-- Direct messages (Phase 2)
 -- 1:1 DM conversations/messages with RLS-first access and notification integration.
 -- Group DMs are schema-ready but not fully enabled in renderer UX yet.
 

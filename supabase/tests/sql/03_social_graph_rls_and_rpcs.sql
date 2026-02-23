@@ -22,6 +22,8 @@ select test_support.assert_eq_int(
   'one pending friend request should exist'
 );
 
+reset role;
+select test_support.clear_jwt_claims();
 select test_support.assert_eq_int(
   (
     select count(*)::bigint
@@ -33,6 +35,9 @@ select test_support.assert_eq_int(
   1,
   'friend request send should emit recipient notification'
 );
+
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 
 select test_support.expect_exception(
   format($sql$select public.send_friend_request(%L)$sql$, test_support.fixture_username('member_b')),
@@ -71,6 +76,8 @@ select test_support.assert_true(
   'friendship row should exist after accept'
 );
 
+reset role;
+select test_support.clear_jwt_claims();
 select test_support.assert_eq_int(
   (
     select count(*)::bigint
@@ -83,7 +90,6 @@ select test_support.assert_eq_int(
   'friend request accept should emit accepted notification to sender'
 );
 
-reset role;
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 

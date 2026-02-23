@@ -23,7 +23,18 @@ export function parseEnvLines(text) {
     const eqIndex = line.indexOf('=');
     if (eqIndex <= 0) continue;
     const key = line.slice(0, eqIndex).trim();
-    const value = line.slice(eqIndex + 1).trim();
+    let value = line.slice(eqIndex + 1).trim();
+    // `supabase status -o env` may return quoted shell-safe values on Windows.
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    value = value
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\');
     env[key] = value;
   }
   return env;

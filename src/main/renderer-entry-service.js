@@ -640,6 +640,34 @@ function createRendererEntryService(options) {
     return routes.map((route) => route.entryName);
   }
 
+  function getCspConnectSrcOrigins() {
+    const origins = new Set();
+    for (const route of routes) {
+      if (route.mode !== 'proxy' || !route.upstream?.origin) continue;
+      try {
+        const parsed = new URL(route.upstream.origin);
+        const candidates = new Set([route.upstream.origin]);
+
+        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+          const aliasHost = parsed.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+          const aliasUrl = new URL(route.upstream.origin);
+          aliasUrl.hostname = aliasHost;
+          candidates.add(aliasUrl.origin);
+        }
+
+        for (const candidateOrigin of candidates) {
+          origins.add(candidateOrigin);
+          const candidateParsed = new URL(candidateOrigin);
+          const wsProtocol = candidateParsed.protocol === 'https:' ? 'wss:' : 'ws:';
+          origins.add(`${wsProtocol}//${candidateParsed.host}`);
+        }
+      } catch {
+        // Ignore malformed upstream origins; parseWebpackEntry already validates these.
+      }
+    }
+    return Array.from(origins);
+  }
+
   return {
     start,
     stop,
@@ -647,6 +675,7 @@ function createRendererEntryService(options) {
     getCanonicalOrigin,
     isRendererDocumentUrl,
     getRegisteredEntryNames,
+    getCspConnectSrcOrigins,
   };
 }
 

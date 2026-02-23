@@ -2,7 +2,7 @@ import { describe, beforeAll, beforeEach, afterAll, expect, it } from 'vitest';
 import { centralDirectMessageBackend } from '@/lib/backend/directMessageBackend';
 import { centralSocialBackend } from '@/lib/backend/socialBackend';
 import { loadBootstrappedTestUsers } from '../../../../test/fixtures/users';
-import { signInAsTestUser, signOutTestUser } from '../../../../test/setup/supabaseLocal';
+import { resetFixtureDomainState, signInAsTestUser, signOutTestUser } from '../../../../test/setup/supabaseLocal';
 
 async function ensureFriendship(memberBUsername: string) {
   try {
@@ -27,6 +27,7 @@ describe.sequential('DirectMessageBackend (contract)', () => {
   });
 
   beforeEach(async () => {
+    await resetFixtureDomainState();
     await signInAsTestUser('member_a');
   });
 

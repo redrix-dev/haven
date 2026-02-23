@@ -175,7 +175,7 @@ export function DirectMessageArea({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-[#111a2b]">
-      <div className="px-4 py-3 border-b border-[#22334f] bg-[#142033]">
+      <div className="h-16 px-4 border-b border-[#22334f] bg-[#142033] flex items-center">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Avatar className="size-10 rounded-xl border border-[#304867] bg-[#1b2a42]">
