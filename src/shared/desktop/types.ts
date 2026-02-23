@@ -1,6 +1,13 @@
+export type NotificationAudioSettings = {
+  masterSoundEnabled: boolean;
+  notificationSoundVolume: number;
+  playSoundsWhenFocused: boolean;
+};
+
 export type AppSettings = {
   schemaVersion: number;
   autoUpdateEnabled: boolean;
+  notifications: NotificationAudioSettings;
 };
 
 export type UpdaterStatus = {
@@ -27,14 +34,26 @@ export type UpdaterStatus = {
   repository: string;
 };
 
+export type SaveFileFromUrlResult = {
+  saved: boolean;
+  filePath: string | null;
+};
+
 export type DesktopAPI = {
   getAppSettings: () => Promise<AppSettings>;
   setAutoUpdateEnabled: (enabled: boolean) => Promise<{
     settings: AppSettings;
     updaterStatus: UpdaterStatus;
   }>;
+  setNotificationAudioSettings: (input: NotificationAudioSettings) => Promise<{
+    settings: AppSettings;
+  }>;
   getUpdaterStatus: () => Promise<UpdaterStatus>;
   checkForUpdates: () => Promise<UpdaterStatus>;
+  saveFileFromUrl: (input: {
+    url: string;
+    suggestedName?: string | null;
+  }) => Promise<SaveFileFromUrlResult>;
   consumeNextProtocolUrl: () => Promise<string | null>;
   onProtocolUrl: (listener: (url: string) => void) => () => void;
 };

@@ -39,6 +39,18 @@
   - per-user output volume controls
   - optional output-device routing (`setSinkId` when supported)
 
+### 4.1) Local Voice Hardware Debug Panel (Feature Flagged)
+- Purpose: test microphone capture + speaker playback before joining a voice session.
+- Renderer-only diagnostic UI behind feature flag: `debug_voice_hardware_panel`.
+- Hotkey toggle: `Ctrl/Cmd + Alt + Shift + V`.
+- Capabilities:
+  - microphone permission/device test with live sound meter,
+  - debug-only input gain slider (client-side meter gain),
+  - speaker output device selection (`setSinkId` when supported),
+  - speaker test playback + speaker volume slider.
+- Speaker test clip is bundled from `src/assets/audio/voice-debug-speaker-test.mp3` via webpack
+  asset import so it ships with the renderer build.
+
 ### 5) Security Boundary
 - Xirsys credentials live only in Supabase secrets.
 - Renderer never receives Xirsys secret/ident directly.
@@ -68,3 +80,4 @@
 6. Adjust per-user volume and confirm local-only effect.
 7. Toggle deafen and confirm local mute of incoming audio.
 8. Disconnect network briefly and retry ICE.
+9. (Flagged) Open voice hardware debug panel and verify mic meter + speaker test work before join.

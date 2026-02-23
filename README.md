@@ -63,3 +63,35 @@ If you do not have that setup, use packaged builds instead.
 
 Full local bootstrap docs are not finalized yet.
 
+## Local testing (Phase 5 hardening pass)
+
+Haven now includes a local Supabase-backed regression harness for SQL/RLS and backend seam tests.
+
+Core commands:
+
+```bash
+npm run test:db
+npm run test:backend
+npm run test:unit
+```
+
+Coverage summary:
+- `test:db` -> SQL RLS/RPC regression suites via `psql` against local Supabase
+- `test:backend` -> backend seam contract/integration tests against local Supabase
+- `test:unit` -> minimal renderer/component tests for notification/DM UX flows
+
+Runbook and audit docs:
+- `docs/testing/rls-and-hardening-runbook.md`
+- `docs/testing/hardening-audit.md`
+
+## Packaged renderer parity (embedded media)
+
+Haven now uses a unified loopback HTTP renderer entry origin in both dev and packaged builds to keep
+embedded video provider behavior (for example YouTube embeds) consistent across environments.
+
+Important rollout note:
+- Existing packaged users may need to sign in once again after upgrading to the parity refactor build,
+  because packaged renderer storage moves from a `file://` origin to a fixed local HTTP origin.
+
+Architecture doc:
+- `docs/architecture/renderer-entry-origin-parity.md`

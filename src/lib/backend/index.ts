@@ -1,5 +1,9 @@
 import { centralCommunityDataBackend, type CommunityDataBackend } from './communityDataBackend';
 import { centralControlPlaneBackend, type ControlPlaneBackend } from './controlPlaneBackend';
+import { centralDirectMessageBackend, type DirectMessageBackend } from './directMessageBackend';
+import { centralModerationBackend, type ModerationBackend } from './moderationBackend';
+import { centralNotificationBackend, type NotificationBackend } from './notificationBackend';
+import { centralSocialBackend, type SocialBackend } from './socialBackend';
 
 export type BackendMode = 'central_supabase';
 
@@ -36,5 +40,37 @@ export const getCommunityDataBackend = (_communityId: string): CommunityDataBack
     case 'central_supabase':
     default:
       return centralCommunityDataBackend;
+  }
+};
+
+export const getNotificationBackend = (): NotificationBackend => {
+  switch (backendMode) {
+    case 'central_supabase':
+    default:
+      return centralNotificationBackend;
+  }
+};
+
+export const getSocialBackend = (): SocialBackend => {
+  switch (backendMode) {
+    case 'central_supabase':
+    default:
+      return centralSocialBackend;
+  }
+};
+
+export const getDirectMessageBackend = (): DirectMessageBackend => {
+  switch (backendMode) {
+    case 'central_supabase':
+    default:
+      return centralDirectMessageBackend;
+  }
+};
+
+export const getModerationBackend = (): ModerationBackend => {
+  switch (backendMode) {
+    case 'central_supabase':
+    default:
+      return centralModerationBackend;
   }
 };

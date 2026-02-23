@@ -26,6 +26,14 @@ module.exports = [
     },
   },
 
+  {
+    test: /\.(mp3|wav|ogg)$/i,
+    type: 'asset/resource',
+    generator: {
+      filename: 'assets/audio/[name][ext]',
+    },
+  },
+
   // CSS processing with PostCSS
   {
     test: /\.css$/,

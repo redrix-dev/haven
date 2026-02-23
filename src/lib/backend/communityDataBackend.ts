@@ -1,20 +1,27 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
+import { messageObjectStore } from './messageObjectStore';
 import type {
   AuthorProfile,
+  BanEligibleServer,
   Channel,
   ChannelCreateInput,
+  ChannelGroup,
+  ChannelGroupState,
   ChannelMemberOption,
   ChannelMemberPermissionItem,
   ChannelPermissionState,
   ChannelPermissionsSnapshot,
   ChannelRolePermissionItem,
+  CommunityBanItem,
+  CommunityMemberListItem,
   PermissionCatalogItem,
   MessageReportKind,
   MessageReportTarget,
   Message,
   MessageAttachment,
+  MessageLinkPreview,
   MessageReaction,
   ServerMemberRoleItem,
   ServerPermissions,
@@ -22,11 +29,14 @@ import type {
   ServerRoleManagementSnapshot,
   ServerSettingsSnapshot,
   ServerSettingsUpdate,
+  LinkPreviewSnapshot,
+  LinkPreviewStatus,
+  LinkPreviewEmbedProvider,
 } from './types';
 
 type CommunityMemberWithProfile = Pick<
   Database['public']['Tables']['community_members']['Row'],
-  'id' | 'nickname' | 'is_owner' | 'user_id'
+  'id' | 'nickname' | 'is_owner' | 'user_id' | 'joined_at'
 > & {
   profiles:
     | Pick<Database['public']['Tables']['profiles']['Row'], 'username' | 'avatar_url'>
@@ -41,6 +51,7 @@ const getRealtimeRowChannelId = (value: unknown): string | null => {
 };
 
 const MESSAGE_MEDIA_BUCKET = 'message-media';
+const LINK_PREVIEW_IMAGE_BUCKET = 'link-preview-images';
 const DEFAULT_MEDIA_EXPIRES_IN_HOURS = 24;
 const MAX_MEDIA_EXPIRES_IN_HOURS = 24 * 30;
 const MEDIA_ONLY_CONTENT_PLACEHOLDER = '\u200B';
@@ -89,18 +100,470 @@ type MessageAttachmentStorageRow = {
   object_path: string;
 };
 
+type MessageLinkPreviewRow = {
+  id: string;
+  message_id: string;
+  community_id: string;
+  channel_id: string;
+  source_url: string | null;
+  normalized_url: string | null;
+  status: LinkPreviewStatus;
+  cache_id: string | null;
+  snapshot: unknown;
+  embed_provider: LinkPreviewEmbedProvider;
+  thumbnail_bucket_name: string | null;
+  thumbnail_object_path: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type MessageLinkPreviewThumbnail = NonNullable<LinkPreviewSnapshot['thumbnail']>;
+
+type MessagePageCursor = {
+  createdAt: string;
+  id: string;
+};
+
+type MessagePageResult = {
+  messages: Message[];
+  hasMore: boolean;
+};
+
+const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const asOptionalString = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim().length > 0 ? value : null;
+
+const asOptionalNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const normalizeLinkPreviewSnapshot = (value: unknown): LinkPreviewSnapshot | null => {
+  const obj = asObjectRecord(value);
+  if (!obj) return null;
+
+  const thumbnailObj = asObjectRecord(obj.thumbnail);
+  const embedObj = asObjectRecord(obj.embed);
+  const embedProvider =
+    embedObj?.provider === 'youtube' || embedObj?.provider === 'vimeo'
+      ? embedObj.provider
+      : null;
+
+  const embed: LinkPreviewSnapshot['embed'] =
+    embedObj &&
+    embedProvider &&
+    typeof embedObj.embedUrl === 'string' &&
+    embedObj.embedUrl.trim().length > 0
+      ? {
+          provider: embedProvider,
+          embedUrl: embedObj.embedUrl,
+          aspectRatio: asOptionalNumber(embedObj.aspectRatio) ?? 16 / 9,
+        }
+      : null;
+
+  const thumbnail: MessageLinkPreviewThumbnail | null = thumbnailObj
+    ? {
+        bucketName: asOptionalString(thumbnailObj.bucketName),
+        objectPath: asOptionalString(thumbnailObj.objectPath),
+        sourceUrl: asOptionalString(thumbnailObj.sourceUrl),
+        signedUrl: null,
+        width: asOptionalNumber(thumbnailObj.width),
+        height: asOptionalNumber(thumbnailObj.height),
+        mimeType: asOptionalString(thumbnailObj.mimeType),
+      }
+    : null;
+
+  const sourceUrl = asOptionalString(obj.sourceUrl);
+  const normalizedUrl = asOptionalString(obj.normalizedUrl);
+  if (!sourceUrl || !normalizedUrl) return null;
+
+  return {
+    sourceUrl,
+    normalizedUrl,
+    finalUrl: asOptionalString(obj.finalUrl),
+    title: asOptionalString(obj.title),
+    description: asOptionalString(obj.description),
+    siteName: asOptionalString(obj.siteName),
+    canonicalUrl: asOptionalString(obj.canonicalUrl),
+    thumbnail,
+    embed,
+  };
+};
+
+const supabaseFunctionJson = async <TResponse>(functionName: string, body: unknown): Promise<TResponse> => {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase URL or key is missing.');
+  }
+
+  const getAccessToken = async (): Promise<string> => {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      throw new Error('No authenticated session token available.');
+    }
+    return accessToken;
+  };
+
+  const callWithToken = async (accessToken: string): Promise<{
+    ok: boolean;
+    status: number;
+    parsed: unknown;
+  }> => {
+    const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body ?? {}),
+    });
+
+    const rawBody = await response.text();
+    let parsed: unknown = null;
+    if (rawBody.trim().length > 0) {
+      try {
+        parsed = JSON.parse(rawBody);
+      } catch {
+        parsed = rawBody;
+      }
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      parsed,
+    };
+  };
+
+  let result = await callWithToken(await getAccessToken());
+
+  const errorMessageFromParsed = (parsed: unknown, status: number): string =>
+    parsed && typeof parsed === 'object' && 'message' in parsed && typeof (parsed as { message: unknown }).message === 'string'
+      ? (parsed as { message: string }).message
+      : `Function ${functionName} failed (${status}).`;
+
+  if (!result.ok && result.status === 401) {
+    try {
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      if (!refreshError && refreshed.session?.access_token) {
+        result = await callWithToken(refreshed.session.access_token);
+      }
+    } catch {
+      // Fall through to the original error handling.
+    }
+  }
+
+  if (!result.ok) {
+    throw new Error(errorMessageFromParsed(result.parsed, result.status));
+  }
+
+  return result.parsed as TResponse;
+};
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const waitForConfirmedSupabaseSession = async (timeoutMs = 4000): Promise<boolean> => {
+  const startedAt = Date.now();
+  let refreshAttempted = false;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (!sessionError && session?.access_token) {
+      const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
+      if (!userError && userData.user) {
+        return true;
+      }
+    }
+
+    if (!refreshAttempted) {
+      refreshAttempted = true;
+      try {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && refreshed.session?.access_token) {
+          const { data: refreshedUser, error: refreshedUserError } = await supabase.auth.getUser(
+            refreshed.session.access_token
+          );
+          if (!refreshedUserError && refreshedUser.user) {
+            return true;
+          }
+        }
+      } catch {
+        // Fall through to retry loop.
+      }
+    }
+
+    await sleep(250);
+  }
+
+  return false;
+};
+
+type UploadedMessageMedia = {
+  bucketName: string;
+  objectPath: string;
+  originalFilename: string;
+  mimeType: string;
+  mediaKind: 'image' | 'video' | 'file';
+  sizeBytes: number;
+  expiresAt: string;
+};
+
+const uploadMessageMediaToObjectStore = async (input: {
+  communityId: string;
+  channelId: string;
+  mediaUpload?: {
+    file: File;
+    expiresInHours?: number;
+  };
+}): Promise<UploadedMessageMedia | null> => {
+  if (!input.mediaUpload?.file) return null;
+
+  const nextFile = input.mediaUpload.file;
+  const expiresInHours = input.mediaUpload.expiresInHours ?? DEFAULT_MEDIA_EXPIRES_IN_HOURS;
+  const boundedExpiresInHours = Math.min(
+    Math.max(Math.floor(expiresInHours), 1),
+    MAX_MEDIA_EXPIRES_IN_HOURS
+  );
+  const originalFilename = sanitizeFileName(nextFile.name || 'media');
+  const objectPath = `${input.communityId}/${input.channelId}/${crypto.randomUUID()}-${originalFilename}`;
+  const mimeType = nextFile.type?.trim() || 'application/octet-stream';
+
+  await messageObjectStore.uploadMessageAttachment({
+    bucketName: MESSAGE_MEDIA_BUCKET,
+    objectPath,
+    file: nextFile,
+    contentType: mimeType,
+    cacheControl: '3600',
+  });
+
+  return {
+    bucketName: MESSAGE_MEDIA_BUCKET,
+    objectPath,
+    originalFilename,
+    mimeType,
+    mediaKind: resolveMediaKind(mimeType),
+    sizeBytes: nextFile.size,
+    expiresAt: new Date(Date.now() + boundedExpiresInHours * 60 * 60 * 1000).toISOString(),
+  };
+};
+
+const removeUploadedMediaObject = async (uploadedMedia: UploadedMessageMedia | null): Promise<void> => {
+  if (!uploadedMedia) return;
+  try {
+    await messageObjectStore.removeObjects(uploadedMedia.bucketName, [uploadedMedia.objectPath]);
+  } catch {
+    // Best-effort rollback/cleanup.
+  }
+};
+
+const mapMessageReactionRows = (rows: MessageReactionRow[]): MessageReaction[] =>
+  rows.map((row) => ({
+    id: row.id,
+    messageId: row.message_id,
+    userId: row.user_id,
+    emoji: row.emoji,
+    createdAt: row.created_at,
+  }));
+
+const mapMessageAttachmentRowsWithSignedUrls = async (
+  attachmentRows: MessageAttachmentRow[]
+): Promise<MessageAttachment[]> => {
+  if (attachmentRows.length === 0) return [];
+
+  const pathsByBucket = new Map<string, string[]>();
+  for (const row of attachmentRows) {
+    const existingPaths = pathsByBucket.get(row.bucket_name) ?? [];
+    existingPaths.push(row.object_path);
+    pathsByBucket.set(row.bucket_name, existingPaths);
+  }
+
+  const signedUrlByBucketAndPath = new Map<string, string>();
+  for (const [bucketName, paths] of pathsByBucket.entries()) {
+    try {
+      const signedRowsByPath = await messageObjectStore.createSignedUrls(bucketName, paths, 60 * 60);
+      for (const [path, signedUrl] of Object.entries(signedRowsByPath)) {
+        signedUrlByBucketAndPath.set(`${bucketName}/${path}`, signedUrl);
+      }
+    } catch (signedError) {
+      console.error('Failed to create signed URLs for message attachments:', signedError);
+    }
+  }
+
+  return attachmentRows.map((row) => ({
+    id: row.id,
+    messageId: row.message_id,
+    communityId: row.community_id,
+    channelId: row.channel_id,
+    ownerUserId: row.owner_user_id,
+    bucketName: row.bucket_name,
+    objectPath: row.object_path,
+    originalFilename: row.original_filename,
+    mimeType: row.mime_type,
+    mediaKind: row.media_kind,
+    sizeBytes: row.size_bytes,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    signedUrl: signedUrlByBucketAndPath.get(`${row.bucket_name}/${row.object_path}`) ?? null,
+  }));
+};
+
+const mapMessageLinkPreviewRowsWithSignedUrls = async (
+  previewRows: MessageLinkPreviewRow[]
+): Promise<MessageLinkPreview[]> => {
+  if (previewRows.length === 0) return [];
+
+  const pathsByBucket = new Map<string, string[]>();
+  for (const row of previewRows) {
+    const snapshot = normalizeLinkPreviewSnapshot(row.snapshot);
+    const bucketName = row.thumbnail_bucket_name ?? snapshot?.thumbnail?.bucketName ?? null;
+    const objectPath = row.thumbnail_object_path ?? snapshot?.thumbnail?.objectPath ?? null;
+    if (!bucketName || !objectPath) continue;
+    if (bucketName !== LINK_PREVIEW_IMAGE_BUCKET) continue;
+    const existing = pathsByBucket.get(bucketName) ?? [];
+    if (!existing.includes(objectPath)) existing.push(objectPath);
+    pathsByBucket.set(bucketName, existing);
+  }
+
+  const signedUrlByBucketAndPath = new Map<string, string>();
+  for (const [bucketName, paths] of pathsByBucket.entries()) {
+    try {
+      const signedRowsByPath = await messageObjectStore.createSignedUrls(bucketName, paths, 60 * 30);
+      for (const [path, signedUrl] of Object.entries(signedRowsByPath)) {
+        signedUrlByBucketAndPath.set(`${bucketName}/${path}`, signedUrl);
+      }
+    } catch (signedError) {
+      console.warn('Failed to create signed URLs for link preview thumbnails:', signedError);
+    }
+  }
+
+  return previewRows.map((row) => {
+    const snapshot = normalizeLinkPreviewSnapshot(row.snapshot);
+    const bucketName = row.thumbnail_bucket_name ?? snapshot?.thumbnail?.bucketName ?? null;
+    const objectPath = row.thumbnail_object_path ?? snapshot?.thumbnail?.objectPath ?? null;
+    const signedUrl =
+      bucketName && objectPath
+        ? signedUrlByBucketAndPath.get(`${bucketName}/${objectPath}`) ?? null
+        : null;
+
+    const normalizedSnapshot: LinkPreviewSnapshot | null = snapshot
+      ? {
+          ...snapshot,
+          thumbnail: snapshot.thumbnail
+            ? {
+                ...snapshot.thumbnail,
+                bucketName,
+                objectPath,
+                signedUrl,
+              }
+            : null,
+        }
+      : null;
+
+    return {
+      id: row.id,
+      messageId: row.message_id,
+      communityId: row.community_id,
+      channelId: row.channel_id,
+      sourceUrl: row.source_url,
+      normalizedUrl: row.normalized_url,
+      status: row.status,
+      cacheId: row.cache_id,
+      snapshot: normalizedSnapshot,
+      embedProvider: row.embed_provider,
+      thumbnailBucketName: bucketName,
+      thumbnailObjectPath: objectPath,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  });
+};
+
 // Incident toggle for channel-create debugging.
 // Keep disabled by default. Re-enable by setting `HAVEN_DEBUG_CHANNEL_CREATE=1`.
 // const ENABLE_CHANNEL_CREATE_DIAGNOSTICS = process.env.HAVEN_DEBUG_CHANNEL_CREATE === '1';
 
 export interface CommunityDataBackend {
   fetchServerPermissions(communityId: string): Promise<ServerPermissions>;
+  listCommunityMembers(communityId: string): Promise<CommunityMemberListItem[]>;
+  reportUserProfile(input: {
+    communityId: string;
+    targetUserId: string;
+    reporterUserId: string;
+    reason: string;
+  }): Promise<void>;
+  listCommunityBans(communityId: string): Promise<CommunityBanItem[]>;
+  banCommunityMember(input: {
+    communityId: string;
+    targetUserId: string;
+    reason: string;
+  }): Promise<void>;
+  unbanCommunityMember(input: {
+    communityId: string;
+    targetUserId: string;
+    reason?: string | null;
+  }): Promise<void>;
+  listBanEligibleServersForUser(targetUserId: string): Promise<BanEligibleServer[]>;
   listChannels(communityId: string): Promise<Channel[]>;
   subscribeToChannels(communityId: string, onChange: () => void): RealtimeChannel;
+  listChannelGroups(input: {
+    communityId: string;
+    channelIds: string[];
+  }): Promise<ChannelGroupState>;
+  createChannelGroup(input: {
+    communityId: string;
+    name: string;
+    position: number;
+    createdByUserId: string;
+  }): Promise<ChannelGroup>;
+  renameChannelGroup(input: {
+    communityId: string;
+    groupId: string;
+    name: string;
+  }): Promise<void>;
+  deleteChannelGroup(input: {
+    communityId: string;
+    groupId: string;
+  }): Promise<void>;
+  setChannelGroupForChannel(input: {
+    communityId: string;
+    channelId: string;
+    groupId: string | null;
+    position: number;
+  }): Promise<void>;
+  setChannelGroupCollapsed(input: {
+    communityId: string;
+    groupId: string;
+    isCollapsed: boolean;
+  }): Promise<void>;
   listMessages(communityId: string, channelId: string): Promise<Message[]>;
-  subscribeToMessages(channelId: string, onChange: () => void): RealtimeChannel;
+  listMessagesPage(input: {
+    communityId: string;
+    channelId: string;
+    beforeCursor?: MessagePageCursor | null;
+    limit?: number;
+  }): Promise<MessagePageResult>;
+  subscribeToMessages(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   listMessageReactions(communityId: string, channelId: string): Promise<MessageReaction[]>;
-  subscribeToMessageReactions(channelId: string, onChange: () => void): RealtimeChannel;
+  listMessageReactionsForMessages(input: {
+    communityId: string;
+    channelId: string;
+    messageIds: string[];
+  }): Promise<MessageReaction[]>;
+  subscribeToMessageReactions(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   toggleMessageReaction(input: {
     communityId: string;
     channelId: string;
@@ -108,8 +571,32 @@ export interface CommunityDataBackend {
     emoji: string;
   }): Promise<void>;
   listMessageAttachments(communityId: string, channelId: string): Promise<MessageAttachment[]>;
-  subscribeToMessageAttachments(channelId: string, onChange: () => void): RealtimeChannel;
+  listMessageAttachmentsForMessages(input: {
+    communityId: string;
+    channelId: string;
+    messageIds: string[];
+  }): Promise<MessageAttachment[]>;
+  subscribeToMessageAttachments(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   cleanupExpiredMessageAttachments(limit?: number): Promise<number>;
+  listMessageLinkPreviews(communityId: string, channelId: string): Promise<MessageLinkPreview[]>;
+  listMessageLinkPreviewsForMessages(input: {
+    communityId: string;
+    channelId: string;
+    messageIds: string[];
+  }): Promise<MessageLinkPreview[]>;
+  subscribeToMessageLinkPreviews(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
+  requestChannelLinkPreviewBackfill(input: {
+    communityId: string;
+    channelId: string;
+    messageIds: string[];
+  }): Promise<{ queued: number; skipped: number; alreadyPresent: number; requested: number }>;
+  runMessageMediaMaintenance(limit?: number): Promise<{
+    deletedMessages: number;
+    claimedDeletionJobs: number;
+    deletedObjects: number;
+    retryableFailures: number;
+    deadLetters: number;
+  }>;
   fetchAuthorProfiles(authorIds: string[]): Promise<Record<string, AuthorProfile>>;
   isHavenDeveloperMessagingAllowed(input: {
     communityId: string;
@@ -224,6 +711,9 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: canCreateChannels },
       { data: canManageChannels },
       { data: canManageMessages },
+      { data: canManageBans },
+      { data: canCreateReports },
+      { data: canRefreshLinkPreviews },
       { data: canManageDeveloperAccess },
       { data: canManageInvites },
     ] = await Promise.all([
@@ -254,6 +744,18 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       }),
       supabase.rpc('user_has_permission', {
         p_community_id: communityId,
+        p_permission_key: 'manage_bans',
+      }),
+      supabase.rpc('user_has_permission', {
+        p_community_id: communityId,
+        p_permission_key: 'create_reports',
+      }),
+      supabase.rpc('user_has_permission', {
+        p_community_id: communityId,
+        p_permission_key: 'refresh_link_previews',
+      }),
+      supabase.rpc('user_has_permission', {
+        p_community_id: communityId,
         p_permission_key: 'manage_developer_access',
       }),
       supabase.rpc('user_has_permission', {
@@ -273,9 +775,140 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       canCreateChannels: owner || Boolean(canCreateChannels) || manageChannels,
       canManageChannels: manageChannels,
       canManageMessages: owner || Boolean(canManageMessages),
+      canManageBans: owner || Boolean(canManageBans),
+      canCreateReports: owner || Boolean(canCreateReports),
+      canRefreshLinkPreviews: owner || Boolean(canRefreshLinkPreviews),
       canManageDeveloperAccess: owner || Boolean(canManageDeveloperAccess),
       canManageInvites: owner || Boolean(canManageInvites),
     };
+  },
+
+  async listCommunityMembers(communityId) {
+    const { data, error } = await supabase
+      .from('community_members')
+      .select('id, user_id, nickname, is_owner, joined_at, profiles(username, avatar_url)')
+      .eq('community_id', communityId)
+      .order('joined_at', { ascending: true });
+    if (error) throw error;
+
+    const rows = (data ?? []) as CommunityMemberWithProfile[];
+    return rows
+      .map((member) => {
+        const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+        const displayName =
+          member.nickname?.trim() || profile?.username || member.user_id.substring(0, 12);
+
+        return {
+          memberId: member.id,
+          userId: member.user_id,
+          displayName,
+          avatarUrl: profile?.avatar_url ?? null,
+          isOwner: Boolean(member.is_owner),
+          joinedAt: member.joined_at,
+        };
+      })
+      .sort((left, right) => {
+        if (left.isOwner !== right.isOwner) return left.isOwner ? -1 : 1;
+        return left.displayName.localeCompare(right.displayName);
+      });
+  },
+
+  async reportUserProfile({ communityId, targetUserId, reporterUserId, reason }) {
+    const normalizedReason = reason.trim();
+    if (!normalizedReason) {
+      throw new Error('Report reason is required.');
+    }
+
+    const reportId = crypto.randomUUID();
+    const reportTitle = 'User Report: Profile';
+    const reportNotes = JSON.stringify({
+      type: 'user_report',
+      targetUserId,
+      reason: normalizedReason,
+    });
+
+    const { error } = await supabase.from('support_reports').insert({
+      id: reportId,
+      community_id: communityId,
+      reporter_user_id: reporterUserId,
+      title: reportTitle,
+      notes: reportNotes,
+      include_last_n_messages: null,
+    });
+    if (error) throw error;
+  },
+
+  async listCommunityBans(communityId) {
+    const { data, error } = await supabase
+      .from('community_bans')
+      .select(
+        'id, community_id, banned_user_id, banned_by_user_id, reason, banned_at, revoked_at, revoked_by_user_id, revoked_reason, profiles:banned_user_id(username, avatar_url)'
+      )
+      .eq('community_id', communityId)
+      .is('revoked_at', null)
+      .order('banned_at', { ascending: false });
+    if (error) throw error;
+
+    return (data ?? []).map((row) => {
+      const profileRaw = (row as { profiles?: unknown }).profiles;
+      const profile = Array.isArray(profileRaw) ? profileRaw[0] : profileRaw;
+      const profileRecord =
+        profile && typeof profile === 'object'
+          ? (profile as { username?: string | null; avatar_url?: string | null })
+          : null;
+
+      return {
+        id: row.id,
+        communityId: row.community_id,
+        bannedUserId: row.banned_user_id,
+        bannedByUserId: row.banned_by_user_id,
+        reason: row.reason,
+        bannedAt: row.banned_at,
+        revokedAt: row.revoked_at,
+        revokedByUserId: row.revoked_by_user_id,
+        revokedReason: row.revoked_reason,
+        username: profileRecord?.username ?? row.banned_user_id.substring(0, 12),
+        avatarUrl: profileRecord?.avatar_url ?? null,
+      } satisfies CommunityBanItem;
+    });
+  },
+
+  async banCommunityMember({ communityId, targetUserId, reason }) {
+    const normalizedReason = reason.trim();
+    if (!normalizedReason) {
+      throw new Error('Ban reason is required.');
+    }
+
+    const { error } = await supabase.rpc('ban_community_member', {
+      p_community_id: communityId,
+      p_target_user_id: targetUserId,
+      p_reason: normalizedReason,
+    });
+    if (error) throw error;
+  },
+
+  async unbanCommunityMember({ communityId, targetUserId, reason }) {
+    const normalizedReason = reason?.trim() ?? null;
+    const { error } = await supabase.rpc('unban_community_member', {
+      p_community_id: communityId,
+      p_target_user_id: targetUserId,
+      p_reason: normalizedReason && normalizedReason.length > 0 ? normalizedReason : undefined,
+    });
+    if (error) throw error;
+  },
+
+  async listBanEligibleServersForUser(targetUserId) {
+    if (!targetUserId) return [];
+
+    const { data, error } = await supabase.rpc('list_bannable_shared_communities', {
+      p_target_user_id: targetUserId,
+    });
+    if (error) throw error;
+
+    return (data ?? []).map((row) => ({
+      communityId: row.community_id,
+      communityName: row.community_name,
+    }));
   },
 
   async listChannels(communityId) {
@@ -286,6 +919,168 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .order('position', { ascending: true });
     if (error) throw error;
     return data ?? [];
+  },
+
+  async listChannelGroups({ communityId, channelIds }) {
+    const [
+      { data: groupRows, error: groupRowsError },
+      { data: mappingRows, error: mappingRowsError },
+      authResult,
+    ] = await Promise.all([
+      supabase
+        .from('channel_groups')
+        .select('id, community_id, name, position')
+        .eq('community_id', communityId)
+        .order('position', { ascending: true }),
+      supabase
+        .from('channel_group_channels')
+        .select('channel_id, group_id, position')
+        .eq('community_id', communityId)
+        .order('position', { ascending: true }),
+      supabase.auth.getUser(),
+    ]);
+
+    if (groupRowsError) throw groupRowsError;
+    if (mappingRowsError) throw mappingRowsError;
+    if (authResult.error) throw authResult.error;
+
+    const currentUserId = authResult.data.user?.id ?? null;
+
+    let collapsedGroupIds: string[] = [];
+    if (currentUserId) {
+      const { data: preferenceRows, error: preferenceRowsError } = await supabase
+        .from('channel_group_preferences')
+        .select('group_id, is_collapsed')
+        .eq('community_id', communityId)
+        .eq('user_id', currentUserId)
+        .eq('is_collapsed', true);
+      if (preferenceRowsError) throw preferenceRowsError;
+      collapsedGroupIds = (preferenceRows ?? []).map((row) => row.group_id);
+    }
+
+    const channelIdsByGroupId = new Map<string, string[]>();
+    for (const mappingRow of mappingRows ?? []) {
+      const existing = channelIdsByGroupId.get(mappingRow.group_id) ?? [];
+      existing.push(mappingRow.channel_id);
+      channelIdsByGroupId.set(mappingRow.group_id, existing);
+    }
+
+    const groups: ChannelGroup[] = (groupRows ?? []).map((groupRow) => ({
+      id: groupRow.id,
+      communityId: groupRow.community_id,
+      name: groupRow.name,
+      position: groupRow.position,
+      channelIds: channelIdsByGroupId.get(groupRow.id) ?? [],
+    }));
+
+    const groupedChannelIds = new Set(
+      Array.from(channelIdsByGroupId.values()).flat()
+    );
+
+    return {
+      groups,
+      ungroupedChannelIds: channelIds.filter((channelId) => !groupedChannelIds.has(channelId)),
+      collapsedGroupIds,
+    };
+  },
+
+  async createChannelGroup({ communityId, name, position, createdByUserId }) {
+    const { data, error } = await supabase
+      .from('channel_groups')
+      .insert({
+        community_id: communityId,
+        name,
+        position,
+        created_by_user_id: createdByUserId,
+      })
+      .select('id, community_id, name, position')
+      .single();
+
+    if (error) throw error;
+
+    return {
+      id: data.id,
+      communityId: data.community_id,
+      name: data.name,
+      position: data.position,
+      channelIds: [],
+    };
+  },
+
+  async renameChannelGroup({ communityId, groupId, name }) {
+    const { error } = await supabase
+      .from('channel_groups')
+      .update({ name })
+      .eq('community_id', communityId)
+      .eq('id', groupId);
+    if (error) throw error;
+  },
+
+  async deleteChannelGroup({ communityId, groupId }) {
+    const { error } = await supabase
+      .from('channel_groups')
+      .delete()
+      .eq('community_id', communityId)
+      .eq('id', groupId);
+    if (error) throw error;
+  },
+
+  async setChannelGroupForChannel({ communityId, channelId, groupId, position }) {
+    if (!groupId) {
+      const { error } = await supabase
+        .from('channel_group_channels')
+        .delete()
+        .eq('community_id', communityId)
+        .eq('channel_id', channelId);
+      if (error) throw error;
+      return;
+    }
+
+    const { error } = await supabase
+      .from('channel_group_channels')
+      .upsert(
+        {
+          community_id: communityId,
+          channel_id: channelId,
+          group_id: groupId,
+          position,
+        },
+        { onConflict: 'community_id,channel_id' }
+      );
+    if (error) throw error;
+  },
+
+  async setChannelGroupCollapsed({ communityId, groupId, isCollapsed }) {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    if (!user?.id) throw new Error('Not authenticated.');
+
+    if (!isCollapsed) {
+      const { error } = await supabase
+        .from('channel_group_preferences')
+        .delete()
+        .eq('community_id', communityId)
+        .eq('group_id', groupId)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      return;
+    }
+
+    const { error } = await supabase
+      .from('channel_group_preferences')
+      .upsert(
+        {
+          community_id: communityId,
+          group_id: groupId,
+          user_id: user.id,
+          is_collapsed: true,
+        },
+        { onConflict: 'community_id,group_id,user_id' }
+      );
+    if (error) throw error;
   },
 
   subscribeToChannels(communityId, onChange) {
@@ -317,6 +1112,41 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return data ?? [];
   },
 
+  async listMessagesPage({ communityId, channelId, beforeCursor, limit = 60 }) {
+    const boundedLimit = Number.isFinite(limit)
+      ? Math.min(Math.max(Math.floor(limit), 1), 100)
+      : 60;
+
+    let query = supabase
+      .from('messages')
+      .select('*')
+      .eq('community_id', communityId)
+      .eq('channel_id', channelId)
+      .is('deleted_at', null);
+
+    if (beforeCursor?.createdAt && beforeCursor?.id) {
+      query = query.or(
+        `created_at.lt.${beforeCursor.createdAt},and(created_at.eq.${beforeCursor.createdAt},id.lt.${beforeCursor.id})`
+      );
+    }
+
+    const { data, error } = await query
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(boundedLimit + 1);
+
+    if (error) throw error;
+
+    const rows = (data ?? []) as Message[];
+    const hasMore = rows.length > boundedLimit;
+    const pageRows = hasMore ? rows.slice(0, boundedLimit) : rows;
+
+    return {
+      messages: [...pageRows].reverse(),
+      hasMore,
+    };
+  },
+
   subscribeToMessages(channelId, onChange) {
     return supabase
       .channel(`messages:${channelId}`)
@@ -328,7 +1158,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           table: 'messages',
           filter: `channel_id=eq.${channelId}`,
         },
-        onChange
+        (payload) => onChange(payload)
       )
       .on(
         'postgres_changes',
@@ -338,7 +1168,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           table: 'messages',
           filter: `channel_id=eq.${channelId}`,
         },
-        onChange
+        (payload) => onChange(payload)
       )
       .on(
         'postgres_changes',
@@ -352,7 +1182,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           // Fall back to firing on every delete so UI never lags stale rows.
           const deletedChannelId = getRealtimeRowChannelId(payload.old);
           if (!deletedChannelId || deletedChannelId === channelId) {
-            onChange();
+            onChange(payload);
           }
         }
       )
@@ -369,13 +1199,34 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     if (error) throw error;
 
-    return ((data ?? []) as MessageReactionRow[]).map((row) => ({
-      id: row.id,
-      messageId: row.message_id,
-      userId: row.user_id,
-      emoji: row.emoji,
-      createdAt: row.created_at,
-    }));
+    return mapMessageReactionRows((data ?? []) as MessageReactionRow[]);
+  },
+
+  async listMessageReactionsForMessages({ communityId, channelId, messageIds }) {
+    const uniqueMessageIds = Array.from(new Set(messageIds.filter(Boolean)));
+    if (uniqueMessageIds.length === 0) return [];
+
+    const chunkSize = 200;
+    const chunks: string[][] = [];
+    for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
+      chunks.push(uniqueMessageIds.slice(index, index + chunkSize));
+    }
+
+    const chunkResults = await Promise.all(
+      chunks.map(async (chunk) => {
+        const { data, error } = await supabase
+          .from('message_reactions' as never)
+          .select('id, message_id, user_id, emoji, created_at')
+          .eq('community_id', communityId)
+          .eq('channel_id', channelId)
+          .in('message_id', chunk as never)
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        return (data ?? []) as MessageReactionRow[];
+      })
+    );
+
+    return mapMessageReactionRows(chunkResults.flat());
   },
 
   subscribeToMessageReactions(channelId, onChange) {
@@ -389,7 +1240,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           table: 'message_reactions',
           filter: `channel_id=eq.${channelId}`,
         },
-        onChange
+        (payload) => onChange(payload)
       )
       .on(
         'postgres_changes',
@@ -399,7 +1250,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           table: 'message_reactions',
           filter: `channel_id=eq.${channelId}`,
         },
-        onChange
+        (payload) => onChange(payload)
       )
       .on(
         'postgres_changes',
@@ -411,7 +1262,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         (payload) => {
           const deletedChannelId = getRealtimeRowChannelId(payload.old);
           if (!deletedChannelId || deletedChannelId === channelId) {
-            onChange();
+            onChange(payload);
           }
         }
       )
@@ -495,52 +1346,39 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     if (error) throw error;
 
-    const attachmentRows = (data ?? []) as MessageAttachmentRow[];
-    if (attachmentRows.length === 0) return [];
+    return await mapMessageAttachmentRowsWithSignedUrls((data ?? []) as MessageAttachmentRow[]);
+  },
 
-    const pathsByBucket = new Map<string, string[]>();
-    for (const row of attachmentRows) {
-      const existingPaths = pathsByBucket.get(row.bucket_name) ?? [];
-      existingPaths.push(row.object_path);
-      pathsByBucket.set(row.bucket_name, existingPaths);
+  async listMessageAttachmentsForMessages({ communityId, channelId, messageIds }) {
+    const uniqueMessageIds = Array.from(new Set(messageIds.filter(Boolean)));
+    if (uniqueMessageIds.length === 0) return [];
+
+    const nowIso = new Date().toISOString();
+    const chunkSize = 200;
+    const chunks: string[][] = [];
+    for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
+      chunks.push(uniqueMessageIds.slice(index, index + chunkSize));
     }
 
-    const signedUrlByBucketAndPath = new Map<string, string>();
-    for (const [bucketName, paths] of pathsByBucket.entries()) {
-      const { data: signedRows, error: signedError } = await supabase.storage
-        .from(bucketName)
-        .createSignedUrls(paths, 60 * 60);
+    const chunkResults = await Promise.all(
+      chunks.map(async (chunk) => {
+        const { data, error } = await supabase
+          .from('message_attachments' as never)
+          .select(
+            'id, message_id, community_id, channel_id, owner_user_id, bucket_name, object_path, original_filename, mime_type, media_kind, size_bytes, created_at, expires_at'
+          )
+          .eq('community_id', communityId)
+          .eq('channel_id', channelId)
+          .in('message_id', chunk as never)
+          .gt('expires_at', nowIso)
+          .order('created_at', { ascending: true });
 
-      if (signedError) {
-        console.error('Failed to create signed URLs for message attachments:', signedError);
-        continue;
-      }
+        if (error) throw error;
+        return (data ?? []) as MessageAttachmentRow[];
+      })
+    );
 
-      for (const signedRow of signedRows ?? []) {
-        if (!signedRow.signedUrl) continue;
-        signedUrlByBucketAndPath.set(
-          `${bucketName}/${signedRow.path}`,
-          signedRow.signedUrl
-        );
-      }
-    }
-
-    return attachmentRows.map((row) => ({
-      id: row.id,
-      messageId: row.message_id,
-      communityId: row.community_id,
-      channelId: row.channel_id,
-      ownerUserId: row.owner_user_id,
-      bucketName: row.bucket_name,
-      objectPath: row.object_path,
-      originalFilename: row.original_filename,
-      mimeType: row.mime_type,
-      mediaKind: row.media_kind,
-      sizeBytes: row.size_bytes,
-      createdAt: row.created_at,
-      expiresAt: row.expires_at,
-      signedUrl: signedUrlByBucketAndPath.get(`${row.bucket_name}/${row.object_path}`) ?? null,
-    }));
+    return await mapMessageAttachmentRowsWithSignedUrls(chunkResults.flat());
   },
 
   subscribeToMessageAttachments(channelId, onChange) {
@@ -554,7 +1392,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           table: 'message_attachments',
           filter: `channel_id=eq.${channelId}`,
         },
-        onChange
+        (payload) => onChange(payload)
       )
       .on(
         'postgres_changes',
@@ -564,7 +1402,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           table: 'message_attachments',
           filter: `channel_id=eq.${channelId}`,
         },
-        onChange
+        (payload) => onChange(payload)
       )
       .on(
         'postgres_changes',
@@ -576,7 +1414,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         (payload) => {
           const deletedChannelId = getRealtimeRowChannelId(payload.old);
           if (!deletedChannelId || deletedChannelId === channelId) {
-            onChange();
+            onChange(payload);
           }
         }
       )
@@ -596,12 +1434,149 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return Number(data ?? 0);
   },
 
+  async listMessageLinkPreviews(communityId, channelId) {
+    const { data, error } = await supabase
+      .from('message_link_previews' as never)
+      .select(
+        'id, message_id, community_id, channel_id, source_url, normalized_url, status, cache_id, snapshot, embed_provider, thumbnail_bucket_name, thumbnail_object_path, created_at, updated_at'
+      )
+      .eq('community_id', communityId)
+      .eq('channel_id', channelId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    return await mapMessageLinkPreviewRowsWithSignedUrls((data ?? []) as MessageLinkPreviewRow[]);
+  },
+
+  async listMessageLinkPreviewsForMessages({ communityId, channelId, messageIds }) {
+    const uniqueMessageIds = Array.from(new Set(messageIds.filter(Boolean)));
+    if (uniqueMessageIds.length === 0) return [];
+
+    const chunkSize = 200;
+    const chunks: string[][] = [];
+    for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
+      chunks.push(uniqueMessageIds.slice(index, index + chunkSize));
+    }
+
+    const chunkResults = await Promise.all(
+      chunks.map(async (chunk) => {
+        const { data, error } = await supabase
+          .from('message_link_previews' as never)
+          .select(
+            'id, message_id, community_id, channel_id, source_url, normalized_url, status, cache_id, snapshot, embed_provider, thumbnail_bucket_name, thumbnail_object_path, created_at, updated_at'
+          )
+          .eq('community_id', communityId)
+          .eq('channel_id', channelId)
+          .in('message_id', chunk as never)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return (data ?? []) as MessageLinkPreviewRow[];
+      })
+    );
+
+    return await mapMessageLinkPreviewRowsWithSignedUrls(chunkResults.flat());
+  },
+
+  subscribeToMessageLinkPreviews(channelId, onChange) {
+    return supabase
+      .channel(`message_link_previews:${channelId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'message_link_previews',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        (payload) => onChange(payload)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'message_link_previews',
+        },
+        (payload) => {
+          const updatedChannelId =
+            getRealtimeRowChannelId(payload.new) ?? getRealtimeRowChannelId(payload.old);
+          // UPDATE payloads may omit unchanged columns (including channel_id), so fall back to
+          // refreshing conservatively when we cannot determine the row's channel.
+          if (!updatedChannelId || updatedChannelId === channelId) {
+            onChange(payload);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'message_link_previews',
+        },
+        (payload) => {
+          const deletedChannelId = getRealtimeRowChannelId(payload.old);
+          if (!deletedChannelId || deletedChannelId === channelId) {
+            onChange(payload);
+          }
+        }
+      )
+      .subscribe();
+  },
+
+  async requestChannelLinkPreviewBackfill({ communityId, channelId, messageIds }) {
+    const boundedMessageIds = messageIds.slice(0, 100);
+    const requestedCount = boundedMessageIds.length;
+
+    const hasConfirmedSession = await waitForConfirmedSupabaseSession();
+    if (!hasConfirmedSession) {
+      return {
+        queued: 0,
+        skipped: requestedCount,
+        alreadyPresent: 0,
+        requested: requestedCount,
+      };
+    }
+
+    return await supabaseFunctionJson<{
+      queued: number;
+      skipped: number;
+      alreadyPresent: number;
+      requested: number;
+    }>('link-preview-backfill', {
+      communityId,
+      channelId,
+      messageIds: boundedMessageIds,
+      limit: Math.min(Math.max(requestedCount, 1), 100),
+    });
+  },
+
+  async runMessageMediaMaintenance(limit = 50) {
+    const boundedLimit = Number.isFinite(limit)
+      ? Math.min(Math.max(Math.floor(limit), 1), 200)
+      : 50;
+
+    return await supabaseFunctionJson<{
+      deletedMessages: number;
+      claimedDeletionJobs: number;
+      deletedObjects: number;
+      retryableFailures: number;
+      deadLetters: number;
+    }>('message-media-maintenance', {
+      mode: 'authenticated-fallback',
+      maxExpiredMessages: boundedLimit,
+      maxDeletionJobs: boundedLimit,
+    });
+  },
+
   async fetchAuthorProfiles(authorIds) {
     if (authorIds.length === 0) return {};
 
     const [{ data: profiles, error: profilesError }, { data: activeStaffRows, error: staffError }] =
       await Promise.all([
-        supabase.from('profiles').select('id, username').in('id', authorIds),
+        supabase.from('profiles').select('id, username, avatar_url').in('id', authorIds),
         supabase
           .from('platform_staff')
           .select('user_id, display_prefix')
@@ -618,6 +1593,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         username: authorId.substring(0, 12),
         isPlatformStaff: false,
         displayPrefix: null,
+        avatarUrl: null,
       };
     }
 
@@ -626,6 +1602,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         username: profile.username,
         isPlatformStaff: false,
         displayPrefix: null,
+        avatarUrl: profile.avatar_url ?? null,
       };
     }
 
@@ -634,6 +1611,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         username: staffRow.user_id.substring(0, 12),
         isPlatformStaff: false,
         displayPrefix: null,
+        avatarUrl: null,
       };
 
       profileMap[staffRow.user_id] = {
@@ -1307,50 +2285,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       throw new Error('Message content or media is required.');
     }
 
-    let uploadedMedia:
-      | {
-          bucketName: string;
-          objectPath: string;
-          originalFilename: string;
-          mimeType: string;
-          mediaKind: 'image' | 'video' | 'file';
-          sizeBytes: number;
-          expiresAt: string;
-        }
-      | null = null;
-
-    if (mediaUpload?.file) {
-      const nextFile = mediaUpload.file;
-      const expiresInHours = mediaUpload.expiresInHours ?? DEFAULT_MEDIA_EXPIRES_IN_HOURS;
-      const boundedExpiresInHours = Math.min(
-        Math.max(Math.floor(expiresInHours), 1),
-        MAX_MEDIA_EXPIRES_IN_HOURS
-      );
-      const originalFilename = sanitizeFileName(nextFile.name || 'media');
-      const objectPath = `${communityId}/${channelId}/${crypto.randomUUID()}-${originalFilename}`;
-      const mimeType = nextFile.type?.trim() || 'application/octet-stream';
-
-      const { error: uploadError } = await supabase.storage.from(MESSAGE_MEDIA_BUCKET).upload(
-        objectPath,
-        nextFile,
-        {
-          cacheControl: '3600',
-          contentType: mimeType,
-          upsert: false,
-        }
-      );
-      if (uploadError) throw uploadError;
-
-      uploadedMedia = {
-        bucketName: MESSAGE_MEDIA_BUCKET,
-        objectPath,
-        originalFilename,
-        mimeType,
-        mediaKind: resolveMediaKind(mimeType),
-        sizeBytes: nextFile.size,
-        expiresAt: new Date(Date.now() + boundedExpiresInHours * 60 * 60 * 1000).toISOString(),
-      };
-    }
+    const uploadedMedia = await uploadMessageMediaToObjectStore({
+      communityId,
+      channelId,
+      mediaUpload,
+    });
 
     const nextMetadata = {
       ...(replyToMessageId && replyToMessageId.trim().length > 0
@@ -1372,9 +2311,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .select('*')
       .single();
     if (insertError) {
-      if (uploadedMedia) {
-        await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
-      }
+      await removeUploadedMediaObject(uploadedMedia);
       throw insertError;
     }
 
@@ -1398,7 +2335,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     if (!attachmentError) return;
 
-    await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+    await removeUploadedMediaObject(uploadedMedia);
     await supabase.from('messages').delete().eq('id', createdMessage.id);
     throw attachmentError;
   },
@@ -1434,8 +2371,9 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     for (const [bucketName, paths] of attachmentPathsByBucket.entries()) {
       if (paths.length === 0) continue;
 
-      const { error: removeError } = await supabase.storage.from(bucketName).remove(paths);
-      if (removeError) {
+      try {
+        await messageObjectStore.removeObjects(bucketName, paths);
+      } catch (removeError) {
         console.warn('Failed to remove message attachment objects before message delete:', {
           messageId,
           bucketName,
@@ -1507,50 +2445,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       throw new Error('Message content or media is required.');
     }
 
-    let uploadedMedia:
-      | {
-          bucketName: string;
-          objectPath: string;
-          originalFilename: string;
-          mimeType: string;
-          mediaKind: 'image' | 'video' | 'file';
-          sizeBytes: number;
-          expiresAt: string;
-        }
-      | null = null;
-
-    if (mediaUpload?.file) {
-      const nextFile = mediaUpload.file;
-      const expiresInHours = mediaUpload.expiresInHours ?? DEFAULT_MEDIA_EXPIRES_IN_HOURS;
-      const boundedExpiresInHours = Math.min(
-        Math.max(Math.floor(expiresInHours), 1),
-        MAX_MEDIA_EXPIRES_IN_HOURS
-      );
-      const originalFilename = sanitizeFileName(nextFile.name || 'media');
-      const objectPath = `${communityId}/${channelId}/${crypto.randomUUID()}-${originalFilename}`;
-      const mimeType = nextFile.type?.trim() || 'application/octet-stream';
-
-      const { error: uploadError } = await supabase.storage.from(MESSAGE_MEDIA_BUCKET).upload(
-        objectPath,
-        nextFile,
-        {
-          cacheControl: '3600',
-          contentType: mimeType,
-          upsert: false,
-        }
-      );
-      if (uploadError) throw uploadError;
-
-      uploadedMedia = {
-        bucketName: MESSAGE_MEDIA_BUCKET,
-        objectPath,
-        originalFilename,
-        mimeType,
-        mediaKind: resolveMediaKind(mimeType),
-        sizeBytes: nextFile.size,
-        expiresAt: new Date(Date.now() + boundedExpiresInHours * 60 * 60 * 1000).toISOString(),
-      };
-    }
+    const uploadedMedia = await uploadMessageMediaToObjectStore({
+      communityId,
+      channelId,
+      mediaUpload,
+    });
 
     const nextMetadata = {
       source: 'renderer_dev_mode',
@@ -1567,9 +2466,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       p_metadata: nextMetadata,
     });
     if (error) {
-      if (uploadedMedia) {
-        await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
-      }
+      await removeUploadedMediaObject(uploadedMedia);
       throw error;
     }
 
@@ -1581,7 +2478,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         : null;
 
     if (!createdMessageId) {
-      await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+      await removeUploadedMediaObject(uploadedMedia);
       throw new Error('Failed to create Haven developer message.');
     }
 
@@ -1590,11 +2487,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       error: authError,
     } = await supabase.auth.getUser();
     if (authError) {
-      await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+      await removeUploadedMediaObject(uploadedMedia);
       throw authError;
     }
     if (!user?.id) {
-      await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+      await removeUploadedMediaObject(uploadedMedia);
       throw new Error('Not authenticated.');
     }
 
@@ -1616,7 +2513,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     if (!attachmentError) return;
 
-    await supabase.storage.from(uploadedMedia.bucketName).remove([uploadedMedia.objectPath]);
+    await removeUploadedMediaObject(uploadedMedia);
     await supabase.from('messages').delete().eq('id', createdMessageId);
     throw attachmentError;
   },

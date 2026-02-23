@@ -8,6 +8,7 @@ The database is the enforcement agent. The app UI reads and writes permission st
 - Channel visibility: `public.can_view_channel(channel_id)`
 - Channel posting/speaking gate: `public.can_send_in_channel(channel_id)`
 - Table-level enforcement: RLS policies on `roles`, `role_permissions`, `member_roles`, `channels`, `messages`, and overwrite tables.
+- Regression coverage: SQL RLS suites in `supabase/tests/sql/*`
 
 ## Current Server Admin Surface
 `src/components/ServerSettingsModal.tsx` now has four tabs:
@@ -47,6 +48,17 @@ Database policies now enforce hierarchy by position (not just UI):
 Implemented in:
 - `supabase/migrations/20260218_000009_enforce_role_hierarchy_by_position.sql`
 
+## Test Matrix (Phase 5)
+Current SQL RLS coverage includes:
+- non-member channel/message visibility denial
+- member/default-role channel access
+- overwrite-restricted channel visibility/send behavior
+- moderator message moderation behavior
+- permission helper checks (`user_has_permission`, channel helpers)
+
+Runbook:
+- `docs/testing/rls-and-hardening-runbook.md`
+
 ## Extension Rules
 When adding new server capabilities:
 1. Add a permission key in `permissions_catalog` and migrations.
@@ -61,3 +73,4 @@ When adding new server capabilities:
 - `src/components/ServerSettingsModal.tsx`
 - `src/renderer.tsx`
 - `supabase/migrations/20260217_000001_reset_discord_like_schema.sql`
+- `supabase/tests/sql/01_core_permissions_rls.sql`

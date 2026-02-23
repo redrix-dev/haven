@@ -1,4 +1,10 @@
-import type { AppSettings, DesktopAPI, UpdaterStatus } from './types';
+import type {
+  AppSettings,
+  DesktopAPI,
+  NotificationAudioSettings,
+  SaveFileFromUrlResult,
+  UpdaterStatus,
+} from './types';
 
 const DESKTOP_BRIDGE_UNAVAILABLE_ERROR = 'Desktop bridge unavailable.';
 
@@ -23,11 +29,22 @@ export const desktopClient = {
   }> {
     return getDesktopApi().setAutoUpdateEnabled(enabled);
   },
+  async setNotificationAudioSettings(input: NotificationAudioSettings): Promise<{
+    settings: AppSettings;
+  }> {
+    return getDesktopApi().setNotificationAudioSettings(input);
+  },
   async getUpdaterStatus(): Promise<UpdaterStatus> {
     return getDesktopApi().getUpdaterStatus();
   },
   async checkForUpdates(): Promise<UpdaterStatus> {
     return getDesktopApi().checkForUpdates();
+  },
+  async saveFileFromUrl(input: {
+    url: string;
+    suggestedName?: string | null;
+  }): Promise<SaveFileFromUrlResult> {
+    return getDesktopApi().saveFileFromUrl(input);
   },
   async consumeNextProtocolUrl(): Promise<string | null> {
     return getDesktopApi().consumeNextProtocolUrl();

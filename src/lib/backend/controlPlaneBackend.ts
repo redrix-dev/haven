@@ -1,7 +1,13 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
-import type { RedeemedInvite, ServerInvite, ServerSummary } from './types';
+import type {
+  BanEligibleServer,
+  FeatureFlagsSnapshot,
+  RedeemedInvite,
+  ServerInvite,
+  ServerSummary,
+} from './types';
 
 export type PlatformStaffInfo = {
   isActive: boolean;
@@ -17,8 +23,12 @@ export type UserProfileInfo = {
 export interface ControlPlaneBackend {
   fetchUserProfile(userId: string): Promise<UserProfileInfo | null>;
   fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
+  listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
   updateUserProfile(input: { userId: string; username: string; avatarUrl: string | null }): Promise<void>;
   listUserCommunities(userId: string): Promise<ServerSummary[]>;
+  renameCommunity(input: { communityId: string; name: string }): Promise<void>;
+  deleteCommunity(communityId: string): Promise<void>;
+  leaveCommunity(communityId: string): Promise<void>;
   subscribeToUserCommunities(userId: string, onChange: () => void): RealtimeChannel;
   createCommunity(name: string): Promise<{ id: string }>;
   createCommunityInvite(input: {
@@ -27,6 +37,7 @@ export interface ControlPlaneBackend {
     expiresInHours: number | null;
   }): Promise<ServerInvite>;
   redeemCommunityInvite(code: string): Promise<RedeemedInvite>;
+  listBanEligibleServersForUser(targetUserId: string): Promise<BanEligibleServer[]>;
   listActiveCommunityInvites(communityId: string): Promise<ServerInvite[]>;
   revokeCommunityInvite(communityId: string, inviteId: string): Promise<void>;
 }
@@ -38,6 +49,11 @@ type InviteRecord = Pick<
 
 type CommunityMemberCommunityRow = {
   communities: ServerSummary | null;
+};
+
+type FeatureFlagRow = {
+  flag_key: string;
+  enabled: boolean;
 };
 
 const mapInvite = (invite: InviteRecord): ServerInvite => ({
@@ -81,6 +97,18 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
     };
   },
 
+  async listMyFeatureFlags() {
+    const { data, error } = await supabase.rpc('list_my_feature_flags' as never);
+    if (error) throw error;
+
+    const snapshot: FeatureFlagsSnapshot = {};
+    for (const row of ((data ?? []) as FeatureFlagRow[])) {
+      if (!row?.flag_key) continue;
+      snapshot[row.flag_key] = Boolean(row.enabled);
+    }
+    return snapshot;
+  },
+
   async updateUserProfile({ userId, username, avatarUrl }) {
     const { error } = await supabase
       .from('profiles')
@@ -107,6 +135,52 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
         (community): community is ServerSummary =>
           community !== null && community !== undefined
       );
+  },
+
+  async renameCommunity({ communityId, name }) {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      throw new Error('Server name is required.');
+    }
+
+    const { error } = await supabase
+      .from('communities')
+      .update({ name: normalizedName })
+      .eq('id', communityId);
+    if (error) throw error;
+  },
+
+  async deleteCommunity(communityId) {
+    const { error } = await supabase.from('communities').delete().eq('id', communityId);
+    if (error) throw error;
+  },
+
+  async leaveCommunity(communityId) {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    if (!user?.id) throw new Error('Not authenticated.');
+
+    const { data: membership, error: membershipError } = await supabase
+      .from('community_members')
+      .select('is_owner')
+      .eq('community_id', communityId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (membershipError) throw membershipError;
+    if (!membership) throw new Error('You are not a member of this server.');
+    if (membership.is_owner) {
+      throw new Error('Owners cannot leave a server. Delete the server instead.');
+    }
+
+    const { error } = await supabase
+      .from('community_members')
+      .delete()
+      .eq('community_id', communityId)
+      .eq('user_id', user.id);
+    if (error) throw error;
   },
 
   subscribeToUserCommunities(userId, onChange) {
@@ -169,6 +243,18 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
       communityName: row.community_name,
       joined: row.joined,
     };
+  },
+
+  async listBanEligibleServersForUser(targetUserId) {
+    if (!targetUserId) return [];
+    const { data, error } = await supabase.rpc('list_bannable_shared_communities', {
+      p_target_user_id: targetUserId,
+    });
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+      communityId: row.community_id,
+      communityName: row.community_name,
+    }));
   },
 
   async listActiveCommunityInvites(communityId) {

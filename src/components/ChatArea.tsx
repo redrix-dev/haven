@@ -5,7 +5,9 @@ import { Database } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Headphones } from 'lucide-react';
 import type {
+  BanEligibleServer,
   MessageAttachment,
+  MessageLinkPreview,
   MessageReaction,
   MessageReportKind,
   MessageReportTarget,
@@ -17,6 +19,7 @@ type AuthorProfile = {
   username: string;
   isPlatformStaff: boolean;
   displayPrefix: string | null;
+  avatarUrl: string | null;
 };
 
 interface ChatAreaProps {
@@ -28,10 +31,14 @@ interface ChatAreaProps {
   messages: Message[];
   messageReactions: MessageReaction[];
   messageAttachments: MessageAttachment[];
+  messageLinkPreviews: MessageLinkPreview[];
   authorProfiles: Record<string, AuthorProfile>;
   currentUserId: string;
   canSpeakInVoiceChannel: boolean;
   canManageMessages: boolean;
+  canCreateReports: boolean;
+  canManageBans: boolean;
+  canRefreshLinkPreviews: boolean;
   showVoiceDiagnostics?: boolean;
   onOpenChannelSettings?: () => void;
   onOpenVoiceControls?: () => void;
@@ -52,6 +59,20 @@ interface ChatAreaProps {
     kind: MessageReportKind;
     comment: string;
   }) => Promise<void>;
+  onRequestMessageLinkPreviewRefresh: (messageId: string) => Promise<void>;
+  hasOlderMessages?: boolean;
+  isLoadingOlderMessages?: boolean;
+  onRequestOlderMessages?: () => Promise<void>;
+  onSaveAttachment: (attachment: MessageAttachment) => Promise<void>;
+  onReportUserProfile: (input: { targetUserId: string; reason: string }) => Promise<void>;
+  onBanUserFromServer: (input: {
+    targetUserId: string;
+    communityId: string;
+    reason: string;
+  }) => Promise<void>;
+  onResolveBanEligibleServers: (targetUserId: string) => Promise<BanEligibleServer[]>;
+  onDirectMessageUser: (targetUserId: string) => void;
+  onComposerHeightChange?: (height: number) => void;
   onSendHavenDeveloperMessage?: (
     content: string,
     options?: {
@@ -71,10 +92,14 @@ export function ChatArea({
   messages,
   messageReactions,
   messageAttachments,
+  messageLinkPreviews,
   authorProfiles,
   currentUserId,
   canSpeakInVoiceChannel,
   canManageMessages,
+  canCreateReports,
+  canManageBans,
+  canRefreshLinkPreviews,
   showVoiceDiagnostics = false,
   onOpenChannelSettings,
   onOpenVoiceControls,
@@ -83,6 +108,16 @@ export function ChatArea({
   onDeleteMessage,
   onToggleMessageReaction,
   onReportMessage,
+  onRequestMessageLinkPreviewRefresh,
+  hasOlderMessages = false,
+  isLoadingOlderMessages = false,
+  onRequestOlderMessages,
+  onSaveAttachment,
+  onReportUserProfile,
+  onBanUserFromServer,
+  onResolveBanEligibleServers,
+  onDirectMessageUser,
+  onComposerHeightChange,
   onSendHavenDeveloperMessage,
 }: ChatAreaProps) {
   const isVoiceChannel = channelKind === 'voice';
@@ -103,6 +138,12 @@ export function ChatArea({
       setReplyTarget(null);
     }
   }, [messages, replyTarget]);
+
+  React.useEffect(() => {
+    if (!onComposerHeightChange) return;
+    if (!isVoiceChannel) return;
+    onComposerHeightChange(0);
+  }, [isVoiceChannel, onComposerHeightChange]);
 
   const handleSendMessage = React.useCallback(
     async (
@@ -203,14 +244,27 @@ export function ChatArea({
             messages={messages}
             messageReactions={messageReactions}
             messageAttachments={messageAttachments}
+            messageLinkPreviews={messageLinkPreviews}
             authorProfiles={authorProfiles}
             currentUserId={currentUserId}
             canManageMessages={canManageMessages}
+            canCreateReports={canCreateReports}
+            canManageBans={canManageBans}
+            canRefreshLinkPreviews={canRefreshLinkPreviews}
+            onSaveAttachment={onSaveAttachment}
+            onReportUserProfile={onReportUserProfile}
+            onBanUserFromServer={onBanUserFromServer}
+            onResolveBanEligibleServers={onResolveBanEligibleServers}
+            onDirectMessageUser={onDirectMessageUser}
             onDeleteMessage={onDeleteMessage}
             onEditMessage={onEditMessage}
             onToggleMessageReaction={onToggleMessageReaction}
             onReplyToMessage={setReplyTarget}
             onReportMessage={onReportMessage}
+            onRequestMessageLinkPreviewRefresh={onRequestMessageLinkPreviewRefresh}
+            hasOlderMessages={hasOlderMessages}
+            isLoadingOlderMessages={isLoadingOlderMessages}
+            onRequestOlderMessages={onRequestOlderMessages}
           />
 
           {/* Input */}
@@ -221,6 +275,7 @@ export function ChatArea({
             channelName={channelName}
             replyTarget={replyTarget}
             onClearReplyTarget={() => setReplyTarget(null)}
+            onContainerHeightChange={onComposerHeightChange}
           />
         </>
       )}

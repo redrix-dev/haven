@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage } from '@/shared/lib/errors';
 import type {
+  CommunityBanItem,
   PermissionCatalogItem,
   ServerMemberRoleItem,
   ServerRoleItem,
@@ -30,7 +31,7 @@ import type {
 import { Database } from '@/types/database';
 
 type DeveloperAccessMode = Database['public']['Enums']['developer_access_mode'];
-type SettingsTab = 'general' | 'roles' | 'members' | 'invites';
+type SettingsTab = 'general' | 'roles' | 'members' | 'invites' | 'bans';
 
 type RoleDraft = {
   name: string;
@@ -66,6 +67,7 @@ interface ServerSettingsModalProps {
   canManageServer: boolean;
   canManageRoles: boolean;
   canManageMembers: boolean;
+  canManageBans: boolean;
   isOwner: boolean;
   roles: ServerRoleItem[];
   members: ServerMemberRoleItem[];
@@ -77,6 +79,9 @@ interface ServerSettingsModalProps {
   invites: ServerInviteItem[];
   invitesLoading: boolean;
   invitesError: string | null;
+  bans: CommunityBanItem[];
+  bansLoading: boolean;
+  bansError: string | null;
   inviteBaseUrl: string;
   onClose: () => void;
   onSave: (values: ServerSettingsValues) => Promise<void>;
@@ -95,6 +100,7 @@ interface ServerSettingsModalProps {
     expiresInHours: number | null;
   }) => Promise<ServerInviteItem>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
+  onUnbanUser: (values: { targetUserId: string; reason?: string | null }) => Promise<void>;
 }
 
 const toTitleCaseWords = (value: string) =>
@@ -111,6 +117,7 @@ export function ServerSettingsModal({
   canManageServer,
   canManageRoles,
   canManageMembers,
+  canManageBans,
   isOwner,
   roles,
   members,
@@ -122,6 +129,9 @@ export function ServerSettingsModal({
   invites,
   invitesLoading,
   invitesError,
+  bans,
+  bansLoading,
+  bansError,
   inviteBaseUrl,
   onClose,
   onSave,
@@ -132,6 +142,7 @@ export function ServerSettingsModal({
   onSaveMemberRoles,
   onCreateInvite,
   onRevokeInvite,
+  onUnbanUser,
 }: ServerSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [values, setValues] = useState<ServerSettingsValues | null>(initialValues);
@@ -156,6 +167,8 @@ export function ServerSettingsModal({
   const [inviteExpiryHoursInput, setInviteExpiryHoursInput] = useState('1');
   const [inviteActionError, setInviteActionError] = useState<string | null>(null);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
+  const [unbanActionError, setUnbanActionError] = useState<string | null>(null);
+  const [unbanBusyUserId, setUnbanBusyUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setValues(initialValues);
@@ -436,6 +449,26 @@ export function ServerSettingsModal({
     }
   };
 
+  const handleUnban = async (values: { targetUserId: string; username: string }) => {
+    if (!canManageBans) return;
+
+    const confirmed = window.confirm(`Unban "${values.username}" from this server?`);
+    if (!confirmed) return;
+
+    setUnbanActionError(null);
+    setUnbanBusyUserId(values.targetUserId);
+    try {
+      await onUnbanUser({
+        targetUserId: values.targetUserId,
+        reason: null,
+      });
+    } catch (err: unknown) {
+      setUnbanActionError(getErrorMessage(err, 'Failed to unban user.'));
+    } finally {
+      setUnbanBusyUserId(null);
+    }
+  };
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -471,6 +504,9 @@ export function ServerSettingsModal({
               </TabsTrigger>
               <TabsTrigger value="invites" className="text-[#a9b8cf] data-[state=active]:text-white">
                 Invites
+              </TabsTrigger>
+              <TabsTrigger value="bans" className="text-[#a9b8cf] data-[state=active]:text-white">
+                Bans
               </TabsTrigger>
             </TabsList>
 
@@ -1092,6 +1128,62 @@ export function ServerSettingsModal({
                               Revoke
                             </Button>
                           )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="bans" className="scrollbar-inset min-h-0 overflow-y-auto pr-1 space-y-4">
+                <h3 className="text-white font-semibold">Banned Users</h3>
+
+                <p className="text-sm text-[#a9b8cf]">
+                  Active bans for this server. Each entry includes who was banned, when, and the ban description.
+                </p>
+
+                {!canManageBans && (
+                  <p className="text-xs text-[#d6a24a]">
+                    You can view bans, but only members with Manage Bans can unban users.
+                  </p>
+                )}
+
+                {bansError && <p className="text-sm text-red-400">{bansError}</p>}
+                {unbanActionError && <p className="text-sm text-red-400">{unbanActionError}</p>}
+
+                {bansLoading ? (
+                  <p className="text-sm text-[#a9b8cf]">Loading bans...</p>
+                ) : bans.length === 0 ? (
+                  <p className="text-sm text-[#a9b8cf]">No active bans.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {bans.map((ban) => (
+                      <div
+                        key={ban.id}
+                        className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3 flex flex-col gap-2"
+                      >
+                        <div className="flex flex-col gap-1">
+                          <p className="text-sm font-semibold text-white">{ban.username}</p>
+                          <p className="text-[11px] text-[#8ea4c7]">
+                            Banned on {new Date(ban.bannedAt).toLocaleString()}
+                          </p>
+                        </div>
+                        <p className="text-sm text-[#d4def0] whitespace-pre-wrap">
+                          {ban.reason}
+                        </p>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => void handleUnban({
+                              targetUserId: ban.bannedUserId,
+                              username: ban.username,
+                            })}
+                            disabled={!canManageBans || unbanBusyUserId === ban.bannedUserId}
+                            className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
+                          >
+                            {unbanBusyUserId === ban.bannedUserId ? 'Unbanning...' : 'Unban'}
+                          </Button>
                         </div>
                       </div>
                     ))}

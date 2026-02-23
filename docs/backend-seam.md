@@ -37,16 +37,84 @@ Responsibilities:
 Used by:
 - `src/renderer.tsx`
 
-### 3) Backend Resolver
+### 3) Notification Backend
+File: `src/lib/backend/notificationBackend.ts`
+
+Responsibilities:
+- Notification inbox list + unread/unseen counts
+- Notification seen/read/dismiss state updates
+- Global notification preference reads/writes
+- Notification inbox realtime subscription
+
+Used by:
+- `src/renderer.tsx`
+
+### 4) Backend Resolver
 File: `src/lib/backend/index.ts`
 
 Responsibilities:
 - Selects backend mode (`HAVEN_BACKEND_MODE`)
-- Returns `ControlPlaneBackend` and `CommunityDataBackend`
+- Returns `ControlPlaneBackend`, `CommunityDataBackend`, `NotificationBackend`, and `SocialBackend`
 - Central place to route to future provider implementations
 
 Current mode:
 - `central_supabase` (default)
+
+### 5) Social Backend
+File: `src/lib/backend/socialBackend.ts`
+
+Responsibilities:
+- Friends/requests/blocked users reads
+- Friend search (exact username v1)
+- Friend request send/accept/decline/cancel
+- Friend remove and block/unblock mutations
+- Social graph realtime subscription (friend requests/friendships/blocks)
+
+Used by:
+- `src/components/FriendsModal.tsx`
+- `src/renderer.tsx` (friends badge counts + notification friend-request actions)
+
+### 6) Direct Message Backend
+File: `src/lib/backend/directMessageBackend.ts`
+
+Responsibilities:
+- DM conversation list + create/load for 1:1 direct messages
+- DM message list/send/read state updates
+- DM thread mute/unmute preference writes
+- DM message reporting (to Haven)
+- DM workspace realtime subscriptions
+
+Used by:
+- `src/renderer.tsx` (DM workspace navigation + thread state)
+
+### 7) Moderation Backend
+File: `src/lib/backend/moderationBackend.ts`
+
+Responsibilities:
+- Haven staff DM report review inbox list + filtering
+- DM report detail loading (reported message + metadata)
+- DM report context retrieval (staff-scoped, not general DM member access)
+- DM report assignment, status transitions, and audit-note actions
+- DM report audit trail reads
+
+Used by:
+- `src/components/DmReportReviewPanel.tsx` (staff-only DM moderation review surface)
+
+## Testing and Hardening Expectations (Phase 5)
+
+Backend seams now have explicit regression expectations:
+- SQL/RLS regression suites under `supabase/tests/sql/*`
+- local-Supabase backend contract tests under `src/lib/backend/__tests__/*`
+
+Current coverage focus:
+- `NotificationBackend`
+- `SocialBackend`
+- `DirectMessageBackend`
+- `ModerationBackend`
+- targeted `CommunityDataBackend` mention-trigger integration coverage
+
+Runbook:
+- `docs/testing/rls-and-hardening-runbook.md`
 
 ## Why This Matters
 - UI components no longer depend on Supabase query details.
