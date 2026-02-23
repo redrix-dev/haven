@@ -223,7 +223,7 @@ export function ServerList({
                 <Button
                   type="button"
                   onClick={onOpenNotifications}
-                  className={`${squareButtonBaseClass} relative bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white`}
+                  className={`${squareButtonBaseClass} relative overflow-visible bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white`}
                 >
                   <Bell className="size-5" />
                   {notificationUnseenCount > 0 && (
@@ -251,7 +251,7 @@ export function ServerList({
                 <Button
                   type="button"
                   onClick={onOpenFriends}
-                  className={`${squareButtonBaseClass} relative bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white`}
+                  className={`${squareButtonBaseClass} relative overflow-visible bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white`}
                 >
                   <Users className="size-5" />
                   {friendRequestIncomingCount > 0 && (

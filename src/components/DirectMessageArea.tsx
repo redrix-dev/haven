@@ -51,6 +51,20 @@ const getConversationErrorHint = (error: string | null) => {
   return null;
 };
 
+const getUiErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    const message = (error as { message: string }).message.trim();
+    if (message) return message;
+  }
+  return fallback;
+};
+
 export function DirectMessageArea({
   currentUserId,
   currentUserDisplayName,
@@ -98,7 +112,7 @@ export function DirectMessageArea({
       await onSendMessage(next);
       setDraft('');
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Failed to send DM.');
+      setActionError(getUiErrorMessage(error, 'Failed to send DM.'));
     }
   };
 
@@ -126,7 +140,7 @@ export function DirectMessageArea({
       });
       setActionNotice(`Blocked ${targetUsername}.`);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Failed to block user.');
+      setActionError(getUiErrorMessage(error, 'Failed to block user.'));
     } finally {
       setBlockingUser(false);
     }
@@ -202,7 +216,7 @@ export function DirectMessageArea({
               className="border-[#304867] text-white"
               onClick={() => {
                 void onToggleMute(!conversation.isMuted).catch((error) => {
-                  setActionError(error instanceof Error ? error.message : 'Failed to update mute.');
+                  setActionError(getUiErrorMessage(error, 'Failed to update mute.'));
                 });
               }}
             >

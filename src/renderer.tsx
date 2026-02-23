@@ -972,7 +972,7 @@ function ChatApp() {
       if (dmWorkspaceIsActive && selectedDmConversationId) {
         void refreshDmMessages(selectedDmConversationId, {
           suppressLoadingState: true,
-          markRead: true,
+          markRead: false,
         }).catch((error) => {
           console.error('Failed to refresh selected DM after realtime update:', error);
         });
@@ -1012,7 +1012,7 @@ function ChatApp() {
     const subscription = directMessageBackend.subscribeToMessages(selectedDmConversationId, () => {
       void refreshDmMessages(selectedDmConversationId, {
         suppressLoadingState: true,
-        markRead: true,
+        markRead: false,
       }).catch((error) => {
         console.error('Failed to refresh DM messages after realtime update:', error);
       });
@@ -3327,7 +3327,7 @@ function ChatApp() {
         content,
       });
       await Promise.all([
-        refreshDmMessages(selectedDmConversationId, { suppressLoadingState: true, markRead: true }),
+        refreshDmMessages(selectedDmConversationId, { suppressLoadingState: true, markRead: false }),
         refreshDmConversations({ suppressLoadingState: true }),
       ]);
     } catch (error) {
