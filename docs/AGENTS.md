@@ -58,12 +58,19 @@ When changing code, preserve these invariants unless explicitly redesigning them
   - Electron main/preload runtime and OS integrations.
 - `src/renderer.tsx`, `src/components/*`, `src/contexts/*`
   - Renderer orchestration and UI.
+- `src/assets/*`
+  - Renderer-bundled UI assets (images/audio/fonts) imported by React/TypeScript code.
+  - Use for assets that should ship with the renderer bundle via webpack imports.
 - `src/lib/backend/*`
   - Backend abstraction layer (control plane + community data).
 - `src/lib/voice/*`
   - Voice-specific client behavior (ICE acquisition, etc.).
 - `src/shared/*`
   - Shared contracts/utilities (desktop types/client, IPC keys/validation).
+- `assets/*` (repo root)
+  - Packaging/build assets (app icons, installer branding, forge/packager-referenced files).
+  - These are separate from `src/assets/*` because they are consumed by build tooling, not treated as
+    renderer-public assets unless explicitly copied/packaged for renderer access.
 - `supabase/migrations/*`
   - Source of truth for schema, RLS, and policy evolution.
 - `supabase/functions/*`
@@ -86,6 +93,11 @@ When changing code, preserve these invariants unless explicitly redesigning them
 - Keep side effects isolated; avoid effect logic that mutates unrelated domains.
 - Preserve predictable state transitions; avoid race-prone async patterns when possible.
 - If adding complex state, prefer extracting focused hooks/modules over increasing `renderer.tsx` complexity.
+- When using browser APIs with strict `lib.dom` typings (for example Web Audio `AnalyserNode` buffers),
+  match the exact expected typed array shape in refs/arguments (e.g. `Uint8Array<ArrayBuffer>`),
+  not a broader alias that may resolve to `ArrayBufferLike`.
+- Treat DOM/Web API type signatures as part of the contract: lint passing is not enough to validate
+  renderer TypeScript changes.
 
 ## 4.3 Electron boundary discipline
 - Do not import `electron`, `node:*`, or main-process internals into renderer feature code.
@@ -154,6 +166,13 @@ npm run lint
 ```
 
 When making behavior changes, also run the most relevant targeted checks available in repo tooling.
+For TypeScript changes (especially renderer/UI and browser API integrations), run a typecheck:
+
+```bash
+npx tsc --noEmit --project tsconfig.json
+```
+
+This catches API-signature mismatches that ESLint will not catch (for example strict DOM generic types).
 If no test exists for a risky path, add a minimal one if practical (and keep it).
 
 ---

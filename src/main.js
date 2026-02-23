@@ -7,6 +7,7 @@ const { DESKTOP_IPC_KEYS } = require('./shared/ipc/keys');
 const {
   parseSaveFileFromUrlPayload,
   parseSetAutoUpdatePayload,
+  parseSetNotificationAudioPayload,
 } = require('./shared/ipc/validators');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -119,6 +120,17 @@ const registerIpcHandlers = () => {
     return {
       settings,
       updaterStatus,
+    };
+  });
+
+  registerIpcHandler(DESKTOP_IPC_KEYS.SETTINGS_SET_NOTIFICATION_AUDIO, async (_event, payload) => {
+    const nextNotificationAudioSettings = parseSetNotificationAudioPayload(payload);
+    const settings = settingsStore.updateSettings({
+      notifications: nextNotificationAudioSettings,
+    });
+
+    return {
+      settings,
     };
   });
 

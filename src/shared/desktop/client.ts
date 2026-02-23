@@ -1,6 +1,7 @@
 import type {
   AppSettings,
   DesktopAPI,
+  NotificationAudioSettings,
   SaveFileFromUrlResult,
   UpdaterStatus,
 } from './types';
@@ -27,6 +28,11 @@ export const desktopClient = {
     updaterStatus: UpdaterStatus;
   }> {
     return getDesktopApi().setAutoUpdateEnabled(enabled);
+  },
+  async setNotificationAudioSettings(input: NotificationAudioSettings): Promise<{
+    settings: AppSettings;
+  }> {
+    return getDesktopApi().setNotificationAudioSettings(input);
   },
   async getUpdaterStatus(): Promise<UpdaterStatus> {
     return getDesktopApi().getUpdaterStatus();

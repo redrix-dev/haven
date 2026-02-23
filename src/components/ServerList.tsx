@@ -2,7 +2,7 @@ import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { LogIn, Plus } from 'lucide-react';
+import { Bell, LogIn, Plus, ShieldAlert, Users } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   ContextMenu,
@@ -29,6 +29,13 @@ interface ServerListProps {
   onServerClick: (serverId: string) => void;
   onCreateServer: () => void;
   onJoinServer: () => void;
+  onOpenNotifications?: () => void;
+  notificationUnseenCount?: number;
+  notificationHasUnseenPulse?: boolean;
+  onOpenFriends?: () => void;
+  friendRequestIncomingCount?: number;
+  friendRequestHasPendingPulse?: boolean;
+  onOpenDmReportReview?: () => void;
   userDisplayName: string;
   userAvatarUrl: string | null;
   onOpenAccountSettings: () => void;
@@ -48,6 +55,13 @@ export function ServerList({
   onServerClick,
   onCreateServer,
   onJoinServer,
+  onOpenNotifications,
+  notificationUnseenCount = 0,
+  notificationHasUnseenPulse = false,
+  onOpenFriends,
+  friendRequestIncomingCount = 0,
+  friendRequestHasPendingPulse = false,
+  onOpenDmReportReview,
   userDisplayName,
   userAvatarUrl,
   onOpenAccountSettings,
@@ -202,6 +216,79 @@ export function ServerList({
               Join server
             </TooltipContent>
           </Tooltip>
+
+          {onOpenNotifications && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  onClick={onOpenNotifications}
+                  className={`${squareButtonBaseClass} relative bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white`}
+                >
+                  <Bell className="size-5" />
+                  {notificationUnseenCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d95c5c] text-white text-[10px] leading-[18px] font-semibold">
+                      {notificationUnseenCount > 99 ? '99+' : notificationUnseenCount}
+                    </span>
+                  )}
+                  {notificationHasUnseenPulse && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-2xl border border-[#6aa1ff] animate-pulse"
+                    />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                Notifications
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {onOpenFriends && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  onClick={onOpenFriends}
+                  className={`${squareButtonBaseClass} relative bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white`}
+                >
+                  <Users className="size-5" />
+                  {friendRequestIncomingCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d95c5c] text-white text-[10px] leading-[18px] font-semibold">
+                      {friendRequestIncomingCount > 99 ? '99+' : friendRequestIncomingCount}
+                    </span>
+                  )}
+                  {friendRequestHasPendingPulse && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-2xl border border-[#6aa1ff] animate-pulse"
+                    />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                Friends
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {onOpenDmReportReview && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  onClick={onOpenDmReportReview}
+                  className={`${squareButtonBaseClass} bg-[#18243a] hover:bg-[#9a5b20] text-[#f7c793] hover:text-white`}
+                >
+                  <ShieldAlert className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                DM report review (staff)
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           <Tooltip>
             <TooltipTrigger asChild>

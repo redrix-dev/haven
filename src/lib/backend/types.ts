@@ -265,3 +265,233 @@ export type ChannelGroupState = {
 export type MessageReportTarget = 'server_admins' | 'haven_developers' | 'both';
 
 export type MessageReportKind = 'content_abuse' | 'bug';
+
+export type NotificationKind =
+  | 'friend_request_received'
+  | 'friend_request_accepted'
+  | 'dm_message'
+  | 'channel_mention'
+  | 'system';
+
+export type NotificationSourceKind = 'friend_request' | 'dm_message' | 'message' | 'system_event';
+
+export type NotificationItem = {
+  recipientId: string;
+  eventId: string;
+  kind: NotificationKind;
+  sourceKind: NotificationSourceKind;
+  sourceId: string;
+  actorUserId: string | null;
+  actorUsername: string | null;
+  actorAvatarUrl: string | null;
+  payload: Record<string, unknown>;
+  deliverInApp: boolean;
+  deliverSound: boolean;
+  createdAt: string;
+  seenAt: string | null;
+  readAt: string | null;
+  dismissedAt: string | null;
+};
+
+export type NotificationCounts = {
+  unseenCount: number;
+  unreadCount: number;
+};
+
+export type NotificationPreferences = {
+  userId: string;
+  friendRequestInAppEnabled: boolean;
+  friendRequestSoundEnabled: boolean;
+  dmInAppEnabled: boolean;
+  dmSoundEnabled: boolean;
+  mentionInAppEnabled: boolean;
+  mentionSoundEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type NotificationPreferenceUpdate = {
+  friendRequestInAppEnabled: boolean;
+  friendRequestSoundEnabled: boolean;
+  dmInAppEnabled: boolean;
+  dmSoundEnabled: boolean;
+  mentionInAppEnabled: boolean;
+  mentionSoundEnabled: boolean;
+};
+
+export type FriendRequestStatus = 'pending' | 'accepted' | 'declined' | 'canceled';
+
+export type FriendRequestDirection = 'incoming' | 'outgoing';
+
+export type FriendSummary = {
+  friendUserId: string;
+  username: string;
+  avatarUrl: string | null;
+  friendshipCreatedAt: string;
+  mutualCommunityCount: number;
+  mutualCommunityNames: string[];
+};
+
+export type FriendRequestSummary = {
+  requestId: string;
+  direction: FriendRequestDirection;
+  status: FriendRequestStatus;
+  senderUserId: string;
+  senderUsername: string;
+  senderAvatarUrl: string | null;
+  recipientUserId: string;
+  recipientUsername: string;
+  recipientAvatarUrl: string | null;
+  createdAt: string;
+  mutualCommunityCount: number;
+  mutualCommunityNames: string[];
+};
+
+export type BlockedUserSummary = {
+  blockedUserId: string;
+  username: string;
+  avatarUrl: string | null;
+  blockedAt: string;
+};
+
+export type FriendSearchRelationshipState =
+  | 'none'
+  | 'friend'
+  | 'incoming_pending'
+  | 'outgoing_pending';
+
+export type FriendSearchResult = {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  relationshipState: FriendSearchRelationshipState;
+  pendingRequestId: string | null;
+  mutualCommunityCount: number;
+  mutualCommunityNames: string[];
+};
+
+export type SocialCounts = {
+  friendsCount: number;
+  incomingPendingRequestCount: number;
+  outgoingPendingRequestCount: number;
+  blockedUserCount: number;
+};
+
+export type DirectMessageConversationSummary = {
+  conversationId: string;
+  kind: 'direct' | 'group';
+  otherUserId: string | null;
+  otherUsername: string | null;
+  otherAvatarUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt: string | null;
+  lastMessageId: string | null;
+  lastMessageAuthorUserId: string | null;
+  lastMessagePreview: string | null;
+  lastMessageCreatedAt: string | null;
+  unreadCount: number;
+  isMuted: boolean;
+  mutedUntil: string | null;
+};
+
+export type DirectMessage = {
+  messageId: string;
+  conversationId: string;
+  authorUserId: string;
+  authorUsername: string;
+  authorAvatarUrl: string | null;
+  content: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  editedAt: string | null;
+  deletedAt: string | null;
+};
+
+export type DirectMessageReportKind = 'content_abuse' | 'bug';
+
+export type DmMessageReportStatus =
+  | 'open'
+  | 'triaged'
+  | 'in_review'
+  | 'resolved_actioned'
+  | 'resolved_no_action'
+  | 'dismissed';
+
+export type DmMessageReportSummary = {
+  reportId: string;
+  conversationId: string;
+  messageId: string;
+  status: DmMessageReportStatus;
+  kind: DirectMessageReportKind;
+  comment: string;
+  createdAt: string;
+  updatedAt: string;
+  reporterUserId: string;
+  reporterUsername: string | null;
+  reporterAvatarUrl: string | null;
+  reportedUserId: string;
+  reportedUsername: string | null;
+  reportedAvatarUrl: string | null;
+  assignedToUserId: string | null;
+  assignedToUsername: string | null;
+  assignedAt: string | null;
+  messageCreatedAt: string | null;
+  messageDeletedAt: string | null;
+  messagePreview: string | null;
+};
+
+export type DmMessageReportDetail = {
+  reportId: string;
+  conversationId: string;
+  messageId: string;
+  status: DmMessageReportStatus;
+  kind: DirectMessageReportKind;
+  comment: string;
+  resolutionNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  reporterUserId: string;
+  reporterUsername: string | null;
+  reporterAvatarUrl: string | null;
+  reportedUserId: string;
+  reportedUsername: string | null;
+  reportedAvatarUrl: string | null;
+  assignedToUserId: string | null;
+  assignedToUsername: string | null;
+  assignedAt: string | null;
+  messageAuthorUserId: string;
+  messageAuthorUsername: string | null;
+  messageAuthorAvatarUrl: string | null;
+  messageContent: string;
+  messageMetadata: Record<string, unknown>;
+  messageCreatedAt: string;
+  messageEditedAt: string | null;
+  messageDeletedAt: string | null;
+};
+
+export type DmMessageReportContextMessage = {
+  messageId: string;
+  conversationId: string;
+  authorUserId: string;
+  authorUsername: string | null;
+  authorAvatarUrl: string | null;
+  content: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  editedAt: string | null;
+  deletedAt: string | null;
+  isTarget: boolean;
+};
+
+export type DmMessageReportAction = {
+  actionId: string;
+  reportId: string;
+  actedByUserId: string;
+  actedByUsername: string | null;
+  actedByAvatarUrl: string | null;
+  actionType: string;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};

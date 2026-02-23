@@ -12,6 +12,38 @@ function parseSetAutoUpdatePayload(payload) {
   };
 }
 
+function parseSetNotificationAudioPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid payload for notification audio preferences.');
+  }
+
+  if (typeof payload.masterSoundEnabled !== 'boolean') {
+    throw new Error('Invalid masterSoundEnabled value. Expected a boolean.');
+  }
+
+  if (typeof payload.playSoundsWhenFocused !== 'boolean') {
+    throw new Error('Invalid playSoundsWhenFocused value. Expected a boolean.');
+  }
+
+  if (
+    typeof payload.notificationSoundVolume !== 'number' ||
+    !Number.isFinite(payload.notificationSoundVolume)
+  ) {
+    throw new Error('Invalid notificationSoundVolume value. Expected a number.');
+  }
+
+  const roundedVolume = Math.round(payload.notificationSoundVolume);
+  if (roundedVolume < 0 || roundedVolume > 100) {
+    throw new Error('Invalid notificationSoundVolume value. Expected 0-100.');
+  }
+
+  return {
+    masterSoundEnabled: payload.masterSoundEnabled,
+    notificationSoundVolume: roundedVolume,
+    playSoundsWhenFocused: payload.playSoundsWhenFocused,
+  };
+}
+
 function parseSaveFileFromUrlPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Invalid payload for save file request.');
@@ -32,5 +64,6 @@ function parseSaveFileFromUrlPayload(payload) {
 
 module.exports = {
   parseSetAutoUpdatePayload,
+  parseSetNotificationAudioPayload,
   parseSaveFileFromUrlPayload,
 };

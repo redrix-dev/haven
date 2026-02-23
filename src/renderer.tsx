@@ -24,6 +24,12 @@ import {
 import { Sidebar } from '@/components/Sidebar';
 import { ChatArea } from '@/components/ChatArea';
 import { VoiceChannelPane } from '@/components/VoiceChannelPane';
+import { VoiceHardwareDebugPanel } from '@/components/VoiceHardwareDebugPanel';
+import { NotificationCenterModal } from '@/components/NotificationCenterModal';
+import { FriendsModal } from '@/components/FriendsModal';
+import { DirectMessagesSidebar } from '@/components/DirectMessagesSidebar';
+import { DirectMessageArea } from '@/components/DirectMessageArea';
+import { DmReportReviewPanel } from '@/components/DmReportReviewPanel';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -38,12 +44,19 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useServers } from '@/lib/hooks/useServers';
-import { getCommunityDataBackend, getControlPlaneBackend } from '@/lib/backend';
+import {
+  getCommunityDataBackend,
+  getControlPlaneBackend,
+  getDirectMessageBackend,
+  getNotificationBackend,
+  getSocialBackend,
+} from '@/lib/backend';
+import { playNotificationSound } from '@/lib/notifications/sound';
 import { supabase } from '@/lib/supabase';
 import { desktopClient } from '@/shared/desktop/client';
 import { getErrorMessage } from '@/shared/lib/errors';
 import { installPromptTrap } from '@/lib/contextMenu/debugTrace';
-import type { AppSettings, UpdaterStatus } from '@/shared/desktop/types';
+import type { AppSettings, NotificationAudioSettings, UpdaterStatus } from '@/shared/desktop/types';
 import type {
   AuthorProfile,
   BanEligibleServer,
@@ -52,10 +65,17 @@ import type {
   ChannelKind,
   CommunityBanItem,
   CommunityMemberListItem,
+  DirectMessage,
+  DirectMessageConversationSummary,
+  DirectMessageReportKind,
   DeveloperAccessMode,
   FeatureFlagsSnapshot,
   MessageAttachment,
   MessageLinkPreview,
+  NotificationCounts,
+  NotificationItem,
+  NotificationPreferences,
+  NotificationPreferenceUpdate,
   PermissionCatalogItem,
   MessageReaction,
   MessageReportKind,
@@ -64,6 +84,7 @@ import type {
   ServerMemberRoleItem,
   ServerPermissions,
   ServerRoleItem,
+  SocialCounts,
 } from '@/lib/backend/types';
 import { Headphones, Mic, MicOff, PhoneOff, Settings2, VolumeX } from 'lucide-react';
 import '@/styles/globals.css';
@@ -87,6 +108,8 @@ type ChannelMessageBundleCacheEntry = {
   hasOlderMessages: boolean;
 };
 
+type FriendsPanelTab = 'friends' | 'add' | 'requests' | 'blocked';
+
 const areVoiceParticipantListsEqual = (
   left: VoiceSidebarParticipant[],
   right: VoiceSidebarParticipant[]
@@ -109,9 +132,52 @@ const areVoiceParticipantListsEqual = (
 const ENABLE_CHANNEL_RELOAD_DIAGNOSTICS =
   typeof process !== 'undefined' && process.env.HAVEN_DEBUG_CHANNEL_RELOADS === '1';
 const MESSAGE_PAGE_SIZE = 75;
+const FRIENDS_SOCIAL_PANEL_FLAG = 'friends_dms_v1';
+const DM_REPORT_REVIEW_PANEL_FLAG = 'dm_report_review_v1';
+const VOICE_HARDWARE_DEBUG_PANEL_FLAG = 'debug_voice_hardware_panel';
+const VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL = 'Ctrl/Cmd + Alt + Shift + V';
+const DEFAULT_NOTIFICATION_AUDIO_SETTINGS: NotificationAudioSettings = {
+  masterSoundEnabled: true,
+  notificationSoundVolume: 70,
+  playSoundsWhenFocused: true,
+};
+const DEFAULT_APP_SETTINGS: AppSettings = {
+  schemaVersion: 2,
+  autoUpdateEnabled: true,
+  notifications: { ...DEFAULT_NOTIFICATION_AUDIO_SETTINGS },
+};
+const DEFAULT_NOTIFICATION_COUNTS: NotificationCounts = {
+  unseenCount: 0,
+  unreadCount: 0,
+};
+const DEFAULT_SOCIAL_COUNTS: SocialCounts = {
+  friendsCount: 0,
+  incomingPendingRequestCount: 0,
+  outgoingPendingRequestCount: 0,
+  blockedUserCount: 0,
+};
+
+const isEditableKeyboardTarget = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+
+  const tagName = target.tagName.toLowerCase();
+  return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+};
+
+const getNotificationPayloadString = (
+  notification: NotificationItem,
+  key: string
+): string | null => {
+  const value = notification.payload[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+};
 
 function ChatApp() {
   const controlPlaneBackend = getControlPlaneBackend();
+  const directMessageBackend = getDirectMessageBackend();
+  const notificationBackend = getNotificationBackend();
+  const socialBackend = getSocialBackend();
   const { user, status: authStatus, error: authError, signOut, deleteAccount } = useAuth();
   const {
     servers,
@@ -149,6 +215,8 @@ function ChatApp() {
   const [canSpeakInVoiceChannel, setCanSpeakInVoiceChannel] = useState(false);
   const [activeVoiceChannelId, setActiveVoiceChannelId] = useState<string | null>(null);
   const [voicePanelOpen, setVoicePanelOpen] = useState(false);
+  const [voiceHardwareDebugPanelOpen, setVoiceHardwareDebugPanelOpen] = useState(false);
+  const [dmReportReviewPanelOpen, setDmReportReviewPanelOpen] = useState(false);
   const [voiceConnected, setVoiceConnected] = useState(false);
   const [voiceParticipants, setVoiceParticipants] = useState<VoiceSidebarParticipant[]>([]);
   const [voicePresenceByChannelId, setVoicePresenceByChannelId] = useState<
@@ -236,9 +304,42 @@ function ChatApp() {
   const [communityBans, setCommunityBans] = useState<CommunityBanItem[]>([]);
   const [communityBansLoading, setCommunityBansLoading] = useState(false);
   const [communityBansError, setCommunityBansError] = useState<string | null>(null);
+  const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
+  const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
+  const [friendsPanelRequestedTab, setFriendsPanelRequestedTab] = useState<FriendsPanelTab | null>(null);
+  const [friendsPanelHighlightedRequestId, setFriendsPanelHighlightedRequestId] = useState<string | null>(
+    null
+  );
+  const [workspaceMode, setWorkspaceMode] = useState<'community' | 'dm'>('community');
+  const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
+  const [notificationCounts, setNotificationCounts] = useState<NotificationCounts>(
+    DEFAULT_NOTIFICATION_COUNTS
+  );
+  const [socialCounts, setSocialCounts] = useState<SocialCounts>(DEFAULT_SOCIAL_COUNTS);
+  const [dmConversations, setDmConversations] = useState<DirectMessageConversationSummary[]>([]);
+  const [dmConversationsLoading, setDmConversationsLoading] = useState(false);
+  const [dmConversationsRefreshing, setDmConversationsRefreshing] = useState(false);
+  const [dmConversationsError, setDmConversationsError] = useState<string | null>(null);
+  const [selectedDmConversationId, setSelectedDmConversationId] = useState<string | null>(null);
+  const [dmMessages, setDmMessages] = useState<DirectMessage[]>([]);
+  const [dmMessagesLoading, setDmMessagesLoading] = useState(false);
+  const [dmMessagesRefreshing, setDmMessagesRefreshing] = useState(false);
+  const [dmMessagesError, setDmMessagesError] = useState<string | null>(null);
+  const [dmMessageSendPending, setDmMessageSendPending] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsRefreshing, setNotificationsRefreshing] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(
+    null
+  );
+  const [notificationPreferencesLoading, setNotificationPreferencesLoading] = useState(false);
+  const [notificationPreferencesSaving, setNotificationPreferencesSaving] = useState(false);
+  const [notificationPreferencesError, setNotificationPreferencesError] = useState<string | null>(null);
+  const [notificationAudioSettingsSaving, setNotificationAudioSettingsSaving] = useState(false);
+  const [notificationAudioSettingsError, setNotificationAudioSettingsError] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>({
-    schemaVersion: 1,
-    autoUpdateEnabled: true,
+    ...DEFAULT_APP_SETTINGS,
+    notifications: { ...DEFAULT_NOTIFICATION_AUDIO_SETTINGS },
   });
   const [appSettingsLoading, setAppSettingsLoading] = useState(true);
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null);
@@ -250,9 +351,19 @@ function ChatApp() {
   const channelsByServerCacheRef = useRef<Record<string, Channel[]>>({});
   const lastSelectedChannelIdByServerRef = useRef<Record<string, string | null>>({});
   const messageBundleByChannelCacheRef = useRef<Record<string, ChannelMessageBundleCacheEntry>>({});
+  const knownNotificationRecipientIdsRef = useRef<Set<string>>(new Set());
+  const notificationsBootstrappedRef = useRef(false);
+  const notificationAudioSettingsRef = useRef<NotificationAudioSettings>(
+    DEFAULT_NOTIFICATION_AUDIO_SETTINGS
+  );
   const hasFeatureFlag = (flagKey: string) => Boolean(featureFlags[flagKey]);
   const debugChannelReloads =
     ENABLE_CHANNEL_RELOAD_DIAGNOSTICS || hasFeatureFlag('debug_channel_reload_diagnostics');
+  const friendsSocialPanelEnabled = hasFeatureFlag(FRIENDS_SOCIAL_PANEL_FLAG);
+  const dmWorkspaceEnabled = friendsSocialPanelEnabled;
+  const dmWorkspaceIsActive = dmWorkspaceEnabled && workspaceMode === 'dm';
+  const dmReportReviewPanelEnabled = isPlatformStaff && hasFeatureFlag(DM_REPORT_REVIEW_PANEL_FLAG);
+  const voiceHardwareDebugPanelEnabled = hasFeatureFlag(VOICE_HARDWARE_DEBUG_PANEL_FLAG);
   const currentChannelKind: ChannelKind | null =
     currentChannelId ? (channels.find((channel) => channel.id === currentChannelId)?.kind ?? null) : null;
   const getChannelBundleCacheKey = (communityId: string, channelId: string) => `${communityId}:${channelId}`;
@@ -260,6 +371,44 @@ function ChatApp() {
   useEffect(() => {
     installPromptTrap();
   }, []);
+
+  useEffect(() => {
+    if (friendsSocialPanelEnabled) return;
+    setFriendsPanelOpen(false);
+    setWorkspaceMode('community');
+    setSelectedDmConversationId(null);
+    setDmConversations([]);
+    setDmMessages([]);
+  }, [friendsSocialPanelEnabled]);
+
+  useEffect(() => {
+    if (dmReportReviewPanelEnabled) return;
+    setDmReportReviewPanelOpen(false);
+  }, [dmReportReviewPanelEnabled]);
+
+  useEffect(() => {
+    if (voiceHardwareDebugPanelEnabled) return;
+    setVoiceHardwareDebugPanelOpen(false);
+  }, [voiceHardwareDebugPanelEnabled]);
+
+  useEffect(() => {
+    if (!user || !voiceHardwareDebugPanelEnabled) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      if (!(event.ctrlKey || event.metaKey) || !event.altKey || !event.shiftKey) return;
+      if (event.key.toLowerCase() !== 'v') return;
+      if (isEditableKeyboardTarget(event.target)) return;
+
+      event.preventDefault();
+      setVoiceHardwareDebugPanelOpen((prev) => !prev);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [user, voiceHardwareDebugPanelEnabled]);
 
   useEffect(() => {
     let isMounted = true;
@@ -273,6 +422,11 @@ function ChatApp() {
       setCanSpeakInVoiceChannel(false);
       setActiveVoiceChannelId(null);
       setVoicePanelOpen(false);
+      setVoiceHardwareDebugPanelOpen(false);
+      setDmReportReviewPanelOpen(false);
+      setNotificationsPanelOpen(false);
+      setFriendsPanelOpen(false);
+      setWorkspaceMode('community');
       setVoiceConnected(false);
       setVoiceParticipants([]);
       setVoicePresenceByChannelId({});
@@ -294,7 +448,31 @@ function ChatApp() {
       setAuthorProfiles({});
       authorProfileCacheRef.current = {};
       requestOlderMessagesRef.current = null;
+      knownNotificationRecipientIdsRef.current = new Set();
+      notificationsBootstrappedRef.current = false;
       setFeatureFlags({});
+      setNotificationItems([]);
+      setNotificationCounts(DEFAULT_NOTIFICATION_COUNTS);
+      setSocialCounts(DEFAULT_SOCIAL_COUNTS);
+      setDmConversations([]);
+      setDmConversationsLoading(false);
+      setDmConversationsRefreshing(false);
+      setDmConversationsError(null);
+      setSelectedDmConversationId(null);
+      setDmMessages([]);
+      setDmMessagesLoading(false);
+      setDmMessagesRefreshing(false);
+      setDmMessagesError(null);
+      setDmMessageSendPending(false);
+      setNotificationsLoading(false);
+      setNotificationsRefreshing(false);
+      setNotificationsError(null);
+      setNotificationPreferences(null);
+      setNotificationPreferencesLoading(false);
+      setNotificationPreferencesSaving(false);
+      setNotificationPreferencesError(null);
+      setNotificationAudioSettingsSaving(false);
+      setNotificationAudioSettingsError(null);
       setServerPermissions({
         isOwner: false,
         canManageServer: false,
@@ -484,6 +662,375 @@ function ChatApp() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    notificationAudioSettingsRef.current = appSettings.notifications;
+  }, [appSettings.notifications]);
+
+  const refreshSocialCounts = React.useCallback(async () => {
+    if (!user?.id || !friendsSocialPanelEnabled) {
+      setSocialCounts(DEFAULT_SOCIAL_COUNTS);
+      return;
+    }
+
+    const nextCounts = await socialBackend.getSocialCounts();
+    setSocialCounts(nextCounts);
+  }, [friendsSocialPanelEnabled, socialBackend, user?.id]);
+
+  const refreshNotificationInbox = React.useCallback(
+    async (options?: { playSoundsForNew?: boolean }) => {
+      if (!user?.id) return;
+
+      const playSoundsForNew = Boolean(options?.playSoundsForNew);
+      const [items, counts] = await Promise.all([
+        notificationBackend.listNotifications({ limit: 50 }),
+        notificationBackend.getNotificationCounts(),
+      ]);
+
+      const nextKnownIds = new Set(items.map((item) => item.recipientId));
+      const previousKnownIds = knownNotificationRecipientIdsRef.current;
+      const canPlaySounds = notificationsBootstrappedRef.current && playSoundsForNew;
+
+      setNotificationItems(items);
+      setNotificationCounts(counts);
+      knownNotificationRecipientIdsRef.current = nextKnownIds;
+
+      if (canPlaySounds) {
+        for (const item of items) {
+          if (previousKnownIds.has(item.recipientId)) continue;
+          if (item.dismissedAt) continue;
+          void playNotificationSound({
+            kind: item.kind,
+            deliverSound: item.deliverSound,
+            audioSettings: notificationAudioSettingsRef.current,
+          });
+        }
+      }
+
+      notificationsBootstrappedRef.current = true;
+    },
+    [notificationBackend, user?.id]
+  );
+
+  const refreshNotificationPreferences = React.useCallback(async () => {
+    if (!user?.id) return;
+    const preferences = await notificationBackend.getNotificationPreferences();
+    setNotificationPreferences(preferences);
+  }, [notificationBackend, user?.id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!user) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setNotificationsLoading(true);
+    setNotificationsError(null);
+    notificationsBootstrappedRef.current = false;
+    knownNotificationRecipientIdsRef.current = new Set();
+
+    const loadInbox = async () => {
+      try {
+        await refreshNotificationInbox({ playSoundsForNew: false });
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to load notification inbox:', error);
+        setNotificationsError(getErrorMessage(error, 'Failed to load notifications.'));
+      } finally {
+        if (!isMounted) return;
+        setNotificationsLoading(false);
+      }
+    };
+
+    void loadInbox();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshNotificationInbox, user?.id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!user) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setNotificationPreferencesLoading(true);
+    setNotificationPreferencesError(null);
+
+    const loadPreferences = async () => {
+      try {
+        const preferences = await notificationBackend.getNotificationPreferences();
+        if (!isMounted) return;
+        setNotificationPreferences(preferences);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to load notification preferences:', error);
+        setNotificationPreferencesError(getErrorMessage(error, 'Failed to load notification preferences.'));
+      } finally {
+        if (!isMounted) return;
+        setNotificationPreferencesLoading(false);
+      }
+    };
+
+    void loadPreferences();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [notificationBackend, refreshNotificationPreferences, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const subscription = notificationBackend.subscribeToNotificationInbox(user.id, () => {
+      setNotificationsRefreshing(true);
+      void refreshNotificationInbox({ playSoundsForNew: true })
+        .catch((error) => {
+          console.error('Failed to refresh notifications after realtime update:', error);
+          setNotificationsError(getErrorMessage(error, 'Failed to refresh notifications.'));
+        })
+        .finally(() => {
+          setNotificationsRefreshing(false);
+        });
+    });
+
+    return () => {
+      void subscription.unsubscribe();
+    };
+  }, [notificationBackend, refreshNotificationInbox, user?.id]);
+
+  useEffect(() => {
+    if (!notificationsPanelOpen || !user?.id) return;
+    if (notificationCounts.unseenCount <= 0) return;
+
+    void notificationBackend
+      .markAllNotificationsSeen()
+      .then(() => refreshNotificationInbox({ playSoundsForNew: false }))
+      .catch((error) => {
+        console.error('Failed to mark notifications seen:', error);
+      });
+  }, [
+    notificationBackend,
+    notificationCounts.unseenCount,
+    notificationsPanelOpen,
+    refreshNotificationInbox,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!user?.id || !friendsSocialPanelEnabled) {
+      setSocialCounts(DEFAULT_SOCIAL_COUNTS);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    void refreshSocialCounts().catch((error) => {
+      if (!isMounted) return;
+      console.error('Failed to load social counts:', error);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [friendsSocialPanelEnabled, refreshSocialCounts, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !friendsSocialPanelEnabled) return;
+
+    const subscription = socialBackend.subscribeToSocialGraph(user.id, () => {
+      void refreshSocialCounts().catch((error) => {
+        console.error('Failed to refresh social counts after realtime update:', error);
+      });
+    });
+
+    return () => {
+      void subscription.unsubscribe();
+    };
+  }, [friendsSocialPanelEnabled, refreshSocialCounts, socialBackend, user?.id]);
+
+  const refreshDmConversations = React.useCallback(
+    async (options?: { suppressLoadingState?: boolean }) => {
+      if (!user?.id || !dmWorkspaceEnabled) {
+        setDmConversations([]);
+        return;
+      }
+
+      if (options?.suppressLoadingState) {
+        setDmConversationsRefreshing(true);
+      } else {
+        setDmConversationsLoading(true);
+      }
+      setDmConversationsError(null);
+
+      try {
+        const conversations = await directMessageBackend.listConversations();
+        setDmConversations(conversations);
+      } catch (error) {
+        setDmConversationsError(getErrorMessage(error, 'Failed to load direct messages.'));
+      } finally {
+        setDmConversationsLoading(false);
+        setDmConversationsRefreshing(false);
+      }
+    },
+    [directMessageBackend, dmWorkspaceEnabled, user?.id]
+  );
+
+  const refreshDmMessages = React.useCallback(
+    async (conversationId: string, options?: { suppressLoadingState?: boolean; markRead?: boolean }) => {
+      if (!user?.id || !dmWorkspaceEnabled || !conversationId) {
+        setDmMessages([]);
+        return;
+      }
+
+      if (options?.suppressLoadingState) {
+        setDmMessagesRefreshing(true);
+      } else {
+        setDmMessagesLoading(true);
+      }
+      setDmMessagesError(null);
+
+      try {
+        const messages = await directMessageBackend.listMessages({
+          conversationId,
+          limit: 100,
+        });
+        if (selectedDmConversationId !== conversationId) {
+          return;
+        }
+        setDmMessages(messages);
+
+        if (options?.markRead !== false) {
+          await directMessageBackend.markConversationRead(conversationId);
+        }
+      } catch (error) {
+        if (selectedDmConversationId !== conversationId) return;
+        setDmMessagesError(getErrorMessage(error, 'Failed to load direct messages.'));
+      } finally {
+        if (selectedDmConversationId !== conversationId) return;
+        setDmMessagesLoading(false);
+        setDmMessagesRefreshing(false);
+      }
+    },
+    [directMessageBackend, dmWorkspaceEnabled, selectedDmConversationId, user?.id]
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!user?.id || !dmWorkspaceEnabled) {
+      setDmConversations([]);
+      setSelectedDmConversationId(null);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    void refreshDmConversations().catch((error) => {
+      if (!isMounted) return;
+      console.error('Failed to initialize DM conversations:', error);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dmWorkspaceEnabled, refreshDmConversations, user?.id]);
+
+  useEffect(() => {
+    if (!dmWorkspaceIsActive) return;
+    if (selectedDmConversationId) {
+      const stillExists = dmConversations.some(
+        (conversation) => conversation.conversationId === selectedDmConversationId
+      );
+      if (!stillExists) {
+        setSelectedDmConversationId(dmConversations[0]?.conversationId ?? null);
+      }
+      return;
+    }
+
+    if (dmConversations.length > 0) {
+      setSelectedDmConversationId(dmConversations[0].conversationId);
+    }
+  }, [dmConversations, dmWorkspaceIsActive, selectedDmConversationId]);
+
+  useEffect(() => {
+    if (!user?.id || !dmWorkspaceEnabled) return;
+
+    const subscription = directMessageBackend.subscribeToConversations(user.id, () => {
+      void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
+        console.error('Failed to refresh DM conversations after realtime update:', error);
+      });
+      if (dmWorkspaceIsActive && selectedDmConversationId) {
+        void refreshDmMessages(selectedDmConversationId, {
+          suppressLoadingState: true,
+          markRead: true,
+        }).catch((error) => {
+          console.error('Failed to refresh selected DM after realtime update:', error);
+        });
+      }
+    });
+
+    return () => {
+      void subscription.unsubscribe();
+    };
+  }, [
+    directMessageBackend,
+    dmWorkspaceEnabled,
+    refreshDmConversations,
+    refreshDmMessages,
+    selectedDmConversationId,
+    dmWorkspaceIsActive,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (!dmWorkspaceIsActive || !selectedDmConversationId || !user?.id) {
+      setDmMessages([]);
+      setDmMessagesLoading(false);
+      setDmMessagesRefreshing(false);
+      setDmMessagesError(null);
+      return;
+    }
+
+    void refreshDmMessages(selectedDmConversationId, { markRead: true }).catch((error) => {
+      console.error('Failed to load selected DM conversation:', error);
+    });
+  }, [dmWorkspaceIsActive, refreshDmMessages, selectedDmConversationId, user?.id]);
+
+  useEffect(() => {
+    if (!dmWorkspaceIsActive || !selectedDmConversationId) return;
+
+    const subscription = directMessageBackend.subscribeToMessages(selectedDmConversationId, () => {
+      void refreshDmMessages(selectedDmConversationId, {
+        suppressLoadingState: true,
+        markRead: true,
+      }).catch((error) => {
+        console.error('Failed to refresh DM messages after realtime update:', error);
+      });
+      void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
+        console.error('Failed to refresh DM conversations after message update:', error);
+      });
+    });
+
+    return () => {
+      void subscription.unsubscribe();
+    };
+  }, [
+    directMessageBackend,
+    dmWorkspaceIsActive,
+    refreshDmConversations,
+    refreshDmMessages,
+    selectedDmConversationId,
+  ]);
 
   // Auto-select first server
   useEffect(() => {
@@ -2727,8 +3274,100 @@ function ChatApp() {
     return controlPlaneBackend.listBanEligibleServersForUser(targetUserId);
   }
 
-  function directMessageUser(_targetUserId: string) {
-    window.alert('Direct messages are coming soon.');
+  async function openDirectMessageWithUser(targetUserId: string) {
+    if (!user) {
+      throw new Error('Not authenticated.');
+    }
+    if (!dmWorkspaceEnabled) {
+      throw new Error('Direct messages are not enabled for your account.');
+    }
+
+    const conversationId = await directMessageBackend.getOrCreateDirectConversation(targetUserId);
+    await openDirectMessageConversation(conversationId);
+  }
+
+  async function openDirectMessageConversation(conversationId: string) {
+    if (!user) {
+      throw new Error('Not authenticated.');
+    }
+    if (!dmWorkspaceEnabled) {
+      throw new Error('Direct messages are not enabled for your account.');
+    }
+    if (!conversationId) {
+      throw new Error('DM conversation id is required.');
+    }
+
+    setWorkspaceMode('dm');
+    setSelectedDmConversationId(conversationId);
+    await refreshDmConversations({ suppressLoadingState: true });
+    await refreshDmMessages(conversationId, { suppressLoadingState: true, markRead: true });
+  }
+
+  function directMessageUser(targetUserId: string) {
+    if (!dmWorkspaceEnabled) {
+      window.alert('Direct messages are coming soon.');
+      return;
+    }
+
+    void openDirectMessageWithUser(targetUserId).catch((error) => {
+      window.alert(getErrorMessage(error, 'Failed to open direct message.'));
+    });
+  }
+
+  async function sendDirectMessage(content: string) {
+    if (!selectedDmConversationId) {
+      throw new Error('No direct message conversation selected.');
+    }
+
+    setDmMessageSendPending(true);
+    setDmMessagesError(null);
+    try {
+      await directMessageBackend.sendMessage({
+        conversationId: selectedDmConversationId,
+        content,
+      });
+      await Promise.all([
+        refreshDmMessages(selectedDmConversationId, { suppressLoadingState: true, markRead: true }),
+        refreshDmConversations({ suppressLoadingState: true }),
+      ]);
+    } catch (error) {
+      setDmMessagesError(getErrorMessage(error, 'Failed to send direct message.'));
+      throw error;
+    } finally {
+      setDmMessageSendPending(false);
+    }
+  }
+
+  async function toggleSelectedDmConversationMuted(nextMuted: boolean) {
+    if (!selectedDmConversationId) {
+      throw new Error('No direct message conversation selected.');
+    }
+
+    await directMessageBackend.setConversationMuted({
+      conversationId: selectedDmConversationId,
+      muted: nextMuted,
+    });
+    await refreshDmConversations({ suppressLoadingState: true });
+  }
+
+  async function reportDirectMessage(input: {
+    messageId: string;
+    kind: DirectMessageReportKind;
+    comment: string;
+  }) {
+    await directMessageBackend.reportMessage(input);
+  }
+
+  async function blockDirectMessageUser(input: { userId: string; username: string }) {
+    await socialBackend.blockUser(input.userId);
+    setDmMessages([]);
+    setSelectedDmConversationId(null);
+
+    await Promise.all([
+      refreshSocialCounts(),
+      refreshDmConversations({ suppressLoadingState: true }),
+      refreshNotificationInbox({ playSoundsForNew: false }),
+    ]);
   }
 
   function requestVoiceChannelJoin(channelId: string) {
@@ -2822,6 +3461,168 @@ function ChatApp() {
     const result = await desktopClient.setAutoUpdateEnabled(enabled);
     setAppSettings(result.settings);
     setUpdaterStatus(result.updaterStatus);
+  }
+
+  async function setNotificationAudioSettings(values: NotificationAudioSettings) {
+    setNotificationAudioSettingsSaving(true);
+    setNotificationAudioSettingsError(null);
+    try {
+      const result = await desktopClient.setNotificationAudioSettings(values);
+      setAppSettings(result.settings);
+    } catch (error) {
+      setNotificationAudioSettingsError(
+        getErrorMessage(error, 'Failed to update local notification audio settings.')
+      );
+    } finally {
+      setNotificationAudioSettingsSaving(false);
+    }
+  }
+
+  async function saveNotificationPreferences(values: NotificationPreferenceUpdate) {
+    setNotificationPreferencesSaving(true);
+    setNotificationPreferencesError(null);
+    try {
+      const nextPreferences = await notificationBackend.updateNotificationPreferences(values);
+      setNotificationPreferences(nextPreferences);
+      await refreshNotificationInbox({ playSoundsForNew: false });
+    } catch (error) {
+      setNotificationPreferencesError(
+        getErrorMessage(error, 'Failed to update notification preferences.')
+      );
+    } finally {
+      setNotificationPreferencesSaving(false);
+    }
+  }
+
+  async function refreshNotificationsManually() {
+    setNotificationsRefreshing(true);
+    setNotificationsError(null);
+    try {
+      await refreshNotificationInbox({ playSoundsForNew: false });
+      await refreshNotificationPreferences();
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to refresh notifications.'));
+    } finally {
+      setNotificationsRefreshing(false);
+    }
+  }
+
+  async function markAllNotificationsSeen() {
+    try {
+      await notificationBackend.markAllNotificationsSeen();
+      await refreshNotificationInbox({ playSoundsForNew: false });
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to mark notifications seen.'));
+    }
+  }
+
+  async function markNotificationRead(recipientId: string) {
+    try {
+      await notificationBackend.markNotificationsRead([recipientId]);
+      await refreshNotificationInbox({ playSoundsForNew: false });
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to mark notification read.'));
+    }
+  }
+
+  async function dismissNotification(recipientId: string) {
+    try {
+      await notificationBackend.dismissNotifications([recipientId]);
+      await refreshNotificationInbox({ playSoundsForNew: false });
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to dismiss notification.'));
+    }
+  }
+
+  async function openNotificationItem(notification: NotificationItem) {
+    try {
+      switch (notification.kind) {
+        case 'dm_message': {
+          const conversationId = getNotificationPayloadString(notification, 'conversationId');
+          if (!conversationId) {
+            throw new Error('This notification does not include a DM conversation target.');
+          }
+          await openDirectMessageConversation(conversationId);
+          setNotificationsPanelOpen(false);
+          break;
+        }
+        case 'friend_request_received': {
+          if (!friendsSocialPanelEnabled) {
+            throw new Error('Friends are not enabled for your account.');
+          }
+          setFriendsPanelRequestedTab('requests');
+          setFriendsPanelHighlightedRequestId(
+            getNotificationPayloadString(notification, 'friendRequestId')
+          );
+          setFriendsPanelOpen(true);
+          setNotificationsPanelOpen(false);
+          break;
+        }
+        case 'friend_request_accepted': {
+          if (!friendsSocialPanelEnabled) {
+            throw new Error('Friends are not enabled for your account.');
+          }
+          setFriendsPanelRequestedTab('friends');
+          setFriendsPanelHighlightedRequestId(null);
+          setFriendsPanelOpen(true);
+          setNotificationsPanelOpen(false);
+          break;
+        }
+        case 'channel_mention': {
+          const communityId = getNotificationPayloadString(notification, 'communityId');
+          const channelId = getNotificationPayloadString(notification, 'channelId');
+          if (!communityId || !channelId) {
+            throw new Error('This mention notification does not include a channel target.');
+          }
+          setWorkspaceMode('community');
+          setCurrentServerId(communityId);
+          setCurrentChannelId(channelId);
+          setNotificationsPanelOpen(false);
+          break;
+        }
+        default: {
+          // Future notification kinds can add deep-link routes here.
+          break;
+        }
+      }
+
+      await notificationBackend.markNotificationsRead([notification.recipientId]);
+      await refreshNotificationInbox({ playSoundsForNew: false });
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to open notification.'));
+    }
+  }
+
+  async function acceptFriendRequestFromNotification(input: {
+    recipientId: string;
+    friendRequestId: string;
+  }) {
+    try {
+      await socialBackend.acceptFriendRequest(input.friendRequestId);
+      await notificationBackend.markNotificationsRead([input.recipientId]);
+      await Promise.all([
+        refreshNotificationInbox({ playSoundsForNew: false }),
+        refreshSocialCounts(),
+      ]);
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to accept friend request.'));
+    }
+  }
+
+  async function declineFriendRequestFromNotification(input: {
+    recipientId: string;
+    friendRequestId: string;
+  }) {
+    try {
+      await socialBackend.declineFriendRequest(input.friendRequestId);
+      await notificationBackend.markNotificationsRead([input.recipientId]);
+      await Promise.all([
+        refreshNotificationInbox({ playSoundsForNew: false }),
+        refreshSocialCounts(),
+      ]);
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to decline friend request.'));
+    }
   }
 
   async function checkForUpdatesNow() {
@@ -2991,6 +3792,12 @@ function ChatApp() {
     channelIds: group.channelIds,
     isCollapsed: channelGroupState.collapsedGroupIds.includes(group.id),
   }));
+  const showDmWorkspace = dmWorkspaceIsActive;
+  const selectedDmConversation =
+    selectedDmConversationId
+      ? dmConversations.find((conversation) => conversation.conversationId === selectedDmConversationId) ??
+        null
+      : null;
 
   return (
     <>
@@ -3001,9 +3808,29 @@ function ChatApp() {
           currentServerIsOwner={serverPermissions.isOwner}
           canManageCurrentServer={canManageCurrentServer}
           canOpenCurrentServerSettings={canOpenServerSettings}
-          onServerClick={setCurrentServerId}
+          onServerClick={(serverId) => {
+            setWorkspaceMode('community');
+            setCurrentServerId(serverId);
+          }}
           onCreateServer={() => setShowCreateModal(true)}
           onJoinServer={() => setShowJoinServerModal(true)}
+          onOpenNotifications={() => setNotificationsPanelOpen(true)}
+          notificationUnseenCount={notificationCounts.unseenCount}
+          notificationHasUnseenPulse={notificationCounts.unseenCount > 0}
+          onOpenFriends={
+            friendsSocialPanelEnabled
+              ? () => {
+                  setFriendsPanelRequestedTab(null);
+                  setFriendsPanelHighlightedRequestId(null);
+                  setFriendsPanelOpen(true);
+                }
+              : undefined
+          }
+          friendRequestIncomingCount={socialCounts.incomingPendingRequestCount}
+          friendRequestHasPendingPulse={socialCounts.incomingPendingRequestCount > 0}
+          onOpenDmReportReview={
+            dmReportReviewPanelEnabled ? () => setDmReportReviewPanelOpen(true) : undefined
+          }
           userDisplayName={userDisplayName}
           userAvatarUrl={profileAvatarUrl}
           onOpenAccountSettings={() => setShowAccountModal(true)}
@@ -3018,7 +3845,45 @@ function ChatApp() {
           }}
         />
 
-        {isServersLoading ? (
+        {showDmWorkspace ? (
+          <>
+            <DirectMessagesSidebar
+              currentUserDisplayName={userDisplayName}
+              conversations={dmConversations}
+              selectedConversationId={selectedDmConversationId}
+              loading={dmConversationsLoading}
+              refreshing={dmConversationsRefreshing}
+              error={dmConversationsError}
+              onSelectConversation={(conversationId) => {
+                setSelectedDmConversationId(conversationId);
+              }}
+              onRefresh={() => {
+                void refreshDmConversations({ suppressLoadingState: true });
+              }}
+            />
+            <DirectMessageArea
+              currentUserId={user.id}
+              currentUserDisplayName={userDisplayName}
+              conversation={selectedDmConversation}
+              messages={dmMessages}
+              loading={dmMessagesLoading}
+              sending={dmMessageSendPending}
+              refreshing={dmMessagesRefreshing}
+              error={dmMessagesError}
+              onRefresh={() => {
+                if (!selectedDmConversationId) return;
+                void refreshDmMessages(selectedDmConversationId, {
+                  suppressLoadingState: true,
+                  markRead: true,
+                });
+              }}
+              onSendMessage={sendDirectMessage}
+              onToggleMute={toggleSelectedDmConversationMuted}
+              onBlockUser={blockDirectMessageUser}
+              onReportMessage={reportDirectMessage}
+            />
+          </>
+        ) : isServersLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <p className="text-[#a9b8cf]">Loading servers...</p>
           </div>
@@ -3305,6 +4170,84 @@ function ChatApp() {
             </div>
           </div>
         </div>
+      )}
+
+      <NotificationCenterModal
+        open={notificationsPanelOpen}
+        onOpenChange={setNotificationsPanelOpen}
+        notifications={notificationItems}
+        counts={notificationCounts}
+        loading={notificationsLoading}
+        error={notificationsError}
+        refreshing={notificationsRefreshing}
+        onRefresh={() => {
+          void refreshNotificationsManually();
+        }}
+        onMarkAllSeen={() => {
+          void markAllNotificationsSeen();
+        }}
+        onMarkNotificationRead={(recipientId) => {
+          void markNotificationRead(recipientId);
+        }}
+        onDismissNotification={(recipientId) => {
+          void dismissNotification(recipientId);
+        }}
+        onOpenNotificationItem={(notification) => {
+          void openNotificationItem(notification);
+        }}
+        onAcceptFriendRequestNotification={({ recipientId, friendRequestId }) => {
+          void acceptFriendRequestFromNotification({ recipientId, friendRequestId });
+        }}
+        onDeclineFriendRequestNotification={({ recipientId, friendRequestId }) => {
+          void declineFriendRequestFromNotification({ recipientId, friendRequestId });
+        }}
+        preferences={notificationPreferences}
+        preferencesLoading={notificationPreferencesLoading}
+        preferencesSaving={notificationPreferencesSaving}
+        preferencesError={notificationPreferencesError}
+        onUpdatePreferences={(next) => {
+          void saveNotificationPreferences(next);
+        }}
+        localAudioSettings={appSettings.notifications}
+        localAudioSaving={notificationAudioSettingsSaving}
+        localAudioError={notificationAudioSettingsError}
+        onUpdateLocalAudioSettings={(next) => {
+          void setNotificationAudioSettings(next);
+        }}
+      />
+
+      {friendsSocialPanelEnabled && user && (
+        <FriendsModal
+          open={friendsPanelOpen}
+          onOpenChange={(open) => {
+            setFriendsPanelOpen(open);
+            if (!open) {
+              setFriendsPanelHighlightedRequestId(null);
+            }
+          }}
+          currentUserId={user.id}
+          currentUserDisplayName={userDisplayName}
+          onStartDirectMessage={directMessageUser}
+          requestedTab={friendsPanelRequestedTab}
+          highlightedRequestId={friendsPanelHighlightedRequestId}
+        />
+      )}
+
+      {voiceHardwareDebugPanelEnabled && (
+        <VoiceHardwareDebugPanel
+          open={voiceHardwareDebugPanelOpen}
+          onOpenChange={setVoiceHardwareDebugPanelOpen}
+          hotkeyLabel={VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL}
+        />
+      )}
+
+      {dmReportReviewPanelEnabled && user && (
+        <DmReportReviewPanel
+          open={dmReportReviewPanelOpen}
+          onOpenChange={setDmReportReviewPanelOpen}
+          currentUserId={user.id}
+          currentUserDisplayName={userDisplayName}
+        />
       )}
 
       <AlertDialog open={Boolean(voiceJoinPrompt)} onOpenChange={(open) => !open && cancelVoiceChannelJoinPrompt()}>

@@ -1,6 +1,13 @@
+export type NotificationAudioSettings = {
+  masterSoundEnabled: boolean;
+  notificationSoundVolume: number;
+  playSoundsWhenFocused: boolean;
+};
+
 export type AppSettings = {
   schemaVersion: number;
   autoUpdateEnabled: boolean;
+  notifications: NotificationAudioSettings;
 };
 
 export type UpdaterStatus = {
@@ -37,6 +44,9 @@ export type DesktopAPI = {
   setAutoUpdateEnabled: (enabled: boolean) => Promise<{
     settings: AppSettings;
     updaterStatus: UpdaterStatus;
+  }>;
+  setNotificationAudioSettings: (input: NotificationAudioSettings) => Promise<{
+    settings: AppSettings;
   }>;
   getUpdaterStatus: () => Promise<UpdaterStatus>;
   checkForUpdates: () => Promise<UpdaterStatus>;

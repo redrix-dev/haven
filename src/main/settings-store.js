@@ -1,11 +1,16 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SETTINGS_SCHEMA_VERSION = 1;
+const SETTINGS_SCHEMA_VERSION = 2;
 
 const DEFAULT_APP_SETTINGS = {
   schemaVersion: SETTINGS_SCHEMA_VERSION,
   autoUpdateEnabled: true,
+  notifications: {
+    masterSoundEnabled: true,
+    notificationSoundVolume: 70,
+    playSoundsWhenFocused: true,
+  },
 };
 
 const SETTINGS_FILE_NAME = 'app-settings.json';
@@ -17,12 +22,31 @@ function createSettingsStore(app) {
 
   const normalizeSettings = (raw) => {
     const candidate = raw && typeof raw === 'object' ? raw : {};
+    const candidateNotifications =
+      candidate.notifications && typeof candidate.notifications === 'object'
+        ? candidate.notifications
+        : {};
+    const normalizedVolume = Number(candidateNotifications.notificationSoundVolume);
     return {
       schemaVersion: SETTINGS_SCHEMA_VERSION,
       autoUpdateEnabled:
         typeof candidate.autoUpdateEnabled === 'boolean'
           ? candidate.autoUpdateEnabled
           : DEFAULT_APP_SETTINGS.autoUpdateEnabled,
+      notifications: {
+        masterSoundEnabled:
+          typeof candidateNotifications.masterSoundEnabled === 'boolean'
+            ? candidateNotifications.masterSoundEnabled
+            : DEFAULT_APP_SETTINGS.notifications.masterSoundEnabled,
+        notificationSoundVolume:
+          Number.isFinite(normalizedVolume) && normalizedVolume >= 0 && normalizedVolume <= 100
+            ? Math.round(normalizedVolume)
+            : DEFAULT_APP_SETTINGS.notifications.notificationSoundVolume,
+        playSoundsWhenFocused:
+          typeof candidateNotifications.playSoundsWhenFocused === 'boolean'
+            ? candidateNotifications.playSoundsWhenFocused
+            : DEFAULT_APP_SETTINGS.notifications.playSoundsWhenFocused,
+      },
     };
   };
 
@@ -91,4 +115,3 @@ module.exports = {
   SETTINGS_SCHEMA_VERSION,
   DEFAULT_APP_SETTINGS,
 };
-
