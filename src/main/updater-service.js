@@ -1,11 +1,13 @@
 const { updateElectronApp, UpdateSourceType } = require('update-electron-app');
 
 const SUPPORTED_PLATFORMS = new Set(['win32', 'darwin']);
+const MANUAL_UPDATE_CHECK_TIMEOUT_MS = 15_000;
 
 function createUpdaterService({ app, autoUpdater, settingsStore, repository }) {
   let initialized = false;
   let listenersAttached = false;
   let disableNeedsRestart = false;
+  let manualCheckPromise = null;
 
   const state = {
     supported: SUPPORTED_PLATFORMS.has(process.platform),
@@ -60,6 +62,47 @@ function createUpdaterService({ app, autoUpdater, settingsStore, repository }) {
       });
     });
   };
+
+  const waitForManualCheckResult = () =>
+    new Promise((resolve) => {
+      let settled = false;
+      let timeoutId = null;
+
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        autoUpdater.off('update-available', handleTerminal);
+        autoUpdater.off('update-not-available', handleTerminal);
+        autoUpdater.off('update-downloaded', handleTerminal);
+        autoUpdater.off('error', handleTerminal);
+      };
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(getStatus());
+      };
+
+      const handleTerminal = () => {
+        finish();
+      };
+
+      autoUpdater.on('update-available', handleTerminal);
+      autoUpdater.on('update-not-available', handleTerminal);
+      autoUpdater.on('update-downloaded', handleTerminal);
+      autoUpdater.on('error', handleTerminal);
+
+      timeoutId = setTimeout(() => {
+        applyStatus('error', {
+          lastError:
+            'Update check timed out. The release may not be available yet. Try again in a moment.',
+        });
+        finish();
+      }, MANUAL_UPDATE_CHECK_TIMEOUT_MS);
+    });
 
   const startUpdater = () => {
     if (initialized) return;
@@ -134,19 +177,28 @@ function createUpdaterService({ app, autoUpdater, settingsStore, repository }) {
       return status;
     }
 
+    if (manualCheckPromise) {
+      return manualCheckPromise;
+    }
+
     try {
       applyStatus('checking', {
         lastCheckedAt: new Date().toISOString(),
         lastError: null,
       });
+      manualCheckPromise = waitForManualCheckResult().finally(() => {
+        manualCheckPromise = null;
+      });
       autoUpdater.checkForUpdates();
     } catch (error) {
+      manualCheckPromise = null;
       applyStatus('error', {
         lastError: error instanceof Error ? error.message : String(error),
       });
+      return getStatus();
     }
 
-    return getStatus();
+    return manualCheckPromise;
   };
 
   const initialize = () => syncWithSettings();
@@ -166,4 +218,3 @@ function createUpdaterService({ app, autoUpdater, settingsStore, repository }) {
 module.exports = {
   createUpdaterService,
 };
-
