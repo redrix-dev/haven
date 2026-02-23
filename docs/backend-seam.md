@@ -100,6 +100,22 @@ Responsibilities:
 Used by:
 - `src/components/DmReportReviewPanel.tsx` (staff-only DM moderation review surface)
 
+## Testing and Hardening Expectations (Phase 5)
+
+Backend seams now have explicit regression expectations:
+- SQL/RLS regression suites under `supabase/tests/sql/*`
+- local-Supabase backend contract tests under `src/lib/backend/__tests__/*`
+
+Current coverage focus:
+- `NotificationBackend`
+- `SocialBackend`
+- `DirectMessageBackend`
+- `ModerationBackend`
+- targeted `CommunityDataBackend` mention-trigger integration coverage
+
+Runbook:
+- `docs/testing/rls-and-hardening-runbook.md`
+
 ## Why This Matters
 - UI components no longer depend on Supabase query details.
 - Future provider changes are isolated behind backend interfaces.

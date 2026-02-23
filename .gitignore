@@ -125,6 +125,7 @@ supabase/functions/.env
 supabase/functions/.env.*
 supabase/functions/**/.env
 supabase/functions/**/.env.*
+supabase/tests/.generated/
 
 # Local packaging artifacts
 dist/

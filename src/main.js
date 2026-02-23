@@ -3,6 +3,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { createSettingsStore } = require('./main/settings-store');
 const { createUpdaterService } = require('./main/updater-service');
+const { createRendererEntryService } = require('./main/renderer-entry-service');
+const { buildRendererCsp } = require('./main/renderer-entry-csp');
 const { DESKTOP_IPC_KEYS } = require('./shared/ipc/keys');
 const {
   parseSaveFileFromUrlPayload,
@@ -21,10 +23,20 @@ if (!hasSingleInstanceLock) {
 }
 
 let mainWindow = null;
+let rendererEntryService = null;
 const pendingProtocolUrls = [];
 const shouldDebugContextMenus =
   !app.isPackaged && process.env.HAVEN_DEBUG_CONTEXT_MENUS === '1';
 const shouldDebugWindowFocus = process.env.HAVEN_DEBUG_WINDOW_FOCUS === '1';
+const shouldDebugRendererEntry = process.env.HAVEN_DEBUG_RENDERER_ENTRY === '1';
+const rendererEntryPortFromEnv = Number.parseInt(process.env.HAVEN_RENDERER_HTTP_PORT ?? '', 10);
+const devRendererEntryPortOverride =
+  !app.isPackaged &&
+  Number.isInteger(rendererEntryPortFromEnv) &&
+  rendererEntryPortFromEnv >= 1 &&
+  rendererEntryPortFromEnv <= 65535
+    ? rendererEntryPortFromEnv
+    : undefined;
 
 const debugContextMenu = (scope, eventName, details) => {
   if (!shouldDebugContextMenus) return;
@@ -178,6 +190,31 @@ const registerIpcHandlers = () => {
   );
 };
 
+const registerRendererDocumentHeaderPolicy = ({ sessionRef, rendererEntryServiceRef }) => {
+  sessionRef.webRequest.onHeadersReceived((details, callback) => {
+    const url = typeof details.url === 'string' ? details.url : '';
+    const isRendererDocument =
+      details.resourceType === 'mainFrame' && rendererEntryServiceRef.isRendererDocumentUrl(url);
+
+    if (!isRendererDocument) {
+      callback({ responseHeaders: details.responseHeaders });
+      return;
+    }
+
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          buildRendererCsp({
+            rendererOrigin: rendererEntryServiceRef.getCanonicalOrigin(),
+          }),
+        ],
+        'Referrer-Policy': ['origin'],
+      },
+    });
+  });
+};
+
 const createWindow = () => {
   const window = new BrowserWindow({
     width: 1400,
@@ -192,6 +229,10 @@ const createWindow = () => {
     },
   });
   mainWindow = window;
+
+  if (!rendererEntryService) {
+    throw new Error('Renderer entry service must be started before creating the main window.');
+  }
 
   if (shouldDebugWindowFocus) {
     window.on('focus', () => {
@@ -214,44 +255,8 @@ const createWindow = () => {
     });
   }
 
-  // Set CSP for the app renderer document only.
-  // Do not inject this into third-party iframe responses (YouTube/Vimeo), or Chromium will
-  // block them because our `frame-ancestors 'none'` policy would apply to the embedded page.
-  window.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    const url = typeof details.url === 'string' ? details.url : '';
-    const isRendererDocument =
-      details.resourceType === 'mainFrame' &&
-      (url.startsWith('http://localhost:') ||
-        url.startsWith('http://127.0.0.1:') ||
-        url.startsWith('file://'));
-
-    if (!isRendererDocument) {
-      callback({ responseHeaders: details.responseHeaders });
-      return;
-    }
-
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          "default-src 'self'; " +
-          "script-src 'self'; " +
-          "style-src 'self' 'unsafe-inline'; " +
-          "connect-src 'self' http://localhost:9000 ws://localhost:9000 https://*.supabase.co wss://*.supabase.co https://*.supabase.in wss://*.supabase.in stun: turn:; " +
-          "media-src 'self' blob: mediastream: https:; " +
-          "img-src 'self' data: https: blob:; " +
-          "font-src 'self' data:; " +
-          "child-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; " +
-          "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; " +
-          "object-src 'none'; " +
-          "base-uri 'self'; " +
-          "frame-ancestors 'none';"
-        ]
-      }
-    });
-  });
-  // and load the index.html of the app.
-  window.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  // and load the app renderer through the unified loopback entry service.
+  window.loadURL(rendererEntryService.getEntryUrl('main_window'));
 
   if (!app.isPackaged) {
     // Open the DevTools only in development.
@@ -305,50 +310,79 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
-  app.setAsDefaultProtocolClient('haven');
-  settingsStore.initialize();
-  updaterService.initialize();
-  registerIpcHandlers();
 
-  // Allow microphone access for WebRTC voice channels.
-  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
-    if (
-      permission === 'media' ||
-      permission === 'microphone' ||
-      permission === 'clipboard-read' ||
-      permission === 'clipboard-sanitized-write'
-    ) {
-      return true;
-    }
+  try {
+    app.setAsDefaultProtocolClient('haven');
+    settingsStore.initialize();
+    updaterService.initialize();
+    registerIpcHandlers();
 
-    return false;
-  });
+    rendererEntryService = createRendererEntryService({
+      entries: [
+        {
+          entryName: 'main_window',
+          webpackEntryUrl: MAIN_WINDOW_WEBPACK_ENTRY,
+        },
+      ],
+      ...(devRendererEntryPortOverride ? { port: devRendererEntryPortOverride } : {}),
+      debug: shouldDebugRendererEntry,
+    });
+    await rendererEntryService.start();
 
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    if (
-      permission === 'media' ||
-      permission === 'microphone' ||
-      permission === 'clipboard-read' ||
-      permission === 'clipboard-sanitized-write'
-    ) {
-      callback(true);
-      return;
-    }
+    registerRendererDocumentHeaderPolicy({
+      sessionRef: session.defaultSession,
+      rendererEntryServiceRef: rendererEntryService,
+    });
 
-    callback(false);
-  });
+    // Allow microphone access for WebRTC voice channels.
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+      if (
+        permission === 'media' ||
+        permission === 'microphone' ||
+        permission === 'clipboard-read' ||
+        permission === 'clipboard-sanitized-write'
+      ) {
+        return true;
+      }
 
-  createWindow();
+      return false;
+    });
 
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+      if (
+        permission === 'media' ||
+        permission === 'microphone' ||
+        permission === 'clipboard-read' ||
+        permission === 'clipboard-sanitized-write'
+      ) {
+        callback(true);
+        return;
+      }
+
+      callback(false);
+    });
+
+    createWindow();
+
+    // On OS X it's common to re-create a window in the app when the
+    // dock icon is clicked and there are no other windows open.
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isPortConflict = Boolean(error && typeof error === 'object' && error.code === 'EADDRINUSE');
+    const errorBody = isPortConflict
+      ? `Haven could not bind the unified renderer entry server because the required local port is already in use.\n\n${message}\n\nClose the conflicting process and try again.`
+      : `Haven could not start the unified renderer entry service.\n\n${message}\n\nCheck for a loopback port conflict and try again.`;
+    console.error('Failed to initialize Haven main process:', error);
+    dialog.showErrorBox('Haven failed to start', errorBody);
+    app.quit();
+  }
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -358,6 +392,13 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  if (!rendererEntryService) return;
+  void rendererEntryService.stop().catch((error) => {
+    console.error('Failed to stop renderer entry service:', error);
+  });
 });
 
 // In this file you can include the rest of your app's specific main process

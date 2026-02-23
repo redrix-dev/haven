@@ -106,11 +106,17 @@ When changing code, preserve these invariants unless explicitly redesigning them
   2) preload implementation,
   3) renderer desktop client.
 - Reuse centralized IPC keys/validators; avoid ad hoc channel strings.
+- BrowserWindow renderer loads must go through the renderer entry service (loopback HTTP parity path);
+  do not directly call `loadURL(MAIN_*_WEBPACK_ENTRY)` in main-process window code.
+- Treat packaged-vs-dev renderer-origin parity as a release concern for embed/media flows.
 
 ## 4.4 Supabase and DB access
 - Prefer backend seam APIs (`src/lib/backend/*`) rather than raw scattered client queries in UI surfaces.
 - Treat migrations as auditable contracts; explain *why* in SQL comments where non-obvious.
 - Avoid policy bypasses for convenience.
+- When changing RLS policies or auth-sensitive SQL RPCs, add/update SQL regression coverage in
+  `supabase/tests/sql/*` whenever practical.
+- Prefer the local Supabase + `psql` SQL harness for permission regressions before introducing heavier DB test stacks.
 
 ## 4.5 Security hygiene
 - Never commit secrets, raw tokens, or environment values.
@@ -175,6 +181,22 @@ npx tsc --noEmit --project tsconfig.json
 This catches API-signature mismatches that ESLint will not catch (for example strict DOM generic types).
 If no test exists for a risky path, add a minimal one if practical (and keep it).
 
+For DB/RLS or authz-sensitive changes, run the local Supabase-backed suites:
+
+```bash
+npm run test:db
+npm run test:backend
+```
+
+For notification/DM UI regressions, run:
+
+```bash
+npm run test:unit
+```
+
+For Electron main bootstrapping / renderer-entry / CSP changes that can affect packaged runtime parity,
+run a packaged smoke check (`npm run make`) and verify embedded media behavior in the packaged app.
+
 ---
 
 ## 8) Off-Limits / High-Risk Actions
@@ -203,6 +225,7 @@ When touching these areas, ensure:
 ### Roles/permissions/moderation
 - UI gating mirrors DB capabilities, but DB remains enforcement source.
 - Hierarchy rules remain consistent for role and overwrite edits.
+- DM moderation review remains a separate workflow from server support reports unless explicitly unified.
 
 ### Voice
 - Authorization failures are distinguished from transient network failures.
@@ -232,6 +255,8 @@ If runtime behavior changes, include docs updates in the same PR whenever feasib
 - Mark potentially stale docs with a warning and revalidation target.
 - Prefer references to stable seams/contracts over brittle implementation details.
 - Revisit this guide as architecture evolves (backend routing, SFU migration, moderation expansion, etc.).
+- If server/channel notification preference overrides are intentionally backlogged, document that explicitly in
+  architecture docs instead of partially implementing precedence logic.
 
 ---
 
