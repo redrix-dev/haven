@@ -1,5 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const { DESKTOP_IPC_KEYS } = require('./shared/ipc/keys');
+const { DESKTOP_IPC_KEYS } = require('../shared/ipc/keys');
 
 contextBridge.exposeInMainWorld('desktop', {
   getAppSettings: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.SETTINGS_GET),

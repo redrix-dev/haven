@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { LoginScreen } from '@/components/LoginScreen';
 import { ServerList } from '@/components/ServerList';
 import { CreateServerModal } from '@/components/CreateServerModal';
@@ -10,15 +9,9 @@ import { AccountSettingsModal } from '@/components/AccountSettingsModal';
 import { QuickRenameDialog } from '@/components/QuickRenameDialog';
 import { ServerMembersModal } from '@/components/ServerMembersModal';
 import {
-  ServerInviteItem,
   ServerSettingsModal,
-  ServerSettingsValues,
 } from '@/components/ServerSettingsModal';
 import {
-  ChannelMemberOption,
-  ChannelMemberPermissionItem,
-  ChannelPermissionState,
-  ChannelRolePermissionItem,
   ChannelSettingsModal,
 } from '@/components/ChannelSettingsModal';
 import { Sidebar } from '@/components/Sidebar';
@@ -42,7 +35,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { useServers } from '@/lib/hooks/useServers';
 import {
   getCommunityDataBackend,
@@ -56,125 +48,63 @@ import { supabase } from '@/lib/supabase';
 import { desktopClient } from '@/shared/desktop/client';
 import { getErrorMessage } from '@/shared/lib/errors';
 import { installPromptTrap } from '@/lib/contextMenu/debugTrace';
-import type { AppSettings, NotificationAudioSettings, UpdaterStatus } from '@/shared/desktop/types';
+import {
+  DEFAULT_APP_SETTINGS,
+  DEFAULT_NOTIFICATION_AUDIO_SETTINGS,
+  DEFAULT_NOTIFICATION_COUNTS,
+  DEFAULT_SOCIAL_COUNTS,
+  DM_REPORT_REVIEW_PANEL_FLAG,
+  ENABLE_CHANNEL_RELOAD_DIAGNOSTICS,
+  FRIENDS_SOCIAL_PANEL_FLAG,
+  MESSAGE_PAGE_SIZE,
+  VOICE_HARDWARE_DEBUG_PANEL_FLAG,
+  VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL,
+} from '@/renderer/app/constants';
+import type {
+  ChannelMessageBundleCacheEntry,
+  FriendsPanelTab,
+  PendingUiConfirmation,
+  VoicePresenceStateRow,
+  VoiceSidebarParticipant,
+} from '@/renderer/app/types';
+import { getPendingUiConfirmationCopy } from '@/renderer/app/ui-confirmations';
+import {
+  areVoiceParticipantListsEqual,
+  getNotificationPayloadString,
+  isEditableKeyboardTarget,
+} from '@/renderer/app/utils';
+import { useDesktopSettings } from '@/renderer/features/desktop/hooks/useDesktopSettings';
+import { useCommunityWorkspace } from '@/renderer/features/community/hooks/useCommunityWorkspace';
+import { useServerAdmin } from '@/renderer/features/community/hooks/useServerAdmin';
+import { useChannelManagement } from '@/renderer/features/community/hooks/useChannelManagement';
+import { useChannelGroups } from '@/renderer/features/community/hooks/useChannelGroups';
+import { useFeatureFlags } from '@/renderer/features/session/hooks/useFeatureFlags';
+import { usePlatformSession } from '@/renderer/features/session/hooks/usePlatformSession';
+import type { NotificationAudioSettings } from '@/shared/desktop/types';
 import type {
   AuthorProfile,
   BanEligibleServer,
   Channel,
-  ChannelGroupState,
   ChannelKind,
-  CommunityBanItem,
-  CommunityMemberListItem,
   DirectMessage,
   DirectMessageConversationSummary,
   DirectMessageReportKind,
-  DeveloperAccessMode,
-  FeatureFlagsSnapshot,
   MessageAttachment,
   MessageLinkPreview,
   NotificationCounts,
   NotificationItem,
   NotificationPreferences,
   NotificationPreferenceUpdate,
-  PermissionCatalogItem,
   MessageReaction,
   MessageReportKind,
   MessageReportTarget,
   Message,
-  ServerMemberRoleItem,
-  ServerPermissions,
-  ServerRoleItem,
   SocialCounts,
 } from '@/lib/backend/types';
 import { Headphones, Mic, MicOff, PhoneOff, Settings2, VolumeX } from 'lucide-react';
-import { toast, Toaster as SonnerToaster } from 'sonner';
-import '@/styles/globals.css';
+import { toast } from 'sonner';
 
-type VoiceSidebarParticipant = {
-  userId: string;
-  displayName: string;
-};
-
-type VoicePresenceStateRow = {
-  user_id?: string | null;
-  display_name?: string | null;
-  joined_at?: string | null;
-};
-
-type ChannelMessageBundleCacheEntry = {
-  messages: Message[];
-  reactions: MessageReaction[];
-  attachments: MessageAttachment[];
-  linkPreviews: MessageLinkPreview[];
-  hasOlderMessages: boolean;
-};
-
-type FriendsPanelTab = 'friends' | 'add' | 'requests' | 'blocked';
-
-const areVoiceParticipantListsEqual = (
-  left: VoiceSidebarParticipant[],
-  right: VoiceSidebarParticipant[]
-) => {
-  if (left === right) return true;
-  if (left.length !== right.length) return false;
-
-  for (let index = 0; index < left.length; index += 1) {
-    if (
-      left[index].userId !== right[index].userId ||
-      left[index].displayName !== right[index].displayName
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-};
-
-const ENABLE_CHANNEL_RELOAD_DIAGNOSTICS =
-  typeof process !== 'undefined' && process.env.HAVEN_DEBUG_CHANNEL_RELOADS === '1';
-const MESSAGE_PAGE_SIZE = 75;
-const FRIENDS_SOCIAL_PANEL_FLAG = 'friends_dms_v1';
-const DM_REPORT_REVIEW_PANEL_FLAG = 'dm_report_review_v1';
-const VOICE_HARDWARE_DEBUG_PANEL_FLAG = 'debug_voice_hardware_panel';
-const VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL = 'Ctrl/Cmd + Alt + Shift + V';
-const DEFAULT_NOTIFICATION_AUDIO_SETTINGS: NotificationAudioSettings = {
-  masterSoundEnabled: true,
-  notificationSoundVolume: 70,
-  playSoundsWhenFocused: true,
-};
-const DEFAULT_APP_SETTINGS: AppSettings = {
-  schemaVersion: 2,
-  autoUpdateEnabled: true,
-  notifications: { ...DEFAULT_NOTIFICATION_AUDIO_SETTINGS },
-};
-const DEFAULT_NOTIFICATION_COUNTS: NotificationCounts = {
-  unseenCount: 0,
-  unreadCount: 0,
-};
-const DEFAULT_SOCIAL_COUNTS: SocialCounts = {
-  friendsCount: 0,
-  incomingPendingRequestCount: 0,
-  outgoingPendingRequestCount: 0,
-  blockedUserCount: 0,
-};
-
-const isEditableKeyboardTarget = (target: EventTarget | null) => {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-
-  const tagName = target.tagName.toLowerCase();
-  return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
-};
-
-const getNotificationPayloadString = (
-  notification: NotificationItem,
-  key: string
-): string | null => {
-  const value = notification.payload[key];
-  return typeof value === 'string' && value.trim().length > 0 ? value : null;
-};
-
-function ChatApp() {
+export function ChatApp() {
   const controlPlaneBackend = getControlPlaneBackend();
   const directMessageBackend = getDirectMessageBackend();
   const notificationBackend = getNotificationBackend();
@@ -187,7 +117,6 @@ function ChatApp() {
     createServer,
     refreshServers,
   } = useServers();
-  const [currentServerId, setCurrentServerId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
   const [showJoinServerModal, setShowJoinServerModal] = useState(false);
@@ -195,23 +124,35 @@ function ChatApp() {
   const [showChannelSettingsModal, setShowChannelSettingsModal] = useState(false);
   const [channelSettingsTargetId, setChannelSettingsTargetId] = useState<string | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
-  const [profileUsername, setProfileUsername] = useState('');
-  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [channelsLoading, setChannelsLoading] = useState(false);
-  const [channelsError, setChannelsError] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageReactions, setMessageReactions] = useState<MessageReaction[]>([]);
   const [messageAttachments, setMessageAttachments] = useState<MessageAttachment[]>([]);
   const [messageLinkPreviews, setMessageLinkPreviews] = useState<MessageLinkPreview[]>([]);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
-  const [currentChannelId, setCurrentChannelId] = useState<string | null>(null);
   const [authorProfiles, setAuthorProfiles] = useState<Record<string, AuthorProfile>>({});
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlagsSnapshot>({});
-  const [isPlatformStaff, setIsPlatformStaff] = useState(false);
-  const [platformStaffPrefix, setPlatformStaffPrefix] = useState<string | null>(null);
-  const [canPostHavenDevMessage, setCanPostHavenDevMessage] = useState(false);
+  const {
+    state: { featureFlags },
+    derived: { hasFeatureFlag },
+    actions: { resetFeatureFlags },
+  } = useFeatureFlags({
+    controlPlaneBackend,
+    userId: user?.id,
+  });
+  const {
+    state: {
+      profileUsername,
+      profileAvatarUrl,
+      isPlatformStaff,
+      platformStaffPrefix,
+      canPostHavenDevMessage,
+    },
+    actions: { resetPlatformSession, applyLocalProfileUpdate },
+  } = usePlatformSession({
+    controlPlaneBackend,
+    userId: user?.id,
+    userEmail: user?.email,
+  });
   const [canSendHavenDeveloperMessage, setCanSendHavenDeveloperMessage] = useState(false);
   const [canSpeakInVoiceChannel, setCanSpeakInVoiceChannel] = useState(false);
   const [activeVoiceChannelId, setActiveVoiceChannelId] = useState<string | null>(null);
@@ -240,60 +181,34 @@ function ChatApp() {
     channelId: string;
     mode: 'join' | 'switch';
   } | null>(null);
-  const [serverPermissions, setServerPermissions] = useState<ServerPermissions>({
-    isOwner: false,
-    canManageServer: false,
-    canManageRoles: false,
-    canManageMembers: false,
-    canCreateChannels: false,
-    canManageChannels: false,
-    canManageMessages: false,
-    canManageBans: false,
-    canCreateReports: false,
-    canRefreshLinkPreviews: false,
-    canManageDeveloperAccess: false,
-    canManageInvites: false,
+  const {
+    state: {
+      channels,
+      channelsLoading,
+      channelsError,
+      currentChannelId,
+      currentServerId,
+      serverPermissions,
+    },
+    derived: {
+      currentServer,
+      currentChannel,
+      channelSettingsTarget,
+      currentRenderableChannel,
+      currentChannelKind,
+    },
+    actions: {
+      resetChannelsWorkspace,
+      setChannels,
+      setCurrentChannelId,
+      setCurrentServerId,
+      resetServerPermissions,
+    },
+  } = useCommunityWorkspace({
+    servers,
+    currentUserId: user?.id ?? null,
+    channelSettingsTargetId,
   });
-  const [serverSettingsInitialValues, setServerSettingsInitialValues] =
-    useState<ServerSettingsValues | null>(null);
-  const [serverSettingsLoading, setServerSettingsLoading] = useState(false);
-  const [serverSettingsLoadError, setServerSettingsLoadError] = useState<string | null>(null);
-  const [serverInvites, setServerInvites] = useState<ServerInviteItem[]>([]);
-  const [serverInvitesLoading, setServerInvitesLoading] = useState(false);
-  const [serverInvitesError, setServerInvitesError] = useState<string | null>(null);
-  const [serverRoles, setServerRoles] = useState<ServerRoleItem[]>([]);
-  const [serverMembers, setServerMembers] = useState<ServerMemberRoleItem[]>([]);
-  const [serverPermissionCatalog, setServerPermissionCatalog] = useState<PermissionCatalogItem[]>(
-    []
-  );
-  const [serverRoleManagementLoading, setServerRoleManagementLoading] = useState(false);
-  const [serverRoleManagementError, setServerRoleManagementError] = useState<string | null>(null);
-  const [channelRolePermissions, setChannelRolePermissions] = useState<ChannelRolePermissionItem[]>(
-    []
-  );
-  const [channelMemberPermissions, setChannelMemberPermissions] = useState<
-    ChannelMemberPermissionItem[]
-  >([]);
-  const [channelPermissionMemberOptions, setChannelPermissionMemberOptions] = useState<
-    ChannelMemberOption[]
-  >([]);
-  const [channelPermissionsLoading, setChannelPermissionsLoading] = useState(false);
-  const [channelPermissionsLoadError, setChannelPermissionsLoadError] = useState<string | null>(
-    null
-  );
-  const [channelGroupState, setChannelGroupState] = useState<ChannelGroupState>({
-    groups: [],
-    ungroupedChannelIds: [],
-    collapsedGroupIds: [],
-  });
-  const [showMembersModal, setShowMembersModal] = useState(false);
-  const [membersModalCommunityId, setMembersModalCommunityId] = useState<string | null>(null);
-  const [membersModalServerName, setMembersModalServerName] = useState('');
-  const [membersModalMembers, setMembersModalMembers] = useState<CommunityMemberListItem[]>([]);
-  const [membersModalLoading, setMembersModalLoading] = useState(false);
-  const [membersModalError, setMembersModalError] = useState<string | null>(null);
-  const [membersModalCanCreateReports, setMembersModalCanCreateReports] = useState(false);
-  const [membersModalCanManageBans, setMembersModalCanManageBans] = useState(false);
   const [renameServerDraft, setRenameServerDraft] = useState<{ serverId: string; currentName: string } | null>(
     null
   );
@@ -302,9 +217,129 @@ function ChatApp() {
   );
   const [renameGroupDraft, setRenameGroupDraft] = useState<{ groupId: string; currentName: string } | null>(null);
   const [createGroupDraft, setCreateGroupDraft] = useState<{ channelId: string | null } | null>(null);
-  const [communityBans, setCommunityBans] = useState<CommunityBanItem[]>([]);
-  const [communityBansLoading, setCommunityBansLoading] = useState(false);
-  const [communityBansError, setCommunityBansError] = useState<string | null>(null);
+  const [pendingUiConfirmation, setPendingUiConfirmation] = useState<PendingUiConfirmation | null>(
+    null
+  );
+  const {
+    state: { channelGroupState },
+    actions: {
+      resetChannelGroups,
+      refreshChannelGroupsState,
+      createChannelGroup,
+      assignChannelToGroup,
+      removeChannelFromGroup,
+      setChannelGroupCollapsed,
+      renameChannelGroup,
+      deleteChannelGroup,
+    },
+  } = useChannelGroups({
+    currentServerId,
+    currentUserId: user?.id ?? null,
+    channels,
+  });
+  const {
+    state: {
+      showMembersModal,
+      membersModalCommunityId,
+      membersModalServerName,
+      membersModalMembers,
+      membersModalLoading,
+      membersModalError,
+      membersModalCanCreateReports,
+      membersModalCanManageBans,
+      communityBans,
+      communityBansLoading,
+      communityBansError,
+      serverInvites,
+      serverInvitesLoading,
+      serverInvitesError,
+      serverRoles,
+      serverMembers,
+      serverPermissionCatalog,
+      serverRoleManagementLoading,
+      serverRoleManagementError,
+      serverSettingsInitialValues,
+      serverSettingsLoading,
+      serverSettingsLoadError,
+    },
+    actions: {
+      resetMembersModal,
+      closeMembersModal,
+      openServerMembersModal,
+      refreshMembersModalMembersIfOpen,
+      resetCommunityBans,
+      clearCommunityBansError,
+      loadCommunityBans,
+      unbanUserFromCurrentServer,
+      resetServerInvites,
+      clearServerInvitesError,
+      setServerInvitesError,
+      loadServerInvites,
+      createServerInvite,
+      revokeServerInvite,
+      resetServerRoleManagement,
+      clearServerRoleManagementError,
+      setServerRoleManagementError,
+      loadServerRoleManagement,
+      createServerRole,
+      updateServerRole,
+      deleteServerRole,
+      saveServerRolePermissions,
+      saveServerMemberRoles,
+      resetServerSettingsState,
+      clearServerSettingsLoadError,
+      setServerSettingsLoadError,
+      loadServerSettings,
+      saveServerSettings,
+      leaveServer,
+      deleteServer,
+      renameServer,
+    },
+  } = useServerAdmin({
+    servers,
+    controlPlaneBackend,
+    currentServerId,
+    currentUserId: user?.id ?? null,
+    canManageDeveloperAccess: serverPermissions.canManageDeveloperAccess,
+    isServerSettingsModalOpen: showServerSettingsModal,
+    refreshServers,
+    onActiveServerRemoved: () => {
+      setCurrentServerId(null);
+      setShowServerSettingsModal(false);
+      setShowChannelSettingsModal(false);
+      setChannelSettingsTargetId(null);
+    },
+  });
+  const {
+    state: {
+      channelRolePermissions,
+      channelMemberPermissions,
+      channelPermissionMemberOptions,
+      channelPermissionsLoading,
+      channelPermissionsLoadError,
+    },
+    actions: {
+      resetChannelPermissionsState,
+      createChannel,
+      saveChannelSettings,
+      renameChannel,
+      deleteChannel,
+      deleteCurrentChannel,
+      openChannelSettingsModal,
+      saveRoleChannelPermissions,
+      saveMemberChannelPermissions,
+    },
+  } = useChannelManagement({
+    currentServerId,
+    currentUserId: user?.id ?? null,
+    currentChannelId,
+    channelSettingsTargetId,
+    channels,
+    setChannels,
+    setCurrentChannelId,
+    setChannelSettingsTargetId,
+    setShowChannelSettingsModal,
+  });
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
   const [friendsPanelRequestedTab, setFriendsPanelRequestedTab] = useState<FriendsPanelTab | null>(null);
@@ -336,21 +371,25 @@ function ChatApp() {
   const [notificationPreferencesLoading, setNotificationPreferencesLoading] = useState(false);
   const [notificationPreferencesSaving, setNotificationPreferencesSaving] = useState(false);
   const [notificationPreferencesError, setNotificationPreferencesError] = useState<string | null>(null);
-  const [notificationAudioSettingsSaving, setNotificationAudioSettingsSaving] = useState(false);
-  const [notificationAudioSettingsError, setNotificationAudioSettingsError] = useState<string | null>(null);
-  const [appSettings, setAppSettings] = useState<AppSettings>({
-    ...DEFAULT_APP_SETTINGS,
-    notifications: { ...DEFAULT_NOTIFICATION_AUDIO_SETTINGS },
-  });
-  const [appSettingsLoading, setAppSettingsLoading] = useState(true);
-  const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null);
-  const [updaterStatusLoading, setUpdaterStatusLoading] = useState(true);
-  const [checkingForUpdates, setCheckingForUpdates] = useState(false);
+  const {
+    state: {
+      appSettings,
+      appSettingsLoading,
+      updaterStatus,
+      updaterStatusLoading,
+      checkingForUpdates,
+      notificationAudioSettingsSaving,
+      notificationAudioSettingsError,
+    },
+    actions: {
+      setAutoUpdateEnabled,
+      setNotificationAudioSettings,
+      checkForUpdatesNow,
+    },
+  } = useDesktopSettings();
   const [composerHeight, setComposerHeight] = useState<number | null>(null);
   const authorProfileCacheRef = useRef<Record<string, AuthorProfile>>({});
   const requestOlderMessagesRef = useRef<(() => Promise<void>) | null>(null);
-  const channelsByServerCacheRef = useRef<Record<string, Channel[]>>({});
-  const lastSelectedChannelIdByServerRef = useRef<Record<string, string | null>>({});
   const messageBundleByChannelCacheRef = useRef<Record<string, ChannelMessageBundleCacheEntry>>({});
   const dmReadMarkInFlightRef = useRef<Record<string, boolean>>({});
   const dmLastReadMarkAtRef = useRef<Record<string, number>>({});
@@ -359,7 +398,6 @@ function ChatApp() {
   const notificationAudioSettingsRef = useRef<NotificationAudioSettings>(
     DEFAULT_NOTIFICATION_AUDIO_SETTINGS
   );
-  const hasFeatureFlag = (flagKey: string) => Boolean(featureFlags[flagKey]);
   const debugChannelReloads =
     ENABLE_CHANNEL_RELOAD_DIAGNOSTICS || hasFeatureFlag('debug_channel_reload_diagnostics');
   const friendsSocialPanelEnabled = hasFeatureFlag(FRIENDS_SOCIAL_PANEL_FLAG);
@@ -367,8 +405,6 @@ function ChatApp() {
   const dmWorkspaceIsActive = dmWorkspaceEnabled && workspaceMode === 'dm';
   const dmReportReviewPanelEnabled = isPlatformStaff && hasFeatureFlag(DM_REPORT_REVIEW_PANEL_FLAG);
   const voiceHardwareDebugPanelEnabled = hasFeatureFlag(VOICE_HARDWARE_DEBUG_PANEL_FLAG);
-  const currentChannelKind: ChannelKind | null =
-    currentChannelId ? (channels.find((channel) => channel.id === currentChannelId)?.kind ?? null) : null;
   const getChannelBundleCacheKey = (communityId: string, channelId: string) => `${communityId}:${channelId}`;
 
   useEffect(() => {
@@ -414,257 +450,94 @@ function ChatApp() {
   }, [user, voiceHardwareDebugPanelEnabled]);
 
   useEffect(() => {
-    let isMounted = true;
+    if (user) return;
 
-    if (!user) {
-      setProfileUsername('');
-      setProfileAvatarUrl(null);
-      setIsPlatformStaff(false);
-      setPlatformStaffPrefix(null);
-      setCanPostHavenDevMessage(false);
-      setCanSpeakInVoiceChannel(false);
-      setActiveVoiceChannelId(null);
-      setVoicePanelOpen(false);
-      setVoiceHardwareDebugPanelOpen(false);
-      setDmReportReviewPanelOpen(false);
-      setNotificationsPanelOpen(false);
-      setFriendsPanelOpen(false);
-      setWorkspaceMode('community');
-      setVoiceConnected(false);
-      setVoiceParticipants([]);
-      setVoicePresenceByChannelId({});
-      setVoiceSessionState({
-        joined: false,
-        joining: false,
-        isMuted: false,
-        isDeafened: false,
-        listenOnly: true,
-      });
-      setVoiceControlActions(null);
-      setVoiceJoinPrompt(null);
-      setMessages([]);
-      setMessageReactions([]);
-      setMessageAttachments([]);
-      setMessageLinkPreviews([]);
-      setHasOlderMessages(false);
-      setIsLoadingOlderMessages(false);
-      setAuthorProfiles({});
-      authorProfileCacheRef.current = {};
-      requestOlderMessagesRef.current = null;
-      knownNotificationRecipientIdsRef.current = new Set();
-      notificationsBootstrappedRef.current = false;
-      setFeatureFlags({});
-      setNotificationItems([]);
-      setNotificationCounts(DEFAULT_NOTIFICATION_COUNTS);
-      setSocialCounts(DEFAULT_SOCIAL_COUNTS);
-      setDmConversations([]);
-      setDmConversationsLoading(false);
-      setDmConversationsRefreshing(false);
-      setDmConversationsError(null);
-      setSelectedDmConversationId(null);
-      setDmMessages([]);
-      setDmMessagesLoading(false);
-      setDmMessagesRefreshing(false);
-      setDmMessagesError(null);
-      setDmMessageSendPending(false);
-      setNotificationsLoading(false);
-      setNotificationsRefreshing(false);
-      setNotificationsError(null);
-      setNotificationPreferences(null);
-      setNotificationPreferencesLoading(false);
-      setNotificationPreferencesSaving(false);
-      setNotificationPreferencesError(null);
-      setNotificationAudioSettingsSaving(false);
-      setNotificationAudioSettingsError(null);
-      setServerPermissions({
-        isOwner: false,
-        canManageServer: false,
-        canManageRoles: false,
-        canManageMembers: false,
-        canCreateChannels: false,
-        canManageChannels: false,
-        canManageMessages: false,
-        canManageBans: false,
-        canCreateReports: false,
-        canRefreshLinkPreviews: false,
-        canManageDeveloperAccess: false,
-        canManageInvites: false,
-      });
-      setServerSettingsInitialValues(null);
-      setShowCreateChannelModal(false);
-      setShowJoinServerModal(false);
-      setShowServerSettingsModal(false);
-      setShowChannelSettingsModal(false);
-      setChannelSettingsTargetId(null);
-      setShowAccountModal(false);
-      setServerSettingsLoadError(null);
-      setServerInvites([]);
-      setServerInvitesLoading(false);
-      setServerInvitesError(null);
-      setServerRoles([]);
-      setServerMembers([]);
-      setServerPermissionCatalog([]);
-      setServerRoleManagementLoading(false);
-      setServerRoleManagementError(null);
-      setChannelRolePermissions([]);
-      setChannelMemberPermissions([]);
-      setChannelPermissionMemberOptions([]);
-      setChannelPermissionsLoadError(null);
-      setChannelPermissionsLoading(false);
-      setChannelGroupState({
-        groups: [],
-        ungroupedChannelIds: [],
-        collapsedGroupIds: [],
-      });
-      setShowMembersModal(false);
-      setMembersModalCommunityId(null);
-      setMembersModalServerName('');
-      setMembersModalMembers([]);
-      setMembersModalLoading(false);
-      setMembersModalError(null);
-      setMembersModalCanCreateReports(false);
-      setMembersModalCanManageBans(false);
-      setRenameServerDraft(null);
-      setRenameChannelDraft(null);
-      setRenameGroupDraft(null);
-      setCreateGroupDraft(null);
-      setCommunityBans([]);
-      setCommunityBansLoading(false);
-      setCommunityBansError(null);
-      return;
-    }
-
-    const fallbackUsername = user.email?.split('@')[0] || 'User';
-
-    const loadProfile = async () => {
-      const [profileResult, staffResult] = await Promise.allSettled([
-        controlPlaneBackend.fetchUserProfile(user.id),
-        controlPlaneBackend.fetchPlatformStaff(user.id),
-      ]);
-
-      if (!isMounted) return;
-
-      if (profileResult.status === 'rejected') {
-        console.error('Error loading profile:', profileResult.reason);
-        setProfileUsername(fallbackUsername);
-        setProfileAvatarUrl(null);
-      } else {
-        const profile = profileResult.value;
-        setProfileUsername(profile?.username ?? fallbackUsername);
-        setProfileAvatarUrl(profile?.avatarUrl ?? null);
-      }
-
-      if (staffResult.status === 'rejected') {
-        console.error('Error loading platform staff info:', staffResult.reason);
-        setIsPlatformStaff(false);
-        setPlatformStaffPrefix(null);
-        setCanPostHavenDevMessage(false);
-      } else {
-        const staff = staffResult.value;
-        const activeStaff = Boolean(staff?.isActive);
-        setIsPlatformStaff(activeStaff);
-        setPlatformStaffPrefix(staff?.displayPrefix ?? null);
-        setCanPostHavenDevMessage(Boolean(staff?.isActive && staff?.canPostHavenDev));
-      }
-    };
-
-    void loadProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!user) {
-      setFeatureFlags({});
-      return;
-    }
-
-    const loadFeatureFlags = async () => {
-      try {
-        const flags = await controlPlaneBackend.listMyFeatureFlags();
-        if (!isMounted) return;
-        setFeatureFlags(flags);
-      } catch (error) {
-        if (!isMounted) return;
-        console.warn('Failed to load feature flags:', error);
-        setFeatureFlags({});
-      }
-    };
-
-    void loadFeatureFlags();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [controlPlaneBackend, user?.id]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadDesktopSettings = async () => {
-      if (!desktopClient.isAvailable()) {
-        if (!isMounted) return;
-        setAppSettingsLoading(false);
-        setUpdaterStatusLoading(false);
-        setUpdaterStatus({
-          supported: false,
-          isPackaged: false,
-          platform: 'unknown',
-          enabled: false,
-          initialized: false,
-          status: 'unsupported_platform',
-          lastCheckedAt: null,
-          lastError: 'Desktop bridge unavailable.',
-          disableNeedsRestart: false,
-          repository: 'redrix-dev/haven',
-        });
-        return;
-      }
-
-      const [settingsResult, updaterResult] = await Promise.allSettled([
-        desktopClient.getAppSettings(),
-        desktopClient.getUpdaterStatus(),
-      ]);
-
-      if (!isMounted) return;
-
-      if (settingsResult.status === 'fulfilled') {
-        setAppSettings(settingsResult.value);
-      }
-      setAppSettingsLoading(false);
-
-      if (updaterResult.status === 'fulfilled') {
-        setUpdaterStatus(updaterResult.value);
-      } else {
-        setUpdaterStatus({
-          supported: false,
-          isPackaged: false,
-          platform: 'unknown',
-          enabled: false,
-          initialized: false,
-          status: 'error',
-          lastCheckedAt: null,
-          lastError: updaterResult.reason instanceof Error
-            ? updaterResult.reason.message
-            : String(updaterResult.reason),
-          disableNeedsRestart: false,
-          repository: 'redrix-dev/haven',
-        });
-      }
-
-      setUpdaterStatusLoading(false);
-    };
-
-    void loadDesktopSettings();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    resetPlatformSession();
+    setCanSpeakInVoiceChannel(false);
+    setActiveVoiceChannelId(null);
+    setVoicePanelOpen(false);
+    setVoiceHardwareDebugPanelOpen(false);
+    setDmReportReviewPanelOpen(false);
+    setNotificationsPanelOpen(false);
+    setFriendsPanelOpen(false);
+    setWorkspaceMode('community');
+    setVoiceConnected(false);
+    setVoiceParticipants([]);
+    setVoicePresenceByChannelId({});
+    setVoiceSessionState({
+      joined: false,
+      joining: false,
+      isMuted: false,
+      isDeafened: false,
+      listenOnly: true,
+    });
+    setVoiceControlActions(null);
+    setVoiceJoinPrompt(null);
+    setMessages([]);
+    setMessageReactions([]);
+    setMessageAttachments([]);
+    setMessageLinkPreviews([]);
+    setHasOlderMessages(false);
+    setIsLoadingOlderMessages(false);
+    setAuthorProfiles({});
+    authorProfileCacheRef.current = {};
+    requestOlderMessagesRef.current = null;
+    knownNotificationRecipientIdsRef.current = new Set();
+    notificationsBootstrappedRef.current = false;
+    resetFeatureFlags();
+    setNotificationItems([]);
+    setNotificationCounts(DEFAULT_NOTIFICATION_COUNTS);
+    setSocialCounts(DEFAULT_SOCIAL_COUNTS);
+    setDmConversations([]);
+    setDmConversationsLoading(false);
+    setDmConversationsRefreshing(false);
+    setDmConversationsError(null);
+    setSelectedDmConversationId(null);
+    setDmMessages([]);
+    setDmMessagesLoading(false);
+    setDmMessagesRefreshing(false);
+    setDmMessagesError(null);
+    setDmMessageSendPending(false);
+    setNotificationsLoading(false);
+    setNotificationsRefreshing(false);
+    setNotificationsError(null);
+    setNotificationPreferences(null);
+    setNotificationPreferencesLoading(false);
+    setNotificationPreferencesSaving(false);
+    setNotificationPreferencesError(null);
+    resetChannelsWorkspace();
+    resetServerPermissions();
+    resetServerSettingsState();
+    setShowCreateChannelModal(false);
+    setShowJoinServerModal(false);
+    setShowServerSettingsModal(false);
+    setShowChannelSettingsModal(false);
+    setChannelSettingsTargetId(null);
+    setShowAccountModal(false);
+    resetServerInvites();
+    resetServerRoleManagement();
+    resetChannelPermissionsState();
+    resetChannelGroups();
+    resetMembersModal();
+    setRenameServerDraft(null);
+    setRenameChannelDraft(null);
+    setRenameGroupDraft(null);
+    setCreateGroupDraft(null);
+    resetCommunityBans();
+  }, [
+    resetChannelGroups,
+    resetChannelsWorkspace,
+    resetChannelPermissionsState,
+    resetFeatureFlags,
+    resetCommunityBans,
+    resetMembersModal,
+    resetPlatformSession,
+    resetServerSettingsState,
+    resetServerRoleManagement,
+    resetServerInvites,
+    resetServerPermissions,
+    user,
+  ]);
 
   useEffect(() => {
     notificationAudioSettingsRef.current = appSettings.notifications;
@@ -1039,84 +912,10 @@ function ChatApp() {
     selectedDmConversationId,
   ]);
 
-  // Auto-select first server
+  // Reset server-scoped UI when no server is selected
   useEffect(() => {
-    if (servers.length > 0 && !currentServerId) {
-      setCurrentServerId(servers[0].id);
-    }
-  }, [servers, currentServerId]);
-
-  useEffect(() => {
-    if (!currentServerId) return;
-    if (!currentChannelId) return;
-    lastSelectedChannelIdByServerRef.current[currentServerId] = currentChannelId;
-  }, [currentServerId, currentChannelId]);
-
-  // Resolve server-scoped permissions for the current user.
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!user || !currentServerId) {
-      setServerPermissions({
-        isOwner: false,
-        canManageServer: false,
-        canManageRoles: false,
-        canManageMembers: false,
-        canCreateChannels: false,
-        canManageChannels: false,
-        canManageMessages: false,
-        canManageBans: false,
-        canCreateReports: false,
-        canRefreshLinkPreviews: false,
-        canManageDeveloperAccess: false,
-        canManageInvites: false,
-      });
-      return;
-    }
-
-    const loadPermissions = async () => {
-      try {
-        const communityBackend = getCommunityDataBackend(currentServerId);
-        const permissions = await communityBackend.fetchServerPermissions(currentServerId);
-
-        if (!isMounted) return;
-        setServerPermissions(permissions);
-      } catch (error) {
-        console.error('Error loading server permissions:', error);
-        if (!isMounted) return;
-        setServerPermissions({
-          isOwner: false,
-          canManageServer: false,
-          canManageRoles: false,
-          canManageMembers: false,
-          canCreateChannels: false,
-          canManageChannels: false,
-          canManageMessages: false,
-          canManageBans: false,
-          canCreateReports: false,
-          canRefreshLinkPreviews: false,
-          canManageDeveloperAccess: false,
-          canManageInvites: false,
-        });
-      }
-    };
-
-    void loadPermissions();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user, currentServerId]);
-
-  // Load channels when server changes
-  useEffect(() => {
-    let isMounted = true;
-
     if (!currentServerId) {
-      setChannels([]);
-      setChannelsLoading(false);
-      setChannelsError(null);
-      setCurrentChannelId(null);
+      resetChannelsWorkspace();
       setActiveVoiceChannelId(null);
       setVoicePanelOpen(false);
       setVoiceConnected(false);
@@ -1142,195 +941,28 @@ function ChatApp() {
       setShowServerSettingsModal(false);
       setShowChannelSettingsModal(false);
       setChannelSettingsTargetId(null);
-      setServerSettingsInitialValues(null);
-      setServerSettingsLoadError(null);
-      setServerInvites([]);
-      setServerInvitesLoading(false);
-      setServerInvitesError(null);
-      setServerRoles([]);
-      setServerMembers([]);
-      setServerPermissionCatalog([]);
-      setServerRoleManagementLoading(false);
-      setServerRoleManagementError(null);
-      setChannelRolePermissions([]);
-      setChannelMemberPermissions([]);
-      setChannelPermissionMemberOptions([]);
-      setChannelPermissionsLoadError(null);
-      setChannelPermissionsLoading(false);
-      setChannelGroupState({
-        groups: [],
-        ungroupedChannelIds: [],
-        collapsedGroupIds: [],
-      });
-      setShowMembersModal(false);
-      setMembersModalCommunityId(null);
-      setMembersModalServerName('');
-      setMembersModalMembers([]);
-      setMembersModalLoading(false);
-      setMembersModalError(null);
-      setMembersModalCanCreateReports(false);
-      setMembersModalCanManageBans(false);
+      resetServerSettingsState();
+      resetServerInvites();
+      resetServerRoleManagement();
+      resetChannelPermissionsState();
+      resetChannelGroups();
+      resetMembersModal();
       setRenameChannelDraft(null);
       setRenameGroupDraft(null);
       setCreateGroupDraft(null);
-      setCommunityBans([]);
-      setCommunityBansLoading(false);
-      setCommunityBansError(null);
-      return;
+      resetCommunityBans();
     }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    const hasCachedChannels = Object.prototype.hasOwnProperty.call(
-      channelsByServerCacheRef.current,
-      currentServerId
-    );
-    const cachedChannels = hasCachedChannels ? channelsByServerCacheRef.current[currentServerId] ?? [] : null;
-
-    const resolvePreferredChannelId = (channelList: Channel[], previousChannelId: string | null) => {
-      if (channelList.length === 0) return null;
-
-      const rememberedChannelId = lastSelectedChannelIdByServerRef.current[currentServerId] ?? null;
-      const candidates = [rememberedChannelId, previousChannelId];
-      for (const candidate of candidates) {
-        if (candidate && channelList.some((channel) => channel.id === candidate)) {
-          return candidate;
-        }
-      }
-
-      const firstTextChannel = channelList.find((channel) => channel.kind === 'text');
-      return firstTextChannel?.id ?? channelList[0].id;
-    };
-
-    if (cachedChannels) {
-      setChannels(cachedChannels);
-      setChannelsError(null);
-      setChannelsLoading(false);
-      setCurrentChannelId((prev) => resolvePreferredChannelId(cachedChannels, prev));
-    }
-
-    const loadChannels = async (options?: { blocking?: boolean }) => {
-      if (options?.blocking === true) {
-        setChannelsLoading(true);
-      } else if (!hasCachedChannels) {
-        setChannelsLoading(true);
-      }
-      setChannelsError(null);
-      try {
-        const channelList = await communityBackend.listChannels(currentServerId);
-
-        if (!isMounted) return;
-
-        channelsByServerCacheRef.current[currentServerId] = channelList;
-        setChannels(channelList);
-        setCurrentChannelId((prev) => {
-          return resolvePreferredChannelId(channelList, prev);
-        });
-      } catch (error: unknown) {
-        if (!isMounted) return;
-        console.error('Error loading channels:', error);
-        if (!hasCachedChannels) {
-          setChannels([]);
-          setCurrentChannelId(null);
-        }
-        setChannelsError(getErrorMessage(error, 'Failed to load channels.'));
-      }
-
-      setChannelsLoading(false);
-    };
-
-    void loadChannels({ blocking: !hasCachedChannels });
-
-    const subscription = communityBackend.subscribeToChannels(currentServerId, () => {
-      void loadChannels({ blocking: false });
-    });
-
-    return () => {
-      isMounted = false;
-      void subscription.unsubscribe();
-    };
-  }, [currentServerId]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!currentServerId) {
-      setChannelGroupState({
-        groups: [],
-        ungroupedChannelIds: [],
-        collapsedGroupIds: [],
-      });
-      return;
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    const channelIds = channels.map((channel) => channel.id);
-
-    const loadChannelGroups = async () => {
-      try {
-        const state = await communityBackend.listChannelGroups({
-          communityId: currentServerId,
-          channelIds,
-        });
-        if (!isMounted) return;
-        setChannelGroupState(state);
-      } catch (error) {
-        console.error('Failed to load channel groups:', error);
-        if (!isMounted) return;
-        setChannelGroupState({
-          groups: [],
-          ungroupedChannelIds: channelIds,
-          collapsedGroupIds: [],
-        });
-      }
-    };
-
-    void loadChannelGroups();
-
-    const groupSubscription = supabase
-      .channel(`channel_groups:${currentServerId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'channel_groups',
-          filter: `community_id=eq.${currentServerId}`,
-        },
-        () => {
-          void loadChannelGroups();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'channel_group_channels',
-          filter: `community_id=eq.${currentServerId}`,
-        },
-        () => {
-          void loadChannelGroups();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'channel_group_preferences',
-          filter: `community_id=eq.${currentServerId}`,
-        },
-        () => {
-          void loadChannelGroups();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      void groupSubscription.unsubscribe();
-    };
-  }, [channels, currentServerId]);
+  }, [
+    currentServerId,
+    resetChannelGroups,
+    resetChannelPermissionsState,
+    resetChannelsWorkspace,
+    resetCommunityBans,
+    resetMembersModal,
+    resetServerSettingsState,
+    resetServerRoleManagement,
+    resetServerInvites,
+  ]);
 
   useEffect(() => {
     if (!activeVoiceChannelId) return;
@@ -2388,101 +2020,6 @@ function ChatApp() {
     };
   }, [user, currentServerId, currentChannelId, activeVoiceChannelId, channels]);
 
-  async function loadServerSettings(communityId = currentServerId) {
-    if (!communityId) {
-      setServerSettingsInitialValues(null);
-      return;
-    }
-
-    setServerSettingsLoadError(null);
-    setServerSettingsLoading(true);
-
-    try {
-      const communityBackend = getCommunityDataBackend(communityId);
-      const snapshot = await communityBackend.fetchServerSettings(communityId);
-      setServerSettingsInitialValues({
-        name: snapshot.name,
-        description: snapshot.description,
-        allowPublicInvites: snapshot.allowPublicInvites,
-        requireReportReason: snapshot.requireReportReason,
-        developerAccessEnabled: snapshot.developerAccessEnabled,
-        developerAccessMode: snapshot.developerAccessMode as DeveloperAccessMode,
-        developerAccessChannelIds: snapshot.developerAccessChannelIds,
-      });
-    } finally {
-      setServerSettingsLoading(false);
-    }
-  }
-
-  async function loadServerInvites(communityId = currentServerId) {
-    if (!communityId) {
-      setServerInvites([]);
-      return;
-    }
-
-    setServerInvitesLoading(true);
-    setServerInvitesError(null);
-    try {
-      const invites = await controlPlaneBackend.listActiveCommunityInvites(communityId);
-      setServerInvites(
-        invites.map((invite) => ({
-          id: invite.id,
-          code: invite.code,
-          currentUses: invite.currentUses,
-          maxUses: invite.maxUses,
-          expiresAt: invite.expiresAt,
-          isActive: invite.isActive,
-        }))
-      );
-    } finally {
-      setServerInvitesLoading(false);
-    }
-  }
-
-  async function loadServerRoleManagement(communityId = currentServerId) {
-    if (!communityId) {
-      setServerRoles([]);
-      setServerMembers([]);
-      setServerPermissionCatalog([]);
-      return;
-    }
-
-    setServerRoleManagementLoading(true);
-    setServerRoleManagementError(null);
-
-    try {
-      const communityBackend = getCommunityDataBackend(communityId);
-      const snapshot = await communityBackend.fetchServerRoleManagement(communityId);
-      setServerRoles(snapshot.roles);
-      setServerMembers(snapshot.members);
-      setServerPermissionCatalog(snapshot.permissionsCatalog);
-    } finally {
-      setServerRoleManagementLoading(false);
-    }
-  }
-
-  async function loadCommunityBans(communityId = currentServerId) {
-    if (!communityId) {
-      setCommunityBans([]);
-      setCommunityBansError(null);
-      return;
-    }
-
-    setCommunityBansLoading(true);
-    setCommunityBansError(null);
-    try {
-      const communityBackend = getCommunityDataBackend(communityId);
-      const bans = await communityBackend.listCommunityBans(communityId);
-      setCommunityBans(bans);
-    } catch (error: unknown) {
-      setCommunityBans([]);
-      setCommunityBansError(getErrorMessage(error, 'Failed to load bans.'));
-      throw error;
-    } finally {
-      setCommunityBansLoading(false);
-    }
-  }
-
   const normalizeInviteCode = (value: string): string => {
     const trimmed = value.trim();
     if (!trimmed) return '';
@@ -2506,11 +2043,11 @@ function ChatApp() {
     }
 
     setShowServerSettingsModal(true);
-    setServerSettingsInitialValues(null);
-    setServerSettingsLoadError(null);
-    setServerInvitesError(null);
-    setServerRoleManagementError(null);
-    setCommunityBansError(null);
+    resetServerSettingsState();
+    clearServerSettingsLoadError();
+    clearServerInvitesError();
+    clearServerRoleManagementError();
+    clearCommunityBansError();
 
     try {
       await loadServerSettings(targetCommunityId);
@@ -2527,9 +2064,7 @@ function ChatApp() {
         setServerInvitesError(getErrorMessage(error, 'Failed to load server invites.'));
       }
     } else {
-      setServerInvites([]);
-      setServerInvitesLoading(false);
-      setServerInvitesError(null);
+      resetServerInvites();
     }
 
     try {
@@ -2545,36 +2080,6 @@ function ChatApp() {
       console.error('Failed to load community bans:', error);
     }
   };
-
-  async function createServerInvite(values: {
-    maxUses: number | null;
-    expiresInHours: number | null;
-  }): Promise<ServerInviteItem> {
-    if (!currentServerId) throw new Error('No server selected.');
-
-    const invite = await controlPlaneBackend.createCommunityInvite({
-      communityId: currentServerId,
-      maxUses: values.maxUses,
-      expiresInHours: values.expiresInHours,
-    });
-
-    await loadServerInvites();
-    return {
-      id: invite.id,
-      code: invite.code,
-      currentUses: invite.currentUses,
-      maxUses: invite.maxUses,
-      expiresAt: invite.expiresAt,
-      isActive: invite.isActive,
-    };
-  }
-
-  async function revokeServerInvite(inviteId: string): Promise<void> {
-    if (!currentServerId) throw new Error('No server selected.');
-
-    await controlPlaneBackend.revokeCommunityInvite(currentServerId, inviteId);
-    await loadServerInvites();
-  }
 
   async function joinServerByInvite(inviteInput: string): Promise<{
     communityName: string;
@@ -2594,497 +2099,6 @@ function ChatApp() {
       communityName: redeemedInvite.communityName,
       joined: redeemedInvite.joined,
     };
-  }
-
-  async function openServerMembersModal(communityId: string) {
-    const server = servers.find((candidate) => candidate.id === communityId);
-    setShowMembersModal(true);
-    setMembersModalCommunityId(communityId);
-    setMembersModalServerName(server?.name ?? 'Server');
-    setMembersModalMembers([]);
-    setMembersModalError(null);
-    setMembersModalLoading(true);
-    setMembersModalCanCreateReports(false);
-    setMembersModalCanManageBans(false);
-
-    try {
-      const communityBackend = getCommunityDataBackend(communityId);
-      const [members, permissions] = await Promise.all([
-        communityBackend.listCommunityMembers(communityId),
-        communityBackend.fetchServerPermissions(communityId),
-      ]);
-      setMembersModalMembers(members);
-      setMembersModalCanCreateReports(Boolean(permissions.canCreateReports));
-      setMembersModalCanManageBans(Boolean(permissions.canManageBans));
-    } catch (error: unknown) {
-      setMembersModalError(getErrorMessage(error, 'Failed to load server members.'));
-    } finally {
-      setMembersModalLoading(false);
-    }
-  }
-
-  async function leaveServer(communityId: string) {
-    await controlPlaneBackend.leaveCommunity(communityId);
-    if (currentServerId === communityId) {
-      setCurrentServerId(null);
-      setShowServerSettingsModal(false);
-      setShowChannelSettingsModal(false);
-      setChannelSettingsTargetId(null);
-      setShowMembersModal(false);
-    }
-    await refreshServers();
-  }
-
-  async function deleteServer(communityId: string) {
-    await controlPlaneBackend.deleteCommunity(communityId);
-    if (currentServerId === communityId) {
-      setCurrentServerId(null);
-      setShowServerSettingsModal(false);
-      setShowChannelSettingsModal(false);
-      setChannelSettingsTargetId(null);
-      setShowMembersModal(false);
-    }
-    await refreshServers();
-  }
-
-  async function renameServer(communityId: string, name: string) {
-    await controlPlaneBackend.renameCommunity({
-      communityId,
-      name,
-    });
-    await refreshServers();
-    if (currentServerId === communityId && showServerSettingsModal) {
-      await loadServerSettings(communityId);
-    }
-  }
-
-  async function saveServerSettings(values: ServerSettingsValues) {
-    if (!currentServerId || !user) throw new Error('Not authenticated');
-
-    const trimmedName = values.name.trim();
-    if (!trimmedName) {
-      throw new Error('Server name is required.');
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.updateServerSettings({
-      communityId: currentServerId,
-      userId: user.id,
-      values: {
-        name: trimmedName,
-        description: values.description,
-        allowPublicInvites: values.allowPublicInvites,
-        requireReportReason: values.requireReportReason,
-        developerAccessEnabled: values.developerAccessEnabled,
-        developerAccessMode: values.developerAccessMode,
-        developerAccessChannelIds: values.developerAccessChannelIds,
-      },
-      canManageDeveloperAccess: serverPermissions.canManageDeveloperAccess,
-    });
-
-    await refreshServers();
-    await loadServerSettings();
-  }
-
-  async function createServerRole(input: { name: string; color: string; position: number }) {
-    if (!currentServerId) throw new Error('No server selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.createServerRole({
-      communityId: currentServerId,
-      name: input.name,
-      color: input.color,
-      position: input.position,
-    });
-
-    await loadServerRoleManagement();
-  }
-
-  async function updateServerRole(input: {
-    roleId: string;
-    name: string;
-    color: string;
-    position: number;
-  }) {
-    if (!currentServerId) throw new Error('No server selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.updateServerRole({
-      communityId: currentServerId,
-      roleId: input.roleId,
-      name: input.name,
-      color: input.color,
-      position: input.position,
-    });
-
-    await loadServerRoleManagement();
-  }
-
-  async function deleteServerRole(roleId: string) {
-    if (!currentServerId) throw new Error('No server selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.deleteServerRole({
-      communityId: currentServerId,
-      roleId,
-    });
-
-    await loadServerRoleManagement();
-  }
-
-  async function saveServerRolePermissions(roleId: string, permissionKeys: string[]) {
-    if (!currentServerId) throw new Error('No server selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.saveServerRolePermissions({
-      roleId,
-      permissionKeys,
-    });
-
-    await loadServerRoleManagement();
-  }
-
-  async function saveServerMemberRoles(memberId: string, roleIds: string[]) {
-    if (!currentServerId || !user) throw new Error('Not authenticated');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.saveServerMemberRoles({
-      communityId: currentServerId,
-      memberId,
-      roleIds,
-      assignedByUserId: user.id,
-    });
-
-    await loadServerRoleManagement();
-  }
-
-  async function createChannel(values: {
-    name: string;
-    topic: string | null;
-    kind: ChannelKind;
-  }) {
-    if (!user || !currentServerId) throw new Error('Not authenticated');
-
-    const nextPosition =
-      channels.length === 0 ? 0 : Math.max(...channels.map((channel) => channel.position)) + 1;
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    const channel = await communityBackend.createChannel({
-      communityId: currentServerId,
-      name: values.name,
-      topic: values.topic,
-      position: nextPosition,
-      kind: values.kind,
-    });
-
-    setChannels((prev) => {
-      if (prev.some((existingChannel) => existingChannel.id === channel.id)) return prev;
-      return [...prev, channel].sort((a, b) => a.position - b.position);
-    });
-    setCurrentChannelId(channel.id);
-  }
-
-  async function loadChannelPermissions(targetChannelId = channelSettingsTargetId ?? currentChannelId) {
-    if (!currentServerId || !targetChannelId || !user) {
-      setChannelRolePermissions([]);
-      setChannelMemberPermissions([]);
-      setChannelPermissionMemberOptions([]);
-      return;
-    }
-
-    setChannelPermissionsLoadError(null);
-    setChannelPermissionsLoading(true);
-    try {
-      const communityBackend = getCommunityDataBackend(currentServerId);
-      const snapshot = await communityBackend.fetchChannelPermissions({
-        communityId: currentServerId,
-        channelId: targetChannelId,
-        userId: user.id,
-      });
-
-      setChannelRolePermissions(snapshot.rolePermissions);
-      setChannelMemberPermissions(snapshot.memberPermissions);
-      setChannelPermissionMemberOptions(snapshot.memberOptions);
-    } finally {
-      setChannelPermissionsLoading(false);
-    }
-  }
-
-  const openChannelSettingsModal = async (channelId?: string) => {
-    const targetChannelId = channelId ?? currentChannelId;
-    if (!targetChannelId) return;
-    setChannelSettingsTargetId(targetChannelId);
-    setShowChannelSettingsModal(true);
-    setChannelPermissionsLoadError(null);
-    try {
-      await loadChannelPermissions(targetChannelId);
-    } catch (error: unknown) {
-      console.error('Failed to load channel permissions:', error);
-      setChannelPermissionsLoadError(getErrorMessage(error, 'Failed to load channel permissions.'));
-    }
-  };
-
-  async function saveRoleChannelPermissions(roleId: string, permissions: ChannelPermissionState) {
-    const targetChannelId = channelSettingsTargetId ?? currentChannelId;
-    if (!currentServerId || !targetChannelId) throw new Error('No channel selected.');
-
-    const roleRow = channelRolePermissions.find((row) => row.roleId === roleId);
-    if (roleRow && !roleRow.editable) {
-      throw new Error('You can only edit overwrites for roles below your highest role.');
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.saveRoleChannelPermissions({
-      communityId: currentServerId,
-      channelId: targetChannelId,
-      roleId,
-      permissions,
-    });
-
-    setChannelRolePermissions((prev) =>
-      prev.map((row) =>
-        row.roleId === roleId
-          ? {
-              ...row,
-              canView: permissions.canView,
-              canSend: permissions.canSend,
-              canManage: permissions.canManage,
-            }
-          : row
-      )
-    );
-  }
-
-  async function saveMemberChannelPermissions(
-    memberId: string,
-    permissions: ChannelPermissionState
-  ) {
-    const targetChannelId = channelSettingsTargetId ?? currentChannelId;
-    if (!currentServerId || !targetChannelId) throw new Error('No channel selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.saveMemberChannelPermissions({
-      communityId: currentServerId,
-      channelId: targetChannelId,
-      memberId,
-      permissions,
-    });
-
-    setChannelMemberPermissions((prev) =>
-      prev.map((row) =>
-        row.memberId === memberId
-          ? {
-              ...row,
-              canView: permissions.canView,
-              canSend: permissions.canSend,
-              canManage: permissions.canManage,
-            }
-          : row
-      )
-    );
-  }
-
-  async function saveChannelSettings(values: { name: string; topic: string | null }) {
-    const channelIdToUpdate = channelSettingsTargetId ?? currentChannelId;
-    if (!currentServerId || !channelIdToUpdate) throw new Error('No channel selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.updateChannel({
-      communityId: currentServerId,
-      channelId: channelIdToUpdate,
-      name: values.name,
-      topic: values.topic,
-    });
-
-    setChannels((prev) =>
-      prev.map((channel) =>
-        channel.id === channelIdToUpdate
-          ? { ...channel, name: values.name, topic: values.topic }
-          : channel
-      )
-    );
-  }
-
-  async function renameChannel(channelId: string, name: string) {
-    if (!currentServerId) throw new Error('No server selected.');
-    const channelRow = channels.find((candidate) => candidate.id === channelId);
-    if (!channelRow) throw new Error('Channel not found.');
-
-    const normalizedName = name.trim();
-    if (!normalizedName) {
-      throw new Error('Channel name is required.');
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.updateChannel({
-      communityId: currentServerId,
-      channelId,
-      name: normalizedName,
-      topic: channelRow.topic,
-    });
-
-    setChannels((prev) =>
-      prev.map((channel) =>
-        channel.id === channelId
-          ? { ...channel, name: normalizedName }
-          : channel
-      )
-    );
-  }
-
-  async function deleteChannel(channelId: string) {
-    if (!currentServerId) throw new Error('No server selected.');
-    if (channels.length <= 1) {
-      throw new Error('At least one channel must exist in a server.');
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.deleteChannel({
-      communityId: currentServerId,
-      channelId,
-    });
-
-    setChannels((prev) => {
-      const next = prev.filter((channel) => channel.id !== channelId);
-      setCurrentChannelId((prevCurrentId) => {
-        if (prevCurrentId !== channelId) return prevCurrentId;
-        return next.length > 0 ? next[0].id : null;
-      });
-      return next;
-    });
-
-    setChannelSettingsTargetId((prevTargetId) => (prevTargetId === channelId ? null : prevTargetId));
-  }
-
-  async function deleteCurrentChannel() {
-    const targetChannelId = channelSettingsTargetId ?? currentChannelId;
-    if (!targetChannelId) throw new Error('No channel selected.');
-    await deleteChannel(targetChannelId);
-    setShowChannelSettingsModal(false);
-  }
-
-  async function refreshChannelGroupsState(communityId = currentServerId, channelIds = channels.map((channel) => channel.id)) {
-    if (!communityId) {
-      setChannelGroupState({
-        groups: [],
-        ungroupedChannelIds: [],
-        collapsedGroupIds: [],
-      });
-      return;
-    }
-
-    const communityBackend = getCommunityDataBackend(communityId);
-    const nextState = await communityBackend.listChannelGroups({
-      communityId,
-      channelIds,
-    });
-    setChannelGroupState(nextState);
-  }
-
-  async function createChannelGroup(name: string, channelIdToAssign?: string | null) {
-    if (!currentServerId || !user) throw new Error('Not authenticated.');
-    const normalizedName = name.trim();
-    if (!normalizedName) throw new Error('Group name is required.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    const nextPosition =
-      channelGroupState.groups.length === 0
-        ? 0
-        : Math.max(...channelGroupState.groups.map((group) => group.position)) + 1;
-
-    const createdGroup = await communityBackend.createChannelGroup({
-      communityId: currentServerId,
-      name: normalizedName,
-      position: nextPosition,
-      createdByUserId: user.id,
-    });
-
-    if (channelIdToAssign) {
-      await communityBackend.setChannelGroupForChannel({
-        communityId: currentServerId,
-        channelId: channelIdToAssign,
-        groupId: createdGroup.id,
-        position: 0,
-      });
-    }
-
-    await refreshChannelGroupsState(currentServerId);
-  }
-
-  async function assignChannelToGroup(channelId: string, groupId: string) {
-    if (!currentServerId) throw new Error('No server selected.');
-
-    const targetGroup = channelGroupState.groups.find((group) => group.id === groupId);
-    if (!targetGroup) throw new Error('Group no longer exists.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-
-    await communityBackend.setChannelGroupForChannel({
-      communityId: currentServerId,
-      channelId,
-      groupId,
-      position: targetGroup.channelIds.length,
-    });
-
-    await refreshChannelGroupsState(currentServerId);
-  }
-
-  async function removeChannelFromGroup(channelId: string) {
-    if (!currentServerId) throw new Error('No server selected.');
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.setChannelGroupForChannel({
-      communityId: currentServerId,
-      channelId,
-      groupId: null,
-      position: 0,
-    });
-    await refreshChannelGroupsState(currentServerId);
-  }
-
-  async function setChannelGroupCollapsed(groupId: string, isCollapsed: boolean) {
-    if (!currentServerId) throw new Error('No server selected.');
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.setChannelGroupCollapsed({
-      communityId: currentServerId,
-      groupId,
-      isCollapsed,
-    });
-
-    setChannelGroupState((prev) => ({
-      ...prev,
-      collapsedGroupIds: isCollapsed
-        ? Array.from(new Set([...prev.collapsedGroupIds, groupId]))
-        : prev.collapsedGroupIds.filter((id) => id !== groupId),
-    }));
-  }
-
-  async function renameChannelGroup(groupId: string, name: string) {
-    if (!currentServerId) throw new Error('No server selected.');
-    const normalizedName = name.trim();
-    if (!normalizedName) throw new Error('Group name is required.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.renameChannelGroup({
-      communityId: currentServerId,
-      groupId,
-      name: normalizedName,
-    });
-    setChannelGroupState((prev) => ({
-      ...prev,
-      groups: prev.groups.map((group) =>
-        group.id === groupId ? { ...group, name: normalizedName } : group
-      ),
-    }));
-  }
-
-  async function deleteChannelGroup(groupId: string) {
-    if (!currentServerId) throw new Error('No server selected.');
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.deleteChannelGroup({
-      communityId: currentServerId,
-      groupId,
-    });
-    await refreshChannelGroupsState(currentServerId);
   }
 
   async function sendMessage(
@@ -3237,13 +2251,10 @@ function ChatApp() {
       reason: input.reason,
     });
 
-    if (showMembersModal && membersModalCommunityId === input.communityId) {
-      try {
-        const members = await communityBackend.listCommunityMembers(input.communityId);
-        setMembersModalMembers(members);
-      } catch (error) {
-        console.error('Failed to refresh members after ban:', error);
-      }
+    try {
+      await refreshMembersModalMembersIfOpen(input.communityId);
+    } catch (error) {
+      console.error('Failed to refresh members after ban:', error);
     }
 
     if (showServerSettingsModal && currentServerId === input.communityId) {
@@ -3252,27 +2263,6 @@ function ChatApp() {
       } catch (error) {
         console.error('Failed to refresh bans after ban:', error);
       }
-    }
-  }
-
-  async function unbanUserFromCurrentServer(input: {
-    targetUserId: string;
-    reason?: string | null;
-  }) {
-    if (!currentServerId) throw new Error('No server selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.unbanCommunityMember({
-      communityId: currentServerId,
-      targetUserId: input.targetUserId,
-      reason: input.reason,
-    });
-
-    await loadCommunityBans(currentServerId);
-
-    if (showMembersModal && membersModalCommunityId === currentServerId) {
-      const members = await communityBackend.listCommunityMembers(currentServerId);
-      setMembersModalMembers(members);
     }
   }
 
@@ -3536,29 +2526,7 @@ function ChatApp() {
       avatarUrl: values.avatarUrl,
     });
 
-    setProfileUsername(values.username);
-    setProfileAvatarUrl(values.avatarUrl);
-  }
-
-  async function setAutoUpdateEnabled(enabled: boolean) {
-    const result = await desktopClient.setAutoUpdateEnabled(enabled);
-    setAppSettings(result.settings);
-    setUpdaterStatus(result.updaterStatus);
-  }
-
-  async function setNotificationAudioSettings(values: NotificationAudioSettings) {
-    setNotificationAudioSettingsSaving(true);
-    setNotificationAudioSettingsError(null);
-    try {
-      const result = await desktopClient.setNotificationAudioSettings(values);
-      setAppSettings(result.settings);
-    } catch (error) {
-      setNotificationAudioSettingsError(
-        getErrorMessage(error, 'Failed to update local notification audio settings.')
-      );
-    } finally {
-      setNotificationAudioSettingsSaving(false);
-    }
+    applyLocalProfileUpdate(values);
   }
 
   async function saveNotificationPreferences(values: NotificationPreferenceUpdate) {
@@ -3708,33 +2676,21 @@ function ChatApp() {
     }
   }
 
-  async function checkForUpdatesNow() {
-    setCheckingForUpdates(true);
-    try {
-      const status = await desktopClient.checkForUpdates();
-      setUpdaterStatus(status);
-    } finally {
-      setCheckingForUpdates(false);
-    }
-  }
-
   const handleLeaveServer = (communityId: string) => {
     const server = servers.find((candidate) => candidate.id === communityId);
-    const confirmed = window.confirm(`Leave "${server?.name ?? 'this server'}"?`);
-    if (!confirmed) return;
-
-    void leaveServer(communityId).catch((error: unknown) => {
-      window.alert(getErrorMessage(error, 'Failed to leave server.'));
+    setPendingUiConfirmation({
+      kind: 'leave-server',
+      communityId,
+      serverName: server?.name ?? 'this server',
     });
   };
 
   const handleDeleteServer = (communityId: string) => {
     const server = servers.find((candidate) => candidate.id === communityId);
-    const confirmed = window.confirm(`Delete "${server?.name ?? 'this server'}"? This cannot be undone.`);
-    if (!confirmed) return;
-
-    void deleteServer(communityId).catch((error: unknown) => {
-      window.alert(getErrorMessage(error, 'Failed to delete server.'));
+    setPendingUiConfirmation({
+      kind: 'delete-server',
+      communityId,
+      serverName: server?.name ?? 'this server',
     });
   };
 
@@ -3759,11 +2715,10 @@ function ChatApp() {
   const handleDeleteChannel = (channelId: string) => {
     const channel = channels.find((candidate) => candidate.id === channelId);
     if (!channel) return;
-    const confirmed = window.confirm(`Delete channel "${channel.name}"? This cannot be undone.`);
-    if (!confirmed) return;
-
-    void deleteChannel(channelId).catch((error: unknown) => {
-      window.alert(getErrorMessage(error, 'Failed to delete channel.'));
+    setPendingUiConfirmation({
+      kind: 'delete-channel',
+      channelId,
+      channelName: channel.name,
     });
   };
 
@@ -3785,12 +2740,45 @@ function ChatApp() {
   const handleDeleteChannelGroup = (groupId: string) => {
     const group = channelGroupState.groups.find((candidate) => candidate.id === groupId);
     if (!group) return;
-    const confirmed = window.confirm(`Delete group "${group.name}"? Channels will become ungrouped.`);
-    if (!confirmed) return;
-
-    void deleteChannelGroup(groupId).catch((error: unknown) => {
-      window.alert(getErrorMessage(error, 'Failed to delete channel group.'));
+    setPendingUiConfirmation({
+      kind: 'delete-channel-group',
+      groupId,
+      groupName: group.name,
     });
+  };
+
+  const confirmPendingUiAction = () => {
+    if (!pendingUiConfirmation) return;
+
+    const action = pendingUiConfirmation;
+    setPendingUiConfirmation(null);
+
+    switch (action.kind) {
+      case 'leave-server':
+        void leaveServer(action.communityId).catch((error: unknown) => {
+          toast.error(getErrorMessage(error, 'Failed to leave server.'), { id: 'leave-server-error' });
+        });
+        return;
+      case 'delete-server':
+        void deleteServer(action.communityId).catch((error: unknown) => {
+          toast.error(getErrorMessage(error, 'Failed to delete server.'), { id: 'delete-server-error' });
+        });
+        return;
+      case 'delete-channel':
+        void deleteChannel(action.channelId).catch((error: unknown) => {
+          toast.error(getErrorMessage(error, 'Failed to delete channel.'), { id: 'delete-channel-error' });
+        });
+        return;
+      case 'delete-channel-group':
+        void deleteChannelGroup(action.groupId).catch((error: unknown) => {
+          toast.error(getErrorMessage(error, 'Failed to delete channel group.'), {
+            id: 'delete-channel-group-error',
+          });
+        });
+        return;
+      default:
+        return;
+    }
   };
 
   if (authStatus === 'initializing') {
@@ -3814,21 +2802,6 @@ function ChatApp() {
   }
 
   const isServersLoading = serversStatus === 'loading';
-  const currentServer = servers.find((s) => s.id === currentServerId);
-  const currentChannel = channels.find((channel) => channel.id === currentChannelId);
-  const currentChannelBelongsToCurrentServer = Boolean(
-    currentChannel && currentServerId && currentChannel.community_id === currentServerId
-  );
-  const channelSettingsTarget = channels.find(
-    (channel) => channel.id === (channelSettingsTargetId ?? currentChannelId)
-  );
-  const currentRenderableChannel =
-    currentChannel && currentChannelBelongsToCurrentServer && currentChannel.kind === 'text'
-      ? currentChannel
-      : channels.find(
-          (channel) => channel.kind === 'text' && (!currentServerId || channel.community_id === currentServerId)
-        ) ??
-        (currentChannelBelongsToCurrentServer ? currentChannel : null);
   const activeVoiceChannel = channels.find(
     (channel) => channel.id === activeVoiceChannelId && channel.kind === 'voice'
   );
@@ -3881,6 +2854,12 @@ function ChatApp() {
       ? dmConversations.find((conversation) => conversation.conversationId === selectedDmConversationId) ??
         null
       : null;
+  const {
+    title: pendingUiConfirmationTitle,
+    description: pendingUiConfirmationDescription,
+    confirmLabel: pendingUiConfirmationConfirmLabel,
+    isDestructive: pendingUiConfirmationIsDestructive,
+  } = getPendingUiConfirmationCopy(pendingUiConfirmation);
 
   return (
     <>
@@ -4111,7 +3090,9 @@ function ChatApp() {
                 serverPermissions.canManageChannels
                   ? (channelId, groupId) => {
                       void assignChannelToGroup(channelId, groupId).catch((error: unknown) => {
-                        window.alert(getErrorMessage(error, 'Failed to assign channel to group.'));
+                        toast.error(getErrorMessage(error, 'Failed to assign channel to group.'), {
+                          id: 'assign-channel-group-error',
+                        });
                       });
                     }
                   : undefined
@@ -4120,7 +3101,9 @@ function ChatApp() {
                 serverPermissions.canManageChannels
                   ? (channelId) => {
                       void removeChannelFromGroup(channelId).catch((error: unknown) => {
-                        window.alert(getErrorMessage(error, 'Failed to remove channel from group.'));
+                        toast.error(getErrorMessage(error, 'Failed to remove channel from group.'), {
+                          id: 'remove-channel-group-error',
+                        });
                       });
                     }
                   : undefined
@@ -4361,6 +3344,42 @@ function ChatApp() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={Boolean(pendingUiConfirmation)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingUiConfirmation(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{pendingUiConfirmationTitle}</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a9b8cf]">
+              {pendingUiConfirmationDescription}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                confirmPendingUiAction();
+              }}
+              className={
+                pendingUiConfirmationIsDestructive
+                  ? 'bg-red-600 text-white hover:bg-red-500'
+                  : 'bg-[#3f79d8] hover:bg-[#325fae] text-white'
+              }
+            >
+              {pendingUiConfirmationConfirmLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {showCreateModal && (
         <CreateServerModal
           onClose={() => setShowCreateModal(false)}
@@ -4467,14 +3486,7 @@ function ChatApp() {
             reason,
           });
         }}
-        onClose={() => {
-          setShowMembersModal(false);
-          setMembersModalCommunityId(null);
-          setMembersModalMembers([]);
-          setMembersModalError(null);
-          setMembersModalCanCreateReports(false);
-          setMembersModalCanManageBans(false);
-        }}
+        onClose={closeMembersModal}
       />
 
       <QuickRenameDialog
@@ -4548,51 +3560,4 @@ function ChatApp() {
     </>
   );
 }
-
-function App() {
-  return (
-    <AuthProvider>
-      <ChatApp />
-    </AuthProvider>
-  );
-}
-
-const root = createRoot(document.body);
-root.render(
-  <TooltipProvider>
-    <>
-      <App />
-      <SonnerToaster
-        position="top-right"
-        theme="dark"
-        closeButton
-        toastOptions={{
-          className: '!bg-[#162238] !border !border-[#304867] !text-white !shadow-2xl',
-          descriptionClassName: '!text-[#a9b8cf]',
-          classNames: {
-            actionButton:
-              '!bg-[#3f79d8] !text-white !border !border-[#325fae] hover:!bg-[#325fae] focus:!ring-2 focus:!ring-[#6ea2ff] focus:!ring-offset-0',
-            cancelButton:
-              '!bg-[#1d2a42] !text-white !border !border-[#304867] hover:!bg-[#22324d]',
-          },
-          actionButtonStyle: {
-            background: '#3f79d8',
-            color: '#ffffff',
-            border: '1px solid #325fae',
-          },
-          cancelButtonStyle: {
-            background: '#1d2a42',
-            color: '#ffffff',
-            border: '1px solid #304867',
-          },
-          style: {
-            background: '#162238',
-            color: '#e6edf7',
-            border: '1px solid #304867',
-          },
-        }}
-      />
-    </>
-  </TooltipProvider>
-);
 

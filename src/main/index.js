@@ -1,16 +1,16 @@
 const { app, BrowserWindow, Menu, dialog, session, ipcMain, autoUpdater } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { createSettingsStore } = require('./main/settings-store');
-const { createUpdaterService } = require('./main/updater-service');
-const { createRendererEntryService } = require('./main/renderer-entry-service');
-const { buildRendererCsp } = require('./main/renderer-entry-csp');
-const { DESKTOP_IPC_KEYS } = require('./shared/ipc/keys');
+const { createSettingsStore } = require('./settings-store');
+const { createUpdaterService } = require('./updater-service');
+const { createRendererEntryService } = require('./renderer-entry-service');
+const { buildRendererCsp } = require('./renderer-entry-csp');
+const { DESKTOP_IPC_KEYS } = require('../shared/ipc/keys');
 const {
   parseSaveFileFromUrlPayload,
   parseSetAutoUpdatePayload,
   parseSetNotificationAudioPayload,
-} = require('./shared/ipc/validators');
+} = require('../shared/ipc/validators');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
