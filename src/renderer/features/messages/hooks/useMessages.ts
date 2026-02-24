@@ -1176,6 +1176,8 @@ export function useMessages({
 
     const selectedChannel = channels.find((channel) => channel.id === currentChannelId);
     if (!selectedChannel || selectedChannel.community_id !== currentServerId) {
+      resetMessageState();
+      setAuthorProfiles({});
       return;
     }
 
