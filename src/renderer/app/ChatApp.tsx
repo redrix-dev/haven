@@ -23,6 +23,7 @@ import { FriendsModal } from '@/components/FriendsModal';
 import { DirectMessagesSidebar } from '@/components/DirectMessagesSidebar';
 import { DirectMessageArea } from '@/components/DirectMessageArea';
 import { DmReportReviewPanel } from '@/components/DmReportReviewPanel';
+import { PasswordRecoveryDialog } from '@/components/PasswordRecoveryDialog';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -34,7 +35,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useServers } from '@/lib/hooks/useServers';
 import {
   getCommunityDataBackend,
@@ -91,7 +91,15 @@ export function ChatApp() {
   const directMessageBackend = getDirectMessageBackend();
   const notificationBackend = getNotificationBackend();
   const socialBackend = getSocialBackend();
-  const { user, status: authStatus, error: authError, signOut, deleteAccount } = useAuth();
+  const {
+    user,
+    status: authStatus,
+    error: authError,
+    passwordRecoveryRequired,
+    completePasswordRecovery,
+    signOut,
+    deleteAccount,
+  } = useAuth();
   const {
     servers,
     status: serversStatus,
@@ -973,6 +981,12 @@ export function ChatApp() {
 
   return (
     <>
+      <PasswordRecoveryDialog
+        open={passwordRecoveryRequired}
+        onCompletePasswordRecovery={completePasswordRecovery}
+        onSignOut={signOut}
+      />
+
       <div className="flex h-screen overflow-hidden bg-[#111a2b] text-[#e6edf7]">
         <ServerList
           servers={servers}

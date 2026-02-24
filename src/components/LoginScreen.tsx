@@ -45,12 +45,17 @@ export function LoginScreen() {
   const [verificationChecking, setVerificationChecking] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState('');
   const [verificationError, setVerificationError] = useState('');
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordSending, setForgotPasswordSending] = useState(false);
+  const [forgotPasswordStatus, setForgotPasswordStatus] = useState('');
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
   const [pendingVerificationCredentials, setPendingVerificationCredentials] = useState<{
     email: string;
     password: string;
   } | null>(null);
 
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, requestPasswordReset } = useAuth();
 
   const handleVerificationRecheck = useCallback(async () => {
     if (verificationChecking) return;
@@ -144,6 +149,32 @@ export function LoginScreen() {
     }
   };
 
+  const handleForgotPasswordSubmit = async () => {
+    const normalizedEmail = forgotPasswordEmail.trim();
+    if (!normalizedEmail) {
+      setForgotPasswordError('Email is required.');
+      setForgotPasswordStatus('');
+      return;
+    }
+
+    setForgotPasswordSending(true);
+    setForgotPasswordError('');
+    setForgotPasswordStatus('');
+
+    try {
+      const { error: resetError } = await requestPasswordReset(normalizedEmail);
+      if (resetError) throw resetError;
+
+      setForgotPasswordStatus(
+        `Password reset link sent to ${normalizedEmail}. Open it and Haven will prompt you to set a new password.`
+      );
+    } catch (err: unknown) {
+      setForgotPasswordError(getErrorMessage(err, 'Failed to send password reset email.'));
+    } finally {
+      setForgotPasswordSending(false);
+    }
+  };
+
   return (
     <div className="flex items-center justify-center h-screen bg-[#111a2b]">
       <Card className="w-full max-w-md bg-[#1c2a43] border-[#142033] shadow-xl">
@@ -199,6 +230,24 @@ export function LoginScreen() {
               required
             />
           </div>
+
+          {!isSignUp && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => {
+                  setForgotPasswordEmail(email.trim());
+                  setForgotPasswordError('');
+                  setForgotPasswordStatus('');
+                  setShowForgotPasswordModal(true);
+                }}
+                className="h-auto px-0 text-xs text-[#59b7ff] hover:text-[#86ccff]"
+              >
+                Forgot password?
+              </Button>
+            </div>
+          )}
 
           {error && (
             <div className="text-red-400 text-sm bg-red-900/20 p-3 rounded">
@@ -275,6 +324,63 @@ export function LoginScreen() {
               className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
             >
               {verificationChecking ? 'Checking...' : 'I verified, recheck now'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showForgotPasswordModal} onOpenChange={setShowForgotPasswordModal}>
+        <DialogContent className="bg-[#1c2a43] border-[#142033] text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription className="text-[#aebad0]">
+              Enter your account email and we&apos;ll send a password reset link.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="forgot-password-email" className="text-xs font-semibold text-[#aebad0] uppercase">
+                Email
+              </Label>
+              <Input
+                id="forgot-password-email"
+                type="email"
+                value={forgotPasswordEmail}
+                onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                className="bg-[#263a58] border-[#304867] text-white"
+                autoFocus
+              />
+            </div>
+
+            {forgotPasswordStatus && (
+              <p className="text-xs text-[#8fc1ff] bg-[#1c3352] rounded px-3 py-2">
+                {forgotPasswordStatus}
+              </p>
+            )}
+
+            {forgotPasswordError && (
+              <p className="text-xs text-[#fca5a5] bg-[#4a1f2c] rounded px-3 py-2">
+                {forgotPasswordError}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowForgotPasswordModal(false)}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleForgotPasswordSubmit()}
+              disabled={forgotPasswordSending}
+              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+            >
+              {forgotPasswordSending ? 'Sending...' : 'Send reset link'}
             </Button>
           </DialogFooter>
         </DialogContent>

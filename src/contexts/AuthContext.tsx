@@ -18,12 +18,15 @@ interface AuthContextType {
   status: AuthStatus;
   error: string | null;
   loading: boolean;
+  passwordRecoveryRequired: boolean;
   signUp: (
     email: string,
     password: string,
     username: string
   ) => Promise<{ error: AuthError | PostgrestError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  requestPasswordReset: (email: string) => Promise<{ error: AuthError | null }>;
+  completePasswordRecovery: (password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
 }
@@ -38,6 +41,7 @@ const SUPPORTED_EMAIL_OTP_TYPES = new Set<EmailOtpType>([
   'email_change',
   'email',
 ]);
+const HAVEN_AUTH_CONFIRM_REDIRECT_URL = 'haven://auth/confirm';
 
 const parseProtocolUrl = (url: string): URL | null => {
   try {
@@ -80,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthStatus>('initializing');
   const [error, setError] = useState<string | null>(null);
+  const [passwordRecoveryRequired, setPasswordRecoveryRequired] = useState(false);
   const loading = status === 'initializing';
   const processedProtocolUrlsRef = useRef<Set<string>>(new Set());
 
@@ -95,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const refreshToken = params.refresh_token?.trim();
     const tokenHash = params.token_hash?.trim();
     const otpType = params.type?.trim().toLowerCase() as EmailOtpType | undefined;
+    const isRecoveryLink = otpType === 'recovery';
 
     try {
       if (accessToken && refreshToken) {
@@ -103,6 +109,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           refresh_token: refreshToken,
         });
         if (setSessionError) throw setSessionError;
+        if (isRecoveryLink) {
+          setPasswordRecoveryRequired(true);
+        }
         return;
       }
 
@@ -112,6 +121,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           type: otpType,
         });
         if (verifyError) throw verifyError;
+        if (otpType === 'recovery') {
+          setPasswordRecoveryRequired(true);
+        }
         return;
       }
 
@@ -153,12 +165,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       setStatus(session?.user ? 'authenticated' : 'unauthenticated');
       setError(null);
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecoveryRequired(true);
+      } else if (event === 'SIGNED_OUT') {
+        setPasswordRecoveryRequired(false);
+      }
     });
 
     return () => {
@@ -212,8 +229,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
       options: {
+        emailRedirectTo: HAVEN_AUTH_CONFIRM_REDIRECT_URL,
         data: {
-          username: username.trim()
+          username: username.trim(),
         },
       },
     });
@@ -232,8 +250,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  const requestPasswordReset = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: HAVEN_AUTH_CONFIRM_REDIRECT_URL,
+    });
+
+    return { error };
+  };
+
+  const completePasswordRecovery = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password,
+    });
+
+    if (!error) {
+      setPasswordRecoveryRequired(false);
+    }
+
+    return { error };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
+    setPasswordRecoveryRequired(false);
   };
 
   const deleteAccount = async () => {
@@ -249,11 +288,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setStatus('unauthenticated');
     setError(null);
+    setPasswordRecoveryRequired(false);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, session, status, error, loading, signUp, signIn, signOut, deleteAccount }}
+      value={{
+        user,
+        session,
+        status,
+        error,
+        loading,
+        passwordRecoveryRequired,
+        signUp,
+        signIn,
+        requestPasswordReset,
+        completePasswordRecovery,
+        signOut,
+        deleteAccount,
+      }}
     >
       {children}
     </AuthContext.Provider>

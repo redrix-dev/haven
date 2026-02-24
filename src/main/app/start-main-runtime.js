@@ -1,7 +1,17 @@
+const path = require('node:path');
 const { createRendererEntryService } = require('../renderer-entry-service');
 const { registerDesktopIpcHandlers } = require('../ipc/register-desktop-ipc-handlers');
 const { registerRendererDocumentHeaderPolicy } = require('./register-header-policy');
 const { registerPermissionHandlers } = require('./register-permission-handlers');
+
+const registerHavenProtocolClient = (app) => {
+  if (process.platform === 'win32' && process.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('haven', process.execPath, [path.resolve(process.argv[1])]);
+    return;
+  }
+
+  app.setAsDefaultProtocolClient('haven');
+};
 
 const startMainRuntime = async ({
   app,
@@ -15,7 +25,7 @@ const startMainRuntime = async ({
   devRendererEntryPortOverride,
   mainWindowWebpackEntry,
 }) => {
-  app.setAsDefaultProtocolClient('haven');
+  registerHavenProtocolClient(app);
   settingsStore.initialize();
   updaterService.initialize();
 
