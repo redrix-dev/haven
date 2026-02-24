@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DirectMessageArea } from '@/components/DirectMessageArea';
 import type { DirectMessageConversationSummary } from '@/lib/backend/types';
@@ -55,17 +55,16 @@ describe('DirectMessageArea', () => {
   it('invokes block handler when confirmed', async () => {
     const user = userEvent.setup();
     const onBlockUser = vi.fn().mockResolvedValue(undefined);
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderArea({ onBlockUser });
 
     await user.click(screen.getByRole('button', { name: /^block$/i }));
+    const confirmDialog = await screen.findByRole('alertdialog');
+    await user.click(within(confirmDialog).getByRole('button', { name: /^block$/i }));
 
     expect(onBlockUser).toHaveBeenCalledWith({
       userId: 'user-2',
       username: 'FriendUser',
     });
-
-    confirmSpy.mockRestore();
   });
 });
