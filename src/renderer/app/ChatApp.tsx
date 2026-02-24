@@ -61,7 +61,6 @@ import {
   VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL,
 } from '@/renderer/app/constants';
 import type {
-  ChannelMessageBundleCacheEntry,
   FriendsPanelTab,
   PendingUiConfirmation,
   VoicePresenceStateRow,
@@ -78,6 +77,7 @@ import { useCommunityWorkspace } from '@/renderer/features/community/hooks/useCo
 import { useServerAdmin } from '@/renderer/features/community/hooks/useServerAdmin';
 import { useChannelManagement } from '@/renderer/features/community/hooks/useChannelManagement';
 import { useChannelGroups } from '@/renderer/features/community/hooks/useChannelGroups';
+import { useMessages } from '@/renderer/features/messages/hooks/useMessages';
 import { useFeatureFlags } from '@/renderer/features/session/hooks/useFeatureFlags';
 import { usePlatformSession } from '@/renderer/features/session/hooks/usePlatformSession';
 import type { NotificationAudioSettings } from '@/shared/desktop/types';
@@ -96,8 +96,6 @@ import type {
   NotificationPreferences,
   NotificationPreferenceUpdate,
   MessageReaction,
-  MessageReportKind,
-  MessageReportTarget,
   Message,
   SocialCounts,
 } from '@/lib/backend/types';
@@ -128,8 +126,6 @@ export function ChatApp() {
   const [messageReactions, setMessageReactions] = useState<MessageReaction[]>([]);
   const [messageAttachments, setMessageAttachments] = useState<MessageAttachment[]>([]);
   const [messageLinkPreviews, setMessageLinkPreviews] = useState<MessageLinkPreview[]>([]);
-  const [hasOlderMessages, setHasOlderMessages] = useState(false);
-  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
   const [authorProfiles, setAuthorProfiles] = useState<Record<string, AuthorProfile>>({});
   const {
     state: { featureFlags },
@@ -268,18 +264,13 @@ export function ChatApp() {
       openServerMembersModal,
       refreshMembersModalMembersIfOpen,
       resetCommunityBans,
-      clearCommunityBansError,
       loadCommunityBans,
       unbanUserFromCurrentServer,
       resetServerInvites,
-      clearServerInvitesError,
-      setServerInvitesError,
       loadServerInvites,
       createServerInvite,
       revokeServerInvite,
       resetServerRoleManagement,
-      clearServerRoleManagementError,
-      setServerRoleManagementError,
       loadServerRoleManagement,
       createServerRole,
       updateServerRole,
@@ -287,10 +278,8 @@ export function ChatApp() {
       saveServerRolePermissions,
       saveServerMemberRoles,
       resetServerSettingsState,
-      clearServerSettingsLoadError,
-      setServerSettingsLoadError,
-      loadServerSettings,
       saveServerSettings,
+      openServerSettingsModal,
       leaveServer,
       deleteServer,
       renameServer,
@@ -301,7 +290,10 @@ export function ChatApp() {
     currentServerId,
     currentUserId: user?.id ?? null,
     canManageDeveloperAccess: serverPermissions.canManageDeveloperAccess,
+    canManageInvites: serverPermissions.canManageInvites,
     isServerSettingsModalOpen: showServerSettingsModal,
+    setCurrentServerId,
+    setShowServerSettingsModal,
     refreshServers,
     onActiveServerRemoved: () => {
       setCurrentServerId(null);
@@ -339,6 +331,42 @@ export function ChatApp() {
     setCurrentChannelId,
     setChannelSettingsTargetId,
     setShowChannelSettingsModal,
+  });
+  const {
+    state: { hasOlderMessages, isLoadingOlderMessages },
+    actions: {
+      setRequestOlderMessagesLoader,
+      clearRequestOlderMessagesLoader,
+      getCachedChannelBundle,
+      cacheChannelBundle,
+      fetchMessageAttachmentsForMessageIds,
+      fetchMessageLinkPreviewsForMessageIds,
+      runMessageMediaMaintenance: runMessageMediaMaintenanceFromHook,
+      getMessageLoadRuntime,
+      isCurrentMessageLoad,
+      syncOldestLoadedCursor,
+      syncLoadedMessageWindow,
+      loadLatestMessagesWithRelated,
+      loadOlderMessagesWithRelated,
+      finishOlderMessagesLoad,
+      resetMessageState,
+      requestOlderMessages,
+      sendMessage,
+      toggleMessageReaction,
+      editMessage,
+      deleteMessage,
+      reportMessage,
+      requestMessageLinkPreviewRefresh,
+    },
+  } = useMessages({
+    currentServerId,
+    currentChannelId,
+    currentUserId: user?.id ?? null,
+    channels,
+    setMessages,
+    setMessageReactions,
+    setMessageAttachments,
+    setMessageLinkPreviews,
   });
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
@@ -389,8 +417,6 @@ export function ChatApp() {
   } = useDesktopSettings();
   const [composerHeight, setComposerHeight] = useState<number | null>(null);
   const authorProfileCacheRef = useRef<Record<string, AuthorProfile>>({});
-  const requestOlderMessagesRef = useRef<(() => Promise<void>) | null>(null);
-  const messageBundleByChannelCacheRef = useRef<Record<string, ChannelMessageBundleCacheEntry>>({});
   const dmReadMarkInFlightRef = useRef<Record<string, boolean>>({});
   const dmLastReadMarkAtRef = useRef<Record<string, number>>({});
   const knownNotificationRecipientIdsRef = useRef<Set<string>>(new Set());
@@ -405,7 +431,6 @@ export function ChatApp() {
   const dmWorkspaceIsActive = dmWorkspaceEnabled && workspaceMode === 'dm';
   const dmReportReviewPanelEnabled = isPlatformStaff && hasFeatureFlag(DM_REPORT_REVIEW_PANEL_FLAG);
   const voiceHardwareDebugPanelEnabled = hasFeatureFlag(VOICE_HARDWARE_DEBUG_PANEL_FLAG);
-  const getChannelBundleCacheKey = (communityId: string, channelId: string) => `${communityId}:${channelId}`;
 
   useEffect(() => {
     installPromptTrap();
@@ -473,15 +498,9 @@ export function ChatApp() {
     });
     setVoiceControlActions(null);
     setVoiceJoinPrompt(null);
-    setMessages([]);
-    setMessageReactions([]);
-    setMessageAttachments([]);
-    setMessageLinkPreviews([]);
-    setHasOlderMessages(false);
-    setIsLoadingOlderMessages(false);
+    resetMessageState();
     setAuthorProfiles({});
     authorProfileCacheRef.current = {};
-    requestOlderMessagesRef.current = null;
     knownNotificationRecipientIdsRef.current = new Set();
     notificationsBootstrappedRef.current = false;
     resetFeatureFlags();
@@ -530,6 +549,7 @@ export function ChatApp() {
     resetChannelPermissionsState,
     resetFeatureFlags,
     resetCommunityBans,
+    resetMessageState,
     resetMembersModal,
     resetPlatformSession,
     resetServerSettingsState,
@@ -1110,14 +1130,8 @@ export function ChatApp() {
     let isMounted = true;
 
     if (!user || !currentServerId || !currentChannelId) {
-      setMessages([]);
-      setMessageReactions([]);
-      setMessageAttachments([]);
-      setMessageLinkPreviews([]);
+      resetMessageState();
       setAuthorProfiles({});
-      setHasOlderMessages(false);
-      setIsLoadingOlderMessages(false);
-      requestOlderMessagesRef.current = null;
       return;
     }
 
@@ -1127,30 +1141,19 @@ export function ChatApp() {
     }
 
     if (selectedChannel.kind !== 'text') {
-      setMessages([]);
-      setMessageReactions([]);
-      setMessageAttachments([]);
-      setMessageLinkPreviews([]);
+      resetMessageState();
       setAuthorProfiles({});
-      setHasOlderMessages(false);
-      setIsLoadingOlderMessages(false);
-      requestOlderMessagesRef.current = null;
       return;
     }
 
     const communityBackend = getCommunityDataBackend(currentServerId);
-    const channelBundleCacheKey = getChannelBundleCacheKey(currentServerId, currentChannelId);
-    let latestLoadId = 0;
     let activeLoadPromise: Promise<void> | null = null;
     let scheduledReloadTimerId: number | null = null;
     const pendingReloadReasons = new Set<string>();
-    let olderLoadInFlight = false;
     let currentMessageList: Message[] = [];
     let currentReactionList: MessageReaction[] = [];
     let currentAttachmentList: MessageAttachment[] = [];
     let currentLinkPreviewList: MessageLinkPreview[] = [];
-    let currentHasOlderMessages = false;
-    let oldestLoadedCursor: { createdAt: string; id: string } | null = null;
     let latestAuthorSyncId = 0;
     let pendingAttachmentRefreshTimerId: number | null = null;
     let pendingLinkPreviewRefreshTimerId: number | null = null;
@@ -1208,13 +1211,14 @@ export function ChatApp() {
     };
 
     const persistCurrentChannelBundleCache = () => {
-      messageBundleByChannelCacheRef.current[channelBundleCacheKey] = {
+      const { hasOlderMessages: runtimeHasOlderMessages } = getMessageLoadRuntime();
+      cacheChannelBundle(currentServerId, currentChannelId, {
         messages: currentMessageList,
         reactions: currentReactionList,
         attachments: currentAttachmentList,
         linkPreviews: currentLinkPreviewList,
-        hasOlderMessages: currentHasOlderMessages,
-      };
+        hasOlderMessages: runtimeHasOlderMessages,
+      });
     };
 
     const updateAuthorProfilesForMessages = async (messageList: Message[]) => {
@@ -1264,30 +1268,22 @@ export function ChatApp() {
       linkPreviewList: MessageLinkPreview[];
       hasOlder: boolean;
     }) => {
-      if (!isMounted || input.loadId !== latestLoadId) return;
+      if (!isMounted || !isCurrentMessageLoad(input.loadId)) return;
 
       currentMessageList = input.messageList;
       currentReactionList = input.reactionList;
       currentAttachmentList = input.attachmentList;
       currentLinkPreviewList = input.linkPreviewList;
-      currentHasOlderMessages = input.hasOlder;
-      oldestLoadedCursor =
-        input.messageList.length > 0
-          ? {
-              createdAt: input.messageList[0].created_at,
-              id: input.messageList[0].id,
-            }
-          : null;
+      syncLoadedMessageWindow(input.messageList, input.hasOlder);
 
       setMessages(input.messageList);
       setMessageReactions(input.reactionList);
       setMessageAttachments(input.attachmentList);
       setMessageLinkPreviews(input.linkPreviewList);
-      setHasOlderMessages(input.hasOlder);
       persistCurrentChannelBundleCache();
 
       const { authorCount, fetchedAuthorCount } = await updateAuthorProfilesForMessages(input.messageList);
-      if (!isMounted || input.loadId !== latestLoadId) return;
+      if (!isMounted || !isCurrentMessageLoad(input.loadId)) return;
 
       logReload('load:success', {
         reason: input.reason,
@@ -1322,8 +1318,7 @@ export function ChatApp() {
 
     const commitMessages = (nextMessages: Message[], reason: string) => {
       currentMessageList = nextMessages;
-      oldestLoadedCursor =
-        nextMessages.length > 0 ? { createdAt: nextMessages[0].created_at, id: nextMessages[0].id } : null;
+      syncOldestLoadedCursor(nextMessages);
       persistCurrentChannelBundleCache();
       if (!isMounted) return;
       setMessages(nextMessages);
@@ -1352,62 +1347,26 @@ export function ChatApp() {
     };
 
     const hydrateChannelBundleFromCache = () => {
-      const cachedBundle = messageBundleByChannelCacheRef.current[channelBundleCacheKey];
+      const cachedBundle = getCachedChannelBundle(currentServerId, currentChannelId);
       if (!cachedBundle) return false;
 
       currentMessageList = cachedBundle.messages;
       currentReactionList = cachedBundle.reactions;
       currentAttachmentList = cachedBundle.attachments;
       currentLinkPreviewList = cachedBundle.linkPreviews;
-      currentHasOlderMessages = cachedBundle.hasOlderMessages;
-      oldestLoadedCursor =
-        cachedBundle.messages.length > 0
-          ? { createdAt: cachedBundle.messages[0].created_at, id: cachedBundle.messages[0].id }
-          : null;
+      syncLoadedMessageWindow(cachedBundle.messages, cachedBundle.hasOlderMessages);
 
       if (!isMounted) return true;
       setMessages(cachedBundle.messages);
       setMessageReactions(cachedBundle.reactions);
       setMessageAttachments(cachedBundle.attachments);
       setMessageLinkPreviews(cachedBundle.linkPreviews);
-      setHasOlderMessages(cachedBundle.hasOlderMessages);
       scheduleAuthorProfileSyncForCurrentMessages('channel_cache_hydrate');
       logReload('cache:hydrate', {
         messageCount: cachedBundle.messages.length,
         hasOlderMessages: cachedBundle.hasOlderMessages,
       });
       return true;
-    };
-
-    const fetchRelatedForMessages = async (messageList: Message[]) => {
-      const messageIds = messageList.map((message) => message.id);
-      if (messageIds.length === 0) {
-        return {
-          reactionList: [] as MessageReaction[],
-          attachmentList: [] as MessageAttachment[],
-          linkPreviewList: [] as MessageLinkPreview[],
-        };
-      }
-
-      const [reactionList, attachmentList, linkPreviewList] = await Promise.all([
-        communityBackend.listMessageReactionsForMessages({
-          communityId: currentServerId,
-          channelId: currentChannelId,
-          messageIds,
-        }),
-        communityBackend.listMessageAttachmentsForMessages({
-          communityId: currentServerId,
-          channelId: currentChannelId,
-          messageIds,
-        }),
-        communityBackend.listMessageLinkPreviewsForMessages({
-          communityId: currentServerId,
-          channelId: currentChannelId,
-          messageIds,
-        }),
-      ]);
-
-      return { reactionList, attachmentList, linkPreviewList };
     };
 
     const mergeAttachmentsForMessageIds = async (messageIds: string[]) => {
@@ -1420,11 +1379,7 @@ export function ChatApp() {
       );
       if (uniqueMessageIds.length === 0) return;
 
-      const refreshedRows = await communityBackend.listMessageAttachmentsForMessages({
-        communityId: currentServerId,
-        channelId: currentChannelId,
-        messageIds: uniqueMessageIds,
-      });
+      const refreshedRows = await fetchMessageAttachmentsForMessageIds(uniqueMessageIds);
 
       const nextAttachments = [
         ...currentAttachmentList.filter((attachment) => !uniqueMessageIds.includes(attachment.messageId)),
@@ -1450,11 +1405,7 @@ export function ChatApp() {
       );
       if (uniqueMessageIds.length === 0) return;
 
-      const refreshedRows = await communityBackend.listMessageLinkPreviewsForMessages({
-        communityId: currentServerId,
-        channelId: currentChannelId,
-        messageIds: uniqueMessageIds,
-      });
+      const refreshedRows = await fetchMessageLinkPreviewsForMessageIds(uniqueMessageIds);
 
       const nextLinkPreviews = [
         ...currentLinkPreviewList.filter((preview) => !uniqueMessageIds.includes(preview.messageId)),
@@ -1653,64 +1604,33 @@ export function ChatApp() {
       return true;
     };
 
-    const fetchLatestMessageWindow = async (targetCount: number) => {
-      const boundedTargetCount = Math.max(Math.floor(targetCount), MESSAGE_PAGE_SIZE);
-      let beforeCursor: { createdAt: string; id: string } | null = null;
-      let aggregatedMessages: Message[] = [];
-      let hasMore = false;
-
-      while (aggregatedMessages.length < boundedTargetCount) {
-        const remaining = boundedTargetCount - aggregatedMessages.length;
-        const page = await communityBackend.listMessagesPage({
-          communityId: currentServerId,
-          channelId: currentChannelId,
-          beforeCursor,
-          limit: Math.min(MESSAGE_PAGE_SIZE, remaining),
-        });
-
-        if (page.messages.length === 0) {
-          hasMore = false;
-          break;
-        }
-
-        aggregatedMessages = [...page.messages, ...aggregatedMessages];
-        hasMore = page.hasMore;
-
-        if (!page.hasMore) {
-          break;
-        }
-
-        const nextOldest = page.messages[0];
-        beforeCursor = nextOldest
-          ? { createdAt: nextOldest.created_at, id: nextOldest.id }
-          : null;
-        if (!beforeCursor) break;
-      }
-
-      return { messageList: aggregatedMessages, hasMore };
-    };
-
     const loadMessages = async (reason: string) => {
-      const loadId = ++latestLoadId;
-      const startedAt = Date.now();
-      logReload('load:start', { reason, loadId });
+      let loadId: number | null = null;
+      let startedAt = Date.now();
       try {
-        const targetCount = Math.max(currentMessageList.length, MESSAGE_PAGE_SIZE);
-        const { messageList, hasMore } = await fetchLatestMessageWindow(targetCount);
-        const { reactionList, attachmentList, linkPreviewList } = await fetchRelatedForMessages(messageList);
+        const loadedBundle = await loadLatestMessagesWithRelated(currentMessageList.length);
+        loadId = loadedBundle.loadId;
+        startedAt = loadedBundle.startedAt;
+        logReload('load:start', { reason, loadId });
 
         await updateMessageBundleState({
           reason,
-          loadId,
-          startedAt,
-          messageList,
-          reactionList,
-          attachmentList,
-          linkPreviewList,
-          hasOlder: hasMore,
+          loadId: loadedBundle.loadId,
+          startedAt: loadedBundle.startedAt,
+          messageList: loadedBundle.messageList,
+          reactionList: loadedBundle.reactionList,
+          attachmentList: loadedBundle.attachmentList,
+          linkPreviewList: loadedBundle.linkPreviewList,
+          hasOlder: loadedBundle.hasOlder,
         });
       } catch (error) {
-        if (!isMounted || loadId !== latestLoadId) return;
+        if (loadId == null) {
+          if (isMounted) {
+            console.error('Error loading messages:', error);
+          }
+          return;
+        }
+        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
         console.error('Error loading messages:', error);
         logReload('load:error', {
           reason,
@@ -1723,32 +1643,28 @@ export function ChatApp() {
 
     const loadOlderMessages = async () => {
       if (!isMounted) return;
-      if (olderLoadInFlight) return;
-      if (!currentHasOlderMessages || !oldestLoadedCursor) return;
-
-      olderLoadInFlight = true;
-      setIsLoadingOlderMessages(true);
-      const loadId = ++latestLoadId;
-      const startedAt = Date.now();
-      logReload('load-older:start', {
-        loadId,
-        cursorCreatedAt: oldestLoadedCursor.createdAt,
-        cursorId: oldestLoadedCursor.id,
-        currentMessageCount: currentMessageList.length,
-      });
+      let loadResult:
+        | Awaited<ReturnType<typeof loadOlderMessagesWithRelated>>
+        | null = null;
+      let loadId: number | null = null;
+      let startedAt = Date.now();
 
       try {
-        const page = await communityBackend.listMessagesPage({
-          communityId: currentServerId,
-          channelId: currentChannelId,
-          beforeCursor: oldestLoadedCursor,
-          limit: MESSAGE_PAGE_SIZE,
+        loadResult = await loadOlderMessagesWithRelated(currentMessageList);
+        if (loadResult.kind === 'skipped') return;
+
+        loadId = loadResult.loadId;
+        startedAt = loadResult.startedAt;
+        logReload('load-older:start', {
+          loadId,
+          cursorCreatedAt: loadResult.oldestLoadedCursor.createdAt,
+          cursorId: loadResult.oldestLoadedCursor.id,
+          currentMessageCount: currentMessageList.length,
         });
 
-        if (page.messages.length === 0) {
-          if (!isMounted || loadId !== latestLoadId) return;
-          currentHasOlderMessages = false;
-          setHasOlderMessages(false);
+        if (loadResult.kind === 'no_more') {
+          if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+          syncLoadedMessageWindow(currentMessageList, false);
           logReload('load-older:complete', {
             loadId,
             addedCount: 0,
@@ -1758,31 +1674,32 @@ export function ChatApp() {
           return;
         }
 
-        const existingIds = new Set(currentMessageList.map((message) => message.id));
-        const prependMessages = page.messages.filter((message) => !existingIds.has(message.id));
-        const nextMessageList = [...prependMessages, ...currentMessageList];
-        const { reactionList, attachmentList, linkPreviewList } = await fetchRelatedForMessages(nextMessageList);
-
         await updateMessageBundleState({
           reason: 'load_older',
           loadId,
           startedAt,
-          messageList: nextMessageList,
-          reactionList,
-          attachmentList,
-          linkPreviewList,
-          hasOlder: page.hasMore,
+          messageList: loadResult.messageList,
+          reactionList: loadResult.reactionList,
+          attachmentList: loadResult.attachmentList,
+          linkPreviewList: loadResult.linkPreviewList,
+          hasOlder: loadResult.hasOlder,
         });
 
-        if (!isMounted || loadId !== latestLoadId) return;
+        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
         logReload('load-older:complete', {
           loadId,
-          addedCount: prependMessages.length,
+          addedCount: loadResult.prependCount,
           durationMs: Date.now() - startedAt,
-          hasOlderMessages: page.hasMore,
+          hasOlderMessages: loadResult.hasOlder,
         });
       } catch (error) {
-        if (!isMounted || loadId !== latestLoadId) return;
+        if (loadId == null) {
+          if (isMounted) {
+            console.error('Error loading older messages:', error);
+          }
+          return;
+        }
+        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
         console.error('Error loading older messages:', error);
         logReload('load-older:error', {
           loadId,
@@ -1791,14 +1708,11 @@ export function ChatApp() {
         });
         throw error;
       } finally {
-        if (isMounted) {
-          setIsLoadingOlderMessages(false);
-        }
-        olderLoadInFlight = false;
+        finishOlderMessagesLoad({ updateUi: isMounted });
       }
     };
 
-    requestOlderMessagesRef.current = loadOlderMessages;
+    setRequestOlderMessagesLoader(loadOlderMessages);
 
     const flushScheduledMessageReload = () => {
       if (!isMounted) return;
@@ -1840,7 +1754,7 @@ export function ChatApp() {
 
     const runMessageMediaMaintenance = async () => {
       try {
-        const result = await communityBackend.runMessageMediaMaintenance(100);
+        const result = await runMessageMediaMaintenanceFromHook(100);
         if (!isMounted) return;
         if ((result.deletedMessages ?? 0) > 0) {
           logReload('maintenance:deleted', {
@@ -1920,7 +1834,7 @@ export function ChatApp() {
 
     return () => {
       isMounted = false;
-      requestOlderMessagesRef.current = null;
+      clearRequestOlderMessagesLoader();
       pendingReloadReasons.clear();
       if (scheduledReloadTimerId !== null) {
         window.clearTimeout(scheduledReloadTimerId);
@@ -1942,7 +1856,27 @@ export function ChatApp() {
       window.removeEventListener('focus', handleWindowFocus);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [user?.id, currentServerId, currentChannelId, currentChannelKind, debugChannelReloads]);
+  }, [
+    user?.id,
+    currentServerId,
+    currentChannelId,
+    currentChannelKind,
+    debugChannelReloads,
+    getCachedChannelBundle,
+    cacheChannelBundle,
+    fetchMessageAttachmentsForMessageIds,
+    fetchMessageLinkPreviewsForMessageIds,
+    runMessageMediaMaintenanceFromHook,
+    getMessageLoadRuntime,
+    isCurrentMessageLoad,
+    syncOldestLoadedCursor,
+    syncLoadedMessageWindow,
+    loadLatestMessagesWithRelated,
+    loadOlderMessagesWithRelated,
+    finishOlderMessagesLoad,
+    setRequestOlderMessagesLoader,
+    clearRequestOlderMessagesLoader,
+  ]);
 
   // Determine whether Haven Developer messaging is allowed in the current channel.
   useEffect(() => {
@@ -2034,53 +1968,6 @@ export function ChatApp() {
     return maybeFromPath.toUpperCase();
   };
 
-  const openServerSettingsModal = async (communityIdOverride?: string) => {
-    const targetCommunityId = communityIdOverride ?? currentServerId;
-    if (!targetCommunityId) return;
-    if (targetCommunityId !== currentServerId) {
-      setCurrentServerId(targetCommunityId);
-      return;
-    }
-
-    setShowServerSettingsModal(true);
-    resetServerSettingsState();
-    clearServerSettingsLoadError();
-    clearServerInvitesError();
-    clearServerRoleManagementError();
-    clearCommunityBansError();
-
-    try {
-      await loadServerSettings(targetCommunityId);
-    } catch (error: unknown) {
-      console.error('Failed to load server settings:', error);
-      setServerSettingsLoadError(getErrorMessage(error, 'Failed to load server settings.'));
-    }
-
-    if (serverPermissions.canManageInvites) {
-      try {
-        await loadServerInvites(targetCommunityId);
-      } catch (error: unknown) {
-        console.error('Failed to load server invites:', error);
-        setServerInvitesError(getErrorMessage(error, 'Failed to load server invites.'));
-      }
-    } else {
-      resetServerInvites();
-    }
-
-    try {
-      await loadServerRoleManagement(targetCommunityId);
-    } catch (error: unknown) {
-      console.error('Failed to load server role management:', error);
-      setServerRoleManagementError(getErrorMessage(error, 'Failed to load server roles and members.'));
-    }
-
-    try {
-      await loadCommunityBans(targetCommunityId);
-    } catch (error: unknown) {
-      console.error('Failed to load community bans:', error);
-    }
-  };
-
   async function joinServerByInvite(inviteInput: string): Promise<{
     communityName: string;
     joined: boolean;
@@ -2099,109 +1986,6 @@ export function ChatApp() {
       communityName: redeemedInvite.communityName,
       joined: redeemedInvite.joined,
     };
-  }
-
-  async function sendMessage(
-    content: string,
-    options?: { replyToMessageId?: string; mediaFile?: File; mediaExpiresInHours?: number }
-  ) {
-    if (!user || !currentChannelId || !currentServerId) return;
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.sendUserMessage({
-      communityId: currentServerId,
-      channelId: currentChannelId,
-      userId: user.id,
-      content,
-      replyToMessageId: options?.replyToMessageId,
-      mediaUpload: options?.mediaFile
-        ? {
-            file: options.mediaFile,
-            expiresInHours: options.mediaExpiresInHours,
-          }
-        : undefined,
-    });
-  }
-
-  async function toggleMessageReaction(messageId: string, emoji: string) {
-    if (!currentServerId || !currentChannelId) throw new Error('No channel selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.toggleMessageReaction({
-      communityId: currentServerId,
-      channelId: currentChannelId,
-      messageId,
-      emoji,
-    });
-  }
-
-  async function editMessage(messageId: string, content: string) {
-    if (!currentServerId) throw new Error('No server selected.');
-    const trimmedContent = content.trim();
-    if (!trimmedContent) throw new Error('Message content is required.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.editUserMessage({
-      communityId: currentServerId,
-      messageId,
-      content: trimmedContent,
-    });
-  }
-
-  async function deleteMessage(messageId: string) {
-    if (!currentServerId) throw new Error('No server selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.deleteMessage({
-      communityId: currentServerId,
-      messageId,
-    });
-    setMessages((prev) => prev.filter((message) => message.id !== messageId));
-    setMessageReactions((prev) => prev.filter((reaction) => reaction.messageId !== messageId));
-    setMessageAttachments((prev) => prev.filter((attachment) => attachment.messageId !== messageId));
-    setMessageLinkPreviews((prev) => prev.filter((preview) => preview.messageId !== messageId));
-  }
-
-  async function reportMessage(input: {
-    messageId: string;
-    target: MessageReportTarget;
-    kind: MessageReportKind;
-    comment: string;
-  }) {
-    if (!user || !currentServerId || !currentChannelId) throw new Error('No channel selected.');
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.reportMessage({
-      communityId: currentServerId,
-      channelId: currentChannelId,
-      messageId: input.messageId,
-      reporterUserId: user.id,
-      target: input.target,
-      kind: input.kind,
-      comment: input.comment,
-    });
-  }
-
-  async function requestMessageLinkPreviewRefresh(messageId: string) {
-    if (!currentServerId || !currentChannelId) throw new Error('No channel selected.');
-
-    const selectedChannel = channels.find((channel) => channel.id === currentChannelId);
-    if (!selectedChannel || selectedChannel.kind !== 'text') {
-      throw new Error('Link previews can only be refreshed in text channels.');
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    await communityBackend.requestChannelLinkPreviewBackfill({
-      communityId: currentServerId,
-      channelId: currentChannelId,
-      messageIds: [messageId],
-    });
-  }
-
-  async function requestOlderMessages() {
-    const loader = requestOlderMessagesRef.current;
-    if (!loader) return;
-    await loader();
   }
 
   async function saveAttachment(attachment: MessageAttachment) {

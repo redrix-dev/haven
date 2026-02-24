@@ -20,7 +20,10 @@ type UseServerAdminInput = {
   currentServerId: string | null;
   currentUserId: string | null;
   canManageDeveloperAccess: boolean;
+  canManageInvites: boolean;
   isServerSettingsModalOpen: boolean;
+  setCurrentServerId: React.Dispatch<React.SetStateAction<string | null>>;
+  setShowServerSettingsModal: React.Dispatch<React.SetStateAction<boolean>>;
   refreshServers: () => Promise<void>;
   onActiveServerRemoved: () => void;
 };
@@ -31,7 +34,10 @@ export function useServerAdmin({
   currentServerId,
   currentUserId,
   canManageDeveloperAccess,
+  canManageInvites,
   isServerSettingsModalOpen,
+  setCurrentServerId,
+  setShowServerSettingsModal,
   refreshServers,
   onActiveServerRemoved,
 }: UseServerAdminInput) {
@@ -334,6 +340,69 @@ export function useServerAdmin({
     ]
   );
 
+  const openServerSettingsModal = React.useCallback(
+    async (communityIdOverride?: string) => {
+      const targetCommunityId = communityIdOverride ?? currentServerId;
+      if (!targetCommunityId) return;
+      if (targetCommunityId !== currentServerId) {
+        setCurrentServerId(targetCommunityId);
+        return;
+      }
+
+      setShowServerSettingsModal(true);
+      resetServerSettingsState();
+      clearServerInvitesError();
+      clearServerRoleManagementError();
+      clearCommunityBansError();
+
+      try {
+        await loadServerSettings(targetCommunityId);
+      } catch (error: unknown) {
+        console.error('Failed to load server settings:', error);
+        setServerSettingsLoadError(getErrorMessage(error, 'Failed to load server settings.'));
+      }
+
+      if (canManageInvites) {
+        try {
+          await loadServerInvites(targetCommunityId);
+        } catch (error: unknown) {
+          console.error('Failed to load server invites:', error);
+          setServerInvitesError(getErrorMessage(error, 'Failed to load server invites.'));
+        }
+      } else {
+        resetServerInvites();
+      }
+
+      try {
+        await loadServerRoleManagement(targetCommunityId);
+      } catch (error: unknown) {
+        console.error('Failed to load server role management:', error);
+        setServerRoleManagementError(getErrorMessage(error, 'Failed to load server roles and members.'));
+      }
+
+      try {
+        await loadCommunityBans(targetCommunityId);
+      } catch (error: unknown) {
+        console.error('Failed to load community bans:', error);
+      }
+    },
+    [
+      canManageInvites,
+      clearCommunityBansError,
+      clearServerInvitesError,
+      clearServerRoleManagementError,
+      currentServerId,
+      loadCommunityBans,
+      loadServerInvites,
+      loadServerRoleManagement,
+      loadServerSettings,
+      resetServerInvites,
+      resetServerSettingsState,
+      setCurrentServerId,
+      setShowServerSettingsModal,
+    ]
+  );
+
   const revokeServerInvite = React.useCallback(
     async (inviteId: string): Promise<void> => {
       if (!currentServerId) throw new Error('No server selected.');
@@ -526,10 +595,6 @@ export function useServerAdmin({
     },
     derived: {},
     actions: {
-      setMembersModalMembers, // temporary compatibility for incremental extraction
-      setServerInvitesError, // temporary compatibility for incremental extraction
-      setServerRoleManagementError, // temporary compatibility for incremental extraction
-      setServerSettingsLoadError, // temporary compatibility for incremental extraction
       resetMembersModal,
       closeMembersModal,
       openServerMembersModal,
@@ -556,6 +621,7 @@ export function useServerAdmin({
       clearServerSettingsLoadError,
       loadServerSettings,
       saveServerSettings,
+      openServerSettingsModal,
       leaveServer,
       deleteServer,
       renameServer,
