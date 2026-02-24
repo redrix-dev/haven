@@ -2,6 +2,16 @@ import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { DmReportModal, type DmReportTarget } from '@/components/DmReportModal';
@@ -85,6 +95,10 @@ export function DirectMessageArea({
   const [actionNotice, setActionNotice] = React.useState<string | null>(null);
   const [blockingUser, setBlockingUser] = React.useState(false);
   const [reportTarget, setReportTarget] = React.useState<DmReportTarget | null>(null);
+  const [pendingBlockConfirm, setPendingBlockConfirm] = React.useState<{
+    userId: string;
+    username: string;
+  } | null>(null);
   const scrollAreaRootRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
@@ -93,6 +107,7 @@ export function DirectMessageArea({
     setActionNotice(null);
     setBlockingUser(false);
     setReportTarget(null);
+    setPendingBlockConfirm(null);
   }, [conversation?.conversationId]);
 
   React.useEffect(() => {
@@ -122,23 +137,29 @@ export function DirectMessageArea({
     void handleSend();
   };
 
-  const handleBlockUser = async () => {
+  const handleBlockUser = () => {
     if (!conversation?.otherUserId) return;
     const targetUsername = conversation.otherUsername?.trim() || 'this user';
-    const confirmed = window.confirm(
-      `Block "${targetUsername}"? This removes the friendship, cancels pending requests, and blocks future DMs.`
-    );
-    if (!confirmed) return;
+    setPendingBlockConfirm({
+      userId: conversation.otherUserId,
+      username: targetUsername,
+    });
+  };
+
+  const confirmBlockUser = async () => {
+    if (!pendingBlockConfirm) return;
+    const { userId, username } = pendingBlockConfirm;
+    setPendingBlockConfirm(null);
 
     setActionError(null);
     setActionNotice(null);
     setBlockingUser(true);
     try {
       await onBlockUser({
-        userId: conversation.otherUserId,
-        username: targetUsername,
+        userId,
+        username,
       });
-      setActionNotice(`Blocked ${targetUsername}.`);
+      setActionNotice(`Blocked ${username}.`);
     } catch (error) {
       setActionError(getUiErrorMessage(error, 'Failed to block user.'));
     } finally {
@@ -229,7 +250,7 @@ export function DirectMessageArea({
               variant="outline"
               className="border-[#5f3544] text-[#ffd4df] hover:bg-[#341f2a]"
               onClick={() => {
-                void handleBlockUser();
+                handleBlockUser();
               }}
               disabled={blockingUser || !conversation.otherUserId}
             >
@@ -356,6 +377,43 @@ export function DirectMessageArea({
         target={reportTarget}
         onSubmit={handleReportSubmit}
       />
+
+      <AlertDialog
+        open={Boolean(pendingBlockConfirm)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingBlockConfirm(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Block User?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a9b8cf]">
+              {pendingBlockConfirm
+                ? `Block "${pendingBlockConfirm.username}"? This removes the friendship, cancels pending requests, and blocks future DMs.`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={blockingUser}
+              className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={blockingUser}
+              onClick={() => {
+                void confirmBlockUser();
+              }}
+            >
+              {blockingUser ? 'Blocking...' : 'Block'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

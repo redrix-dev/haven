@@ -1,4 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -39,6 +49,9 @@ type RoleDraft = {
   position: number;
   permissionKeys: string[];
 };
+type ServerSettingsConfirmState =
+  | { kind: 'deleteRole'; roleId: string; roleName: string }
+  | { kind: 'unbanUser'; targetUserId: string; username: string };
 
 export interface ServerSettingsValues {
   name: string;
@@ -169,6 +182,7 @@ export function ServerSettingsModal({
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [unbanActionError, setUnbanActionError] = useState<string | null>(null);
   const [unbanBusyUserId, setUnbanBusyUserId] = useState<string | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<ServerSettingsConfirmState | null>(null);
 
   useEffect(() => {
     setValues(initialValues);
@@ -370,15 +384,20 @@ export function ServerSettingsModal({
     }
   };
 
-  const handleDeleteRole = async () => {
+  const handleDeleteRole = () => {
     if (!selectedRoleId || !selectedRole) return;
-    const confirmed = window.confirm(`Delete role \"${selectedRole.name}\"? This cannot be undone.`);
-    if (!confirmed) return;
+    setPendingConfirm({
+      kind: 'deleteRole',
+      roleId: selectedRoleId,
+      roleName: selectedRole.name,
+    });
+  };
 
+  const confirmDeleteRole = async (roleId: string) => {
     setRoleActionSaving(true);
     setRoleActionError(null);
     try {
-      await onDeleteRole(selectedRoleId);
+      await onDeleteRole(roleId);
       setSelectedRoleId(null);
     } catch (err: unknown) {
       setRoleActionError(getErrorMessage(err, 'Failed to delete role.'));
@@ -449,17 +468,21 @@ export function ServerSettingsModal({
     }
   };
 
-  const handleUnban = async (values: { targetUserId: string; username: string }) => {
+  const handleUnban = (values: { targetUserId: string; username: string }) => {
     if (!canManageBans) return;
+    setPendingConfirm({
+      kind: 'unbanUser',
+      targetUserId: values.targetUserId,
+      username: values.username,
+    });
+  };
 
-    const confirmed = window.confirm(`Unban "${values.username}" from this server?`);
-    if (!confirmed) return;
-
+  const confirmUnban = async (targetUserId: string) => {
     setUnbanActionError(null);
-    setUnbanBusyUserId(values.targetUserId);
+    setUnbanBusyUserId(targetUserId);
     try {
       await onUnbanUser({
-        targetUserId: values.targetUserId,
+        targetUserId,
         reason: null,
       });
     } catch (err: unknown) {
@@ -469,13 +492,32 @@ export function ServerSettingsModal({
     }
   };
 
+  const confirmPendingAction = async () => {
+    if (!pendingConfirm) return;
+    const nextConfirm = pendingConfirm;
+    setPendingConfirm(null);
+
+    if (nextConfirm.kind === 'deleteRole') {
+      await confirmDeleteRole(nextConfirm.roleId);
+      return;
+    }
+
+    await confirmUnban(nextConfirm.targetUserId);
+  };
+
+  const pendingConfirmBusy =
+    pendingConfirm?.kind === 'deleteRole'
+      ? roleActionSaving
+      : pendingConfirm?.kind === 'unbanUser' && unbanBusyUserId === pendingConfirm.targetUserId;
+
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        size="app"
-        className="bg-[#18243a] border-[#142033] text-white overflow-hidden"
-        showCloseButton={false}
-      >
+    <>
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent
+          size="app"
+          className="bg-[#18243a] border-[#142033] text-white overflow-hidden"
+          showCloseButton={false}
+        >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-white">Server Settings</DialogTitle>
         </DialogHeader>
@@ -1204,7 +1246,55 @@ export function ServerSettingsModal({
             Close
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={Boolean(pendingConfirm)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingConfirm(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingConfirm?.kind === 'deleteRole' ? 'Delete Role?' : 'Unban User?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a9b8cf]">
+              {pendingConfirm?.kind === 'deleteRole'
+                ? `Delete role "${pendingConfirm.roleName}"? This cannot be undone.`
+                : pendingConfirm
+                  ? `Unban "${pendingConfirm.username}" from this server?`
+                  : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={Boolean(pendingConfirmBusy)}
+              className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={Boolean(pendingConfirmBusy)}
+              onClick={() => {
+                void confirmPendingAction();
+              }}
+            >
+              {pendingConfirmBusy
+                ? pendingConfirm?.kind === 'deleteRole'
+                  ? 'Deleting...'
+                  : 'Unbanning...'
+                : pendingConfirm?.kind === 'deleteRole'
+                  ? 'Delete Role'
+                  : 'Unban'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

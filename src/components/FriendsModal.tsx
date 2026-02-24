@@ -1,5 +1,15 @@
 ﻿import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -28,6 +38,9 @@ type FriendsModalProps = {
 };
 
 type FriendsTab = 'friends' | 'add' | 'requests' | 'blocked';
+type FriendsConfirmState =
+  | { kind: 'removeFriend'; friendUserId: string; username: string }
+  | { kind: 'blockUser'; userId: string; username: string };
 
 const socialBackend = getSocialBackend();
 
@@ -76,6 +89,7 @@ export function FriendsModal({
   const [searchResults, setSearchResults] = React.useState<FriendSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = React.useState(false);
   const [searchError, setSearchError] = React.useState<string | null>(null);
+  const [pendingConfirm, setPendingConfirm] = React.useState<FriendsConfirmState | null>(null);
   const searchRequestIdRef = React.useRef(0);
 
   const incomingRequests = requests.filter((request) => request.direction === 'incoming');
@@ -120,6 +134,7 @@ export function FriendsModal({
       setActionError(null);
       setSearchError(null);
       setSearchLoading(false);
+      setPendingConfirm(null);
       return;
     }
 
@@ -233,20 +248,35 @@ export function FriendsModal({
     });
 
   const handleRemoveFriend = (friend: FriendSummary) => {
-    const confirmed = window.confirm(`Remove "${friend.username}" from your friends list?`);
-    if (!confirmed) return;
-    void runMutation(`remove-friend:${friend.friendUserId}`, async () => {
-      await socialBackend.removeFriend(friend.friendUserId);
+    setPendingConfirm({
+      kind: 'removeFriend',
+      friendUserId: friend.friendUserId,
+      username: friend.username,
     });
   };
 
   const handleBlockUser = (input: { userId: string; username: string }) => {
-    const confirmed = window.confirm(
-      `Block "${input.username}"? This removes any friendship and pending friend requests.`
-    );
-    if (!confirmed) return;
-    void runMutation(`block-user:${input.userId}`, async () => {
-      await socialBackend.blockUser(input.userId);
+    setPendingConfirm({
+      kind: 'blockUser',
+      userId: input.userId,
+      username: input.username,
+    });
+  };
+
+  const confirmPendingAction = () => {
+    if (!pendingConfirm) return;
+    const nextConfirm = pendingConfirm;
+    setPendingConfirm(null);
+
+    if (nextConfirm.kind === 'removeFriend') {
+      void runMutation(`remove-friend:${nextConfirm.friendUserId}`, async () => {
+        await socialBackend.removeFriend(nextConfirm.friendUserId);
+      });
+      return;
+    }
+
+    void runMutation(`block-user:${nextConfirm.userId}`, async () => {
+      await socialBackend.blockUser(nextConfirm.userId);
     });
   };
 
@@ -297,9 +327,18 @@ export function FriendsModal({
     </div>
   );
 
+  const pendingConfirmActionKey =
+    pendingConfirm?.kind === 'removeFriend'
+      ? `remove-friend:${pendingConfirm.friendUserId}`
+      : pendingConfirm
+        ? `block-user:${pendingConfirm.userId}`
+        : null;
+  const pendingConfirmBusy = pendingConfirmActionKey !== null && busyActionKey === pendingConfirmActionKey;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="app" className="border-[#304867] bg-[#111a2b] text-white p-0 overflow-hidden">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent size="app" className="border-[#304867] bg-[#111a2b] text-white p-0 overflow-hidden">
         <div className="flex h-full min-h-0 flex-col">
           <DialogHeader className="px-5 py-4 border-b border-[#263a58] bg-[linear-gradient(135deg,#16233a_0%,#101a2b_70%,#111a2b_100%)]">
             <div className="flex items-start justify-between gap-3">
@@ -740,7 +779,53 @@ export function FriendsModal({
             </Tabs>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={Boolean(pendingConfirm)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setPendingConfirm(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingConfirm?.kind === 'removeFriend' ? 'Remove Friend?' : 'Block User?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a9b8cf]">
+              {pendingConfirm?.kind === 'removeFriend'
+                ? `Remove "${pendingConfirm.username}" from your friends list?`
+                : pendingConfirm
+                  ? `Block "${pendingConfirm.username}"? This removes any friendship and pending friend requests.`
+                  : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={pendingConfirmBusy}
+              className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={pendingConfirmBusy}
+              onClick={confirmPendingAction}
+            >
+              {pendingConfirmBusy
+                ? pendingConfirm?.kind === 'removeFriend'
+                  ? 'Removing...'
+                  : 'Blocking...'
+                : pendingConfirm?.kind === 'removeFriend'
+                  ? 'Remove'
+                  : 'Block'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
