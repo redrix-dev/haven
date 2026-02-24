@@ -5,11 +5,45 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { scheduleRadixInteractionStateRepair } from "@/lib/radixInteractionState"
 
 function Dialog({
+  open,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  const previousControlledOpenRef = React.useRef<boolean | undefined>(open)
+
+  React.useEffect(() => {
+    if (typeof open !== "boolean") {
+      return
+    }
+
+    if (previousControlledOpenRef.current && !open) {
+      scheduleRadixInteractionStateRepair()
+    }
+
+    previousControlledOpenRef.current = open
+  }, [open])
+
+  const handleOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        scheduleRadixInteractionStateRepair()
+      }
+      onOpenChange?.(nextOpen)
+    },
+    [onOpenChange]
+  )
+
+  return (
+    <DialogPrimitive.Root
+      data-slot="dialog"
+      open={open}
+      onOpenChange={handleOpenChange}
+      {...props}
+    />
+  )
 }
 
 function DialogTrigger({

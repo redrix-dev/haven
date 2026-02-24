@@ -5,9 +5,45 @@ import { XIcon } from "lucide-react"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { scheduleRadixInteractionStateRepair } from "@/lib/radixInteractionState"
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+function Sheet({
+  open,
+  onOpenChange,
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  const previousControlledOpenRef = React.useRef<boolean | undefined>(open)
+
+  React.useEffect(() => {
+    if (typeof open !== "boolean") {
+      return
+    }
+
+    if (previousControlledOpenRef.current && !open) {
+      scheduleRadixInteractionStateRepair()
+    }
+
+    previousControlledOpenRef.current = open
+  }, [open])
+
+  const handleOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        scheduleRadixInteractionStateRepair()
+      }
+      onOpenChange?.(nextOpen)
+    },
+    [onOpenChange]
+  )
+
+  return (
+    <SheetPrimitive.Root
+      data-slot="sheet"
+      open={open}
+      onOpenChange={handleOpenChange}
+      {...props}
+    />
+  )
 }
 
 function SheetTrigger({
