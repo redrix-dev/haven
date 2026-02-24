@@ -88,7 +88,7 @@ Backend contract tests also reset fixture domain state before each test for isol
 Local test harness config (like `supabase/config.toml`) does **not** change hosted behavior.
 
 If you are onboarding as a real collaborator (shared envs/secrets, local prereqs), start with
-`docs/collaborator-setup.md` before this doc.
+`docs/internal/contributor/collaborator-setup.md` before this doc.
 
 ## Automated Local Test Report (Generated Logs + Summary)
 

@@ -138,5 +138,8 @@ release/
 # Local planning docs
 mvp-roadmap/
 
+# Internal documentation workspace (new files are local-only by default)
+docs/internal/
+
 # Local test run reports (generated)
 test-reports/

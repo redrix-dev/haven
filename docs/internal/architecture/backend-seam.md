@@ -20,7 +20,7 @@ Responsibilities:
 
 Used by:
 - `src/lib/hooks/useServers.ts`
-- `src/renderer.tsx`
+- `src/renderer/app/ChatApp.tsx`
 
 ### 2) Community Data Backend
 File: `src/lib/backend/communityDataBackend.ts`
@@ -35,7 +35,7 @@ Responsibilities:
 - Haven developer message posting
 
 Used by:
-- `src/renderer.tsx`
+- `src/renderer/app/ChatApp.tsx`
 
 ### 3) Notification Backend
 File: `src/lib/backend/notificationBackend.ts`
@@ -47,7 +47,7 @@ Responsibilities:
 - Notification inbox realtime subscription
 
 Used by:
-- `src/renderer.tsx`
+- `src/renderer/app/ChatApp.tsx`
 
 ### 4) Backend Resolver
 File: `src/lib/backend/index.ts`
@@ -72,7 +72,7 @@ Responsibilities:
 
 Used by:
 - `src/components/FriendsModal.tsx`
-- `src/renderer.tsx` (friends badge counts + notification friend-request actions)
+- `src/renderer/app/ChatApp.tsx` (friends badge counts + notification friend-request actions)
 
 ### 6) Direct Message Backend
 File: `src/lib/backend/directMessageBackend.ts`
@@ -85,7 +85,7 @@ Responsibilities:
 - DM workspace realtime subscriptions
 
 Used by:
-- `src/renderer.tsx` (DM workspace navigation + thread state)
+- `src/renderer/app/ChatApp.tsx` (DM workspace navigation + thread state)
 
 ### 7) Moderation Backend
 File: `src/lib/backend/moderationBackend.ts`
@@ -114,7 +114,7 @@ Current coverage focus:
 - targeted `CommunityDataBackend` mention-trigger integration coverage
 
 Runbook:
-- `docs/testing/rls-and-hardening-runbook.md`
+- `docs/internal/testing/rls-and-hardening-runbook.md`
 
 ## Why This Matters
 - UI components no longer depend on Supabase query details.

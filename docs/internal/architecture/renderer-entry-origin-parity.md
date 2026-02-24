@@ -12,7 +12,7 @@ Modes:
 - Dev (`MAIN_WINDOW_WEBPACK_ENTRY` is `http://...`): local loopback server proxies HTTP + websocket traffic to Forge's webpack dev server.
 - Packaged (`MAIN_WINDOW_WEBPACK_ENTRY` is `file://...`): local loopback server statically serves packaged renderer files from the resolved `.webpack` output directory.
 
-`src/main.js` does not load Forge entry constants directly anymore. It loads through:
+`src/main/index.js` does not load Forge entry constants directly anymore. It loads through:
 - `rendererEntryService.getEntryUrl('main_window')`
 
 This preserves a consistent renderer origin in both dev and packaged builds.
@@ -37,7 +37,7 @@ Hard rules:
 - prevent path traversal in packaged static serving
 - no open proxy behavior in dev (only registered entry prefixes proxy to the fixed upstream Forge origin)
 
-Renderer security policy is still enforced by Electron header interception in `src/main.js`, with renderer-document detection delegated to `rendererEntryService.isRendererDocumentUrl(...)`.
+Renderer security policy is still enforced by Electron header interception in `src/main/index.js`, with renderer-document detection delegated to `rendererEntryService.isRendererDocumentUrl(...)`.
 
 ## Failure Modes
 ### Port conflict (`EADDRINUSE`)
@@ -67,7 +67,7 @@ This keeps referrer behavior explicit and consistent across modes.
 
 ## Sequence Flow
 ### App startup (dev + packaged)
-1. `app.whenReady()` in `src/main.js`
+1. `app.whenReady()` in `src/main/index.js`
 2. `createRendererEntryService(...)`
 3. `rendererEntryService.start()`
 4. Register renderer-document CSP/header policy using `rendererEntryService.isRendererDocumentUrl(...)`
@@ -89,7 +89,7 @@ This keeps referrer behavior explicit and consistent across modes.
 
 ## Release / Smoke Gate
 Changes touching any of the following require packaged parity smoke testing (`npm run make`):
-- `src/main.js`
+- `src/main/index.js`
 - `src/main/renderer-entry-service.js`
 - `src/main/renderer-entry-csp.js`
 - renderer embed behavior / iframe policies
@@ -106,7 +106,7 @@ Future windows should register additional renderer entrypoints in `RendererEntry
 Do not introduce parallel renderer-loading strategies (`file://` in one window, loopback HTTP in another).
 
 ## Files to Know
-- `src/main.js`
+- `src/main/index.js`
 - `src/main/renderer-entry-service.js`
 - `src/main/renderer-entry-csp.js`
 - `src/components/MessageList.tsx`

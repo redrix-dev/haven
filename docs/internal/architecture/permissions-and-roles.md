@@ -57,7 +57,7 @@ Current SQL RLS coverage includes:
 - permission helper checks (`user_has_permission`, channel helpers)
 
 Runbook:
-- `docs/testing/rls-and-hardening-runbook.md`
+- `docs/internal/testing/rls-and-hardening-runbook.md`
 
 ## Extension Rules
 When adding new server capabilities:
@@ -71,6 +71,6 @@ When adding new server capabilities:
 - `src/lib/backend/communityDataBackend.ts`
 - `src/lib/backend/types.ts`
 - `src/components/ServerSettingsModal.tsx`
-- `src/renderer.tsx`
+- `src/renderer/app/ChatApp.tsx`
 - `supabase/migrations/20260217_000001_reset_discord_like_schema.sql`
 - `supabase/tests/sql/01_core_permissions_rls.sql`

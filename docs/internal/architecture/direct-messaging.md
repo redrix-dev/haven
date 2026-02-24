@@ -34,7 +34,7 @@ Document Haven's current 1:1 direct messaging system (friends-only), including a
 
 ### Renderer Model (current)
 - `workspaceMode: 'community' | 'dm'`
-- DM list + thread state in `src/renderer.tsx`
+- DM list + thread state in `src/renderer/app/ChatApp.tsx`
 - UI components:
   - `DirectMessagesSidebar`
   - `DirectMessageArea`
@@ -80,7 +80,7 @@ Document Haven's current 1:1 direct messaging system (friends-only), including a
 - `src/components/DirectMessagesSidebar.tsx`
 - `src/components/DirectMessageArea.tsx`
 - `src/components/DmReportModal.tsx`
-- `src/renderer.tsx`
+- `src/renderer/app/ChatApp.tsx`
 
 ## Deferred / Future
 - Group DMs

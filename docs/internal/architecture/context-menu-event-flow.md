@@ -44,9 +44,9 @@ This map documents the current menu surfaces and their trigger hierarchy after t
   - `native_text` -> stop propagation.
 - Action content rendered by `ActionMenuContent`.
 
-## Native Text Context (`src/main.js`)
+## Native Text Context (`src/main/app/register-native-context-menu.js`)
 
-- Source: `webContents.on('context-menu')`.
+- Source: `webContents.on('context-menu')`, registered from `src/main/app/create-main-window.js`.
 - Editable target menu: `Cut`, `Copy`, `Paste`, `Select All`.
 - Selected non-editable text menu: `Copy`, `Select All`.
 - Debug hook (dev opt-in): `HAVEN_DEBUG_CONTEXT_MENUS=1`.

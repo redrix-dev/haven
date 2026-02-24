@@ -18,9 +18,9 @@ This is intentionally a small-team setup guide (not a formal access-tier policy)
 - Shared environment/secrets handling basics
 
 Not covered:
-- full release workflow (`docs/haven-workflow.md`)
-- deep test internals (`docs/testing/test-suite-breakdown.md`)
-- DB/RLS runbook details (`docs/testing/rls-and-hardening-runbook.md`)
+- full release workflow (`docs/internal/contributor/haven-workflow.md`)
+- deep test internals (`docs/internal/testing/test-suite-breakdown.md`)
+- DB/RLS runbook details (`docs/internal/testing/rls-and-hardening-runbook.md`)
 
 ## First Principle: Local vs Hosted Supabase
 - Local Supabase (Docker) is for destructive/repeatable testing.
@@ -76,9 +76,9 @@ npm run test:unit
 ```
 
 Useful docs:
-- `docs/testing/rls-and-hardening-runbook.md`
-- `docs/testing/test-suite-breakdown.md`
-- `docs/haven-workflow.md`
+- `docs/internal/testing/rls-and-hardening-runbook.md`
+- `docs/internal/testing/test-suite-breakdown.md`
+- `docs/internal/contributor/haven-workflow.md`
 
 ## Shared Environment / Secrets (Small-Team Guidance)
 
@@ -109,7 +109,7 @@ Useful docs:
 - [ ] Local Supabase test harness runs (`npx supabase start`, `npm run test:db`)
 - [ ] Shared backend access clarified (if needed)
 - [ ] Required secrets/env values handed off securely (if needed)
-- [ ] Knows where to find process docs (`docs/haven-workflow.md`)
+- [ ] Knows where to find process docs (`docs/internal/contributor/haven-workflow.md`)
 
 ## Offboarding / Access Cleanup (Simple Version)
 If a collaborator no longer needs access:

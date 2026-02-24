@@ -76,7 +76,7 @@ Describe how Haven notifications are created, stored, delivered in-app, marked s
 - `src/lib/backend/notificationBackend.ts`
 - `src/lib/notifications/sound.ts`
 - `src/components/NotificationCenterModal.tsx`
-- `src/renderer.tsx`
+- `src/renderer/app/ChatApp.tsx`
 
 ## Deferred / Future
 - Server/channel notification preference overrides (Phase 4, backlogged during hardening pass)

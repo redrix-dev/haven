@@ -54,10 +54,10 @@ When changing code, preserve these invariants unless explicitly redesigning them
 
 ## 3) Repo Structure Cheat Sheet
 
-- `src/main.js`, `src/preload.js`, `src/main/*`
-  - Electron main/preload runtime and OS integrations.
-- `src/renderer.tsx`, `src/components/*`, `src/contexts/*`
-  - Renderer orchestration and UI.
+- `src/main/index.js`, `src/main/app/*`, `src/main/ipc/*`, `src/preload/index.js`, `src/preload/desktop-bridge.js`
+  - Electron main/preload runtime, desktop bridge, and OS integrations.
+- `src/renderer/index.tsx`, `src/renderer/app/ChatApp.tsx`, `src/renderer/features/*`, `src/components/*`, `src/contexts/*`
+  - Renderer bootstrap, orchestration, feature hooks, and UI.
 - `src/assets/*`
   - Renderer-bundled UI assets (images/audio/fonts) imported by React/TypeScript code.
   - Use for assets that should ship with the renderer bundle via webpack imports.

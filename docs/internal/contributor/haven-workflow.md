@@ -28,16 +28,16 @@ It is designed for solo-maintainer use and AI-assisted sessions.
 - Hotfix workflows (DB-only, client-only, mixed)
 
 ## What This Does Not Cover
-- Deep architecture design details (see `docs/architecture/*`)
+- Deep architecture design details (see `docs/internal/architecture/*`)
 - Repo-wide coding invariants (see `docs/AGENTS.md`)
-- Detailed auto-update implementation internals (see `docs/auto-updates.md`)
+- Detailed auto-update implementation internals (see `docs/internal/operations/auto-updates.md`)
 
 ## Related Docs
 - `docs/AGENTS.md`
-- `docs/auto-updates.md`
-- `docs/collaborator-setup.md`
-- `docs/testing/rls-and-hardening-runbook.md`
-- `docs/testing/test-suite-breakdown.md`
+- `docs/internal/operations/auto-updates.md`
+- `docs/internal/contributor/collaborator-setup.md`
+- `docs/internal/testing/rls-and-hardening-runbook.md`
+- `docs/internal/testing/test-suite-breakdown.md`
 - `SESSION_HANDOFF.local` (local, git-ignored)
 
 ---
@@ -205,7 +205,7 @@ Outputs (git-ignored):
 
 Notes:
 - The report includes a "Learning View" that explains major SQL/backend suites in actor/action/expected terms.
-- See `docs/testing/test-suite-breakdown.md` for how the suite works end-to-end.
+- See `docs/internal/testing/test-suite-breakdown.md` for how the suite works end-to-end.
 
 ### 6. End-of-Day Handoff Workflow
 
@@ -334,7 +334,7 @@ Local Supabase is for destructive/repeatable testing:
 - `psql` installed and on PATH
 - `npx supabase start`
 
-If onboarding a real collaborator, start with `docs/collaborator-setup.md` and then use this playbook for workflow/release habits.
+If onboarding a real collaborator, start with `docs/internal/contributor/collaborator-setup.md` and then use this playbook for workflow/release habits.
 
 #### Common setup checks
 ```bash
@@ -555,8 +555,8 @@ It gives you:
 - Learning View (human-readable scenario summaries for SQL/backend suites)
 
 See:
-- `docs/testing/test-suite-breakdown.md`
-- `docs/testing/rls-and-hardening-runbook.md`
+- `docs/internal/testing/test-suite-breakdown.md`
+- `docs/internal/testing/rls-and-hardening-runbook.md`
 
 ### 3. Known Local Test Flake Handling
 

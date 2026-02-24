@@ -9,7 +9,7 @@
 
 ## Desktop Contract Flow
 1. `src/shared/desktop/types.ts` defines the canonical desktop API contract.
-2. `src/preload.js` exposes the implementation to the renderer.
+2. `src/preload/index.js` is the thin preload entrypoint and delegates desktop bridge exposure to `src/preload/desktop-bridge.js`.
 3. `src/shared/desktop/client.ts` is the only renderer-side access point.
 
 ## Notification / Moderation Boundary Notes
