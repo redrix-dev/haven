@@ -43,7 +43,6 @@ import {
   getNotificationBackend,
   getSocialBackend,
 } from '@/lib/backend';
-import { supabase } from '@/lib/supabase';
 import { desktopClient } from '@/shared/desktop/client';
 import { getErrorMessage } from '@/shared/lib/errors';
 import { installPromptTrap } from '@/lib/contextMenu/debugTrace';
@@ -58,14 +57,8 @@ import {
 } from '@/renderer/app/constants';
 import type {
   PendingUiConfirmation,
-  VoicePresenceStateRow,
-  VoiceSidebarParticipant,
 } from '@/renderer/app/types';
 import { getPendingUiConfirmationCopy } from '@/renderer/app/ui-confirmations';
-import {
-  areVoiceParticipantListsEqual,
-  isEditableKeyboardTarget,
-} from '@/renderer/app/utils';
 import { useDesktopSettings } from '@/renderer/features/desktop/hooks/useDesktopSettings';
 import { useCommunityWorkspace } from '@/renderer/features/community/hooks/useCommunityWorkspace';
 import { useServerAdmin } from '@/renderer/features/community/hooks/useServerAdmin';
@@ -77,6 +70,7 @@ import { useNotificationInteractions } from '@/renderer/features/notifications/h
 import { useSocialWorkspace } from '@/renderer/features/social/hooks/useSocialWorkspace';
 import { useDirectMessages } from '@/renderer/features/direct-messages/hooks/useDirectMessages';
 import { useDirectMessageInteractions } from '@/renderer/features/direct-messages/hooks/useDirectMessageInteractions';
+import { useVoice } from '@/renderer/features/voice/hooks/useVoice';
 import { useFeatureFlags } from '@/renderer/features/session/hooks/useFeatureFlags';
 import { usePlatformSession } from '@/renderer/features/session/hooks/usePlatformSession';
 import type {
@@ -128,6 +122,7 @@ export function ChatApp() {
   });
   const debugChannelReloads =
     ENABLE_CHANNEL_RELOAD_DIAGNOSTICS || hasFeatureFlag('debug_channel_reload_diagnostics');
+  const voiceHardwareDebugPanelEnabled = hasFeatureFlag(VOICE_HARDWARE_DEBUG_PANEL_FLAG);
   const {
     state: {
       profileUsername,
@@ -143,33 +138,7 @@ export function ChatApp() {
     userEmail: user?.email,
   });
   const [canSendHavenDeveloperMessage, setCanSendHavenDeveloperMessage] = useState(false);
-  const [canSpeakInVoiceChannel, setCanSpeakInVoiceChannel] = useState(false);
-  const [activeVoiceChannelId, setActiveVoiceChannelId] = useState<string | null>(null);
-  const [voicePanelOpen, setVoicePanelOpen] = useState(false);
-  const [voiceHardwareDebugPanelOpen, setVoiceHardwareDebugPanelOpen] = useState(false);
   const [dmReportReviewPanelOpen, setDmReportReviewPanelOpen] = useState(false);
-  const [voiceConnected, setVoiceConnected] = useState(false);
-  const [voiceParticipants, setVoiceParticipants] = useState<VoiceSidebarParticipant[]>([]);
-  const [voicePresenceByChannelId, setVoicePresenceByChannelId] = useState<
-    Record<string, VoiceSidebarParticipant[]>
-  >({});
-  const [voiceSessionState, setVoiceSessionState] = useState({
-    joined: false,
-    joining: false,
-    isMuted: false,
-    isDeafened: false,
-    listenOnly: true,
-  });
-  const [voiceControlActions, setVoiceControlActions] = useState<{
-    join: () => void;
-    leave: () => void;
-    toggleMute: () => void;
-    toggleDeafen: () => void;
-  } | null>(null);
-  const [voiceJoinPrompt, setVoiceJoinPrompt] = useState<{
-    channelId: string;
-    mode: 'join' | 'switch';
-  } | null>(null);
   const {
     state: {
       channels,
@@ -197,6 +166,48 @@ export function ChatApp() {
     servers,
     currentUserId: user?.id ?? null,
     channelSettingsTargetId,
+  });
+  const {
+    state: {
+      activeVoiceChannelId,
+      voicePanelOpen,
+      voiceHardwareDebugPanelOpen,
+      voiceConnected,
+      voiceParticipants,
+      voiceSessionState,
+      canSpeakInVoiceChannel,
+      voiceControlActions,
+      voiceJoinPrompt,
+    },
+    derived: {
+      activeVoiceChannel,
+      voiceChannelParticipants,
+      activeVoiceParticipantCount,
+    },
+    actions: {
+      setVoicePanelOpen,
+      setVoiceHardwareDebugPanelOpen,
+      setVoiceConnected,
+      setVoiceParticipants,
+      setVoiceSessionState,
+      setVoiceControlActions,
+      resetVoiceState,
+      requestVoiceChannelJoin,
+      confirmVoiceChannelJoin,
+      cancelVoiceChannelJoinPrompt,
+      disconnectVoiceSession,
+    },
+  } = useVoice({
+    currentServerId,
+    currentUserId: user?.id,
+    currentUserDisplayName:
+      (isPlatformStaff
+        ? `${platformStaffPrefix ?? 'Haven'}-${profileUsername || user?.email?.split('@')[0] || 'User'}`
+        : profileUsername || user?.email?.split('@')[0] || 'User'),
+    currentChannelId,
+    setCurrentChannelId,
+    voiceHardwareDebugPanelEnabled,
+    channels,
   });
   const [renameServerDraft, setRenameServerDraft] = useState<{ serverId: string; currentName: string } | null>(
     null
@@ -373,7 +384,6 @@ export function ChatApp() {
   const dmWorkspaceEnabled = friendsSocialPanelEnabled;
   const dmWorkspaceIsActive = dmWorkspaceEnabled && workspaceMode === 'dm';
   const dmReportReviewPanelEnabled = isPlatformStaff && hasFeatureFlag(DM_REPORT_REVIEW_PANEL_FLAG);
-  const voiceHardwareDebugPanelEnabled = hasFeatureFlag(VOICE_HARDWARE_DEBUG_PANEL_FLAG);
   const {
     state: {
       notificationItems,
@@ -538,53 +548,14 @@ export function ChatApp() {
   }, [dmReportReviewPanelEnabled]);
 
   useEffect(() => {
-    if (voiceHardwareDebugPanelEnabled) return;
-    setVoiceHardwareDebugPanelOpen(false);
-  }, [voiceHardwareDebugPanelEnabled]);
-
-  useEffect(() => {
-    if (!user || !voiceHardwareDebugPanelEnabled) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) return;
-      if (!(event.ctrlKey || event.metaKey) || !event.altKey || !event.shiftKey) return;
-      if (event.key.toLowerCase() !== 'v') return;
-      if (isEditableKeyboardTarget(event.target)) return;
-
-      event.preventDefault();
-      setVoiceHardwareDebugPanelOpen((prev) => !prev);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [user, voiceHardwareDebugPanelEnabled]);
-
-  useEffect(() => {
     if (user) return;
 
     resetPlatformSession();
-    setCanSpeakInVoiceChannel(false);
-    setActiveVoiceChannelId(null);
-    setVoicePanelOpen(false);
-    setVoiceHardwareDebugPanelOpen(false);
+    resetVoiceState();
     setDmReportReviewPanelOpen(false);
     setNotificationsPanelOpen(false);
     setFriendsPanelOpen(false);
     setWorkspaceMode('community');
-    setVoiceConnected(false);
-    setVoiceParticipants([]);
-    setVoicePresenceByChannelId({});
-    setVoiceSessionState({
-      joined: false,
-      joining: false,
-      isMuted: false,
-      isDeafened: false,
-      listenOnly: true,
-    });
-    setVoiceControlActions(null);
-    setVoiceJoinPrompt(null);
     resetMessageState();
     setAuthorProfiles({});
     authorProfileCacheRef.current = {};
@@ -623,6 +594,7 @@ export function ChatApp() {
     resetPlatformSession,
     resetDirectMessages,
     resetSocialWorkspace,
+    resetVoiceState,
     resetServerSettingsState,
     resetServerRoleManagement,
     resetServerInvites,
@@ -634,26 +606,12 @@ export function ChatApp() {
   useEffect(() => {
     if (!currentServerId) {
       resetChannelsWorkspace();
-      setActiveVoiceChannelId(null);
-      setVoicePanelOpen(false);
-      setVoiceConnected(false);
-      setVoiceParticipants([]);
-      setVoicePresenceByChannelId({});
-      setVoiceSessionState({
-        joined: false,
-        joining: false,
-        isMuted: false,
-        isDeafened: false,
-        listenOnly: true,
-      });
-      setVoiceControlActions(null);
-      setVoiceJoinPrompt(null);
+      resetVoiceState();
       setMessages([]);
       setMessageReactions([]);
       setMessageAttachments([]);
       setMessageLinkPreviews([]);
       setAuthorProfiles({});
-      setCanSpeakInVoiceChannel(false);
       setShowCreateChannelModal(false);
       setShowJoinServerModal(false);
       setShowServerSettingsModal(false);
@@ -677,151 +635,11 @@ export function ChatApp() {
     resetChannelsWorkspace,
     resetCommunityBans,
     resetMembersModal,
+    resetVoiceState,
     resetServerSettingsState,
     resetServerRoleManagement,
     resetServerInvites,
   ]);
-
-  useEffect(() => {
-    if (!activeVoiceChannelId) return;
-
-    const activeVoiceChannel = channels.find(
-      (channel) => channel.id === activeVoiceChannelId && channel.kind === 'voice'
-    );
-
-    if (!activeVoiceChannel) {
-      setActiveVoiceChannelId(null);
-      setVoiceConnected(false);
-      setVoiceParticipants([]);
-      setVoicePanelOpen(false);
-    }
-  }, [activeVoiceChannelId, channels]);
-
-  useEffect(() => {
-    if (!activeVoiceChannelId) return;
-    setVoicePanelOpen(false);
-  }, [activeVoiceChannelId]);
-
-  useEffect(() => {
-    if (!currentServerId || !user?.id) {
-      setVoicePresenceByChannelId({});
-      return;
-    }
-
-    const voiceChannelIds = channels
-      .filter((channel) => channel.kind === 'voice')
-      .map((channel) => channel.id)
-      .filter((channelId) => channelId !== activeVoiceChannelId);
-
-    setVoicePresenceByChannelId((prev) => {
-      const nextEntries = Object.entries(prev).filter(([channelId]) =>
-        voiceChannelIds.includes(channelId)
-      );
-      if (nextEntries.length === Object.keys(prev).length) return prev;
-      return Object.fromEntries(nextEntries);
-    });
-
-    if (voiceChannelIds.length === 0) {
-      return;
-    }
-
-    let disposed = false;
-
-    const subscriptionChannels = voiceChannelIds.map((voiceChannelId) => {
-      const subscriptionChannel = supabase.channel(`voice:${currentServerId}:${voiceChannelId}`);
-
-      const syncPresenceState = () => {
-        if (disposed) return;
-
-        const presenceState = subscriptionChannel.presenceState() as Record<
-          string,
-          VoicePresenceStateRow[]
-        >;
-        const participantsByUserId = new Map<string, VoiceSidebarParticipant>();
-
-        for (const [presenceKey, presenceRows] of Object.entries(presenceState)) {
-          const latestPresence = presenceRows[presenceRows.length - 1];
-          if (!latestPresence) continue;
-
-          const userId = latestPresence.user_id ?? presenceKey;
-          if (!userId) continue;
-
-          const trimmedDisplayName = latestPresence.display_name?.trim() ?? '';
-          const displayName = trimmedDisplayName.length > 0 ? trimmedDisplayName : userId.slice(0, 12);
-
-          if (!participantsByUserId.has(userId)) {
-            participantsByUserId.set(userId, {
-              userId,
-              displayName,
-            });
-          }
-        }
-
-        const nextParticipants = Array.from(participantsByUserId.values()).sort((left, right) =>
-          left.displayName.localeCompare(right.displayName)
-        );
-
-        setVoicePresenceByChannelId((prev) => {
-          const previousParticipants = prev[voiceChannelId] ?? [];
-          if (areVoiceParticipantListsEqual(previousParticipants, nextParticipants)) {
-            return prev;
-          }
-          return {
-            ...prev,
-            [voiceChannelId]: nextParticipants,
-          };
-        });
-      };
-
-      subscriptionChannel
-        .on('presence', { event: 'sync' }, syncPresenceState)
-        .on('presence', { event: 'join' }, syncPresenceState)
-        .on('presence', { event: 'leave' }, syncPresenceState);
-
-      subscriptionChannel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          syncPresenceState();
-          return;
-        }
-        if (status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT') {
-          return;
-        }
-
-        if (disposed) return;
-        setVoicePresenceByChannelId((prev) => {
-          const previousParticipants = prev[voiceChannelId];
-          if (!previousParticipants || previousParticipants.length === 0) {
-            return prev;
-          }
-          return {
-            ...prev,
-            [voiceChannelId]: [],
-          };
-        });
-      });
-
-      return subscriptionChannel;
-    });
-
-    return () => {
-      disposed = true;
-      for (const subscriptionChannel of subscriptionChannels) {
-        void supabase.removeChannel(subscriptionChannel);
-      }
-    };
-  }, [activeVoiceChannelId, channels, currentServerId, user?.id]);
-
-  useEffect(() => {
-    if (!currentChannelId) return;
-
-    const selectedChannel = channels.find((channel) => channel.id === currentChannelId);
-    if (!selectedChannel || selectedChannel.kind !== 'voice') return;
-
-    const firstTextChannel = channels.find((channel) => channel.kind === 'text');
-    if (firstTextChannel) {
-      setCurrentChannelId(firstTextChannel.id);
-    }
-  }, [currentChannelId, channels]);
 
   // Determine whether Haven Developer messaging is allowed in the current channel.
   useEffect(() => {
@@ -861,43 +679,6 @@ export function ChatApp() {
       isMounted = false;
     };
   }, [user, currentServerId, currentChannelId, canPostHavenDevMessage, channels]);
-
-  // Resolve whether current user can speak in the selected voice channel.
-  useEffect(() => {
-    let isMounted = true;
-    const voicePermissionChannelId = activeVoiceChannelId ?? currentChannelId;
-
-    if (!user || !currentServerId || !voicePermissionChannelId) {
-      setCanSpeakInVoiceChannel(false);
-      return;
-    }
-
-    const selectedChannel = channels.find((channel) => channel.id === voicePermissionChannelId);
-    if (!selectedChannel || selectedChannel.kind !== 'voice') {
-      setCanSpeakInVoiceChannel(false);
-      return;
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-
-    const resolveVoiceSpeakPermission = async () => {
-      try {
-        const canSpeak = await communityBackend.canSendInChannel(voicePermissionChannelId);
-        if (!isMounted) return;
-        setCanSpeakInVoiceChannel(canSpeak);
-      } catch (error) {
-        if (!isMounted) return;
-        console.error('Error resolving voice speak permission:', error);
-        setCanSpeakInVoiceChannel(false);
-      }
-    };
-
-    void resolveVoiceSpeakPermission();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user, currentServerId, currentChannelId, activeVoiceChannelId, channels]);
 
   const normalizeInviteCode = (value: string): string => {
     const trimmed = value.trim();
@@ -998,59 +779,6 @@ export function ChatApp() {
   async function resolveBanEligibleServers(targetUserId: string): Promise<BanEligibleServer[]> {
     if (!targetUserId) return [];
     return controlPlaneBackend.listBanEligibleServersForUser(targetUserId);
-  }
-
-  function requestVoiceChannelJoin(channelId: string) {
-    const targetChannel = channels.find(
-      (channel) => channel.id === channelId && channel.kind === 'voice'
-    );
-    if (!targetChannel) return;
-
-    if (!activeVoiceChannelId) {
-      setVoiceJoinPrompt({
-        channelId,
-        mode: 'join',
-      });
-      return;
-    }
-
-    if (activeVoiceChannelId === channelId) {
-      return;
-    }
-
-    setVoiceJoinPrompt({
-      channelId,
-      mode: 'switch',
-    });
-  }
-
-  function confirmVoiceChannelJoin() {
-    if (!voiceJoinPrompt) return;
-    setActiveVoiceChannelId(voiceJoinPrompt.channelId);
-    setVoicePanelOpen(false);
-    setVoiceJoinPrompt(null);
-  }
-
-  function cancelVoiceChannelJoinPrompt() {
-    setVoiceJoinPrompt(null);
-  }
-
-  function disconnectVoiceSession(options?: { triggerPaneLeave?: boolean }) {
-    if (options?.triggerPaneLeave !== false) {
-      voiceControlActions?.leave();
-    }
-    setActiveVoiceChannelId(null);
-    setVoicePanelOpen(false);
-    setVoiceConnected(false);
-    setVoiceParticipants([]);
-    setVoiceControlActions(null);
-    setVoiceSessionState({
-      joined: false,
-      joining: false,
-      isMuted: false,
-      isDeafened: false,
-      listenOnly: true,
-    });
   }
 
   async function sendHavenDeveloperMessage(
@@ -1212,38 +940,10 @@ export function ChatApp() {
   }
 
   const isServersLoading = serversStatus === 'loading';
-  const activeVoiceChannel = channels.find(
-    (channel) => channel.id === activeVoiceChannelId && channel.kind === 'voice'
-  );
   const baseUserDisplayName = profileUsername || user.email?.split('@')[0] || 'User';
   const userDisplayName = isPlatformStaff
     ? `${platformStaffPrefix ?? 'Haven'}-${baseUserDisplayName}`
     : baseUserDisplayName;
-  const activeVoiceParticipantsForSidebar: VoiceSidebarParticipant[] = activeVoiceChannelId
-    ? [
-        ...(voiceSessionState.joined
-          ? [
-              {
-                userId: user.id,
-                displayName: userDisplayName,
-              },
-            ]
-          : []),
-        ...voiceParticipants,
-      ].filter(
-        (participant, participantIndex, participantList) =>
-          participantList.findIndex((candidate) => candidate.userId === participant.userId) ===
-          participantIndex
-      )
-    : [];
-  const voiceChannelParticipants = {
-    ...voicePresenceByChannelId,
-    ...(activeVoiceChannelId
-      ? {
-          [activeVoiceChannelId]: activeVoiceParticipantsForSidebar,
-        }
-      : {}),
-  };
   const canOpenServerSettings =
     serverPermissions.canManageServer ||
     serverPermissions.canManageRoles ||
@@ -1468,7 +1168,7 @@ export function ChatApp() {
                           <PhoneOff className="size-4" />
                         </Button>
                         <div className="ml-auto text-[11px] text-[#95a5bf]">
-                          {voiceParticipants.length + (voiceConnected ? 1 : 0)} in call
+                          {activeVoiceParticipantCount} in call
                         </div>
                       </div>
                     </div>
