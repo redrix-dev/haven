@@ -43,16 +43,12 @@ import {
   getNotificationBackend,
   getSocialBackend,
 } from '@/lib/backend';
-import { playNotificationSound } from '@/lib/notifications/sound';
 import { supabase } from '@/lib/supabase';
 import { desktopClient } from '@/shared/desktop/client';
 import { getErrorMessage } from '@/shared/lib/errors';
 import { installPromptTrap } from '@/lib/contextMenu/debugTrace';
 import {
   DEFAULT_APP_SETTINGS,
-  DEFAULT_NOTIFICATION_AUDIO_SETTINGS,
-  DEFAULT_NOTIFICATION_COUNTS,
-  DEFAULT_SOCIAL_COUNTS,
   DM_REPORT_REVIEW_PANEL_FLAG,
   ENABLE_CHANNEL_RELOAD_DIAGNOSTICS,
   FRIENDS_SOCIAL_PANEL_FLAG,
@@ -61,7 +57,6 @@ import {
   VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL,
 } from '@/renderer/app/constants';
 import type {
-  FriendsPanelTab,
   PendingUiConfirmation,
   VoicePresenceStateRow,
   VoiceSidebarParticipant,
@@ -69,7 +64,6 @@ import type {
 import { getPendingUiConfirmationCopy } from '@/renderer/app/ui-confirmations';
 import {
   areVoiceParticipantListsEqual,
-  getNotificationPayloadString,
   isEditableKeyboardTarget,
 } from '@/renderer/app/utils';
 import { useDesktopSettings } from '@/renderer/features/desktop/hooks/useDesktopSettings';
@@ -78,26 +72,22 @@ import { useServerAdmin } from '@/renderer/features/community/hooks/useServerAdm
 import { useChannelManagement } from '@/renderer/features/community/hooks/useChannelManagement';
 import { useChannelGroups } from '@/renderer/features/community/hooks/useChannelGroups';
 import { useMessages } from '@/renderer/features/messages/hooks/useMessages';
+import { useNotifications } from '@/renderer/features/notifications/hooks/useNotifications';
+import { useNotificationInteractions } from '@/renderer/features/notifications/hooks/useNotificationInteractions';
+import { useSocialWorkspace } from '@/renderer/features/social/hooks/useSocialWorkspace';
+import { useDirectMessages } from '@/renderer/features/direct-messages/hooks/useDirectMessages';
+import { useDirectMessageInteractions } from '@/renderer/features/direct-messages/hooks/useDirectMessageInteractions';
 import { useFeatureFlags } from '@/renderer/features/session/hooks/useFeatureFlags';
 import { usePlatformSession } from '@/renderer/features/session/hooks/usePlatformSession';
-import type { NotificationAudioSettings } from '@/shared/desktop/types';
 import type {
   AuthorProfile,
   BanEligibleServer,
   Channel,
   ChannelKind,
-  DirectMessage,
-  DirectMessageConversationSummary,
-  DirectMessageReportKind,
   MessageAttachment,
   MessageLinkPreview,
-  NotificationCounts,
-  NotificationItem,
-  NotificationPreferences,
-  NotificationPreferenceUpdate,
   MessageReaction,
   Message,
-  SocialCounts,
 } from '@/lib/backend/types';
 import { Headphones, Mic, MicOff, PhoneOff, Settings2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
@@ -127,6 +117,7 @@ export function ChatApp() {
   const [messageAttachments, setMessageAttachments] = useState<MessageAttachment[]>([]);
   const [messageLinkPreviews, setMessageLinkPreviews] = useState<MessageLinkPreview[]>([]);
   const [authorProfiles, setAuthorProfiles] = useState<Record<string, AuthorProfile>>({});
+  const authorProfileCacheRef = useRef<Record<string, AuthorProfile>>({});
   const {
     state: { featureFlags },
     derived: { hasFeatureFlag },
@@ -135,6 +126,8 @@ export function ChatApp() {
     controlPlaneBackend,
     userId: user?.id,
   });
+  const debugChannelReloads =
+    ENABLE_CHANNEL_RELOAD_DIAGNOSTICS || hasFeatureFlag('debug_channel_reload_diagnostics');
   const {
     state: {
       profileUsername,
@@ -335,20 +328,6 @@ export function ChatApp() {
   const {
     state: { hasOlderMessages, isLoadingOlderMessages },
     actions: {
-      setRequestOlderMessagesLoader,
-      clearRequestOlderMessagesLoader,
-      getCachedChannelBundle,
-      cacheChannelBundle,
-      fetchMessageAttachmentsForMessageIds,
-      fetchMessageLinkPreviewsForMessageIds,
-      runMessageMediaMaintenance: runMessageMediaMaintenanceFromHook,
-      getMessageLoadRuntime,
-      isCurrentMessageLoad,
-      syncOldestLoadedCursor,
-      syncLoadedMessageWindow,
-      loadLatestMessagesWithRelated,
-      loadOlderMessagesWithRelated,
-      finishOlderMessagesLoad,
       resetMessageState,
       requestOlderMessages,
       sendMessage,
@@ -362,43 +341,17 @@ export function ChatApp() {
     currentServerId,
     currentChannelId,
     currentUserId: user?.id ?? null,
+    debugChannelReloads,
     channels,
     setMessages,
     setMessageReactions,
     setMessageAttachments,
     setMessageLinkPreviews,
+    setAuthorProfiles,
+    authorProfileCacheRef,
   });
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
-  const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
-  const [friendsPanelRequestedTab, setFriendsPanelRequestedTab] = useState<FriendsPanelTab | null>(null);
-  const [friendsPanelHighlightedRequestId, setFriendsPanelHighlightedRequestId] = useState<string | null>(
-    null
-  );
   const [workspaceMode, setWorkspaceMode] = useState<'community' | 'dm'>('community');
-  const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
-  const [notificationCounts, setNotificationCounts] = useState<NotificationCounts>(
-    DEFAULT_NOTIFICATION_COUNTS
-  );
-  const [socialCounts, setSocialCounts] = useState<SocialCounts>(DEFAULT_SOCIAL_COUNTS);
-  const [dmConversations, setDmConversations] = useState<DirectMessageConversationSummary[]>([]);
-  const [dmConversationsLoading, setDmConversationsLoading] = useState(false);
-  const [dmConversationsRefreshing, setDmConversationsRefreshing] = useState(false);
-  const [dmConversationsError, setDmConversationsError] = useState<string | null>(null);
-  const [selectedDmConversationId, setSelectedDmConversationId] = useState<string | null>(null);
-  const [dmMessages, setDmMessages] = useState<DirectMessage[]>([]);
-  const [dmMessagesLoading, setDmMessagesLoading] = useState(false);
-  const [dmMessagesRefreshing, setDmMessagesRefreshing] = useState(false);
-  const [dmMessagesError, setDmMessagesError] = useState<string | null>(null);
-  const [dmMessageSendPending, setDmMessageSendPending] = useState(false);
-  const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const [notificationsRefreshing, setNotificationsRefreshing] = useState(false);
-  const [notificationsError, setNotificationsError] = useState<string | null>(null);
-  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(
-    null
-  );
-  const [notificationPreferencesLoading, setNotificationPreferencesLoading] = useState(false);
-  const [notificationPreferencesSaving, setNotificationPreferencesSaving] = useState(false);
-  const [notificationPreferencesError, setNotificationPreferencesError] = useState<string | null>(null);
   const {
     state: {
       appSettings,
@@ -416,21 +369,157 @@ export function ChatApp() {
     },
   } = useDesktopSettings();
   const [composerHeight, setComposerHeight] = useState<number | null>(null);
-  const authorProfileCacheRef = useRef<Record<string, AuthorProfile>>({});
-  const dmReadMarkInFlightRef = useRef<Record<string, boolean>>({});
-  const dmLastReadMarkAtRef = useRef<Record<string, number>>({});
-  const knownNotificationRecipientIdsRef = useRef<Set<string>>(new Set());
-  const notificationsBootstrappedRef = useRef(false);
-  const notificationAudioSettingsRef = useRef<NotificationAudioSettings>(
-    DEFAULT_NOTIFICATION_AUDIO_SETTINGS
-  );
-  const debugChannelReloads =
-    ENABLE_CHANNEL_RELOAD_DIAGNOSTICS || hasFeatureFlag('debug_channel_reload_diagnostics');
   const friendsSocialPanelEnabled = hasFeatureFlag(FRIENDS_SOCIAL_PANEL_FLAG);
   const dmWorkspaceEnabled = friendsSocialPanelEnabled;
   const dmWorkspaceIsActive = dmWorkspaceEnabled && workspaceMode === 'dm';
   const dmReportReviewPanelEnabled = isPlatformStaff && hasFeatureFlag(DM_REPORT_REVIEW_PANEL_FLAG);
   const voiceHardwareDebugPanelEnabled = hasFeatureFlag(VOICE_HARDWARE_DEBUG_PANEL_FLAG);
+  const {
+    state: {
+      notificationItems,
+      notificationCounts,
+      notificationsLoading,
+      notificationsRefreshing,
+      notificationsError,
+      notificationPreferences,
+      notificationPreferencesLoading,
+      notificationPreferencesSaving,
+      notificationPreferencesError,
+    },
+    actions: {
+      resetNotifications,
+      refreshNotificationInbox,
+      saveNotificationPreferences,
+      refreshNotificationsManually,
+      markAllNotificationsSeen,
+      markNotificationRead,
+      dismissNotification,
+      setNotificationsError,
+    },
+  } = useNotifications({
+    notificationBackend,
+    userId: user?.id,
+    notificationsPanelOpen,
+    audioSettings: appSettings.notifications,
+  });
+  const {
+    state: {
+      friendsPanelOpen,
+      friendsPanelRequestedTab,
+      friendsPanelHighlightedRequestId,
+      socialCounts,
+    },
+    actions: {
+      setFriendsPanelOpen,
+      setFriendsPanelRequestedTab,
+      setFriendsPanelHighlightedRequestId,
+      refreshSocialCounts,
+      resetSocialWorkspace,
+    },
+  } = useSocialWorkspace({
+    socialBackend,
+    userId: user?.id,
+    enabled: friendsSocialPanelEnabled,
+  });
+  const {
+    state: {
+      dmConversations,
+      dmConversationsLoading,
+      dmConversationsRefreshing,
+      dmConversationsError,
+      selectedDmConversationId,
+      dmMessages,
+      dmMessagesLoading,
+      dmMessagesRefreshing,
+      dmMessagesError,
+      dmMessageSendPending,
+    },
+    actions: {
+      resetDirectMessages,
+      clearSelectedDmConversation,
+      refreshDmConversations,
+      refreshDmMessages,
+      setSelectedDmConversationId,
+      setDmConversationsError,
+      openDirectMessageConversation,
+      openDirectMessageWithUser,
+      sendDirectMessage,
+      toggleSelectedDmConversationMuted,
+      reportDirectMessage,
+    },
+  } = useDirectMessages({
+    directMessageBackend,
+    userId: user?.id,
+    enabled: dmWorkspaceEnabled,
+    isActive: dmWorkspaceIsActive,
+  });
+  const {
+    actions: {
+      openDirectMessagesWorkspace,
+      directMessageUser,
+      blockDirectMessageUser,
+    },
+  } = useDirectMessageInteractions({
+    dmWorkspaceEnabled,
+    friendsSocialPanelEnabled,
+    currentUserId: user?.id,
+    selectedDmConversationId,
+    dmConversations,
+    setSelectedDmConversationId,
+    setDmConversationsError,
+    refreshDmConversations,
+    openDirectMessageWithUser,
+    clearSelectedDmConversation,
+    socialBackend,
+    refreshSocialCounts,
+    refreshNotificationInbox,
+    onOpenDmWorkspace: () => {
+      setWorkspaceMode('dm');
+      setNotificationsPanelOpen(false);
+      setFriendsPanelOpen(false);
+      setFriendsPanelRequestedTab(null);
+      setFriendsPanelHighlightedRequestId(null);
+    },
+    onEnterDmWorkspace: () => {
+      setWorkspaceMode('dm');
+    },
+    onOpenFriendsAddPanel: () => {
+      setFriendsPanelRequestedTab('add');
+      setFriendsPanelHighlightedRequestId(null);
+      setFriendsPanelOpen(true);
+    },
+  });
+  const {
+    actions: {
+      openNotificationItem,
+      acceptFriendRequestFromNotification,
+      declineFriendRequestFromNotification,
+    },
+  } = useNotificationInteractions({
+    notificationBackend,
+    socialBackend,
+    friendsSocialPanelEnabled,
+    refreshNotificationInbox,
+    refreshSocialCounts,
+    setNotificationsError,
+    onOpenDmConversation: async (conversationId) => {
+      setWorkspaceMode('dm');
+      await openDirectMessageConversation(conversationId);
+      setNotificationsPanelOpen(false);
+    },
+    onOpenFriendsPanel: ({ tab, highlightedRequestId }) => {
+      setFriendsPanelRequestedTab(tab);
+      setFriendsPanelHighlightedRequestId(highlightedRequestId);
+      setFriendsPanelOpen(true);
+      setNotificationsPanelOpen(false);
+    },
+    onOpenChannelMention: ({ communityId, channelId }) => {
+      setWorkspaceMode('community');
+      setCurrentServerId(communityId);
+      setCurrentChannelId(channelId);
+      setNotificationsPanelOpen(false);
+    },
+  });
 
   useEffect(() => {
     installPromptTrap();
@@ -438,12 +527,10 @@ export function ChatApp() {
 
   useEffect(() => {
     if (friendsSocialPanelEnabled) return;
-    setFriendsPanelOpen(false);
+    resetSocialWorkspace();
     setWorkspaceMode('community');
-    setSelectedDmConversationId(null);
-    setDmConversations([]);
-    setDmMessages([]);
-  }, [friendsSocialPanelEnabled]);
+    resetDirectMessages();
+  }, [friendsSocialPanelEnabled, resetDirectMessages, resetSocialWorkspace]);
 
   useEffect(() => {
     if (dmReportReviewPanelEnabled) return;
@@ -501,29 +588,10 @@ export function ChatApp() {
     resetMessageState();
     setAuthorProfiles({});
     authorProfileCacheRef.current = {};
-    knownNotificationRecipientIdsRef.current = new Set();
-    notificationsBootstrappedRef.current = false;
     resetFeatureFlags();
-    setNotificationItems([]);
-    setNotificationCounts(DEFAULT_NOTIFICATION_COUNTS);
-    setSocialCounts(DEFAULT_SOCIAL_COUNTS);
-    setDmConversations([]);
-    setDmConversationsLoading(false);
-    setDmConversationsRefreshing(false);
-    setDmConversationsError(null);
-    setSelectedDmConversationId(null);
-    setDmMessages([]);
-    setDmMessagesLoading(false);
-    setDmMessagesRefreshing(false);
-    setDmMessagesError(null);
-    setDmMessageSendPending(false);
-    setNotificationsLoading(false);
-    setNotificationsRefreshing(false);
-    setNotificationsError(null);
-    setNotificationPreferences(null);
-    setNotificationPreferencesLoading(false);
-    setNotificationPreferencesSaving(false);
-    setNotificationPreferencesError(null);
+    resetNotifications();
+    resetSocialWorkspace();
+    resetDirectMessages();
     resetChannelsWorkspace();
     resetServerPermissions();
     resetServerSettingsState();
@@ -551,385 +619,15 @@ export function ChatApp() {
     resetCommunityBans,
     resetMessageState,
     resetMembersModal,
+    resetNotifications,
     resetPlatformSession,
+    resetDirectMessages,
+    resetSocialWorkspace,
     resetServerSettingsState,
     resetServerRoleManagement,
     resetServerInvites,
     resetServerPermissions,
     user,
-  ]);
-
-  useEffect(() => {
-    notificationAudioSettingsRef.current = appSettings.notifications;
-  }, [appSettings.notifications]);
-
-  const refreshSocialCounts = React.useCallback(async () => {
-    if (!user?.id || !friendsSocialPanelEnabled) {
-      setSocialCounts(DEFAULT_SOCIAL_COUNTS);
-      return;
-    }
-
-    const nextCounts = await socialBackend.getSocialCounts();
-    setSocialCounts(nextCounts);
-  }, [friendsSocialPanelEnabled, socialBackend, user?.id]);
-
-  const refreshNotificationInbox = React.useCallback(
-    async (options?: { playSoundsForNew?: boolean }) => {
-      if (!user?.id) return;
-
-      const playSoundsForNew = Boolean(options?.playSoundsForNew);
-      const [items, counts] = await Promise.all([
-        notificationBackend.listNotifications({ limit: 50 }),
-        notificationBackend.getNotificationCounts(),
-      ]);
-
-      const nextKnownIds = new Set(items.map((item) => item.recipientId));
-      const previousKnownIds = knownNotificationRecipientIdsRef.current;
-      const canPlaySounds = notificationsBootstrappedRef.current && playSoundsForNew;
-
-      setNotificationItems(items);
-      setNotificationCounts(counts);
-      knownNotificationRecipientIdsRef.current = nextKnownIds;
-
-      if (canPlaySounds) {
-        for (const item of items) {
-          if (previousKnownIds.has(item.recipientId)) continue;
-          if (item.dismissedAt) continue;
-          void playNotificationSound({
-            kind: item.kind,
-            deliverSound: item.deliverSound,
-            audioSettings: notificationAudioSettingsRef.current,
-          });
-        }
-      }
-
-      notificationsBootstrappedRef.current = true;
-    },
-    [notificationBackend, user?.id]
-  );
-
-  const refreshNotificationPreferences = React.useCallback(async () => {
-    if (!user?.id) return;
-    const preferences = await notificationBackend.getNotificationPreferences();
-    setNotificationPreferences(preferences);
-  }, [notificationBackend, user?.id]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!user) {
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    setNotificationsLoading(true);
-    setNotificationsError(null);
-    notificationsBootstrappedRef.current = false;
-    knownNotificationRecipientIdsRef.current = new Set();
-
-    const loadInbox = async () => {
-      try {
-        await refreshNotificationInbox({ playSoundsForNew: false });
-      } catch (error) {
-        if (!isMounted) return;
-        console.error('Failed to load notification inbox:', error);
-        setNotificationsError(getErrorMessage(error, 'Failed to load notifications.'));
-      } finally {
-        if (!isMounted) return;
-        setNotificationsLoading(false);
-      }
-    };
-
-    void loadInbox();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshNotificationInbox, user?.id]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!user) {
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    setNotificationPreferencesLoading(true);
-    setNotificationPreferencesError(null);
-
-    const loadPreferences = async () => {
-      try {
-        const preferences = await notificationBackend.getNotificationPreferences();
-        if (!isMounted) return;
-        setNotificationPreferences(preferences);
-      } catch (error) {
-        if (!isMounted) return;
-        console.error('Failed to load notification preferences:', error);
-        setNotificationPreferencesError(getErrorMessage(error, 'Failed to load notification preferences.'));
-      } finally {
-        if (!isMounted) return;
-        setNotificationPreferencesLoading(false);
-      }
-    };
-
-    void loadPreferences();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [notificationBackend, refreshNotificationPreferences, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const subscription = notificationBackend.subscribeToNotificationInbox(user.id, () => {
-      setNotificationsRefreshing(true);
-      void refreshNotificationInbox({ playSoundsForNew: true })
-        .catch((error) => {
-          console.error('Failed to refresh notifications after realtime update:', error);
-          setNotificationsError(getErrorMessage(error, 'Failed to refresh notifications.'));
-        })
-        .finally(() => {
-          setNotificationsRefreshing(false);
-        });
-    });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [notificationBackend, refreshNotificationInbox, user?.id]);
-
-  useEffect(() => {
-    if (!notificationsPanelOpen || !user?.id) return;
-    if (notificationCounts.unseenCount <= 0) return;
-
-    void notificationBackend
-      .markAllNotificationsSeen()
-      .then(() => refreshNotificationInbox({ playSoundsForNew: false }))
-      .catch((error) => {
-        console.error('Failed to mark notifications seen:', error);
-      });
-  }, [
-    notificationBackend,
-    notificationCounts.unseenCount,
-    notificationsPanelOpen,
-    refreshNotificationInbox,
-    user?.id,
-  ]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!user?.id || !friendsSocialPanelEnabled) {
-      setSocialCounts(DEFAULT_SOCIAL_COUNTS);
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    void refreshSocialCounts().catch((error) => {
-      if (!isMounted) return;
-      console.error('Failed to load social counts:', error);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [friendsSocialPanelEnabled, refreshSocialCounts, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || !friendsSocialPanelEnabled) return;
-
-    const subscription = socialBackend.subscribeToSocialGraph(user.id, () => {
-      void refreshSocialCounts().catch((error) => {
-        console.error('Failed to refresh social counts after realtime update:', error);
-      });
-    });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [friendsSocialPanelEnabled, refreshSocialCounts, socialBackend, user?.id]);
-
-  const refreshDmConversations = React.useCallback(
-    async (options?: { suppressLoadingState?: boolean }) => {
-      if (!user?.id || !dmWorkspaceEnabled) {
-        setDmConversations([]);
-        return;
-      }
-
-      if (options?.suppressLoadingState) {
-        setDmConversationsRefreshing(true);
-      } else {
-        setDmConversationsLoading(true);
-      }
-      setDmConversationsError(null);
-
-      try {
-        const conversations = await directMessageBackend.listConversations();
-        setDmConversations(conversations);
-      } catch (error) {
-        setDmConversationsError(getErrorMessage(error, 'Failed to load direct messages.'));
-      } finally {
-        setDmConversationsLoading(false);
-        setDmConversationsRefreshing(false);
-      }
-    },
-    [directMessageBackend, dmWorkspaceEnabled, user?.id]
-  );
-
-  const refreshDmMessages = React.useCallback(
-    async (conversationId: string, options?: { suppressLoadingState?: boolean; markRead?: boolean }) => {
-      if (!user?.id || !dmWorkspaceEnabled || !conversationId) {
-        setDmMessages([]);
-        return;
-      }
-
-      if (options?.suppressLoadingState) {
-        setDmMessagesRefreshing(true);
-      } else {
-        setDmMessagesLoading(true);
-      }
-      setDmMessagesError(null);
-
-      try {
-        const messages = await directMessageBackend.listMessages({
-          conversationId,
-          limit: 100,
-        });
-        if (selectedDmConversationId !== conversationId) {
-          return;
-        }
-        setDmMessages(messages);
-
-        if (options?.markRead !== false) {
-          const now = Date.now();
-          const lastMarkedAt = dmLastReadMarkAtRef.current[conversationId] ?? 0;
-          const recentlyMarked = now - lastMarkedAt < 1500;
-          const inFlight = Boolean(dmReadMarkInFlightRef.current[conversationId]);
-          if (!recentlyMarked && !inFlight) {
-            dmReadMarkInFlightRef.current[conversationId] = true;
-            try {
-              await directMessageBackend.markConversationRead(conversationId);
-              dmLastReadMarkAtRef.current[conversationId] = Date.now();
-            } finally {
-              dmReadMarkInFlightRef.current[conversationId] = false;
-            }
-          }
-        }
-      } catch (error) {
-        if (selectedDmConversationId !== conversationId) return;
-        setDmMessagesError(getErrorMessage(error, 'Failed to load direct messages.'));
-      } finally {
-        if (selectedDmConversationId !== conversationId) return;
-        setDmMessagesLoading(false);
-        setDmMessagesRefreshing(false);
-      }
-    },
-    [directMessageBackend, dmWorkspaceEnabled, selectedDmConversationId, user?.id]
-  );
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!user?.id || !dmWorkspaceEnabled) {
-      setDmConversations([]);
-      setSelectedDmConversationId(null);
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    void refreshDmConversations().catch((error) => {
-      if (!isMounted) return;
-      console.error('Failed to initialize DM conversations:', error);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [dmWorkspaceEnabled, refreshDmConversations, user?.id]);
-
-  useEffect(() => {
-    if (!dmWorkspaceIsActive) return;
-    if (selectedDmConversationId) {
-      const stillExists = dmConversations.some(
-        (conversation) => conversation.conversationId === selectedDmConversationId
-      );
-      if (!stillExists) {
-        setSelectedDmConversationId(dmConversations[0]?.conversationId ?? null);
-      }
-      return;
-    }
-
-    if (dmConversations.length > 0) {
-      setSelectedDmConversationId(dmConversations[0].conversationId);
-    }
-  }, [dmConversations, dmWorkspaceIsActive, selectedDmConversationId]);
-
-  useEffect(() => {
-    if (!user?.id || !dmWorkspaceEnabled) return;
-
-    const subscription = directMessageBackend.subscribeToConversations(user.id, () => {
-      void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
-        console.error('Failed to refresh DM conversations after realtime update:', error);
-      });
-    });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [
-    directMessageBackend,
-    dmWorkspaceEnabled,
-    refreshDmConversations,
-    refreshDmMessages,
-    selectedDmConversationId,
-    dmWorkspaceIsActive,
-    user?.id,
-  ]);
-
-  useEffect(() => {
-    if (!dmWorkspaceIsActive || !selectedDmConversationId || !user?.id) {
-      setDmMessages([]);
-      setDmMessagesLoading(false);
-      setDmMessagesRefreshing(false);
-      setDmMessagesError(null);
-      return;
-    }
-
-    void refreshDmMessages(selectedDmConversationId, { markRead: true }).catch((error) => {
-      console.error('Failed to load selected DM conversation:', error);
-    });
-  }, [dmWorkspaceIsActive, refreshDmMessages, selectedDmConversationId, user?.id]);
-
-  useEffect(() => {
-    if (!dmWorkspaceIsActive || !selectedDmConversationId) return;
-
-    const subscription = directMessageBackend.subscribeToMessages(selectedDmConversationId, () => {
-      void refreshDmMessages(selectedDmConversationId, {
-        suppressLoadingState: true,
-        markRead: false,
-      }).catch((error) => {
-        console.error('Failed to refresh DM messages after realtime update:', error);
-      });
-      void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
-        console.error('Failed to refresh DM conversations after message update:', error);
-      });
-    });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [
-    directMessageBackend,
-    dmWorkspaceIsActive,
-    refreshDmConversations,
-    refreshDmMessages,
-    selectedDmConversationId,
   ]);
 
   // Reset server-scoped UI when no server is selected
@@ -1125,759 +823,6 @@ export function ChatApp() {
     }
   }, [currentChannelId, channels]);
 
-  // Load messages when channel changes
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!user || !currentServerId || !currentChannelId) {
-      resetMessageState();
-      setAuthorProfiles({});
-      return;
-    }
-
-    const selectedChannel = channels.find((channel) => channel.id === currentChannelId);
-    if (!selectedChannel || selectedChannel.community_id !== currentServerId) {
-      return;
-    }
-
-    if (selectedChannel.kind !== 'text') {
-      resetMessageState();
-      setAuthorProfiles({});
-      return;
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    let activeLoadPromise: Promise<void> | null = null;
-    let scheduledReloadTimerId: number | null = null;
-    const pendingReloadReasons = new Set<string>();
-    let currentMessageList: Message[] = [];
-    let currentReactionList: MessageReaction[] = [];
-    let currentAttachmentList: MessageAttachment[] = [];
-    let currentLinkPreviewList: MessageLinkPreview[] = [];
-    let latestAuthorSyncId = 0;
-    let pendingAttachmentRefreshTimerId: number | null = null;
-    let pendingLinkPreviewRefreshTimerId: number | null = null;
-    let attachmentRefreshInFlight = false;
-    let linkPreviewRefreshInFlight = false;
-    const pendingAttachmentRefreshMessageIds = new Set<string>();
-    const pendingLinkPreviewRefreshMessageIds = new Set<string>();
-
-    const logReload = (event: string, details?: Record<string, unknown>) => {
-      if (!debugChannelReloads) return;
-      console.debug(`[chat-reload] ${event}`, {
-        channelId: currentChannelId,
-        serverId: currentServerId,
-        ...details,
-      });
-    };
-
-    const asRecord = (value: unknown): Record<string, unknown> | null =>
-      value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : null;
-
-    const getStringField = (value: unknown, key: string): string | null => {
-      const record = asRecord(value);
-      if (!record) return null;
-      const candidate = record[key];
-      return typeof candidate === 'string' && candidate.length > 0 ? candidate : null;
-    };
-
-    const getNullableStringField = (value: unknown, key: string): string | null => {
-      const record = asRecord(value);
-      if (!record) return null;
-      const candidate = record[key];
-      if (candidate == null) return null;
-      return typeof candidate === 'string' ? candidate : null;
-    };
-
-    const getRealtimeEventType = (payload: unknown): 'INSERT' | 'UPDATE' | 'DELETE' | null => {
-      const eventType = getStringField(payload, 'eventType');
-      if (eventType === 'INSERT' || eventType === 'UPDATE' || eventType === 'DELETE') return eventType;
-      return null;
-    };
-
-    const getRealtimeNewRow = (payload: unknown): Record<string, unknown> | null =>
-      asRecord(asRecord(payload)?.new);
-    const getRealtimeOldRow = (payload: unknown): Record<string, unknown> | null =>
-      asRecord(asRecord(payload)?.old);
-
-    const compareMessagesAsc = (left: Message, right: Message): number => {
-      if (left.created_at < right.created_at) return -1;
-      if (left.created_at > right.created_at) return 1;
-      if (left.id < right.id) return -1;
-      if (left.id > right.id) return 1;
-      return 0;
-    };
-
-    const persistCurrentChannelBundleCache = () => {
-      const { hasOlderMessages: runtimeHasOlderMessages } = getMessageLoadRuntime();
-      cacheChannelBundle(currentServerId, currentChannelId, {
-        messages: currentMessageList,
-        reactions: currentReactionList,
-        attachments: currentAttachmentList,
-        linkPreviews: currentLinkPreviewList,
-        hasOlderMessages: runtimeHasOlderMessages,
-      });
-    };
-
-    const updateAuthorProfilesForMessages = async (messageList: Message[]) => {
-      const authorIds = Array.from(
-        new Set(
-          messageList
-            .map((message) => message.author_user_id)
-            .filter((authorId): authorId is string => Boolean(authorId))
-        )
-      );
-
-      if (authorIds.length === 0) {
-        if (!isMounted) return { authorCount: 0, fetchedAuthorCount: 0 };
-        setAuthorProfiles({});
-        return { authorCount: 0, fetchedAuthorCount: 0 };
-      }
-
-      const missingAuthorIds = authorIds.filter((authorId) => !authorProfileCacheRef.current[authorId]);
-      if (missingAuthorIds.length > 0) {
-        const fetchedProfiles = await communityBackend.fetchAuthorProfiles(missingAuthorIds);
-        authorProfileCacheRef.current = {
-          ...authorProfileCacheRef.current,
-          ...fetchedProfiles,
-        };
-      }
-
-      const profileMap: Record<string, AuthorProfile> = {};
-      for (const authorId of authorIds) {
-        const cachedProfile = authorProfileCacheRef.current[authorId];
-        if (cachedProfile) {
-          profileMap[authorId] = cachedProfile;
-        }
-      }
-
-      if (!isMounted) return { authorCount: authorIds.length, fetchedAuthorCount: missingAuthorIds.length };
-      setAuthorProfiles(profileMap);
-      return { authorCount: authorIds.length, fetchedAuthorCount: missingAuthorIds.length };
-    };
-
-    const updateMessageBundleState = async (input: {
-      reason: string;
-      loadId: number;
-      startedAt: number;
-      messageList: Message[];
-      reactionList: MessageReaction[];
-      attachmentList: MessageAttachment[];
-      linkPreviewList: MessageLinkPreview[];
-      hasOlder: boolean;
-    }) => {
-      if (!isMounted || !isCurrentMessageLoad(input.loadId)) return;
-
-      currentMessageList = input.messageList;
-      currentReactionList = input.reactionList;
-      currentAttachmentList = input.attachmentList;
-      currentLinkPreviewList = input.linkPreviewList;
-      syncLoadedMessageWindow(input.messageList, input.hasOlder);
-
-      setMessages(input.messageList);
-      setMessageReactions(input.reactionList);
-      setMessageAttachments(input.attachmentList);
-      setMessageLinkPreviews(input.linkPreviewList);
-      persistCurrentChannelBundleCache();
-
-      const { authorCount, fetchedAuthorCount } = await updateAuthorProfilesForMessages(input.messageList);
-      if (!isMounted || !isCurrentMessageLoad(input.loadId)) return;
-
-      logReload('load:success', {
-        reason: input.reason,
-        loadId: input.loadId,
-        durationMs: Date.now() - input.startedAt,
-        messageCount: input.messageList.length,
-        authorCount,
-        fetchedAuthorCount,
-        hasOlderMessages: input.hasOlder,
-      });
-    };
-
-    const scheduleAuthorProfileSyncForCurrentMessages = (reason: string) => {
-      const authorSyncId = ++latestAuthorSyncId;
-      const messageSnapshot = [...currentMessageList];
-      void (async () => {
-        try {
-          const { authorCount, fetchedAuthorCount } = await updateAuthorProfilesForMessages(messageSnapshot);
-          if (!isMounted || authorSyncId !== latestAuthorSyncId) return;
-          logReload('authors:sync', {
-            reason,
-            messageCount: messageSnapshot.length,
-            authorCount,
-            fetchedAuthorCount,
-          });
-        } catch (error) {
-          if (!isMounted || authorSyncId !== latestAuthorSyncId) return;
-          console.warn('Failed to sync author profiles after incremental message change:', error);
-        }
-      })();
-    };
-
-    const commitMessages = (nextMessages: Message[], reason: string) => {
-      currentMessageList = nextMessages;
-      syncOldestLoadedCursor(nextMessages);
-      persistCurrentChannelBundleCache();
-      if (!isMounted) return;
-      setMessages(nextMessages);
-      scheduleAuthorProfileSyncForCurrentMessages(reason);
-    };
-
-    const commitReactions = (nextReactions: MessageReaction[]) => {
-      currentReactionList = nextReactions;
-      persistCurrentChannelBundleCache();
-      if (!isMounted) return;
-      setMessageReactions(nextReactions);
-    };
-
-    const commitAttachments = (nextAttachments: MessageAttachment[]) => {
-      currentAttachmentList = nextAttachments;
-      persistCurrentChannelBundleCache();
-      if (!isMounted) return;
-      setMessageAttachments(nextAttachments);
-    };
-
-    const commitLinkPreviews = (nextLinkPreviews: MessageLinkPreview[]) => {
-      currentLinkPreviewList = nextLinkPreviews;
-      persistCurrentChannelBundleCache();
-      if (!isMounted) return;
-      setMessageLinkPreviews(nextLinkPreviews);
-    };
-
-    const hydrateChannelBundleFromCache = () => {
-      const cachedBundle = getCachedChannelBundle(currentServerId, currentChannelId);
-      if (!cachedBundle) return false;
-
-      currentMessageList = cachedBundle.messages;
-      currentReactionList = cachedBundle.reactions;
-      currentAttachmentList = cachedBundle.attachments;
-      currentLinkPreviewList = cachedBundle.linkPreviews;
-      syncLoadedMessageWindow(cachedBundle.messages, cachedBundle.hasOlderMessages);
-
-      if (!isMounted) return true;
-      setMessages(cachedBundle.messages);
-      setMessageReactions(cachedBundle.reactions);
-      setMessageAttachments(cachedBundle.attachments);
-      setMessageLinkPreviews(cachedBundle.linkPreviews);
-      scheduleAuthorProfileSyncForCurrentMessages('channel_cache_hydrate');
-      logReload('cache:hydrate', {
-        messageCount: cachedBundle.messages.length,
-        hasOlderMessages: cachedBundle.hasOlderMessages,
-      });
-      return true;
-    };
-
-    const mergeAttachmentsForMessageIds = async (messageIds: string[]) => {
-      const uniqueMessageIds = Array.from(
-        new Set(
-          messageIds.filter((messageId) =>
-            currentMessageList.some((message) => message.id === messageId)
-          )
-        )
-      );
-      if (uniqueMessageIds.length === 0) return;
-
-      const refreshedRows = await fetchMessageAttachmentsForMessageIds(uniqueMessageIds);
-
-      const nextAttachments = [
-        ...currentAttachmentList.filter((attachment) => !uniqueMessageIds.includes(attachment.messageId)),
-        ...refreshedRows,
-      ].sort((left, right) => {
-        if (left.createdAt < right.createdAt) return -1;
-        if (left.createdAt > right.createdAt) return 1;
-        if (left.id < right.id) return -1;
-        if (left.id > right.id) return 1;
-        return 0;
-      });
-
-      commitAttachments(nextAttachments);
-    };
-
-    const mergeLinkPreviewsForMessageIds = async (messageIds: string[]) => {
-      const uniqueMessageIds = Array.from(
-        new Set(
-          messageIds.filter((messageId) =>
-            currentMessageList.some((message) => message.id === messageId)
-          )
-        )
-      );
-      if (uniqueMessageIds.length === 0) return;
-
-      const refreshedRows = await fetchMessageLinkPreviewsForMessageIds(uniqueMessageIds);
-
-      const nextLinkPreviews = [
-        ...currentLinkPreviewList.filter((preview) => !uniqueMessageIds.includes(preview.messageId)),
-        ...refreshedRows,
-      ].sort((left, right) => {
-        if (left.createdAt < right.createdAt) return -1;
-        if (left.createdAt > right.createdAt) return 1;
-        if (left.id < right.id) return -1;
-        if (left.id > right.id) return 1;
-        return 0;
-      });
-
-      commitLinkPreviews(nextLinkPreviews);
-    };
-
-    const flushAttachmentRefreshQueue = () => {
-      if (!isMounted) return;
-      if (attachmentRefreshInFlight) return;
-      if (pendingAttachmentRefreshMessageIds.size === 0) return;
-
-      const messageIds = Array.from(pendingAttachmentRefreshMessageIds);
-      pendingAttachmentRefreshMessageIds.clear();
-      attachmentRefreshInFlight = true;
-
-      void mergeAttachmentsForMessageIds(messageIds)
-        .catch((error) => {
-          console.warn('Failed to incrementally refresh message attachments:', error);
-          scheduleMessageReload('attachments_sub_fallback', 20);
-        })
-        .finally(() => {
-          attachmentRefreshInFlight = false;
-          if (!isMounted) return;
-          if (pendingAttachmentRefreshMessageIds.size > 0 && pendingAttachmentRefreshTimerId === null) {
-            pendingAttachmentRefreshTimerId = window.setTimeout(() => {
-              pendingAttachmentRefreshTimerId = null;
-              flushAttachmentRefreshQueue();
-            }, 25);
-          }
-        });
-    };
-
-    const queueAttachmentRefresh = (messageId: string) => {
-      if (!messageId) return;
-      pendingAttachmentRefreshMessageIds.add(messageId);
-      if (pendingAttachmentRefreshTimerId !== null) return;
-      pendingAttachmentRefreshTimerId = window.setTimeout(() => {
-        pendingAttachmentRefreshTimerId = null;
-        flushAttachmentRefreshQueue();
-      }, 25);
-    };
-
-    const flushLinkPreviewRefreshQueue = () => {
-      if (!isMounted) return;
-      if (linkPreviewRefreshInFlight) return;
-      if (pendingLinkPreviewRefreshMessageIds.size === 0) return;
-
-      const messageIds = Array.from(pendingLinkPreviewRefreshMessageIds);
-      pendingLinkPreviewRefreshMessageIds.clear();
-      linkPreviewRefreshInFlight = true;
-
-      void mergeLinkPreviewsForMessageIds(messageIds)
-        .catch((error) => {
-          console.warn('Failed to incrementally refresh message link previews:', error);
-          scheduleMessageReload('previews_sub_fallback', 20);
-        })
-        .finally(() => {
-          linkPreviewRefreshInFlight = false;
-          if (!isMounted) return;
-          if (pendingLinkPreviewRefreshMessageIds.size > 0 && pendingLinkPreviewRefreshTimerId === null) {
-            pendingLinkPreviewRefreshTimerId = window.setTimeout(() => {
-              pendingLinkPreviewRefreshTimerId = null;
-              flushLinkPreviewRefreshQueue();
-            }, 25);
-          }
-        });
-    };
-
-    const queueLinkPreviewRefresh = (messageId: string) => {
-      if (!messageId) return;
-      pendingLinkPreviewRefreshMessageIds.add(messageId);
-      if (pendingLinkPreviewRefreshTimerId !== null) return;
-      pendingLinkPreviewRefreshTimerId = window.setTimeout(() => {
-        pendingLinkPreviewRefreshTimerId = null;
-        flushLinkPreviewRefreshQueue();
-      }, 25);
-    };
-
-    const parseReactionFromRow = (row: Record<string, unknown> | null): MessageReaction | null => {
-      if (!row) return null;
-      const id = getStringField(row, 'id');
-      const messageId = getStringField(row, 'message_id');
-      const userId = getStringField(row, 'user_id');
-      const emoji = getStringField(row, 'emoji');
-      const createdAt = getStringField(row, 'created_at');
-      if (!id || !messageId || !userId || !emoji || !createdAt) return null;
-      return { id, messageId, userId, emoji, createdAt };
-    };
-
-    const getAffectedMessageIdFromRealtimePayload = (
-      payload: unknown,
-      currentRows: { id: string; messageId: string }[]
-    ): string | null => {
-      const nextRow = getRealtimeNewRow(payload);
-      const oldRow = getRealtimeOldRow(payload);
-      const directMessageId =
-        getStringField(nextRow, 'message_id') ?? getStringField(oldRow, 'message_id');
-      if (directMessageId) return directMessageId;
-
-      const rowId = getStringField(nextRow, 'id') ?? getStringField(oldRow, 'id');
-      if (!rowId) return null;
-      return currentRows.find((row) => row.id === rowId)?.messageId ?? null;
-    };
-
-    const applyIncrementalMessageChange = (payload: unknown): boolean => {
-      const eventType = getRealtimeEventType(payload);
-      if (!eventType) return false;
-
-      const nextRow = getRealtimeNewRow(payload);
-      const oldRow = getRealtimeOldRow(payload);
-      const rowRecord = eventType === 'DELETE' ? oldRow : nextRow;
-      const messageId = getStringField(rowRecord, 'id');
-      if (!messageId) return false;
-
-      if (eventType === 'DELETE') {
-        if (!currentMessageList.some((message) => message.id === messageId)) return true;
-        commitMessages(
-          currentMessageList.filter((message) => message.id !== messageId),
-          'messages_sub_delete'
-        );
-        commitReactions(currentReactionList.filter((reaction) => reaction.messageId !== messageId));
-        commitAttachments(currentAttachmentList.filter((attachment) => attachment.messageId !== messageId));
-        commitLinkPreviews(currentLinkPreviewList.filter((preview) => preview.messageId !== messageId));
-        return true;
-      }
-
-      const deletedAt = getNullableStringField(nextRow, 'deleted_at');
-      if (deletedAt) {
-        if (!currentMessageList.some((message) => message.id === messageId)) return true;
-        commitMessages(
-          currentMessageList.filter((message) => message.id !== messageId),
-          'messages_sub_soft_delete'
-        );
-        commitReactions(currentReactionList.filter((reaction) => reaction.messageId !== messageId));
-        commitAttachments(currentAttachmentList.filter((attachment) => attachment.messageId !== messageId));
-        commitLinkPreviews(currentLinkPreviewList.filter((preview) => preview.messageId !== messageId));
-        return true;
-      }
-
-      if (!nextRow) return false;
-      const messageRow = nextRow as unknown as Message;
-      const existingIndex = currentMessageList.findIndex((message) => message.id === messageId);
-      const nextMessages = [...currentMessageList];
-      if (existingIndex >= 0) {
-        nextMessages[existingIndex] = messageRow;
-      } else {
-        nextMessages.push(messageRow);
-      }
-      nextMessages.sort(compareMessagesAsc);
-      commitMessages(nextMessages, existingIndex >= 0 ? 'messages_sub_update' : 'messages_sub_insert');
-      return true;
-    };
-
-    const applyIncrementalReactionChange = (payload: unknown): boolean => {
-      const eventType = getRealtimeEventType(payload);
-      if (!eventType) return false;
-      const nextRow = getRealtimeNewRow(payload);
-      const oldRow = getRealtimeOldRow(payload);
-
-      if (eventType === 'DELETE') {
-        const reactionId = getStringField(oldRow, 'id');
-        if (!reactionId) return false;
-        if (!currentReactionList.some((reaction) => reaction.id === reactionId)) return true;
-        commitReactions(currentReactionList.filter((reaction) => reaction.id !== reactionId));
-        return true;
-      }
-
-      const reactionRow = parseReactionFromRow(nextRow);
-      if (!reactionRow) return false;
-      if (!currentMessageList.some((message) => message.id === reactionRow.messageId)) return true;
-
-      const existingIndex = currentReactionList.findIndex((reaction) => reaction.id === reactionRow.id);
-      const nextReactions = [...currentReactionList];
-      if (existingIndex >= 0) {
-        nextReactions[existingIndex] = reactionRow;
-      } else {
-        nextReactions.push(reactionRow);
-      }
-      nextReactions.sort((left, right) => {
-        if (left.createdAt < right.createdAt) return -1;
-        if (left.createdAt > right.createdAt) return 1;
-        if (left.id < right.id) return -1;
-        if (left.id > right.id) return 1;
-        return 0;
-      });
-      commitReactions(nextReactions);
-      return true;
-    };
-
-    const loadMessages = async (reason: string) => {
-      let loadId: number | null = null;
-      let startedAt = Date.now();
-      try {
-        const loadedBundle = await loadLatestMessagesWithRelated(currentMessageList.length);
-        loadId = loadedBundle.loadId;
-        startedAt = loadedBundle.startedAt;
-        logReload('load:start', { reason, loadId });
-
-        await updateMessageBundleState({
-          reason,
-          loadId: loadedBundle.loadId,
-          startedAt: loadedBundle.startedAt,
-          messageList: loadedBundle.messageList,
-          reactionList: loadedBundle.reactionList,
-          attachmentList: loadedBundle.attachmentList,
-          linkPreviewList: loadedBundle.linkPreviewList,
-          hasOlder: loadedBundle.hasOlder,
-        });
-      } catch (error) {
-        if (loadId == null) {
-          if (isMounted) {
-            console.error('Error loading messages:', error);
-          }
-          return;
-        }
-        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
-        console.error('Error loading messages:', error);
-        logReload('load:error', {
-          reason,
-          loadId,
-          durationMs: Date.now() - startedAt,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    };
-
-    const loadOlderMessages = async () => {
-      if (!isMounted) return;
-      let loadResult:
-        | Awaited<ReturnType<typeof loadOlderMessagesWithRelated>>
-        | null = null;
-      let loadId: number | null = null;
-      let startedAt = Date.now();
-
-      try {
-        loadResult = await loadOlderMessagesWithRelated(currentMessageList);
-        if (loadResult.kind === 'skipped') return;
-
-        loadId = loadResult.loadId;
-        startedAt = loadResult.startedAt;
-        logReload('load-older:start', {
-          loadId,
-          cursorCreatedAt: loadResult.oldestLoadedCursor.createdAt,
-          cursorId: loadResult.oldestLoadedCursor.id,
-          currentMessageCount: currentMessageList.length,
-        });
-
-        if (loadResult.kind === 'no_more') {
-          if (!isMounted || !isCurrentMessageLoad(loadId)) return;
-          syncLoadedMessageWindow(currentMessageList, false);
-          logReload('load-older:complete', {
-            loadId,
-            addedCount: 0,
-            durationMs: Date.now() - startedAt,
-            hasOlderMessages: false,
-          });
-          return;
-        }
-
-        await updateMessageBundleState({
-          reason: 'load_older',
-          loadId,
-          startedAt,
-          messageList: loadResult.messageList,
-          reactionList: loadResult.reactionList,
-          attachmentList: loadResult.attachmentList,
-          linkPreviewList: loadResult.linkPreviewList,
-          hasOlder: loadResult.hasOlder,
-        });
-
-        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
-        logReload('load-older:complete', {
-          loadId,
-          addedCount: loadResult.prependCount,
-          durationMs: Date.now() - startedAt,
-          hasOlderMessages: loadResult.hasOlder,
-        });
-      } catch (error) {
-        if (loadId == null) {
-          if (isMounted) {
-            console.error('Error loading older messages:', error);
-          }
-          return;
-        }
-        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
-        console.error('Error loading older messages:', error);
-        logReload('load-older:error', {
-          loadId,
-          durationMs: Date.now() - startedAt,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        throw error;
-      } finally {
-        finishOlderMessagesLoad({ updateUi: isMounted });
-      }
-    };
-
-    setRequestOlderMessagesLoader(loadOlderMessages);
-
-    const flushScheduledMessageReload = () => {
-      if (!isMounted) return;
-      if (activeLoadPromise) return;
-      if (pendingReloadReasons.size === 0) return;
-
-      const reasons = Array.from(pendingReloadReasons);
-      pendingReloadReasons.clear();
-      const reasonLabel = reasons.join('+');
-
-      activeLoadPromise = loadMessages(reasonLabel).finally(() => {
-        activeLoadPromise = null;
-        if (!isMounted) return;
-        if (pendingReloadReasons.size > 0 && scheduledReloadTimerId === null) {
-          scheduledReloadTimerId = window.setTimeout(() => {
-            scheduledReloadTimerId = null;
-            flushScheduledMessageReload();
-          }, 40);
-        }
-      });
-    };
-
-    const scheduleMessageReload = (reason: string, delayMs = 60) => {
-      if (!isMounted) return;
-      pendingReloadReasons.add(reason);
-      logReload('load:queued', { reason, delayMs, pendingReasons: Array.from(pendingReloadReasons) });
-
-      if (scheduledReloadTimerId !== null) return;
-      if (delayMs <= 0 && !activeLoadPromise) {
-        flushScheduledMessageReload();
-        return;
-      }
-
-      scheduledReloadTimerId = window.setTimeout(() => {
-        scheduledReloadTimerId = null;
-        flushScheduledMessageReload();
-      }, Math.max(0, delayMs));
-    };
-
-    const runMessageMediaMaintenance = async () => {
-      try {
-        const result = await runMessageMediaMaintenanceFromHook(100);
-        if (!isMounted) return;
-        if ((result.deletedMessages ?? 0) > 0) {
-          logReload('maintenance:deleted', {
-            deletedMessages: result.deletedMessages ?? 0,
-            deletedObjects: result.deletedObjects ?? 0,
-          });
-          scheduleMessageReload('maintenance_reload', 20);
-        }
-      } catch (error) {
-        if (!isMounted) return;
-        console.warn('Failed to run media maintenance:', error);
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      const visibility = document.visibilityState;
-      logReload('visibility', { state: visibility });
-      if (visibility === 'visible') {
-        scheduleMessageReload('visibility_resume', 120);
-      }
-    };
-
-    const handleWindowFocus = () => {
-      logReload('window_focus');
-      scheduleMessageReload('window_focus', 120);
-    };
-
-    const handleWindowBlur = () => {
-      logReload('window_blur');
-    };
-
-    void hydrateChannelBundleFromCache();
-    void runMessageMediaMaintenance();
-    scheduleMessageReload('initial', 0);
-
-    const messageChannel = communityBackend.subscribeToMessages(currentChannelId, (payload) => {
-      const handled = applyIncrementalMessageChange(payload);
-      if (!handled) {
-        scheduleMessageReload('messages_sub_fallback');
-      }
-    });
-    const reactionsChannel = communityBackend.subscribeToMessageReactions(currentChannelId, (payload) => {
-      const handled = applyIncrementalReactionChange(payload);
-      if (!handled) {
-        scheduleMessageReload('reactions_sub_fallback');
-      }
-    });
-    const attachmentsChannel = communityBackend.subscribeToMessageAttachments(currentChannelId, (payload) => {
-      const messageId = getAffectedMessageIdFromRealtimePayload(
-        payload,
-        currentAttachmentList.map((row) => ({ id: row.id, messageId: row.messageId }))
-      );
-      if (!messageId) {
-        scheduleMessageReload('attachments_sub_fallback');
-        return;
-      }
-      queueAttachmentRefresh(messageId);
-    });
-    const linkPreviewsChannel = communityBackend.subscribeToMessageLinkPreviews(currentChannelId, (payload) => {
-      const messageId = getAffectedMessageIdFromRealtimePayload(
-        payload,
-        currentLinkPreviewList.map((row) => ({ id: row.id, messageId: row.messageId }))
-      );
-      if (!messageId) {
-        scheduleMessageReload('previews_sub_fallback');
-        return;
-      }
-      queueLinkPreviewRefresh(messageId);
-    });
-    const cleanupIntervalId = window.setInterval(() => {
-      void runMessageMediaMaintenance();
-    }, 60 * 1000);
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleWindowFocus);
-    window.addEventListener('blur', handleWindowBlur);
-
-    return () => {
-      isMounted = false;
-      clearRequestOlderMessagesLoader();
-      pendingReloadReasons.clear();
-      if (scheduledReloadTimerId !== null) {
-        window.clearTimeout(scheduledReloadTimerId);
-      }
-      if (pendingAttachmentRefreshTimerId !== null) {
-        window.clearTimeout(pendingAttachmentRefreshTimerId);
-      }
-      if (pendingLinkPreviewRefreshTimerId !== null) {
-        window.clearTimeout(pendingLinkPreviewRefreshTimerId);
-      }
-      pendingAttachmentRefreshMessageIds.clear();
-      pendingLinkPreviewRefreshMessageIds.clear();
-      void messageChannel.unsubscribe();
-      void reactionsChannel.unsubscribe();
-      void attachmentsChannel.unsubscribe();
-      void linkPreviewsChannel.unsubscribe();
-      window.clearInterval(cleanupIntervalId);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleWindowFocus);
-      window.removeEventListener('blur', handleWindowBlur);
-    };
-  }, [
-    user?.id,
-    currentServerId,
-    currentChannelId,
-    currentChannelKind,
-    debugChannelReloads,
-    getCachedChannelBundle,
-    cacheChannelBundle,
-    fetchMessageAttachmentsForMessageIds,
-    fetchMessageLinkPreviewsForMessageIds,
-    runMessageMediaMaintenanceFromHook,
-    getMessageLoadRuntime,
-    isCurrentMessageLoad,
-    syncOldestLoadedCursor,
-    syncLoadedMessageWindow,
-    loadLatestMessagesWithRelated,
-    loadOlderMessagesWithRelated,
-    finishOlderMessagesLoad,
-    setRequestOlderMessagesLoader,
-    clearRequestOlderMessagesLoader,
-  ]);
-
   // Determine whether Haven Developer messaging is allowed in the current channel.
   useEffect(() => {
     let isMounted = true;
@@ -2055,178 +1000,6 @@ export function ChatApp() {
     return controlPlaneBackend.listBanEligibleServersForUser(targetUserId);
   }
 
-  function openDirectMessagesWorkspace() {
-    if (!dmWorkspaceEnabled) {
-      const message = 'Direct messages are not enabled for your account.';
-      setDmConversationsError(message);
-      toast.error(message, { id: 'dm-workspace-disabled' });
-      return;
-    }
-
-    setWorkspaceMode('dm');
-    setNotificationsPanelOpen(false);
-    setFriendsPanelOpen(false);
-    setFriendsPanelRequestedTab(null);
-    setFriendsPanelHighlightedRequestId(null);
-    setDmConversationsError(null);
-
-    if (!selectedDmConversationId && dmConversations.length > 0) {
-      setSelectedDmConversationId(dmConversations[0].conversationId);
-    }
-
-    void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
-      const message = getErrorMessage(error, 'Failed to load direct messages.');
-      console.error('Failed to open direct messages workspace:', error);
-      setDmConversationsError(message);
-      toast.error(message, { id: 'dm-workspace-open-error' });
-    });
-  }
-
-  async function openDirectMessageWithUser(targetUserId: string) {
-    if (!user) {
-      throw new Error('Not authenticated.');
-    }
-    if (!dmWorkspaceEnabled) {
-      throw new Error('Direct messages are not enabled for your account.');
-    }
-
-    const conversationId = await directMessageBackend.getOrCreateDirectConversation(targetUserId);
-    await openDirectMessageConversation(conversationId);
-  }
-
-  async function openDirectMessageConversation(conversationId: string) {
-    if (!user) {
-      throw new Error('Not authenticated.');
-    }
-    if (!dmWorkspaceEnabled) {
-      throw new Error('Direct messages are not enabled for your account.');
-    }
-    if (!conversationId) {
-      throw new Error('DM conversation id is required.');
-    }
-
-    setWorkspaceMode('dm');
-    setSelectedDmConversationId(conversationId);
-    await refreshDmConversations({ suppressLoadingState: true });
-    await refreshDmMessages(conversationId, { suppressLoadingState: true, markRead: true });
-  }
-
-  function directMessageUser(targetUserId: string) {
-    setDmConversationsError(null);
-
-    if (!dmWorkspaceEnabled) {
-      const message = 'Direct messages are coming soon.';
-      setDmConversationsError(message);
-      toast.error(message, { id: 'dm-open-disabled' });
-      return;
-    }
-
-    if (!targetUserId) {
-      const message = 'Invalid DM target.';
-      setDmConversationsError(message);
-      toast.error(message, { id: 'dm-open-invalid-target' });
-      return;
-    }
-
-    if (user?.id && targetUserId === user.id) {
-      const message = 'You cannot direct message yourself.';
-      setDmConversationsError(message);
-      toast.error(message, { id: 'dm-open-self' });
-      return;
-    }
-
-    void openDirectMessageWithUser(targetUserId).catch((error) => {
-      const message = getErrorMessage(error, 'Failed to open direct message.');
-      const errorCode =
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        typeof (error as { code?: unknown }).code === 'string'
-          ? ((error as { code: string }).code ?? null)
-          : null;
-
-      console.error('Failed to open direct message:', error);
-      setDmConversationsError(message);
-
-      if (errorCode === 'P0001' && message.includes('friends list')) {
-        toast.error(message, {
-          id: 'dm-open-friends-only',
-          action: friendsSocialPanelEnabled
-            ? {
-                label: 'Open Friends',
-                onClick: () => {
-                  setFriendsPanelRequestedTab('add');
-                  setFriendsPanelHighlightedRequestId(null);
-                  setFriendsPanelOpen(true);
-                },
-              }
-            : undefined,
-        });
-        return;
-      }
-
-      toast.error(message, { id: 'dm-open-error' });
-    });
-  }
-
-  async function sendDirectMessage(content: string) {
-    if (!selectedDmConversationId) {
-      throw new Error('No direct message conversation selected.');
-    }
-
-    setDmMessageSendPending(true);
-    setDmMessagesError(null);
-    try {
-      await directMessageBackend.sendMessage({
-        conversationId: selectedDmConversationId,
-        content,
-      });
-      await Promise.all([
-        refreshDmMessages(selectedDmConversationId, { suppressLoadingState: true, markRead: false }),
-        refreshDmConversations({ suppressLoadingState: true }),
-      ]);
-    } catch (error) {
-      const message = getErrorMessage(error, 'Failed to send direct message.');
-      console.error('Failed to send direct message:', error);
-      setDmMessagesError(message);
-      throw new Error(message);
-    } finally {
-      setDmMessageSendPending(false);
-    }
-  }
-
-  async function toggleSelectedDmConversationMuted(nextMuted: boolean) {
-    if (!selectedDmConversationId) {
-      throw new Error('No direct message conversation selected.');
-    }
-
-    await directMessageBackend.setConversationMuted({
-      conversationId: selectedDmConversationId,
-      muted: nextMuted,
-    });
-    await refreshDmConversations({ suppressLoadingState: true });
-  }
-
-  async function reportDirectMessage(input: {
-    messageId: string;
-    kind: DirectMessageReportKind;
-    comment: string;
-  }) {
-    await directMessageBackend.reportMessage(input);
-  }
-
-  async function blockDirectMessageUser(input: { userId: string; username: string }) {
-    await socialBackend.blockUser(input.userId);
-    setDmMessages([]);
-    setSelectedDmConversationId(null);
-
-    await Promise.all([
-      refreshSocialCounts(),
-      refreshDmConversations({ suppressLoadingState: true }),
-      refreshNotificationInbox({ playSoundsForNew: false }),
-    ]);
-  }
-
   function requestVoiceChannelJoin(channelId: string) {
     const targetChannel = channels.find(
       (channel) => channel.id === channelId && channel.kind === 'voice'
@@ -2311,153 +1084,6 @@ export function ChatApp() {
     });
 
     applyLocalProfileUpdate(values);
-  }
-
-  async function saveNotificationPreferences(values: NotificationPreferenceUpdate) {
-    setNotificationPreferencesSaving(true);
-    setNotificationPreferencesError(null);
-    try {
-      const nextPreferences = await notificationBackend.updateNotificationPreferences(values);
-      setNotificationPreferences(nextPreferences);
-      await refreshNotificationInbox({ playSoundsForNew: false });
-    } catch (error) {
-      setNotificationPreferencesError(
-        getErrorMessage(error, 'Failed to update notification preferences.')
-      );
-    } finally {
-      setNotificationPreferencesSaving(false);
-    }
-  }
-
-  async function refreshNotificationsManually() {
-    setNotificationsRefreshing(true);
-    setNotificationsError(null);
-    try {
-      await refreshNotificationInbox({ playSoundsForNew: false });
-      await refreshNotificationPreferences();
-    } catch (error) {
-      setNotificationsError(getErrorMessage(error, 'Failed to refresh notifications.'));
-    } finally {
-      setNotificationsRefreshing(false);
-    }
-  }
-
-  async function markAllNotificationsSeen() {
-    try {
-      await notificationBackend.markAllNotificationsSeen();
-      await refreshNotificationInbox({ playSoundsForNew: false });
-    } catch (error) {
-      setNotificationsError(getErrorMessage(error, 'Failed to mark notifications seen.'));
-    }
-  }
-
-  async function markNotificationRead(recipientId: string) {
-    try {
-      await notificationBackend.markNotificationsRead([recipientId]);
-      await refreshNotificationInbox({ playSoundsForNew: false });
-    } catch (error) {
-      setNotificationsError(getErrorMessage(error, 'Failed to mark notification read.'));
-    }
-  }
-
-  async function dismissNotification(recipientId: string) {
-    try {
-      await notificationBackend.dismissNotifications([recipientId]);
-      await refreshNotificationInbox({ playSoundsForNew: false });
-    } catch (error) {
-      setNotificationsError(getErrorMessage(error, 'Failed to dismiss notification.'));
-    }
-  }
-
-  async function openNotificationItem(notification: NotificationItem) {
-    try {
-      switch (notification.kind) {
-        case 'dm_message': {
-          const conversationId = getNotificationPayloadString(notification, 'conversationId');
-          if (!conversationId) {
-            throw new Error('This notification does not include a DM conversation target.');
-          }
-          await openDirectMessageConversation(conversationId);
-          setNotificationsPanelOpen(false);
-          break;
-        }
-        case 'friend_request_received': {
-          if (!friendsSocialPanelEnabled) {
-            throw new Error('Friends are not enabled for your account.');
-          }
-          setFriendsPanelRequestedTab('requests');
-          setFriendsPanelHighlightedRequestId(
-            getNotificationPayloadString(notification, 'friendRequestId')
-          );
-          setFriendsPanelOpen(true);
-          setNotificationsPanelOpen(false);
-          break;
-        }
-        case 'friend_request_accepted': {
-          if (!friendsSocialPanelEnabled) {
-            throw new Error('Friends are not enabled for your account.');
-          }
-          setFriendsPanelRequestedTab('friends');
-          setFriendsPanelHighlightedRequestId(null);
-          setFriendsPanelOpen(true);
-          setNotificationsPanelOpen(false);
-          break;
-        }
-        case 'channel_mention': {
-          const communityId = getNotificationPayloadString(notification, 'communityId');
-          const channelId = getNotificationPayloadString(notification, 'channelId');
-          if (!communityId || !channelId) {
-            throw new Error('This mention notification does not include a channel target.');
-          }
-          setWorkspaceMode('community');
-          setCurrentServerId(communityId);
-          setCurrentChannelId(channelId);
-          setNotificationsPanelOpen(false);
-          break;
-        }
-        default: {
-          // Future notification kinds can add deep-link routes here.
-          break;
-        }
-      }
-
-      await notificationBackend.markNotificationsRead([notification.recipientId]);
-      await refreshNotificationInbox({ playSoundsForNew: false });
-    } catch (error) {
-      setNotificationsError(getErrorMessage(error, 'Failed to open notification.'));
-    }
-  }
-
-  async function acceptFriendRequestFromNotification(input: {
-    recipientId: string;
-    friendRequestId: string;
-  }) {
-    try {
-      await socialBackend.acceptFriendRequest(input.friendRequestId);
-      await notificationBackend.markNotificationsRead([input.recipientId]);
-      await Promise.all([
-        refreshNotificationInbox({ playSoundsForNew: false }),
-        refreshSocialCounts(),
-      ]);
-    } catch (error) {
-      setNotificationsError(getErrorMessage(error, 'Failed to accept friend request.'));
-    }
-  }
-
-  async function declineFriendRequestFromNotification(input: {
-    recipientId: string;
-    friendRequestId: string;
-  }) {
-    try {
-      await socialBackend.declineFriendRequest(input.friendRequestId);
-      await notificationBackend.markNotificationsRead([input.recipientId]);
-      await Promise.all([
-        refreshNotificationInbox({ playSoundsForNew: false }),
-        refreshSocialCounts(),
-      ]);
-    } catch (error) {
-      setNotificationsError(getErrorMessage(error, 'Failed to decline friend request.'));
-    }
   }
 
   const handleLeaveServer = (communityId: string) => {
@@ -3344,4 +1970,5 @@ export function ChatApp() {
     </>
   );
 }
+
 
