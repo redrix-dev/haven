@@ -1280,40 +1280,6 @@ export function ChatApp() {
     }
   }, [loadWebPushModules, refreshWebPushDiagnostics, refreshWebPushStatus]);
 
-  const syncWebPushNow = React.useCallback(async () => {
-    if (desktopClient.isAvailable()) return;
-
-    setWebPushActionBusy(true);
-    setWebPushStatusError(null);
-    try {
-      const modules = await loadWebPushModules();
-      if (!modules) return;
-
-      modules.serviceWorkerModule.setHavenServiceWorkerRegistrationEnabled(true);
-      modules.webPushClientModule.enableHavenWebPushSync();
-
-      const statusBeforeSync = await modules.webPushClientModule.getHavenWebPushClientStatus();
-      setWebPushStatus(statusBeforeSync);
-      if (!statusBeforeSync.vapidPublicKeyConfigured) {
-        throw new Error('Web push VAPID public key is not configured for this web build.');
-      }
-      if (statusBeforeSync.notificationPermission !== 'granted') {
-        throw new Error('Browser notification permission must be granted before syncing web push.');
-      }
-
-      const serviceWorkerResult = await modules.serviceWorkerModule.registerHavenServiceWorker();
-      await modules.webPushClientModule.startHavenWebPushClient(serviceWorkerResult);
-      await modules.webPushClientModule.syncHavenWebPushSubscriptionNow();
-      toast.success('Web push subscription sync completed.', { id: 'web-push-sync-success' });
-    } catch (error) {
-      setWebPushStatusError(getErrorMessage(error, 'Failed to sync web push subscription.'));
-    } finally {
-      await refreshWebPushStatus();
-      await refreshWebPushDiagnostics();
-      setWebPushActionBusy(false);
-    }
-  }, [loadWebPushModules, refreshWebPushDiagnostics, refreshWebPushStatus]);
-
   const disableWebPushOnThisDevice = React.useCallback(async () => {
     if (desktopClient.isAvailable()) return;
 
@@ -2634,14 +2600,12 @@ export function ChatApp() {
                 onRefreshStatus: () => {
                   void refreshWebPushStatus();
                 },
-                onEnableOnThisDevice: () => {
+                onToggleOnThisDevice: () => {
+                  if (webPushStatus?.webPushSyncEnabled) {
+                    void disableWebPushOnThisDevice();
+                    return;
+                  }
                   void enableWebPushOnThisDevice();
-                },
-                onSyncNow: () => {
-                  void syncWebPushNow();
-                },
-                onDisableOnThisDevice: () => {
-                  void disableWebPushOnThisDevice();
                 },
                 testTools: webPushTestToolsEnabled
                   ? {

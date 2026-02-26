@@ -43,6 +43,7 @@ const createIdleMeterBars = () => Array.from({ length: MIC_METER_BAR_COUNT }, ()
 
 const isAudioInput = (device: MediaDeviceInfo) => device.kind === 'audioinput';
 const isAudioOutput = (device: MediaDeviceInfo) => device.kind === 'audiooutput';
+const hasSelectableDeviceId = (device: MediaDeviceInfo) => device.deviceId.trim().length > 0;
 
 export function VoiceHardwareDebugPanel({
   open,
@@ -87,8 +88,12 @@ export function VoiceHardwareDebugPanel({
 
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const nextInputDevices = devices.filter(isAudioInput);
-      const nextOutputDevices = devices.filter(isAudioOutput);
+      const nextInputDevices = devices.filter(
+        (device) => isAudioInput(device) && hasSelectableDeviceId(device)
+      );
+      const nextOutputDevices = devices.filter(
+        (device) => isAudioOutput(device) && hasSelectableDeviceId(device)
+      );
       setInputDevices(nextInputDevices);
       setOutputDevices(nextOutputDevices);
 
@@ -97,6 +102,8 @@ export function VoiceHardwareDebugPanel({
         !nextInputDevices.some((device) => device.deviceId === selectedInputDeviceId)
       ) {
         setSelectedInputDeviceId(nextInputDevices[0].deviceId);
+      } else if (nextInputDevices.length === 0 && selectedInputDeviceId !== 'default') {
+        setSelectedInputDeviceId('default');
       }
 
       if (
@@ -104,6 +111,8 @@ export function VoiceHardwareDebugPanel({
         !nextOutputDevices.some((device) => device.deviceId === selectedOutputDeviceId)
       ) {
         setSelectedOutputDeviceId(nextOutputDevices[0].deviceId);
+      } else if (nextOutputDevices.length === 0 && selectedOutputDeviceId !== 'default') {
+        setSelectedOutputDeviceId('default');
       }
     } catch (error) {
       console.error('Failed to enumerate audio devices for debug panel:', error);

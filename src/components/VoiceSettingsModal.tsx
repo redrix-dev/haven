@@ -30,6 +30,7 @@ type VoiceSettingsModalProps = {
 
 const isAudioInput = (device: MediaDeviceInfo) => device.kind === 'audioinput';
 const isAudioOutput = (device: MediaDeviceInfo) => device.kind === 'audiooutput';
+const hasSelectableDeviceId = (device: MediaDeviceInfo) => device.deviceId.trim().length > 0;
 
 const TRANSMISSION_MODE_OPTIONS: Array<{ value: VoiceTransmissionMode; label: string; description: string }> = [
   {
@@ -67,8 +68,8 @@ export function VoiceSettingsModal({
 
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      setInputDevices(devices.filter(isAudioInput));
-      setOutputDevices(devices.filter(isAudioOutput));
+      setInputDevices(devices.filter((device) => isAudioInput(device) && hasSelectableDeviceId(device)));
+      setOutputDevices(devices.filter((device) => isAudioOutput(device) && hasSelectableDeviceId(device)));
     } catch (deviceError) {
       console.error('Failed to enumerate audio devices in voice settings:', deviceError);
     }
@@ -204,7 +205,7 @@ export function VoiceSettingsModal({
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Microphone</Label>
                 <Select
-                  value={settings.preferredInputDeviceId}
+                  value={settings.preferredInputDeviceId || 'default'}
                   onValueChange={(value) =>
                     onUpdateSettings({
                       ...settings,
@@ -236,7 +237,7 @@ export function VoiceSettingsModal({
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Speaker</Label>
                 <Select
-                  value={settings.preferredOutputDeviceId}
+                  value={settings.preferredOutputDeviceId || 'default'}
                   onValueChange={(value) =>
                     onUpdateSettings({
                       ...settings,

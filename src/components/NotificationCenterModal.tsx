@@ -45,9 +45,7 @@ type WebPushControls = {
   busy: boolean;
   error: string | null;
   onRefreshStatus: () => void;
-  onEnableOnThisDevice: () => void;
-  onSyncNow: () => void;
-  onDisableOnThisDevice: () => void;
+  onToggleOnThisDevice: () => void;
   testTools?: {
     busy: boolean;
     error: string | null;
@@ -240,6 +238,8 @@ export function NotificationCenterModal({
   onUpdateLocalAudioSettings,
   webPushControls,
 }: NotificationCenterModalProps) {
+  const webPushEnabled = Boolean(webPushControls?.status?.webPushSyncEnabled);
+
   const updatePrefs = (patch: Partial<NotificationPreferenceUpdate>) => {
     if (!preferences) return;
     onUpdatePreferences({
@@ -760,35 +760,18 @@ export function NotificationCenterModal({
                         <p className="text-sm text-[#a9b8cf]">Web push status not loaded yet.</p>
                       )}
 
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={webPushControls.onEnableOnThisDevice}
-                          disabled={webPushControls.busy}
-                        >
-                          Enable on This Device
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={webPushControls.onSyncNow}
-                          disabled={webPushControls.busy}
-                        >
-                          Sync Now
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="border-[#304867] text-white"
-                          onClick={webPushControls.onDisableOnThisDevice}
-                          disabled={webPushControls.busy}
-                        >
-                          Disable on This Device
-                        </Button>
-                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={webPushControls.onToggleOnThisDevice}
+                        disabled={
+                          webPushControls.busy ||
+                          webPushControls.loading ||
+                          (webPushControls.status ? !webPushControls.status.supported : true)
+                        }
+                      >
+                        {webPushEnabled ? 'Disable Push Notifications' : 'Enable Push Notifications'}
+                      </Button>
 
                       {webPushControls.error && (
                         <p className="text-sm text-red-300">{webPushControls.error}</p>

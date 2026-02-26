@@ -112,6 +112,7 @@ const VOICE_ACTIVITY_GATE_RELEASE_MS = 220;
 
 const isAudioInput = (device: MediaDeviceInfo) => device.kind === 'audioinput';
 const isAudioOutput = (device: MediaDeviceInfo) => device.kind === 'audiooutput';
+const hasSelectableDeviceId = (device: MediaDeviceInfo) => device.deviceId.trim().length > 0;
 const formatBytes = (value: number | null) => (value == null ? 'n/a' : `${(value / 1024).toFixed(1)} KB`);
 
 export function VoiceChannelPane({
@@ -213,8 +214,8 @@ export function VoiceChannelPane({
 
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioInputs = devices.filter(isAudioInput);
-      const audioOutputs = devices.filter(isAudioOutput);
+      const audioInputs = devices.filter((device) => isAudioInput(device) && hasSelectableDeviceId(device));
+      const audioOutputs = devices.filter((device) => isAudioOutput(device) && hasSelectableDeviceId(device));
       setInputDevices(audioInputs);
       setOutputDevices(audioOutputs);
 
@@ -223,6 +224,8 @@ export function VoiceChannelPane({
         !audioInputs.some((device) => device.deviceId === selectedInputDeviceId)
       ) {
         setSelectedInputDeviceId(audioInputs[0].deviceId);
+      } else if (audioInputs.length === 0 && selectedInputDeviceId !== 'default') {
+        setSelectedInputDeviceId('default');
       }
 
       if (
@@ -230,6 +233,8 @@ export function VoiceChannelPane({
         !audioOutputs.some((device) => device.deviceId === selectedOutputDeviceId)
       ) {
         setSelectedOutputDeviceId(audioOutputs[0].deviceId);
+      } else if (audioOutputs.length === 0 && selectedOutputDeviceId !== 'default') {
+        setSelectedOutputDeviceId('default');
       }
     } catch (deviceError) {
       console.error('Failed to enumerate audio devices:', deviceError);
