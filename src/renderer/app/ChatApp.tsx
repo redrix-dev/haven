@@ -943,8 +943,10 @@ export function ChatApp() {
   const dmWorkspaceEnabled = friendsSocialPanelEnabled;
   const dmWorkspaceIsActive = dmWorkspaceEnabled && workspaceMode === 'dm';
   const dmReportReviewPanelEnabled = isPlatformStaff && hasFeatureFlag(DM_REPORT_REVIEW_PANEL_FLAG);
+  const notificationDevToolsEnabled = process.env.ENABLE_NOTIFICATION_DEVTOOLS === 'true';
   const webPushTestToolsEnabled =
     !desktopClient.isAvailable() &&
+    notificationDevToolsEnabled &&
     (isPlatformStaff || process.env.NODE_ENV === 'development');
   const {
     state: {

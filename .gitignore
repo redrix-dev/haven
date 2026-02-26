@@ -140,6 +140,7 @@ mvp-roadmap/
 
 # Internal documentation workspace (new files are local-only by default)
 docs/internal/
+!docs/internal/operations/web-push-cutover-runbook.md
 
 # Local test run reports (generated)
 test-reports/

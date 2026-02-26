@@ -18,6 +18,10 @@ export default defineConfig(({ mode }) => {
       'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
       'process.env.NODE_ENV': JSON.stringify(env.NODE_ENV),
       'process.env.WEB_PUSH_VAPID_PUBLIC_KEY': JSON.stringify(env.VITE_WEB_PUSH_VAPID_PUBLIC_KEY),
+      'process.env.ENABLE_NOTIFICATION_DEVTOOLS': JSON.stringify(
+        env.VITE_ENABLE_NOTIFICATION_DEVTOOLS
+      ),
+      'process.env.PUBLIC_WEBCLIENT_URL': JSON.stringify(env.VITE_PUBLIC_WEBCLIENT_URL),
     },
     build: {
       outDir: '../../dist/web'

@@ -824,9 +824,30 @@ const resolveRegistrationFromResult = async (
     // Ignore getRegistration errors and try a short ready fallback next.
   }
 
+  if (typeof navigator.serviceWorker.getRegistrations === 'function') {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : null;
+      const matching = registrations.find((registration) => {
+        if (!currentOrigin) return true;
+        try {
+          const scopeUrl = new URL(registration.scope);
+          return scopeUrl.origin === currentOrigin;
+        } catch {
+          return false;
+        }
+      });
+      if (matching) {
+        return matching;
+      }
+    } catch {
+      // Ignore getRegistrations errors and continue to ready fallback.
+    }
+  }
+
   try {
     const timeout = new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), 250);
+      setTimeout(() => resolve(null), 1500);
     });
     return (await Promise.race([navigator.serviceWorker.ready, timeout])) as ServiceWorkerRegistration | null;
   } catch {

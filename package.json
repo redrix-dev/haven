@@ -24,6 +24,8 @@
     "test:db": "node scripts/test/run-db-suite.mjs",
     "test:notifications:smoke": "node scripts/test/run-notification-dispatch-smoke.mjs",
     "test:notifications:route-sim": "node scripts/test/run-notification-route-policy-sim.mjs",
+    "test:signoff": "node scripts/test/generate-test-signoff.mjs",
+    "test:signoff:release": "node scripts/test/generate-test-signoff.mjs --mode release",
     "test:report": "node scripts/test/generate-test-report.mjs",
     "test:all": "npm run lint && npx tsc --noEmit --project tsconfig.json && npm run test:unit && npm run test:db && npm run test:backend",
     "test:ci": "npm run lint && npx tsc --noEmit --project tsconfig.json && npm run test:unit && npm run test:db && npm run test:backend",

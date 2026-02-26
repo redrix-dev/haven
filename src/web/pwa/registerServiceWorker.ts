@@ -16,6 +16,7 @@ export type RegisterServiceWorkerResult =
       capabilities: WebPwaCapabilities;
     };
 
+// Dev-only override. By default service worker auto-registration is enabled.
 export const SERVICE_WORKER_ENABLE_STORAGE_KEY = 'haven:pwa:service-worker-enabled';
 const SERVICE_WORKER_SCRIPT_PATH = '/haven-sw.js';
 
@@ -42,9 +43,12 @@ export const isHavenServiceWorkerRegistrationEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
 
   try {
-    return window.localStorage.getItem(SERVICE_WORKER_ENABLE_STORAGE_KEY) === '1';
+    const stored = window.localStorage.getItem(SERVICE_WORKER_ENABLE_STORAGE_KEY);
+    // Legacy behavior used explicit "1" enable. Reset baseline flips to enabled-by-default,
+    // with an optional local "0" dev override to disable auto-registration temporarily.
+    return stored !== '0';
   } catch {
-    return false;
+    return true;
   }
 };
 
@@ -55,7 +59,7 @@ export const setHavenServiceWorkerRegistrationEnabled = (enabled: boolean): void
     if (enabled) {
       window.localStorage.setItem(SERVICE_WORKER_ENABLE_STORAGE_KEY, '1');
     } else {
-      window.localStorage.removeItem(SERVICE_WORKER_ENABLE_STORAGE_KEY);
+      window.localStorage.setItem(SERVICE_WORKER_ENABLE_STORAGE_KEY, '0');
     }
   } catch {
     // Ignore storage failures in restricted/private contexts.
@@ -75,7 +79,7 @@ export const registerHavenServiceWorker = async (): Promise<RegisterServiceWorke
   if (!isHavenServiceWorkerRegistrationEnabled()) {
     return {
       attempted: false,
-      reason: `Service worker registration disabled (set ${SERVICE_WORKER_ENABLE_STORAGE_KEY}=1 in localStorage to enable).`,
+      reason: `Service worker registration disabled by local override (${SERVICE_WORKER_ENABLE_STORAGE_KEY}=0).`,
       capabilities,
     };
   }
