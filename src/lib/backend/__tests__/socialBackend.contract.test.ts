@@ -48,10 +48,12 @@ describe.sequential('SocialBackend (contract)', () => {
     const friendList = await centralSocialBackend.listFriends();
     expect(friendList.some((friend) => friend.friendUserId === users.member_a.id)).toBe(true);
 
-    const notifications = await centralNotificationBackend.listNotifications({ limit: 20 });
-    expect(
-      notifications.some((notification) => notification.kind === 'friend_request_received' || notification.kind === 'friend_request_accepted')
-    ).toBe(true);
+    const recipientNotifications = await centralNotificationBackend.listNotifications({ limit: 20 });
+    expect(recipientNotifications.some((notification) => notification.kind === 'friend_request_received')).toBe(false);
+
+    await signInAsTestUser('member_a');
+    const senderNotifications = await centralNotificationBackend.listNotifications({ limit: 20 });
+    expect(senderNotifications.some((notification) => notification.kind === 'friend_request_accepted')).toBe(true);
   });
 });
 

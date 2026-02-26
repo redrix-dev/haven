@@ -1,0 +1,21 @@
+{
+  "name": "Haven",
+  "short_name": "Haven",
+  "description": "Community chat for people who give a damn",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1728",
+  "theme_color": "#3f79d8",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

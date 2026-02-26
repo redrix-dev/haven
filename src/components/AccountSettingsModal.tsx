@@ -38,6 +38,7 @@ interface AccountSettingsModalProps {
   checkingForUpdates: boolean;
   onClose: () => void;
   onSave: (values: { username: string; avatarUrl: string | null }) => Promise<void>;
+  onOpenVoiceSettings: () => void;
   onAutoUpdateChange: (enabled: boolean) => Promise<void>;
   onCheckForUpdates: () => Promise<void>;
   onSignOut: () => Promise<void>;
@@ -54,6 +55,7 @@ export function AccountSettingsModal({
   checkingForUpdates,
   onClose,
   onSave,
+  onOpenVoiceSettings,
   onAutoUpdateChange,
   onCheckForUpdates,
   onSignOut,
@@ -69,6 +71,7 @@ export function AccountSettingsModal({
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoUpdateError, setAutoUpdateError] = useState<string | null>(null);
+  const updaterControlsUnsupported = updaterStatus?.supported === false;
 
   const previewInitial = username.trim().charAt(0).toUpperCase() || 'U';
 
@@ -102,6 +105,8 @@ export function AccountSettingsModal({
   })();
 
   const handleAutoUpdateChange = async (enabled: boolean) => {
+    if (updaterControlsUnsupported) return;
+
     setUpdatingAutoUpdatePreference(true);
     setAutoUpdateError(null);
 
@@ -178,6 +183,8 @@ export function AccountSettingsModal({
   };
 
   const handleCheckForUpdates = async () => {
+    if (updaterControlsUnsupported) return;
+
     setAutoUpdateError(null);
     try {
       await onCheckForUpdates();
@@ -212,6 +219,17 @@ export function AccountSettingsModal({
               <div>
                 <p className="text-xs uppercase font-semibold text-[#a9b8cf]">Email</p>
                 <p className="text-sm text-white">{userEmail}</p>
+              </div>
+              <div className="ml-auto">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={onOpenVoiceSettings}
+                  disabled={saving || signingOut || deletingAccount}
+                >
+                  Voice Settings
+                </Button>
               </div>
             </div>
 
@@ -259,7 +277,7 @@ export function AccountSettingsModal({
                 <Switch
                   checked={autoUpdateEnabled}
                   onCheckedChange={handleToggleRequested}
-                  disabled={updatingAutoUpdatePreference}
+                  disabled={updatingAutoUpdatePreference || updaterControlsUnsupported}
                 />
               </div>
 
@@ -270,7 +288,7 @@ export function AccountSettingsModal({
                 <Button
                   type="button"
                   onClick={() => void handleCheckForUpdates()}
-                  disabled={checkingForUpdates || updaterStatusLoading}
+                  disabled={checkingForUpdates || updaterStatusLoading || updaterControlsUnsupported}
                   variant="secondary"
                   size="sm"
                 >

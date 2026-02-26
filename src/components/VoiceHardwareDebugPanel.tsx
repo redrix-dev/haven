@@ -26,8 +26,11 @@ type MicStatus = 'idle' | 'requesting' | 'active' | 'error';
 type VoiceHardwareDebugPanelProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  hotkeyLabel: string;
+  hotkeyLabel?: string | null;
   speakerTestAudioPath?: string;
+  title?: string;
+  description?: string;
+  showDebugWorkflow?: boolean;
 };
 
 type MeterSnapshot = {
@@ -46,6 +49,9 @@ export function VoiceHardwareDebugPanel({
   onOpenChange,
   hotkeyLabel,
   speakerTestAudioPath = DEFAULT_SPEAKER_TEST_AUDIO_PATH,
+  title = 'Voice Hardware Debug Panel',
+  description = 'Test microphone capture and speaker playback locally before joining a voice session.',
+  showDebugWorkflow = true,
 }: VoiceHardwareDebugPanelProps) {
   const [inputDevices, setInputDevices] = React.useState<MediaDeviceInfo[]>([]);
   const [outputDevices, setOutputDevices] = React.useState<MediaDeviceInfo[]>([]);
@@ -451,16 +457,18 @@ export function VoiceHardwareDebugPanel({
               <div>
                 <DialogTitle className="flex items-center gap-2 text-white">
                   <Waves className="size-5 text-[#87b5ff]" />
-                  Voice Hardware Debug Panel
+                  {title}
                 </DialogTitle>
                 <DialogDescription className="text-[#a9b8cf]">
-                  Test microphone capture and speaker playback locally before joining a voice session.
+                  {description}
                 </DialogDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="border-[#355077] text-[#d5e4ff]">
-                  Hotkey: {hotkeyLabel}
-                </Badge>
+                {hotkeyLabel && (
+                  <Badge variant="outline" className="border-[#355077] text-[#d5e4ff]">
+                    Hotkey: {hotkeyLabel}
+                  </Badge>
+                )}
                 <Badge
                   variant={micResponsive ? 'default' : 'outline'}
                   className={
@@ -727,12 +735,14 @@ export function VoiceHardwareDebugPanel({
                     {speakerError && <p className="text-sm text-red-300">{speakerError}</p>}
                   </div>
 
-                  <div className="rounded-lg border border-dashed border-[#304867] bg-[#111a2b]/70 p-3 text-xs text-[#9fb2cf] space-y-1">
-                    <p className="font-medium text-white">Debug workflow</p>
-                    <p>1. Start mic test and confirm the meter reacts.</p>
-                    <p>2. Adjust input volume to reproduce clipping/low-gain client issues.</p>
-                    <p>3. Run speaker test and confirm output routing + volume behavior.</p>
-                  </div>
+                  {showDebugWorkflow && (
+                    <div className="rounded-lg border border-dashed border-[#304867] bg-[#111a2b]/70 p-3 text-xs text-[#9fb2cf] space-y-1">
+                      <p className="font-medium text-white">Debug workflow</p>
+                      <p>1. Start mic test and confirm the meter reacts.</p>
+                      <p>2. Adjust input volume to reproduce clipping/low-gain client issues.</p>
+                      <p>3. Run speaker test and confirm output routing + volume behavior.</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

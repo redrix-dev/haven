@@ -6,6 +6,7 @@ const {
   parseSaveFileFromUrlPayload,
   parseSetAutoUpdatePayload,
   parseSetNotificationAudioPayload,
+  parseSetVoiceSettingsPayload,
 } = require('../../shared/ipc/validators');
 
 const registerIpcHandler = (ipcMain, channel, handler) => {
@@ -42,6 +43,21 @@ const registerDesktopIpcHandlers = ({
       const nextNotificationAudioSettings = parseSetNotificationAudioPayload(payload);
       const settings = settingsStore.updateSettings({
         notifications: nextNotificationAudioSettings,
+      });
+
+      return {
+        settings,
+      };
+    }
+  );
+
+  registerIpcHandler(
+    ipcMain,
+    DESKTOP_IPC_KEYS.SETTINGS_SET_VOICE,
+    async (_event, payload) => {
+      const nextVoiceSettings = parseSetVoiceSettingsPayload(payload);
+      const settings = settingsStore.updateSettings({
+        voice: nextVoiceSettings,
       });
 
       return {

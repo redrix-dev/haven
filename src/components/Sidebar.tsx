@@ -58,6 +58,7 @@ interface SidebarProps {
   onDeleteChannelGroup?: (groupId: string) => void;
   onOpenServerSettings?: () => void;
   composerHeight?: number | null;
+  footerStatusActions?: React.ReactNode;
 }
 
 export function Sidebar({
@@ -85,6 +86,7 @@ export function Sidebar({
   onDeleteChannelGroup,
   onOpenServerSettings,
   composerHeight = null,
+  footerStatusActions,
 }: SidebarProps) {
   const sidebarRef = React.useRef<HTMLDivElement | null>(null);
   const serverNameRef = React.useRef<HTMLSpanElement | null>(null);
@@ -540,11 +542,14 @@ export function Sidebar({
       <div className="bg-[#172338] border-t border-[#263a58]" data-component="sidebar">
         {voiceStatusPanel}
         <div
-          className="px-4 pt-[11px] pb-[13px] flex flex-col justify-start"
+          className="px-4 pt-[11px] pb-[13px] flex items-start justify-between gap-2"
           style={linkedComposerHeight ? { minHeight: `${linkedComposerHeight}px` } : undefined}
         >
-          <p className="text-sm font-semibold text-white leading-5">{userName}</p>
-          <p className="text-xs text-[#44b894] leading-4">Online</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-white leading-5 truncate">{userName}</p>
+            <p className="text-xs text-[#44b894] leading-4">Online</p>
+          </div>
+          {footerStatusActions ? <div className="flex items-center gap-1">{footerStatusActions}</div> : null}
         </div>
       </div>
 

@@ -2,7 +2,7 @@ import type {
   NotificationCounts,
   SocialCounts,
 } from '@/lib/backend/types';
-import type { AppSettings, NotificationAudioSettings } from '@/shared/desktop/types';
+import type { AppSettings, NotificationAudioSettings, VoiceSettings } from '@/shared/desktop/types';
 
 export const ENABLE_CHANNEL_RELOAD_DIAGNOSTICS =
   typeof process !== 'undefined' && process.env.HAVEN_DEBUG_CHANNEL_RELOADS === '1';
@@ -19,10 +19,27 @@ export const DEFAULT_NOTIFICATION_AUDIO_SETTINGS: NotificationAudioSettings = {
   playSoundsWhenFocused: true,
 };
 
+export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
+  preferredInputDeviceId: 'default',
+  preferredOutputDeviceId: 'default',
+  transmissionMode: 'voice_activity',
+  voiceActivationThreshold: 18,
+  pushToTalkBinding: {
+    code: 'F13',
+    key: 'F13',
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    metaKey: false,
+    label: 'F13',
+  },
+};
+
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   autoUpdateEnabled: true,
   notifications: { ...DEFAULT_NOTIFICATION_AUDIO_SETTINGS },
+  voice: { ...DEFAULT_VOICE_SETTINGS },
 };
 
 export const DEFAULT_NOTIFICATION_COUNTS: NotificationCounts = {

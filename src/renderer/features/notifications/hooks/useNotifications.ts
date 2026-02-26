@@ -1,6 +1,9 @@
 import React from 'react';
 import { playNotificationSound } from '@/lib/notifications/sound';
 import type { NotificationBackend } from '@/lib/backend/notificationBackend';
+import { recordLocalNotificationDeliveryTrace } from '@/lib/notifications/devTrace';
+import { resolveNotificationRoutePolicy } from '@/lib/notifications/routePolicy';
+import { getHavenWebPushRoutingSignalsSync } from '@/web/pwa/webPushClient';
 import type {
   NotificationCounts,
   NotificationItem,
@@ -15,6 +18,7 @@ type UseNotificationsInput = {
   notificationBackend: Pick<
     NotificationBackend,
     | 'listNotifications'
+    | 'listSoundNotifications'
     | 'getNotificationCounts'
     | 'markNotificationsRead'
     | 'markAllNotificationsSeen'
@@ -49,7 +53,7 @@ export function useNotifications({
     null
   );
 
-  const knownNotificationRecipientIdsRef = React.useRef<Set<string>>(new Set());
+  const knownSoundNotificationRecipientIdsRef = React.useRef<Set<string>>(new Set());
   const notificationsBootstrappedRef = React.useRef(false);
   const notificationAudioSettingsRef = React.useRef<NotificationAudioSettings>(audioSettings);
 
@@ -62,27 +66,60 @@ export function useNotifications({
       if (!userId) return;
 
       const playSoundsForNew = Boolean(options?.playSoundsForNew);
-      const [items, counts] = await Promise.all([
+      const [items, soundItems, counts] = await Promise.all([
         notificationBackend.listNotifications({ limit: 50 }),
+        notificationBackend.listSoundNotifications({ limit: 50 }),
         notificationBackend.getNotificationCounts(),
       ]);
 
-      const nextKnownIds = new Set(items.map((item) => item.recipientId));
-      const previousKnownIds = knownNotificationRecipientIdsRef.current;
+      const nextKnownSoundIds = new Set(soundItems.map((item) => item.recipientId));
+      const previousKnownSoundIds = knownSoundNotificationRecipientIdsRef.current;
       const canPlaySounds = notificationsBootstrappedRef.current && playSoundsForNew;
+      const routePolicy = (() => {
+        const signals = getHavenWebPushRoutingSignalsSync();
+        const hasFocus = typeof document !== 'undefined' ? document.hasFocus() : true;
+        return resolveNotificationRoutePolicy({
+          hasFocus,
+          pushSupported: signals.pushSupported,
+          pushPermission: signals.pushPermission,
+          swRegistered: signals.swRegistered,
+          pushSubscriptionActive: signals.pushSubscriptionActive,
+          pushSyncEnabled: signals.pushSyncEnabled,
+          serviceWorkerRegistrationEnabled: signals.serviceWorkerRegistrationEnabled,
+          audioSettings: notificationAudioSettingsRef.current,
+        });
+      })();
+      const suppressHavenSoundsWhenUnfocused = canPlaySounds && !routePolicy.allowInAppSound;
 
       setNotificationItems(items);
       setNotificationCounts(counts);
-      knownNotificationRecipientIdsRef.current = nextKnownIds;
+      knownSoundNotificationRecipientIdsRef.current = nextKnownSoundIds;
 
       if (canPlaySounds) {
-        for (const item of items) {
-          if (previousKnownIds.has(item.recipientId)) continue;
+        for (const item of soundItems) {
+          if (previousKnownSoundIds.has(item.recipientId)) continue;
           if (item.dismissedAt) continue;
           void playNotificationSound({
             kind: item.kind,
             deliverSound: item.deliverSound,
             audioSettings: notificationAudioSettingsRef.current,
+            suppressWhenUnfocused: suppressHavenSoundsWhenUnfocused,
+          }).then((result) => {
+            recordLocalNotificationDeliveryTrace({
+              notificationRecipientId: item.recipientId,
+              eventId: item.eventId,
+              transport: 'in_app',
+              stage: 'client_route',
+              decision: result.played ? 'send' : 'skip',
+              reasonCode: result.reasonCode,
+              details: {
+                kind: item.kind,
+                routeMode: routePolicy.routeMode,
+                allowOsPushDisplay: routePolicy.allowOsPushDisplay,
+                allowInAppSound: routePolicy.allowInAppSound,
+                routeReasons: routePolicy.reasonCodes,
+              },
+            });
           });
         }
       }
@@ -108,7 +145,7 @@ export function useNotifications({
     setNotificationPreferencesLoading(false);
     setNotificationPreferencesSaving(false);
     setNotificationPreferencesError(null);
-    knownNotificationRecipientIdsRef.current = new Set();
+    knownSoundNotificationRecipientIdsRef.current = new Set();
     notificationsBootstrappedRef.current = false;
   }, []);
 
@@ -125,7 +162,7 @@ export function useNotifications({
     setNotificationsLoading(true);
     setNotificationsError(null);
     notificationsBootstrappedRef.current = false;
-    knownNotificationRecipientIdsRef.current = new Set();
+    knownSoundNotificationRecipientIdsRef.current = new Set();
 
     const loadInbox = async () => {
       try {

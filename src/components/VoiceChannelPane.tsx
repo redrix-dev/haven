@@ -2,10 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { fetchIceConfig } from '@/lib/voice/ice';
+import { matchesVoicePushToTalkBinding } from '@/lib/voice/pushToTalk';
 import { getErrorMessage } from '@/shared/lib/errors';
+import type { VoiceSettings } from '@/shared/desktop/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PushToTalkBindingField } from '@/components/PushToTalkBindingField';
+import { isEditableKeyboardTarget } from '@/renderer/app/utils';
 import {
   Select,
   SelectContent,
@@ -67,6 +71,12 @@ interface VoiceChannelPaneProps {
   currentUserId: string;
   currentUserDisplayName: string;
   canSpeak: boolean;
+  voiceSettings: VoiceSettings;
+  voiceSettingsSaving?: boolean;
+  voiceSettingsError?: string | null;
+  onUpdateVoiceSettings?: (next: VoiceSettings) => void;
+  onOpenVoiceSettings?: () => void;
+  onOpenVoiceHardwareTest?: () => void;
   showDiagnostics?: boolean;
   autoJoin?: boolean;
   onParticipantsChange?: (participants: Array<{ userId: string; displayName: string }>) => void;
@@ -98,6 +108,7 @@ const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
 ];
 
 const REMOTE_VOLUME_OPTIONS = [0, 25, 50, 75, 100, 125, 150, 200] as const;
+const VOICE_ACTIVITY_GATE_RELEASE_MS = 220;
 
 const isAudioInput = (device: MediaDeviceInfo) => device.kind === 'audioinput';
 const isAudioOutput = (device: MediaDeviceInfo) => device.kind === 'audiooutput';
@@ -110,6 +121,12 @@ export function VoiceChannelPane({
   currentUserId,
   currentUserDisplayName,
   canSpeak,
+  voiceSettings,
+  voiceSettingsSaving = false,
+  voiceSettingsError = null,
+  onUpdateVoiceSettings,
+  onOpenVoiceSettings,
+  onOpenVoiceHardwareTest,
   showDiagnostics = false,
   autoJoin = false,
   onParticipantsChange,
@@ -131,10 +148,17 @@ export function VoiceChannelPane({
   const [iceSource, setIceSource] = useState<'xirsys' | 'fallback' | null>(null);
   const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedInputDeviceId, setSelectedInputDeviceId] = useState('default');
-  const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState('default');
+  const [selectedInputDeviceId, setSelectedInputDeviceId] = useState(
+    voiceSettings.preferredInputDeviceId || 'default'
+  );
+  const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState(
+    voiceSettings.preferredOutputDeviceId || 'default'
+  );
   const [switchingInput, setSwitchingInput] = useState(false);
   const [supportsOutputSelection, setSupportsOutputSelection] = useState(false);
+  const [localInputLevel, setLocalInputLevel] = useState(0);
+  const [voiceActivityGateOpen, setVoiceActivityGateOpen] = useState(false);
+  const [pushToTalkPressed, setPushToTalkPressed] = useState(false);
   const [peerDiagnostics, setPeerDiagnostics] = useState<Record<string, VoicePeerDiagnostics>>({});
   const [diagnosticsUpdatedAt, setDiagnosticsUpdatedAt] = useState<string | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
@@ -147,6 +171,15 @@ export function VoiceChannelPane({
   const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE_SERVERS);
   const autoJoinAttemptedChannelKeyRef = useRef<string | null>(null);
   const autoEnableMicAttemptedChannelKeyRef = useRef<string | null>(null);
+  const localInputMonitorAudioContextRef = useRef<AudioContext | null>(null);
+  const localInputMonitorSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const localInputMonitorAnalyserNodeRef = useRef<AnalyserNode | null>(null);
+  const localInputMonitorTimeDomainRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const localInputMonitorRafIdRef = useRef<number | null>(null);
+  const localInputMonitorActiveRef = useRef(false);
+  const lastVoiceActivityAtRef = useRef<number>(0);
+  const activePushToTalkCodeRef = useRef<string | null>(null);
+  const voiceSettingsRef = useRef(voiceSettings);
   const joinVoiceChannelActionRef = useRef<(() => Promise<void>) | null>(null);
   const leaveVoiceChannelActionRef = useRef<(() => Promise<void>) | null>(null);
   const toggleMuteActionRef = useRef<(() => void) | null>(null);
@@ -200,6 +233,114 @@ export function VoiceChannelPane({
       }
     } catch (deviceError) {
       console.error('Failed to enumerate audio devices:', deviceError);
+    }
+  };
+
+  const persistVoiceSettingsPatch = (patch: Partial<VoiceSettings>) => {
+    if (!onUpdateVoiceSettings) return;
+    onUpdateVoiceSettings({
+      ...voiceSettings,
+      ...patch,
+    });
+  };
+
+  const stopLocalInputMonitor = async () => {
+    localInputMonitorActiveRef.current = false;
+    if (localInputMonitorRafIdRef.current != null) {
+      window.cancelAnimationFrame(localInputMonitorRafIdRef.current);
+      localInputMonitorRafIdRef.current = null;
+    }
+
+    localInputMonitorSourceNodeRef.current?.disconnect();
+    localInputMonitorSourceNodeRef.current = null;
+    localInputMonitorAnalyserNodeRef.current?.disconnect();
+    localInputMonitorAnalyserNodeRef.current = null;
+    localInputMonitorTimeDomainRef.current = null;
+
+    if (localInputMonitorAudioContextRef.current) {
+      try {
+        await localInputMonitorAudioContextRef.current.close();
+      } catch (error) {
+        console.warn('Failed to close local input monitor audio context:', error);
+      }
+      localInputMonitorAudioContextRef.current = null;
+    }
+
+    setLocalInputLevel(0);
+    setVoiceActivityGateOpen(false);
+  };
+
+  const startLocalInputMonitor = async (stream: MediaStream | null) => {
+    await stopLocalInputMonitor();
+    if (!stream) return;
+
+    const track = stream.getAudioTracks()[0];
+    if (!track) return;
+
+    const AudioContextCtor =
+      window.AudioContext ??
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return;
+
+    try {
+      const audioContext = new AudioContextCtor();
+      await audioContext.resume();
+
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      source.connect(analyser);
+
+      localInputMonitorAudioContextRef.current = audioContext;
+      localInputMonitorSourceNodeRef.current = source;
+      localInputMonitorAnalyserNodeRef.current = analyser;
+      localInputMonitorTimeDomainRef.current = new Uint8Array(analyser.fftSize);
+      localInputMonitorActiveRef.current = true;
+
+      const frame = (now: number) => {
+        if (!localInputMonitorActiveRef.current) {
+          localInputMonitorRafIdRef.current = null;
+          return;
+        }
+
+        const analyserNode = localInputMonitorAnalyserNodeRef.current;
+        const timeDomain = localInputMonitorTimeDomainRef.current;
+        if (!analyserNode || !timeDomain) {
+          localInputMonitorRafIdRef.current = null;
+          return;
+        }
+
+        analyserNode.getByteTimeDomainData(timeDomain);
+
+        let rmsAccumulator = 0;
+        for (let index = 0; index < timeDomain.length; index += 1) {
+          const centered = (timeDomain[index] - 128) / 128;
+          rmsAccumulator += centered * centered;
+        }
+        const rms = Math.sqrt(rmsAccumulator / timeDomain.length);
+        const normalizedLevel = Math.min(1, rms * 3);
+        const threshold = Math.max(
+          0,
+          Math.min(1, voiceSettingsRef.current.voiceActivationThreshold / 100)
+        );
+
+        if (normalizedLevel >= threshold) {
+          lastVoiceActivityAtRef.current = now;
+        }
+
+        const gateOpen = normalizedLevel >= threshold || now - lastVoiceActivityAtRef.current <= VOICE_ACTIVITY_GATE_RELEASE_MS;
+
+        setLocalInputLevel((prev) => (Math.abs(prev - normalizedLevel) > 0.01 ? normalizedLevel : prev));
+        setVoiceActivityGateOpen((prev) => (prev === gateOpen ? prev : gateOpen));
+
+        localInputMonitorRafIdRef.current = window.requestAnimationFrame(frame);
+      };
+
+      localInputMonitorRafIdRef.current = window.requestAnimationFrame(frame);
+    } catch (monitorError) {
+      console.warn('Failed to start local input monitor for voice activity gating:', monitorError);
+      void stopLocalInputMonitor();
     }
   };
 
@@ -595,7 +736,25 @@ export function VoiceChannelPane({
     const localStream = localStreamRef.current;
     if (!localStream) return;
 
-    const shouldSendAudio = !listenOnly && !isMuted && !isDeafened;
+    const baseAllowsSend = !listenOnly && !isMuted && !isDeafened;
+    let modeAllowsSend = true;
+
+    if (baseAllowsSend) {
+      switch (voiceSettings.transmissionMode) {
+        case 'push_to_talk':
+          modeAllowsSend = Boolean(voiceSettings.pushToTalkBinding) && pushToTalkPressed;
+          break;
+        case 'voice_activity':
+          modeAllowsSend = voiceActivityGateOpen;
+          break;
+        case 'open_mic':
+        default:
+          modeAllowsSend = true;
+          break;
+      }
+    }
+
+    const shouldSendAudio = baseAllowsSend && modeAllowsSend;
     localStream.getAudioTracks().forEach((track) => {
       track.enabled = shouldSendAudio;
     });
@@ -612,6 +771,7 @@ export function VoiceChannelPane({
 
     const previousStream = localStreamRef.current;
     localStreamRef.current = stream;
+    await startLocalInputMonitor(stream);
 
     for (const [remoteUserId, peerConnection] of peersRef.current.entries()) {
       const audioSender = peerConnection
@@ -659,6 +819,7 @@ export function VoiceChannelPane({
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
+    await stopLocalInputMonitor();
 
     setParticipants([]);
     setRemoteStreams({});
@@ -671,6 +832,10 @@ export function VoiceChannelPane({
     setListenOnly(!canSpeak);
     setIceSource(null);
     setDiagnosticsUpdatedAt(null);
+    setLocalInputLevel(0);
+    setVoiceActivityGateOpen(false);
+    setPushToTalkPressed(false);
+    activePushToTalkCodeRef.current = null;
     autoEnableMicAttemptedChannelKeyRef.current = null;
 
     if (channel) {
@@ -719,6 +884,7 @@ export function VoiceChannelPane({
     }
 
     localStreamRef.current = localStream;
+    await startLocalInputMonitor(localStream);
     setListenOnly(joinAsListener);
     if (localStream) {
       const shouldSendAudio = !joinAsListener && !isMuted && !isDeafened;
@@ -777,6 +943,7 @@ export function VoiceChannelPane({
 
   const switchInputDevice = async (deviceId: string) => {
     setSelectedInputDeviceId(deviceId);
+    persistVoiceSettingsPatch({ preferredInputDeviceId: deviceId });
     if (!joined || listenOnly) return;
 
     setSwitchingInput(true);
@@ -820,6 +987,10 @@ export function VoiceChannelPane({
   };
 
   useEffect(() => {
+    voiceSettingsRef.current = voiceSettings;
+  }, [voiceSettings]);
+
+  useEffect(() => {
     setSupportsOutputSelection(
       typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype
     );
@@ -839,9 +1010,84 @@ export function VoiceChannelPane({
   }, []);
 
   useEffect(() => {
+    const nextInputId = voiceSettings.preferredInputDeviceId || 'default';
+    setSelectedInputDeviceId((prev) => (prev === nextInputId ? prev : nextInputId));
+  }, [voiceSettings.preferredInputDeviceId]);
+
+  useEffect(() => {
+    const nextOutputId = voiceSettings.preferredOutputDeviceId || 'default';
+    setSelectedOutputDeviceId((prev) => (prev === nextOutputId ? prev : nextOutputId));
+  }, [voiceSettings.preferredOutputDeviceId]);
+
+  useEffect(() => {
     applyLocalTrackState();
     void trackPresenceState();
-  }, [isMuted, isDeafened, listenOnly, joined, currentUserDisplayName]);
+  }, [
+    isMuted,
+    isDeafened,
+    listenOnly,
+    joined,
+    currentUserDisplayName,
+    pushToTalkPressed,
+    voiceActivityGateOpen,
+    voiceSettings.transmissionMode,
+    voiceSettings.pushToTalkBinding,
+  ]);
+
+  useEffect(() => {
+    if (!localStreamRef.current) return;
+    void startLocalInputMonitor(localStreamRef.current);
+  }, [voiceSettings.voiceActivationThreshold]);
+
+  useEffect(() => {
+    if (voiceSettings.transmissionMode !== 'push_to_talk') {
+      activePushToTalkCodeRef.current = null;
+      setPushToTalkPressed(false);
+      return;
+    }
+
+    const binding = voiceSettings.pushToTalkBinding;
+    if (!binding) {
+      setPushToTalkPressed(false);
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      if (isEditableKeyboardTarget(event.target)) return;
+      if (!matchesVoicePushToTalkBinding(event, binding)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      activePushToTalkCodeRef.current = event.code;
+      setPushToTalkPressed(true);
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      const activeCode = activePushToTalkCodeRef.current;
+      if (!activeCode) return;
+      if (event.code !== activeCode) return;
+      activePushToTalkCodeRef.current = null;
+      setPushToTalkPressed(false);
+    };
+
+    const clearPressed = () => {
+      activePushToTalkCodeRef.current = null;
+      setPushToTalkPressed(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    window.addEventListener('blur', clearPressed);
+    document.addEventListener('visibilitychange', clearPressed);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+      window.removeEventListener('blur', clearPressed);
+      document.removeEventListener('visibilitychange', clearPressed);
+      clearPressed();
+    };
+  }, [voiceSettings.pushToTalkBinding, voiceSettings.transmissionMode]);
 
   useEffect(() => {
     setRemoteVolumes((prev) => {
@@ -1091,6 +1337,111 @@ export function VoiceChannelPane({
 
       <Card className="bg-[#1c2a43] border-[#263a58] text-white">
         <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mic className="size-5" />
+            <span>Voice Transmission</span>
+          </CardTitle>
+          <CardDescription className="text-[#a9b8cf]">
+            Control how your mic transmits while unmuted. These settings are stored locally on this
+            device.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">Mode: {voiceSettings.transmissionMode.replace(/_/g, ' ')}</Badge>
+            {voiceSettings.transmissionMode === 'voice_activity' && (
+              <Badge variant={voiceActivityGateOpen ? 'default' : 'outline'}>
+                Gate {voiceActivityGateOpen ? 'Open' : 'Closed'}
+              </Badge>
+            )}
+            {voiceSettings.transmissionMode === 'push_to_talk' && (
+              <Badge variant={pushToTalkPressed ? 'default' : 'outline'}>
+                PTT {pushToTalkPressed ? 'Held' : 'Idle'}
+              </Badge>
+            )}
+            <Badge variant="outline">Input {Math.round(localInputLevel * 100)}%</Badge>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Transmission mode</p>
+            <Select
+              value={voiceSettings.transmissionMode}
+              onValueChange={(value) =>
+                persistVoiceSettingsPatch({ transmissionMode: value as VoiceSettings['transmissionMode'] })
+              }
+              disabled={voiceSettingsSaving}
+            >
+              <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
+                <SelectValue placeholder="Select mode" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                <SelectItem value="voice_activity">Voice Activity</SelectItem>
+                <SelectItem value="push_to_talk">Push to Talk</SelectItem>
+                <SelectItem value="open_mic">Open Mic</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {voiceSettings.transmissionMode === 'voice_activity' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 text-xs text-[#a9b8cf]">
+                <span>Gate threshold</span>
+                <span>{voiceSettings.voiceActivationThreshold}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={voiceSettings.voiceActivationThreshold}
+                onChange={(event) =>
+                  persistVoiceSettingsPatch({
+                    voiceActivationThreshold: Number(event.target.value),
+                  })
+                }
+                disabled={voiceSettingsSaving}
+                className="w-full accent-[#4f8df5]"
+                aria-label="Voice activity gate threshold"
+              />
+              <p className="text-[11px] text-[#90a5c4]">
+                Lower values open the mic more easily. Use Voice Hardware Test for tuning.
+              </p>
+            </div>
+          )}
+
+          {voiceSettings.transmissionMode === 'push_to_talk' && (
+            <PushToTalkBindingField
+              value={voiceSettings.pushToTalkBinding}
+              disabled={voiceSettingsSaving}
+              onChange={(nextBinding) => persistVoiceSettingsPatch({ pushToTalkBinding: nextBinding })}
+              helperText="PTT works while Haven is focused. F13-F24 bindings work when your pedal/driver emits those key events."
+            />
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {onOpenVoiceSettings && (
+              <Button type="button" variant="secondary" onClick={onOpenVoiceSettings}>
+                Open Full Voice Settings
+              </Button>
+            )}
+            {onOpenVoiceHardwareTest && (
+              <Button
+                type="button"
+                variant="outline"
+                className="border-[#304867] text-white"
+                onClick={onOpenVoiceHardwareTest}
+              >
+                Open Voice Hardware Test
+              </Button>
+            )}
+          </div>
+
+          {voiceSettingsError && <p className="text-sm text-red-300">{voiceSettingsError}</p>}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-[#1c2a43] border-[#263a58] text-white">
+        <CardHeader>
           <CardTitle>Devices</CardTitle>
           <CardDescription className="text-[#a9b8cf]">
             Select microphone and speaker devices. Input switching applies live while connected.
@@ -1122,7 +1473,10 @@ export function VoiceChannelPane({
             <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Speaker</p>
             <Select
               value={selectedOutputDeviceId}
-              onValueChange={setSelectedOutputDeviceId}
+              onValueChange={(value) => {
+                setSelectedOutputDeviceId(value);
+                persistVoiceSettingsPatch({ preferredOutputDeviceId: value });
+              }}
               disabled={!supportsOutputSelection}
             >
               <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">

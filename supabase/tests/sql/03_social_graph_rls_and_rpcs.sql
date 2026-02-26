@@ -147,5 +147,118 @@ select test_support.assert_true(
   'recipient can decline pending friend request'
 );
 
+reset role;
+select test_support.clear_jwt_claims();
+
+select test_support.assert_true(
+  exists(
+    select 1
+    from public.notification_recipients nr
+    join public.notification_events ne on ne.id = nr.event_id
+    where ne.kind = 'friend_request_received'
+      and ne.source_kind = 'friend_request'
+      and ne.source_id = (
+        select fr.id
+        from public.friend_requests fr
+        where fr.sender_user_id = test_support.fixture_user_id('community_owner')
+          and fr.recipient_user_id = test_support.fixture_user_id('server_mod')
+          and fr.status = 'declined'
+        order by fr.responded_at desc nulls last, fr.created_at desc
+        limit 1
+      )
+      and nr.recipient_user_id = test_support.fixture_user_id('server_mod')
+      and nr.dismissed_at is not null
+  ),
+  'declining a friend request should dismiss the incoming friend-request notification row'
+);
+
+-- Push-only friend request receive + accepted notifications should still create recipient rows.
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+select public.update_my_notification_preferences(
+  false, false,
+  true, true,
+  true, true,
+  true, true, true
+);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('community_owner'));
+select public.update_my_notification_preferences(
+  false, false,
+  true, true,
+  true, true,
+  true, true, true
+);
+
+select public.send_friend_request(test_support.fixture_username('member_a'));
+
+reset role;
+select test_support.clear_jwt_claims();
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.notification_recipients nr
+    join public.notification_events ne on ne.id = nr.event_id
+    where ne.kind = 'friend_request_received'
+      and nr.recipient_user_id = test_support.fixture_user_id('member_a')
+      and ne.source_id = (
+        select fr.id
+        from public.friend_requests fr
+        where fr.sender_user_id = test_support.fixture_user_id('community_owner')
+          and fr.recipient_user_id = test_support.fixture_user_id('member_a')
+          and fr.status = 'pending'
+        order by fr.created_at desc
+        limit 1
+      )
+      and nr.deliver_in_app = false
+      and nr.deliver_sound = false
+  ),
+  1,
+  'push-only friend request prefs should create a received notification recipient row with in-app/sound flags false'
+);
+
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+select public.accept_friend_request(
+  (select fr.id
+   from public.friend_requests fr
+   where fr.sender_user_id = test_support.fixture_user_id('community_owner')
+     and fr.recipient_user_id = test_support.fixture_user_id('member_a')
+     and fr.status = 'pending'
+   order by fr.created_at desc
+   limit 1)
+);
+
+reset role;
+select test_support.clear_jwt_claims();
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.notification_recipients nr
+    join public.notification_events ne on ne.id = nr.event_id
+    where ne.kind = 'friend_request_accepted'
+      and nr.recipient_user_id = test_support.fixture_user_id('community_owner')
+      and ne.source_id = (
+        select fr.id
+        from public.friend_requests fr
+        where fr.sender_user_id = test_support.fixture_user_id('community_owner')
+          and fr.recipient_user_id = test_support.fixture_user_id('member_a')
+          and fr.status = 'accepted'
+        order by fr.responded_at desc nulls last, fr.created_at desc
+        limit 1
+      )
+      and nr.deliver_in_app = false
+      and nr.deliver_sound = false
+  ),
+  1,
+  'push-only friend request prefs should create an accepted notification recipient row with in-app/sound flags false'
+);
+
 rollback;
 

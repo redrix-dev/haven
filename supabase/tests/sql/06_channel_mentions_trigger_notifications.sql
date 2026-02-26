@@ -147,7 +147,8 @@ select test_support.set_jwt_claims(test_support.fixture_user_id('member_b'));
 select public.update_my_notification_preferences(
   true, true,
   true, true,
-  false, false
+  false, false,
+  true, true, false
 );
 
 reset role;
@@ -190,6 +191,60 @@ select test_support.assert_eq_int(
   ),
   0,
   'global mention prefs disabled should suppress notification recipient row'
+);
+
+-- Push-only mention notifications should still create recipient rows with in-app/sound flags false.
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_b'));
+select public.update_my_notification_preferences(
+  true, true,
+  true, true,
+  false, false,
+  true, true, true
+);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+create temp table tmp_mention_message_push_only on commit drop as
+with inserted as (
+  insert into public.messages (
+    community_id,
+    channel_id,
+    author_type,
+    author_user_id,
+    content
+  )
+  values (
+    test_support.fixture_community_id(),
+    test_support.fixture_channel_id('general'),
+    'user',
+    test_support.fixture_user_id('member_a'),
+    format('@%s push-only mention should still create recipient row', test_support.fixture_username('member_b'))
+  )
+  returning id
+)
+select id from inserted;
+
+insert into mention_ids (key, id)
+select 'message_push_only', id from tmp_mention_message_push_only
+on conflict (key) do update set id = excluded.id;
+reset role;
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.notification_recipients nr
+    join public.notification_events ne on ne.id = nr.event_id
+    where ne.kind = 'channel_mention'
+      and ne.source_id = (select id from mention_ids where key = 'message_push_only')
+      and nr.recipient_user_id = test_support.fixture_user_id('member_b')
+      and nr.deliver_in_app = false
+      and nr.deliver_sound = false
+  ),
+  1,
+  'push-only mention prefs should create a recipient row with in-app/sound flags false'
 );
 
 -- Trigger should ignore non-user author types.

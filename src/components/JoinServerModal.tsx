@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getErrorMessage } from '@/shared/lib/errors';
+import { getPlatformInviteInputPlaceholder } from '@/shared/platform/urls';
 import {
   Dialog,
   DialogContent,
@@ -62,7 +63,7 @@ export function JoinServerModal({ onClose, onJoin }: JoinServerModalProps) {
               id="invite-input"
               value={inviteInput}
               onChange={(e) => setInviteInput(e.target.value)}
-              placeholder="ABC12345 or haven://invite/ABC12345"
+              placeholder={getPlatformInviteInputPlaceholder()}
               className="bg-[#142033] border-[#304867] text-white"
               autoFocus
               required

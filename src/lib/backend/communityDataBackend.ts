@@ -2126,6 +2126,25 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     );
 
     const rolePositionById = new Map((roles ?? []).map((role) => [role.id, role.position]));
+    const roleIds = (roles ?? []).map((role) => role.id);
+    let rolePermissionRows: Array<{ role_id: string; permission_key: string }> = [];
+
+    if (roleIds.length > 0) {
+      const { data: rolePermissionData, error: rolePermissionsError } = await supabase
+        .from('role_permissions')
+        .select('role_id, permission_key')
+        .in('role_id', roleIds);
+
+      if (rolePermissionsError) throw rolePermissionsError;
+      rolePermissionRows = rolePermissionData ?? [];
+    }
+
+    const rolePermissionKeysByRoleId = new Map<string, Set<string>>();
+    for (const row of rolePermissionRows) {
+      const current = rolePermissionKeysByRoleId.get(row.role_id) ?? new Set<string>();
+      current.add(row.permission_key);
+      rolePermissionKeysByRoleId.set(row.role_id, current);
+    }
 
     let canEditAllRoles = Boolean(myMember?.is_owner);
     let myHighestRolePosition = Number.NEGATIVE_INFINITY;
@@ -2148,12 +2167,16 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     const roleRows: ChannelRolePermissionItem[] = (roles ?? []).map((role) => {
       const overwrite = roleOverwriteMap.get(role.id);
+      const rolePermissionKeys = rolePermissionKeysByRoleId.get(role.id) ?? new Set<string>();
       return {
         roleId: role.id,
         name: role.name,
         color: role.color,
         isDefault: role.is_default,
         editable: canEditAllRoles || role.position < myHighestRolePosition,
+        defaultCanView: rolePermissionKeys.has('view_channels'),
+        defaultCanSend: rolePermissionKeys.has('send_messages'),
+        defaultCanManage: rolePermissionKeys.has('manage_channels'),
         canView: overwrite?.canView ?? null,
         canSend: overwrite?.canSend ?? null,
         canManage: overwrite?.canManage ?? null,
