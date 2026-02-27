@@ -251,6 +251,15 @@ max_frequency = "5s"
 # [auth.sms.test_otp]
 # 4152127777 = "123456"
 
+[functions.message-media-maintenance]
+verify_jwt = false
+
+[functions.link-preview-worker]
+verify_jwt = false
+
+[functions.web-push-worker]
+verify_jwt = false
+
 # Configure logged in session timeouts.
 # [auth.sessions]
 # Force log out after the specified duration.

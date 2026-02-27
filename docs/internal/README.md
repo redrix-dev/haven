@@ -16,3 +16,5 @@ Internal architecture references, contributor workflow material, testing runbook
 
 ## Important
 `docs/internal/` is git-ignored for new files by default. If you intentionally add a new tracked internal document, use `git add -f`.
+
+//comment no=op

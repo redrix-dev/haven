@@ -63,6 +63,13 @@ begin
     from public.notification_recipients nr
     where nr.event_id = ne.id
   );
+
+  delete from public.notification_delivery_traces ndt
+  where ndt.recipient_user_id in (select user_id from test_support.fixture_user_ids())
+     or ndt.notification_recipient_id is null;
+
+  delete from public.web_push_subscriptions wps
+  where wps.user_id in (select user_id from test_support.fixture_user_ids());
 end;
 $$;
 

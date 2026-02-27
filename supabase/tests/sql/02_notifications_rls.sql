@@ -147,15 +147,94 @@ select test_support.assert_true(
   'second notification page should return remaining rows'
 );
 
+reset role;
+select test_support.clear_jwt_claims();
+
+insert into notification_test_rows (key, event_id)
+values (
+  'event_member_a_sound_only',
+  public.create_notification_event_with_recipients(
+    'system',
+    'system_event',
+    gen_random_uuid(),
+    null,
+    jsonb_build_object('title', 'Sound only', 'message', 'Should play sound without inbox row'),
+    jsonb_build_array(
+      jsonb_build_object(
+        'recipient_user_id', test_support.fixture_user_id('member_a'),
+        'deliver_in_app', false,
+        'deliver_sound', true
+      )
+    )
+  )
+)
+on conflict (key) do update set event_id = excluded.event_id;
+
+update notification_test_rows n
+set recipient_id = nr.id
+from public.notification_recipients nr
+where nr.event_id = n.event_id
+  and n.key = 'event_member_a_sound_only';
+
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_notifications(100, null, null) inbox
+    where inbox.recipient_id = (select recipient_id from notification_test_rows where key = 'event_member_a_sound_only')
+  ),
+  0,
+  'sound-only notifications should remain excluded from list_my_notifications inbox RPC'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_sound_notifications(100, null, null) sounds
+    where sounds.recipient_id = (select recipient_id from notification_test_rows where key = 'event_member_a_sound_only')
+  ),
+  1,
+  'sound-only notifications should be returned by list_my_sound_notifications RPC'
+);
+
+select test_support.assert_true(
+  (
+    select coalesce(sounds.deliver_sound, false)
+       and coalesce(sounds.deliver_in_app, true) = false
+    from public.list_my_sound_notifications(100, null, null) sounds
+    where sounds.recipient_id = (select recipient_id from notification_test_rows where key = 'event_member_a_sound_only')
+    limit 1
+  ),
+  'sound notification RPC should preserve deliver_sound=true and deliver_in_app=false flags'
+);
+
+select test_support.assert_true(
+  (select coalesce(friend_request_push_enabled, false) from public.get_my_notification_preferences() limit 1),
+  'push notification preferences should default enabled for friend requests'
+);
+
 select public.update_my_notification_preferences(
   false, false,
   true, true,
-  true, false
+  true, false,
+  false, true, false
 );
 
 select test_support.assert_false(
   (select friend_request_in_app_enabled from public.get_my_notification_preferences() limit 1),
   'member_a preference update should persist'
+);
+
+select test_support.assert_false(
+  (select friend_request_push_enabled from public.get_my_notification_preferences() limit 1),
+  'friend_request_push_enabled should persist through preference update'
+);
+
+select test_support.assert_false(
+  (select mention_push_enabled from public.get_my_notification_preferences() limit 1),
+  'mention_push_enabled should persist through preference update'
 );
 
 reset role;

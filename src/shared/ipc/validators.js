@@ -44,6 +44,80 @@ function parseSetNotificationAudioPayload(payload) {
   };
 }
 
+function parseSetVoiceSettingsPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid payload for voice settings.');
+  }
+
+  const transmissionMode = payload.transmissionMode;
+  if (
+    transmissionMode !== 'open_mic' &&
+    transmissionMode !== 'voice_activity' &&
+    transmissionMode !== 'push_to_talk'
+  ) {
+    throw new Error('Invalid transmissionMode value for voice settings.');
+  }
+
+  if (
+    typeof payload.preferredInputDeviceId !== 'string' ||
+    payload.preferredInputDeviceId.trim().length === 0
+  ) {
+    throw new Error('Invalid preferredInputDeviceId value for voice settings.');
+  }
+
+  if (
+    typeof payload.preferredOutputDeviceId !== 'string' ||
+    payload.preferredOutputDeviceId.trim().length === 0
+  ) {
+    throw new Error('Invalid preferredOutputDeviceId value for voice settings.');
+  }
+
+  if (
+    typeof payload.voiceActivationThreshold !== 'number' ||
+    !Number.isFinite(payload.voiceActivationThreshold)
+  ) {
+    throw new Error('Invalid voiceActivationThreshold value. Expected a number.');
+  }
+
+  const roundedThreshold = Math.round(payload.voiceActivationThreshold);
+  if (roundedThreshold < 0 || roundedThreshold > 100) {
+    throw new Error('Invalid voiceActivationThreshold value. Expected 0-100.');
+  }
+
+  let pushToTalkBinding = null;
+  if (payload.pushToTalkBinding != null) {
+    const binding = payload.pushToTalkBinding;
+    if (!binding || typeof binding !== 'object') {
+      throw new Error('Invalid pushToTalkBinding value for voice settings.');
+    }
+    if (typeof binding.code !== 'string' || binding.code.trim().length === 0) {
+      throw new Error('Invalid pushToTalkBinding.code value for voice settings.');
+    }
+    const label =
+      typeof binding.label === 'string' && binding.label.trim().length > 0
+        ? binding.label.trim()
+        : binding.code.trim();
+
+    pushToTalkBinding = {
+      code: binding.code.trim(),
+      key: typeof binding.key === 'string' && binding.key.trim().length > 0 ? binding.key.trim() : null,
+      ctrlKey: Boolean(binding.ctrlKey),
+      altKey: Boolean(binding.altKey),
+      shiftKey: Boolean(binding.shiftKey),
+      metaKey: Boolean(binding.metaKey),
+      label,
+    };
+  }
+
+  return {
+    preferredInputDeviceId: payload.preferredInputDeviceId.trim(),
+    preferredOutputDeviceId: payload.preferredOutputDeviceId.trim(),
+    transmissionMode,
+    voiceActivationThreshold: roundedThreshold,
+    pushToTalkBinding,
+  };
+}
+
 function parseSaveFileFromUrlPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Invalid payload for save file request.');
@@ -65,5 +139,6 @@ function parseSaveFileFromUrlPayload(payload) {
 module.exports = {
   parseSetAutoUpdatePayload,
   parseSetNotificationAudioPayload,
+  parseSetVoiceSettingsPayload,
   parseSaveFileFromUrlPayload,
 };

@@ -22,10 +22,16 @@
     "test:db:rls": "node scripts/test/run-supabase-sql-suite.mjs",
     "test:db:quick": "node scripts/test/run-supabase-sql-suite.mjs --skip-fixtures",
     "test:db": "node scripts/test/run-db-suite.mjs",
+    "test:notifications:smoke": "node scripts/test/run-notification-dispatch-smoke.mjs",
+    "test:notifications:route-sim": "node scripts/test/run-notification-route-policy-sim.mjs",
+    "test:signoff": "node scripts/test/generate-test-signoff.mjs",
+    "test:signoff:release": "node scripts/test/generate-test-signoff.mjs --mode release",
     "test:report": "node scripts/test/generate-test-report.mjs",
     "test:all": "npm run lint && npx tsc --noEmit --project tsconfig.json && npm run test:unit && npm run test:db && npm run test:backend",
     "test:ci": "npm run lint && npx tsc --noEmit --project tsconfig.json && npm run test:unit && npm run test:db && npm run test:backend",
-    "ci:verify": "npm run test:ci"
+    "ci:verify": "npm run test:ci",
+    "dev:web": "vite",
+    "build:web": "vite build"
   },
   "keywords": [],
   "author": {
@@ -53,6 +59,7 @@
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.56.0",
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "@vitejs/plugin-react": "^5.1.4",
     "autoprefixer": "^10.4.24",
     "css-loader": "^6.11.0",
     "electron": "40.4.1",
@@ -67,6 +74,7 @@
     "tailwindcss": "^4.1.18",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
+    "vite": "^7.3.1",
     "vitest": "^4.0.18"
   },
   "dependencies": {

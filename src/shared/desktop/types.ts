@@ -4,10 +4,31 @@ export type NotificationAudioSettings = {
   playSoundsWhenFocused: boolean;
 };
 
+export type VoiceTransmissionMode = 'voice_activity' | 'push_to_talk' | 'open_mic';
+
+export type VoicePushToTalkBinding = {
+  code: string;
+  key: string | null;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  metaKey: boolean;
+  label: string;
+};
+
+export type VoiceSettings = {
+  preferredInputDeviceId: string;
+  preferredOutputDeviceId: string;
+  transmissionMode: VoiceTransmissionMode;
+  voiceActivationThreshold: number;
+  pushToTalkBinding: VoicePushToTalkBinding | null;
+};
+
 export type AppSettings = {
   schemaVersion: number;
   autoUpdateEnabled: boolean;
   notifications: NotificationAudioSettings;
+  voice: VoiceSettings;
 };
 
 export type UpdaterStatus = {
@@ -46,6 +67,9 @@ export type DesktopAPI = {
     updaterStatus: UpdaterStatus;
   }>;
   setNotificationAudioSettings: (input: NotificationAudioSettings) => Promise<{
+    settings: AppSettings;
+  }>;
+  setVoiceSettings: (input: VoiceSettings) => Promise<{
     settings: AppSettings;
   }>;
   getUpdaterStatus: () => Promise<UpdaterStatus>;

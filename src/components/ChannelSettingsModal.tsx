@@ -43,6 +43,9 @@ export interface ChannelRolePermissionItem extends ChannelPermissionState {
   color: string;
   isDefault: boolean;
   editable: boolean;
+  defaultCanView: boolean;
+  defaultCanSend: boolean;
+  defaultCanManage: boolean;
 }
 
 export interface ChannelMemberPermissionItem extends ChannelPermissionState {
@@ -80,6 +83,7 @@ interface ChannelSettingsModalProps {
 }
 
 type PermissionKey = keyof ChannelPermissionState;
+type PermissionSelectValue = 'default' | 'allow' | 'deny';
 
 type TabKey = 'general' | 'permissions';
 
@@ -89,27 +93,55 @@ const PERMISSION_COLUMNS: Array<{ key: PermissionKey; label: string }> = [
   { key: 'canManage', label: 'Manage Channel' },
 ];
 
-function nextPermissionValue(value: PermissionValue): PermissionValue {
-  if (value === null) return true;
-  if (value === true) return false;
+const permissionValueToSelectValue = (value: PermissionValue): PermissionSelectValue => {
+  if (value === true) return 'allow';
+  if (value === false) return 'deny';
+  return 'default';
+};
+
+const permissionSelectValueToPermissionValue = (value: PermissionSelectValue): PermissionValue => {
+  if (value === 'allow') return true;
+  if (value === 'deny') return false;
   return null;
-}
+};
 
-function permissionLabel(value: PermissionValue): string {
-  if (value === true) return 'Allow';
-  if (value === false) return 'Deny';
+const permissionLabel = (value: PermissionValue, defaultValue?: boolean): string => {
+  if (value === true) return 'Yes';
+  if (value === false) return 'No';
+  if (typeof defaultValue === 'boolean') {
+    return defaultValue ? 'Yes (default)' : 'No (default)';
+  }
   return 'Inherit';
-}
+};
 
-function permissionClassName(value: PermissionValue): string {
-  if (value === true) {
-    return 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40';
+const rolePermissionDefaultValueForKey = (
+  row: ChannelRolePermissionItem,
+  key: PermissionKey
+): boolean => {
+  switch (key) {
+    case 'canView':
+      return row.defaultCanView;
+    case 'canSend':
+      return row.defaultCanSend;
+    case 'canManage':
+      return row.defaultCanManage;
+    default:
+      return false;
   }
-  if (value === false) {
-    return 'bg-red-600/20 text-red-300 border border-red-500/40';
+};
+
+const permissionSentence = (subject: string, key: PermissionKey): string => {
+  switch (key) {
+    case 'canView':
+      return `${subject} can view this channel`;
+    case 'canSend':
+      return `${subject} can send messages`;
+    case 'canManage':
+      return `${subject} can manage this channel`;
+    default:
+      return subject;
   }
-  return 'bg-[#142033] text-[#a9b8cf] border border-[#304867]';
-}
+};
 
 export function ChannelSettingsModal({
   initialName,
@@ -238,14 +270,18 @@ export function ChannelSettingsModal({
     setPermissionError(null);
   };
 
-  const handleRolePermissionToggle = async (roleId: string, key: PermissionKey) => {
+  const handleRolePermissionSet = async (
+    roleId: string,
+    key: PermissionKey,
+    nextValue: PermissionValue
+  ) => {
     const row = roleRows.find((roleRow) => roleRow.roleId === roleId);
     if (!row || !row.editable) return;
 
     const previousRow = row;
     const nextRow: ChannelRolePermissionItem = {
       ...row,
-      [key]: nextPermissionValue(row[key]),
+      [key]: nextValue,
     };
 
     setRoleRows((prev) =>
@@ -271,14 +307,18 @@ export function ChannelSettingsModal({
     }
   };
 
-  const handleMemberPermissionToggle = async (memberId: string, key: PermissionKey) => {
+  const handleMemberPermissionSet = async (
+    memberId: string,
+    key: PermissionKey,
+    nextValue: PermissionValue
+  ) => {
     const row = memberRows.find((memberRow) => memberRow.memberId === memberId);
     if (!row) return;
 
     const previousRow = row;
     const nextRow: ChannelMemberPermissionItem = {
       ...row,
-      [key]: nextPermissionValue(row[key]),
+      [key]: nextValue,
     };
 
     setMemberRows((prev) =>
@@ -396,7 +436,10 @@ export function ChannelSettingsModal({
           <TabsContent value="permissions" className="space-y-5">
             <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-1">
               <p className="text-sm font-medium text-white">How channel permissions work</p>
-              <p className="text-xs text-[#a9b8cf]">Each value cycles: Inherit -&gt; Allow -&gt; Deny.</p>
+              <p className="text-xs text-[#a9b8cf]">
+                Role rows show the effective server default directly in the dropdown (for example,
+                “Yes (default)”).
+              </p>
               <p className="text-xs text-[#a9b8cf]">
                 Priority: Member overwrites, then role overwrites, then server role permissions.
               </p>
@@ -438,21 +481,53 @@ export function ChannelSettingsModal({
                             </span>
                           )}
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-2">
                           {PERMISSION_COLUMNS.map((column) => {
                             const value = roleRow[column.key];
                             const saveKey = `role:${roleRow.roleId}:${column.key}`;
+                            const defaultValue = rolePermissionDefaultValueForKey(roleRow, column.key);
                             return (
-                              <button
+                              <div
                                 key={column.key}
-                                type="button"
-                                onClick={() => void handleRolePermissionToggle(roleRow.roleId, column.key)}
-                                disabled={permissionSavingKey !== null || !roleRow.editable}
-                                className={`rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${permissionClassName(value)} disabled:opacity-60`}
+                                className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-[#304867] bg-[#111a2b] p-2"
                               >
-                                {column.label}:{' '}
-                                {permissionSavingKey === saveKey ? 'Saving...' : permissionLabel(value)}
-                              </button>
+                                <div className="min-w-0">
+                                  <p className="text-sm text-white">
+                                    {permissionSentence(roleRow.name, column.key)}
+                                  </p>
+                                  <p className="text-xs text-[#8ea4c7]">
+                                    Server default: {defaultValue ? 'Yes' : 'No'}
+                                  </p>
+                                </div>
+                                <Select
+                                  value={permissionValueToSelectValue(value)}
+                                  onValueChange={(nextSelectValue) =>
+                                    void handleRolePermissionSet(
+                                      roleRow.roleId,
+                                      column.key,
+                                      permissionSelectValueToPermissionValue(
+                                        nextSelectValue as PermissionSelectValue
+                                      )
+                                    )
+                                  }
+                                  disabled={permissionSavingKey !== null || !roleRow.editable}
+                                >
+                                  <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
+                                    <SelectValue
+                                      placeholder={permissionLabel(null, defaultValue)}
+                                    />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                                    <SelectItem value="default">
+                                      {permissionSavingKey === saveKey
+                                        ? 'Saving...'
+                                        : permissionLabel(null, defaultValue)}
+                                    </SelectItem>
+                                    <SelectItem value="allow">Yes</SelectItem>
+                                    <SelectItem value="deny">No</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             );
                           })}
                         </div>
@@ -523,23 +598,48 @@ export function ChannelSettingsModal({
                               </span>
                             )}
                           </div>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-2">
                             {PERMISSION_COLUMNS.map((column) => {
                               const value = memberRow[column.key];
                               const saveKey = `member:${memberRow.memberId}:${column.key}`;
                               return (
-                                <button
+                                <div
                                   key={column.key}
-                                  type="button"
-                                  onClick={() =>
-                                    void handleMemberPermissionToggle(memberRow.memberId, column.key)
-                                  }
-                                  disabled={permissionSavingKey !== null}
-                                  className={`rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${permissionClassName(value)} disabled:opacity-60`}
+                                  className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-[#304867] bg-[#111a2b] p-2"
                                 >
-                                  {column.label}:{' '}
-                                  {permissionSavingKey === saveKey ? 'Saving...' : permissionLabel(value)}
-                                </button>
+                                  <div className="min-w-0">
+                                    <p className="text-sm text-white">
+                                      {permissionSentence(memberRow.displayName, column.key)}
+                                    </p>
+                                    <p className="text-xs text-[#8ea4c7]">
+                                      Member-specific override (takes priority over roles)
+                                    </p>
+                                  </div>
+                                  <Select
+                                    value={permissionValueToSelectValue(value)}
+                                    onValueChange={(nextSelectValue) =>
+                                      void handleMemberPermissionSet(
+                                        memberRow.memberId,
+                                        column.key,
+                                        permissionSelectValueToPermissionValue(
+                                          nextSelectValue as PermissionSelectValue
+                                        )
+                                      )
+                                    }
+                                    disabled={permissionSavingKey !== null}
+                                  >
+                                    <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
+                                      <SelectValue placeholder={permissionLabel(null)} />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                                      <SelectItem value="default">
+                                        {permissionSavingKey === saveKey ? 'Saving...' : permissionLabel(null)}
+                                      </SelectItem>
+                                      <SelectItem value="allow">Yes</SelectItem>
+                                      <SelectItem value="deny">No</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               );
                             })}
                           </div>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { desktopClient } from '@/shared/desktop/client';
+import { getPlatformAuthConfirmRedirectUrl } from '@/shared/platform/urls';
 import { getErrorMessage } from '@/shared/lib/errors';
 import type {
   AuthError,
@@ -41,27 +42,29 @@ const SUPPORTED_EMAIL_OTP_TYPES = new Set<EmailOtpType>([
   'email_change',
   'email',
 ]);
-const HAVEN_AUTH_CONFIRM_REDIRECT_URL = 'haven://auth/confirm';
 
-const parseProtocolUrl = (url: string): URL | null => {
+const normalizePathname = (pathname: string): string => {
+  const normalized = pathname.replace(/\/+$/, '');
+  return normalized || '/';
+};
+
+const parseAuthConfirmUrl = (url: string): URL | null => {
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'haven:' ? parsed : null;
+    const pathname = normalizePathname(parsed.pathname);
+    if (parsed.protocol === 'haven:') {
+      return parsed.hostname === 'auth' && pathname === '/confirm' ? parsed : null;
+    }
+    if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && pathname === '/auth/confirm') {
+      return parsed;
+    }
+    return null;
   } catch {
     return null;
   }
 };
 
-const isAuthConfirmProtocolUrl = (url: string): boolean => {
-  const parsed = parseProtocolUrl(url);
-  if (!parsed) return false;
-  return parsed.hostname === 'auth' && parsed.pathname === '/confirm';
-};
-
-const parseProtocolParams = (url: string): Record<string, string> => {
-  const parsed = parseProtocolUrl(url);
-  if (!parsed) return {};
-
+const parseAuthConfirmParams = (parsed: URL): Record<string, string> => {
   const next: Record<string, string> = {};
   const applyParams = (params: URLSearchParams) => {
     for (const [key, value] of params.entries()) {
@@ -86,16 +89,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] = useState(false);
   const loading = status === 'initializing';
-  const processedProtocolUrlsRef = useRef<Set<string>>(new Set());
+  const processedAuthConfirmUrlsRef = useRef<Set<string>>(new Set());
 
-  const consumeProtocolAuthUrl = useCallback(async (url: string) => {
-    if (!url) return;
-    if (processedProtocolUrlsRef.current.has(url)) return;
-    processedProtocolUrlsRef.current.add(url);
+  const consumeAuthConfirmUrl = useCallback(async (url: string): Promise<boolean> => {
+    if (!url) return false;
+    if (processedAuthConfirmUrlsRef.current.has(url)) return false;
 
-    if (!isAuthConfirmProtocolUrl(url)) return;
+    const parsedAuthConfirmUrl = parseAuthConfirmUrl(url);
+    if (!parsedAuthConfirmUrl) return false;
 
-    const params = parseProtocolParams(url);
+    processedAuthConfirmUrlsRef.current.add(url);
+
+    const params = parseAuthConfirmParams(parsedAuthConfirmUrl);
     const accessToken = params.access_token?.trim();
     const refreshToken = params.refresh_token?.trim();
     const tokenHash = params.token_hash?.trim();
@@ -112,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (isRecoveryLink) {
           setPasswordRecoveryRequired(true);
         }
-        return;
+        return true;
       }
 
       if (tokenHash && otpType && SUPPORTED_EMAIL_OTP_TYPES.has(otpType)) {
@@ -124,13 +129,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (otpType === 'recovery') {
           setPasswordRecoveryRequired(true);
         }
-        return;
+        return true;
       }
 
       throw new Error('Verification link is missing required token fields.');
     } catch (authUrlError: unknown) {
       console.error('Failed to process Haven auth confirmation URL:', authUrlError);
       setError(getErrorMessage(authUrlError, 'Failed to confirm verification link.'));
+      return false;
     }
   }, []);
 
@@ -192,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const handleProtocolUrl = (url: string) => {
       if (disposed) return;
-      void consumeProtocolAuthUrl(url);
+      void consumeAuthConfirmUrl(url);
     };
 
     try {
@@ -207,7 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const url = await desktopClient.consumeNextProtocolUrl();
           if (!url) break;
           if (disposed) break;
-          await consumeProtocolAuthUrl(url);
+          await consumeAuthConfirmUrl(url);
         }
       } catch (consumeError) {
         if (!disposed) {
@@ -222,14 +228,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       disposed = true;
       unsubscribe();
     };
-  }, [consumeProtocolAuthUrl]);
+  }, [consumeAuthConfirmUrl]);
+
+  useEffect(() => {
+    if (desktopClient.isAvailable()) return;
+    if (typeof window === 'undefined') return;
+
+    let disposed = false;
+
+    const consumeBrowserAuthConfirmUrl = async () => {
+      const currentUrl = window.location.href;
+      const didProcess = await consumeAuthConfirmUrl(currentUrl);
+      if (!didProcess || disposed) return;
+
+      const parsed = parseAuthConfirmUrl(currentUrl);
+      if (!parsed) return;
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+
+      try {
+        window.history.replaceState({}, document.title, '/');
+      } catch (historyError) {
+        if (!disposed) {
+          console.warn('Failed to clear browser auth confirmation URL:', historyError);
+        }
+      }
+    };
+
+    void consumeBrowserAuthConfirmUrl();
+
+    return () => {
+      disposed = true;
+    };
+  }, [consumeAuthConfirmUrl]);
 
   const signUp = async (email: string, password: string, username: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: HAVEN_AUTH_CONFIRM_REDIRECT_URL,
+        emailRedirectTo: getPlatformAuthConfirmRedirectUrl(),
         data: {
           username: username.trim(),
         },
@@ -252,7 +289,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const requestPasswordReset = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: HAVEN_AUTH_CONFIRM_REDIRECT_URL,
+      redirectTo: getPlatformAuthConfirmRedirectUrl(),
     });
 
     return { error };

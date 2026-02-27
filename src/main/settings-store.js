@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SETTINGS_SCHEMA_VERSION = 2;
+const SETTINGS_SCHEMA_VERSION = 3;
 
 const DEFAULT_APP_SETTINGS = {
   schemaVersion: SETTINGS_SCHEMA_VERSION,
@@ -10,6 +10,21 @@ const DEFAULT_APP_SETTINGS = {
     masterSoundEnabled: true,
     notificationSoundVolume: 70,
     playSoundsWhenFocused: true,
+  },
+  voice: {
+    preferredInputDeviceId: 'default',
+    preferredOutputDeviceId: 'default',
+    transmissionMode: 'voice_activity',
+    voiceActivationThreshold: 18,
+    pushToTalkBinding: {
+      code: 'F13',
+      key: 'F13',
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      label: 'F13',
+    },
   },
 };
 
@@ -26,7 +41,44 @@ function createSettingsStore(app) {
       candidate.notifications && typeof candidate.notifications === 'object'
         ? candidate.notifications
         : {};
+    const candidateVoice =
+      candidate.voice && typeof candidate.voice === 'object'
+        ? candidate.voice
+        : {};
     const normalizedVolume = Number(candidateNotifications.notificationSoundVolume);
+    const normalizedVoiceActivationThreshold = Number(candidateVoice.voiceActivationThreshold);
+    const candidatePushToTalkBinding =
+      candidateVoice.pushToTalkBinding && typeof candidateVoice.pushToTalkBinding === 'object'
+        ? candidateVoice.pushToTalkBinding
+        : null;
+    const normalizedPushToTalkBinding =
+      candidatePushToTalkBinding &&
+      typeof candidatePushToTalkBinding.code === 'string' &&
+      candidatePushToTalkBinding.code.trim().length > 0
+        ? {
+            code: candidatePushToTalkBinding.code.trim(),
+            key:
+              typeof candidatePushToTalkBinding.key === 'string' &&
+              candidatePushToTalkBinding.key.trim().length > 0
+                ? candidatePushToTalkBinding.key.trim()
+                : null,
+            ctrlKey: Boolean(candidatePushToTalkBinding.ctrlKey),
+            altKey: Boolean(candidatePushToTalkBinding.altKey),
+            shiftKey: Boolean(candidatePushToTalkBinding.shiftKey),
+            metaKey: Boolean(candidatePushToTalkBinding.metaKey),
+            label:
+              typeof candidatePushToTalkBinding.label === 'string' &&
+              candidatePushToTalkBinding.label.trim().length > 0
+                ? candidatePushToTalkBinding.label.trim()
+                : candidatePushToTalkBinding.code.trim(),
+          }
+        : DEFAULT_APP_SETTINGS.voice.pushToTalkBinding;
+    const normalizedTransmissionMode =
+      candidateVoice.transmissionMode === 'open_mic' ||
+      candidateVoice.transmissionMode === 'voice_activity' ||
+      candidateVoice.transmissionMode === 'push_to_talk'
+        ? candidateVoice.transmissionMode
+        : DEFAULT_APP_SETTINGS.voice.transmissionMode;
     return {
       schemaVersion: SETTINGS_SCHEMA_VERSION,
       autoUpdateEnabled:
@@ -46,6 +98,26 @@ function createSettingsStore(app) {
           typeof candidateNotifications.playSoundsWhenFocused === 'boolean'
             ? candidateNotifications.playSoundsWhenFocused
             : DEFAULT_APP_SETTINGS.notifications.playSoundsWhenFocused,
+      },
+      voice: {
+        preferredInputDeviceId:
+          typeof candidateVoice.preferredInputDeviceId === 'string' &&
+          candidateVoice.preferredInputDeviceId.trim().length > 0
+            ? candidateVoice.preferredInputDeviceId.trim()
+            : DEFAULT_APP_SETTINGS.voice.preferredInputDeviceId,
+        preferredOutputDeviceId:
+          typeof candidateVoice.preferredOutputDeviceId === 'string' &&
+          candidateVoice.preferredOutputDeviceId.trim().length > 0
+            ? candidateVoice.preferredOutputDeviceId.trim()
+            : DEFAULT_APP_SETTINGS.voice.preferredOutputDeviceId,
+        transmissionMode: normalizedTransmissionMode,
+        voiceActivationThreshold:
+          Number.isFinite(normalizedVoiceActivationThreshold) &&
+          normalizedVoiceActivationThreshold >= 0 &&
+          normalizedVoiceActivationThreshold <= 100
+            ? Math.round(normalizedVoiceActivationThreshold)
+            : DEFAULT_APP_SETTINGS.voice.voiceActivationThreshold,
+        pushToTalkBinding: normalizedPushToTalkBinding,
       },
     };
   };

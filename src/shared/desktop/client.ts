@@ -4,6 +4,7 @@ import type {
   NotificationAudioSettings,
   SaveFileFromUrlResult,
   UpdaterStatus,
+  VoiceSettings,
 } from './types';
 
 const DESKTOP_BRIDGE_UNAVAILABLE_ERROR = 'Desktop bridge unavailable.';
@@ -33,6 +34,11 @@ export const desktopClient = {
     settings: AppSettings;
   }> {
     return getDesktopApi().setNotificationAudioSettings(input);
+  },
+  async setVoiceSettings(input: VoiceSettings): Promise<{
+    settings: AppSettings;
+  }> {
+    return getDesktopApi().setVoiceSettings(input);
   },
   async getUpdaterStatus(): Promise<UpdaterStatus> {
     return getDesktopApi().getUpdaterStatus();

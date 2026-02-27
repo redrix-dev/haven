@@ -17,4 +17,9 @@ supabase/tests/sql/03_social_graph_rls_and_rpcs.sql
 supabase/tests/sql/04_dm_rls_and_rpcs.sql
 supabase/tests/sql/05_dm_moderation_review_rls_and_rpcs.sql
 supabase/tests/sql/06_channel_mentions_trigger_notifications.sql
+supabase/tests/sql/07_web_push_subscriptions_rls_and_rpcs.sql
+supabase/tests/sql/08_web_push_dispatch_jobs.sql
+supabase/tests/sql/09_notification_delivery_traces_rls_and_rpcs.sql
+supabase/tests/sql/10_web_push_dispatch_wakeups_shadow.sql
+supabase/tests/sql/11_web_push_queue_health_diagnostics.sql
 

@@ -12,10 +12,13 @@ const basePreferences: NotificationPreferences = {
   userId: 'user-1',
   friendRequestInAppEnabled: true,
   friendRequestSoundEnabled: true,
+  friendRequestPushEnabled: true,
   dmInAppEnabled: true,
   dmSoundEnabled: true,
+  dmPushEnabled: true,
   mentionInAppEnabled: true,
   mentionSoundEnabled: true,
+  mentionPushEnabled: true,
   createdAt: nowIso,
   updatedAt: nowIso,
 };

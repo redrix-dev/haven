@@ -203,6 +203,17 @@ Outputs (git-ignored):
 - `test-reports/<timestamp>.local/report.local.md`
 - raw logs in same folder
 
+#### Tier F: Release / Canary Signoff Artifact (recommended before staging or production rollout)
+Produces a paste-ready summary with command results, timestamps, git snapshot, and explicit signatures.
+
+```bash
+npm run test:signoff -- --release-label <label> --environment staging --test-author "<name>" --run-by "<name>"
+```
+
+Artifacts (git-ignored):
+- `test-reports/<timestamp>.local/signoff.local.md`
+- `test-reports/<timestamp>.local/signoff.local.json`
+
 Notes:
 - The report includes a "Learning View" that explains major SQL/backend suites in actor/action/expected terms.
 - See `docs/internal/testing/test-suite-breakdown.md` for how the suite works end-to-end.
@@ -227,7 +238,32 @@ Before stopping for the day:
 - commit if the checkpoint is valuable
 - or clearly note what is uncommitted in `SESSION_HANDOFF.local`
 
+4. If you ran validation, record:
+- exact commands
+- pass/fail status
+- generated report/signoff paths
+- any known issues observed (for example Edge/WNS push behavior)
+
 ---
+
+## Web/PWA Staging Validation (Root Domain)
+
+For PWA/push validation, use one canonical origin per environment to avoid stale service worker registrations and
+duplicate push subscriptions.
+
+Recommended:
+- Staging: `https://staging-haven.redrixx.com`
+- Production: `https://haven.redrixx.com`
+
+Avoid mixing:
+- `*.vercel.app` URLs
+- previous staging aliases
+- multiple origins for the same build during push testing
+
+Primary canary validation targets:
+1. Windows Chrome PWA
+2. iOS installed web app
+3. Windows Edge PWA (known-issue verification only, unless fixed)
 
 ## Commit Workflow and Commit Message Conventions
 

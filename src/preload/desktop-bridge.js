@@ -7,6 +7,8 @@ const exposeDesktopBridge = ({ contextBridge, ipcRenderer }) => {
       ipcRenderer.invoke(DESKTOP_IPC_KEYS.SETTINGS_SET_AUTO_UPDATE, { enabled }),
     setNotificationAudioSettings: (payload) =>
       ipcRenderer.invoke(DESKTOP_IPC_KEYS.SETTINGS_SET_NOTIFICATION_AUDIO, payload),
+    setVoiceSettings: (payload) =>
+      ipcRenderer.invoke(DESKTOP_IPC_KEYS.SETTINGS_SET_VOICE, payload),
     getUpdaterStatus: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_STATUS_GET),
     checkForUpdates: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_CHECK_NOW),
     saveFileFromUrl: (payload) => ipcRenderer.invoke(DESKTOP_IPC_KEYS.MEDIA_SAVE_FROM_URL, payload),

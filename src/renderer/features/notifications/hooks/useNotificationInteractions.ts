@@ -6,7 +6,7 @@ import { getErrorMessage } from '@/shared/lib/errors';
 import { getNotificationPayloadString } from '@/renderer/app/utils';
 
 type UseNotificationInteractionsInput = {
-  notificationBackend: Pick<NotificationBackend, 'markNotificationsRead'>;
+  notificationBackend: Pick<NotificationBackend, 'markNotificationsRead' | 'dismissNotifications'>;
   socialBackend: Pick<SocialBackend, 'acceptFriendRequest' | 'declineFriendRequest'>;
   friendsSocialPanelEnabled: boolean;
   refreshNotificationInbox: (options?: { playSoundsForNew?: boolean }) => Promise<void>;
@@ -96,7 +96,9 @@ export function useNotificationInteractions({
     async (input: { recipientId: string; friendRequestId: string }) => {
       try {
         await socialBackend.acceptFriendRequest(input.friendRequestId);
-        await notificationBackend.markNotificationsRead([input.recipientId]);
+        // Dismiss handled friend-request notifications so the row clears immediately and
+        // future requests from the same user don't stack beside stale handled rows.
+        await notificationBackend.dismissNotifications([input.recipientId]);
         await Promise.all([
           refreshNotificationInbox({ playSoundsForNew: false }),
           refreshSocialCounts(),
@@ -118,7 +120,7 @@ export function useNotificationInteractions({
     async (input: { recipientId: string; friendRequestId: string }) => {
       try {
         await socialBackend.declineFriendRequest(input.friendRequestId);
-        await notificationBackend.markNotificationsRead([input.recipientId]);
+        await notificationBackend.dismissNotifications([input.recipientId]);
         await Promise.all([
           refreshNotificationInbox({ playSoundsForNew: false }),
           refreshSocialCounts(),

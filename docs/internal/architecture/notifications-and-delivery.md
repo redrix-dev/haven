@@ -1,85 +1,146 @@
 # Notifications and Delivery Architecture
 
 ## Purpose
-Describe how Haven notifications are created, stored, delivered in-app, marked seen/read, and extended by future producers.
+Describe how Haven notifications are created, stored, delivered (foreground and background), and debugged.
 
-## Current Design
+## Core Model
 
-### Inbox Model
+### Inbox records (DB source of truth)
 - `public.notification_events`
-  - immutable notification event record (`kind`, `source_kind`, `source_id`, `actor_user_id`, `payload`)
+  - immutable event payload (`kind`, source ids, actor, payload)
 - `public.notification_recipients`
-  - per-user inbox row + delivery flags + seen/read/dismiss state
+  - per-user delivery row (`deliver_in_app`, `deliver_sound`, read/seen/dismiss state)
 
-### Semantics
-- `seen_at`: user opened notification center and item was visible
-- `read_at`: user acted on/opened the notification target
-- `dismissed_at`: hidden from the active inbox list
+### Delivery split (intentional)
+- `Supabase Realtime`:
+  - foreground/in-app inbox refreshes and counts
+- `Web Push + Service Worker`:
+  - background/minimized/lock-screen OS notifications
 
-### Current Producers
-- Social graph RPCs:
-  - `send_friend_request(...)`
-  - `accept_friend_request(...)` (accepted notification)
-- DM RPC:
-  - `send_dm_message(...)`
-- Channel mentions:
-  - DB trigger `trg_messages_process_channel_mentions`
-  - function `public.process_channel_message_mentions()`
+Realtime is **not** treated as the background delivery transport because browsers/PWAs suspend.
 
-### Current Delivery Resolution
-- Global preferences only (`public.user_notification_preferences`)
-- Mention notifications currently use global mention preferences only
-- Server/channel overrides are intentionally backlogged (Phase 4)
+## Delivery Stages
 
-### Sound Boundary
-- Server/DB decides eligibility (`deliver_in_app`, `deliver_sound`)
-- Renderer applies local desktop sound settings:
-  - `masterSoundEnabled`
-  - volume
-  - play-when-focused behavior
+1. Producer creates a notification event + recipient rows (server-side SQL)
+2. Recipient rows drive:
+   - in-app inbox visibility
+   - sound eligibility
+   - push queue fanout eligibility
+3. Web push jobs are queued per recipient x subscription
+4. `web-push-worker` claims jobs and sends push
+5. Service worker shows notification (or suppresses based on route policy)
+6. Renderer opens deep links and marks notifications read/dismissed as appropriate
 
-## Trust Boundary
-- Notification creation is server-side (SQL RPCs and DB trigger)
-- Renderer never authoritatively creates notification rows
-- Privacy is enforced by RLS on `notification_events` and `notification_recipients`
-- Deep-link routing happens in renderer, but target access is still enforced by DB/RLS when data loads
+## Producers (Current)
+- Friend requests / social graph RPCs
+- Direct messages (`send_dm_message(...)`)
+- Channel mentions (`process_channel_message_mentions()`)
 
-## Sequence Flow: Channel Mention -> Inbox Delivery
-1. User inserts channel message into `public.messages`
-2. `trg_messages_process_channel_mentions` runs
-3. `public.process_channel_message_mentions()` parses `@handles`
-4. Mention targets are filtered by:
-   - self-mention suppression
-   - block relationship suppression
-   - community membership
-5. Delivery flags resolved via `resolve_channel_mention_notification_delivery_for_user(...)`
-6. `notification_events` row inserted (`kind='channel_mention'`)
-7. `notification_recipients` rows inserted for recipients
-8. Renderer realtime subscription sees recipient-row insert and refreshes inbox/counts
+## Notification Preferences
+- In-app and sound prefs remain per kind (friend request / DM / mention)
+- Push prefs are separate (do not overload `deliver_sound`)
+- DM mute logic is respected at creation and rechecked at send-time for push races
 
-## Failure Modes
-- Invalid/missing deep-link payload fields -> notification opens fail safely in renderer
-- Mention parser false negatives for usernames outside handle-style syntax (known v1 limitation)
-- Realtime reconnect duplicates -> renderer refresh logic must stay idempotent
-- Notification volume growth -> retention maintenance needed (`dismiss_old_read_notifications_before`)
+## Push Infrastructure (Supabase)
 
-## Extension Path
-- Phase 4: add `community_notification_preferences` + `channel_notification_preferences`
-- Native OS desktop notifications (deferred)
-- Batching/coalescing for high-volume events
-- New producers (system events, moderation alerts, etc.) emitting into the same inbox model
+### Subscription registry
+- `public.web_push_subscriptions`
+- Stores:
+  - endpoint
+  - encryption keys (`p256dh_key`, `auth_key`)
+  - client/device metadata
+  - `installation_id` for same-device dedupe/replacement
+
+### Push queue
+- `public.web_push_notification_jobs`
+- One job per `(notification_recipient, subscription)`
+- Status lifecycle:
+  - `pending`
+  - `processing`
+  - `done`
+  - `skipped`
+  - `retryable_failed`
+  - `dead_letter`
+
+### Worker
+- `supabase/functions/web-push-worker/index.ts`
+- Supports:
+  - `cron`
+  - `manual`
+  - `shadow`
+  - `wakeup`
+- Cron remains a backstop
+- Immediate wakeups are the near-realtime path
+
+## Near-Realtime Delivery (Wakeup + Cron Backstop)
+
+- Notification queue fanout triggers a debounced immediate wakeup request
+- Worker processes fresh jobs quickly (`wakeup` mode)
+- Cron sweep remains enabled for:
+  - missed wakeups
+  - retries
+  - backstop recovery
+
+This is the current production-target design.
+
+## Client Route Arbiter (Foreground vs Background)
+
+Haven uses a route policy to prevent duplicate user-facing alerts:
+
+- Focused app:
+  - in-app notification path
+  - suppress OS push display
+- Background/minimized app with active push:
+  - OS push display
+  - suppress Haven in-app sound
+- No push support / permission:
+  - in-app fallback
+
+Files:
+- `src/lib/notifications/routePolicy.ts`
+- `src/renderer/features/notifications/hooks/useNotifications.ts`
+- `src/web/public/haven-sw.js`
+
+## Delivery Traces and Diagnostics (Internal/Dev)
+
+### DB traces
+- `public.notification_delivery_traces`
+- Used for:
+  - delivery decisions
+  - wake source parity checks
+  - skip/send reason diagnostics
+
+### Queue health diagnostics
+- Queue health RPCs expose backlog age, retry pressure, stale leases, dead-letter trends
+- Used for shadow/cutover readiness and rollback decisions
+
+### Dev tooling policy
+- Diagnostics and test tools exist for internal/dev use
+- They should be hidden behind an explicit dev flag in production UX
+
+## Trust / Security Boundaries
+
+- Notification rows are server-authored (SQL RPCs/triggers)
+- Renderer cannot authoritatively create inbox rows
+- RLS protects notification visibility
+- Service-role operations are isolated to Edge Functions / backend contexts
+- Browser clients only use publishable keys and user JWTs
+
+## Known Platform Variances
+
+- Windows Edge PWA push (WNS endpoints) may fail to deliver/receive even when provider accepts sends
+- Chrome (Windows) and iOS installed web app are the primary canary validation targets
+- Edge/WNS is tracked as a known issue, not a blocker for Chrome+iOS canary rollouts
 
 ## Files to Know
-- `supabase/migrations/20260222_000031_add_notification_foundation.sql`
-- `supabase/migrations/20260222_000035_add_channel_mention_notifications_phase3.sql`
-- `supabase/migrations/20260222_000036_phase5_hardening_and_test_support.sql`
-- `src/lib/backend/notificationBackend.ts`
-- `src/lib/notifications/sound.ts`
-- `src/components/NotificationCenterModal.tsx`
-- `src/renderer/app/ChatApp.tsx`
 
-## Deferred / Future
-- Server/channel notification preference overrides (Phase 4, backlogged during hardening pass)
-- Native OS notifications
-- Notification batching/coalescing
+- `src/lib/backend/notificationBackend.ts`
+- `src/renderer/features/notifications/hooks/useNotifications.ts`
+- `src/renderer/features/notifications/hooks/useNotificationInteractions.ts`
+- `src/lib/notifications/routePolicy.ts`
+- `src/web/pwa/webPushClient.ts`
+- `src/web/public/haven-sw.js`
+- `supabase/functions/web-push-worker/index.ts`
+- `supabase/migrations/20260225000041_add_list_my_sound_notifications_rpc.sql`
+- `supabase/migrations/20260226000056_add_web_push_queue_health_diagnostics_rpc.sql`
 

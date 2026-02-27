@@ -1,6 +1,6 @@
 # Haven
 
-Haven is a desktop community chat app built with Electron.
+Haven is a community chat app with a primary Electron desktop client and a web/PWA client.
 
 The goal is simple. Keep the parts people actually love about community chat, cut the bloat, and keep the system understandable enough that anyone can inspect how it works.
 
@@ -28,6 +28,7 @@ I care more about correctness and trust than fancy abstractions.
 ## Stack
 
 - Electron Forge
+- Vite (web/PWA entry)
 - React + TypeScript
 - Tailwind + shadcn/ui components
 - Supabase (Auth, Postgres, Realtime, Edge Functions)
@@ -53,22 +54,24 @@ No app is "trust me" safe by default, so Haven is built to be inspectable.
 
 ## Current status
 
-Haven is early and actively evolving. The focus right now is MVP completeness, permission correctness, and stable desktop updates.
+Haven is early and actively evolving. Current focus is a clean root-hosted PWA, near-instant push notifications,
+permission correctness, and stable desktop updates.
 
 ## Local development
 
-Haven supports two practical local workflows:
+Haven supports three practical local workflows:
 
 1. Code + UI work (no hosted backend access required)
 2. Full backend/runtime work with a compatible Supabase project and required secrets
+3. Web/PWA validation (Vite + browser/PWA + push testing)
 
 If you do not have a shared backend setup, you can still:
 - run packaged builds
 - run the local Supabase-backed test harness (for DB/RLS/backend tests)
 
 See:
-- `docs/collaborator-setup.md` (small-team collaborator setup + secrets guidance)
-- `docs/haven-workflow.md` (end-to-end dev and release workflow)
+- `docs/internal/contributor/collaborator-setup.md` (small-team collaborator setup + secrets guidance)
+- `docs/internal/contributor/haven-workflow.md` (end-to-end dev and release workflow)
 
 ## Local testing (Phase 5 hardening pass)
 
@@ -81,9 +84,9 @@ Quick prerequisites (details in docs):
 - `npx supabase start`
 
 Setup/help docs:
-- `docs/collaborator-setup.md` (collaborator-focused setup + secrets handling)
-- `docs/testing/rls-and-hardening-runbook.md` (operational runbook)
-- `docs/testing/test-suite-breakdown.md` (how the suite works end-to-end)
+- `docs/internal/contributor/collaborator-setup.md` (collaborator-focused setup + secrets handling)
+- `docs/internal/testing/rls-and-hardening-runbook.md` (operational runbook)
+- `docs/internal/testing/test-suite-breakdown.md` (how the suite works end-to-end)
 
 Core commands:
 
@@ -91,6 +94,7 @@ Core commands:
 npm run test:db
 npm run test:backend
 npm run test:unit
+npm run build:web
 ```
 
 Coverage summary:
@@ -99,7 +103,7 @@ Coverage summary:
 - `test:unit` -> minimal renderer/component tests for notification/DM UX flows
 
 Additional testing docs:
-- `docs/testing/hardening-audit.md`
+- `docs/internal/testing/rls-and-hardening-runbook.md`
 
 You can also generate a local proof report (with logs + a human-readable learning breakdown):
 
@@ -108,6 +112,12 @@ npm run test:report
 ```
 
 Outputs are written to git-ignored `test-reports/*.local/`.
+
+For release/canary validation signoff (timestamp + command table + signatures):
+
+```bash
+npm run test:signoff -- --release-label <label> --environment <env> --test-author "<name>" --run-by "<name>"
+```
 
 ## Packaged renderer parity (embedded media)
 
@@ -119,21 +129,25 @@ Important rollout note:
   because packaged renderer storage moves from a `file://` origin to a fixed local HTTP origin.
 
 Architecture doc:
-- `docs/architecture/renderer-entry-origin-parity.md`
+- `docs/internal/architecture/renderer-entry-origin-parity.md`
 
 ## Documentation map
 
 Use this repo as a doc hub, not just a README.
 
-- `docs/haven-workflow.md`
+- `docs/internal/contributor/haven-workflow.md`
   - End-to-end daily dev + release workflow (branches, commits, versioning, publish, hotfixes)
-- `docs/collaborator-setup.md`
+- `docs/internal/contributor/collaborator-setup.md`
   - Small-team collaborator setup, prerequisites, and secrets/environment handling
-- `docs/AGENTS.md`
+- `docs/internal/contributor/AGENTS.md`
   - Repo-wide engineering and safety rules
-- `docs/auto-updates.md`
+- `docs/internal/operations/auto-updates.md`
   - Auto-update behavior and publish notes
-- `docs/testing/rls-and-hardening-runbook.md`
+- `docs/internal/testing/rls-and-hardening-runbook.md`
   - Operational runbook for local Supabase-backed DB/RLS/backend tests
-- `docs/testing/test-suite-breakdown.md`
+- `docs/internal/testing/test-suite-breakdown.md`
   - How the test stack works and how to read generated test reports
+- `docs/internal/operations/web-push-cutover-runbook.md`
+  - Web push shadow/wakeup cutover and rollback runbook
+- `docs/users/web-and-mobile-install.md`
+  - User-facing install and notification setup guide (web/PWA)

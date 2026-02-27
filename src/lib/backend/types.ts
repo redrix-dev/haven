@@ -222,6 +222,9 @@ export type ChannelRolePermissionItem = {
   color: string;
   isDefault: boolean;
   editable: boolean;
+  defaultCanView: boolean;
+  defaultCanSend: boolean;
+  defaultCanManage: boolean;
   canView: boolean | null;
   canSend: boolean | null;
   canManage: boolean | null;
@@ -302,10 +305,13 @@ export type NotificationPreferences = {
   userId: string;
   friendRequestInAppEnabled: boolean;
   friendRequestSoundEnabled: boolean;
+  friendRequestPushEnabled: boolean;
   dmInAppEnabled: boolean;
   dmSoundEnabled: boolean;
+  dmPushEnabled: boolean;
   mentionInAppEnabled: boolean;
   mentionSoundEnabled: boolean;
+  mentionPushEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -313,10 +319,132 @@ export type NotificationPreferences = {
 export type NotificationPreferenceUpdate = {
   friendRequestInAppEnabled: boolean;
   friendRequestSoundEnabled: boolean;
+  friendRequestPushEnabled: boolean;
   dmInAppEnabled: boolean;
   dmSoundEnabled: boolean;
+  dmPushEnabled: boolean;
   mentionInAppEnabled: boolean;
   mentionSoundEnabled: boolean;
+  mentionPushEnabled: boolean;
+};
+
+export type WebPushSubscriptionRecord = {
+  id: string;
+  userId: string;
+  endpoint: string;
+  installationId: string | null;
+  p256dhKey: string;
+  authKey: string;
+  expirationTime: string | null;
+  userAgent: string | null;
+  clientPlatform: string | null;
+  appDisplayMode: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  lastSeenAt: string;
+};
+
+export type WebPushSubscriptionUpsertInput = {
+  endpoint: string;
+  installationId?: string | null;
+  p256dhKey: string;
+  authKey: string;
+  expirationTime?: string | null;
+  userAgent?: string | null;
+  clientPlatform?: string | null;
+  appDisplayMode?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type NotificationDeliveryTransport = 'web_push' | 'in_app' | 'simulated_push' | 'route_policy';
+
+export type NotificationDeliveryDecisionStage = 'enqueue' | 'claim' | 'send_time' | 'client_route';
+
+export type NotificationDeliveryDecision = 'send' | 'skip' | 'defer';
+
+export type NotificationDeliveryReasonCode =
+  | 'sent'
+  | 'push_pref_disabled'
+  | 'in_app_pref_disabled'
+  | 'sound_pref_disabled'
+  | 'dm_conversation_muted'
+  | 'recipient_dismissed'
+  | 'recipient_read'
+  | 'no_active_push_subscription'
+  | 'sw_focused_window_suppressed'
+  | 'in_app_suppressed_due_to_push_active_background'
+  | 'provider_retryable_failure'
+  | 'provider_terminal_failure'
+  | 'browser_push_unsupported'
+  | 'notification_permission_not_granted'
+  | 'service_worker_not_ready'
+  | 'push_sync_disabled'
+  | 'push_subscription_inactive'
+  | 'app_focused'
+  | 'app_backgrounded'
+  | 'shadow_peek'
+  | 'shadow_mode_no_send';
+
+export type NotificationDeliveryTraceRecord = {
+  id: string;
+  notificationRecipientId: string | null;
+  notificationEventId: string | null;
+  recipientUserId: string | null;
+  transport: NotificationDeliveryTransport;
+  stage: NotificationDeliveryDecisionStage;
+  decision: NotificationDeliveryDecision;
+  reasonCode: NotificationDeliveryReasonCode | string;
+  details: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type WebPushDispatchWakeupDiagnostics = {
+  enabled: boolean;
+  shadowMode: boolean;
+  minIntervalSeconds: number;
+  lastAttemptedAt: string | null;
+  lastRequestedAt: string | null;
+  lastRequestId: number | null;
+  lastMode: string | null;
+  lastReason: string | null;
+  lastSkipReason: string | null;
+  lastError: string | null;
+  totalAttempts: number;
+  totalScheduled: number;
+  totalDebounced: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WebPushDispatchQueueHealthDiagnostics = {
+  asOf: string;
+  totalPending: number;
+  totalRetryableFailed: number;
+  totalProcessing: number;
+  totalDone: number;
+  totalDeadLetter: number;
+  totalSkipped: number;
+  claimableNowCount: number;
+  pendingDueNowCount: number;
+  retryableDueNowCount: number;
+  processingLeaseExpiredCount: number;
+  oldestClaimableAgeSeconds: number | null;
+  oldestPendingAgeSeconds: number | null;
+  oldestRetryableFailedAgeSeconds: number | null;
+  oldestProcessingAgeSeconds: number | null;
+  oldestProcessingLeaseOverdueSeconds: number | null;
+  maxAttemptsActive: number | null;
+  highRetryAttemptCount: number;
+  deadLetterLast60mCount: number;
+  retryableFailedLast10mCount: number;
+  doneLast10mCount: number;
+};
+
+export type WebPushDispatchWakeupConfigUpdate = {
+  enabled?: boolean | null;
+  shadowMode?: boolean | null;
+  minIntervalSeconds?: number | null;
 };
 
 export type FriendRequestStatus = 'pending' | 'accepted' | 'declined' | 'canceled';
