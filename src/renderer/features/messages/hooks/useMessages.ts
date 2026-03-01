@@ -12,11 +12,7 @@ import type {
   MessageReportKind,
   MessageReportTarget,
 } from '@/lib/backend/types';
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+import { asRecord } from '@/shared/lib/records';
 
 const getStringField = (value: unknown, key: string): string | null => {
   const record = asRecord(value);
@@ -173,6 +169,45 @@ export function useMessages({
     (communityId: string, channelId: string, bundle: ChannelMessageBundleCacheEntry) => {
       const cacheKey = getChannelBundleCacheKey(communityId, channelId);
       messageBundleByChannelCacheRef.current[cacheKey] = bundle;
+    },
+    [getChannelBundleCacheKey]
+  );
+
+  const prefetchChannelMessages = React.useCallback(
+    async (serverId: string, channelId: string) => {
+      const cacheKey = getChannelBundleCacheKey(serverId, channelId);
+      if (messageBundleByChannelCacheRef.current[cacheKey]) return;
+      try {
+        const communityBackend = getCommunityDataBackend(serverId);
+        const page = await communityBackend.listMessagesPage({
+          communityId: serverId,
+          channelId,
+          beforeCursor: null,
+          limit: MESSAGE_PAGE_SIZE,
+        });
+        const messages = page.messages;
+        const messageIds = messages.map((m) => m.id);
+        const [reactions, attachments, linkPreviews] =
+          messageIds.length > 0
+            ? await Promise.all([
+                communityBackend.listMessageReactionsForMessages({ communityId: serverId, channelId, messageIds }),
+                communityBackend.listMessageAttachmentsForMessages({ communityId: serverId, channelId, messageIds }),
+                communityBackend.listMessageLinkPreviewsForMessages({ communityId: serverId, channelId, messageIds }),
+              ])
+            : [[] as MessageReaction[], [] as MessageAttachment[], [] as MessageLinkPreview[]];
+        // Only write if not already populated — avoid clobbering an active channel load
+        if (!messageBundleByChannelCacheRef.current[cacheKey]) {
+          messageBundleByChannelCacheRef.current[cacheKey] = {
+            messages,
+            reactions,
+            attachments,
+            linkPreviews,
+            hasOlderMessages: page.hasMore,
+          };
+        }
+      } catch {
+        // silent — prefetch failures are non-fatal
+      }
     },
     [getChannelBundleCacheKey]
   );
@@ -1556,6 +1591,7 @@ export function useMessages({
       deleteMessage,
       reportMessage,
       requestMessageLinkPreviewRefresh,
+      prefetchChannelMessages,
     },
   };
 }

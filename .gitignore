@@ -144,3 +144,5 @@ docs/internal/
 
 # Local test run reports (generated)
 test-reports/
+
+.claude/

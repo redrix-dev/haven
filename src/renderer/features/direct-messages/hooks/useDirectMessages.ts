@@ -38,7 +38,7 @@ export function useDirectMessages({
   const [dmConversationsLoading, setDmConversationsLoading] = React.useState(false);
   const [dmConversationsRefreshing, setDmConversationsRefreshing] = React.useState(false);
   const [dmConversationsError, setDmConversationsError] = React.useState<string | null>(null);
-  const [selectedDmConversationId, setSelectedDmConversationId] = React.useState<string | null>(null);
+  const [selectedDmConversationId, setSelectedDmConversationIdState] = React.useState<string | null>(null);
   const [dmMessages, setDmMessages] = React.useState<DirectMessage[]>([]);
   const [dmMessagesLoading, setDmMessagesLoading] = React.useState(false);
   const [dmMessagesRefreshing, setDmMessagesRefreshing] = React.useState(false);
@@ -47,6 +47,34 @@ export function useDirectMessages({
 
   const dmReadMarkInFlightRef = React.useRef<Record<string, boolean>>({});
   const dmLastReadMarkAtRef = React.useRef<Record<string, number>>({});
+  const selectedDmConversationIdRef = React.useRef<string | null>(null);
+  const dmMessagesCacheRef = React.useRef<Record<string, DirectMessage[]>>({});
+
+  const setSelectedDmConversationId = React.useCallback<React.Dispatch<React.SetStateAction<string | null>>>(
+    (value) => {
+      setSelectedDmConversationIdState((previousValue) => {
+        const nextValue =
+          typeof value === 'function'
+            ? (value as (previousState: string | null) => string | null)(previousValue)
+            : value;
+        selectedDmConversationIdRef.current = nextValue;
+        return nextValue;
+      });
+    },
+    []
+  );
+
+  const applyCachedDmMessages = React.useCallback((conversationId: string) => {
+    const cachedMessages = dmMessagesCacheRef.current[conversationId];
+    if (!cachedMessages) return false;
+    if (selectedDmConversationIdRef.current !== conversationId) return false;
+
+    setDmMessages(cachedMessages);
+    setDmMessagesLoading(false);
+    setDmMessagesRefreshing(false);
+    setDmMessagesError(null);
+    return true;
+  }, []);
 
   const resetDirectMessages = React.useCallback(() => {
     setDmConversations([]);
@@ -61,7 +89,8 @@ export function useDirectMessages({
     setDmMessageSendPending(false);
     dmReadMarkInFlightRef.current = {};
     dmLastReadMarkAtRef.current = {};
-  }, []);
+    dmMessagesCacheRef.current = {};
+  }, [setSelectedDmConversationId]);
 
   const clearSelectedDmConversation = React.useCallback(() => {
     setDmMessages([]);
@@ -69,7 +98,7 @@ export function useDirectMessages({
     setDmMessagesLoading(false);
     setDmMessagesRefreshing(false);
     setDmMessagesError(null);
-  }, []);
+  }, [setSelectedDmConversationId]);
 
   const refreshDmConversations = React.useCallback(
     async (options?: RefreshDmConversationsOptions) => {
@@ -117,7 +146,9 @@ export function useDirectMessages({
           conversationId,
           limit: 100,
         });
-        if (selectedDmConversationId !== conversationId) {
+        dmMessagesCacheRef.current[conversationId] = messages;
+
+        if (selectedDmConversationIdRef.current !== conversationId) {
           return;
         }
         setDmMessages(messages);
@@ -138,15 +169,15 @@ export function useDirectMessages({
           }
         }
       } catch (error) {
-        if (selectedDmConversationId !== conversationId) return;
+        if (selectedDmConversationIdRef.current !== conversationId) return;
         setDmMessagesError(getErrorMessage(error, 'Failed to load direct messages.'));
       } finally {
-        if (selectedDmConversationId !== conversationId) return;
+        if (selectedDmConversationIdRef.current !== conversationId) return;
         setDmMessagesLoading(false);
         setDmMessagesRefreshing(false);
       }
     },
-    [directMessageBackend, enabled, selectedDmConversationId, userId]
+    [directMessageBackend, enabled, userId]
   );
 
   React.useEffect(() => {
@@ -168,7 +199,7 @@ export function useDirectMessages({
     return () => {
       isMounted = false;
     };
-  }, [enabled, refreshDmConversations, userId]);
+  }, [enabled, refreshDmConversations, setSelectedDmConversationId, userId]);
 
   React.useEffect(() => {
     if (!isActive) return;
@@ -185,7 +216,7 @@ export function useDirectMessages({
     if (dmConversations.length > 0) {
       setSelectedDmConversationId(dmConversations[0].conversationId);
     }
-  }, [dmConversations, isActive, selectedDmConversationId]);
+  }, [dmConversations, isActive, selectedDmConversationId, setSelectedDmConversationId]);
 
   React.useEffect(() => {
     if (!userId || !enabled) return;
@@ -210,10 +241,15 @@ export function useDirectMessages({
       return;
     }
 
-    void refreshDmMessages(selectedDmConversationId, { markRead: true }).catch((error) => {
+    const hasCachedMessages = applyCachedDmMessages(selectedDmConversationId);
+
+    void refreshDmMessages(selectedDmConversationId, {
+      suppressLoadingState: hasCachedMessages,
+      markRead: true,
+    }).catch((error) => {
       console.error('Failed to load selected DM conversation:', error);
     });
-  }, [isActive, refreshDmMessages, selectedDmConversationId, userId]);
+  }, [applyCachedDmMessages, isActive, refreshDmMessages, selectedDmConversationId, userId]);
 
   React.useEffect(() => {
     if (!isActive || !selectedDmConversationId) return;
@@ -247,11 +283,38 @@ export function useDirectMessages({
         throw new Error('DM conversation id is required.');
       }
 
+      const wasAlreadySelected = selectedDmConversationIdRef.current === conversationId;
       setSelectedDmConversationId(conversationId);
-      await refreshDmConversations({ suppressLoadingState: true });
-      await refreshDmMessages(conversationId, { suppressLoadingState: true, markRead: true });
+      const hasCachedMessages = applyCachedDmMessages(conversationId);
+      if (!hasCachedMessages) {
+        setDmMessages([]);
+        setDmMessagesLoading(true);
+        setDmMessagesRefreshing(false);
+        setDmMessagesError(null);
+      }
+      if (wasAlreadySelected) {
+        void refreshDmMessages(conversationId, {
+          suppressLoadingState: hasCachedMessages,
+          markRead: true,
+        });
+      }
+
+      const conversationExists = dmConversations.some(
+        (conversation) => conversation.conversationId === conversationId
+      );
+      if (!conversationExists) {
+        await refreshDmConversations({ suppressLoadingState: true });
+      }
     },
-    [enabled, refreshDmConversations, refreshDmMessages, userId]
+    [
+      applyCachedDmMessages,
+      dmConversations,
+      enabled,
+      refreshDmConversations,
+      refreshDmMessages,
+      setSelectedDmConversationId,
+      userId,
+    ]
   );
 
   const openDirectMessageWithUser = React.useCallback(

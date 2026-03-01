@@ -3,21 +3,24 @@ import { createRoot } from 'react-dom/client';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppRoot } from '@/renderer/app/AppRoot';
+import { MobileRoot } from '@/renderer/app/MobileRoot';
 import { registerHavenServiceWorker } from './pwa/registerServiceWorker';
 import { startHavenWebPushClient } from './pwa/webPushClient';
 import '@/styles/globals.css';
-
 void (async () => {
   const serviceWorkerResult = await registerHavenServiceWorker();
   await startHavenWebPushClient(serviceWorkerResult);
 })();
 
+const isMobile = window.innerWidth <= 768;
+console.log('isMobile:', isMobile, 'width:', window.innerWidth);
 const root = createRoot(document.body);
 
 root.render(
   <TooltipProvider>
     <>
-      <AppRoot />
+      {isMobile ? <MobileRoot /> : <AppRoot />}
+
       <SonnerToaster
         position="top-right"
         theme="dark"
