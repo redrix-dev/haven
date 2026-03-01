@@ -22,7 +22,7 @@ export function MobileChannelDrawer({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-30" onClick={onClose} />
+      <div className="fixed inset-0 z-30 touch-none overscroll-none" onClick={onClose} />
 
       {/* Panel drops from below the sub-header (top-full = below the relative parent) */}
       <div className="absolute top-full left-0 right-0 z-40 bg-[#0d1525] border border-white/10 border-t-0 rounded-b-2xl max-h-[60vh] overflow-y-auto overscroll-contain shadow-2xl">

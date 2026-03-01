@@ -254,7 +254,7 @@ export function MobileDmConversationView({
       {/* ── Conversation options sheet ──────────────────────────────────── */}
       {optionsOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setOptionsOpen(false)} />
+          <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={() => setOptionsOpen(false)} />
           <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 pb-8">
             <div className="flex justify-center pt-3 pb-2">
               <div className="w-9 h-1 rounded-full bg-white/20" />
@@ -312,7 +312,7 @@ export function MobileDmConversationView({
       {/* ── Block confirmation ──────────────────────────────────────────── */}
       {blockConfirmOpen && otherUserId && (
         <>
-          <div className="fixed inset-0 z-50 bg-black/70" onClick={() => setBlockConfirmOpen(false)} />
+          <div className="fixed inset-0 z-50 bg-black/70 touch-none overscroll-none" onClick={() => setBlockConfirmOpen(false)} />
           <div className="fixed inset-x-4 bottom-8 z-60 rounded-2xl bg-[#18243a] border border-white/10 p-5">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />

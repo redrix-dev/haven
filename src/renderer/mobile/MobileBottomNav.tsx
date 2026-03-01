@@ -42,7 +42,7 @@ export function MobileBottomNav({
       {/* Backdrop when drawer is open */}
       {open && (
         <div
-          className="fixed inset-0 bg-black/60 z-40"
+          className="fixed inset-0 bg-black/60 z-40 touch-none overscroll-none"
           onClick={onToggle}
         />
       )}

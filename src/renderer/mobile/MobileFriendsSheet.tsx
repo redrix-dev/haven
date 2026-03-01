@@ -196,7 +196,7 @@ export function MobileFriendsSheet({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/60" onClick={() => onOpenChange(false)} />
+      <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={() => onOpenChange(false)} />
 
       {/* Sheet */}
       <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 flex flex-col" style={{ height: '92dvh' }}>
@@ -536,7 +536,7 @@ export function MobileFriendsSheet({
       {/* Confirm action sheet */}
       {pendingConfirm && (
         <>
-          <div className="fixed inset-0 z-60 bg-black/70" onClick={() => setPendingConfirm(null)} />
+          <div className="fixed inset-0 z-60 bg-black/70 touch-none overscroll-none" onClick={() => setPendingConfirm(null)} />
           <div className="fixed inset-x-4 bottom-8 z-70 rounded-2xl bg-[#18243a] border border-white/10 p-5">
             <p className="text-white font-semibold text-center mb-1">
               {pendingConfirm.kind === 'removeFriend' ? 'Remove friend?' : 'Block user?'}

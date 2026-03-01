@@ -183,7 +183,7 @@ export function MobileAccountSettingsSheet({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/60"
+        className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none"
         onClick={() => {
           if (confirmState !== 'none') { setConfirmState('none'); return; }
           onClose();

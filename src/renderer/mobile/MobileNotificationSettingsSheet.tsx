@@ -111,7 +111,7 @@ export function MobileNotificationSettingsSheet({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/60" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={onClose} />
 
       {/* Sheet */}
       <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 max-h-[85vh] flex flex-col">

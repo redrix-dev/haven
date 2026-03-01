@@ -7,6 +7,10 @@ import { MobileRoot } from '@/renderer/app/MobileRoot';
 import { registerHavenServiceWorker } from './pwa/registerServiceWorker';
 import { startHavenWebPushClient } from './pwa/webPushClient';
 import '@/styles/globals.css';
+
+document.documentElement.classList.add('haven-web-shell');
+document.body.classList.add('haven-web-shell');
+
 void (async () => {
   const serviceWorkerResult = await registerHavenServiceWorker();
   await startHavenWebPushClient(serviceWorkerResult);
