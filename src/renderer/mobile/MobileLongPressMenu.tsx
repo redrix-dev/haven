@@ -1,6 +1,8 @@
 import React from 'react';
 import { Reply, Pencil, Trash2, Flag, X } from 'lucide-react';
 
+const PINCH_ZOOM_LONG_PRESS_THRESHOLD = 1.01;
+
 interface MobileLongPressMenuProps {
   open: boolean;
   onClose: () => void;
@@ -22,6 +24,24 @@ export function MobileLongPressMenu({
   onDelete,
   onReport,
 }: MobileLongPressMenuProps) {
+  React.useEffect(() => {
+    if (!open) return;
+
+    const visualViewport = window.visualViewport;
+    if (!visualViewport) return;
+
+    const handleViewportResize = () => {
+      if (visualViewport.scale > PINCH_ZOOM_LONG_PRESS_THRESHOLD) {
+        onClose();
+      }
+    };
+
+    visualViewport.addEventListener('resize', handleViewportResize);
+    return () => {
+      visualViewport.removeEventListener('resize', handleViewportResize);
+    };
+  }, [onClose, open]);
+
   if (!open) return null;
 
   const canDelete = isOwnMessage || canManageMessages;
@@ -30,7 +50,7 @@ export function MobileLongPressMenu({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 z-50 touch-none overscroll-none"
+        className="fixed inset-0 bg-black/60 z-50 touch-auto overscroll-none"
         onClick={onClose}
       />
 

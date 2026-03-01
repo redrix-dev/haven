@@ -3,6 +3,7 @@ import { Loader2, ChevronUp } from 'lucide-react';
 import type { Message, MessageReaction, MessageAttachment, MessageLinkPreview, AuthorProfile } from '@/lib/backend/types';
 import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
+import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
 
 interface ReplyTarget {
   id: string;
@@ -58,7 +59,7 @@ export function MobileChannelView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const listEndRef = useRef<HTMLDivElement>(null);
-  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPress = useMobileLongPress();
 
   // Group reactions by messageId
   const reactionsByMessage = new Map<string, MessageReaction[]>();
@@ -91,16 +92,6 @@ export function MobileChannelView({
     } finally {
       setSending(false);
     }
-  };
-
-  const startLongPress = (message: Message, isOwn: boolean) => {
-    pressTimerRef.current = setTimeout(() => {
-      setContextMenu({ message, isOwnMessage: isOwn });
-    }, 450);
-  };
-
-  const cancelLongPress = () => {
-    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
   };
 
   const formatTime = (iso: string) => {
@@ -181,10 +172,15 @@ export function MobileChannelView({
 
               <div
                 className={`flex gap-2.5 mb-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
-                onPointerDown={() => startLongPress(message, isOwn)}
-                onPointerUp={cancelLongPress}
-                onPointerLeave={cancelLongPress}
-                onPointerCancel={cancelLongPress}
+                onPointerDown={(event) =>
+                  longPress.onPointerDown(event, () => {
+                    setContextMenu({ message, isOwnMessage: isOwn });
+                  })
+                }
+                onPointerMove={longPress.onPointerMove}
+                onPointerUp={longPress.onPointerUp}
+                onPointerLeave={longPress.onPointerLeave}
+                onPointerCancel={longPress.onPointerCancel}
               >
                 {/* Avatar */}
                 {!isOwn && (

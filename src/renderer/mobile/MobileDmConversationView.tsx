@@ -4,6 +4,7 @@ import type { DirectMessage } from '@/lib/backend/types';
 import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobilePullToRefresh } from '@/renderer/mobile/useMobilePullToRefresh';
+import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
 
 interface ContextMenuState {
   message: DirectMessage;
@@ -46,7 +47,7 @@ export function MobileDmConversationView({
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const listEndRef = useRef<HTMLDivElement>(null);
-  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPress = useMobileLongPress();
   const {
     scrollRef,
     pullDistance,
@@ -68,16 +69,6 @@ export function MobileDmConversationView({
     if (!content || sendPending) return;
     setDraft('');
     await onSendMessage(content);
-  };
-
-  const startLongPress = (message: DirectMessage, isOwn: boolean) => {
-    pressTimerRef.current = setTimeout(() => {
-      setContextMenu({ message, isOwn });
-    }, 450);
-  };
-
-  const cancelLongPress = () => {
-    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
   };
 
   const formatTime = (iso: string) => {
@@ -182,10 +173,15 @@ export function MobileDmConversationView({
 
                   <div
                     className={`flex gap-2.5 mb-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
-                    onPointerDown={() => startLongPress(message, isOwn)}
-                    onPointerUp={cancelLongPress}
-                    onPointerLeave={cancelLongPress}
-                    onPointerCancel={cancelLongPress}
+                    onPointerDown={(event) =>
+                      longPress.onPointerDown(event, () => {
+                        setContextMenu({ message, isOwn });
+                      })
+                    }
+                    onPointerMove={longPress.onPointerMove}
+                    onPointerUp={longPress.onPointerUp}
+                    onPointerLeave={longPress.onPointerLeave}
+                    onPointerCancel={longPress.onPointerCancel}
                   >
                     {!isOwn && (
                       <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5 overflow-hidden">
