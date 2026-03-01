@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -592,6 +593,29 @@ export function VoiceHardwareDebugPanel({
                             {micStatus === 'requesting' ? 'Starting...' : 'Start Mic Test'}
                           </Button>
                         )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] text-[#96abc8]">
+                          <span>Live level</span>
+                          <span>{Math.round(meterSnapshot.level * 100)}%</span>
+                        </div>
+                        <Progress
+                          value={Math.round(meterSnapshot.level * 100)}
+                          className="h-1.5 bg-[#22334f]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] text-[#96abc8]">
+                          <span>Peak hold</span>
+                          <span>{Math.round(meterSnapshot.peak * 100)}%</span>
+                        </div>
+                        <Progress
+                          value={Math.round(meterSnapshot.peak * 100)}
+                          className="h-1.5 bg-[#22334f]"
+                        />
                       </div>
                     </div>
 

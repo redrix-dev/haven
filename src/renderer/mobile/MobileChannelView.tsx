@@ -172,15 +172,9 @@ export function MobileChannelView({
 
               <div
                 className={`flex gap-2.5 mb-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
-                onPointerDown={(event) =>
-                  longPress.onPointerDown(event, () => {
-                    setContextMenu({ message, isOwnMessage: isOwn });
-                  })
-                }
-                onPointerMove={longPress.onPointerMove}
-                onPointerUp={longPress.onPointerUp}
-                onPointerLeave={longPress.onPointerLeave}
-                onPointerCancel={longPress.onPointerCancel}
+                {...longPress.bind(() => {
+                  setContextMenu({ message, isOwnMessage: isOwn });
+                })}
               >
                 {/* Avatar */}
                 {!isOwn && (

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PushToTalkBindingField } from '@/components/PushToTalkBindingField';
 import { isEditableKeyboardTarget } from '@/renderer/app/utils';
+import { Slider } from '@/components/ui/slider';
 import {
   Select,
   SelectContent,
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Toggle } from '@/components/ui/toggle';
 import { Headphones, Mic, MicOff, PhoneCall, PhoneOff, RefreshCcw, Volume2 } from 'lucide-react';
 
 type VoiceSignalEvent = 'offer' | 'answer' | 'ice';
@@ -1300,23 +1302,43 @@ export function VoiceChannelPane({
               </Button>
             ) : (
               <>
-                <Button
-                  type="button"
-                  onClick={toggleMute}
+                <Toggle
+                  pressed={isMuted}
+                  onPressedChange={(pressed) => {
+                    if (pressed !== isMuted) {
+                      toggleMute();
+                    }
+                  }}
                   disabled={listenOnly}
-                  variant={isMuted ? 'destructive' : 'secondary'}
+                  variant="outline"
+                  aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                  className={`h-9 gap-2 px-3 text-white ${
+                    isMuted
+                      ? 'border-red-500/40 bg-red-500/15 hover:bg-red-500/20'
+                      : 'border-[#304867] bg-[#142033] hover:bg-[#22334f]'
+                  } ${listenOnly ? 'opacity-50' : ''}`}
                 >
                   {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
                   {isMuted ? 'Unmute' : 'Mute'}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={toggleDeafen}
-                  variant={isDeafened ? 'destructive' : 'secondary'}
+                </Toggle>
+                <Toggle
+                  pressed={isDeafened}
+                  onPressedChange={(pressed) => {
+                    if (pressed !== isDeafened) {
+                      toggleDeafen();
+                    }
+                  }}
+                  variant="outline"
+                  aria-label={isDeafened ? 'Undeafen audio' : 'Deafen audio'}
+                  className={`h-9 gap-2 px-3 text-white ${
+                    isDeafened
+                      ? 'border-red-500/40 bg-red-500/15 hover:bg-red-500/20'
+                      : 'border-[#304867] bg-[#142033] hover:bg-[#22334f]'
+                  }`}
                 >
                   <Headphones className="size-4" />
                   {isDeafened ? 'Undeafen' : 'Deafen'}
-                </Button>
+                </Toggle>
                 {listenOnly && canSpeak && (
                   <Button type="button" variant="secondary" onClick={() => void enableMicrophone()}>
                     Enable Mic
@@ -1393,19 +1415,20 @@ export function VoiceChannelPane({
                 <span>Gate threshold</span>
                 <span>{voiceSettings.voiceActivationThreshold}%</span>
               </div>
-              <input
-                type="range"
+              <Slider
                 min={0}
                 max={100}
                 step={1}
-                value={voiceSettings.voiceActivationThreshold}
-                onChange={(event) =>
+                value={[voiceSettings.voiceActivationThreshold]}
+                onValueChange={(values) => {
+                  const nextValue = values[0];
+                  if (typeof nextValue !== 'number') return;
                   persistVoiceSettingsPatch({
-                    voiceActivationThreshold: Number(event.target.value),
-                  })
-                }
+                    voiceActivationThreshold: nextValue,
+                  });
+                }}
                 disabled={voiceSettingsSaving}
-                className="w-full accent-[#4f8df5]"
+                className="w-full py-1"
                 aria-label="Voice activity gate threshold"
               />
               <p className="text-[11px] text-[#90a5c4]">
@@ -1615,30 +1638,27 @@ export function VoiceChannelPane({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-[180px] items-center gap-3">
                   <Volume2 className="size-4 text-[#a9b8cf]" />
-                  <Select
-                    value={String(remoteVolumes[participant.userId] ?? 100)}
-                    onValueChange={(value) => {
-                      const numericValue = Number(value);
+                  <Slider
+                    min={REMOTE_VOLUME_OPTIONS[0]}
+                    max={REMOTE_VOLUME_OPTIONS[REMOTE_VOLUME_OPTIONS.length - 1]}
+                    step={25}
+                    value={[remoteVolumes[participant.userId] ?? 100]}
+                    onValueChange={(values) => {
+                      const numericValue = values[0];
                       setRemoteVolumes((prev) => ({
                         ...prev,
                         [participant.userId]: Number.isFinite(numericValue) ? numericValue : 100,
                       }));
                     }}
                     disabled={isDeafened}
-                  >
-                    <SelectTrigger className="w-[110px] bg-[#111214] border-[#304867] text-white">
-                      <SelectValue placeholder="100%" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#142033] border-[#304867] text-white">
-                      {REMOTE_VOLUME_OPTIONS.map((volume) => (
-                        <SelectItem key={volume} value={String(volume)}>
-                          {volume}%
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    className="w-full"
+                    aria-label={`Volume for ${participant.displayName}`}
+                  />
+                  <span className="w-10 shrink-0 text-right text-xs text-[#c8d7ee]">
+                    {remoteVolumes[participant.userId] ?? 100}%
+                  </span>
                 </div>
               </div>
             ))

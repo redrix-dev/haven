@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { getModerationBackend } from '@/lib/backend';
@@ -260,7 +261,22 @@ export function DmReportReviewPanel({
               <ScrollArea className="h-full max-h-[40dvh] xl:max-h-none">
                 <div className="p-3 space-y-2">
                   {loadingReports ? (
-                    <p className="text-sm text-[#a9b8cf]">Loading...</p>
+                    Array.from({ length: 4 }, (_, index) => (
+                      <div
+                        key={index}
+                        className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <Skeleton className="h-4 w-32 bg-[#22334f]" />
+                            <Skeleton className="h-5 w-20 rounded-full bg-[#22334f]" />
+                          </div>
+                          <Skeleton className="h-3 w-40 bg-[#1b2a42]" />
+                          <Skeleton className="h-3 w-44 bg-[#1b2a42]" />
+                          <Skeleton className="h-3 w-full bg-[#1b2a42]" />
+                        </div>
+                      </div>
+                    ))
                   ) : reports.length === 0 ? (
                     <p className="text-sm text-[#a9b8cf]">No reports in this filter.</p>
                   ) : (
@@ -306,7 +322,22 @@ export function DmReportReviewPanel({
               <ScrollArea className="h-full max-h-[40dvh] xl:max-h-none">
                 <div className="p-4 space-y-4">
                   {loadingDetail && !detail ? (
-                    <p className="text-sm text-[#a9b8cf]">Loading detail...</p>
+                    <div className="space-y-4">
+                      {Array.from({ length: 3 }, (_, index) => (
+                        <div
+                          key={index}
+                          className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <Skeleton className="h-4 w-32 bg-[#22334f]" />
+                            <Skeleton className="h-5 w-20 rounded-full bg-[#22334f]" />
+                          </div>
+                          <Skeleton className="h-3 w-2/3 bg-[#1b2a42]" />
+                          <Skeleton className="h-3 w-full bg-[#1b2a42]" />
+                          <Skeleton className="h-16 w-full bg-[#1b2a42]" />
+                        </div>
+                      ))}
+                    </div>
                   ) : !detail ? (
                     <p className="text-sm text-[#a9b8cf]">Select a report to review.</p>
                   ) : (

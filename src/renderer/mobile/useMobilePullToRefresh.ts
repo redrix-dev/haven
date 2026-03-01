@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDrag } from '@use-gesture/react';
 
 type UseMobilePullToRefreshOptions = {
   refreshing: boolean;
@@ -16,70 +17,78 @@ export function useMobilePullToRefresh({
   maxPull = 72,
 }: UseMobilePullToRefreshOptions) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
-  const touchStartYRef = React.useRef<number | null>(null);
-  const isPullingRef = React.useRef(false);
+  const pullDistanceRef = React.useRef(0);
   const [pullDistance, setPullDistance] = React.useState(0);
 
   const resetPull = React.useCallback(() => {
-    touchStartYRef.current = null;
-    isPullingRef.current = false;
+    pullDistanceRef.current = 0;
     setPullDistance(0);
   }, []);
 
-  const handleTouchStart = React.useCallback(
-    (event: React.TouchEvent<HTMLDivElement>) => {
-      if (disabled || refreshing) return;
-      if ((scrollRef.current?.scrollTop ?? 0) > 0) return;
+  const bindGesture = useDrag(
+    ({ first, last, movement: [, movementY], cancel, event }) => {
+      if (disabled || refreshing) {
+        if (last) {
+          resetPull();
+        }
+        return;
+      }
 
-      touchStartYRef.current = event.touches[0]?.clientY ?? null;
-      isPullingRef.current = true;
-    },
-    [disabled, refreshing]
-  );
-
-  const handleTouchMove = React.useCallback(
-    (event: React.TouchEvent<HTMLDivElement>) => {
-      if (disabled || refreshing) return;
-      if (!isPullingRef.current || touchStartYRef.current == null) return;
-      if ((scrollRef.current?.scrollTop ?? 0) > 0) {
+      const scrollTop = scrollRef.current?.scrollTop ?? 0;
+      if ((first && scrollTop > 0) || (scrollTop > 0 && movementY > 0)) {
+        cancel();
         resetPull();
         return;
       }
 
-      const currentY = event.touches[0]?.clientY ?? touchStartYRef.current;
-      const delta = currentY - touchStartYRef.current;
-      if (delta <= 0) {
-        setPullDistance(0);
+      if (movementY <= 0) {
+        if (last) {
+          resetPull();
+        } else if (pullDistanceRef.current !== 0) {
+          pullDistanceRef.current = 0;
+          setPullDistance(0);
+        }
         return;
       }
 
-      if (event.nativeEvent.cancelable) {
+      if ('cancelable' in event && event.cancelable) {
         event.preventDefault();
       }
 
-      setPullDistance(Math.min(delta * 0.4, maxPull));
-    },
-    [disabled, maxPull, refreshing, resetPull]
-  );
+      const nextPullDistance = Math.min(movementY * 0.4, maxPull);
+      pullDistanceRef.current = nextPullDistance;
+      setPullDistance(nextPullDistance);
 
-  const handleTouchEnd = React.useCallback(() => {
-    const shouldRefresh = !disabled && !refreshing && pullDistance >= threshold;
-    resetPull();
-    if (shouldRefresh) {
-      onRefresh();
+      if (!last) {
+        return;
+      }
+
+      const shouldRefresh = nextPullDistance >= threshold;
+      resetPull();
+      if (shouldRefresh) {
+        onRefresh();
+      }
+    },
+    {
+      axis: 'y',
+      threshold: 0,
+      filterTaps: true,
+      pointer: {
+        touch: true,
+        capture: false,
+        keys: false,
+      },
+      eventOptions: {
+        passive: false,
+      },
     }
-  }, [disabled, onRefresh, pullDistance, refreshing, resetPull, threshold]);
+  );
 
   return {
     scrollRef,
     pullDistance,
     pullProgress: Math.min(pullDistance / threshold, 1),
     showIndicator: refreshing || pullDistance > 0,
-    bind: {
-      onTouchStart: handleTouchStart,
-      onTouchMove: handleTouchMove,
-      onTouchEnd: handleTouchEnd,
-      onTouchCancel: handleTouchEnd,
-    },
+    bind: bindGesture(),
   };
 }

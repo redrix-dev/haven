@@ -5,6 +5,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card';
 import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog,
@@ -109,7 +115,20 @@ export function ServerMembersModal({
           {error && <p className="text-xs text-red-400">{error}</p>}
           {actionError && <p className="text-xs text-red-400">{actionError}</p>}
           {loading ? (
-            <p className="text-sm text-[#a9b8cf]">Loading members...</p>
+            <div className="rounded-md border border-[#304867] bg-[#142033] p-2 space-y-1">
+              {Array.from({ length: 5 }, (_, index) => (
+                <div key={index} className="flex items-center justify-between gap-2 rounded-md px-2 py-2">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <Skeleton className="size-8 rounded-full bg-[#22334f]" />
+                    <div className="min-w-0 space-y-2">
+                      <Skeleton className="h-4 w-28 bg-[#22334f]" />
+                      <Skeleton className="h-3 w-40 bg-[#1b2a42]" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-5 w-12 rounded-full bg-[#22334f]" />
+                </div>
+              ))}
+            </div>
           ) : (
             <ScrollArea className="h-[420px] rounded-md border border-[#304867] bg-[#142033]">
               <div className="p-2 space-y-1">
@@ -151,21 +170,41 @@ export function ServerMembersModal({
                         }}
                         resolveBanServers={onResolveBanServers}
                       >
-                        <div className="flex items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-[#1a2a43]">
-                          <div className="min-w-0 flex items-center gap-2">
-                            <Avatar size="sm">
-                              {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={member.displayName} />}
-                              <AvatarFallback>{avatarInitial}</AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-white">{member.displayName}</p>
-                              <p className="truncate text-[11px] text-[#8ea4c7]">{member.userId}</p>
+                        <HoverCard openDelay={120} closeDelay={100}>
+                          <HoverCardTrigger asChild>
+                            <div className="flex items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-[#1a2a43]">
+                              <div className="min-w-0 flex items-center gap-2">
+                                <Avatar size="sm">
+                                  {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={member.displayName} />}
+                                  <AvatarFallback>{avatarInitial}</AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium text-white">{member.displayName}</p>
+                                  <p className="truncate text-[11px] text-[#8ea4c7]">{member.userId}</p>
+                                </div>
+                              </div>
+                              <div className="shrink-0">
+                                {member.isOwner && <Badge variant="outline">Owner</Badge>}
+                              </div>
                             </div>
-                          </div>
-                          <div className="shrink-0">
-                            {member.isOwner && <Badge variant="outline">Owner</Badge>}
-                          </div>
-                        </div>
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-72 border-[#304867] bg-[#18243a] text-white">
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-sm font-semibold text-white">{member.displayName}</p>
+                                <p className="text-xs text-[#a9b8cf] break-all">{member.userId}</p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-[#9fb2cf]">
+                                {member.isOwner && (
+                                  <Badge variant="outline" className="border-[#587aa8] text-[#d5e6ff]">
+                                    Owner
+                                  </Badge>
+                                )}
+                                <span>Right-click or press Enter for profile actions.</span>
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
                       </ProfileContextMenu>
                     );
                   })

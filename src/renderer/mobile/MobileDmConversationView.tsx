@@ -173,15 +173,9 @@ export function MobileDmConversationView({
 
                   <div
                     className={`flex gap-2.5 mb-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
-                    onPointerDown={(event) =>
-                      longPress.onPointerDown(event, () => {
-                        setContextMenu({ message, isOwn });
-                      })
-                    }
-                    onPointerMove={longPress.onPointerMove}
-                    onPointerUp={longPress.onPointerUp}
-                    onPointerLeave={longPress.onPointerLeave}
-                    onPointerCancel={longPress.onPointerCancel}
+                    {...longPress.bind(() => {
+                      setContextMenu({ message, isOwn });
+                    })}
                   >
                     {!isOwn && (
                       <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5 overflow-hidden">

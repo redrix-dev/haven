@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -527,7 +528,14 @@ export function ServerSettingsModal({
             <p className="text-sm text-red-400">{initialLoadError}</p>
           </div>
         ) : loadingInitialValues || !values ? (
-          <p className="text-[#a9b8cf]">Loading settings...</p>
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-full bg-[#22334f]" />
+            <div className="rounded-md border border-[#304867] bg-[#142033] p-4 space-y-3">
+              <Skeleton className="h-5 w-40 bg-[#22334f]" />
+              <Skeleton className="h-10 w-full bg-[#1b2a42]" />
+              <Skeleton className="h-24 w-full bg-[#1b2a42]" />
+            </div>
+          </div>
         ) : (
           <Tabs
             value={activeTab}
@@ -741,7 +749,18 @@ export function ServerSettingsModal({
                 {roleActionError && <p className="text-sm text-red-400">{roleActionError}</p>}
 
                 {roleManagementLoading ? (
-                  <p className="text-sm text-[#a9b8cf]">Loading roles...</p>
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }, (_, index) => (
+                      <div
+                        key={index}
+                        className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3"
+                      >
+                        <Skeleton className="h-4 w-32 bg-[#22334f]" />
+                        <Skeleton className="h-10 w-full bg-[#1b2a42]" />
+                        <Skeleton className="h-10 w-full bg-[#1b2a42]" />
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-4">
                     <div className="space-y-3 min-h-0 flex flex-col">
@@ -958,7 +977,23 @@ export function ServerSettingsModal({
                 {memberActionError && <p className="text-sm text-red-400">{memberActionError}</p>}
 
                 {roleManagementLoading ? (
-                  <p className="text-sm text-[#a9b8cf]">Loading members...</p>
+                  <div className="space-y-3">
+                    <Skeleton className="h-10 w-full bg-[#22334f]" />
+                    {Array.from({ length: 4 }, (_, index) => (
+                      <div
+                        key={index}
+                        className="rounded-md border border-[#304867] bg-[#142033] p-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-32 bg-[#22334f]" />
+                            <Skeleton className="h-3 w-24 bg-[#1b2a42]" />
+                          </div>
+                          <Skeleton className="h-8 w-24 bg-[#22334f]" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4">
                     <div className="space-y-3 min-h-0 flex flex-col">
@@ -1127,7 +1162,17 @@ export function ServerSettingsModal({
                 {invitesError && <p className="text-sm text-red-400">{invitesError}</p>}
 
                 {invitesLoading ? (
-                  <p className="text-sm text-[#a9b8cf]">Loading invites...</p>
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }, (_, index) => (
+                      <div
+                        key={index}
+                        className="rounded-md bg-[#142033] p-3 space-y-2"
+                      >
+                        <Skeleton className="h-4 w-full bg-[#22334f]" />
+                        <Skeleton className="h-3 w-44 bg-[#1b2a42]" />
+                      </div>
+                    ))}
+                  </div>
                 ) : invites.length === 0 ? (
                   <p className="text-sm text-[#a9b8cf]">No active invites.</p>
                 ) : (
@@ -1194,7 +1239,18 @@ export function ServerSettingsModal({
                 {unbanActionError && <p className="text-sm text-red-400">{unbanActionError}</p>}
 
                 {bansLoading ? (
-                  <p className="text-sm text-[#a9b8cf]">Loading bans...</p>
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }, (_, index) => (
+                      <div
+                        key={index}
+                        className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3 space-y-2"
+                      >
+                        <Skeleton className="h-4 w-28 bg-[#22334f]" />
+                        <Skeleton className="h-3 w-40 bg-[#1b2a42]" />
+                        <Skeleton className="h-8 w-20 bg-[#22334f]" />
+                      </div>
+                    ))}
+                  </div>
                 ) : bans.length === 0 ? (
                   <p className="text-sm text-[#a9b8cf]">No active bans.</p>
                 ) : (

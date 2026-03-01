@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getSocialBackend } from '@/lib/backend';
 import type {
@@ -416,7 +417,24 @@ export function FriendsModal({
                   <ScrollArea className="h-[52dvh] xl:h-[56dvh]">
                     <div className="p-3 space-y-2">
                       {loading ? (
-                        <p className="text-sm text-[#a9b8cf]">Loading friends...</p>
+                        Array.from({ length: 4 }, (_, index) => (
+                          <div
+                            key={index}
+                            className="rounded-md border border-[#304867] bg-[#111a2b]/60 px-3 py-3"
+                          >
+                            <div className="flex items-start gap-3">
+                              <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                              <div className="min-w-0 flex-1 space-y-2">
+                                <Skeleton className="h-4 w-28 bg-[#22334f]" />
+                                <Skeleton className="h-3 w-3/4 bg-[#1b2a42]" />
+                                <div className="flex gap-2">
+                                  <Skeleton className="h-8 w-20 bg-[#22334f]" />
+                                  <Skeleton className="h-8 w-20 bg-[#22334f]" />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
                       ) : friends.length === 0 ? (
                         <div className="rounded-md border border-dashed border-[#304867] bg-[#111a2b]/60 p-4">
                           <p className="text-sm text-[#a9b8cf]">No friends yet.</p>
@@ -624,7 +642,24 @@ export function FriendsModal({
                     <ScrollArea className="h-[48dvh] xl:h-[54dvh]">
                       <div className="p-3 space-y-2">
                         {loading ? (
-                          <p className="text-sm text-[#a9b8cf]">Loading requests...</p>
+                          Array.from({ length: 3 }, (_, index) => (
+                            <div
+                              key={index}
+                              className="rounded-md border border-[#304867] bg-[#111a2b]/60 px-3 py-3"
+                            >
+                              <div className="flex items-start gap-3">
+                                <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                                <div className="min-w-0 flex-1 space-y-2">
+                                  <Skeleton className="h-4 w-28 bg-[#22334f]" />
+                                  <Skeleton className="h-3 w-3/4 bg-[#1b2a42]" />
+                                  <div className="flex gap-2">
+                                    <Skeleton className="h-8 w-16 bg-[#22334f]" />
+                                    <Skeleton className="h-8 w-16 bg-[#22334f]" />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
                         ) : incomingRequests.length === 0 ? (
                           <p className="text-sm text-[#a9b8cf]">No incoming requests.</p>
                         ) : (
@@ -697,7 +732,23 @@ export function FriendsModal({
                     <ScrollArea className="h-[48dvh] xl:h-[54dvh]">
                       <div className="p-3 space-y-2">
                         {loading ? (
-                          <p className="text-sm text-[#a9b8cf]">Loading requests...</p>
+                          Array.from({ length: 3 }, (_, index) => (
+                            <div
+                              key={index}
+                              className="rounded-md border border-[#304867] bg-[#111a2b]/60 px-3 py-3"
+                            >
+                              <div className="flex items-start gap-3">
+                                <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                                <div className="min-w-0 flex-1 space-y-2">
+                                  <Skeleton className="h-4 w-28 bg-[#22334f]" />
+                                  <Skeleton className="h-3 w-3/4 bg-[#1b2a42]" />
+                                  <div className="flex gap-2">
+                                    <Skeleton className="h-8 w-20 bg-[#22334f]" />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
                         ) : outgoingRequests.length === 0 ? (
                           <p className="text-sm text-[#a9b8cf]">No sent requests.</p>
                         ) : (
@@ -746,7 +797,21 @@ export function FriendsModal({
                   <ScrollArea className="h-[52dvh] xl:h-[56dvh]">
                     <div className="p-3 space-y-2">
                       {loading ? (
-                        <p className="text-sm text-[#a9b8cf]">Loading blocked users...</p>
+                        Array.from({ length: 3 }, (_, index) => (
+                          <div
+                            key={index}
+                            className="rounded-md border border-[#304867] bg-[#111a2b]/60 px-3 py-3"
+                          >
+                            <div className="flex items-start gap-3">
+                              <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                              <div className="min-w-0 flex-1 space-y-2">
+                                <Skeleton className="h-4 w-28 bg-[#22334f]" />
+                                <Skeleton className="h-3 w-3/4 bg-[#1b2a42]" />
+                                <Skeleton className="h-8 w-20 bg-[#22334f]" />
+                              </div>
+                            </div>
+                          </div>
+                        ))
                       ) : blockedUsers.length === 0 ? (
                         <p className="text-sm text-[#a9b8cf]">No blocked users.</p>
                       ) : (

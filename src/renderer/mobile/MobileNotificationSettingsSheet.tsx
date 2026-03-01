@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bell, BellOff, Smartphone, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { X, Bell, BellOff, Smartphone, Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import type { NotificationPreferences, NotificationPreferenceUpdate } from '@/lib/backend/types';
 import type { HavenWebPushClientStatus } from '@/web/pwa/webPushClient';
 
@@ -34,21 +36,12 @@ function ToggleRow({ label, description, checked, onChange, disabled }: ToggleRo
           <p className={`text-xs mt-0.5 ${disabled ? 'text-gray-700' : 'text-gray-500'}`}>{description}</p>
         )}
       </div>
-      <button
-        role="switch"
-        aria-checked={checked}
+      <Switch
+        checked={checked}
+        onCheckedChange={onChange}
         disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${
-          disabled ? 'opacity-40 cursor-default' : 'cursor-pointer'
-        } ${checked ? 'bg-blue-500' : 'bg-white/10'}`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-            checked ? 'translate-x-5' : 'translate-x-0'
-          }`}
-        />
-      </button>
+        className="data-[state=checked]:bg-blue-500 data-[state=unchecked]:bg-white/10"
+      />
     </div>
   );
 }
@@ -97,8 +90,8 @@ export function MobileNotificationSettingsSheet({
     onClose();
   };
 
-  const pushEnabled = webPushStatus?.subscribed === true;
-  const pushBlocked = webPushStatus?.permissionState === 'denied';
+  const pushEnabled = webPushStatus?.browserSubscriptionActive === true;
+  const pushBlocked = webPushStatus?.notificationPermission === 'denied';
   const pushUnavailable = webPushStatus === null && !webPushStatusLoading;
 
   const pushLabel = (() => {
@@ -174,8 +167,29 @@ export function MobileNotificationSettingsSheet({
 
           {/* Preference toggles */}
           {notificationPreferencesLoading && !draft ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+            <div className="space-y-5 py-4">
+              {['Direct Messages', 'Mentions', 'Friend Requests'].map((section) => (
+                <div key={section} className="space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Bell className="w-3.5 h-3.5 text-gray-500" />
+                    <p className="text-[11px] uppercase tracking-widest text-gray-500 font-semibold">{section}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/3 border border-white/5 px-4 py-2">
+                    {Array.from({ length: 3 }, (_, index) => (
+                      <div
+                        key={`${section}-${index}`}
+                        className="flex items-center justify-between gap-3 py-3.5 border-b border-white/5 last:border-b-0"
+                      >
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <Skeleton className="h-4 w-32 bg-[#22334f]" />
+                          <Skeleton className="h-3 w-44 bg-[#1b2a42]" />
+                        </div>
+                        <Skeleton className="h-6 w-11 rounded-full bg-[#22334f]" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : draft ? (
             <>

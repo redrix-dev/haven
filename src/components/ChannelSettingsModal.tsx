@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -450,7 +451,28 @@ export function ChannelSettingsModal({
             {permissionError && <p className="text-sm text-red-400">{permissionError}</p>}
 
             {permissionsLoading ? (
-              <p className="text-[#a9b8cf]">Loading channel permissions...</p>
+              <div className="space-y-3">
+                {Array.from({ length: 2 }, (_, cardIndex) => (
+                  <div
+                    key={cardIndex}
+                    className="rounded-lg border border-[#304867] bg-[#142033] p-3 space-y-3"
+                  >
+                    <Skeleton className="h-4 w-36 bg-[#22334f]" />
+                    {Array.from({ length: 3 }, (_, rowIndex) => (
+                      <div
+                        key={rowIndex}
+                        className="grid grid-cols-1 gap-2 rounded-md border border-[#304867] bg-[#111a2b] p-2 md:grid-cols-[1fr_220px]"
+                      >
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-44 bg-[#22334f]" />
+                          <Skeleton className="h-3 w-32 bg-[#1b2a42]" />
+                        </div>
+                        <Skeleton className="h-9 w-full bg-[#22334f]" />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             ) : !hasPermissionRows ? (
               <p className="text-[#a9b8cf]">No roles or member overwrites found for this channel.</p>
             ) : (

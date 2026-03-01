@@ -10,6 +10,7 @@ import type {
   FriendSummary,
   SocialCounts,
 } from '@/lib/backend/types';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { getErrorMessage } from '@/shared/lib/errors';
 
 type FriendsTab = 'friends' | 'add' | 'requests' | 'blocked';
@@ -175,9 +176,13 @@ export function MobileFriendsSheet({
     const next = pendingConfirm;
     setPendingConfirm(null);
     if (next.kind === 'removeFriend') {
-      void runMutation(`remove-friend:${next.friendUserId}`, () => socialBackend.removeFriend(next.friendUserId));
+      void runMutation(`remove-friend:${next.friendUserId}`, async () => {
+        await socialBackend.removeFriend(next.friendUserId);
+      });
     } else {
-      void runMutation(`block-user:${next.userId}`, () => socialBackend.blockUser(next.userId));
+      void runMutation(`block-user:${next.userId}`, async () => {
+        await socialBackend.blockUser(next.userId);
+      });
     }
   };
 
@@ -229,27 +234,37 @@ export function MobileFriendsSheet({
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 px-3 pt-3 pb-1 shrink-0 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-blue-600/20 text-blue-300'
-                  : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
-              }`}
-            >
-              {tab.label}
-              {tab.badge !== undefined && tab.badge > 0 && (
-                <span className={`min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1 leading-none ${
-                  tab.id === 'requests' ? 'bg-red-500 text-white' : 'bg-white/10 text-gray-300'
-                }`}>
-                  {tab.badge > 99 ? '99+' : tab.badge}
-                </span>
-              )}
-            </button>
-          ))}
+        <div className="px-3 pt-3 pb-1 shrink-0 overflow-x-auto">
+          <ToggleGroup
+            type="single"
+            value={activeTab}
+            onValueChange={(value) => {
+              if (value) {
+                setActiveTab(value as FriendsTab);
+              }
+            }}
+            rovingFocus={false}
+            className="min-w-max gap-1"
+          >
+            {tabs.map((tab) => (
+              <ToggleGroupItem
+                key={tab.id}
+                value={tab.id}
+                variant="outline"
+                size="sm"
+                className="rounded-xl border-white/10 bg-transparent px-3 py-1.5 text-sm font-medium whitespace-nowrap text-gray-400 hover:bg-white/5 hover:text-gray-200 data-[state=on]:border-blue-500/20 data-[state=on]:bg-blue-600/20 data-[state=on]:text-blue-300"
+              >
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <span className={`min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1 leading-none ${
+                    tab.id === 'requests' ? 'bg-red-500 text-white' : 'bg-white/10 text-gray-300'
+                  }`}>
+                    {tab.badge > 99 ? '99+' : tab.badge}
+                  </span>
+                )}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
 
         {/* Error banner */}
@@ -359,6 +374,15 @@ export function MobileFriendsSheet({
               <div className="space-y-2">
                 {searchResults.map((result) => {
                   const reqKey = `send-request:${result.username.toLowerCase()}`;
+                  const relationshipLabel =
+                    result.relationshipState === 'incoming_pending'
+                      ? 'Incoming request'
+                      : result.relationshipState === 'outgoing_pending'
+                        ? 'Request sent'
+                        : result.relationshipState === 'friend'
+                          ? 'Already friends'
+                          : null;
+
                   return (
                     <div
                       key={result.userId}
@@ -371,13 +395,15 @@ export function MobileFriendsSheet({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-white truncate">{result.username}</p>
-                        {result.relationshipStatus !== 'none' && (
-                          <p className="text-xs text-gray-500 mt-0.5 capitalize">{result.relationshipStatus.replace(/_/g, ' ')}</p>
+                        {relationshipLabel && (
+                          <p className="text-xs text-gray-500 mt-0.5">{relationshipLabel}</p>
                         )}
                       </div>
-                      {result.relationshipStatus === 'none' && (
+                      {result.relationshipState === 'none' && (
                         <button
-                          onClick={() => void runMutation(reqKey, () => socialBackend.sendFriendRequest(result.username), { refreshSearch: true })}
+                          onClick={() => void runMutation(reqKey, async () => {
+                            await socialBackend.sendFriendRequest(result.username);
+                          }, { refreshSearch: true })}
                           disabled={busy(reqKey)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors disabled:opacity-60"
                         >
@@ -385,10 +411,10 @@ export function MobileFriendsSheet({
                           Add
                         </button>
                       )}
-                      {result.relationshipStatus === 'request_sent' && (
+                      {result.relationshipState === 'outgoing_pending' && (
                         <span className="text-xs text-gray-500 px-2">Sent</span>
                       )}
-                      {result.relationshipStatus === 'friends' && (
+                      {result.relationshipState === 'friend' && (
                         <Check className="w-4 h-4 text-green-400 shrink-0" />
                       )}
                     </div>
@@ -426,16 +452,18 @@ export function MobileFriendsSheet({
                           }`}
                         >
                           <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden">
-                            {req.avatarUrl ? (
-                              <img src={req.avatarUrl} alt={req.username} className="w-full h-full object-cover" />
-                            ) : initial(req.username)}
+                            {req.senderAvatarUrl ? (
+                              <img src={req.senderAvatarUrl} alt={req.senderUsername} className="w-full h-full object-cover" />
+                            ) : initial(req.senderUsername)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-white truncate">{req.username}</p>
+                            <p className="text-sm font-semibold text-white truncate">{req.senderUsername}</p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button
-                              onClick={() => void runMutation(`accept-request:${req.requestId}`, () => socialBackend.acceptFriendRequest(req.requestId))}
+                              onClick={() => void runMutation(`accept-request:${req.requestId}`, async () => {
+                                await socialBackend.acceptFriendRequest(req.requestId);
+                              })}
                               disabled={busy(`accept-request:${req.requestId}`)}
                               className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors disabled:opacity-60"
                             >
@@ -443,7 +471,9 @@ export function MobileFriendsSheet({
                               Accept
                             </button>
                             <button
-                              onClick={() => void runMutation(`decline-request:${req.requestId}`, () => socialBackend.declineFriendRequest(req.requestId))}
+                              onClick={() => void runMutation(`decline-request:${req.requestId}`, async () => {
+                                await socialBackend.declineFriendRequest(req.requestId);
+                              })}
                               disabled={busy(`decline-request:${req.requestId}`)}
                               className="flex items-center justify-center w-8 h-8 rounded-xl hover:bg-white/10 transition-colors"
                             >
@@ -469,16 +499,18 @@ export function MobileFriendsSheet({
                         className="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/3 border border-white/5"
                       >
                         <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden">
-                          {req.avatarUrl ? (
-                            <img src={req.avatarUrl} alt={req.username} className="w-full h-full object-cover" />
-                          ) : initial(req.username)}
+                          {req.recipientAvatarUrl ? (
+                            <img src={req.recipientAvatarUrl} alt={req.recipientUsername} className="w-full h-full object-cover" />
+                          ) : initial(req.recipientUsername)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">{req.username}</p>
+                          <p className="text-sm font-semibold text-white truncate">{req.recipientUsername}</p>
                           <p className="text-xs text-gray-500 mt-0.5">Pending</p>
                         </div>
                         <button
-                          onClick={() => void runMutation(`cancel-request:${req.requestId}`, () => socialBackend.cancelFriendRequest(req.requestId))}
+                          onClick={() => void runMutation(`cancel-request:${req.requestId}`, async () => {
+                            await socialBackend.cancelFriendRequest(req.requestId);
+                          })}
                           disabled={busy(`cancel-request:${req.requestId}`)}
                           className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
                         >
@@ -517,7 +549,9 @@ export function MobileFriendsSheet({
                         <p className="text-sm font-semibold text-gray-400 truncate">{blocked.username}</p>
                       </div>
                       <button
-                        onClick={() => void runMutation(`unblock-user:${blocked.blockedUserId}`, () => socialBackend.unblockUser(blocked.blockedUserId))}
+                        onClick={() => void runMutation(`unblock-user:${blocked.blockedUserId}`, async () => {
+                          await socialBackend.unblockUser(blocked.blockedUserId);
+                        })}
                         disabled={busy(`unblock-user:${blocked.blockedUserId}`)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
                       >

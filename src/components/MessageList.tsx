@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -1142,33 +1147,38 @@ export function MessageList({
     const renderableReplies = replies.filter((reply) => !nextAncestorIds.has(reply.id));
 
     return (
-      <div key={message.id} className="space-y-2">
+      <Collapsible
+        key={message.id}
+        open={repliesExpanded}
+        onOpenChange={(nextOpen) =>
+          setExpandedReplyThreads((prev) => ({
+            ...prev,
+            [message.id]: nextOpen,
+          }))
+        }
+        className="space-y-2"
+      >
         {renderMessageRow(message, depth)}
 
         {renderableReplies.length > 0 && (
           <div className="ml-1">
-            <Button
+            <CollapsibleTrigger
               type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                setExpandedReplyThreads((prev) => ({
-                  ...prev,
-                  [message.id]: !repliesExpanded,
-                }))
-              }
-              className="text-[#8ea4c7] hover:text-white hover:bg-[#22334f]"
+              className="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-[#8ea4c7] transition-colors hover:bg-[#22334f] hover:text-white focus-visible:ring-2 focus-visible:ring-[#5b92e8] focus-visible:outline-none"
             >
               {repliesExpanded
                 ? `Hide replies (${renderableReplies.length})`
                 : `View replies (${renderableReplies.length})`}
-            </Button>
+            </CollapsibleTrigger>
           </div>
         )}
 
-        {repliesExpanded &&
-          renderableReplies.map((reply) => renderMessageTree(reply, depth + 1, nextAncestorIds))}
-      </div>
+        {renderableReplies.length > 0 && (
+          <CollapsibleContent className="space-y-2">
+            {renderableReplies.map((reply) => renderMessageTree(reply, depth + 1, nextAncestorIds))}
+          </CollapsibleContent>
+        )}
+      </Collapsible>
     );
   };
 

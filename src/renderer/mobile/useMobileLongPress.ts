@@ -1,79 +1,110 @@
 import React from 'react';
+import { useDrag } from '@use-gesture/react';
 
 const PINCH_ZOOM_LONG_PRESS_THRESHOLD = 1.01;
+const LONG_PRESS_MOVE_TOLERANCE_PX = 8;
 
 function isViewportZoomed(): boolean {
   return (window.visualViewport?.scale ?? 1) > PINCH_ZOOM_LONG_PRESS_THRESHOLD;
 }
 
-export function useMobileLongPress(delayMs = 450) {
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activeTouchPointersRef = React.useRef(new Set<number>());
+function isTouchGestureEvent(event: Event): boolean {
+  if (typeof TouchEvent !== 'undefined' && event instanceof TouchEvent) {
+    return true;
+  }
 
-  const clearTimer = React.useCallback(() => {
-    if (!timerRef.current) return;
-    clearTimeout(timerRef.current);
-    timerRef.current = null;
+  return typeof PointerEvent !== 'undefined'
+    && event instanceof PointerEvent
+    && event.pointerType === 'touch';
+}
+
+export function useMobileLongPress(delayMs = 450) {
+  const activeCancelRef = React.useRef<(() => void) | null>(null);
+  const hasTriggeredRef = React.useRef(false);
+
+  const cancelLongPress = React.useCallback(() => {
+    activeCancelRef.current?.();
+    activeCancelRef.current = null;
+    hasTriggeredRef.current = false;
   }, []);
 
-  const handlePointerDown = React.useCallback(
-    (event: React.PointerEvent<HTMLElement>, onLongPress: () => void) => {
-      if (event.pointerType !== 'touch') return;
+  const bind = useDrag(
+    ({ args, active, first, last, intentional, touches, movement: [movementX, movementY], cancel, event }) => {
+      const onLongPress = args?.[0] as (() => void) | undefined;
+      const touchEvent = isTouchGestureEvent(event);
 
-      activeTouchPointersRef.current.add(event.pointerId);
-      clearTimer();
+      if (first) {
+        hasTriggeredRef.current = false;
+        activeCancelRef.current = cancel;
 
-      if (!event.isPrimary || activeTouchPointersRef.current.size > 1 || isViewportZoomed()) {
+        if (
+          !touchEvent
+          || isViewportZoomed()
+          || touches > 1
+          || (
+            typeof PointerEvent !== 'undefined'
+            && event instanceof PointerEvent
+            && !event.isPrimary
+          )
+        ) {
+          cancel();
+          activeCancelRef.current = null;
+          return;
+        }
+      }
+
+      if (!touchEvent || !onLongPress) {
+        if (last) {
+          activeCancelRef.current = null;
+          hasTriggeredRef.current = false;
+        }
         return;
       }
 
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
+      const movedTooFar =
+        Math.abs(movementX) > LONG_PRESS_MOVE_TOLERANCE_PX
+        || Math.abs(movementY) > LONG_PRESS_MOVE_TOLERANCE_PX;
 
-        if (activeTouchPointersRef.current.size !== 1 || isViewportZoomed()) {
-          return;
-        }
+      if (!hasTriggeredRef.current && (isViewportZoomed() || touches > 1 || movedTooFar)) {
+        cancel();
+        activeCancelRef.current = null;
+        return;
+      }
 
+      if (!hasTriggeredRef.current && active && intentional) {
+        hasTriggeredRef.current = true;
+        activeCancelRef.current = null;
         onLongPress();
-      }, delayMs);
-    },
-    [clearTimer, delayMs]
-  );
+        cancel();
+        return;
+      }
 
-  const handlePointerMove = React.useCallback(
-    (event: React.PointerEvent<HTMLElement>) => {
-      if (event.pointerType !== 'touch') return;
-      if (activeTouchPointersRef.current.size > 1 || isViewportZoomed()) {
-        clearTimer();
+      if (last) {
+        activeCancelRef.current = null;
+        hasTriggeredRef.current = false;
       }
     },
-    [clearTimer]
-  );
-
-  const handlePointerEnd = React.useCallback(
-    (event: React.PointerEvent<HTMLElement>) => {
-      if (event.pointerType !== 'touch') return;
-
-      activeTouchPointersRef.current.delete(event.pointerId);
-      clearTimer();
-    },
-    [clearTimer]
+    {
+      delay: delayMs,
+      threshold: 0,
+      filterTaps: true,
+      pointer: {
+        touch: true,
+        capture: false,
+        keys: false,
+      },
+    }
   );
 
   React.useEffect(
     () => () => {
-      clearTimer();
-      activeTouchPointersRef.current.clear();
+      cancelLongPress();
     },
-    [clearTimer]
+    [cancelLongPress]
   );
 
   return {
-    onPointerDown: handlePointerDown,
-    onPointerMove: handlePointerMove,
-    onPointerUp: handlePointerEnd,
-    onPointerLeave: handlePointerEnd,
-    onPointerCancel: handlePointerEnd,
-    cancelLongPress: clearTimer,
+    bind,
+    cancelLongPress,
   };
 }

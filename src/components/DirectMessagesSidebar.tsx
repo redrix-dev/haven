@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { DirectMessageConversationSummary } from '@/lib/backend/types';
 import { MessageCircle, RefreshCcw, VolumeX } from 'lucide-react';
 
@@ -143,7 +144,23 @@ export function DirectMessagesSidebar({
       <ScrollArea className="min-h-0 flex-1">
         <div className="p-3 space-y-2">
           {loading ? (
-            <p className="text-sm text-[#a9b8cf]">Loading DMs...</p>
+            Array.from({ length: 4 }, (_, index) => (
+              <div
+                key={index}
+                className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3"
+              >
+                <div className="flex items-start gap-3">
+                  <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-28 bg-[#22334f]" />
+                      <Skeleton className="ml-auto h-4 w-8 rounded-full bg-[#22334f]" />
+                    </div>
+                    <Skeleton className="h-3 w-full bg-[#1b2a42]" />
+                  </div>
+                </div>
+              </div>
+            ))
           ) : error ? (
             <p className="text-sm text-red-300">{error}</p>
           ) : conversations.length === 0 ? (
