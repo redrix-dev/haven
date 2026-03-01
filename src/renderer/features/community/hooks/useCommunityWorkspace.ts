@@ -51,6 +51,36 @@ export function useCommunityWorkspace({
     setServerPermissions(EMPTY_SERVER_PERMISSIONS);
   }, []);
 
+  const prefetchServersChannels = React.useCallback(async (serverIds: string[]) => {
+    await Promise.allSettled(
+      serverIds
+        .filter((id) => !Object.prototype.hasOwnProperty.call(channelsByServerCacheRef.current, id))
+        .map(async (id) => {
+          try {
+            const communityBackend = getCommunityDataBackend(id);
+            const channelList = await communityBackend.listChannels(id);
+            channelsByServerCacheRef.current[id] = channelList;
+          } catch {
+            // silent — prefetch failures are non-fatal
+          }
+        })
+    );
+  }, []);
+
+  const getDefaultChannelIdForServer = React.useCallback(
+    (serverId: string, lastVisitedChannelId?: string | null): string | null => {
+      const cached = channelsByServerCacheRef.current[serverId];
+      if (!cached || cached.length === 0) return null;
+      const rememberedId = lastSelectedChannelIdByServerRef.current[serverId] ?? null;
+      const candidates = [lastVisitedChannelId ?? null, rememberedId];
+      for (const candidate of candidates) {
+        if (candidate && cached.some((c) => c.id === candidate)) return candidate;
+      }
+      return cached.find((c) => c.kind === 'text')?.id ?? cached[0]?.id ?? null;
+    },
+    []
+  );
+
   React.useEffect(() => {
     if (servers.length > 0 && !currentServerId) {
       setCurrentServerId(servers[0].id);
@@ -223,6 +253,8 @@ export function useCommunityWorkspace({
       setCurrentChannelId,
       setCurrentServerId,
       resetServerPermissions,
+      prefetchServersChannels,
+      getDefaultChannelIdForServer,
     },
   };
 }
