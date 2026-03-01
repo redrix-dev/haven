@@ -192,4 +192,23 @@
     margin-block: 0.75rem;
     border-radius: 9999px;
   }
+
+  .mobile-bottom-sheet {
+    bottom: var(--app-keyboard-inset, 0px);
+    max-height: calc(var(--app-visual-viewport-height, 100dvh) - env(safe-area-inset-top, 0px));
+  }
+
+  .mobile-bottom-card {
+    bottom: calc(var(--app-keyboard-inset, 0px) + 2rem);
+  }
+
+  @media (max-width: 768px), (pointer: coarse) {
+    .haven-web-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]),
+    .haven-web-shell textarea,
+    .haven-web-shell select {
+      font-size: 16px !important;
+      line-height: 1.4;
+      -webkit-text-size-adjust: 100%;
+    }
+  }
 }

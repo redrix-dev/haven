@@ -199,7 +199,7 @@ export function MobileFriendsSheet({
       <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={() => onOpenChange(false)} />
 
       {/* Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 flex flex-col" style={{ height: '92dvh' }}>
+      <div className="mobile-bottom-sheet fixed inset-x-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 flex flex-col" style={{ height: '92dvh' }}>
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-9 h-1 rounded-full bg-white/20" />
@@ -333,7 +333,7 @@ export function MobileFriendsSheet({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by username…"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-base text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50"
                   autoFocus
                 />
               </div>
@@ -537,7 +537,7 @@ export function MobileFriendsSheet({
       {pendingConfirm && (
         <>
           <div className="fixed inset-0 z-60 bg-black/70 touch-none overscroll-none" onClick={() => setPendingConfirm(null)} />
-          <div className="fixed inset-x-4 bottom-8 z-70 rounded-2xl bg-[#18243a] border border-white/10 p-5">
+          <div className="mobile-bottom-card fixed inset-x-4 z-70 rounded-2xl bg-[#18243a] border border-white/10 p-5">
             <p className="text-white font-semibold text-center mb-1">
               {pendingConfirm.kind === 'removeFriend' ? 'Remove friend?' : 'Block user?'}
             </p>

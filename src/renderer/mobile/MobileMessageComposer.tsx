@@ -80,7 +80,7 @@ export function MobileMessageComposer({
           placeholder={placeholder}
           disabled={sending}
           rows={1}
-          className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:border-blue-500/50 transition-colors leading-relaxed disabled:opacity-50"
+          className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-base text-white placeholder-gray-500 resize-none focus:outline-none focus:border-blue-500/50 transition-colors leading-relaxed disabled:opacity-50"
           style={{ minHeight: '42px' }}
         />
         <button

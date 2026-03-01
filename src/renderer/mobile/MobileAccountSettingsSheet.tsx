@@ -191,7 +191,7 @@ export function MobileAccountSettingsSheet({
       />
 
       {/* Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 max-h-[92dvh] flex flex-col">
+      <div className="mobile-bottom-sheet fixed inset-x-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 flex flex-col">
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-9 h-1 rounded-full bg-white/20" />
@@ -235,7 +235,7 @@ export function MobileAccountSettingsSheet({
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               maxLength={32}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/60 transition-colors"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-base text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/60 transition-colors"
               placeholder="Your username"
             />
           </div>
@@ -248,7 +248,7 @@ export function MobileAccountSettingsSheet({
             <input
               value={avatarUrl}
               onChange={(e) => setAvatarUrl(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/60 transition-colors"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-base text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/60 transition-colors"
               placeholder="https://..."
             />
           </div>
@@ -337,7 +337,7 @@ export function MobileAccountSettingsSheet({
 
       {/* Inline confirm: disable auto-updates */}
       {confirmState === 'disable-updates' && (
-        <div className="fixed inset-x-4 bottom-24 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-5 shadow-xl">
+        <div className="mobile-bottom-card fixed inset-x-4 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-5 shadow-xl">
           <div className="flex items-start gap-3 mb-4">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
@@ -367,7 +367,7 @@ export function MobileAccountSettingsSheet({
 
       {/* Inline confirm: sign out */}
       {confirmState === 'sign-out' && (
-        <div className="fixed inset-x-4 bottom-24 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-5 shadow-xl">
+        <div className="mobile-bottom-card fixed inset-x-4 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-5 shadow-xl">
           <div className="flex items-start gap-3 mb-4">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
@@ -397,7 +397,7 @@ export function MobileAccountSettingsSheet({
 
       {/* Inline confirm: delete account */}
       {confirmState === 'delete-account' && (
-        <div className="fixed inset-x-4 bottom-24 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-5 shadow-xl">
+        <div className="mobile-bottom-card fixed inset-x-4 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-5 shadow-xl">
           <div className="flex items-start gap-3 mb-4">
             <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
             <div>

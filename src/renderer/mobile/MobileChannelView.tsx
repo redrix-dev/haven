@@ -69,7 +69,6 @@ export function MobileChannelView({
   }
 
   // Index link previews by messageId
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const linkPreviewByMessageId = useMemo(() => {
     const map = new Map<string, MessageLinkPreview>();
     for (const p of messageLinkPreviews) map.set(p.messageId, p);
@@ -226,7 +225,7 @@ export function MobileChannelView({
                       <textarea
                         value={editDraft}
                         onChange={(e) => setEditDraft(e.target.value)}
-                        className="w-full bg-white/10 border border-blue-500/50 rounded-xl px-3 py-2 text-sm text-white resize-none focus:outline-none"
+                        className="w-full bg-white/10 border border-blue-500/50 rounded-xl px-3 py-2 text-base text-white resize-none focus:outline-none"
                         rows={2}
                         autoFocus
                       />

@@ -114,7 +114,7 @@ export function MobileNotificationSettingsSheet({
       <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={onClose} />
 
       {/* Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 max-h-[85vh] flex flex-col">
+      <div className="mobile-bottom-sheet fixed inset-x-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 flex flex-col">
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-9 h-1 rounded-full bg-white/20" />

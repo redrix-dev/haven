@@ -162,9 +162,12 @@ export function MobileChatApp() {
   ) ?? null;
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  // Use h-dvh so the container shrinks with the virtual keyboard
+  // The mobile shell follows the visual viewport while the keyboard is open.
   return (
-    <div className="flex flex-col bg-[#111a2b] overflow-hidden" style={{ height: '100dvh' }}>
+    <div
+      className="flex flex-col bg-[#111a2b] overflow-hidden"
+      style={{ height: 'var(--app-visual-viewport-height, 100dvh)' }}
+    >
 
       {/* ── Main nav header — always visible, "Haven" centered ────────────── */}
       <MobileHeader

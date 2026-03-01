@@ -313,7 +313,7 @@ export function MobileDmConversationView({
       {blockConfirmOpen && otherUserId && (
         <>
           <div className="fixed inset-0 z-50 bg-black/70 touch-none overscroll-none" onClick={() => setBlockConfirmOpen(false)} />
-          <div className="fixed inset-x-4 bottom-8 z-60 rounded-2xl bg-[#18243a] border border-white/10 p-5">
+          <div className="mobile-bottom-card fixed inset-x-4 z-60 rounded-2xl bg-[#18243a] border border-white/10 p-5">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
               <p className="text-white font-semibold">Block {otherUsername}?</p>
