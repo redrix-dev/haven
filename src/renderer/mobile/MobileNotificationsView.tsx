@@ -1,3 +1,4 @@
+// Changed: auto-clear unseen notification count when the mobile notifications screen mounts.
 import React from 'react';
 import { Loader2, RefreshCcw, Bell, Check, X, UserCheck, UserX, Settings } from 'lucide-react';
 import type { NotificationItem, NotificationCounts } from '@/lib/backend/types';
@@ -66,6 +67,12 @@ export function MobileNotificationsView({
   onRefresh,
   onSettingsPress,
 }: MobileNotificationsViewProps) {
+  React.useEffect(() => {
+    if (notificationCounts.unseenCount > 0) {
+      onMarkAllSeen();
+    }
+  }, [notificationCounts.unseenCount, onMarkAllSeen]);
+
   if (loading && notificationItems.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">

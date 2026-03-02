@@ -1,10 +1,16 @@
+// Changed: remove viewport-anchor hook usage to avoid stabilizer races, keep local focus snap behavior, and retain shared/skeleton/tap-target improvements.
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, MoreHorizontal, BellOff, Bell, ShieldOff, X, AlertTriangle } from 'lucide-react';
+import { MoreHorizontal, BellOff, Bell, ShieldOff, X, AlertTriangle } from 'lucide-react';
 import type { DirectMessage } from '@/lib/backend/types';
 import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
-import { useMobileComposerViewportAnchor } from '@/renderer/mobile/useMobileComposerViewportAnchor';
+import { DateSeparator } from '@/renderer/shared/DateSeparator';
+import { formatMessageDate, formatMessageTime } from '@/renderer/shared/dateFormatters';
+import { MessageContent } from '@/renderer/shared/MessageContent';
+import { AvatarBubble } from '@/renderer/shared/AvatarBubble';
+import { Backdrop } from '@/renderer/shared/Backdrop';
+import { MessageListSkeleton } from '@/renderer/mobile/skeletons/MessageListSkeleton';
 
 interface ContextMenuState {
   message: DirectMessage;
@@ -13,6 +19,7 @@ interface ContextMenuState {
 
 interface MobileDmConversationViewProps {
   currentUserId: string;
+  currentUserDisplayName: string;
   conversationTitle?: string;
   messages: DirectMessage[];
   loading: boolean;
@@ -27,6 +34,7 @@ interface MobileDmConversationViewProps {
 
 export function MobileDmConversationView({
   currentUserId,
+  currentUserDisplayName,
   conversationTitle,
   messages,
   loading,
@@ -43,15 +51,20 @@ export function MobileDmConversationView({
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const hasInitializedScrollRef = useRef(false);
+  const isNearBottomRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const longPress = useMobileLongPress();
-  const {
-    handleComposerBlur,
-    handleComposerFocus,
-    isNearBottomRef,
-  } = useMobileComposerViewportAnchor({
-    scrollRef,
-  });
+
+  const handleComposerFocus = () => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const distFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    if (distFromBottom < 80) {
+      requestAnimationFrame(() => {
+        node.scrollTop = node.scrollHeight;
+      });
+    }
+  };
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -70,6 +83,18 @@ export function MobileDmConversationView({
     node.scrollTop = node.scrollHeight;
   }, [messages.length, scrollRef]);
 
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const handleScroll = () => {
+      const nextBottomOffset = Math.max(0, node.scrollHeight - node.scrollTop - node.clientHeight);
+      isNearBottomRef.current = nextBottomOffset <= 32;
+    };
+    node.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => node.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const handleSend = async () => {
     const content = draft.trim();
     if (!content || sendPending) return;
@@ -77,20 +102,6 @@ export function MobileDmConversationView({
     await onSendMessage(content);
   };
 
-  const formatTime = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    const today = new Date();
-    if (d.toDateString() === today.toDateString()) return 'Today';
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  };
 
   // Derive the other user from any non-own message for block action
   const otherUser = messages.find((m) => m.authorUserId !== currentUserId);
@@ -98,11 +109,7 @@ export function MobileDmConversationView({
   const otherUsername = otherUser?.authorUsername ?? 'this user';
 
   if (loading && messages.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-      </div>
-    );
+    return <MessageListSkeleton />;
   }
 
   let lastDateLabel = '';
@@ -127,7 +134,7 @@ export function MobileDmConversationView({
         </button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2 pb-4">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2">
         {error && (
           <p className="text-red-400 text-xs text-center py-2">{error}</p>
         )}
@@ -135,19 +142,14 @@ export function MobileDmConversationView({
         {messages.map((message) => {
           const isOwn = message.authorUserId === currentUserId;
           const name = message.authorUsername ?? 'Unknown';
-          const initial = name.charAt(0).toUpperCase();
-          const dateLabel = formatDate(message.createdAt);
+          const dateLabel = formatMessageDate(message.createdAt);
           const showDateSep = dateLabel !== lastDateLabel;
           if (showDateSep) lastDateLabel = dateLabel;
 
           return (
             <React.Fragment key={message.messageId}>
               {showDateSep && (
-                <div className="flex items-center gap-3 my-3">
-                  <div className="flex-1 h-px bg-white/10" />
-                  <span className="text-gray-500 text-[11px] font-medium shrink-0">{dateLabel}</span>
-                  <div className="flex-1 h-px bg-white/10" />
-                </div>
+                <DateSeparator label={dateLabel} />
               )}
 
               <div
@@ -157,13 +159,7 @@ export function MobileDmConversationView({
                 })}
               >
                 {!isOwn && (
-                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5 overflow-hidden">
-                    {message.authorAvatarUrl ? (
-                      <img src={message.authorAvatarUrl} alt={name} className="w-full h-full object-cover" />
-                    ) : (
-                      initial
-                    )}
-                  </div>
+                  <AvatarBubble url={message.authorAvatarUrl} name={name} size="sm" className="mt-0.5" />
                 )}
 
                 <div className={`flex flex-col max-w-[78%] ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -172,7 +168,7 @@ export function MobileDmConversationView({
                       {isOwn ? 'You' : name}
                     </span>
                     <span className="text-[10px] text-gray-600 shrink-0">
-                      {formatTime(message.createdAt)}
+                      {formatMessageTime(message.createdAt)}
                     </span>
                     {message.editedAt && (
                       <span className="text-[10px] text-gray-600">(edited)</span>
@@ -186,13 +182,14 @@ export function MobileDmConversationView({
                         : 'bg-[#1a2840] text-gray-100 rounded-tl-sm border border-white/5'
                     }`}
                   >
-                    {message.content}
+                    <MessageContent content={message.content} currentUserDisplayName={currentUserDisplayName} />
                   </div>
                 </div>
               </div>
             </React.Fragment>
           );
         })}
+        <div className="h-2 shrink-0" />
       </div>
 
       <MobileMessageComposer
@@ -202,7 +199,6 @@ export function MobileDmConversationView({
         sending={sendPending}
         placeholder="Message..."
         onFocus={handleComposerFocus}
-        onBlur={handleComposerBlur}
       />
 
       <MobileLongPressMenu
@@ -222,17 +218,17 @@ export function MobileDmConversationView({
       {/* ── Conversation options sheet ──────────────────────────────────── */}
       {optionsOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={() => setOptionsOpen(false)} />
+          <Backdrop onDismiss={() => setOptionsOpen(false)} />
           <div
             className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10"
-            style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+            style={{ paddingBottom: 'calc(2rem + var(--sab))' }}
           >
             <div className="flex justify-center pt-3 pb-2">
               <div className="w-9 h-1 rounded-full bg-white/20" />
             </div>
             <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
               <p className="text-sm font-semibold text-white">Conversation Options</p>
-              <button onClick={() => setOptionsOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors">
+              <button onClick={() => setOptionsOpen(false)} className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors">
                 <X className="w-4 h-4 text-gray-400" />
               </button>
             </div>
@@ -283,7 +279,7 @@ export function MobileDmConversationView({
       {/* ── Block confirmation ──────────────────────────────────────────── */}
       {blockConfirmOpen && otherUserId && (
         <>
-          <div className="fixed inset-0 z-50 bg-black/70 touch-none overscroll-none" onClick={() => setBlockConfirmOpen(false)} />
+          <Backdrop zIndex="z-50" className="bg-black/70" onDismiss={() => setBlockConfirmOpen(false)} />
           <div className="mobile-bottom-card fixed inset-x-4 z-60 rounded-2xl bg-[#18243a] border border-white/10 p-5">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />

@@ -1,3 +1,4 @@
+// Changed: wire mobile-aware deep-link navigation + push badge clearing, fix notification open DM routing, and add screen-level error boundary wrappers.
 import React, { useState, useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,6 +23,9 @@ import { MobileDmConversationView } from '@/renderer/mobile/MobileDmConversation
 import { MobileNotificationsView } from '@/renderer/mobile/MobileNotificationsView';
 import { MobileNotificationSettingsSheet } from '@/renderer/mobile/MobileNotificationSettingsSheet';
 import { MobileFriendsSheet } from '@/renderer/mobile/MobileFriendsSheet';
+import type { WebAppDeepLinkTarget } from '@/lib/deepLinks';
+import { getNotificationPayloadString } from '@/renderer/app/utils';
+import { MobileErrorBoundary } from '@/renderer/mobile/MobileErrorBoundary';
 
 // Explicit mobile navigation — independent of orchestration's currentServerId so that
 // useCommunityWorkspace's desktop auto-select doesn't interfere.
@@ -34,13 +38,47 @@ type MobileScreen =
   | 'dm-conversation'
   | 'notifications';
 
+type NavigationDirection = 'forward' | 'backward';
+
+interface MobileScreenTransitionProps {
+  screen: MobileScreen;
+  direction: NavigationDirection;
+  children: React.ReactNode;
+}
+
+function MobileScreenTransition({ screen, direction, children }: MobileScreenTransitionProps) {
+  return (
+    <div
+      key={screen}
+      style={{ animation: `${direction === 'backward' ? 'slideInLeft' : 'slideInRight'} 220ms ease-out` }}
+      className="flex-1 min-h-0"
+    >
+      {children}
+    </div>
+  );
+}
+
 export function MobileChatApp() {
-  const app = useChatAppOrchestration();
+  const pendingDeepLinkTargetRef = useRef<WebAppDeepLinkTarget | null>(null);
+  const pendingNotificationRecipientIdRef = useRef<string | null>(null);
+  const [deepLinkTick, setDeepLinkTick] = useState(0);
+  const app = useChatAppOrchestration({
+    onMobileDeepLinkNavigate: (screen) => {
+      if (screen === 'friends') return;
+      setMobileScreen(screen);
+    },
+    onPushNotificationNavigationComplete: ({ recipientId, target }) => {
+      pendingNotificationRecipientIdRef.current = recipientId;
+      pendingDeepLinkTargetRef.current = target;
+      setDeepLinkTick((value) => value + 1);
+    },
+  });
   const [mobileScreen, setMobileScreen] = useState<MobileScreen>('home');
   const [serverDrawerOpen, setServerDrawerOpen] = useState(false);
   const [channelDrawerOpen, setChannelDrawerOpen] = useState(false);
   const [notifSettingsOpen, setNotifSettingsOpen] = useState(false);
   const [bottomNavOpen, setBottomNavOpen] = useState(false);
+  const directionRef = useRef<NavigationDirection>('forward');
 
   // Remember the last channel visited per server so we can restore it on re-entry.
   const lastChannelByServer = useRef(new Map<string, string>());
@@ -77,6 +115,34 @@ export function MobileChatApp() {
   }, [mobileScreen, app.channels, app.channelsLoading, app.currentServerId]);
 
   useEffect(() => {
+    const target = pendingDeepLinkTargetRef.current;
+    if (!target || app.authStatus !== 'authenticated' || !app.user) return;
+
+    const recipientId = pendingNotificationRecipientIdRef.current;
+    if (recipientId) {
+      void app.markNotificationRead(recipientId);
+    } else {
+      void app.refreshNotificationsManually();
+    }
+
+    if (target.kind === 'dm_message') {
+      app.setWorkspaceMode('dm');
+      app.setSelectedDmConversationId(target.conversationId);
+      setMobileScreen('dm-conversation');
+      void app.refreshDmConversations({ suppressLoadingState: true });
+    } else if (target.kind === 'channel_mention') {
+      app.setWorkspaceMode('community');
+      app.setCurrentServerId(target.communityId);
+      app.setCurrentChannelId(target.channelId);
+      setMobileScreen('channel');
+    } else if (target.kind === 'friend_request_received' || target.kind === 'friend_request_accepted') {
+      app.setFriendsPanelOpen(true);
+    }
+    pendingDeepLinkTargetRef.current = null;
+    pendingNotificationRecipientIdRef.current = null;
+  }, [app.authStatus, app.user, deepLinkTick]);
+
+  useEffect(() => {
     if (!notifSettingsOpen) return;
     void app.refreshWebPushStatus();
   }, [notifSettingsOpen, app.refreshWebPushStatus]);
@@ -111,6 +177,7 @@ export function MobileChatApp() {
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
   const goHome = () => {
+    directionRef.current = 'backward';
     app.setWorkspaceMode('community');
     setMobileScreen('home');
     setServerDrawerOpen(false);
@@ -118,6 +185,7 @@ export function MobileChatApp() {
   };
 
   const goToServer = (id: string) => {
+    directionRef.current = 'forward';
     app.setWorkspaceMode('community');
     // Try to resolve the channel from cache so we can skip the 'server' spinner entirely.
     const cachedChannelId = app.getDefaultChannelIdForServer(
@@ -138,6 +206,7 @@ export function MobileChatApp() {
   };
 
   const goToChannel = (id: string) => {
+    directionRef.current = 'forward';
     app.setWorkspaceMode('community');
     if (app.currentServerId) {
       lastChannelByServer.current.set(app.currentServerId, id);
@@ -148,6 +217,7 @@ export function MobileChatApp() {
   };
 
   const goBack = () => {
+    directionRef.current = 'backward';
     if (mobileScreen === 'channel' || mobileScreen === 'server') {
       app.setCurrentChannelId(null);
       goHome();
@@ -220,6 +290,8 @@ export function MobileChatApp() {
 
       {/* ── Content area ──────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0">
+        <MobileErrorBoundary key={mobileScreen}>
+        <MobileScreenTransition screen={mobileScreen} direction={directionRef.current}>
         {mobileScreen === 'home' && (
           <MobileServerGrid
             servers={app.servers}
@@ -298,6 +370,7 @@ export function MobileChatApp() {
         {mobileScreen === 'dm-conversation' && (
           <MobileDmConversationView
             currentUserId={app.user.id}
+            currentUserDisplayName={app.userDisplayName}
             conversationTitle={selectedConvo?.otherUsername ?? undefined}
             messages={app.dmMessages}
             loading={app.dmMessagesLoading}
@@ -338,10 +411,18 @@ export function MobileChatApp() {
                 toast.error(getErrorMessage(err, 'Failed to decline friend request.'));
               });
             }}
-            onOpenItem={(notification) => {
-              app.openNotificationItem(notification);
+            onOpenItem={async (notification) => {
+              await app.openNotificationItem(notification);
               if (notification.kind === 'dm_message') {
-                setMobileScreen('dm-inbox');
+                const conversationId = getNotificationPayloadString(notification, 'conversationId');
+                if (conversationId) {
+                  app.setSelectedDmConversationId(conversationId);
+                  setMobileScreen('dm-conversation');
+                } else {
+                  setMobileScreen('dm-inbox');
+                }
+              } else if (notification.kind === 'channel_mention') {
+                setMobileScreen('channel');
               } else {
                 goHome();
               }
@@ -350,6 +431,8 @@ export function MobileChatApp() {
             onSettingsPress={() => setNotifSettingsOpen(true)}
           />
         )}
+        </MobileScreenTransition>
+        </MobileErrorBoundary>
       </div>
 
       {/* Bottom nav — only on home screen */}

@@ -1,3 +1,4 @@
+// Changed: add optional channel group rendering in channel drawer and replace inline safe-area env usage with CSS vars.
 import React from 'react';
 import { ChevronUp, ChevronDown, Hash, Volume2, LogOut, Settings } from 'lucide-react';
 
@@ -19,6 +20,7 @@ interface MobileBottomNavProps {
   channels: Channel[];
   currentChannelId: string | null;
   onSelectChannel: (id: string) => void;
+  channelGroups?: { id: string; name: string; position: number }[];
 }
 
 export function MobileBottomNav({
@@ -31,11 +33,14 @@ export function MobileBottomNav({
   channels,
   currentChannelId,
   onSelectChannel,
+  channelGroups = [],
 }: MobileBottomNavProps) {
   const drawerLabel =
     mode === 'home' ? 'Account & Settings' : 'Channels';
 
   const textChannels = channels.filter((ch) => ch.kind === 'text' || ch.kind === 'voice');
+  const [collapsedGroupIds, setCollapsedGroupIds] = React.useState<Record<string, boolean>>({});
+  const sortedGroups = [...channelGroups].sort((a, b) => a.position - b.position);
 
   return (
     <>
@@ -51,7 +56,7 @@ export function MobileBottomNav({
       {open && (
         <div
           className="fixed left-0 right-0 z-50 bg-[#0d1525] border-t border-white/10 max-h-[65vh] flex flex-col rounded-t-2xl"
-          style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
+          style={{ bottom: 'calc(3.5rem + var(--sab))' }}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
             <span className="text-white font-semibold text-sm">{drawerLabel}</span>
@@ -100,7 +105,7 @@ export function MobileBottomNav({
                     No channels yet
                   </p>
                 )}
-                {textChannels.map((channel) => {
+                {sortedGroups.length === 0 && textChannels.map((channel) => {
                   const isActive = channel.id === currentChannelId;
                   const isVoice = channel.kind === 'voice';
                   const Icon = isVoice ? Volume2 : Hash;
@@ -133,6 +138,59 @@ export function MobileBottomNav({
                     </button>
                   );
                 })}
+                {sortedGroups.length > 0 && (
+                  <>
+                    {textChannels.filter((channel) => !channel.name.includes('/')).map((channel) => {
+                      const isActive = channel.id === currentChannelId;
+                      const Icon = channel.kind === 'voice' ? Volume2 : Hash;
+                      return (
+                        <button
+                          key={channel.id}
+                          onClick={() => {
+                            onSelectChannel(channel.id);
+                            onToggle();
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${isActive ? 'bg-white/5' : 'hover:bg-white/5'}`}
+                        >
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-gray-500'}`} />
+                          <span className={`text-sm truncate ${isActive ? 'text-white font-semibold' : 'text-gray-300'}`}>{channel.name}</span>
+                        </button>
+                      );
+                    })}
+                    {sortedGroups.map((group) => {
+                      const isCollapsed = Boolean(collapsedGroupIds[group.id]);
+                      const groupChannels = textChannels.filter((channel) => channel.name.startsWith(`${group.name}/`));
+                      return (
+                        <div key={group.id}>
+                          <button
+                            className="w-full flex items-center justify-between px-4 py-2 text-xs uppercase tracking-wide text-gray-500 hover:bg-white/5"
+                            onClick={() => setCollapsedGroupIds((state) => ({ ...state, [group.id]: !isCollapsed }))}
+                          >
+                            <span>{group.name}</span>
+                            {isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+                          </button>
+                          {!isCollapsed && groupChannels.map((channel) => {
+                            const isActive = channel.id === currentChannelId;
+                            const Icon = channel.kind === 'voice' ? Volume2 : Hash;
+                            return (
+                              <button
+                                key={channel.id}
+                                onClick={() => {
+                                  onSelectChannel(channel.id);
+                                  onToggle();
+                                }}
+                                className={`w-full flex items-center gap-3 px-6 py-3 transition-colors ${isActive ? 'bg-white/5' : 'hover:bg-white/5'}`}
+                              >
+                                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-gray-500'}`} />
+                                <span className={`text-sm truncate ${isActive ? 'text-white font-semibold' : 'text-gray-300'}`}>{channel.name.replace(`${group.name}/`, '')}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
               </>
             )}
           </div>
@@ -144,8 +202,8 @@ export function MobileBottomNav({
         onClick={onToggle}
         className="fixed bottom-0 left-0 right-0 bg-[#0d1525] border-t border-white/10 flex items-center justify-between px-5 z-30"
         style={{
-          height: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))',
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          height: 'calc(3.5rem + var(--sab))',
+          paddingBottom: 'var(--sab)',
         }}
       >
         <span className="text-gray-400 text-sm font-medium">{drawerLabel}</span>
