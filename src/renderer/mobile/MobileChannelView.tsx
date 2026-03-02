@@ -1,3 +1,4 @@
+// Changed: remove unsafe reaction casts, memoize derived maps, share date/content/avatar rendering, and eliminate bottom dead-space scroll gap.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, ChevronUp } from 'lucide-react';
 import type { Message, MessageReaction, MessageAttachment, MessageLinkPreview, AuthorProfile } from '@/lib/backend/types';
@@ -5,6 +6,10 @@ import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
 import { useMobileComposerViewportAnchor } from '@/renderer/mobile/useMobileComposerViewportAnchor';
+import { DateSeparator } from '@/renderer/shared/DateSeparator';
+import { formatMessageDate, formatMessageTime } from '@/renderer/shared/dateFormatters';
+import { MessageContent } from '@/renderer/shared/MessageContent';
+import { AvatarBubble } from '@/renderer/shared/AvatarBubble';
 
 interface ReplyTarget {
   id: string;
@@ -39,6 +44,7 @@ interface ContextMenuState {
 export function MobileChannelView({
   channelName,
   currentUserId,
+  currentUserDisplayName,
   messages,
   messageReactions,
   messageAttachments,
@@ -71,12 +77,24 @@ export function MobileChannelView({
   });
 
   // Group reactions by messageId
-  const reactionsByMessage = new Map<string, MessageReaction[]>();
-  for (const r of messageReactions) {
-    const key = (r as unknown as Record<string, string>)['message_id'] as string;
-    if (!reactionsByMessage.has(key)) reactionsByMessage.set(key, []);
-    reactionsByMessage.get(key)!.push(r);
-  }
+  const reactionsByMessage = useMemo(() => {
+    const map = new Map<string, MessageReaction[]>();
+    for (const reaction of messageReactions) {
+      const key = reaction.messageId;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)?.push(reaction);
+    }
+    return map;
+  }, [messageReactions]);
+
+  const attachmentsByMessage = useMemo(() => {
+    const map = new Map<string, MessageAttachment[]>();
+    for (const attachment of messageAttachments) {
+      if (!map.has(attachment.messageId)) map.set(attachment.messageId, []);
+      map.get(attachment.messageId)?.push(attachment);
+    }
+    return map;
+  }, [messageAttachments]);
 
   // Index link previews by messageId
   const linkPreviewByMessageId = useMemo(() => {
@@ -116,22 +134,6 @@ export function MobileChannelView({
     }
   };
 
-  const formatTime = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    const today = new Date();
-    const isToday = d.toDateString() === today.toDateString();
-    if (isToday) return 'Today';
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  };
-
   // Date separators
   let lastDateLabel = '';
 
@@ -139,6 +141,7 @@ export function MobileChannelView({
     <div className="flex-1 flex flex-col min-h-0">
       {/* Message list */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-2">
+        {/* Pull-to-refresh intentionally excluded from conversation views to avoid conflicts with upward reading scroll. */}
         {/* Load older messages */}
         {hasOlderMessages && (
           <button
@@ -168,7 +171,6 @@ export function MobileChannelView({
             ? 'Haven Developer'
             : (authorProfile?.username ?? message.author_user_id?.substring(0, 8) ?? 'Unknown');
           const displayName = isOwn ? `${username} (You)` : username;
-          const initial = username.charAt(0).toUpperCase();
           const avatarUrl = isHavenDev ? null : (authorProfile?.avatarUrl ?? null);
           // Avatar background — amber for haven_dev, blue otherwise (matches desktop color scheme)
           const avatarBg = isHavenDev ? 'bg-[#d6a24a]' : 'bg-blue-600';
@@ -176,20 +178,17 @@ export function MobileChannelView({
           const nameColor = isHavenDev ? 'text-[#d6a24a]' : isPlatformStaff ? 'text-[#59b7ff]' : 'text-gray-300';
           const isEditing = editingId === message.id;
           const reactions = reactionsByMessage.get(message.id) ?? [];
+          const attachments = attachmentsByMessage.get(message.id) ?? [];
           const linkPreview = linkPreviewByMessageId.get(message.id) ?? null;
 
-          const dateLabel = formatDate(message.created_at);
+          const dateLabel = formatMessageDate(message.created_at);
           const showDateSep = dateLabel !== lastDateLabel;
           if (showDateSep) lastDateLabel = dateLabel;
 
           return (
             <React.Fragment key={message.id}>
               {showDateSep && (
-                <div className="flex items-center gap-3 my-3">
-                  <div className="flex-1 h-px bg-white/10" />
-                  <span className="text-gray-500 text-[11px] font-medium shrink-0">{dateLabel}</span>
-                  <div className="flex-1 h-px bg-white/10" />
-                </div>
+                <DateSeparator label={dateLabel} />
               )}
 
               <div
@@ -200,13 +199,7 @@ export function MobileChannelView({
               >
                 {/* Avatar */}
                 {!isOwn && (
-                  <div className={`w-8 h-8 rounded-full ${avatarBg} flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5 overflow-hidden`}>
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt={username} className="w-full h-full object-cover" />
-                    ) : (
-                      initial
-                    )}
-                  </div>
+                  <AvatarBubble url={avatarUrl} name={username} size="sm" className={`${avatarBg} mt-0.5`} />
                 )}
 
                 <div className={`flex flex-col max-w-[78%] ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -227,7 +220,7 @@ export function MobileChannelView({
                       </span>
                     )} */}
                     <span className="text-[10px] text-gray-600 shrink-0">
-                      {formatTime(message.created_at)}
+                      {formatMessageTime(message.created_at)}
                     </span>
                   </div>
 
@@ -273,8 +266,12 @@ export function MobileChannelView({
                     >
                       {/* Message text */}
                       <div className="px-3.5 py-2.5 leading-relaxed whitespace-pre-wrap break-words">
-                        {message.content}
+                        <MessageContent content={message.content} currentUserDisplayName={currentUserDisplayName} />
                       </div>
+
+                      {attachments.length > 0 && (
+                        <div className="px-3.5 pb-2 text-[11px] opacity-70">{attachments.length} attachment(s)</div>
+                      )}
 
                       {/* Link preview — embedded flush against the bottom of the bubble */}
                       {linkPreview?.status === 'pending' && (
@@ -330,7 +327,7 @@ export function MobileChannelView({
                           key={i}
                           className="text-xs bg-white/10 rounded-full px-2 py-0.5 border border-white/10"
                         >
-                          {(r as unknown as Record<string, string>)['emoji']}
+                          {r.emoji}
                         </span>
                       ))}
                     </div>
@@ -340,6 +337,7 @@ export function MobileChannelView({
             </React.Fragment>
           );
         })}
+        <div className="h-2 shrink-0" />
       </div>
 
       {/* Composer */}

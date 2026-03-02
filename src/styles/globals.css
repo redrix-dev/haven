@@ -1,3 +1,4 @@
+/* Changed: add safe-area CSS vars and mobile screen transition keyframes for reusable animation classes. */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -40,6 +41,10 @@
   --scrollbar-track: #142033;
   --scrollbar-thumb: #304867;
   --scrollbar-thumb-hover: #3f79d8;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
 .dark {
@@ -197,7 +202,7 @@
     bottom: calc(
       var(--app-keyboard-inset, 0px) + var(--app-keyboard-accessory-inset, 0px)
     );
-    max-height: calc(var(--app-visual-viewport-height, 100dvh) - env(safe-area-inset-top, 0px));
+    max-height: calc(var(--app-visual-viewport-height, 100dvh) - var(--sat));
   }
 
   .mobile-bottom-card {
@@ -214,5 +219,15 @@
       line-height: 1.4;
       -webkit-text-size-adjust: 100%;
     }
+  }
+
+  @keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes slideInLeft {
+    from { transform: translateX(-30%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
   }
 }

@@ -1,5 +1,5 @@
-/* Haven web service worker (v1 push-ready)
- * No offline caching yet. Push notifications and click-through deep links are supported.
+/* Changed: include notification recipientId in click postMessage payload and add navigate-only stale-while-revalidate app-shell caching.
+ * Haven web service worker (v1 push-ready)
  */
 
 const SW_VERSION = 'push-v1';
@@ -9,6 +9,7 @@ const DEFAULT_NOTIFICATION_BADGE = '/icon-192.png';
 const DEFAULT_TARGET_PATH = '/';
 const DEBUG_NOTIFICATION_TAG = 'haven:debug:test';
 const ROUTE_TRACE_MESSAGE_TYPE = 'HAVEN_PUSH_DELIVERY_TRACE';
+const APP_SHELL_CACHE = 'haven-app-shell-v1';
 
 const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
 
@@ -254,6 +255,7 @@ const focusOrOpenClientWindow = async (targetUrl, payload) => {
         type: 'HAVEN_PUSH_NOTIFICATION_CLICK',
         targetUrl,
         payload,
+        recipientId: toTrimmedString(payload?.recipientId) ?? null,
       });
     } catch {
       // Ignore postMessage failures.
@@ -271,6 +273,27 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.mode !== 'navigate') return;
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
+
+  event.respondWith(
+    caches.open(APP_SHELL_CACHE).then(async (cache) => {
+      const cached = await cache.match(event.request);
+      const networkFetch = fetch(event.request)
+        .then((response) => {
+          if (response && response.ok) {
+            cache.put(event.request, response.clone());
+          }
+          return response;
+        })
+        .catch(() => cached);
+      return cached ?? networkFetch;
+    })
+  );
 });
 
 self.addEventListener('message', (event) => {

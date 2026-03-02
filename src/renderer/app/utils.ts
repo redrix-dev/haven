@@ -1,3 +1,4 @@
+// Changed: add type-safe notification payload helpers to avoid repetitive ad-hoc payload checks.
 import type { NotificationItem } from '@/lib/backend/types';
 import type { VoiceSidebarParticipant } from '@/renderer/app/types';
 
@@ -28,10 +29,22 @@ export const isEditableKeyboardTarget = (target: EventTarget | null) => {
   return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
 };
 
-export const getNotificationPayloadString = (
+export function getNotificationPayloadString<K extends string>(
+  notification: NotificationItem,
+  key: K
+): string | null;
+export function getNotificationPayloadString(
   notification: NotificationItem,
   key: string
-): string | null => {
+): string | null {
   const value = notification.payload[key];
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+export const getNotificationPayloadBoolean = (
+  notification: NotificationItem,
+  key: string
+): boolean | null => {
+  const value = notification.payload[key];
+  return typeof value === 'boolean' ? value : null;
 };
