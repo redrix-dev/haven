@@ -76,6 +76,11 @@ export function MobileChatApp() {
     }
   }, [mobileScreen, app.channels, app.channelsLoading, app.currentServerId]);
 
+  useEffect(() => {
+    if (!notifSettingsOpen) return;
+    void app.refreshWebPushStatus();
+  }, [notifSettingsOpen, app.refreshWebPushStatus]);
+
   // ── Auth guards (after all hooks) ─────────────────────────────────────────
   if (app.authStatus === 'initializing') {
     return (
@@ -462,6 +467,7 @@ export function MobileChatApp() {
         webPushStatus={app.webPushStatus}
         webPushStatusLoading={app.webPushStatusLoading}
         webPushActionBusy={app.webPushActionBusy}
+        webPushStatusError={app.webPushStatusError}
         onEnablePush={app.enableWebPushOnThisDevice}
         onDisablePush={app.disableWebPushOnThisDevice}
       />

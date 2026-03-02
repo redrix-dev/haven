@@ -15,6 +15,7 @@ interface MobileNotificationSettingsSheetProps {
   webPushStatus: HavenWebPushClientStatus | null;
   webPushStatusLoading: boolean;
   webPushActionBusy: boolean;
+  webPushStatusError?: string | null;
   onEnablePush: () => Promise<void>;
   onDisablePush: () => Promise<void>;
 }
@@ -56,11 +57,14 @@ export function MobileNotificationSettingsSheet({
   webPushStatus,
   webPushStatusLoading,
   webPushActionBusy,
+  webPushStatusError = null,
   onEnablePush,
   onDisablePush,
 }: MobileNotificationSettingsSheetProps) {
   // Local draft state so changes are batched into one save
   const [draft, setDraft] = useState<NotificationPreferenceUpdate | null>(null);
+  const [pendingPushPreferenceKey, setPendingPushPreferenceKey] =
+    useState<keyof NotificationPreferenceUpdate | null>(null);
 
   useEffect(() => {
     if (notificationPreferences) {
@@ -78,8 +82,6 @@ export function MobileNotificationSettingsSheet({
     }
   }, [notificationPreferences]);
 
-  if (!open) return null;
-
   const set = <K extends keyof NotificationPreferenceUpdate>(key: K, value: boolean) => {
     setDraft((prev) => prev ? { ...prev, [key]: value } : prev);
   };
@@ -90,9 +92,50 @@ export function MobileNotificationSettingsSheet({
     onClose();
   };
 
+  const pushSupported = webPushStatus?.supported === true;
   const pushEnabled = webPushStatus?.browserSubscriptionActive === true;
   const pushBlocked = webPushStatus?.notificationPermission === 'denied';
   const pushUnavailable = webPushStatus === null && !webPushStatusLoading;
+  const canPromptForPush = pushSupported && !pushBlocked;
+  const pushToggleDisabled =
+    pushBlocked || !pushSupported || pushUnavailable || webPushActionBusy || webPushStatusLoading;
+
+  useEffect(() => {
+    if (!pendingPushPreferenceKey) return;
+
+    if (pushEnabled) {
+      set(pendingPushPreferenceKey, true);
+      setPendingPushPreferenceKey(null);
+      return;
+    }
+
+    if (!webPushActionBusy && !webPushStatusLoading) {
+      setPendingPushPreferenceKey(null);
+    }
+  }, [pendingPushPreferenceKey, pushEnabled, webPushActionBusy, webPushStatusLoading]);
+
+  const handlePushPreferenceChange = async (
+    key: keyof NotificationPreferenceUpdate,
+    nextValue: boolean
+  ) => {
+    if (!nextValue) {
+      setPendingPushPreferenceKey(null);
+      set(key, false);
+      return;
+    }
+
+    if (pushEnabled) {
+      set(key, true);
+      return;
+    }
+
+    if (!canPromptForPush || webPushActionBusy || webPushStatusLoading) {
+      return;
+    }
+
+    setPendingPushPreferenceKey(key);
+    await onEnablePush();
+  };
 
   const pushLabel = (() => {
     if (webPushStatusLoading || webPushActionBusy) return 'Checking…';
@@ -100,6 +143,22 @@ export function MobileNotificationSettingsSheet({
     if (pushEnabled) return 'Disable push notifications';
     return 'Enable push notifications';
   })();
+
+  const resolvedPushLabel =
+    webPushStatus && !webPushStatus.supported
+      ? 'Push not available on this device'
+      : pushLabel;
+
+  const pushRowDescription = (() => {
+    if (pushBlocked) return 'Enable notifications for this site in browser settings first.';
+    if (webPushStatus && !webPushStatus.supported) {
+      return 'This browser or install mode does not support web push.';
+    }
+    if (!pushEnabled) return 'Turn this on to prompt for push notifications on this device.';
+    return undefined;
+  })();
+
+  if (!open) return null;
 
   return (
     <>
@@ -143,12 +202,22 @@ export function MobileNotificationSettingsSheet({
               ) : (
                 <button
                   onClick={pushEnabled ? onDisablePush : onEnablePush}
-                  disabled={webPushStatusLoading || webPushActionBusy}
+                  disabled={
+                    webPushStatusLoading ||
+                    webPushActionBusy ||
+                    (webPushStatus ? !webPushStatus.supported : false)
+                  }
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
                     pushEnabled
                       ? 'bg-white/5 border-white/10 hover:bg-white/8'
                       : 'bg-blue-600/20 border-blue-500/30 hover:bg-blue-600/30'
-                  } ${webPushStatusLoading || webPushActionBusy ? 'opacity-60 cursor-default' : ''}`}
+                  } ${
+                    webPushStatusLoading ||
+                    webPushActionBusy ||
+                    (webPushStatus ? !webPushStatus.supported : false)
+                      ? 'opacity-60 cursor-default'
+                      : ''
+                  }`}
                 >
                   {webPushStatusLoading || webPushActionBusy ? (
                     <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
@@ -158,10 +227,22 @@ export function MobileNotificationSettingsSheet({
                     <Bell className="w-4 h-4 text-blue-400 shrink-0" />
                   )}
                   <span className={`text-sm font-medium ${pushEnabled ? 'text-gray-300' : 'text-blue-300'}`}>
-                    {pushLabel}
+                    {resolvedPushLabel}
                   </span>
                 </button>
               )}
+
+              {webPushStatusError && (
+                <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
+                  <p className="text-xs text-red-300">{webPushStatusError}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {pushUnavailable && webPushStatusError && (
+            <div className="mt-4 mb-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
+              <p className="text-xs text-red-300">{webPushStatusError}</p>
             </div>
           )}
 
@@ -213,8 +294,11 @@ export function MobileNotificationSettingsSheet({
                   <ToggleRow
                     label="Push"
                     checked={draft.dmPushEnabled}
-                    onChange={(v) => set('dmPushEnabled', v)}
-                    disabled={!pushEnabled}
+                    description={pushRowDescription}
+                    onChange={(v) => {
+                      void handlePushPreferenceChange('dmPushEnabled', v);
+                    }}
+                    disabled={pushToggleDisabled}
                   />
                 </div>
               </div>
@@ -239,8 +323,11 @@ export function MobileNotificationSettingsSheet({
                   <ToggleRow
                     label="Push"
                     checked={draft.mentionPushEnabled}
-                    onChange={(v) => set('mentionPushEnabled', v)}
-                    disabled={!pushEnabled}
+                    description={pushRowDescription}
+                    onChange={(v) => {
+                      void handlePushPreferenceChange('mentionPushEnabled', v);
+                    }}
+                    disabled={pushToggleDisabled}
                   />
                 </div>
               </div>
@@ -265,8 +352,11 @@ export function MobileNotificationSettingsSheet({
                   <ToggleRow
                     label="Push"
                     checked={draft.friendRequestPushEnabled}
-                    onChange={(v) => set('friendRequestPushEnabled', v)}
-                    disabled={!pushEnabled}
+                    description={pushRowDescription}
+                    onChange={(v) => {
+                      void handlePushPreferenceChange('friendRequestPushEnabled', v);
+                    }}
+                    disabled={pushToggleDisabled}
                   />
                 </div>
               </div>
