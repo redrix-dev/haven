@@ -1,3 +1,4 @@
+// Changed: use shared MessageContent renderer for mention highlighting and URL linkification parity with mobile message views.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,7 @@ import type {
   MessageReportTarget,
 } from '@/lib/backend/types';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
+import { MessageContent } from '@/renderer/shared/MessageContent';
 
 type Message = Database['public']['Tables']['messages']['Row'];
 const QUICK_REACTION_EMOJI = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}'] as const;
@@ -143,69 +145,6 @@ const getAuthorColor = (
 };
 
 const URL_SEGMENT_PATTERN = /https?:\/\/[^\s<>"'`]+/gi;
-
-const trimTrailingUrlPunctuation = (value: string): { url: string; trailing: string } => {
-  let end = value.length;
-  while (end > 0 && /[.,!?;:]$/.test(value.slice(0, end))) {
-    end -= 1;
-  }
-  return {
-    url: value.slice(0, end),
-    trailing: value.slice(end),
-  };
-};
-
-const renderLinkifiedMessageText = (content: string): React.ReactNode[] => {
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let matchIndex = 0;
-  URL_SEGMENT_PATTERN.lastIndex = 0;
-
-  for (const match of content.matchAll(URL_SEGMENT_PATTERN)) {
-    const start = match.index ?? 0;
-    const raw = match[0] ?? '';
-    if (start > lastIndex) {
-      nodes.push(
-        <React.Fragment key={`text-${matchIndex}-${lastIndex}`}>
-          {content.slice(lastIndex, start)}
-        </React.Fragment>
-      );
-    }
-
-    const { url, trailing } = trimTrailingUrlPunctuation(raw);
-    if (url.length > 0) {
-      nodes.push(
-        <a
-          key={`link-${matchIndex}-${start}`}
-          href={url}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-[#8fc1ff] hover:text-[#b4d6ff] underline break-all"
-        >
-          {url}
-        </a>
-      );
-    } else {
-      nodes.push(
-        <React.Fragment key={`link-fallback-${matchIndex}-${start}`}>{raw}</React.Fragment>
-      );
-    }
-    if (trailing) {
-      nodes.push(
-        <React.Fragment key={`trail-${matchIndex}-${start}`}>{trailing}</React.Fragment>
-      );
-    }
-
-    lastIndex = start + raw.length;
-    matchIndex += 1;
-  }
-
-  if (lastIndex < content.length) {
-    nodes.push(<React.Fragment key={`tail-${lastIndex}`}>{content.slice(lastIndex)}</React.Fragment>);
-  }
-
-  return nodes.length > 0 ? nodes : [content];
-};
 
 const messageContainsHttpUrl = (content: string): boolean => {
   URL_SEGMENT_PATTERN.lastIndex = 0;
@@ -933,7 +872,10 @@ export function MessageList({
               <div className="space-y-2">
                 {!hideMediaPlaceholder && (
                   <div className="text-[#e6edf7] text-[15px] leading-[1.375] break-words">
-                    {renderLinkifiedMessageText(message.content)}
+                    <MessageContent
+                      content={message.content}
+                      currentUserDisplayName={authorProfiles[currentUserId]?.username ?? null}
+                    />
                   </div>
                 )}
 

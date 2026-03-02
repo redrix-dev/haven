@@ -1,9 +1,10 @@
-// Changed: switch inbox to shared date/avatar utilities and improve compose tap target sizing.
+// Changed: switch inbox to shared date/avatar utilities, improve compose tap target sizing, and use skeleton loading state.
 import React from 'react';
-import { Loader2, RefreshCcw, BellOff, PencilLine } from 'lucide-react';
+import { RefreshCcw, BellOff, PencilLine } from 'lucide-react';
 import type { DirectMessageConversationSummary } from '@/lib/backend/types';
 import { formatConversationTime } from '@/renderer/shared/dateFormatters';
 import { AvatarBubble } from '@/renderer/shared/AvatarBubble';
+import { DmInboxSkeleton } from '@/renderer/mobile/skeletons/DmInboxSkeleton';
 
 interface MobileDmInboxProps {
   conversations: DirectMessageConversationSummary[];
@@ -25,11 +26,7 @@ export function MobileDmInbox({
   onCompose,
 }: MobileDmInboxProps) {
   if (loading && conversations.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-      </div>
-    );
+    return <DmInboxSkeleton />;
   }
 
   if (error) {

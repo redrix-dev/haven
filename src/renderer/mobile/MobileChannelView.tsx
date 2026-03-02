@@ -1,15 +1,15 @@
-// Changed: remove unsafe reaction casts, memoize derived maps, share date/content/avatar rendering, and eliminate bottom dead-space scroll gap.
+// Changed: remove viewport-anchor hook usage to avoid stabilizer races, keep near-bottom focus snap local, and preserve shared render/memoization improvements.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, ChevronUp } from 'lucide-react';
 import type { Message, MessageReaction, MessageAttachment, MessageLinkPreview, AuthorProfile } from '@/lib/backend/types';
 import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
-import { useMobileComposerViewportAnchor } from '@/renderer/mobile/useMobileComposerViewportAnchor';
 import { DateSeparator } from '@/renderer/shared/DateSeparator';
 import { formatMessageDate, formatMessageTime } from '@/renderer/shared/dateFormatters';
 import { MessageContent } from '@/renderer/shared/MessageContent';
 import { AvatarBubble } from '@/renderer/shared/AvatarBubble';
+import { MessageListSkeleton } from '@/renderer/mobile/skeletons/MessageListSkeleton';
 
 interface ReplyTarget {
   id: string;
@@ -65,16 +65,22 @@ export function MobileChannelView({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
+  const [hasLoadedInitialBatch, setHasLoadedInitialBatch] = useState(false);
   const hasInitializedScrollRef = useRef(false);
+  const isNearBottomRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const longPress = useMobileLongPress();
-  const {
-    handleComposerBlur,
-    handleComposerFocus,
-    isNearBottomRef,
-  } = useMobileComposerViewportAnchor({
-    scrollRef,
-  });
+
+  const handleComposerFocus = () => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const distFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    if (distFromBottom < 80) {
+      requestAnimationFrame(() => {
+        node.scrollTop = node.scrollHeight;
+      });
+    }
+  };
 
   // Group reactions by messageId
   const reactionsByMessage = useMemo(() => {
@@ -121,6 +127,24 @@ export function MobileChannelView({
     node.scrollTop = node.scrollHeight;
   }, [messages.length]);
 
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const handleScroll = () => {
+      const nextBottomOffset = Math.max(0, node.scrollHeight - node.scrollTop - node.clientHeight);
+      isNearBottomRef.current = nextBottomOffset <= 32;
+    };
+    node.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => node.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      setHasLoadedInitialBatch(true);
+    }
+  }, [messages.length]);
+
   const handleSend = async () => {
     const content = draft.trim();
     if (!content || sending) return;
@@ -140,7 +164,10 @@ export function MobileChannelView({
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Message list */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-2">
+      {messages.length === 0 && !hasLoadedInitialBatch ? (
+        <MessageListSkeleton />
+      ) : (
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-2 animate-in fade-in duration-200">
         {/* Pull-to-refresh intentionally excluded from conversation views to avoid conflicts with upward reading scroll. */}
         {/* Load older messages */}
         {hasOlderMessages && (
@@ -339,6 +366,7 @@ export function MobileChannelView({
         })}
         <div className="h-2 shrink-0" />
       </div>
+      )}
 
       {/* Composer */}
       <MobileMessageComposer
@@ -350,7 +378,6 @@ export function MobileChannelView({
         replyTarget={replyTarget}
         onClearReply={() => setReplyTarget(null)}
         onFocus={handleComposerFocus}
-        onBlur={handleComposerBlur}
       />
 
       {/* Long-press context menu */}

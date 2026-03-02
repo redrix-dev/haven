@@ -200,14 +200,14 @@
 
   .mobile-bottom-sheet {
     bottom: calc(
-      var(--app-keyboard-inset, 0px) + var(--app-keyboard-accessory-inset, 0px)
+      var(--app-keyboard-inset, 0px)
     );
     max-height: calc(var(--app-visual-viewport-height, 100dvh) - var(--sat));
   }
 
   .mobile-bottom-card {
     bottom: calc(
-      var(--app-keyboard-inset, 0px) + var(--app-keyboard-accessory-inset, 0px) + 2rem
+      var(--app-keyboard-inset, 0px) + 2rem
     );
   }
 
@@ -229,5 +229,11 @@
   @keyframes slideInLeft {
     from { transform: translateX(-30%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes shimmer {
+    0% { opacity: 0.4; }
+    50% { opacity: 0.7; }
+    100% { opacity: 0.4; }
   }
 }

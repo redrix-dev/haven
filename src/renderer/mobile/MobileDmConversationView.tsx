@@ -1,16 +1,16 @@
-// Changed: fix dead-zone scroll gap, reuse shared rendering components/utilities, and improve tap target sizing in DM conversation UI.
+// Changed: remove viewport-anchor hook usage to avoid stabilizer races, keep local focus snap behavior, and retain shared/skeleton/tap-target improvements.
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, MoreHorizontal, BellOff, Bell, ShieldOff, X, AlertTriangle } from 'lucide-react';
+import { MoreHorizontal, BellOff, Bell, ShieldOff, X, AlertTriangle } from 'lucide-react';
 import type { DirectMessage } from '@/lib/backend/types';
 import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
-import { useMobileComposerViewportAnchor } from '@/renderer/mobile/useMobileComposerViewportAnchor';
 import { DateSeparator } from '@/renderer/shared/DateSeparator';
 import { formatMessageDate, formatMessageTime } from '@/renderer/shared/dateFormatters';
 import { MessageContent } from '@/renderer/shared/MessageContent';
 import { AvatarBubble } from '@/renderer/shared/AvatarBubble';
 import { Backdrop } from '@/renderer/shared/Backdrop';
+import { MessageListSkeleton } from '@/renderer/mobile/skeletons/MessageListSkeleton';
 
 interface ContextMenuState {
   message: DirectMessage;
@@ -19,6 +19,7 @@ interface ContextMenuState {
 
 interface MobileDmConversationViewProps {
   currentUserId: string;
+  currentUserDisplayName: string;
   conversationTitle?: string;
   messages: DirectMessage[];
   loading: boolean;
@@ -33,6 +34,7 @@ interface MobileDmConversationViewProps {
 
 export function MobileDmConversationView({
   currentUserId,
+  currentUserDisplayName,
   conversationTitle,
   messages,
   loading,
@@ -49,15 +51,20 @@ export function MobileDmConversationView({
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const hasInitializedScrollRef = useRef(false);
+  const isNearBottomRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const longPress = useMobileLongPress();
-  const {
-    handleComposerBlur,
-    handleComposerFocus,
-    isNearBottomRef,
-  } = useMobileComposerViewportAnchor({
-    scrollRef,
-  });
+
+  const handleComposerFocus = () => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const distFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    if (distFromBottom < 80) {
+      requestAnimationFrame(() => {
+        node.scrollTop = node.scrollHeight;
+      });
+    }
+  };
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -76,6 +83,18 @@ export function MobileDmConversationView({
     node.scrollTop = node.scrollHeight;
   }, [messages.length, scrollRef]);
 
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const handleScroll = () => {
+      const nextBottomOffset = Math.max(0, node.scrollHeight - node.scrollTop - node.clientHeight);
+      isNearBottomRef.current = nextBottomOffset <= 32;
+    };
+    node.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => node.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const handleSend = async () => {
     const content = draft.trim();
     if (!content || sendPending) return;
@@ -90,11 +109,7 @@ export function MobileDmConversationView({
   const otherUsername = otherUser?.authorUsername ?? 'this user';
 
   if (loading && messages.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-      </div>
-    );
+    return <MessageListSkeleton />;
   }
 
   let lastDateLabel = '';
@@ -167,7 +182,7 @@ export function MobileDmConversationView({
                         : 'bg-[#1a2840] text-gray-100 rounded-tl-sm border border-white/5'
                     }`}
                   >
-                    <MessageContent content={message.content} currentUserDisplayName={conversationTitle} />
+                    <MessageContent content={message.content} currentUserDisplayName={currentUserDisplayName} />
                   </div>
                 </div>
               </div>
@@ -184,7 +199,6 @@ export function MobileDmConversationView({
         sending={sendPending}
         placeholder="Message..."
         onFocus={handleComposerFocus}
-        onBlur={handleComposerBlur}
       />
 
       <MobileLongPressMenu

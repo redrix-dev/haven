@@ -38,6 +38,26 @@ type MobileScreen =
   | 'dm-conversation'
   | 'notifications';
 
+type NavigationDirection = 'forward' | 'backward';
+
+interface MobileScreenTransitionProps {
+  screen: MobileScreen;
+  direction: NavigationDirection;
+  children: React.ReactNode;
+}
+
+function MobileScreenTransition({ screen, direction, children }: MobileScreenTransitionProps) {
+  return (
+    <div
+      key={screen}
+      style={{ animation: `${direction === 'backward' ? 'slideInLeft' : 'slideInRight'} 220ms ease-out` }}
+      className="flex-1 min-h-0"
+    >
+      {children}
+    </div>
+  );
+}
+
 export function MobileChatApp() {
   const pendingDeepLinkTargetRef = useRef<WebAppDeepLinkTarget | null>(null);
   const pendingNotificationRecipientIdRef = useRef<string | null>(null);
@@ -58,6 +78,7 @@ export function MobileChatApp() {
   const [channelDrawerOpen, setChannelDrawerOpen] = useState(false);
   const [notifSettingsOpen, setNotifSettingsOpen] = useState(false);
   const [bottomNavOpen, setBottomNavOpen] = useState(false);
+  const directionRef = useRef<NavigationDirection>('forward');
 
   // Remember the last channel visited per server so we can restore it on re-entry.
   const lastChannelByServer = useRef(new Map<string, string>());
@@ -156,6 +177,7 @@ export function MobileChatApp() {
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
   const goHome = () => {
+    directionRef.current = 'backward';
     app.setWorkspaceMode('community');
     setMobileScreen('home');
     setServerDrawerOpen(false);
@@ -163,6 +185,7 @@ export function MobileChatApp() {
   };
 
   const goToServer = (id: string) => {
+    directionRef.current = 'forward';
     app.setWorkspaceMode('community');
     // Try to resolve the channel from cache so we can skip the 'server' spinner entirely.
     const cachedChannelId = app.getDefaultChannelIdForServer(
@@ -183,6 +206,7 @@ export function MobileChatApp() {
   };
 
   const goToChannel = (id: string) => {
+    directionRef.current = 'forward';
     app.setWorkspaceMode('community');
     if (app.currentServerId) {
       lastChannelByServer.current.set(app.currentServerId, id);
@@ -193,6 +217,7 @@ export function MobileChatApp() {
   };
 
   const goBack = () => {
+    directionRef.current = 'backward';
     if (mobileScreen === 'channel' || mobileScreen === 'server') {
       app.setCurrentChannelId(null);
       goHome();
@@ -266,6 +291,7 @@ export function MobileChatApp() {
       {/* ── Content area ──────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0">
         <MobileErrorBoundary key={mobileScreen}>
+        <MobileScreenTransition screen={mobileScreen} direction={directionRef.current}>
         {mobileScreen === 'home' && (
           <MobileServerGrid
             servers={app.servers}
@@ -344,6 +370,7 @@ export function MobileChatApp() {
         {mobileScreen === 'dm-conversation' && (
           <MobileDmConversationView
             currentUserId={app.user.id}
+            currentUserDisplayName={app.userDisplayName}
             conversationTitle={selectedConvo?.otherUsername ?? undefined}
             messages={app.dmMessages}
             loading={app.dmMessagesLoading}
@@ -404,6 +431,7 @@ export function MobileChatApp() {
             onSettingsPress={() => setNotifSettingsOpen(true)}
           />
         )}
+        </MobileScreenTransition>
         </MobileErrorBoundary>
       </div>
 
