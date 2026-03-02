@@ -87,6 +87,7 @@ export function MobileMessageComposer({
               rows={1}
               inputMode="text"
               autoComplete="off"
+              enterKeyHint="send"
               className="block w-full resize-none bg-transparent px-4 py-2.5 pr-14 text-base leading-relaxed text-white placeholder-gray-500 focus:outline-none disabled:opacity-50"
               style={{ minHeight: '42px' }}
             />
