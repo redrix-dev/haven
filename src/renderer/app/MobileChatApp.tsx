@@ -79,14 +79,20 @@ export function MobileChatApp() {
   // ── Auth guards (after all hooks) ─────────────────────────────────────────
   if (app.authStatus === 'initializing') {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#111a2b] text-white">
+      <div
+        className="flex items-center justify-center bg-[#111a2b] text-white"
+        style={{ height: 'var(--app-visual-viewport-height, 100dvh)' }}
+      >
         Loading...
       </div>
     );
   }
   if (app.authStatus === 'error') {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#111a2b] text-white">
+      <div
+        className="flex items-center justify-center bg-[#111a2b] text-white"
+        style={{ height: 'var(--app-visual-viewport-height, 100dvh)' }}
+      >
         <p>{app.authError ?? 'Authentication failed. Please restart the app.'}</p>
       </div>
     );
@@ -271,7 +277,6 @@ export function MobileChatApp() {
           <MobileDmInbox
             conversations={app.dmConversations}
             loading={app.dmConversationsLoading}
-            refreshing={app.dmConversationsRefreshing}
             error={app.dmConversationsError}
             currentUserId={app.user.id}
             onSelectConversation={(conversationId) => {
@@ -291,18 +296,10 @@ export function MobileChatApp() {
             conversationTitle={selectedConvo?.otherUsername ?? undefined}
             messages={app.dmMessages}
             loading={app.dmMessagesLoading}
-            refreshing={app.dmMessagesRefreshing}
             sendPending={app.dmMessageSendPending}
             error={app.dmMessagesError}
             isMuted={selectedConvo?.isMuted ?? false}
             onSendMessage={app.sendDirectMessage}
-            onRefresh={() => {
-              if (!app.selectedDmConversationId) return;
-              void app.refreshDmMessages(app.selectedDmConversationId, {
-                suppressLoadingState: true,
-                markRead: true,
-              });
-            }}
             onMuteToggle={(nextMuted) => app.toggleSelectedDmConversationMuted(nextMuted).catch((err: unknown) => {
               toast.error(getErrorMessage(err, 'Failed to update mute status.'));
             })}

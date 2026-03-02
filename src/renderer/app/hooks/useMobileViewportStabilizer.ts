@@ -1,6 +1,7 @@
 import React from 'react';
 
 const KEYBOARD_OPEN_THRESHOLD_PX = 80;
+const IOS_KEYBOARD_ACCESSORY_INSET_PX = 44;
 const PINCH_ZOOM_THRESHOLD = 1.01;
 
 const NON_TEXT_INPUT_TYPES = new Set([
@@ -28,14 +29,27 @@ function isKeyboardTextEntryElement(element: Element | null): boolean {
   return false;
 }
 
+function isLikelyIOSTouchDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+
+  if (/iP(ad|hone|od)/.test(navigator.userAgent)) {
+    return true;
+  }
+
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+}
+
 export function useMobileViewportStabilizer(): void {
   React.useEffect(() => {
     const root = document.documentElement;
+    const isIOS = isLikelyIOSTouchDevice();
     let frameId: number | null = null;
+    let layoutViewportHeightPx = window.innerHeight;
 
     const setClosedViewportState = () => {
       root.style.setProperty('--app-visual-viewport-height', '100dvh');
       root.style.setProperty('--app-keyboard-inset', '0px');
+      root.style.setProperty('--app-keyboard-accessory-inset', '0px');
       root.style.setProperty('--app-visual-viewport-offset-top', '0px');
       root.dataset.mobileKeyboardOpen = 'false';
     };
@@ -59,19 +73,35 @@ export function useMobileViewportStabilizer(): void {
 
       const visibleHeightPx = visualViewport.height;
       const offsetTopPx = visualViewport.offsetTop;
+      const measuredLayoutViewportHeightPx = Math.max(
+        window.innerHeight,
+        visibleHeightPx + offsetTopPx
+      );
+
+      if (!hasFocusedTextEntry) {
+        layoutViewportHeightPx = measuredLayoutViewportHeightPx;
+      } else {
+        layoutViewportHeightPx = Math.max(layoutViewportHeightPx, measuredLayoutViewportHeightPx);
+      }
+
       const keyboardInsetPx = Math.max(
         0,
-        window.innerHeight - (visualViewport.height + visualViewport.offsetTop)
+        layoutViewportHeightPx - (visibleHeightPx + offsetTopPx)
       );
       const keyboardOpen = hasFocusedTextEntry && keyboardInsetPx >= KEYBOARD_OPEN_THRESHOLD_PX;
 
       if (!keyboardOpen) {
+        layoutViewportHeightPx = measuredLayoutViewportHeightPx;
         setClosedViewportState();
         return;
       }
 
-      root.style.setProperty('--app-visual-viewport-height', `${visibleHeightPx}px`);
+      const keyboardAccessoryInsetPx = isIOS ? IOS_KEYBOARD_ACCESSORY_INSET_PX : 0;
+      const usableVisibleHeightPx = Math.max(0, visibleHeightPx - keyboardAccessoryInsetPx);
+
+      root.style.setProperty('--app-visual-viewport-height', `${usableVisibleHeightPx}px`);
       root.style.setProperty('--app-keyboard-inset', `${keyboardInsetPx}px`);
+      root.style.setProperty('--app-keyboard-accessory-inset', `${keyboardAccessoryInsetPx}px`);
       root.style.setProperty('--app-visual-viewport-offset-top', `${offsetTopPx}px`);
       root.dataset.mobileKeyboardOpen = 'true';
     };
@@ -110,6 +140,7 @@ export function useMobileViewportStabilizer(): void {
 
       root.style.removeProperty('--app-visual-viewport-height');
       root.style.removeProperty('--app-keyboard-inset');
+      root.style.removeProperty('--app-keyboard-accessory-inset');
       root.style.removeProperty('--app-visual-viewport-offset-top');
       delete root.dataset.mobileKeyboardOpen;
     };

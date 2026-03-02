@@ -4,6 +4,7 @@ import type { Message, MessageReaction, MessageAttachment, MessageLinkPreview, A
 import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
+import { useMobileComposerViewportAnchor } from '@/renderer/mobile/useMobileComposerViewportAnchor';
 
 interface ReplyTarget {
   id: string;
@@ -58,8 +59,16 @@ export function MobileChannelView({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
-  const listEndRef = useRef<HTMLDivElement>(null);
+  const hasInitializedScrollRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const longPress = useMobileLongPress();
+  const {
+    handleComposerBlur,
+    handleComposerFocus,
+    isNearBottomRef,
+  } = useMobileComposerViewportAnchor({
+    scrollRef,
+  });
 
   // Group reactions by messageId
   const reactionsByMessage = new Map<string, MessageReaction[]>();
@@ -78,7 +87,20 @@ export function MobileChannelView({
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
-    listEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const node = scrollRef.current;
+    if (!node) return;
+
+    if (!hasInitializedScrollRef.current) {
+      hasInitializedScrollRef.current = true;
+      node.scrollTop = node.scrollHeight;
+      return;
+    }
+
+    if (!isNearBottomRef.current) {
+      return;
+    }
+
+    node.scrollTop = node.scrollHeight;
   }, [messages.length]);
 
   const handleSend = async () => {
@@ -116,7 +138,7 @@ export function MobileChannelView({
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Message list */}
-      <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-2">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-2">
         {/* Load older messages */}
         {hasOlderMessages && (
           <button
@@ -215,6 +237,9 @@ export function MobileChannelView({
                       <textarea
                         value={editDraft}
                         onChange={(e) => setEditDraft(e.target.value)}
+                        enterKeyHint="done"
+                        inputMode="text"
+                        autoComplete="off"
                         className="w-full bg-white/10 border border-blue-500/50 rounded-xl px-3 py-2 text-base text-white resize-none focus:outline-none"
                         rows={2}
                         autoFocus
@@ -315,7 +340,6 @@ export function MobileChannelView({
             </React.Fragment>
           );
         })}
-        <div ref={listEndRef} />
       </div>
 
       {/* Composer */}
@@ -327,6 +351,8 @@ export function MobileChannelView({
         placeholder={`Message #${channelName}`}
         replyTarget={replyTarget}
         onClearReply={() => setReplyTarget(null)}
+        onFocus={handleComposerFocus}
+        onBlur={handleComposerBlur}
       />
 
       {/* Long-press context menu */}

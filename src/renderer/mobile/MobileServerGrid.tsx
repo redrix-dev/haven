@@ -21,7 +21,7 @@ export function MobileServerGrid({
   onJoinServer,
 }: MobileServerGridProps) {
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto overscroll-contain">
       <div className="p-5 grid grid-cols-4 gap-x-3 gap-y-5">
         {servers.map((server) => (
           <button

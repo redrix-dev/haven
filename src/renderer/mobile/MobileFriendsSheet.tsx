@@ -347,6 +347,12 @@ export function MobileFriendsSheet({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  enterKeyHint="done"
+                  inputMode="search"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  autoComplete="off"
                   placeholder="Search by username…"
                   className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-base text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50"
                   autoFocus

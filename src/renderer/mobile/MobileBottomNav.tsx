@@ -49,7 +49,10 @@ export function MobileBottomNav({
 
       {/* Sliding drawer — rises from above the bottom bar */}
       {open && (
-        <div className="fixed bottom-14 left-0 right-0 z-50 bg-[#0d1525] border-t border-white/10 max-h-[65vh] flex flex-col rounded-t-2xl">
+        <div
+          className="fixed left-0 right-0 z-50 bg-[#0d1525] border-t border-white/10 max-h-[65vh] flex flex-col rounded-t-2xl"
+          style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
             <span className="text-white font-semibold text-sm">{drawerLabel}</span>
             <button
@@ -60,7 +63,7 @@ export function MobileBottomNav({
             </button>
           </div>
 
-          <div className="overflow-y-auto flex-1 py-2">
+          <div className="overflow-y-auto overscroll-contain flex-1 py-2">
             {mode === 'home' ? (
               <>
                 {/* Profile row */}
@@ -139,7 +142,11 @@ export function MobileBottomNav({
       {/* Persistent bottom bar — always visible */}
       <button
         onClick={onToggle}
-        className="fixed bottom-0 left-0 right-0 h-14 bg-[#0d1525] border-t border-white/10 flex items-center justify-between px-5 z-30"
+        className="fixed bottom-0 left-0 right-0 bg-[#0d1525] border-t border-white/10 flex items-center justify-between px-5 z-30"
+        style={{
+          height: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
       >
         <span className="text-gray-400 text-sm font-medium">{drawerLabel}</span>
         {open ? (

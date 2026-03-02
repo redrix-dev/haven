@@ -3,7 +3,10 @@ import { Loader2 } from 'lucide-react';
 
 export function MobileSplashScreen() {
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-[#111a2b] gap-6">
+    <div
+      className="flex flex-col items-center justify-center bg-[#111a2b] gap-6"
+      style={{ height: 'var(--app-visual-viewport-height, 100dvh)' }}
+    >
       <img
         src="/icon-192.png"
         alt="Haven"

@@ -55,7 +55,10 @@ export function MobileLongPressMenu({
       />
 
       {/* Bottom sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#0d1525] rounded-t-2xl border-t border-white/10">
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 bg-[#0d1525] rounded-t-2xl border-t border-white/10"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-white/20" />

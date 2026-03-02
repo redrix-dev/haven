@@ -235,6 +235,12 @@ export function MobileAccountSettingsSheet({
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               maxLength={32}
+              enterKeyHint="done"
+              inputMode="text"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              autoComplete="off"
               className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-base text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/60 transition-colors"
               placeholder="Your username"
             />
@@ -248,6 +254,12 @@ export function MobileAccountSettingsSheet({
             <input
               value={avatarUrl}
               onChange={(e) => setAvatarUrl(e.target.value)}
+              enterKeyHint="done"
+              inputMode="url"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              autoComplete="off"
               className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-base text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/60 transition-colors"
               placeholder="https://..."
             />

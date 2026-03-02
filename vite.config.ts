@@ -25,6 +25,10 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: '../../dist/web'
+    },
+    server: {
+      host: true,
+      allowedHosts: ['all', 'local.haven.redrixx.com']
     }
   }
 })

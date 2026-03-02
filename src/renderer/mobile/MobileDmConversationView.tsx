@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, MoreHorizontal, BellOff, Bell, ShieldOff, X, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { Loader2, MoreHorizontal, BellOff, Bell, ShieldOff, X, AlertTriangle } from 'lucide-react';
 import type { DirectMessage } from '@/lib/backend/types';
 import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
-import { useMobilePullToRefresh } from '@/renderer/mobile/useMobilePullToRefresh';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
+import { useMobileComposerViewportAnchor } from '@/renderer/mobile/useMobileComposerViewportAnchor';
 
 interface ContextMenuState {
   message: DirectMessage;
@@ -16,12 +16,10 @@ interface MobileDmConversationViewProps {
   conversationTitle?: string;
   messages: DirectMessage[];
   loading: boolean;
-  refreshing: boolean;
   sendPending: boolean;
   error: string | null;
   isMuted: boolean;
   onSendMessage: (content: string) => Promise<void>;
-  onRefresh: () => void;
   onMuteToggle: (nextMuted: boolean) => Promise<void>;
   onBlock: (input: { userId: string; username: string }) => Promise<void>;
   onReportMessage: (messageId: string) => void;
@@ -32,12 +30,10 @@ export function MobileDmConversationView({
   conversationTitle,
   messages,
   loading,
-  refreshing,
   sendPending,
   error,
   isMuted,
   onSendMessage,
-  onRefresh,
   onMuteToggle,
   onBlock,
   onReportMessage,
@@ -46,23 +42,33 @@ export function MobileDmConversationView({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
-  const listEndRef = useRef<HTMLDivElement>(null);
+  const hasInitializedScrollRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const longPress = useMobileLongPress();
   const {
+    handleComposerBlur,
+    handleComposerFocus,
+    isNearBottomRef,
+  } = useMobileComposerViewportAnchor({
     scrollRef,
-    pullDistance,
-    pullProgress,
-    showIndicator,
-    bind,
-  } = useMobilePullToRefresh({
-    refreshing,
-    onRefresh,
-    disabled: loading,
   });
 
   useEffect(() => {
-    listEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    const node = scrollRef.current;
+    if (!node) return;
+
+    if (!hasInitializedScrollRef.current) {
+      hasInitializedScrollRef.current = true;
+      node.scrollTop = node.scrollHeight;
+      return;
+    }
+
+    if (!isNearBottomRef.current) {
+      return;
+    }
+
+    node.scrollTop = node.scrollHeight;
+  }, [messages.length, scrollRef]);
 
   const handleSend = async () => {
     const content = draft.trim();
@@ -121,102 +127,72 @@ export function MobileDmConversationView({
         </button>
       </div>
 
-      <div className="relative flex-1 min-h-0 overflow-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2">
-          <div
-            className={`flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#142033]/90 shadow-sm transition-opacity duration-150 ${
-              showIndicator ? 'opacity-100' : 'opacity-0'
-            }`}
-            style={{
-              transform: `translateY(${showIndicator ? Math.max(pullDistance - 20, 0) : 0}px)`,
-            }}
-          >
-            {refreshing ? (
-              <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-            ) : (
-              <RefreshCcw
-                className="w-4 h-4 text-blue-400 transition-transform duration-75"
-                style={{ transform: `rotate(${pullProgress * 180}deg)` }}
-              />
-            )}
-          </div>
-        </div>
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2 pb-4">
+        {error && (
+          <p className="text-red-400 text-xs text-center py-2">{error}</p>
+        )}
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-2" {...bind}>
-          <div
-            style={{
-              transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
-              transition: pullDistance === 0 ? 'transform 180ms ease-out' : undefined,
-            }}
-          >
-            {error && (
-              <p className="text-red-400 text-xs text-center py-2">{error}</p>
-            )}
+        {messages.map((message) => {
+          const isOwn = message.authorUserId === currentUserId;
+          const name = message.authorUsername ?? 'Unknown';
+          const initial = name.charAt(0).toUpperCase();
+          const dateLabel = formatDate(message.createdAt);
+          const showDateSep = dateLabel !== lastDateLabel;
+          if (showDateSep) lastDateLabel = dateLabel;
 
-            {messages.map((message) => {
-              const isOwn = message.authorUserId === currentUserId;
-              const name = message.authorUsername ?? 'Unknown';
-              const initial = name.charAt(0).toUpperCase();
-              const dateLabel = formatDate(message.createdAt);
-              const showDateSep = dateLabel !== lastDateLabel;
-              if (showDateSep) lastDateLabel = dateLabel;
+          return (
+            <React.Fragment key={message.messageId}>
+              {showDateSep && (
+                <div className="flex items-center gap-3 my-3">
+                  <div className="flex-1 h-px bg-white/10" />
+                  <span className="text-gray-500 text-[11px] font-medium shrink-0">{dateLabel}</span>
+                  <div className="flex-1 h-px bg-white/10" />
+                </div>
+              )}
 
-              return (
-                <React.Fragment key={message.messageId}>
-                  {showDateSep && (
-                    <div className="flex items-center gap-3 my-3">
-                      <div className="flex-1 h-px bg-white/10" />
-                      <span className="text-gray-500 text-[11px] font-medium shrink-0">{dateLabel}</span>
-                      <div className="flex-1 h-px bg-white/10" />
-                    </div>
-                  )}
+              <div
+                className={`flex gap-2.5 mb-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
+                {...longPress.bind(() => {
+                  setContextMenu({ message, isOwn });
+                })}
+              >
+                {!isOwn && (
+                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5 overflow-hidden">
+                    {message.authorAvatarUrl ? (
+                      <img src={message.authorAvatarUrl} alt={name} className="w-full h-full object-cover" />
+                    ) : (
+                      initial
+                    )}
+                  </div>
+                )}
+
+                <div className={`flex flex-col max-w-[78%] ${isOwn ? 'items-end' : 'items-start'}`}>
+                  <div className={`flex items-baseline gap-2 mb-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <span className="text-[11px] font-semibold text-gray-300 truncate max-w-[120px]">
+                      {isOwn ? 'You' : name}
+                    </span>
+                    <span className="text-[10px] text-gray-600 shrink-0">
+                      {formatTime(message.createdAt)}
+                    </span>
+                    {message.editedAt && (
+                      <span className="text-[10px] text-gray-600">(edited)</span>
+                    )}
+                  </div>
 
                   <div
-                    className={`flex gap-2.5 mb-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
-                    {...longPress.bind(() => {
-                      setContextMenu({ message, isOwn });
-                    })}
+                    className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                      isOwn
+                        ? 'bg-blue-600 text-white rounded-tr-sm'
+                        : 'bg-[#1a2840] text-gray-100 rounded-tl-sm border border-white/5'
+                    }`}
                   >
-                    {!isOwn && (
-                      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5 overflow-hidden">
-                        {message.authorAvatarUrl ? (
-                          <img src={message.authorAvatarUrl} alt={name} className="w-full h-full object-cover" />
-                        ) : (
-                          initial
-                        )}
-                      </div>
-                    )}
-
-                    <div className={`flex flex-col max-w-[78%] ${isOwn ? 'items-end' : 'items-start'}`}>
-                      <div className={`flex items-baseline gap-2 mb-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-                        <span className="text-[11px] font-semibold text-gray-300 truncate max-w-[120px]">
-                          {isOwn ? 'You' : name}
-                        </span>
-                        <span className="text-[10px] text-gray-600 shrink-0">
-                          {formatTime(message.createdAt)}
-                        </span>
-                        {message.editedAt && (
-                          <span className="text-[10px] text-gray-600">(edited)</span>
-                        )}
-                      </div>
-
-                      <div
-                        className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                          isOwn
-                            ? 'bg-blue-600 text-white rounded-tr-sm'
-                            : 'bg-[#1a2840] text-gray-100 rounded-tl-sm border border-white/5'
-                        }`}
-                      >
-                        {message.content}
-                      </div>
-                    </div>
+                    {message.content}
                   </div>
-                </React.Fragment>
-              );
-            })}
-            <div ref={listEndRef} />
-          </div>
-        </div>
+                </div>
+              </div>
+            </React.Fragment>
+          );
+        })}
       </div>
 
       <MobileMessageComposer
@@ -225,6 +201,8 @@ export function MobileDmConversationView({
         onSend={handleSend}
         sending={sendPending}
         placeholder="Message..."
+        onFocus={handleComposerFocus}
+        onBlur={handleComposerBlur}
       />
 
       <MobileLongPressMenu
@@ -245,7 +223,10 @@ export function MobileDmConversationView({
       {optionsOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={() => setOptionsOpen(false)} />
-          <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 pb-8">
+          <div
+            className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10"
+            style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+          >
             <div className="flex justify-center pt-3 pb-2">
               <div className="w-9 h-1 rounded-full bg-white/20" />
             </div>

@@ -78,7 +78,7 @@ export function MobileServerDrawer({
         </div>
 
         {/* Server list */}
-        <div className="overflow-y-auto flex-1 pb-2">
+        <div className="overflow-y-auto overscroll-contain flex-1 pb-2">
           {servers.map((server) => {
             const isActive = server.id === currentServerId;
             return (
