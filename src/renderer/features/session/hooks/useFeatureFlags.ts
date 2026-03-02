@@ -9,14 +9,18 @@ type UseFeatureFlagsInput = {
 
 export function useFeatureFlags({ controlPlaneBackend, userId }: UseFeatureFlagsInput) {
   const [featureFlags, setFeatureFlags] = React.useState<FeatureFlagsSnapshot>({});
+  const [featureFlagsLoaded, setFeatureFlagsLoaded] = React.useState(false);
 
   React.useEffect(() => {
     let isMounted = true;
 
     if (!userId) {
       setFeatureFlags({});
+      setFeatureFlagsLoaded(false);
       return;
     }
+
+    setFeatureFlagsLoaded(false);
 
     const loadFeatureFlags = async () => {
       try {
@@ -27,6 +31,9 @@ export function useFeatureFlags({ controlPlaneBackend, userId }: UseFeatureFlags
         if (!isMounted) return;
         console.warn('Failed to load feature flags:', error);
         setFeatureFlags({});
+      } finally {
+        if (!isMounted) return;
+        setFeatureFlagsLoaded(true);
       }
     };
 
@@ -49,6 +56,7 @@ export function useFeatureFlags({ controlPlaneBackend, userId }: UseFeatureFlags
   return {
     state: {
       featureFlags,
+      featureFlagsLoaded,
     },
     derived: {
       hasFeatureFlag,

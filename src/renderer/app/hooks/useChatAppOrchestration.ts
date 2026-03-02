@@ -89,6 +89,7 @@ export function useChatAppOrchestration() {
 
   // ── Feature flags ─────────────────────────────────────────────────────────
   const {
+    state: { featureFlagsLoaded },
     derived: { hasFeatureFlag },
     actions: { resetFeatureFlags },
   } = useFeatureFlags({ controlPlaneBackend, userId: user?.id });
@@ -731,6 +732,7 @@ export function useChatAppOrchestration() {
   // ── Deep links ────────────────────────────────────────────────────────────
   useDeepLinks({
     user,
+    featureFlagsLoaded,
     friendsSocialPanelEnabled,
     joinServerByInvite,
     openDirectMessageConversation,

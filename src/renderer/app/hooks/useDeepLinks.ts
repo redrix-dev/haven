@@ -17,6 +17,7 @@ import type { FriendsPanelTab } from '@/renderer/app/types';
 
 interface UseDeepLinksOptions {
   user: { id: string } | null;
+  featureFlagsLoaded: boolean;
   friendsSocialPanelEnabled: boolean;
   joinServerByInvite: (code: string) => Promise<{ joined: boolean; communityName: string }>;
   openDirectMessageConversation: (conversationId: string) => Promise<void>;
@@ -31,6 +32,7 @@ interface UseDeepLinksOptions {
 
 export function useDeepLinks({
   user,
+  featureFlagsLoaded,
   friendsSocialPanelEnabled,
   joinServerByInvite,
   openDirectMessageConversation,
@@ -106,6 +108,20 @@ export function useDeepLinks({
         return false;
       }
 
+      const requiresFeatureFlags =
+        target.kind === 'dm_message' ||
+        target.kind === 'friend_request_received' ||
+        target.kind === 'friend_request_accepted';
+
+      if (!featureFlagsLoaded && requiresFeatureFlags) {
+        pendingWebDeepLinkRef.current = {
+          target,
+          clearBrowserUrlAfterOpen: Boolean(options?.clearBrowserUrlAfterOpen),
+          dedupeKey,
+        };
+        return false;
+      }
+
       try {
         switch (target.kind) {
           case 'invite': {
@@ -171,6 +187,7 @@ export function useDeepLinks({
     },
     [
       clearBrowserDeepLinkUrl,
+      featureFlagsLoaded,
       friendsSocialPanelEnabled,
       joinServerByInvite,
       openDirectMessageConversation,
@@ -249,9 +266,9 @@ export function useDeepLinks({
     });
   }, [openWebDeepLinkTarget]);
 
-  // Flush any deep link that was queued before the user was authenticated
+  // Flush any deep link that was queued before auth or feature flags were ready
   useEffect(() => {
-    if (!user) return;
+    if (!user || !featureFlagsLoaded) return;
     const pending = pendingWebDeepLinkRef.current;
     if (!pending) return;
 
@@ -260,7 +277,7 @@ export function useDeepLinks({
       clearBrowserUrlAfterOpen: pending.clearBrowserUrlAfterOpen,
       dedupeKey: pending.dedupeKey,
     });
-  }, [openWebDeepLinkTarget, user]);
+  }, [featureFlagsLoaded, openWebDeepLinkTarget, user]);
 
   return { openWebDeepLinkTarget, clearBrowserDeepLinkUrl };
 }
