@@ -1,3 +1,4 @@
+// Changed: stabilize textarea auto-resize to reduce scroll jumps, align composer width with message list, and improve mobile send UX.
 import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
@@ -35,8 +36,14 @@ export function MobileMessageComposer({
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
+    const prev = parseInt(el.style.height || '0', 10);
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    const next = Math.min(el.scrollHeight, 120);
+    if (Math.abs(prev - next) > 1) {
+      el.style.height = `${next}px`;
+    } else {
+      el.style.height = prev > 0 ? `${prev}px` : `${next}px`;
+    }
   }, [draft]);
 
   const canSend = draft.trim().length > 0 && !sending;
@@ -44,7 +51,7 @@ export function MobileMessageComposer({
   return (
     <div
       className="shrink-0 border-t border-white/10 bg-[#0d1525]"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      style={{ paddingBottom: 'var(--sab)' }}
     >
       {replyTarget && (
         <div className="px-4 pt-2">
@@ -67,7 +74,7 @@ export function MobileMessageComposer({
       )}
 
       <div className="px-3 py-0.5">
-        <div className="mx-auto w-full max-w-[24rem]">
+        <div className="mx-auto w-full max-w-none">
           <div className="relative rounded-[1.4rem] border border-white/10 bg-white/5 transition-colors focus-within:border-blue-500/50">
             <textarea
               ref={textareaRef}
@@ -80,6 +87,7 @@ export function MobileMessageComposer({
               rows={1}
               inputMode="text"
               autoComplete="off"
+              enterKeyHint="send"
               className="block w-full resize-none bg-transparent px-4 py-2.5 pr-14 text-base leading-relaxed text-white placeholder-gray-500 focus:outline-none disabled:opacity-50"
               style={{ minHeight: '42px' }}
             />

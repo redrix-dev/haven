@@ -1,3 +1,4 @@
+// Changed: add mobile-aware navigation side effects and push-click completion callbacks for badge/read-state clearing.
 import React, { useEffect, useRef } from 'react';
 import { asRecord, getRecordString } from '@/shared/lib/records';
 import {
@@ -28,6 +29,11 @@ interface UseDeepLinksOptions {
   setFriendsPanelHighlightedRequestId: (id: string | null) => void;
   setCurrentServerId: (id: string) => void;
   setCurrentChannelId: (id: string) => void;
+  onNavigate?: (screen: 'dm-conversation' | 'channel' | 'friends') => void;
+  onPushNotificationNavigationComplete?: (input: {
+    recipientId: string | null;
+    target: WebAppDeepLinkTarget;
+  }) => void;
 }
 
 export function useDeepLinks({
@@ -43,6 +49,8 @@ export function useDeepLinks({
   setFriendsPanelHighlightedRequestId,
   setCurrentServerId,
   setCurrentChannelId,
+  onNavigate,
+  onPushNotificationNavigationComplete,
 }: UseDeepLinksOptions) {
   const processedWebDeepLinkKeysRef = useRef<Map<string, number>>(new Map());
   const pendingWebDeepLinkRef = useRef<{
@@ -138,6 +146,7 @@ export function useDeepLinks({
             setWorkspaceMode('dm');
             await openDirectMessageConversation(target.conversationId);
             setNotificationsPanelOpen(false);
+            onNavigate?.('dm-conversation');
             break;
           }
           case 'friend_request_received': {
@@ -148,6 +157,7 @@ export function useDeepLinks({
             setFriendsPanelHighlightedRequestId(target.friendRequestId);
             setFriendsPanelOpen(true);
             setNotificationsPanelOpen(false);
+            onNavigate?.('friends');
             break;
           }
           case 'friend_request_accepted': {
@@ -158,6 +168,7 @@ export function useDeepLinks({
             setFriendsPanelHighlightedRequestId(null);
             setFriendsPanelOpen(true);
             setNotificationsPanelOpen(false);
+            onNavigate?.('friends');
             break;
           }
           case 'channel_mention': {
@@ -165,6 +176,7 @@ export function useDeepLinks({
             setCurrentServerId(target.communityId);
             setCurrentChannelId(target.channelId);
             setNotificationsPanelOpen(false);
+            onNavigate?.('channel');
             break;
           }
           default:
@@ -238,10 +250,15 @@ export function useDeepLinks({
         parseWebPushClickPayloadTarget(data.payload);
       if (!target) return;
       const dedupeKey = `sw:${targetUrl ?? ''}:${safeStableStringify(data.payload)}`;
+      const payload = asRecord(data.payload);
+      const recipientId = getRecordString(data, 'recipientId') ?? getRecordString(payload, 'recipientId');
 
       void openWebDeepLinkTarget(target, {
         clearBrowserUrlAfterOpen: Boolean(targetUrl),
         dedupeKey,
+      }).then((didNavigate) => {
+        if (!didNavigate) return;
+        onPushNotificationNavigationComplete?.({ recipientId, target });
       });
     };
 
@@ -249,7 +266,7 @@ export function useDeepLinks({
     return () => {
       navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
     };
-  }, [openWebDeepLinkTarget]);
+  }, [onPushNotificationNavigationComplete, openWebDeepLinkTarget]);
 
   // Handle deep link in the initial page URL (web PWA only)
   useEffect(() => {

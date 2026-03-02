@@ -1,3 +1,4 @@
+// Changed: improve header badge styling/limits and add safe-area top inset support for standalone iOS PWA mode.
 import React from 'react';
 import { Bell, MessageCircle, Home, ArrowLeft, Users } from 'lucide-react';
 
@@ -27,7 +28,7 @@ export function MobileHeader({
   onFriendsPress,
 }: MobileHeaderProps) {
   return (
-    <div className="relative flex items-center h-14 px-3 bg-[#0d1525] border-b border-white/10 shrink-0">
+    <div className="relative flex items-center h-14 px-3 bg-[#0d1525] border-b border-white/10 shrink-0" style={{ paddingTop: 'var(--sat)' }}>
       {/* Left: Back + Home + Friends */}
       <div className="flex items-center gap-1.5 z-10">
         <button
@@ -60,8 +61,8 @@ export function MobileHeader({
         >
           <Users className="w-5 h-5 text-gray-300" />
           {friendRequestCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
-              {friendRequestCount > 99 ? '99+' : friendRequestCount}
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-blue-500 text-white text-[9px] font-bold flex items-center justify-center px-1 leading-none pointer-events-none">
+              {friendRequestCount > 9 ? '9+' : friendRequestCount}
             </span>
           )}
         </button>
@@ -92,8 +93,8 @@ export function MobileHeader({
         >
           <MessageCircle className="w-5 h-5 text-gray-300" />
           {dmUnreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
-              {dmUnreadCount > 99 ? '99+' : dmUnreadCount}
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-blue-500 text-white text-[9px] font-bold flex items-center justify-center px-1 leading-none pointer-events-none">
+              {dmUnreadCount > 9 ? '9+' : dmUnreadCount}
             </span>
           )}
         </button>

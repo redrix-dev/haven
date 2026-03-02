@@ -1,3 +1,4 @@
+// Changed: allow callers to hook deep-link navigation outcomes for mobile-specific screen transitions and notification cleanup.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useServers } from '@/lib/hooks/useServers';
@@ -59,7 +60,15 @@ const normalizeInviteCode = (value: string): string => {
   return maybeFromPath.toUpperCase();
 };
 
-export function useChatAppOrchestration() {
+export interface UseChatAppOrchestrationOptions {
+  onMobileDeepLinkNavigate?: (screen: 'dm-conversation' | 'channel' | 'friends') => void;
+  onPushNotificationNavigationComplete?: (input: {
+    recipientId: string | null;
+    target: import('@/lib/deepLinks').WebAppDeepLinkTarget;
+  }) => void;
+}
+
+export function useChatAppOrchestration(options: UseChatAppOrchestrationOptions = {}) {
   // ── Backend singletons ────────────────────────────────────────────────────
   const controlPlaneBackend = getControlPlaneBackend();
   const directMessageBackend = getDirectMessageBackend();
@@ -743,6 +752,8 @@ export function useChatAppOrchestration() {
     setFriendsPanelHighlightedRequestId,
     setCurrentServerId,
     setCurrentChannelId,
+    onNavigate: options.onMobileDeepLinkNavigate,
+    onPushNotificationNavigationComplete: options.onPushNotificationNavigationComplete,
   });
 
   // ── Handle functions (UI event → business action) ─────────────────────────

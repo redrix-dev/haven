@@ -1,6 +1,9 @@
+// Changed: switch inbox to shared date/avatar utilities and improve compose tap target sizing.
 import React from 'react';
 import { Loader2, RefreshCcw, BellOff, PencilLine } from 'lucide-react';
 import type { DirectMessageConversationSummary } from '@/lib/backend/types';
+import { formatConversationTime } from '@/renderer/shared/dateFormatters';
+import { AvatarBubble } from '@/renderer/shared/AvatarBubble';
 
 interface MobileDmInboxProps {
   conversations: DirectMessageConversationSummary[];
@@ -10,18 +13,6 @@ interface MobileDmInboxProps {
   onSelectConversation: (conversationId: string) => void;
   onRefresh: (options?: { suppressLoadingState?: boolean }) => void;
   onCompose: () => void;
-}
-
-function formatConversationTime(iso: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return d.toLocaleDateString([], { weekday: 'short' });
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 export function MobileDmInbox({
@@ -71,7 +62,7 @@ export function MobileDmInbox({
         <span className="text-sm font-semibold text-gray-300">Direct Messages</span>
         <button
           onClick={onCompose}
-          className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 transition-colors"
+          className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 transition-colors"
           title="New message"
         >
           <PencilLine className="w-4 h-4 text-gray-300" />
@@ -82,7 +73,6 @@ export function MobileDmInbox({
         <div className="min-h-full">
           {conversations.map((convo) => {
             const name = convo.otherUsername ?? 'Unknown User';
-            const initial = name.charAt(0).toUpperCase();
             const hasUnread = convo.unreadCount > 0;
             const timeLabel = formatConversationTime(convo.lastMessageAt ?? convo.updatedAt);
 
@@ -93,13 +83,7 @@ export function MobileDmInbox({
                 className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 active:bg-white/10 transition-colors border-b border-white/5"
               >
                 {/* Avatar */}
-                <div className="w-11 h-11 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-base shrink-0 overflow-hidden">
-                  {convo.otherAvatarUrl ? (
-                    <img src={convo.otherAvatarUrl} alt={name} className="w-full h-full object-cover" />
-                  ) : (
-                    initial
-                  )}
-                </div>
+                <AvatarBubble url={convo.otherAvatarUrl} name={name} size="md" />
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
