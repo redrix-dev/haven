@@ -37,14 +37,17 @@ export function MobileMessageComposer({
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-  }, [draft]);
+  
 
+    const isOverflowing = el.scrollHeight > 120;
+    el.style.touchAction = isOverflowing ? 'auto' : 'none';
+  }, [draft]);
   const canSend = draft.trim().length > 0 && !sending;
 
   return (
     <div
       className="shrink-0 border-t border-white/10 bg-[#0d1525]"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      style={{ paddingBottom: '0px)', touchAction: 'none' }}
     >
       {replyTarget && (
         <div className="px-4 pt-2">
@@ -66,9 +69,9 @@ export function MobileMessageComposer({
         </div>
       )}
 
-      <div className="px-3 py-0.5">
-        <div className="mx-auto w-full max-w-[24rem]">
-          <div className="relative rounded-[1.4rem] border border-white/10 bg-white/5 transition-colors focus-within:border-blue-500/50">
+      <div className="px-3 py-2" style={{ touchAction: 'none' }}>
+        <div className="mx-auto w-full max-w-[24rem]" style={{ touchAction: 'none' }}>
+          <div className="relative rounded-[1.4rem] border border-white/10 bg-white/5 transition-colors focus-within:border-blue-500/50" style={{ touchAction: 'none' }}>
             <textarea
               ref={textareaRef}
               value={draft}
@@ -81,7 +84,7 @@ export function MobileMessageComposer({
               inputMode="text"
               autoComplete="off"
               className="block w-full resize-none bg-transparent px-4 py-2.5 pr-14 text-base leading-relaxed text-white placeholder-gray-500 focus:outline-none disabled:opacity-50"
-              style={{ minHeight: '42px' }}
+              style={{ minHeight: '42px', touchAction: 'auto' }}
             />
             <button
               type="button"
