@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, ChevronUp } from 'lucide-react';
-import type { Message, MessageReaction, MessageAttachment, MessageLinkPreview, AuthorProfile } from '@/lib/backend/types';
+import type { Message, MessageReaction, MessageLinkPreview, AuthorProfile } from '@/lib/backend/types';
 import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
-import { useMobileComposerViewportAnchor } from '@/renderer/mobile/useMobileComposerViewportAnchor';
+import { isNearBottom } from '@/renderer/mobile/scrollAnchor';
 
 interface ReplyTarget {
   id: string;
@@ -15,10 +15,8 @@ interface ReplyTarget {
 interface MobileChannelViewProps {
   channelName: string;
   currentUserId: string;
-  currentUserDisplayName: string;
   messages: Message[];
   messageReactions: MessageReaction[];
-  messageAttachments: MessageAttachment[];
   messageLinkPreviews: MessageLinkPreview[];
   authorProfiles: Record<string, AuthorProfile>;
   hasOlderMessages: boolean;
@@ -41,7 +39,6 @@ export function MobileChannelView({
   currentUserId,
   messages,
   messageReactions,
-  messageAttachments,
   messageLinkPreviews,
   authorProfiles,
   hasOlderMessages,
@@ -62,13 +59,22 @@ export function MobileChannelView({
   const hasInitializedScrollRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const longPress = useMobileLongPress();
-  const {
-    handleComposerBlur,
-    handleComposerFocus,
-    isNearBottomRef,
-  } = useMobileComposerViewportAnchor({
-    scrollRef,
-  });
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+
+    if (!hasInitializedScrollRef.current) {
+      hasInitializedScrollRef.current = true;
+      node.scrollTop = node.scrollHeight;
+      return;
+    }
+
+    if (!isNearBottom(node)) {
+      return;
+    }
+
+    node.scrollTop = node.scrollHeight;
+  }, [messages.length, scrollRef]);
 
   // Group reactions by messageId
   const reactionsByMessage = new Map<string, MessageReaction[]>();
@@ -96,7 +102,7 @@ export function MobileChannelView({
       return;
     }
 
-    if (!isNearBottomRef.current) {
+    if (!isNearBottom(node)) {
       return;
     }
 
@@ -351,8 +357,6 @@ export function MobileChannelView({
         placeholder={`Message #${channelName}`}
         replyTarget={replyTarget}
         onClearReply={() => setReplyTarget(null)}
-        onFocus={handleComposerFocus}
-        onBlur={handleComposerBlur}
       />
 
       {/* Long-press context menu */}

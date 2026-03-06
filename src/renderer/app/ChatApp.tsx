@@ -373,11 +373,9 @@ export function ChatApp() {
               </div>
             ) : app.currentRenderableChannel ? (
               <ChatArea
-                communityId={app.currentServer.id}
                 channelId={app.currentRenderableChannel.id}
                 channelName={app.currentRenderableChannel.name}
                 channelKind={app.currentRenderableChannel.kind}
-                currentUserDisplayName={app.userDisplayName}
                 messages={app.messages}
                 messageReactions={app.messageReactions}
                 messageAttachments={app.messageAttachments}

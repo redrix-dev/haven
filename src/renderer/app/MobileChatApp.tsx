@@ -257,10 +257,8 @@ export function MobileChatApp() {
             <MobileChannelView
               channelName={app.currentChannel.name}
               currentUserId={app.user.id}
-              currentUserDisplayName={app.userDisplayName}
               messages={app.messages}
               messageReactions={app.messageReactions}
-              messageAttachments={app.messageAttachments}
               messageLinkPreviews={app.messageLinkPreviews}
               authorProfiles={app.authorProfiles}
               hasOlderMessages={app.hasOlderMessages}
