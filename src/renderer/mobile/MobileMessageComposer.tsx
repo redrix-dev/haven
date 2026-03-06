@@ -84,7 +84,7 @@ export function MobileMessageComposer({
               inputMode="text"
               autoComplete="off"
               className="block w-full resize-none bg-transparent px-4 py-2.5 pr-14 text-base leading-relaxed text-white placeholder-gray-500 focus:outline-none disabled:opacity-50"
-              style={{ minHeight: '42px', touchAction: 'auto' }}
+              style={{ minHeight: '42px', height: '42px', touchAction: 'none' }}
             />
             <button
               type="button"
