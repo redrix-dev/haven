@@ -146,7 +146,7 @@ export function useServerAdmin({
       const server = servers.find((candidate) => candidate.id === communityId);
       setShowMembersModal(true);
       setMembersModalCommunityId(communityId);
-      setMembersModalServerName(server?.name ?? 'Server');
+      setMembersModalServerName(server?.name ?? 'Community');
       setMembersModalMembers([]);
       setMembersModalError(null);
       setMembersModalLoading(true);
@@ -163,7 +163,7 @@ export function useServerAdmin({
         setMembersModalCanCreateReports(Boolean(permissions.canCreateReports));
         setMembersModalCanManageBans(Boolean(permissions.canManageBans));
       } catch (error: unknown) {
-        setMembersModalError(getErrorMessage(error, 'Failed to load server members.'));
+        setMembersModalError(getErrorMessage(error, 'Failed to load community members.'));
       } finally {
         setMembersModalLoading(false);
       }
@@ -281,7 +281,7 @@ export function useServerAdmin({
 
   const createServerInvite = React.useCallback(
     async (values: { maxUses: number | null; expiresInHours: number | null }): Promise<ServerInvite> => {
-      if (!currentServerId) throw new Error('No server selected.');
+      if (!currentServerId) throw new Error('No community selected.');
 
       const invite = await controlPlaneBackend.createCommunityInvite({
         communityId: currentServerId,
@@ -309,7 +309,7 @@ export function useServerAdmin({
 
       const trimmedName = values.name.trim();
       if (!trimmedName) {
-        throw new Error('Server name is required.');
+        throw new Error('Community name is required.');
       }
 
       const communityBackend = getCommunityDataBackend(currentServerId);
@@ -358,16 +358,16 @@ export function useServerAdmin({
       try {
         await loadServerSettings(targetCommunityId);
       } catch (error: unknown) {
-        console.error('Failed to load server settings:', error);
-        setServerSettingsLoadError(getErrorMessage(error, 'Failed to load server settings.'));
+        console.error('Failed to load community settings:', error);
+        setServerSettingsLoadError(getErrorMessage(error, 'Failed to load community settings.'));
       }
 
       if (canManageInvites) {
         try {
           await loadServerInvites(targetCommunityId);
         } catch (error: unknown) {
-          console.error('Failed to load server invites:', error);
-          setServerInvitesError(getErrorMessage(error, 'Failed to load server invites.'));
+          console.error('Failed to load community invites:', error);
+          setServerInvitesError(getErrorMessage(error, 'Failed to load community invites.'));
         }
       } else {
         resetServerInvites();
@@ -376,8 +376,10 @@ export function useServerAdmin({
       try {
         await loadServerRoleManagement(targetCommunityId);
       } catch (error: unknown) {
-        console.error('Failed to load server role management:', error);
-        setServerRoleManagementError(getErrorMessage(error, 'Failed to load server roles and members.'));
+        console.error('Failed to load community role management:', error);
+        setServerRoleManagementError(
+          getErrorMessage(error, 'Failed to load community roles and members.')
+        );
       }
 
       try {
@@ -405,7 +407,7 @@ export function useServerAdmin({
 
   const revokeServerInvite = React.useCallback(
     async (inviteId: string): Promise<void> => {
-      if (!currentServerId) throw new Error('No server selected.');
+      if (!currentServerId) throw new Error('No community selected.');
 
       await controlPlaneBackend.revokeCommunityInvite(currentServerId, inviteId);
       await loadServerInvites();
@@ -415,7 +417,7 @@ export function useServerAdmin({
 
   const unbanUserFromCurrentServer = React.useCallback(
     async (input: { targetUserId: string; reason?: string | null }) => {
-      if (!currentServerId) throw new Error('No server selected.');
+      if (!currentServerId) throw new Error('No community selected.');
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.unbanCommunityMember({
@@ -432,7 +434,7 @@ export function useServerAdmin({
 
   const createServerRole = React.useCallback(
     async (input: { name: string; color: string; position: number }) => {
-      if (!currentServerId) throw new Error('No server selected.');
+      if (!currentServerId) throw new Error('No community selected.');
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.createServerRole({
@@ -449,7 +451,7 @@ export function useServerAdmin({
 
   const updateServerRole = React.useCallback(
     async (input: { roleId: string; name: string; color: string; position: number }) => {
-      if (!currentServerId) throw new Error('No server selected.');
+      if (!currentServerId) throw new Error('No community selected.');
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.updateServerRole({
@@ -467,7 +469,7 @@ export function useServerAdmin({
 
   const deleteServerRole = React.useCallback(
     async (roleId: string) => {
-      if (!currentServerId) throw new Error('No server selected.');
+      if (!currentServerId) throw new Error('No community selected.');
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.deleteServerRole({
@@ -482,7 +484,7 @@ export function useServerAdmin({
 
   const saveServerRolePermissions = React.useCallback(
     async (roleId: string, permissionKeys: string[]) => {
-      if (!currentServerId) throw new Error('No server selected.');
+      if (!currentServerId) throw new Error('No community selected.');
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.saveServerRolePermissions({

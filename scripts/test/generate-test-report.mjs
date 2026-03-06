@@ -182,6 +182,31 @@ const explainedScenarioCatalog = {
         },
       ],
     },
+    '12_channel_overwrite_permission_split.sql': {
+      title: 'Channel Structure vs Overwrite Permission Split',
+      scenarios: [
+        {
+          actor: 'member_a (structure-only role)',
+          action: 'Renames a channel with manage_channels but without manage_channel_permissions.',
+          expected: 'Channel structure edit succeeds.',
+        },
+        {
+          actor: 'member_a (structure-only role)',
+          action: 'Attempts to mutate role/member channel overwrites before explicit overwrite permission.',
+          expected: 'Overwrite mutations are rejected by row-level security.',
+        },
+        {
+          actor: 'owner migration/backfill path',
+          action: 'Backfills manage_channel_permissions for roles that already have manage_channels.',
+          expected: 'Target role gains explicit overwrite-management permission.',
+        },
+        {
+          actor: 'member_a (after backfill)',
+          action: 'Mutates both role and member channel overwrites on allowed hierarchy targets.',
+          expected: 'Overwrite mutations succeed once manage_channel_permissions is present.',
+        },
+      ],
+    },
   },
   backendFiles: {
     'src/lib/backend/__tests__/notificationBackend.contract.test.ts': {

@@ -490,7 +490,7 @@ export function Sidebar({
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={8}>
-                Server settings
+                Community settings
               </TooltipContent>
             </Tooltip>
           )}

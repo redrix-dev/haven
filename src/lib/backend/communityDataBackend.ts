@@ -709,7 +709,8 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: canManageRoles },
       { data: canManageMembers },
       { data: canCreateChannels },
-      { data: canManageChannels },
+      { data: canManageChannelStructure },
+      { data: canManageChannelPermissions },
       { data: canManageMessages },
       { data: canManageBans },
       { data: canCreateReports },
@@ -740,6 +741,10 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       }),
       supabase.rpc('user_has_permission', {
         p_community_id: communityId,
+        p_permission_key: 'manage_channel_permissions',
+      }),
+      supabase.rpc('user_has_permission', {
+        p_community_id: communityId,
         p_permission_key: 'manage_messages',
       }),
       supabase.rpc('user_has_permission', {
@@ -765,15 +770,17 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     ]);
 
     const owner = Boolean(isOwner);
-    const manageChannels = owner || Boolean(canManageChannels);
+    const manageChannelStructure = owner || Boolean(canManageChannelStructure);
+    const manageChannelPermissions = owner || Boolean(canManageChannelPermissions);
 
     return {
       isOwner: owner,
       canManageServer: owner || Boolean(canManageServer),
       canManageRoles: owner || Boolean(canManageRoles),
       canManageMembers: owner || Boolean(canManageMembers),
-      canCreateChannels: owner || Boolean(canCreateChannels) || manageChannels,
-      canManageChannels: manageChannels,
+      canCreateChannels: owner || Boolean(canCreateChannels) || manageChannelStructure,
+      canManageChannelStructure: manageChannelStructure,
+      canManageChannelPermissions: manageChannelPermissions,
       canManageMessages: owner || Boolean(canManageMessages),
       canManageBans: owner || Boolean(canManageBans),
       canCreateReports: owner || Boolean(canCreateReports),

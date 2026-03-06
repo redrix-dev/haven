@@ -117,7 +117,92 @@ interface ServerSettingsModalProps {
   onUnbanUser: (values: { targetUserId: string; reason?: string | null }) => Promise<void>;
 }
 
-const toTitleCaseWords = (value: string) =>
+type PermissionScope =
+  | 'channel_access'
+  | 'channel_structure'
+  | 'channel_overwrites'
+  | 'community_admin'
+  | 'role_admin'
+  | 'member_admin'
+  | 'message_admin'
+  | 'invite_admin'
+  | 'reporting'
+  | 'developer'
+  | 'moderation'
+  | 'reserved';
+
+type PermissionMetadata = {
+  label: string;
+  scope: PermissionScope;
+  ownerVisible: boolean;
+};
+
+const PERMISSION_SCOPE_ORDER: PermissionScope[] = [
+  'community_admin',
+  'role_admin',
+  'member_admin',
+  'channel_access',
+  'channel_structure',
+  'channel_overwrites',
+  'message_admin',
+  'invite_admin',
+  'reporting',
+  'moderation',
+  'developer',
+  'reserved',
+];
+
+const PERMISSION_SCOPE_LABELS: Record<PermissionScope, string> = {
+  channel_access: 'Channel Access',
+  channel_structure: 'Channel Structure',
+  channel_overwrites: 'Channel Overwrites',
+  community_admin: 'Community Administration',
+  role_admin: 'Role Management',
+  member_admin: 'Member Management',
+  message_admin: 'Message Moderation',
+  invite_admin: 'Invites',
+  reporting: 'Reports',
+  developer: 'Developer Tools',
+  moderation: 'Safety Moderation',
+  reserved: 'Reserved',
+};
+
+const COMMUNITY_PERMISSION_METADATA: Record<string, PermissionMetadata> = {
+  view_channels: { label: 'View Channels', scope: 'channel_access', ownerVisible: true },
+  send_messages: { label: 'Send Messages', scope: 'channel_access', ownerVisible: true },
+  create_channels: { label: 'Create Channels', scope: 'channel_structure', ownerVisible: true },
+  manage_channels: { label: 'Manage Channel Structure', scope: 'channel_structure', ownerVisible: true },
+  manage_channel_permissions: {
+    label: 'Manage Channel Overwrites',
+    scope: 'channel_overwrites',
+    ownerVisible: true,
+  },
+  manage_messages: { label: 'Manage Messages', scope: 'message_admin', ownerVisible: true },
+  manage_server: { label: 'Manage Community', scope: 'community_admin', ownerVisible: true },
+  manage_roles: { label: 'Manage Roles', scope: 'role_admin', ownerVisible: true },
+  manage_members: { label: 'Manage Members', scope: 'member_admin', ownerVisible: true },
+  manage_invites: { label: 'Manage Invites', scope: 'invite_admin', ownerVisible: true },
+  create_reports: { label: 'Create Reports', scope: 'reporting', ownerVisible: true },
+  manage_reports: { label: 'Manage Reports', scope: 'reporting', ownerVisible: true },
+  manage_developer_access: {
+    label: 'Manage Developer Access',
+    scope: 'developer',
+    ownerVisible: true,
+  },
+  manage_bans: { label: 'Manage Bans', scope: 'moderation', ownerVisible: true },
+  refresh_link_previews: {
+    label: 'Refresh Link Previews',
+    scope: 'developer',
+    ownerVisible: true,
+  },
+  mention_haven_developers: {
+    label: 'Mention Haven Developers',
+    scope: 'reserved',
+    ownerVisible: false,
+  },
+};
+
+const fallbackPermissionLabel = (value: string) =>
   value
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -257,6 +342,40 @@ export function ServerSettingsModal({
     [roles]
   );
 
+  const visiblePermissionGroups = useMemo(() => {
+    const grouped = new Map<
+      PermissionScope,
+      Array<{
+        key: string;
+        label: string;
+        description: string;
+      }>
+    >();
+
+    for (const permission of permissionsCatalog) {
+      const metadata = COMMUNITY_PERMISSION_METADATA[permission.key];
+      const ownerVisible = metadata?.ownerVisible ?? true;
+      if (!ownerVisible) continue;
+
+      const scope = metadata?.scope ?? 'community_admin';
+      const group = grouped.get(scope) ?? [];
+      group.push({
+        key: permission.key,
+        label: metadata?.label ?? fallbackPermissionLabel(permission.key),
+        description: permission.description,
+      });
+      grouped.set(scope, group);
+    }
+
+    return PERMISSION_SCOPE_ORDER
+      .map((scope) => ({
+        scope,
+        label: PERMISSION_SCOPE_LABELS[scope],
+        permissions: grouped.get(scope) ?? [],
+      }))
+      .filter((group) => group.permissions.length > 0);
+  }, [permissionsCatalog]);
+
   const canEditSelectedRoleDetails =
     Boolean(selectedRole) &&
     canManageRoles &&
@@ -307,7 +426,7 @@ export function ServerSettingsModal({
   const handleSave = async () => {
     if (!values) return;
     if (!values.name.trim()) {
-      setError('Server name is required.');
+      setError('Community name is required.');
       return;
     }
 
@@ -320,7 +439,7 @@ export function ServerSettingsModal({
         description: values.description?.trim() ? values.description.trim() : null,
       });
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to save server settings.'));
+      setError(getErrorMessage(err, 'Failed to save community settings.'));
     } finally {
       setSaving(false);
     }
@@ -520,7 +639,7 @@ export function ServerSettingsModal({
           showCloseButton={false}
         >
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-white">Server Settings</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-white">Community Settings</DialogTitle>
         </DialogHeader>
 
         {initialLoadError ? (
@@ -569,7 +688,7 @@ export function ServerSettingsModal({
 
                       <div className="space-y-2">
                         <Label htmlFor="server-settings-name" className="text-xs font-semibold uppercase text-[#a9b8cf]">
-                          Server Name
+                          Community Name
                         </Label>
                         <Input
                           id="server-settings-name"
@@ -597,7 +716,7 @@ export function ServerSettingsModal({
                           }
                           className="min-h-24 bg-[#142033] border-[#304867] text-white"
                           maxLength={500}
-                          placeholder="Tell people what this server is about."
+                          placeholder="Tell people what this community is about."
                           disabled={!canManageServer}
                         />
                       </div>
@@ -638,7 +757,7 @@ export function ServerSettingsModal({
 
                       {!canManageServer && (
                         <p className="text-xs text-[#d6a24a]">
-                          You can view these settings, but only members with Manage Server can edit them.
+                          You can view these settings, but only members with Manage Community can edit them.
                         </p>
                       )}
                     </section>
@@ -647,7 +766,7 @@ export function ServerSettingsModal({
                       <h3 className="text-white font-semibold">Haven Developer Access</h3>
 
                       <p className="text-sm text-[#a9b8cf]">
-                        Configure whether Haven developers can send official messages inside this server.
+                        Configure whether Haven developers can send official messages inside this community.
                       </p>
 
                       <div className="flex items-center justify-between gap-3 rounded-md bg-[#111a2b] px-3 py-2">
@@ -742,7 +861,7 @@ export function ServerSettingsModal({
 
               <TabsContent value="roles" className="min-h-0 overflow-hidden pr-1 flex flex-col gap-4">
                 <p className="text-sm text-[#a9b8cf]">
-                  Roles define what people can do server-wide. The database enforces permissions using
+                  Roles define what people can do community-wide. The database enforces permissions using
                   role assignments and role permission entries.
                 </p>
                 {roleManagementError && <p className="text-sm text-red-400">{roleManagementError}</p>}
@@ -912,31 +1031,46 @@ export function ServerSettingsModal({
 
                           <div className="space-y-2 min-h-0 flex-1 flex flex-col">
                             <p className="text-xs font-semibold uppercase text-[#a9b8cf]">Permissions</p>
+                            <p className="text-[11px] text-[#8ea4c7]">
+                              Reserved internal permissions are hidden from this editor.
+                            </p>
                             <div className="min-h-0 flex-1 rounded-md border border-[#304867] overflow-hidden">
-                              <div className="scrollbar-inset h-full min-h-0 overflow-y-auto divide-y divide-[#233753]">
-                                {permissionsCatalog.map((permission) => {
-                                  const checked = roleDraft.permissionKeys.includes(permission.key);
-                                  return (
-                                    <label
-                                      key={permission.key}
-                                      className="flex items-start gap-3 p-3 text-sm text-[#e6edf7]"
-                                    >
-                                      <Checkbox
-                                        checked={checked}
-                                        onCheckedChange={() => toggleDraftPermission(permission.key)}
-                                        disabled={!canEditSelectedRolePermissions || roleActionSaving}
-                                      />
-                                      <span className="space-y-1">
-                                        <span className="block font-medium text-white">
-                                          {toTitleCaseWords(permission.key)}
-                                        </span>
-                                        <span className="block text-xs text-[#a9b8cf]">
-                                          {permission.description}
-                                        </span>
-                                      </span>
-                                    </label>
-                                  );
-                                })}
+                              <div className="scrollbar-inset h-full min-h-0 overflow-y-auto space-y-3 p-2">
+                                {visiblePermissionGroups.map((group) => (
+                                  <section
+                                    key={group.scope}
+                                    className="rounded-md border border-[#304867] bg-[#101a2b]"
+                                  >
+                                    <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                                      {group.label}
+                                    </p>
+                                    <div className="divide-y divide-[#233753]">
+                                      {group.permissions.map((permission) => {
+                                        const checked = roleDraft.permissionKeys.includes(permission.key);
+                                        return (
+                                          <label
+                                            key={permission.key}
+                                            className="flex items-start gap-3 p-3 text-sm text-[#e6edf7]"
+                                          >
+                                            <Checkbox
+                                              checked={checked}
+                                              onCheckedChange={() => toggleDraftPermission(permission.key)}
+                                              disabled={!canEditSelectedRolePermissions || roleActionSaving}
+                                            />
+                                            <span className="space-y-1">
+                                              <span className="block font-medium text-white">
+                                                {permission.label}
+                                              </span>
+                                              <span className="block text-xs text-[#a9b8cf]">
+                                                {permission.description}
+                                              </span>
+                                            </span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </section>
+                                ))}
                               </div>
                             </div>
                           </div>
@@ -1000,7 +1134,7 @@ export function ServerSettingsModal({
                       <Input
                         value={memberSearch}
                         onChange={(e) => setMemberSearch(e.target.value)}
-                        placeholder="Search server members..."
+                        placeholder="Search community members..."
                         className="bg-[#142033] border-[#304867] text-white"
                       />
 
@@ -1120,7 +1254,7 @@ export function ServerSettingsModal({
                 <h3 className="text-white font-semibold">Invite Links</h3>
 
                 <p className="text-sm text-[#a9b8cf]">
-                  Create and share invite links for this server.
+                  Create and share invite links for this community.
                 </p>
 
                 {canManageInvites ? (
@@ -1226,7 +1360,7 @@ export function ServerSettingsModal({
                 <h3 className="text-white font-semibold">Banned Users</h3>
 
                 <p className="text-sm text-[#a9b8cf]">
-                  Active bans for this server. Each entry includes who was banned, when, and the ban description.
+                  Active bans for this community. Each entry includes who was banned, when, and the ban description.
                 </p>
 
                 {!canManageBans && (
@@ -1322,7 +1456,7 @@ export function ServerSettingsModal({
               {pendingConfirm?.kind === 'deleteRole'
                 ? `Delete role "${pendingConfirm.roleName}"? This cannot be undone.`
                 : pendingConfirm
-                  ? `Unban "${pendingConfirm.username}" from this server?`
+                  ? `Unban "${pendingConfirm.username}" from this community?`
                   : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>

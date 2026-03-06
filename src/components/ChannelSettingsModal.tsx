@@ -65,6 +65,8 @@ interface ChannelSettingsModalProps {
   initialName: string;
   initialTopic: string | null;
   canDelete: boolean;
+  canManageChannelStructure: boolean;
+  canManageChannelPermissions: boolean;
   rolePermissions: ChannelRolePermissionItem[];
   memberPermissions: ChannelMemberPermissionItem[];
   availableMembers: ChannelMemberOption[];
@@ -83,15 +85,14 @@ interface ChannelSettingsModalProps {
   ) => Promise<void>;
 }
 
-type PermissionKey = keyof ChannelPermissionState;
+type PermissionKey = 'canView' | 'canSend';
 type PermissionSelectValue = 'default' | 'allow' | 'deny';
 
 type TabKey = 'general' | 'permissions';
 
 const PERMISSION_COLUMNS: Array<{ key: PermissionKey; label: string }> = [
-  { key: 'canView', label: 'View Channel' },
-  { key: 'canSend', label: 'Send Messages' },
-  { key: 'canManage', label: 'Manage Channel' },
+  { key: 'canView', label: 'Can view this channel' },
+  { key: 'canSend', label: 'Can send messages' },
 ];
 
 const permissionValueToSelectValue = (value: PermissionValue): PermissionSelectValue => {
@@ -106,14 +107,10 @@ const permissionSelectValueToPermissionValue = (value: PermissionSelectValue): P
   return null;
 };
 
-const permissionLabel = (value: PermissionValue, defaultValue?: boolean): string => {
-  if (value === true) return 'Yes';
-  if (value === false) return 'No';
-  if (typeof defaultValue === 'boolean') {
-    return defaultValue ? 'Yes (default)' : 'No (default)';
-  }
-  return 'Inherit';
-};
+const roleDefaultSelectLabel = (defaultValue: boolean): string =>
+  `Community Default [${defaultValue ? 'Yes' : 'No'}]`;
+
+const memberDefaultSelectLabel = (): string => 'Community Default';
 
 const rolePermissionDefaultValueForKey = (
   row: ChannelRolePermissionItem,
@@ -124,23 +121,8 @@ const rolePermissionDefaultValueForKey = (
       return row.defaultCanView;
     case 'canSend':
       return row.defaultCanSend;
-    case 'canManage':
-      return row.defaultCanManage;
     default:
       return false;
-  }
-};
-
-const permissionSentence = (subject: string, key: PermissionKey): string => {
-  switch (key) {
-    case 'canView':
-      return `${subject} can view this channel`;
-    case 'canSend':
-      return `${subject} can send messages`;
-    case 'canManage':
-      return `${subject} can manage this channel`;
-    default:
-      return subject;
   }
 };
 
@@ -148,6 +130,8 @@ export function ChannelSettingsModal({
   initialName,
   initialTopic,
   canDelete,
+  canManageChannelStructure,
+  canManageChannelPermissions,
   rolePermissions,
   memberPermissions,
   availableMembers,
@@ -159,7 +143,9 @@ export function ChannelSettingsModal({
   onSaveRolePermissions,
   onSaveMemberPermissions,
 }: ChannelSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('general');
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    canManageChannelStructure ? 'general' : 'permissions'
+  );
   const [name, setName] = useState(initialName);
   const [topic, setTopic] = useState(initialTopic ?? '');
   const [saving, setSaving] = useState(false);
@@ -188,21 +174,50 @@ export function ChannelSettingsModal({
     setMemberRows(memberPermissions);
   }, [memberPermissions]);
 
+  useEffect(() => {
+    if (!canManageChannelStructure && !canManageChannelPermissions) {
+      return;
+    }
+
+    if (activeTab === 'general' && !canManageChannelStructure && canManageChannelPermissions) {
+      setActiveTab('permissions');
+      return;
+    }
+
+    if (activeTab === 'permissions' && !canManageChannelPermissions && canManageChannelStructure) {
+      setActiveTab('general');
+    }
+  }, [activeTab, canManageChannelPermissions, canManageChannelStructure]);
+
+  const visibleRoleRows = useMemo(
+    () => roleRows.filter((roleRow) => roleRow.name.trim().toLowerCase() !== 'owner'),
+    [roleRows]
+  );
+
+  const visibleMemberRows = useMemo(
+    () => memberRows.filter((memberRow) => !memberRow.isOwner),
+    [memberRows]
+  );
+
   const hasPermissionRows = useMemo(
-    () => roleRows.length > 0 || memberRows.length > 0,
-    [roleRows.length, memberRows.length]
+    () => visibleRoleRows.length > 0 || visibleMemberRows.length > 0,
+    [visibleRoleRows.length, visibleMemberRows.length]
   );
 
   const availableMembersForAdd = useMemo(() => {
-    const existingMemberIds = new Set(memberRows.map((memberRow) => memberRow.memberId));
-    return availableMembers.filter((member) => !existingMemberIds.has(member.memberId));
-  }, [availableMembers, memberRows]);
+    const existingMemberIds = new Set(visibleMemberRows.map((memberRow) => memberRow.memberId));
+    return availableMembers.filter(
+      (member) => !member.isOwner && !existingMemberIds.has(member.memberId)
+    );
+  }, [availableMembers, visibleMemberRows]);
 
   const filteredMemberRows = useMemo(() => {
     const query = memberSearch.trim().toLowerCase();
-    if (!query) return memberRows;
-    return memberRows.filter((memberRow) => memberRow.displayName.toLowerCase().includes(query));
-  }, [memberRows, memberSearch]);
+    if (!query) return visibleMemberRows;
+    return visibleMemberRows.filter((memberRow) =>
+      memberRow.displayName.toLowerCase().includes(query)
+    );
+  }, [visibleMemberRows, memberSearch]);
 
   useEffect(() => {
     if (availableMembersForAdd.length === 0) {
@@ -217,6 +232,7 @@ export function ChannelSettingsModal({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageChannelStructure) return;
     if (!name.trim()) {
       setGeneralError('Channel name is required.');
       return;
@@ -238,6 +254,7 @@ export function ChannelSettingsModal({
   };
 
   const handleDelete = async () => {
+    if (!canManageChannelStructure) return;
     setDeleting(true);
     setGeneralError(null);
     try {
@@ -252,6 +269,7 @@ export function ChannelSettingsModal({
   };
 
   const handleAddMemberOverwrite = () => {
+    if (!canManageChannelPermissions) return;
     if (!addMemberId) return;
 
     const member = availableMembersForAdd.find((item) => item.memberId === addMemberId);
@@ -276,6 +294,7 @@ export function ChannelSettingsModal({
     key: PermissionKey,
     nextValue: PermissionValue
   ) => {
+    if (!canManageChannelPermissions) return;
     const row = roleRows.find((roleRow) => roleRow.roleId === roleId);
     if (!row || !row.editable) return;
 
@@ -313,8 +332,9 @@ export function ChannelSettingsModal({
     key: PermissionKey,
     nextValue: PermissionValue
   ) => {
+    if (!canManageChannelPermissions) return;
     const row = memberRows.find((memberRow) => memberRow.memberId === memberId);
-    if (!row) return;
+    if (!row || row.isOwner) return;
 
     const previousRow = row;
     const nextRow: ChannelMemberPermissionItem = {
@@ -358,12 +378,16 @@ export function ChannelSettingsModal({
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="space-y-5">
           <TabsList className="bg-[#142033]">
-            <TabsTrigger value="general" className="text-[#a9b8cf] data-[state=active]:text-white">
-              General
-            </TabsTrigger>
-            <TabsTrigger value="permissions" className="text-[#a9b8cf] data-[state=active]:text-white">
-              Permissions
-            </TabsTrigger>
+            {canManageChannelStructure && (
+              <TabsTrigger value="general" className="text-[#a9b8cf] data-[state=active]:text-white">
+                General
+              </TabsTrigger>
+            )}
+            {canManageChannelPermissions && (
+              <TabsTrigger value="permissions" className="text-[#a9b8cf] data-[state=active]:text-white">
+                Permissions
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="general">
@@ -379,6 +403,7 @@ export function ChannelSettingsModal({
                   className="bg-[#142033] border-[#304867] text-white"
                   required
                   maxLength={80}
+                  disabled={!canManageChannelStructure || saving || deleting}
                 />
               </div>
 
@@ -393,13 +418,19 @@ export function ChannelSettingsModal({
                   className="bg-[#142033] border-[#304867] text-white"
                   placeholder="What is this channel for?"
                   maxLength={200}
+                  disabled={!canManageChannelStructure || saving || deleting}
                 />
               </div>
 
               {generalError && <p className="text-sm text-red-400">{generalError}</p>}
+              {!canManageChannelStructure && (
+                <p className="text-xs text-[#d6a24a]">
+                  You can view this tab, but only members with Manage Channels can edit channel structure.
+                </p>
+              )}
 
               <DialogFooter className="justify-between sm:justify-between">
-                {canDelete ? (
+                {canDelete && canManageChannelStructure ? (
                   <Button
                     type="button"
                     onClick={() => setConfirmDeleteOpen(true)}
@@ -424,7 +455,7 @@ export function ChannelSettingsModal({
                   </Button>
                   <Button
                     type="submit"
-                    disabled={saving || deleting}
+                    disabled={saving || deleting || !canManageChannelStructure}
                     className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
                   >
                     {saving ? 'Saving...' : 'Save'}
@@ -438,11 +469,10 @@ export function ChannelSettingsModal({
             <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-1">
               <p className="text-sm font-medium text-white">How channel permissions work</p>
               <p className="text-xs text-[#a9b8cf]">
-                Role rows show the effective server default directly in the dropdown (for example,
-                “Yes (default)”).
+                Role rows show the effective community default directly in the dropdown.
               </p>
               <p className="text-xs text-[#a9b8cf]">
-                Priority: Member overwrites, then role overwrites, then server role permissions.
+                Priority: Member overwrites, then role overwrites, then community role permissions.
               </p>
               <p className="text-xs text-[#a9b8cf]">At each layer, Deny overrides Allow.</p>
             </div>
@@ -483,7 +513,7 @@ export function ChannelSettingsModal({
                     Applies to everyone with that role in this channel.
                   </p>
                   <div className="space-y-2">
-                    {roleRows.map((roleRow) => (
+                    {visibleRoleRows.map((roleRow) => (
                       <div
                         key={roleRow.roleId}
                         className="bg-[#142033] rounded-lg p-3 flex flex-col gap-2"
@@ -514,12 +544,7 @@ export function ChannelSettingsModal({
                                 className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-[#304867] bg-[#111a2b] p-2"
                               >
                                 <div className="min-w-0">
-                                  <p className="text-sm text-white">
-                                    {permissionSentence(roleRow.name, column.key)}
-                                  </p>
-                                  <p className="text-xs text-[#8ea4c7]">
-                                    Server default: {defaultValue ? 'Yes' : 'No'}
-                                  </p>
+                                  <p className="text-sm text-white">{column.label}</p>
                                 </div>
                                 <Select
                                   value={permissionValueToSelectValue(value)}
@@ -532,18 +557,22 @@ export function ChannelSettingsModal({
                                       )
                                     )
                                   }
-                                  disabled={permissionSavingKey !== null || !roleRow.editable}
+                                  disabled={
+                                    permissionSavingKey !== null ||
+                                    !roleRow.editable ||
+                                    !canManageChannelPermissions
+                                  }
                                 >
                                   <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
                                     <SelectValue
-                                      placeholder={permissionLabel(null, defaultValue)}
+                                      placeholder={roleDefaultSelectLabel(defaultValue)}
                                     />
                                   </SelectTrigger>
                                   <SelectContent className="bg-[#142033] border-[#304867] text-white">
                                     <SelectItem value="default">
                                       {permissionSavingKey === saveKey
                                         ? 'Saving...'
-                                        : permissionLabel(null, defaultValue)}
+                                        : roleDefaultSelectLabel(defaultValue)}
                                     </SelectItem>
                                     <SelectItem value="allow">Yes</SelectItem>
                                     <SelectItem value="deny">No</SelectItem>
@@ -563,6 +592,9 @@ export function ChannelSettingsModal({
                   <p className="text-xs text-[#8ea4c7]">
                     Member-specific settings take priority over role overwrites.
                   </p>
+                  <p className="text-xs text-[#8ea4c7]">
+                    Community owner overwrite controls are hidden in this view.
+                  </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <Input
@@ -570,11 +602,12 @@ export function ChannelSettingsModal({
                       onChange={(e) => setMemberSearch(e.target.value)}
                       placeholder="Search overwrites..."
                       className="bg-[#142033] border-[#304867] text-white"
+                      disabled={!canManageChannelPermissions}
                     />
                     <Select
                       value={addMemberId}
                       onValueChange={setAddMemberId}
-                      disabled={availableMembersForAdd.length === 0}
+                      disabled={!canManageChannelPermissions || availableMembersForAdd.length === 0}
                     >
                       <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
                         <SelectValue placeholder="Select member" />
@@ -596,7 +629,9 @@ export function ChannelSettingsModal({
                     <Button
                       type="button"
                       onClick={handleAddMemberOverwrite}
-                      disabled={!addMemberId || availableMembersForAdd.length === 0}
+                      disabled={
+                        !canManageChannelPermissions || !addMemberId || availableMembersForAdd.length === 0
+                      }
                       className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
                     >
                       Add Member Overwrite
@@ -614,11 +649,6 @@ export function ChannelSettingsModal({
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-white text-sm font-medium">{memberRow.displayName}</span>
-                            {memberRow.isOwner && (
-                              <span className="px-1.5 py-0.5 rounded bg-[#3f79d8]/20 text-[#b7c5ff] text-[10px] font-semibold uppercase tracking-wide">
-                                Owner
-                              </span>
-                            )}
                           </div>
                           <div className="space-y-2">
                             {PERMISSION_COLUMNS.map((column) => {
@@ -630,12 +660,7 @@ export function ChannelSettingsModal({
                                   className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-[#304867] bg-[#111a2b] p-2"
                                 >
                                   <div className="min-w-0">
-                                    <p className="text-sm text-white">
-                                      {permissionSentence(memberRow.displayName, column.key)}
-                                    </p>
-                                    <p className="text-xs text-[#8ea4c7]">
-                                      Member-specific override (takes priority over roles)
-                                    </p>
+                                    <p className="text-sm text-white">{column.label}</p>
                                   </div>
                                   <Select
                                     value={permissionValueToSelectValue(value)}
@@ -648,14 +673,16 @@ export function ChannelSettingsModal({
                                         )
                                       )
                                     }
-                                    disabled={permissionSavingKey !== null}
+                                    disabled={permissionSavingKey !== null || !canManageChannelPermissions}
                                   >
                                     <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
-                                      <SelectValue placeholder={permissionLabel(null)} />
+                                      <SelectValue placeholder={memberDefaultSelectLabel()} />
                                     </SelectTrigger>
                                     <SelectContent className="bg-[#142033] border-[#304867] text-white">
                                       <SelectItem value="default">
-                                        {permissionSavingKey === saveKey ? 'Saving...' : permissionLabel(null)}
+                                        {permissionSavingKey === saveKey
+                                          ? 'Saving...'
+                                          : memberDefaultSelectLabel()}
                                       </SelectItem>
                                       <SelectItem value="allow">Yes</SelectItem>
                                       <SelectItem value="deny">No</SelectItem>
@@ -710,4 +737,5 @@ export function ChannelSettingsModal({
     </Dialog>
   );
 }
+
 

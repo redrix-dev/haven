@@ -72,6 +72,9 @@ export function ChatApp() {
   }
 
   const { user } = app;
+  const canManageChannelStructure = app.serverPermissions.canManageChannelStructure;
+  const canManageChannelPermissions = app.serverPermissions.canManageChannelPermissions;
+  const canOpenChannelSettings = canManageChannelStructure || canManageChannelPermissions;
 
   return (
     <>
@@ -309,22 +312,22 @@ export function ChatApp() {
                   ? () => app.setShowCreateChannelModal(true)
                   : undefined
               }
-              canManageChannels={app.serverPermissions.canManageChannels}
+              canManageChannels={canOpenChannelSettings}
               onRenameChannel={
-                app.serverPermissions.canManageChannels ? app.handleRenameChannel : undefined
+                canManageChannelStructure ? app.handleRenameChannel : undefined
               }
               onDeleteChannel={
-                app.serverPermissions.canManageChannels ? app.handleDeleteChannel : undefined
+                canManageChannelStructure ? app.handleDeleteChannel : undefined
               }
               onOpenChannelSettings={
-                app.serverPermissions.canManageChannels
+                canOpenChannelSettings
                   ? (channelId) => {
                       void app.openChannelSettingsModal(channelId);
                     }
                   : undefined
               }
               onAddChannelToGroup={
-                app.serverPermissions.canManageChannels
+                canManageChannelStructure
                   ? (channelId, groupId) => {
                       void app.assignChannelToGroup(channelId, groupId).catch((error: unknown) => {
                         toast.error(getErrorMessage(error, 'Failed to assign channel to group.'), {
@@ -335,7 +338,7 @@ export function ChatApp() {
                   : undefined
               }
               onRemoveChannelFromGroup={
-                app.serverPermissions.canManageChannels
+                canManageChannelStructure
                   ? (channelId) => {
                       void app.removeChannelFromGroup(channelId).catch((error: unknown) => {
                         toast.error(
@@ -347,7 +350,7 @@ export function ChatApp() {
                   : undefined
               }
               onCreateChannelGroup={
-                app.serverPermissions.canManageChannels
+                canManageChannelStructure
                   ? app.handleCreateChannelGroup
                   : undefined
               }
@@ -357,10 +360,10 @@ export function ChatApp() {
                 });
               }}
               onRenameChannelGroup={
-                app.serverPermissions.canManageChannels ? app.handleRenameChannelGroup : undefined
+                canManageChannelStructure ? app.handleRenameChannelGroup : undefined
               }
               onDeleteChannelGroup={
-                app.serverPermissions.canManageChannels ? app.handleDeleteChannelGroup : undefined
+                canManageChannelStructure ? app.handleDeleteChannelGroup : undefined
               }
               onOpenServerSettings={
                 app.canOpenServerSettings
@@ -391,7 +394,7 @@ export function ChatApp() {
                 canRefreshLinkPreviews={app.serverPermissions.canRefreshLinkPreviews}
                 showVoiceDiagnostics={app.isPlatformStaff}
                 onOpenChannelSettings={
-                  app.serverPermissions.canManageChannels
+                  canOpenChannelSettings
                     ? () => void app.openChannelSettingsModal(app.currentRenderableChannel!.id)
                     : undefined
                 }
@@ -761,11 +764,13 @@ export function ChatApp() {
 
       {app.showChannelSettingsModal &&
         app.channelSettingsTarget &&
-        app.serverPermissions.canManageChannels && (
+        canOpenChannelSettings && (
           <ChannelSettingsModal
             initialName={app.channelSettingsTarget.name}
             initialTopic={app.channelSettingsTarget.topic}
             canDelete={app.channels.length > 1}
+            canManageChannelStructure={canManageChannelStructure}
+            canManageChannelPermissions={canManageChannelPermissions}
             rolePermissions={app.channelRolePermissions}
             memberPermissions={app.channelMemberPermissions}
             availableMembers={app.channelPermissionMemberOptions}
@@ -809,7 +814,7 @@ export function ChatApp() {
 
       <QuickRenameDialog
         open={Boolean(app.renameServerDraft)}
-        title="Rename Server"
+        title="Rename Community"
         initialValue={app.renameServerDraft?.currentName ?? ''}
         confirmLabel="Rename"
         onClose={() => app.setRenameServerDraft(null)}
