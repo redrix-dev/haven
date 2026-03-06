@@ -18,7 +18,8 @@ void (async () => {
 
 const isMobile = window.innerWidth <= 768;
 console.log('isMobile:', isMobile, 'width:', window.innerWidth);
-const root = createRoot(document.body);
+const appHost = document.getElementById('haven-web-root') ?? document.body;
+const root = createRoot(appHost);
 
 root.render(
   <TooltipProvider>

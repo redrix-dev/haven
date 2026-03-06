@@ -4,7 +4,7 @@ import type { DirectMessage } from '@/lib/backend/types';
 import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
-import { useMobileComposerViewportAnchor } from '@/renderer/mobile/useMobileComposerViewportAnchor';
+import { isNearBottom } from '@/renderer/mobile/scrollAnchor';
 
 interface ContextMenuState {
   message: DirectMessage;
@@ -45,13 +45,22 @@ export function MobileDmConversationView({
   const hasInitializedScrollRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const longPress = useMobileLongPress();
-  const {
-    handleComposerBlur,
-    handleComposerFocus,
-    isNearBottomRef,
-  } = useMobileComposerViewportAnchor({
-    scrollRef,
-  });
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+
+    if (!hasInitializedScrollRef.current) {
+      hasInitializedScrollRef.current = true;
+      node.scrollTop = node.scrollHeight;
+      return;
+    }
+
+    if (!isNearBottom(node)) {
+      return;
+    }
+
+    node.scrollTop = node.scrollHeight;
+  }, [messages.length, scrollRef]);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -63,7 +72,7 @@ export function MobileDmConversationView({
       return;
     }
 
-    if (!isNearBottomRef.current) {
+    if (!isNearBottom(node)) {
       return;
     }
 
@@ -201,8 +210,6 @@ export function MobileDmConversationView({
         onSend={handleSend}
         sending={sendPending}
         placeholder="Message..."
-        onFocus={handleComposerFocus}
-        onBlur={handleComposerBlur}
       />
 
       <MobileLongPressMenu

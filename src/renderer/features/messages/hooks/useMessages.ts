@@ -229,16 +229,6 @@ export function useMessages({
     await loader();
   }, []);
 
-  const getMessageLoadRuntime = React.useCallback(
-    () => ({
-      latestLoadId: latestLoadIdRef.current,
-      olderLoadInFlight: olderLoadInFlightRef.current,
-      hasOlderMessages: currentHasOlderMessagesRef.current,
-      oldestLoadedCursor: oldestLoadedCursorRef.current,
-    }),
-    []
-  );
-
   const createNextMessageLoadId = React.useCallback(() => {
     latestLoadIdRef.current += 1;
     return latestLoadIdRef.current;
@@ -279,16 +269,6 @@ export function useMessages({
     olderLoadInFlightRef.current = false;
     if (options?.updateUi === false) return;
     setIsLoadingOlderMessages(false);
-  }, []);
-
-  const resetMessagePagination = React.useCallback(() => {
-    latestLoadIdRef.current = 0;
-    olderLoadInFlightRef.current = false;
-    currentHasOlderMessagesRef.current = false;
-    oldestLoadedCursorRef.current = null;
-    setHasOlderMessages(false);
-    setIsLoadingOlderMessages(false);
-    requestOlderMessagesRef.current = null;
   }, []);
 
   const resetMessageState = React.useCallback(() => {

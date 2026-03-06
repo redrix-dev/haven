@@ -23,11 +23,9 @@ type AuthorProfile = {
 };
 
 interface ChatAreaProps {
-  communityId: string;
   channelId: string;
   channelName: string;
   channelKind: ChannelKind;
-  currentUserDisplayName: string;
   messages: Message[];
   messageReactions: MessageReaction[];
   messageAttachments: MessageAttachment[];
@@ -84,11 +82,9 @@ interface ChatAreaProps {
 }
 
 export function ChatArea({
-  communityId,
   channelId,
   channelName,
   channelKind,
-  currentUserDisplayName,
   messages,
   messageReactions,
   messageAttachments,

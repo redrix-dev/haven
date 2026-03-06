@@ -30,6 +30,7 @@ type UseNotificationsInput = {
   userId: string | null | undefined;
   notificationsPanelOpen: boolean;
   audioSettings: NotificationAudioSettings;
+  autoMarkSeenOnPanelOpen?: boolean;
 };
 
 export function useNotifications({
@@ -37,6 +38,7 @@ export function useNotifications({
   userId,
   notificationsPanelOpen,
   audioSettings,
+  autoMarkSeenOnPanelOpen = false,
 }: UseNotificationsInput) {
   const [notificationItems, setNotificationItems] = React.useState<NotificationItem[]>([]);
   const [notificationCounts, setNotificationCounts] = React.useState<NotificationCounts>(
@@ -245,6 +247,7 @@ export function useNotifications({
   }, [notificationBackend, refreshNotificationInbox, userId]);
 
   React.useEffect(() => {
+    if (!autoMarkSeenOnPanelOpen) return;
     if (!notificationsPanelOpen || !userId) return;
     if (notificationCounts.unseenCount <= 0) return;
 
@@ -254,7 +257,14 @@ export function useNotifications({
       .catch((error) => {
         console.error('Failed to mark notifications seen:', error);
       });
-  }, [notificationBackend, notificationCounts.unseenCount, notificationsPanelOpen, refreshNotificationInbox, userId]);
+  }, [
+    autoMarkSeenOnPanelOpen,
+    notificationBackend,
+    notificationCounts.unseenCount,
+    notificationsPanelOpen,
+    refreshNotificationInbox,
+    userId,
+  ]);
 
   const saveNotificationPreferences = React.useCallback(
     async (values: NotificationPreferenceUpdate) => {

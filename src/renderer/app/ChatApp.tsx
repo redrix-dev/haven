@@ -139,7 +139,9 @@ export function ChatApp() {
               refreshing={app.dmConversationsRefreshing}
               error={app.dmConversationsError}
               onSelectConversation={(conversationId) => {
-                app.setSelectedDmConversationId(conversationId);
+                void app.openDirectMessageConversation(conversationId).catch((error: unknown) => {
+                  toast.error(getErrorMessage(error, 'Failed to open direct message.'));
+                });
               }}
               onRefresh={() => {
                 void app.refreshDmConversations({ suppressLoadingState: true });
@@ -373,11 +375,9 @@ export function ChatApp() {
               </div>
             ) : app.currentRenderableChannel ? (
               <ChatArea
-                communityId={app.currentServer.id}
                 channelId={app.currentRenderableChannel.id}
                 channelName={app.currentRenderableChannel.name}
                 channelKind={app.currentRenderableChannel.kind}
-                currentUserDisplayName={app.userDisplayName}
                 messages={app.messages}
                 messageReactions={app.messageReactions}
                 messageAttachments={app.messageAttachments}

@@ -194,7 +194,6 @@ export function MobileChatApp() {
           setMobileScreen('notifications');
         }}
         onDmPress={() => {
-          app.setWorkspaceMode('dm');
           setMobileScreen('dm-inbox');
         }}
         onFriendsPress={() => app.setFriendsPanelOpen(true)}
@@ -257,10 +256,8 @@ export function MobileChatApp() {
             <MobileChannelView
               channelName={app.currentChannel.name}
               currentUserId={app.user.id}
-              currentUserDisplayName={app.userDisplayName}
               messages={app.messages}
               messageReactions={app.messageReactions}
-              messageAttachments={app.messageAttachments}
               messageLinkPreviews={app.messageLinkPreviews}
               authorProfiles={app.authorProfiles}
               hasOlderMessages={app.hasOlderMessages}
@@ -285,7 +282,10 @@ export function MobileChatApp() {
             error={app.dmConversationsError}
             currentUserId={app.user.id}
             onSelectConversation={(conversationId) => {
-              app.setSelectedDmConversationId(conversationId);
+              app.setWorkspaceMode('dm');
+              void app.openDirectMessageConversation(conversationId).catch((error: unknown) => {
+                toast.error(getErrorMessage(error, 'Failed to open direct message.'));
+              });
               setMobileScreen('dm-conversation');
             }}
             onRefresh={(options) => {

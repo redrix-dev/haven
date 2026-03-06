@@ -1,16 +1,12 @@
 import React from 'react';
 import { toast } from 'sonner';
 import type { SocialBackend } from '@/lib/backend/socialBackend';
-import type { DirectMessageConversationSummary } from '@/lib/backend/types';
 import { getErrorMessage } from '@/shared/lib/errors';
 
 type UseDirectMessageInteractionsInput = {
   dmWorkspaceEnabled: boolean;
   friendsSocialPanelEnabled: boolean;
   currentUserId: string | null | undefined;
-  selectedDmConversationId: string | null;
-  dmConversations: DirectMessageConversationSummary[];
-  setSelectedDmConversationId: React.Dispatch<React.SetStateAction<string | null>>;
   setDmConversationsError: React.Dispatch<React.SetStateAction<string | null>>;
   refreshDmConversations: (options?: { suppressLoadingState?: boolean }) => Promise<void>;
   openDirectMessageWithUser: (targetUserId: string) => Promise<void>;
@@ -27,9 +23,6 @@ export function useDirectMessageInteractions({
   dmWorkspaceEnabled,
   friendsSocialPanelEnabled,
   currentUserId,
-  selectedDmConversationId,
-  dmConversations,
-  setSelectedDmConversationId,
   setDmConversationsError,
   refreshDmConversations,
   openDirectMessageWithUser,
@@ -52,10 +45,6 @@ export function useDirectMessageInteractions({
     onOpenDmWorkspace();
     setDmConversationsError(null);
 
-    if (!selectedDmConversationId && dmConversations.length > 0) {
-      setSelectedDmConversationId(dmConversations[0].conversationId);
-    }
-
     void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
       const message = getErrorMessage(error, 'Failed to load direct messages.');
       console.error('Failed to open direct messages workspace:', error);
@@ -63,13 +52,10 @@ export function useDirectMessageInteractions({
       toast.error(message, { id: 'dm-workspace-open-error' });
     });
   }, [
-    dmConversations,
     dmWorkspaceEnabled,
     onOpenDmWorkspace,
     refreshDmConversations,
-    selectedDmConversationId,
     setDmConversationsError,
-    setSelectedDmConversationId,
   ]);
 
   const directMessageUser = React.useCallback(
