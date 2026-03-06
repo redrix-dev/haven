@@ -139,7 +139,9 @@ export function ChatApp() {
               refreshing={app.dmConversationsRefreshing}
               error={app.dmConversationsError}
               onSelectConversation={(conversationId) => {
-                app.setSelectedDmConversationId(conversationId);
+                void app.openDirectMessageConversation(conversationId).catch((error: unknown) => {
+                  toast.error(getErrorMessage(error, 'Failed to open direct message.'));
+                });
               }}
               onRefresh={() => {
                 void app.refreshDmConversations({ suppressLoadingState: true });

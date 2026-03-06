@@ -202,19 +202,12 @@ export function useDirectMessages({
   }, [enabled, refreshDmConversations, setSelectedDmConversationId, userId]);
 
   React.useEffect(() => {
-    if (!isActive) return;
-    if (selectedDmConversationId) {
-      const stillExists = dmConversations.some(
-        (conversation) => conversation.conversationId === selectedDmConversationId
-      );
-      if (!stillExists) {
-        setSelectedDmConversationId(dmConversations[0]?.conversationId ?? null);
-      }
-      return;
-    }
-
-    if (dmConversations.length > 0) {
-      setSelectedDmConversationId(dmConversations[0].conversationId);
+    if (!isActive || !selectedDmConversationId) return;
+    const stillExists = dmConversations.some(
+      (conversation) => conversation.conversationId === selectedDmConversationId
+    );
+    if (!stillExists) {
+      setSelectedDmConversationId(null);
     }
   }, [dmConversations, isActive, selectedDmConversationId, setSelectedDmConversationId]);
 
@@ -245,7 +238,7 @@ export function useDirectMessages({
 
     void refreshDmMessages(selectedDmConversationId, {
       suppressLoadingState: hasCachedMessages,
-      markRead: true,
+      markRead: false,
     }).catch((error) => {
       console.error('Failed to load selected DM conversation:', error);
     });
@@ -283,7 +276,6 @@ export function useDirectMessages({
         throw new Error('DM conversation id is required.');
       }
 
-      const wasAlreadySelected = selectedDmConversationIdRef.current === conversationId;
       setSelectedDmConversationId(conversationId);
       const hasCachedMessages = applyCachedDmMessages(conversationId);
       if (!hasCachedMessages) {
@@ -292,12 +284,10 @@ export function useDirectMessages({
         setDmMessagesRefreshing(false);
         setDmMessagesError(null);
       }
-      if (wasAlreadySelected) {
-        void refreshDmMessages(conversationId, {
-          suppressLoadingState: hasCachedMessages,
-          markRead: true,
-        });
-      }
+      void refreshDmMessages(conversationId, {
+        suppressLoadingState: hasCachedMessages,
+        markRead: true,
+      });
 
       const conversationExists = dmConversations.some(
         (conversation) => conversation.conversationId === conversationId

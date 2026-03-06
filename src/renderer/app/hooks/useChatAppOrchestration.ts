@@ -494,6 +494,7 @@ export function useChatAppOrchestration() {
     userId: user?.id,
     notificationsPanelOpen,
     audioSettings: appSettings.notifications,
+    autoMarkSeenOnPanelOpen: false,
   });
 
   // ── Social / Friends ──────────────────────────────────────────────────────
@@ -564,9 +565,6 @@ export function useChatAppOrchestration() {
     dmWorkspaceEnabled,
     friendsSocialPanelEnabled,
     currentUserId: user?.id,
-    selectedDmConversationId,
-    dmConversations,
-    setSelectedDmConversationId,
     setDmConversationsError,
     refreshDmConversations,
     openDirectMessageWithUser,

@@ -7,21 +7,13 @@ on:
       - main
       - master
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint-typecheck-unit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npx tsc --noEmit --project tsconfig.json
-      - run: npm run test:unit
-
-  supabase-db-rls:
+  verify:
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,29 +27,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: npm ci
       - run: supabase start
-      - run: npm run test:db
-      - name: Stop Supabase
-        if: always()
-        run: supabase stop
-
-  supabase-backend-contract:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
-      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - run: npm ci
-      - run: supabase start
-      - run: supabase db reset --local
-      - run: npm run test:db:users
-      - run: npm run test:db:fixtures
-      - run: npm run test:backend
+      - run: npm run ci:verify
       - name: Stop Supabase
         if: always()
         run: supabase stop
