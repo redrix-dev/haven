@@ -881,43 +881,43 @@ export function ServerSettingsModal({
                     ))}
                   </div>
                 ) : (
-                  <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-4">
-                    <div className="space-y-3 min-h-0 flex flex-col">
-                      <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
-                        <p className="text-sm font-semibold text-white">Create Role</p>
-                        <Input
-                          value={newRoleName}
-                          onChange={(e) => setNewRoleName(e.target.value)}
-                          placeholder="Role name"
-                          className="bg-[#101a2b] border-[#304867] text-white"
-                          disabled={!canManageRoles || roleActionSaving}
-                        />
-                        <div className="flex items-center gap-2">
+                  <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+                      <div className="space-y-3 xl:sticky xl:top-0 xl:self-start">
+                        <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
+                          <p className="text-sm font-semibold text-white">Create Role</p>
                           <Input
-                            type="color"
-                            value={newRoleColor}
-                            onChange={(e) => setNewRoleColor(e.target.value)}
-                            className="h-9 w-14 p-1 bg-[#101a2b] border-[#304867]"
+                            value={newRoleName}
+                            onChange={(e) => setNewRoleName(e.target.value)}
+                            placeholder="Role name"
+                            className="bg-[#101a2b] border-[#304867] text-white"
                             disabled={!canManageRoles || roleActionSaving}
                           />
-                          <Button
-                            type="button"
-                            onClick={() => void handleCreateRole()}
-                            disabled={!canManageRoles || roleActionSaving}
-                            className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-                          >
-                            {roleActionSaving ? 'Creating...' : 'Create'}
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="color"
+                              value={newRoleColor}
+                              onChange={(e) => setNewRoleColor(e.target.value)}
+                              className="h-9 w-14 p-1 bg-[#101a2b] border-[#304867]"
+                              disabled={!canManageRoles || roleActionSaving}
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => void handleCreateRole()}
+                              disabled={!canManageRoles || roleActionSaving}
+                              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                            >
+                              {roleActionSaving ? 'Creating...' : 'Create'}
+                            </Button>
+                          </div>
+                          {!canManageRoles && (
+                            <p className="text-xs text-[#d6a24a]">
+                              You need Manage Roles to create or edit roles.
+                            </p>
+                          )}
                         </div>
-                        {!canManageRoles && (
-                          <p className="text-xs text-[#d6a24a]">
-                            You need Manage Roles to create or edit roles.
-                          </p>
-                        )}
-                      </div>
 
-                      <div className="rounded-md border border-[#304867] bg-[#142033] min-h-0 flex-1 overflow-hidden">
-                        <div className="scrollbar-inset h-full min-h-0 overflow-y-auto p-2 space-y-1">
+                        <div className="rounded-md border border-[#304867] bg-[#142033] p-2 space-y-1">
                           {roles.length === 0 ? (
                             <p className="text-sm text-[#a9b8cf] px-2 py-3">No roles found.</p>
                           ) : (
@@ -953,57 +953,73 @@ export function ServerSettingsModal({
                           )}
                         </div>
                       </div>
-                    </div>
 
-                    <div className="rounded-md border border-[#304867] bg-[#142033] min-h-0 flex flex-col overflow-hidden">
-                      {!selectedRole || !roleDraft ? (
-                        <p className="p-4 text-sm text-[#a9b8cf]">Select a role to edit its permissions.</p>
-                      ) : (
-                        <div className="p-4 min-h-0 flex flex-col gap-4">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-lg font-semibold text-white">{selectedRole.name}</p>
-                            {selectedRole.isDefault && <Badge variant="outline">Default</Badge>}
-                            {selectedRole.isSystem && <Badge variant="outline">System</Badge>}
-                            <Badge variant="outline">{selectedRole.memberCount} members</Badge>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Role Name</Label>
-                              <Input
-                                value={roleDraft.name}
-                                onChange={(e) =>
-                                  setRoleDraft({
-                                    ...roleDraft,
-                                    name: e.target.value,
-                                  })
-                                }
-                                className="bg-[#101a2b] border-[#304867] text-white"
-                                disabled={!canEditSelectedRoleDetails || roleActionSaving}
-                              />
+                      <div className="rounded-md border border-[#304867] bg-[#142033] flex flex-col">
+                        {!selectedRole || !roleDraft ? (
+                          <p className="p-4 text-sm text-[#a9b8cf]">Select a role to edit its permissions.</p>
+                        ) : (
+                          <div className="p-4 flex flex-col gap-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-lg font-semibold text-white">{selectedRole.name}</p>
+                              {selectedRole.isDefault && <Badge variant="outline">Default</Badge>}
+                              {selectedRole.isSystem && <Badge variant="outline">System</Badge>}
+                              <Badge variant="outline">{selectedRole.memberCount} members</Badge>
                             </div>
 
-                            <div className="space-y-2">
-                              <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Color</Label>
-                              <div className="flex items-center gap-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                              <div className="space-y-2">
+                                <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Role Name</Label>
                                 <Input
-                                  type="color"
-                                  value={roleDraft.color}
+                                  value={roleDraft.name}
                                   onChange={(e) =>
                                     setRoleDraft({
                                       ...roleDraft,
-                                      color: e.target.value,
+                                      name: e.target.value,
                                     })
                                   }
-                                  className="h-9 w-14 p-1 bg-[#101a2b] border-[#304867]"
+                                  className="bg-[#101a2b] border-[#304867] text-white"
                                   disabled={!canEditSelectedRoleDetails || roleActionSaving}
                                 />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Color</Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="color"
+                                    value={roleDraft.color}
+                                    onChange={(e) =>
+                                      setRoleDraft({
+                                        ...roleDraft,
+                                        color: e.target.value,
+                                      })
+                                    }
+                                    className="h-9 w-14 p-1 bg-[#101a2b] border-[#304867]"
+                                    disabled={!canEditSelectedRoleDetails || roleActionSaving}
+                                  />
+                                  <Input
+                                    value={roleDraft.color}
+                                    onChange={(e) =>
+                                      setRoleDraft({
+                                        ...roleDraft,
+                                        color: e.target.value,
+                                      })
+                                    }
+                                    className="bg-[#101a2b] border-[#304867] text-white"
+                                    disabled={!canEditSelectedRoleDetails || roleActionSaving}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Tier</Label>
                                 <Input
-                                  value={roleDraft.color}
+                                  type="number"
+                                  value={roleDraft.position}
                                   onChange={(e) =>
                                     setRoleDraft({
                                       ...roleDraft,
-                                      color: e.target.value,
+                                      position: Number(e.target.value),
                                     })
                                   }
                                   className="bg-[#101a2b] border-[#304867] text-white"
@@ -1013,90 +1029,74 @@ export function ServerSettingsModal({
                             </div>
 
                             <div className="space-y-2">
-                              <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Tier</Label>
-                              <Input
-                                type="number"
-                                value={roleDraft.position}
-                                onChange={(e) =>
-                                  setRoleDraft({
-                                    ...roleDraft,
-                                    position: Number(e.target.value),
-                                  })
-                                }
-                                className="bg-[#101a2b] border-[#304867] text-white"
-                                disabled={!canEditSelectedRoleDetails || roleActionSaving}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-2 min-h-0 flex-1 flex flex-col">
-                            <p className="text-xs font-semibold uppercase text-[#a9b8cf]">Permissions</p>
-                            <p className="text-[11px] text-[#8ea4c7]">
-                              Reserved internal permissions are hidden from this editor.
-                            </p>
-                            <div className="min-h-0 flex-1 rounded-md border border-[#304867] overflow-hidden">
-                              <div className="scrollbar-inset h-full min-h-0 overflow-y-auto space-y-3 p-2">
-                                {visiblePermissionGroups.map((group) => (
-                                  <section
-                                    key={group.scope}
-                                    className="rounded-md border border-[#304867] bg-[#101a2b]"
-                                  >
-                                    <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
-                                      {group.label}
-                                    </p>
-                                    <div className="divide-y divide-[#233753]">
-                                      {group.permissions.map((permission) => {
-                                        const checked = roleDraft.permissionKeys.includes(permission.key);
-                                        return (
-                                          <label
-                                            key={permission.key}
-                                            className="flex items-start gap-3 p-3 text-sm text-[#e6edf7]"
-                                          >
-                                            <Checkbox
-                                              checked={checked}
-                                              onCheckedChange={() => toggleDraftPermission(permission.key)}
-                                              disabled={!canEditSelectedRolePermissions || roleActionSaving}
-                                            />
-                                            <span className="space-y-1">
-                                              <span className="block font-medium text-white">
-                                                {permission.label}
+                              <p className="text-xs font-semibold uppercase text-[#a9b8cf]">Permissions</p>
+                              <p className="text-[11px] text-[#8ea4c7]">
+                                Reserved internal permissions are hidden from this editor.
+                              </p>
+                              <div className="rounded-md border border-[#304867] overflow-hidden">
+                                <div className="space-y-3 p-2">
+                                  {visiblePermissionGroups.map((group) => (
+                                    <section
+                                      key={group.scope}
+                                      className="rounded-md border border-[#304867] bg-[#101a2b]"
+                                    >
+                                      <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                                        {group.label}
+                                      </p>
+                                      <div className="divide-y divide-[#233753]">
+                                        {group.permissions.map((permission) => {
+                                          const checked = roleDraft.permissionKeys.includes(permission.key);
+                                          return (
+                                            <label
+                                              key={permission.key}
+                                              className="flex items-start gap-3 p-3 text-sm text-[#e6edf7]"
+                                            >
+                                              <Checkbox
+                                                checked={checked}
+                                                onCheckedChange={() => toggleDraftPermission(permission.key)}
+                                                disabled={!canEditSelectedRolePermissions || roleActionSaving}
+                                              />
+                                              <span className="space-y-1">
+                                                <span className="block font-medium text-white">
+                                                  {permission.label}
+                                                </span>
+                                                <span className="block text-xs text-[#a9b8cf]">
+                                                  {permission.description}
+                                                </span>
                                               </span>
-                                              <span className="block text-xs text-[#a9b8cf]">
-                                                {permission.description}
-                                              </span>
-                                            </span>
-                                          </label>
-                                        );
-                                      })}
-                                    </div>
-                                  </section>
-                                ))}
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    </section>
+                                  ))}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center justify-between gap-3">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              onClick={() => void handleDeleteRole()}
-                              disabled={!canDeleteSelectedRole || roleActionSaving}
-                              className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
-                            >
-                              Delete Role
-                            </Button>
+                            <div className="flex items-center justify-between gap-3">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => void handleDeleteRole()}
+                                disabled={!canDeleteSelectedRole || roleActionSaving}
+                                className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
+                              >
+                                Delete Role
+                              </Button>
 
-                            <Button
-                              type="button"
-                              onClick={() => void handleSaveRole()}
-                              disabled={roleActionSaving || !canEditSelectedRolePermissions}
-                              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-                            >
-                              {roleActionSaving ? 'Saving...' : 'Save Role'}
-                            </Button>
+                              <Button
+                                type="button"
+                                onClick={() => void handleSaveRole()}
+                                disabled={roleActionSaving || !canEditSelectedRolePermissions}
+                                className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                              >
+                                {roleActionSaving ? 'Saving...' : 'Save Role'}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
