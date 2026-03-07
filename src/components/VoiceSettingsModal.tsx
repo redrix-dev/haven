@@ -105,14 +105,14 @@ export function VoiceSettingsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="lg"
-        className="scrollbar-inset max-h-[88vh] overflow-y-auto bg-[#18243a] border-[#142033] text-white md:w-[min(92vw,860px)] md:max-w-none md:h-[min(86dvh,760px)] md:max-h-[calc(100dvh-1.5rem)] md:flex md:flex-col md:gap-0 md:overflow-hidden md:p-0"
+        className="max-h-[88vh] bg-[#18243a] border-[#142033] text-white md:w-[min(92vw,860px)] md:max-w-none md:h-[min(86dvh,760px)] md:max-h-[calc(100dvh-1.5rem)] min-h-0 flex flex-col gap-0 overflow-hidden p-0"
         showCloseButton={false}
       >
-        <DialogHeader className="md:shrink-0 md:border-b md:border-[#233753] md:px-6 md:py-4">
+        <DialogHeader className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
           <DialogTitle className="text-2xl font-bold text-white">Voice Settings</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 md:scrollbar-inset md:min-h-0 md:flex-1 md:overflow-y-auto md:px-6 md:py-5">
+        <div className="scrollbar-inset min-h-0 flex-1 overflow-y-auto space-y-4 px-4 py-4 sm:px-6 sm:py-5">
           <div className="rounded-xl border border-[#304867] bg-[#142033] p-4 space-y-3">
             <div>
               <p className="text-sm font-semibold text-white">Transmission Mode</p>
@@ -310,7 +310,7 @@ export function VoiceSettingsModal({
           {error && <p className="text-sm text-red-300">{error}</p>}
         </div>
 
-        <DialogFooter className="md:shrink-0 md:border-t md:border-[#233753] md:px-6 md:py-4">
+        <DialogFooter className="shrink-0 border-t border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
           <Button
             type="button"
             onClick={() => onOpenChange(false)}

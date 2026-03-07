@@ -369,20 +369,20 @@ export function ChannelSettingsModal({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         size="xl"
-        className="scrollbar-inset bg-[#18243a] border-[#142033] text-white max-h-[85vh] overflow-y-auto md:w-[min(94vw,980px)] md:max-w-none md:h-[min(86dvh,780px)] md:max-h-[calc(100dvh-1.5rem)] md:flex md:flex-col md:gap-0 md:overflow-hidden md:p-0"
+        className="bg-[#18243a] border-[#142033] text-white max-h-[85vh] md:w-[min(94vw,980px)] md:max-w-none md:h-[min(86dvh,780px)] md:max-h-[calc(100dvh-1.5rem)] min-h-0 flex flex-col gap-0 overflow-hidden p-0"
         showCloseButton={false}
       >
-        <DialogHeader className="md:shrink-0 md:border-b md:border-[#233753] md:px-6 md:py-4">
+        <DialogHeader className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
           <DialogTitle className="text-2xl font-bold text-white">Channel Settings</DialogTitle>
         </DialogHeader>
 
         <Tabs
           value={activeTab}
           onValueChange={(value) => setActiveTab(value as TabKey)}
-          className="space-y-5 md:min-h-0 md:flex md:flex-1 md:flex-col md:gap-0 md:space-y-0"
+          className="min-h-0 flex flex-1 flex-col gap-0 overflow-hidden"
         >
-          <div className="md:shrink-0 md:border-b md:border-[#233753] md:px-6 md:py-3">
-            <TabsList className="bg-[#142033] md:h-auto md:w-full md:flex-wrap md:justify-start md:border md:border-[#304867]">
+          <div className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6">
+            <TabsList className="bg-[#142033] h-auto w-full flex-wrap justify-start border border-[#304867]">
               {canManageChannelStructure && (
                 <TabsTrigger value="general" className="text-[#a9b8cf] data-[state=active]:text-white">
                   General
@@ -396,12 +396,16 @@ export function ChannelSettingsModal({
             </TabsList>
           </div>
 
-          <TabsContent value="general" className="md:min-h-0 md:flex md:flex-1 md:flex-col md:px-6 md:py-5">
-            <form
-              onSubmit={handleSave}
-              className="space-y-4 md:min-h-0 md:flex md:flex-1 md:flex-col md:space-y-0"
+          <div className="min-h-0 flex-1 overflow-hidden px-4 py-4 sm:px-6 sm:py-5 flex flex-col">
+            <TabsContent
+              value="general"
+              className="min-h-0 flex-1 overflow-hidden flex flex-col data-[state=inactive]:hidden"
             >
-              <div className="space-y-4 md:scrollbar-inset md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-1">
+              <form
+                onSubmit={handleSave}
+                className="min-h-0 flex flex-1 flex-col"
+              >
+                <div className="scrollbar-inset min-h-0 flex-1 overflow-y-auto space-y-4 pr-1">
                 <div className="space-y-2">
                   <Label htmlFor="channel-settings-name" className="text-xs font-semibold uppercase text-[#a9b8cf]">
                     Channel Name
@@ -438,59 +442,59 @@ export function ChannelSettingsModal({
                     You can view this tab, but only members with Manage Channels can edit channel structure.
                   </p>
                 )}
-              </div>
-
-              <DialogFooter className="justify-between sm:justify-between md:mt-4 md:shrink-0 md:border-t md:border-[#233753] md:pt-4">
-                {canDelete && canManageChannelStructure ? (
-                  <Button
-                    type="button"
-                    onClick={() => setConfirmDeleteOpen(true)}
-                    disabled={deleting || saving}
-                    variant="ghost"
-                    className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
-                  >
-                    {deleting ? 'Deleting...' : 'Delete Channel'}
-                  </Button>
-                ) : (
-                  <span />
-                )}
-
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    onClick={onClose}
-                    variant="ghost"
-                    className="text-white hover:underline"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={saving || deleting || !canManageChannelStructure}
-                    className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-                  >
-                    {saving ? 'Saving...' : 'Save'}
-                  </Button>
                 </div>
-              </DialogFooter>
-            </form>
-          </TabsContent>
 
-          <TabsContent
-            value="permissions"
-            className="space-y-5 md:min-h-0 md:flex md:flex-1 md:flex-col md:px-6 md:py-5 md:space-y-0"
-          >
-            <div className="space-y-5 md:scrollbar-inset md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-1">
-              <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-1">
-              <p className="text-sm font-medium text-white">How channel permissions work</p>
-              <p className="text-xs text-[#a9b8cf]">
-                Role rows show the effective community default directly in the dropdown.
-              </p>
-              <p className="text-xs text-[#a9b8cf]">
-                Priority: Member overwrites, then role overwrites, then community role permissions.
-              </p>
-              <p className="text-xs text-[#a9b8cf]">At each layer, Deny overrides Allow.</p>
-              </div>
+                <DialogFooter className="justify-between sm:justify-between mt-4 shrink-0 border-t border-[#233753] pt-4">
+                  {canDelete && canManageChannelStructure ? (
+                    <Button
+                      type="button"
+                      onClick={() => setConfirmDeleteOpen(true)}
+                      disabled={deleting || saving}
+                      variant="ghost"
+                      className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
+                    >
+                      {deleting ? 'Deleting...' : 'Delete Channel'}
+                    </Button>
+                  ) : (
+                    <span />
+                  )}
+
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      onClick={onClose}
+                      variant="ghost"
+                      className="text-white hover:underline"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={saving || deleting || !canManageChannelStructure}
+                      className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                    >
+                      {saving ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </form>
+            </TabsContent>
+
+            <TabsContent
+              value="permissions"
+              className="min-h-0 flex-1 overflow-hidden flex flex-col data-[state=inactive]:hidden"
+            >
+              <div className="scrollbar-inset space-y-5 min-h-0 flex-1 overflow-y-auto pr-1">
+                <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-1">
+                  <p className="text-sm font-medium text-white">How channel permissions work</p>
+                  <p className="text-xs text-[#a9b8cf]">
+                    Role rows show the effective community default directly in the dropdown.
+                  </p>
+                  <p className="text-xs text-[#a9b8cf]">
+                    Priority: Member overwrites, then role overwrites, then community role permissions.
+                  </p>
+                  <p className="text-xs text-[#a9b8cf]">At each layer, Deny overrides Allow.</p>
+                </div>
 
               {permissionsLoadError && <p className="text-sm text-red-400">{permissionsLoadError}</p>}
               {permissionError && <p className="text-sm text-red-400">{permissionError}</p>}
@@ -714,19 +718,20 @@ export function ChannelSettingsModal({
                   </section>
                 </>
               )}
-            </div>
+              </div>
 
-            <div className="flex justify-end md:mt-4 md:shrink-0 md:border-t md:border-[#233753] md:pt-4">
-              <Button
-                type="button"
-                onClick={onClose}
-                variant="ghost"
-                className="text-white hover:underline"
-              >
-                Close
-              </Button>
-            </div>
-          </TabsContent>
+              <div className="flex justify-end mt-4 shrink-0 border-t border-[#233753] pt-4">
+                <Button
+                  type="button"
+                  onClick={onClose}
+                  variant="ghost"
+                  className="text-white hover:underline"
+                >
+                  Close
+                </Button>
+              </div>
+            </TabsContent>
+          </div>
         </Tabs>
 
         <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>

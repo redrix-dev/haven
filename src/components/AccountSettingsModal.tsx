@@ -198,15 +198,15 @@ export function AccountSettingsModal({
       <Dialog open onOpenChange={(open) => !open && onClose()}>
         <DialogContent
           size="sm"
-          className="bg-[#18243a] border-[#142033] text-white md:w-[min(92vw,640px)] md:max-w-none md:h-[min(86dvh,720px)] md:max-h-[calc(100dvh-1.5rem)] md:gap-0 md:overflow-hidden md:p-0"
+          className="bg-[#18243a] border-[#142033] text-white md:w-[min(92vw,640px)] md:max-w-none md:h-[min(86dvh,720px)] md:max-h-[calc(100dvh-1.5rem)] max-h-[88vh] flex flex-col gap-0 overflow-hidden p-0"
           showCloseButton={false}
         >
-          <DialogHeader className="md:shrink-0 md:border-b md:border-[#233753] md:px-6 md:py-4">
+          <DialogHeader className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
             <DialogTitle className="text-2xl font-bold text-white">Account Settings</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSave} className="space-y-4 md:flex md:min-h-0 md:flex-1 md:flex-col md:space-y-0">
-            <div className="space-y-4 md:scrollbar-inset md:min-h-0 md:flex-1 md:overflow-y-auto md:px-6 md:py-5">
+          <form onSubmit={handleSave} className="min-h-0 flex flex-1 flex-col">
+            <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto space-y-4 px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex items-center gap-3">
                 <Avatar
                   size="lg"
@@ -312,7 +312,7 @@ export function AccountSettingsModal({
               {autoUpdateError && <p className="text-sm text-red-400">{autoUpdateError}</p>}
             </div>
 
-            <DialogFooter className="justify-between sm:justify-between md:shrink-0 md:border-t md:border-[#233753] md:px-6 md:py-4">
+            <DialogFooter className="justify-between sm:justify-between shrink-0 border-t border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
               <div className="flex gap-2">
                 <Button
                   type="button"
