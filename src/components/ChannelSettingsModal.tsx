@@ -369,67 +369,78 @@ export function ChannelSettingsModal({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         size="xl"
-        className="scrollbar-inset bg-[#18243a] border-[#142033] text-white max-h-[85vh] overflow-y-auto"
+        className="scrollbar-inset bg-[#18243a] border-[#142033] text-white max-h-[85vh] overflow-y-auto md:w-[min(94vw,980px)] md:max-w-none md:h-[min(86dvh,780px)] md:max-h-[calc(100dvh-1.5rem)] md:flex md:flex-col md:gap-0 md:overflow-hidden md:p-0"
         showCloseButton={false}
       >
-        <DialogHeader>
+        <DialogHeader className="md:shrink-0 md:border-b md:border-[#233753] md:px-6 md:py-4">
           <DialogTitle className="text-2xl font-bold text-white">Channel Settings</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="space-y-5">
-          <TabsList className="bg-[#142033]">
-            {canManageChannelStructure && (
-              <TabsTrigger value="general" className="text-[#a9b8cf] data-[state=active]:text-white">
-                General
-              </TabsTrigger>
-            )}
-            {canManageChannelPermissions && (
-              <TabsTrigger value="permissions" className="text-[#a9b8cf] data-[state=active]:text-white">
-                Permissions
-              </TabsTrigger>
-            )}
-          </TabsList>
-
-          <TabsContent value="general">
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="channel-settings-name" className="text-xs font-semibold uppercase text-[#a9b8cf]">
-                  Channel Name
-                </Label>
-                <Input
-                  id="channel-settings-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="bg-[#142033] border-[#304867] text-white"
-                  required
-                  maxLength={80}
-                  disabled={!canManageChannelStructure || saving || deleting}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="channel-settings-topic" className="text-xs font-semibold uppercase text-[#a9b8cf]">
-                  Topic
-                </Label>
-                <Input
-                  id="channel-settings-topic"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  className="bg-[#142033] border-[#304867] text-white"
-                  placeholder="What is this channel for?"
-                  maxLength={200}
-                  disabled={!canManageChannelStructure || saving || deleting}
-                />
-              </div>
-
-              {generalError && <p className="text-sm text-red-400">{generalError}</p>}
-              {!canManageChannelStructure && (
-                <p className="text-xs text-[#d6a24a]">
-                  You can view this tab, but only members with Manage Channels can edit channel structure.
-                </p>
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as TabKey)}
+          className="space-y-5 md:min-h-0 md:flex md:flex-1 md:flex-col md:gap-0 md:space-y-0"
+        >
+          <div className="md:shrink-0 md:border-b md:border-[#233753] md:px-6 md:py-3">
+            <TabsList className="bg-[#142033] md:h-auto md:w-full md:flex-wrap md:justify-start md:border md:border-[#304867]">
+              {canManageChannelStructure && (
+                <TabsTrigger value="general" className="text-[#a9b8cf] data-[state=active]:text-white">
+                  General
+                </TabsTrigger>
               )}
+              {canManageChannelPermissions && (
+                <TabsTrigger value="permissions" className="text-[#a9b8cf] data-[state=active]:text-white">
+                  Permissions
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
-              <DialogFooter className="justify-between sm:justify-between">
+          <TabsContent value="general" className="md:min-h-0 md:flex md:flex-1 md:flex-col md:px-6 md:py-5">
+            <form
+              onSubmit={handleSave}
+              className="space-y-4 md:min-h-0 md:flex md:flex-1 md:flex-col md:space-y-0"
+            >
+              <div className="space-y-4 md:scrollbar-inset md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-1">
+                <div className="space-y-2">
+                  <Label htmlFor="channel-settings-name" className="text-xs font-semibold uppercase text-[#a9b8cf]">
+                    Channel Name
+                  </Label>
+                  <Input
+                    id="channel-settings-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="bg-[#142033] border-[#304867] text-white"
+                    required
+                    maxLength={80}
+                    disabled={!canManageChannelStructure || saving || deleting}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="channel-settings-topic" className="text-xs font-semibold uppercase text-[#a9b8cf]">
+                    Topic
+                  </Label>
+                  <Input
+                    id="channel-settings-topic"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    className="bg-[#142033] border-[#304867] text-white"
+                    placeholder="What is this channel for?"
+                    maxLength={200}
+                    disabled={!canManageChannelStructure || saving || deleting}
+                  />
+                </div>
+
+                {generalError && <p className="text-sm text-red-400">{generalError}</p>}
+                {!canManageChannelStructure && (
+                  <p className="text-xs text-[#d6a24a]">
+                    You can view this tab, but only members with Manage Channels can edit channel structure.
+                  </p>
+                )}
+              </div>
+
+              <DialogFooter className="justify-between sm:justify-between md:mt-4 md:shrink-0 md:border-t md:border-[#233753] md:pt-4">
                 {canDelete && canManageChannelStructure ? (
                   <Button
                     type="button"
@@ -465,8 +476,12 @@ export function ChannelSettingsModal({
             </form>
           </TabsContent>
 
-          <TabsContent value="permissions" className="space-y-5">
-            <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-1">
+          <TabsContent
+            value="permissions"
+            className="space-y-5 md:min-h-0 md:flex md:flex-1 md:flex-col md:px-6 md:py-5 md:space-y-0"
+          >
+            <div className="space-y-5 md:scrollbar-inset md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-1">
+              <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-1">
               <p className="text-sm font-medium text-white">How channel permissions work</p>
               <p className="text-xs text-[#a9b8cf]">
                 Role rows show the effective community default directly in the dropdown.
@@ -475,185 +490,69 @@ export function ChannelSettingsModal({
                 Priority: Member overwrites, then role overwrites, then community role permissions.
               </p>
               <p className="text-xs text-[#a9b8cf]">At each layer, Deny overrides Allow.</p>
-            </div>
-
-            {permissionsLoadError && <p className="text-sm text-red-400">{permissionsLoadError}</p>}
-            {permissionError && <p className="text-sm text-red-400">{permissionError}</p>}
-
-            {permissionsLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 2 }, (_, cardIndex) => (
-                  <div
-                    key={cardIndex}
-                    className="rounded-lg border border-[#304867] bg-[#142033] p-3 space-y-3"
-                  >
-                    <Skeleton className="h-4 w-36 bg-[#22334f]" />
-                    {Array.from({ length: 3 }, (_, rowIndex) => (
-                      <div
-                        key={rowIndex}
-                        className="grid grid-cols-1 gap-2 rounded-md border border-[#304867] bg-[#111a2b] p-2 md:grid-cols-[1fr_220px]"
-                      >
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-44 bg-[#22334f]" />
-                          <Skeleton className="h-3 w-32 bg-[#1b2a42]" />
-                        </div>
-                        <Skeleton className="h-9 w-full bg-[#22334f]" />
-                      </div>
-                    ))}
-                  </div>
-                ))}
               </div>
-            ) : !hasPermissionRows ? (
-              <p className="text-[#a9b8cf]">No roles or member overwrites found for this channel.</p>
-            ) : (
-              <>
-                <section className="space-y-3">
-                  <h3 className="text-white font-semibold">Role Overwrites</h3>
-                  <p className="text-xs text-[#8ea4c7]">
-                    Applies to everyone with that role in this channel.
-                  </p>
-                  <div className="space-y-2">
-                    {visibleRoleRows.map((roleRow) => (
-                      <div
-                        key={roleRow.roleId}
-                        className="bg-[#142033] rounded-lg p-3 flex flex-col gap-2"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-block size-2 rounded-full"
-                            style={{ backgroundColor: roleRow.color }}
-                          />
-                          <span className="text-white text-sm font-medium">
-                            {roleRow.name}
-                            {roleRow.isDefault ? ' (@everyone)' : ''}
-                          </span>
-                          {!roleRow.editable && (
-                            <span className="px-1.5 py-0.5 rounded bg-[#d6a24a]/20 text-[#d6a24a] text-[10px] font-semibold uppercase tracking-wide">
-                              Locked
-                            </span>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          {PERMISSION_COLUMNS.map((column) => {
-                            const value = roleRow[column.key];
-                            const saveKey = `role:${roleRow.roleId}:${column.key}`;
-                            const defaultValue = rolePermissionDefaultValueForKey(roleRow, column.key);
-                            return (
-                              <div
-                                key={column.key}
-                                className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-[#304867] bg-[#111a2b] p-2"
-                              >
-                                <div className="min-w-0">
-                                  <p className="text-sm text-white">{column.label}</p>
-                                </div>
-                                <Select
-                                  value={permissionValueToSelectValue(value)}
-                                  onValueChange={(nextSelectValue) =>
-                                    void handleRolePermissionSet(
-                                      roleRow.roleId,
-                                      column.key,
-                                      permissionSelectValueToPermissionValue(
-                                        nextSelectValue as PermissionSelectValue
-                                      )
-                                    )
-                                  }
-                                  disabled={
-                                    permissionSavingKey !== null ||
-                                    !roleRow.editable ||
-                                    !canManageChannelPermissions
-                                  }
-                                >
-                                  <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
-                                    <SelectValue
-                                      placeholder={roleDefaultSelectLabel(defaultValue)}
-                                    />
-                                  </SelectTrigger>
-                                  <SelectContent className="bg-[#142033] border-[#304867] text-white">
-                                    <SelectItem value="default">
-                                      {permissionSavingKey === saveKey
-                                        ? 'Saving...'
-                                        : roleDefaultSelectLabel(defaultValue)}
-                                    </SelectItem>
-                                    <SelectItem value="allow">Yes</SelectItem>
-                                    <SelectItem value="deny">No</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
 
-                <section className="space-y-3">
-                  <h3 className="text-white font-semibold">Member Overwrites</h3>
-                  <p className="text-xs text-[#8ea4c7]">
-                    Member-specific settings take priority over role overwrites.
-                  </p>
-                  <p className="text-xs text-[#8ea4c7]">
-                    Community owner overwrite controls are hidden in this view.
-                  </p>
+              {permissionsLoadError && <p className="text-sm text-red-400">{permissionsLoadError}</p>}
+              {permissionError && <p className="text-sm text-red-400">{permissionError}</p>}
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <Input
-                      value={memberSearch}
-                      onChange={(e) => setMemberSearch(e.target.value)}
-                      placeholder="Search overwrites..."
-                      className="bg-[#142033] border-[#304867] text-white"
-                      disabled={!canManageChannelPermissions}
-                    />
-                    <Select
-                      value={addMemberId}
-                      onValueChange={setAddMemberId}
-                      disabled={!canManageChannelPermissions || availableMembersForAdd.length === 0}
+              {permissionsLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 2 }, (_, cardIndex) => (
+                    <div
+                      key={cardIndex}
+                      className="rounded-lg border border-[#304867] bg-[#142033] p-3 space-y-3"
                     >
-                      <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
-                        <SelectValue placeholder="Select member" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#142033] border-[#304867] text-white">
-                        {availableMembersForAdd.length === 0 ? (
-                          <SelectItem value="__none__" disabled>
-                            No members left to add
-                          </SelectItem>
-                        ) : (
-                          availableMembersForAdd.map((member) => (
-                            <SelectItem key={member.memberId} value={member.memberId}>
-                              {member.displayName}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      onClick={handleAddMemberOverwrite}
-                      disabled={
-                        !canManageChannelPermissions || !addMemberId || availableMembersForAdd.length === 0
-                      }
-                      className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-                    >
-                      Add Member Overwrite
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {filteredMemberRows.length === 0 ? (
-                      <p className="text-sm text-[#a9b8cf]">No matching member overwrites.</p>
-                    ) : (
-                      filteredMemberRows.map((memberRow) => (
+                      <Skeleton className="h-4 w-36 bg-[#22334f]" />
+                      {Array.from({ length: 3 }, (_, rowIndex) => (
                         <div
-                          key={memberRow.memberId}
+                          key={rowIndex}
+                          className="grid grid-cols-1 gap-2 rounded-md border border-[#304867] bg-[#111a2b] p-2 md:grid-cols-[1fr_220px]"
+                        >
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-44 bg-[#22334f]" />
+                            <Skeleton className="h-3 w-32 bg-[#1b2a42]" />
+                          </div>
+                          <Skeleton className="h-9 w-full bg-[#22334f]" />
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : !hasPermissionRows ? (
+                <p className="text-[#a9b8cf]">No roles or member overwrites found for this channel.</p>
+              ) : (
+                <>
+                  <section className="space-y-3">
+                    <h3 className="text-white font-semibold">Role Overwrites</h3>
+                    <p className="text-xs text-[#8ea4c7]">
+                      Applies to everyone with that role in this channel.
+                    </p>
+                    <div className="space-y-2">
+                      {visibleRoleRows.map((roleRow) => (
+                        <div
+                          key={roleRow.roleId}
                           className="bg-[#142033] rounded-lg p-3 flex flex-col gap-2"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-white text-sm font-medium">{memberRow.displayName}</span>
+                            <span
+                              className="inline-block size-2 rounded-full"
+                              style={{ backgroundColor: roleRow.color }}
+                            />
+                            <span className="text-white text-sm font-medium">
+                              {roleRow.name}
+                              {roleRow.isDefault ? ' (@everyone)' : ''}
+                            </span>
+                            {!roleRow.editable && (
+                              <span className="px-1.5 py-0.5 rounded bg-[#d6a24a]/20 text-[#d6a24a] text-[10px] font-semibold uppercase tracking-wide">
+                                Locked
+                              </span>
+                            )}
                           </div>
                           <div className="space-y-2">
                             {PERMISSION_COLUMNS.map((column) => {
-                              const value = memberRow[column.key];
-                              const saveKey = `member:${memberRow.memberId}:${column.key}`;
+                              const value = roleRow[column.key];
+                              const saveKey = `role:${roleRow.roleId}:${column.key}`;
+                              const defaultValue = rolePermissionDefaultValueForKey(roleRow, column.key);
                               return (
                                 <div
                                   key={column.key}
@@ -665,24 +564,30 @@ export function ChannelSettingsModal({
                                   <Select
                                     value={permissionValueToSelectValue(value)}
                                     onValueChange={(nextSelectValue) =>
-                                      void handleMemberPermissionSet(
-                                        memberRow.memberId,
+                                      void handleRolePermissionSet(
+                                        roleRow.roleId,
                                         column.key,
                                         permissionSelectValueToPermissionValue(
                                           nextSelectValue as PermissionSelectValue
                                         )
                                       )
                                     }
-                                    disabled={permissionSavingKey !== null || !canManageChannelPermissions}
+                                    disabled={
+                                      permissionSavingKey !== null ||
+                                      !roleRow.editable ||
+                                      !canManageChannelPermissions
+                                    }
                                   >
                                     <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
-                                      <SelectValue placeholder={memberDefaultSelectLabel()} />
+                                      <SelectValue
+                                        placeholder={roleDefaultSelectLabel(defaultValue)}
+                                      />
                                     </SelectTrigger>
                                     <SelectContent className="bg-[#142033] border-[#304867] text-white">
                                       <SelectItem value="default">
                                         {permissionSavingKey === saveKey
                                           ? 'Saving...'
-                                          : memberDefaultSelectLabel()}
+                                          : roleDefaultSelectLabel(defaultValue)}
                                       </SelectItem>
                                       <SelectItem value="allow">Yes</SelectItem>
                                       <SelectItem value="deny">No</SelectItem>
@@ -693,14 +598,125 @@ export function ChannelSettingsModal({
                             })}
                           </div>
                         </div>
-                      ))
-                    )}
-                  </div>
-                </section>
-              </>
-            )}
+                      ))}
+                    </div>
+                  </section>
 
-            <div className="flex justify-end">
+                  <section className="space-y-3">
+                    <h3 className="text-white font-semibold">Member Overwrites</h3>
+                    <p className="text-xs text-[#8ea4c7]">
+                      Member-specific settings take priority over role overwrites.
+                    </p>
+                    <p className="text-xs text-[#8ea4c7]">
+                      Community owner overwrite controls are hidden in this view.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <Input
+                        value={memberSearch}
+                        onChange={(e) => setMemberSearch(e.target.value)}
+                        placeholder="Search overwrites..."
+                        className="bg-[#142033] border-[#304867] text-white"
+                        disabled={!canManageChannelPermissions}
+                      />
+                      <Select
+                        value={addMemberId}
+                        onValueChange={setAddMemberId}
+                        disabled={!canManageChannelPermissions || availableMembersForAdd.length === 0}
+                      >
+                        <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
+                          <SelectValue placeholder="Select member" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                          {availableMembersForAdd.length === 0 ? (
+                            <SelectItem value="__none__" disabled>
+                              No members left to add
+                            </SelectItem>
+                          ) : (
+                            availableMembersForAdd.map((member) => (
+                              <SelectItem key={member.memberId} value={member.memberId}>
+                                {member.displayName}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        onClick={handleAddMemberOverwrite}
+                        disabled={
+                          !canManageChannelPermissions || !addMemberId || availableMembersForAdd.length === 0
+                        }
+                        className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                      >
+                        Add Member Overwrite
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {filteredMemberRows.length === 0 ? (
+                        <p className="text-sm text-[#a9b8cf]">No matching member overwrites.</p>
+                      ) : (
+                        filteredMemberRows.map((memberRow) => (
+                          <div
+                            key={memberRow.memberId}
+                            className="bg-[#142033] rounded-lg p-3 flex flex-col gap-2"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-white text-sm font-medium">{memberRow.displayName}</span>
+                            </div>
+                            <div className="space-y-2">
+                              {PERMISSION_COLUMNS.map((column) => {
+                                const value = memberRow[column.key];
+                                const saveKey = `member:${memberRow.memberId}:${column.key}`;
+                                return (
+                                  <div
+                                    key={column.key}
+                                    className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-[#304867] bg-[#111a2b] p-2"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="text-sm text-white">{column.label}</p>
+                                    </div>
+                                    <Select
+                                      value={permissionValueToSelectValue(value)}
+                                      onValueChange={(nextSelectValue) =>
+                                        void handleMemberPermissionSet(
+                                          memberRow.memberId,
+                                          column.key,
+                                          permissionSelectValueToPermissionValue(
+                                            nextSelectValue as PermissionSelectValue
+                                          )
+                                        )
+                                      }
+                                      disabled={permissionSavingKey !== null || !canManageChannelPermissions}
+                                    >
+                                      <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
+                                        <SelectValue placeholder={memberDefaultSelectLabel()} />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                                        <SelectItem value="default">
+                                          {permissionSavingKey === saveKey
+                                            ? 'Saving...'
+                                            : memberDefaultSelectLabel()}
+                                        </SelectItem>
+                                        <SelectItem value="allow">Yes</SelectItem>
+                                        <SelectItem value="deny">No</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </section>
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end md:mt-4 md:shrink-0 md:border-t md:border-[#233753] md:pt-4">
               <Button
                 type="button"
                 onClick={onClose}
@@ -737,5 +753,3 @@ export function ChannelSettingsModal({
     </Dialog>
   );
 }
-
-

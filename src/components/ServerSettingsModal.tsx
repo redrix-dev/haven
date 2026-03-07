@@ -635,53 +635,56 @@ export function ServerSettingsModal({
       <Dialog open onOpenChange={(open) => !open && onClose()}>
         <DialogContent
           size="app"
-          className="bg-[#18243a] border-[#142033] text-white overflow-hidden"
+          className="bg-[#18243a] border-[#142033] text-white overflow-hidden md:w-[min(95vw,1160px)] md:max-w-none md:h-[min(88dvh,860px)] md:max-h-[calc(100dvh-1.5rem)] md:gap-0 md:p-0"
           showCloseButton={false}
         >
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-white">Community Settings</DialogTitle>
-        </DialogHeader>
+          <DialogHeader className="md:shrink-0 md:border-b md:border-[#233753] md:px-6 md:py-4">
+            <DialogTitle className="text-2xl font-bold text-white">Community Settings</DialogTitle>
+          </DialogHeader>
 
-        {initialLoadError ? (
-          <div className="space-y-4">
-            <p className="text-sm text-red-400">{initialLoadError}</p>
-          </div>
-        ) : loadingInitialValues || !values ? (
-          <div className="space-y-4">
-            <Skeleton className="h-10 w-full bg-[#22334f]" />
-            <div className="rounded-md border border-[#304867] bg-[#142033] p-4 space-y-3">
-              <Skeleton className="h-5 w-40 bg-[#22334f]" />
-              <Skeleton className="h-10 w-full bg-[#1b2a42]" />
-              <Skeleton className="h-24 w-full bg-[#1b2a42]" />
-            </div>
-          </div>
-        ) : (
-          <Tabs
-            value={activeTab}
-            onValueChange={(nextValue) => setActiveTab(nextValue as SettingsTab)}
-            className="flex-1 min-h-0 flex flex-col"
-          >
-            <TabsList className="bg-[#142033] border border-[#304867] w-full flex-wrap justify-start h-auto">
-              <TabsTrigger value="general" className="text-[#a9b8cf] data-[state=active]:text-white">
-                General
-              </TabsTrigger>
-              <TabsTrigger value="roles" className="text-[#a9b8cf] data-[state=active]:text-white">
-                Roles
-              </TabsTrigger>
-              <TabsTrigger value="members" className="text-[#a9b8cf] data-[state=active]:text-white">
-                Members
-              </TabsTrigger>
-              <TabsTrigger value="invites" className="text-[#a9b8cf] data-[state=active]:text-white">
-                Invites
-              </TabsTrigger>
-              <TabsTrigger value="bans" className="text-[#a9b8cf] data-[state=active]:text-white">
-                Bans
-              </TabsTrigger>
-            </TabsList>
+          <div className="min-h-0 flex-1 md:overflow-hidden md:px-6 md:py-5">
+            {initialLoadError ? (
+              <div className="space-y-4 md:scrollbar-inset md:h-full md:overflow-y-auto">
+                <p className="text-sm text-red-400">{initialLoadError}</p>
+              </div>
+            ) : loadingInitialValues || !values ? (
+              <div className="space-y-4 md:scrollbar-inset md:h-full md:overflow-y-auto">
+                <Skeleton className="h-10 w-full bg-[#22334f]" />
+                <div className="rounded-md border border-[#304867] bg-[#142033] p-4 space-y-3">
+                  <Skeleton className="h-5 w-40 bg-[#22334f]" />
+                  <Skeleton className="h-10 w-full bg-[#1b2a42]" />
+                  <Skeleton className="h-24 w-full bg-[#1b2a42]" />
+                </div>
+              </div>
+            ) : (
+              <Tabs
+                value={activeTab}
+                onValueChange={(nextValue) => setActiveTab(nextValue as SettingsTab)}
+                className="flex-1 min-h-0 flex flex-col md:gap-0"
+              >
+                <div className="md:shrink-0 md:border-b md:border-[#233753] md:pb-3">
+                  <TabsList className="bg-[#142033] border border-[#304867] w-full flex-wrap justify-start h-auto">
+                    <TabsTrigger value="general" className="text-[#a9b8cf] data-[state=active]:text-white">
+                      General
+                    </TabsTrigger>
+                    <TabsTrigger value="roles" className="text-[#a9b8cf] data-[state=active]:text-white">
+                      Roles
+                    </TabsTrigger>
+                    <TabsTrigger value="members" className="text-[#a9b8cf] data-[state=active]:text-white">
+                      Members
+                    </TabsTrigger>
+                    <TabsTrigger value="invites" className="text-[#a9b8cf] data-[state=active]:text-white">
+                      Invites
+                    </TabsTrigger>
+                    <TabsTrigger value="bans" className="text-[#a9b8cf] data-[state=active]:text-white">
+                      Bans
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
-            <div className="mt-4 min-h-0 flex-1 overflow-hidden flex flex-col">
-              <TabsContent value="general" className="min-h-0 overflow-hidden pr-1 flex flex-col gap-4">
-                <div className="scrollbar-inset min-h-0 flex-1 overflow-y-auto">
+                <div className="mt-4 min-h-0 flex-1 overflow-hidden flex flex-col md:mt-5">
+                  <TabsContent value="general" className="min-h-0 overflow-hidden pr-1 flex flex-col gap-4">
+                    <div className="scrollbar-inset min-h-0 flex-1 overflow-y-auto">
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     <section className="rounded-md border border-[#304867] bg-[#142033] p-4 space-y-4">
                       <h3 className="text-white font-semibold">General</h3>
@@ -859,7 +862,10 @@ export function ServerSettingsModal({
                 </div>
               </TabsContent>
 
-              <TabsContent value="roles" className="min-h-0 overflow-hidden pr-1 flex flex-col gap-4">
+              <TabsContent
+                value="roles"
+                className="scrollbar-inset min-h-0 overflow-y-auto pr-1 flex flex-col gap-4"
+              >
                 <p className="text-sm text-[#a9b8cf]">
                   Roles define what people can do community-wide. The database enforces permissions using
                   role assignments and role permission entries.
@@ -881,7 +887,7 @@ export function ServerSettingsModal({
                     ))}
                   </div>
                 ) : (
-                  <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto pr-1">
+                  <div className="flex-1 min-h-0">
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
                       <div className="space-y-3 xl:sticky xl:top-0 xl:self-start">
                         <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
@@ -1423,10 +1429,11 @@ export function ServerSettingsModal({
                 )}
               </TabsContent>
             </div>
-          </Tabs>
-        )}
+              </Tabs>
+            )}
+          </div>
 
-        <DialogFooter className="gap-3">
+        <DialogFooter className="gap-3 md:shrink-0 md:border-t md:border-[#233753] md:px-6 md:py-4">
           <Button
             type="button"
             onClick={onClose}
@@ -1436,7 +1443,7 @@ export function ServerSettingsModal({
             Close
           </Button>
         </DialogFooter>
-        </DialogContent>
+      </DialogContent>
       </Dialog>
 
       <AlertDialog

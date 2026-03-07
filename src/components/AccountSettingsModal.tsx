@@ -198,119 +198,121 @@ export function AccountSettingsModal({
       <Dialog open onOpenChange={(open) => !open && onClose()}>
         <DialogContent
           size="sm"
-          className="bg-[#18243a] border-[#142033] text-white"
+          className="bg-[#18243a] border-[#142033] text-white md:w-[min(92vw,640px)] md:max-w-none md:h-[min(86dvh,720px)] md:max-h-[calc(100dvh-1.5rem)] md:gap-0 md:overflow-hidden md:p-0"
           showCloseButton={false}
         >
-          <DialogHeader>
+          <DialogHeader className="md:shrink-0 md:border-b md:border-[#233753] md:px-6 md:py-4">
             <DialogTitle className="text-2xl font-bold text-white">Account Settings</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Avatar
-                size="lg"
-                className="rounded-2xl bg-[#142033] border border-[#304867] data-[size=lg]:size-12"
-              >
-                {avatarUrl.trim() && <AvatarImage src={avatarUrl.trim()} alt="Avatar preview" />}
-                <AvatarFallback className="rounded-2xl bg-[#142033] text-white font-semibold">
-                  {previewInitial}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-xs uppercase font-semibold text-[#a9b8cf]">Email</p>
-                <p className="text-sm text-white">{userEmail}</p>
-              </div>
-              <div className="ml-auto">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={onOpenVoiceSettings}
-                  disabled={saving || signingOut || deletingAccount}
+          <form onSubmit={handleSave} className="space-y-4 md:flex md:min-h-0 md:flex-1 md:flex-col md:space-y-0">
+            <div className="space-y-4 md:scrollbar-inset md:min-h-0 md:flex-1 md:overflow-y-auto md:px-6 md:py-5">
+              <div className="flex items-center gap-3">
+                <Avatar
+                  size="lg"
+                  className="rounded-2xl bg-[#142033] border border-[#304867] data-[size=lg]:size-12"
                 >
-                  Voice Settings
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="account-username"
-                className="text-xs font-semibold uppercase text-[#a9b8cf]"
-              >
-                Username
-              </Label>
-              <Input
-                id="account-username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="bg-[#142033] border-[#304867] text-white"
-                maxLength={32}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="account-avatar-url"
-                className="text-xs font-semibold uppercase text-[#a9b8cf]"
-              >
-                Avatar URL
-              </Label>
-              <Input
-                id="account-avatar-url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://..."
-                className="bg-[#142033] border-[#304867] text-white"
-              />
-            </div>
-
-            <div className="rounded-xl border border-[#304867] bg-[#142033] px-3 py-3 space-y-2">
-              <div className="flex items-center justify-between gap-3">
+                  {avatarUrl.trim() && <AvatarImage src={avatarUrl.trim()} alt="Avatar preview" />}
+                  <AvatarFallback className="rounded-2xl bg-[#142033] text-white font-semibold">
+                    {previewInitial}
+                  </AvatarFallback>
+                </Avatar>
                 <div>
-                  <p className="text-sm font-semibold text-white">Automatic Updates</p>
-                  <p className="text-xs text-[#a9b8cf]">
-                    Keeps this app current with security and compatibility fixes.
-                  </p>
+                  <p className="text-xs uppercase font-semibold text-[#a9b8cf]">Email</p>
+                  <p className="text-sm text-white">{userEmail}</p>
                 </div>
-                <Switch
-                  checked={autoUpdateEnabled}
-                  onCheckedChange={handleToggleRequested}
-                  disabled={updatingAutoUpdatePreference || updaterControlsUnsupported}
+                <div className="ml-auto">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={onOpenVoiceSettings}
+                    disabled={saving || signingOut || deletingAccount}
+                  >
+                    Voice Settings
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label
+                  htmlFor="account-username"
+                  className="text-xs font-semibold uppercase text-[#a9b8cf]"
+                >
+                  Username
+                </Label>
+                <Input
+                  id="account-username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="bg-[#142033] border-[#304867] text-white"
+                  maxLength={32}
+                  required
                 />
               </div>
 
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-[#a9b8cf]">
-                  Status: {updaterStatusLoading ? 'Loading...' : updaterStatusLabel}
-                </p>
-                <Button
-                  type="button"
-                  onClick={() => void handleCheckForUpdates()}
-                  disabled={checkingForUpdates || updaterStatusLoading || updaterControlsUnsupported}
-                  variant="secondary"
-                  size="sm"
+              <div className="space-y-2">
+                <Label
+                  htmlFor="account-avatar-url"
+                  className="text-xs font-semibold uppercase text-[#a9b8cf]"
                 >
-                  {checkingForUpdates ? 'Checking...' : 'Check now'}
-                </Button>
+                  Avatar URL
+                </Label>
+                <Input
+                  id="account-avatar-url"
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="bg-[#142033] border-[#304867] text-white"
+                />
               </div>
 
-              {updaterStatus?.disableNeedsRestart && (
-                <p className="text-xs text-amber-300">
-                  Restart required to fully stop active update checks.
-                </p>
-              )}
+              <div className="rounded-xl border border-[#304867] bg-[#142033] px-3 py-3 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Automatic Updates</p>
+                    <p className="text-xs text-[#a9b8cf]">
+                      Keeps this app current with security and compatibility fixes.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={autoUpdateEnabled}
+                    onCheckedChange={handleToggleRequested}
+                    disabled={updatingAutoUpdatePreference || updaterControlsUnsupported}
+                  />
+                </div>
 
-              {updaterStatus?.lastError && (
-                <p className="text-xs text-red-300">Updater: {updaterStatus.lastError}</p>
-              )}
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-[#a9b8cf]">
+                    Status: {updaterStatusLoading ? 'Loading...' : updaterStatusLabel}
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={() => void handleCheckForUpdates()}
+                    disabled={checkingForUpdates || updaterStatusLoading || updaterControlsUnsupported}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    {checkingForUpdates ? 'Checking...' : 'Check now'}
+                  </Button>
+                </div>
+
+                {updaterStatus?.disableNeedsRestart && (
+                  <p className="text-xs text-amber-300">
+                    Restart required to fully stop active update checks.
+                  </p>
+                )}
+
+                {updaterStatus?.lastError && (
+                  <p className="text-xs text-red-300">Updater: {updaterStatus.lastError}</p>
+                )}
+              </div>
+
+              {error && <p className="text-sm text-red-400">{error}</p>}
+              {autoUpdateError && <p className="text-sm text-red-400">{autoUpdateError}</p>}
             </div>
 
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            {autoUpdateError && <p className="text-sm text-red-400">{autoUpdateError}</p>}
-
-            <DialogFooter className="justify-between sm:justify-between">
+            <DialogFooter className="justify-between sm:justify-between md:shrink-0 md:border-t md:border-[#233753] md:px-6 md:py-4">
               <div className="flex gap-2">
                 <Button
                   type="button"
@@ -415,4 +417,3 @@ export function AccountSettingsModal({
     </>
   );
 }
-
