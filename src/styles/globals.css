@@ -194,13 +194,23 @@
   }
 
   .mobile-bottom-sheet {
-    bottom: calc(
-      var(--app-keyboard-inset, 0px) + var(--app-keyboard-accessory-inset, 0px)
+    bottom: 0;
+    max-height: calc(
+      var(--app-visual-viewport-height, 100dvh) - env(safe-area-inset-top, 0px)
     );
-    max-height: calc(var(--app-visual-viewport-height, 100dvh) - env(safe-area-inset-top, 0px));
+  }
+
+  .mobile-bottom-sheet--keyboard-aware {
+  bottom: calc(
+    var(--app-keyboard-inset, 0px) + var(--app-keyboard-accessory-inset, 0px)
+  );
   }
 
   .mobile-bottom-card {
+    bottom: 2rem;
+  }
+
+  .mobile-bottom-card--keyboard-aware {
     bottom: calc(
       var(--app-keyboard-inset, 0px) + var(--app-keyboard-accessory-inset, 0px) + 2rem
     );

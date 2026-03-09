@@ -52,6 +52,8 @@ export interface MobileMessageComposerProps {
   onBlur?: () => void;
 }
 
+
+
 // ── Emoji data — common emojis by category ────────────────────────────────────
 
 const EMOJI_CATEGORIES: Array<{ label: string; emojis: string[] }> = [
@@ -201,34 +203,23 @@ const FORMATTING_ACTIONS: Array<{
 ];
 
 function ComposerFormattingToolbar({
-  textareaRef,
+  contentEditableRef,
   draft,
   onDraftChange,
 }: {
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  contentEditableRef: React.RefObject<HTMLDivElement | null>;
   draft: string;
   onDraftChange: (v: string) => void;
 }) {
   const applyFormat = (prefix: string, suffix: string) => {
-    const el = textareaRef.current;
+    const el = contentEditableRef.current;
     if (!el) return;
 
-    const start = el.selectionStart ?? draft.length;
-    const end = el.selectionEnd ?? draft.length;
-    const selected = draft.slice(start, end);
-    const wrapped = `${prefix}${selected || 'text'}${suffix}`;
-    const next = draft.slice(0, start) + wrapped + draft.slice(end);
-    onDraftChange(next);
-
-    // Restore cursor after state update
-    requestAnimationFrame(() => {
-      el.focus();
-      const cursorStart = start + prefix.length;
-      const cursorEnd = cursorStart + (selected || 'text').length;
-      el.setSelectionRange(cursorStart, cursorEnd);
-    });
+    const selection = window.getSelection();
+    const range = selection?.getRangeAt(0);
+    const selectedText = range?.toString() ?? '';
+    const wrapped = `${prefix}${selectedText || 'text'}${suffix}`;
   };
-
   return (
     <div className="px-3 pb-1">
       <div
@@ -386,9 +377,7 @@ function EmojiPicker({
   );
 }
 
-// ── MobileMessageComposer ─────────────────────────────────────────────────────
-
-export function MobileMessageComposer({
+export function EnhancedComposer({
   draft,
   onDraftChange,
   onSend,
@@ -399,165 +388,49 @@ export function MobileMessageComposer({
   onFocus,
   onBlur,
 }: MobileMessageComposerProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [showAttachment, setShowAttachment] = useState(false);
-  const [showEmoji, setShowEmoji] = useState(false);
+  const contentEditableRef = useRef<HTMLDivElement>(null);
   const [mediaFile, setMediaFile] = useState<MediaFile | null>(null);
   const [mediaExpiresInHours, setMediaExpiresInHours] = useState(24);
-
-  // ── Preserved original textarea height + touchAction logic ────────────────
   useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-
-    const isOverflowing = el.scrollHeight > 120;
-    el.style.touchAction = isOverflowing ? 'auto' : 'none';
-  }, [draft]);
-
-  const canSend = (draft.trim().length > 0 || mediaFile !== null) && !sending;
-
-  const handleSend = () => {
-    const attachment = mediaFile
-      ? { file: mediaFile.file, expiresInHours: mediaExpiresInHours }
-      : undefined;
-    onSend(attachment);
-    // Clear media after send
-    setMediaFile(null);
-    setMediaExpiresInHours(24);
-  };
-
-  const handleSelectMedia = (file: File) => {
-    const previewUrl = URL.createObjectURL(file);
-    setMediaFile({ file, previewUrl });
-  };
-
-  const handleRemoveMedia = () => {
-    if (mediaFile) URL.revokeObjectURL(mediaFile.previewUrl);
-    setMediaFile(null);
-  };
-
-  const handleInsertEmoji = (emoji: string) => {
-    const el = textareaRef.current;
-    if (!el) {
-      onDraftChange(draft + emoji);
-      return;
+    if (contentEditableRef.current && draft) {
+      contentEditableRef.current.innerText = draft;
     }
-    const start = el.selectionStart ?? draft.length;
-    const end = el.selectionEnd ?? draft.length;
-    const next = draft.slice(0, start) + emoji + draft.slice(end);
-    onDraftChange(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      const pos = start + emoji.length;
-      el.setSelectionRange(pos, pos);
-    });
-  };
+  }, []);
+    const handleSend = () => {
+        const el = contentEditableRef.current;
+        if (!el) return;
+        const content = el.innerText.trim();
+        if (!content && !mediaFile) return;
+        if (sending) return;
+        onDraftChange(content); // sync to parent first
+        onSend();
+        el.innerText = '';
+        onDraftChange('');
+    };
 
-  return (
-    // ── Preserved: outer wrapper with touchAction none + safe-area ──────────
-    <div
-      className="shrink-0 border-t border-white/10 bg-[#0d1525]"
-      style={{ paddingBottom: '0px', touchAction: 'none' }}
-    >
-      {/* Media preview strip */}
-      <ComposerMediaPreview
-        media={mediaFile}
-        expiresInHours={mediaExpiresInHours}
-        onExpireChange={setMediaExpiresInHours}
-        onRemove={handleRemoveMedia}
-      />
-
-      {/* Reply target banner — preserved from original */}
-      <ComposerReplyBanner replyTarget={replyTarget} onClearReply={onClearReply} />
-
-      {/* Formatting toolbar — toggled by Aa button */}
-      <ComposerFormattingToolbar
-          textareaRef={textareaRef}
+return (
+    <div className="shrink-0 border-t border-white/10 bg-[#0d1525] px-3 py-3">
+        <ComposerFormattingToolbar
+          contentEditableRef={contentEditableRef}
           draft={draft}
           onDraftChange={onDraftChange}
         />
-
-      {/* Input row */}
-      {/* Preserved: touchAction none on wrapper divs */}
-      <div className="px-3 py-2" style={{ touchAction: 'none' }}>
-        <div className="mx-auto w-full max-w-[24rem]" style={{ touchAction: 'none' }}>
-          <div
-            className="relative rounded-[1.4rem] border border-white/10 bg-white/5 transition-colors focus-within:border-blue-500/50 flex items-center gap-1 px-2 py-1.5"
-            style={{ touchAction: 'none' }}
-          >
-            {/* + Attachment button */}
-            <button
-              type="button"
-              onClick={() => { setShowAttachment(true); setShowEmoji(false); }}
-              aria-label="Add attachment"
-              className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-gray-400 hover:bg-white/10 hover:text-gray-200 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-
-            {/* Textarea — touch/scroll logic preserved exactly from original */}
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(e) => onDraftChange(e.target.value)}
-              onFocus={onFocus}
-              onBlur={onBlur}
-              placeholder={placeholder}
-              disabled={sending}
-              rows={1}
-              inputMode="text"
-              autoComplete="off"
-              className="flex-1 resize-none bg-transparent py-2.75 text-base leading-relaxed text-white placeholder-gray-500 focus:outline-none disabled:opacity-50"
-              style={{ minHeight: '38px', height: '38px', touchAction: 'none' }}
-            />
-
-            
-
-            {/* Emoji button */}
-            <button
-              type="button"
-              onClick={() => { setShowEmoji((v) => !v); }}
-              aria-label="Emoji"
-              className={`shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
-                showEmoji
-                  ? 'bg-blue-600/30 text-blue-400'
-                  : 'text-gray-400 hover:bg-white/10 hover:text-gray-200'
-              }`}
-            >
-              <Smile className="w-5 h-5" />
-            </button>
-
-            {/* Send button — preserved from original */}
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!canSend}
-              aria-label="Send message"
-              className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white transition-colors disabled:bg-white/10 disabled:text-gray-500"
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-2">
-                <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
+        <div className="mx-auto w-full max-w-[24rem] flex items-center">
+            <div 
+                ref={contentEditableRef}            
+                contentEditable
+                suppressContentEditableWarning 
+                className="relative rounded-[1.2rem] border border-white/10 bg-white/5 outline outline-2 outline-white/20 outline-offset-2 min-h-[48px] flex items-center px-4 overflow-hidden w-full break-all"/>
+                <button
+                    type="button"
+                    onClick={handleSend}
+                    className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white ml-2"
+                >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-2">
+                    <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+                 </svg>
+                </button>
         </div>
-      </div>
-
-      {/* Overlays */}
-      {showAttachment && (
-        <AttachmentMenu
-          onSelectFile={handleSelectMedia}
-          onClose={() => setShowAttachment(false)}
-        />
-      )}
-      {showEmoji && (
-        <EmojiPicker
-          onSelect={handleInsertEmoji}
-          onClose={() => setShowEmoji(false)}
-        />
-      )}
     </div>
-  );
+);
 }

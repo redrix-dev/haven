@@ -25,6 +25,7 @@ import { MobileNotificationSettingsSheet } from '@/renderer/mobile/MobileNotific
 import { MobileFriendsSheet } from '@/renderer/mobile/MobileFriendsSheet';
 import { MobileVoiceSettingsSheet } from '@/renderer/mobile/MobileVoiceSettingsSheet';
 import { useServerOrder } from '@/renderer/features/community/hooks/useServerOrder';
+import { ENHANCED_COMPOSER_FLAG } from './constants';
 
 // Explicit mobile navigation — independent of orchestration's currentServerId so that
 // useCommunityWorkspace's desktop auto-select doesn't interfere.
@@ -275,6 +276,7 @@ export function MobileChatApp() {
             </div>
 
             <MobileChannelView
+              useEnhancedComposer={app.hasFeatureFlag(ENHANCED_COMPOSER_FLAG)}
               channelName={app.currentChannel.name}
               currentUserId={app.user.id}
               messages={app.messages}

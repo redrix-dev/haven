@@ -6,7 +6,7 @@ import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
 import { isNearBottom } from '@/renderer/mobile/scrollAnchor';
 import { MarkdownText } from '@/lib/markdownRenderer';
-
+import { EnhancedComposer } from './MobileEnhancedComposer';
 interface ReplyTarget {
   id: string;
   authorLabel: string;
@@ -14,6 +14,7 @@ interface ReplyTarget {
 }
 
 interface MobileChannelViewProps {
+  useEnhancedComposer: boolean;
   channelName: string;
   currentUserId: string;
   messages: Message[];
@@ -50,6 +51,7 @@ export function MobileChannelView({
   onEditMessage,
   onDeleteMessage,
   onReportMessage,
+  useEnhancedComposer,
 }: MobileChannelViewProps) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -354,15 +356,26 @@ export function MobileChannelView({
       </div>
 
       {/* Composer */}
-      <MobileMessageComposer
-        draft={draft}
-        onDraftChange={setDraft}
-        onSend={handleSend}
-        sending={sending}
-        placeholder={`Message #${channelName}`}
-        replyTarget={replyTarget}
-        onClearReply={() => setReplyTarget(null)}
-      />
+      {useEnhancedComposer
+        ? <EnhancedComposer
+            draft={draft}
+            onDraftChange={setDraft}
+            onSend={handleSend}
+            sending={sending}
+            placeholder={`Message #${channelName}`}
+            replyTarget={replyTarget}
+            onClearReply={() => setReplyTarget(null)}
+          />
+        : <MobileMessageComposer
+            draft={draft}
+            onDraftChange={setDraft}
+            onSend={handleSend}
+            sending={sending}
+            placeholder={`Message #${channelName}`}
+            replyTarget={replyTarget}
+            onClearReply={() => setReplyTarget(null)}
+          />
+      }
 
       {/* Long-press context menu */}
       <MobileLongPressMenu

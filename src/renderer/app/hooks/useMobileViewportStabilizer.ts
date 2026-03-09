@@ -134,9 +134,9 @@ export function useMobileViewportStabilizer(): void {
       document.removeEventListener('focusout', handleFocusEvent);
 
       root.style.removeProperty('--app-visual-viewport-height');
-      root.style.removeProperty('--app-keyboard-inset');
-      root.style.removeProperty('--app-keyboard-accessory-inset');
-      root.style.removeProperty('--app-visual-viewport-offset-top');
+      root.style.setProperty('--app-keyboard-inset', '0px');
+      root.style.setProperty('--app-keyboard-accessory-inset', '0px');
+      root.style.setProperty('--app-visual-viewport-offset-top', '0px');
       delete root.dataset.mobileKeyboardOpen;
     };
   }, []);

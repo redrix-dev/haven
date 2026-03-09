@@ -6,6 +6,7 @@ import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
 import { isNearBottom } from '@/renderer/mobile/scrollAnchor';
 import { MarkdownText } from '@/lib/markdownRenderer';
+import { send } from 'node:process';
 
 interface ContextMenuState {
   message: DirectMessage;
@@ -46,43 +47,39 @@ export function MobileDmConversationView({
   const hasInitializedScrollRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const longPress = useMobileLongPress();
+  const justSentRef = useRef(false);
+  const previousMessageCountRef = useRef(0);
+  
   useEffect(() => {
     const node = scrollRef.current;
     if (!node) return;
-
-    if (!hasInitializedScrollRef.current) {
-      hasInitializedScrollRef.current = true;
-      node.scrollTop = node.scrollHeight;
-      return;
-    }
-
-    if (!isNearBottom(node)) {
-      return;
-    }
-
+    if (hasInitializedScrollRef.current) return;
+    hasInitializedScrollRef.current = true;
     node.scrollTop = node.scrollHeight;
-  }, [messages.length, scrollRef]);
+  }, [messages.length]);
 
+// Effect 2 — handles scroll on new messages
   useEffect(() => {
+    if (!hasInitializedScrollRef.current) return;
     const node = scrollRef.current;
     if (!node) return;
 
-    if (!hasInitializedScrollRef.current) {
-      hasInitializedScrollRef.current = true;
-      node.scrollTop = node.scrollHeight;
-      return;
-    }
-
-    if (!isNearBottom(node)) {
-      return;
-    }
-
-    node.scrollTop = node.scrollHeight;
-  }, [messages.length, scrollRef]);
+    requestAnimationFrame(() => {
+      if (justSentRef.current) {
+        justSentRef.current = false;
+        node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+        return;
+      }
+      if (isNearBottom(node)) {
+        node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+      }
+    });
+}, [messages.length]);
 
   const handleSend = async (_mediaAttachment?: { file: File; expiresInHours: number }) => {
     const content = draft.trim();
     if (!content || sendPending) return;
+    justSentRef.current = true;
     setDraft('');
     await onSendMessage(content);
   };

@@ -12,6 +12,7 @@ export const FRIENDS_SOCIAL_PANEL_FLAG = 'friends_dms_v1';
 export const DM_REPORT_REVIEW_PANEL_FLAG = 'dm_report_review_v1';
 export const VOICE_HARDWARE_DEBUG_PANEL_FLAG = 'debug_voice_hardware_panel';
 export const VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL = 'Ctrl/Cmd + Alt + Shift + V';
+export const ENHANCED_COMPOSER_FLAG = 'enhanced_composer_v1';
 
 export const DEFAULT_NOTIFICATION_AUDIO_SETTINGS: NotificationAudioSettings = {
   masterSoundEnabled: true,

@@ -10,7 +10,8 @@
     "url": "https://github.com/redrix-dev/haven.git"
   },
   "scripts": {
-    "tunnel": "cloudflared tunnel --config /Users/codymagnuson/.cloudflared/haven.yml run",
+    "tunnel:mac": "cloudflared tunnel --config /Users/codymagnuson/.cloudflared/haven.yml run",
+    "tunnel:windows": "cloudflared tunnel --config C:\\Users\\Churro\\.cloudflared\\haven.yml run",
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
