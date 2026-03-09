@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Loader2, ChevronRight, AlertTriangle } from 'lucide-react';
+import { X, Loader2, ChevronRight, AlertTriangle, Volume2 } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/errors';
 import type { UpdaterStatus } from '@/shared/desktop/types';
 
@@ -18,6 +18,7 @@ interface MobileAccountSettingsSheetProps {
   onCheckForUpdates: () => Promise<void>;
   onSignOut: () => Promise<void>;
   onDeleteAccount: () => Promise<void>;
+  onOpenVoiceSettings?: () => void;
 }
 
 type ConfirmState = 'none' | 'disable-updates' | 'sign-out' | 'delete-account';
@@ -65,6 +66,7 @@ export function MobileAccountSettingsSheet({
   onCheckForUpdates,
   onSignOut,
   onDeleteAccount,
+  onOpenVoiceSettings,
 }: MobileAccountSettingsSheetProps) {
   const [username, setUsername] = useState(initialUsername);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? '');
@@ -267,6 +269,23 @@ export function MobileAccountSettingsSheet({
 
           {error && (
             <p className="text-sm text-red-400 mb-4">{error}</p>
+          )}
+
+          {/* Voice Settings shortcut */}
+          {onOpenVoiceSettings && (
+            <div className="mb-5">
+              <p className="text-[11px] uppercase tracking-widest text-gray-500 font-semibold mb-2">Voice</p>
+              <div className="rounded-xl bg-white/3 border border-white/5">
+                <button
+                  onClick={() => { onOpenVoiceSettings(); }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5"
+                >
+                  <Volume2 className="w-4 h-4 text-gray-500 shrink-0" />
+                  <span className="flex-1 text-sm text-gray-200 text-left">Voice Settings</span>
+                  <ChevronRight className="w-4 h-4 text-gray-600 shrink-0" />
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Auto-update section */}

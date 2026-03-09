@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -46,6 +46,8 @@ interface ServerListProps {
   onDeleteServer?: (serverId: string) => void;
   onRenameServer?: (serverId: string) => void;
   onOpenServerSettingsForServer?: (serverId: string) => void;
+  /** Called with the new ordered server IDs after user drag-reorders them. */
+  onReorder?: (orderedIds: string[]) => void;
 }
 
 export function ServerList({
@@ -74,8 +76,13 @@ export function ServerList({
   onDeleteServer,
   onRenameServer,
   onOpenServerSettingsForServer,
+  onReorder,
 }: ServerListProps) {
   const avatarInitial = userDisplayName.trim().charAt(0).toUpperCase() || 'U';
+
+  // Drag-to-reorder state
+  const [dragFromIdx, setDragFromIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const squareButtonBaseClass =
     'size-12 p-0 rounded-2xl flex items-center justify-center overflow-hidden transition-colors';
 
@@ -84,7 +91,7 @@ export function ServerList({
       <div className="flex h-full w-full flex-col px-3 py-3">
         <ScrollArea className="min-h-0 flex-1 [--scrollbar-size:8px] [&_[data-slot=scroll-area-scrollbar]]:opacity-0 [&:hover_[data-slot=scroll-area-scrollbar]]:opacity-100 [&_[data-slot=scroll-area-scrollbar]]:transition-opacity">
           <div className="flex w-full flex-col items-center gap-2">
-            {servers.map((server) => {
+            {servers.map((server, serverIdx) => {
               const isCurrentServer = currentServerId === server.id;
               const canRename = isCurrentServer && canManageCurrentServer && Boolean(onRenameServer);
               const canDelete = isCurrentServer && currentServerIsOwner && Boolean(onDeleteServer);
@@ -93,6 +100,8 @@ export function ServerList({
                 canOpenCurrentServerSettings &&
                 Boolean(onOpenServerSettingsForServer);
               const canLeave = Boolean(onLeaveServer) && !(isCurrentServer && currentServerIsOwner);
+              const isDragging = dragFromIdx === serverIdx;
+              const isDragTarget = dragOverIdx === serverIdx && dragFromIdx !== serverIdx;
               const serverActions: MenuActionNode[] = [
                 {
                   kind: 'item',
@@ -137,54 +146,82 @@ export function ServerList({
               ];
 
               return (
-                <ContextMenu
+                <div
                   key={server.id}
-                  onOpenChange={(nextOpen) => {
-                    traceContextMenuEvent('server', 'open-change', {
-                      serverId: server.id,
-                      open: nextOpen,
-                    });
+                  draggable={Boolean(onReorder)}
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'move';
+                    setDragFromIdx(serverIdx);
                   }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverIdx !== serverIdx) setDragOverIdx(serverIdx);
+                  }}
+                  onDrop={() => {
+                    if (dragFromIdx !== null && dragFromIdx !== serverIdx && onReorder) {
+                      const ids = servers.map((s) => s.id);
+                      const [moved] = ids.splice(dragFromIdx, 1);
+                      ids.splice(serverIdx, 0, moved);
+                      onReorder(ids);
+                    }
+                    setDragFromIdx(null);
+                    setDragOverIdx(null);
+                  }}
+                  onDragEnd={() => {
+                    setDragFromIdx(null);
+                    setDragOverIdx(null);
+                  }}
+                  className={`transition-opacity ${isDragging ? 'opacity-40' : ''} ${isDragTarget ? 'ring-2 ring-[#3f79d8] rounded-2xl' : ''}`}
                 >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ContextMenuTrigger
-                        asChild
-                        onContextMenuCapture={(event) => {
-                          const intent = resolveContextMenuIntent(event.target);
-                          traceContextMenuEvent('server', 'contextmenu-trigger', {
-                            serverId: server.id,
-                            intent,
-                          });
-                          if (intent === 'native_text') {
-                            event.stopPropagation();
-                          }
-                        }}
-                      >
-                        <Button
-                          data-menu-scope="server"
-                          type="button"
-                          onClick={() => onServerClick(server.id)}
-                          className={`${squareButtonBaseClass} font-semibold text-white leading-none ${
-                            isCurrentServer
-                              ? 'bg-[#3f79d8] hover:bg-[#3f79d8]'
-                              : 'bg-[#18243a] hover:bg-[#3f79d8]'
-                          }`}
+                  <ContextMenu
+                    onOpenChange={(nextOpen) => {
+                      traceContextMenuEvent('server', 'open-change', {
+                        serverId: server.id,
+                        open: nextOpen,
+                      });
+                    }}
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <ContextMenuTrigger
+                          asChild
+                          onContextMenuCapture={(event) => {
+                            const intent = resolveContextMenuIntent(event.target);
+                            traceContextMenuEvent('server', 'contextmenu-trigger', {
+                              serverId: server.id,
+                              intent,
+                            });
+                            if (intent === 'native_text') {
+                              event.stopPropagation();
+                            }
+                          }}
                         >
-                          <span className="text-base leading-none">
-                            {server.icon || server.name.charAt(0).toUpperCase()}
-                          </span>
-                        </Button>
-                      </ContextMenuTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" sideOffset={8}>
-                      {server.name}
-                    </TooltipContent>
-                  </Tooltip>
-                  <ContextMenuContent className="bg-[#18243a] border-[#304867] text-white">
-                    <ActionMenuContent mode="context" scope="server" actions={serverActions} />
-                  </ContextMenuContent>
-                </ContextMenu>
+                          <Button
+                            data-menu-scope="server"
+                            type="button"
+                            onClick={() => onServerClick(server.id)}
+                            className={`${squareButtonBaseClass} font-semibold text-white leading-none ${
+                              isCurrentServer
+                                ? 'bg-[#3f79d8] hover:bg-[#3f79d8]'
+                                : 'bg-[#18243a] hover:bg-[#3f79d8]'
+                            }`}
+                          >
+                            <span className="text-base leading-none">
+                              {server.icon || server.name.charAt(0).toUpperCase()}
+                            </span>
+                          </Button>
+                        </ContextMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={8}>
+                        {server.name}
+                      </TooltipContent>
+                    </Tooltip>
+                    <ContextMenuContent className="bg-[#18243a] border-[#304867] text-white">
+                      <ActionMenuContent mode="context" scope="server" actions={serverActions} />
+                    </ContextMenuContent>
+                  </ContextMenu>
+                </div>
               );
             })}
           </div>

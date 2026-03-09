@@ -46,6 +46,7 @@ interface SidebarProps {
   voiceChannelParticipants?: Record<string, Array<{ userId: string; displayName: string }>>;
   voiceStatusPanel?: React.ReactNode;
   canManageChannels?: boolean;
+  canManageChannelStructure?: boolean;
   onCreateChannel?: () => void;
   onRenameChannel?: (channelId: string) => void;
   onDeleteChannel?: (channelId: string) => void;
@@ -74,6 +75,7 @@ export function Sidebar({
   voiceChannelParticipants = {},
   voiceStatusPanel,
   canManageChannels = false,
+  canManageChannelStructure = false,
   onCreateChannel,
   onRenameChannel,
   onDeleteChannel,
@@ -300,21 +302,21 @@ export function Sidebar({
         kind: 'submenu',
         key: 'add-to-group',
         label: 'Add To Group',
-        disabled: !canManageChannels || !onAddChannelToGroup,
+        disabled: !canManageChannelStructure || !onAddChannelToGroup,
         items: addToGroupItems,
       },
       {
         kind: 'item',
         key: 'remove-from-group',
         label: 'Remove From Group',
-        disabled: !canManageChannels || !onRemoveChannelFromGroup || !assignedGroup,
+        disabled: !canManageChannelStructure || !onRemoveChannelFromGroup || !assignedGroup,
         onSelect: () => onRemoveChannelFromGroup?.(channel.id),
       },
       {
         kind: 'item',
         key: 'create-group',
         label: 'Create Group',
-        disabled: !canManageChannels || !onCreateChannelGroup,
+        disabled: !canManageChannelStructure || !onCreateChannelGroup,
         onSelect: () => onCreateChannelGroup?.(channel.id),
       },
       {
@@ -371,7 +373,7 @@ export function Sidebar({
         kind: 'item',
         key: `rename-group-${group.id}`,
         label: 'Rename Group',
-        disabled: !canManageChannels || !onRenameChannelGroup,
+        disabled: !canManageChannelStructure || !onRenameChannelGroup,
         onSelect: () => onRenameChannelGroup?.(group.id),
       },
       {
@@ -379,7 +381,7 @@ export function Sidebar({
         key: `delete-group-${group.id}`,
         label: 'Delete Group',
         destructive: true,
-        disabled: !canManageChannels || !onDeleteChannelGroup,
+        disabled: !canManageChannelStructure || !onDeleteChannelGroup,
         onSelect: () => onDeleteChannelGroup?.(group.id),
       },
     ];
@@ -436,11 +438,11 @@ export function Sidebar({
         kind: 'item',
         key: 'viewport-create-group',
         label: 'Create Group',
-        disabled: !canManageChannels || !onCreateChannelGroup,
+        disabled: !canManageChannelStructure || !onCreateChannelGroup,
         onSelect: () => onCreateChannelGroup?.(),
       },
     ],
-    [canManageChannels, onCreateChannel, onCreateChannelGroup]
+    [canManageChannelStructure, onCreateChannel, onCreateChannelGroup]
   );
 
   return (

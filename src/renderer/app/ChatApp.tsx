@@ -47,9 +47,11 @@ import {
 } from '@/lib/notifications/webPushDiagnostics';
 import { Headphones, Mic, MicOff, PhoneOff, Settings2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
+import { useServerOrder } from '@/renderer/features/community/hooks/useServerOrder';
 
 export function ChatApp() {
   const app = useChatAppOrchestration();
+  const { orderedServers, setOrder: setServerOrder } = useServerOrder(app.user?.id ?? null, app.servers);
 
   if (app.authStatus === 'initializing') {
     return (
@@ -86,7 +88,8 @@ export function ChatApp() {
 
       <div className="flex h-screen overflow-hidden bg-[#111a2b] text-[#e6edf7]">
         <ServerList
-          servers={app.servers}
+          servers={orderedServers}
+          onReorder={setServerOrder}
           currentServerId={app.currentServerId}
           currentServerIsOwner={app.serverPermissions.isOwner}
           canManageCurrentServer={app.canManageCurrentServer}
@@ -313,6 +316,7 @@ export function ChatApp() {
                   : undefined
               }
               canManageChannels={canOpenChannelSettings}
+              canManageChannelStructure={canManageChannelStructure}
               onRenameChannel={
                 canManageChannelStructure ? app.handleRenameChannel : undefined
               }
