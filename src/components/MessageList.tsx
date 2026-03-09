@@ -53,6 +53,7 @@ import type {
   MessageReportTarget,
 } from '@/lib/backend/types';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
+import { MarkdownText } from '@/lib/markdownRenderer';
 
 type Message = Database['public']['Tables']['messages']['Row'];
 const QUICK_REACTION_EMOJI = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}'] as const;
@@ -933,7 +934,7 @@ export function MessageList({
               <div className="space-y-2">
                 {!hideMediaPlaceholder && (
                   <div className="text-[#e6edf7] text-[15px] leading-[1.375] break-words">
-                    {renderLinkifiedMessageText(message.content)}
+                    <MarkdownText content={message.content} />
                   </div>
                 )}
 

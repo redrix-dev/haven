@@ -5,6 +5,7 @@ import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
 import { isNearBottom } from '@/renderer/mobile/scrollAnchor';
+import { MarkdownText } from '@/lib/markdownRenderer';
 
 interface ContextMenuState {
   message: DirectMessage;
@@ -79,7 +80,7 @@ export function MobileDmConversationView({
     node.scrollTop = node.scrollHeight;
   }, [messages.length, scrollRef]);
 
-  const handleSend = async () => {
+  const handleSend = async (_mediaAttachment?: { file: File; expiresInHours: number }) => {
     const content = draft.trim();
     if (!content || sendPending) return;
     setDraft('');
@@ -189,13 +190,13 @@ export function MobileDmConversationView({
                   </div>
 
                   <div
-                    className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                    className={`rounded-2xl px-3.5 py-2.5 text-sm ${
                       isOwn
                         ? 'bg-blue-600 text-white rounded-tr-sm'
                         : 'bg-[#1a2840] text-gray-100 rounded-tl-sm border border-white/5'
                     }`}
                   >
-                    {message.content}
+                    <MarkdownText content={message.content} />
                   </div>
                 </div>
               </div>

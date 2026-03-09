@@ -5,7 +5,8 @@ import { LoginScreen } from '@/components/LoginScreen';
 import { CreateServerModal } from '@/components/CreateServerModal';
 import { JoinServerModal } from '@/components/JoinServerModal';
 import { MobileAccountSettingsSheet } from '@/renderer/mobile/MobileAccountSettingsSheet';
-import { ServerSettingsModal } from '@/components/ServerSettingsModal';
+import { MobileServerSettingsSheet } from '@/renderer/mobile/MobileServerSettingsSheet';
+import { MobileChannelSettingsSheet } from '@/renderer/mobile/MobileChannelSettingsSheet';
 import { getErrorMessage } from '@/shared/lib/errors';
 import { useChatAppOrchestration } from '@/renderer/app/hooks/useChatAppOrchestration';
 import { MobileSplashScreen } from '@/renderer/mobile/MobileSplashScreen';
@@ -22,6 +23,8 @@ import { MobileDmConversationView } from '@/renderer/mobile/MobileDmConversation
 import { MobileNotificationsView } from '@/renderer/mobile/MobileNotificationsView';
 import { MobileNotificationSettingsSheet } from '@/renderer/mobile/MobileNotificationSettingsSheet';
 import { MobileFriendsSheet } from '@/renderer/mobile/MobileFriendsSheet';
+import { MobileVoiceSettingsSheet } from '@/renderer/mobile/MobileVoiceSettingsSheet';
+import { useServerOrder } from '@/renderer/features/community/hooks/useServerOrder';
 
 // Explicit mobile navigation — independent of orchestration's currentServerId so that
 // useCommunityWorkspace's desktop auto-select doesn't interfere.
@@ -41,9 +44,13 @@ export function MobileChatApp() {
   const [channelDrawerOpen, setChannelDrawerOpen] = useState(false);
   const [notifSettingsOpen, setNotifSettingsOpen] = useState(false);
   const [bottomNavOpen, setBottomNavOpen] = useState(false);
+  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
 
   // Remember the last channel visited per server so we can restore it on re-entry.
   const lastChannelByServer = useRef(new Map<string, string>());
+
+  // Server ordering (client-side, persisted to localStorage)
+  const { orderedServers, setOrder: setServerOrder } = useServerOrder(app.user?.id ?? null, app.servers);
 
   // ── Auto-navigate from 'server' loading state once channels are available ──
   // Must be declared before any early returns to satisfy the Rules of Hooks.
@@ -210,7 +217,7 @@ export function MobileChatApp() {
       <MobileServerDrawer
         open={serverDrawerOpen}
         onClose={() => setServerDrawerOpen(false)}
-        servers={app.servers}
+        servers={orderedServers}
         currentServerId={app.currentServerId}
         onSelectServer={goToServer}
         canManageCurrentServer={app.canManageCurrentServer}
@@ -221,10 +228,11 @@ export function MobileChatApp() {
       <div className="flex-1 flex flex-col min-h-0">
         {mobileScreen === 'home' && (
           <MobileServerGrid
-            servers={app.servers}
+            servers={orderedServers}
             onSelectServer={goToServer}
             onCreateServer={() => app.setShowCreateModal(true)}
             onJoinServer={() => app.setShowJoinServerModal(true)}
+            onReorder={setServerOrder}
           />
         )}
 
@@ -250,6 +258,19 @@ export function MobileChatApp() {
                 channels={app.channels}
                 currentChannelId={app.currentChannelId}
                 onSelectChannel={goToChannel}
+                channelGroups={app.sidebarChannelGroups}
+                ungroupedChannelIds={app.channelGroupState.ungroupedChannelIds}
+                canOpenChannelSettings={
+                  app.serverPermissions.canManageChannelStructure ||
+                  app.serverPermissions.canManageChannelPermissions
+                }
+                onOpenChannelSettings={(channelId) => {
+                  void app.openChannelSettingsModal(channelId);
+                  setChannelDrawerOpen(false);
+                }}
+                onToggleGroup={(groupId, isCollapsed) => {
+                  void app.setChannelGroupCollapsed(groupId, isCollapsed);
+                }}
               />
             </div>
 
@@ -402,41 +423,64 @@ export function MobileChatApp() {
         />
       )}
 
-      {app.showServerSettingsModal && app.currentServerId && app.canOpenServerSettings && (
-        <ServerSettingsModal
-          channels={app.channels.map((c) => ({ id: c.id, name: c.name }))}
-          initialValues={app.serverSettingsInitialValues}
-          loadingInitialValues={app.serverSettingsLoading}
-          initialLoadError={app.serverSettingsLoadError}
-          canManageServer={app.serverPermissions.canManageServer}
-          canManageRoles={app.serverPermissions.canManageRoles}
-          canManageMembers={app.serverPermissions.canManageMembers}
-          canManageBans={app.serverPermissions.canManageBans}
-          isOwner={app.serverPermissions.isOwner}
-          roles={app.serverRoles}
-          members={app.serverMembers}
-          permissionsCatalog={app.serverPermissionCatalog}
-          roleManagementLoading={app.serverRoleManagementLoading}
-          roleManagementError={app.serverRoleManagementError}
-          canManageDeveloperAccess={app.serverPermissions.canManageDeveloperAccess}
-          canManageInvites={app.serverPermissions.canManageInvites}
-          invites={app.serverInvites}
-          invitesLoading={app.serverInvitesLoading}
-          invitesError={app.serverInvitesError}
-          bans={app.communityBans}
-          bansLoading={app.communityBansLoading}
-          bansError={app.communityBansError}
-          inviteBaseUrl={app.getPlatformInviteBaseUrl()}
-          onClose={() => app.setShowServerSettingsModal(false)}
-          onSave={app.saveServerSettings}
-          onCreateRole={app.createServerRole}
-          onUpdateRole={app.updateServerRole}
-          onDeleteRole={app.deleteServerRole}
-          onSaveRolePermissions={app.saveServerRolePermissions}
-          onSaveMemberRoles={app.saveServerMemberRoles}
-          onCreateInvite={app.createServerInvite}
-          onRevokeInvite={app.revokeServerInvite}
-          onUnbanUser={app.unbanUserFromCurrentServer}
+      <MobileServerSettingsSheet
+        open={app.showServerSettingsModal && !!app.currentServerId && app.canOpenServerSettings}
+        channels={app.channels.map((c) => ({ id: c.id, name: c.name }))}
+        initialValues={app.serverSettingsInitialValues}
+        loadingInitialValues={app.serverSettingsLoading}
+        initialLoadError={app.serverSettingsLoadError}
+        canManageServer={app.serverPermissions.canManageServer}
+        canManageRoles={app.serverPermissions.canManageRoles}
+        canManageMembers={app.serverPermissions.canManageMembers}
+        canManageBans={app.serverPermissions.canManageBans}
+        isOwner={app.serverPermissions.isOwner}
+        roles={app.serverRoles}
+        members={app.serverMembers}
+        permissionsCatalog={app.serverPermissionCatalog}
+        roleManagementLoading={app.serverRoleManagementLoading}
+        roleManagementError={app.serverRoleManagementError}
+        canManageDeveloperAccess={app.serverPermissions.canManageDeveloperAccess}
+        canManageInvites={app.serverPermissions.canManageInvites}
+        invites={app.serverInvites}
+        invitesLoading={app.serverInvitesLoading}
+        invitesError={app.serverInvitesError}
+        bans={app.communityBans}
+        bansLoading={app.communityBansLoading}
+        bansError={app.communityBansError}
+        inviteBaseUrl={app.getPlatformInviteBaseUrl()}
+        onClose={() => app.setShowServerSettingsModal(false)}
+        onSave={app.saveServerSettings}
+        onCreateRole={app.createServerRole}
+        onUpdateRole={app.updateServerRole}
+        onDeleteRole={app.deleteServerRole}
+        onSaveRolePermissions={app.saveServerRolePermissions}
+        onSaveMemberRoles={app.saveServerMemberRoles}
+        onCreateInvite={app.createServerInvite}
+        onRevokeInvite={app.revokeServerInvite}
+        onUnbanUser={app.unbanUserFromCurrentServer}
+      />
+
+      {app.showChannelSettingsModal && app.channelSettingsTarget && (
+        <MobileChannelSettingsSheet
+          open
+          initialName={app.channelSettingsTarget.name}
+          initialTopic={app.channelSettingsTarget.topic}
+          canDelete={app.channels.length > 1}
+          canManageChannelStructure={app.serverPermissions.canManageChannelStructure}
+          canManageChannelPermissions={app.serverPermissions.canManageChannelPermissions}
+          rolePermissions={app.channelRolePermissions}
+          memberPermissions={app.channelMemberPermissions}
+          availableMembers={app.channelPermissionMemberOptions}
+          permissionsLoading={app.channelPermissionsLoading}
+          permissionsLoadError={app.channelPermissionsLoadError}
+          onClose={() => {
+            app.setShowChannelSettingsModal(false);
+            app.setChannelSettingsTargetId(null);
+          }}
+          onSave={app.saveChannelSettings}
+          onDelete={app.deleteCurrentChannel}
+          onSaveRolePermissions={app.saveRoleChannelPermissions}
+          onSaveMemberPermissions={app.saveMemberChannelPermissions}
         />
       )}
 
@@ -455,6 +499,16 @@ export function MobileChatApp() {
         onCheckForUpdates={app.checkForUpdatesNow}
         onSignOut={app.signOut}
         onDeleteAccount={app.deleteAccount}
+        onOpenVoiceSettings={() => setVoiceSettingsOpen(true)}
+      />
+
+      <MobileVoiceSettingsSheet
+        open={voiceSettingsOpen}
+        onClose={() => setVoiceSettingsOpen(false)}
+        settings={app.appSettings.voice}
+        saving={app.voiceSettingsSaving}
+        error={app.voiceSettingsError}
+        onUpdateSettings={(next) => void app.setVoiceSettings(next)}
       />
 
       <MobileNotificationSettingsSheet

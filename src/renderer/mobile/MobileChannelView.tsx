@@ -5,6 +5,7 @@ import { MobileMessageComposer } from './MobileMessageComposer';
 import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@/renderer/mobile/useMobileLongPress';
 import { isNearBottom } from '@/renderer/mobile/scrollAnchor';
+import { MarkdownText } from '@/lib/markdownRenderer';
 
 interface ReplyTarget {
   id: string;
@@ -23,7 +24,7 @@ interface MobileChannelViewProps {
   isLoadingOlderMessages: boolean;
   canManageMessages: boolean;
   onRequestOlderMessages: () => void;
-  onSendMessage: (content: string, options?: { replyToMessageId?: string }) => Promise<void>;
+  onSendMessage: (content: string, options?: { replyToMessageId?: string; mediaFile?: File; mediaExpiresInHours?: number }) => Promise<void>;
   onEditMessage: (messageId: string, content: string) => Promise<void>;
   onDeleteMessage: (messageId: string) => Promise<void>;
   onReportMessage: (messageId: string) => void;
@@ -109,13 +110,17 @@ export function MobileChannelView({
     node.scrollTop = node.scrollHeight;
   }, [messages.length]);
 
-  const handleSend = async () => {
+  const handleSend = async (mediaAttachment?: { file: File; expiresInHours: number }) => {
     const content = draft.trim();
-    if (!content || sending) return;
+    if (!content && !mediaAttachment) return;
+    if (sending) return;
     setSending(true);
     setDraft('');
     try {
-      await onSendMessage(content, replyTarget ? { replyToMessageId: replyTarget.id } : undefined);
+      await onSendMessage(content, {
+        ...(replyTarget ? { replyToMessageId: replyTarget.id } : {}),
+        ...(mediaAttachment ? { mediaFile: mediaAttachment.file, mediaExpiresInHours: mediaAttachment.expiresInHours } : {}),
+      });
       setReplyTarget(null);
     } finally {
       setSending(false);
@@ -278,8 +283,8 @@ export function MobileChannelView({
                       }`}
                     >
                       {/* Message text */}
-                      <div className="px-3.5 py-2.5 leading-relaxed whitespace-pre-wrap break-words">
-                        {message.content}
+                      <div className="px-3.5 py-2.5">
+                        <MarkdownText content={message.content} />
                       </div>
 
                       {/* Link preview — embedded flush against the bottom of the bubble */}

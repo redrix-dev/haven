@@ -22,6 +22,7 @@ import type {
   DirectMessageReportKind,
 } from '@/lib/backend/types';
 import { Flag, RefreshCcw, Send, ShieldBan, Volume2, VolumeX } from 'lucide-react';
+import { MarkdownText } from '@/lib/markdownRenderer';
 
 type DirectMessageAreaProps = {
   currentUserId: string;
@@ -328,8 +329,8 @@ export function DirectMessageArea({
                             </Badge>
                           )}
                         </div>
-                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-[#dbe7f8]">
-                          {message.content}
+                        <p className="mt-1 text-sm text-[#dbe7f8]">
+                          <MarkdownText content={message.content} />
                         </p>
                         {!isSelf && (
                           <div className="mt-2 flex items-center gap-2">
