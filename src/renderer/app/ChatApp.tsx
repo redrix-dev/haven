@@ -227,7 +227,7 @@ export function ChatApp() {
                             size="icon-xs"
                             variant="ghost"
                             onClick={() => app.voiceControlActions?.join()}
-                            disabled={app.voiceSessionState.joining || !app.voiceControlActions}
+                            disabled={!app.voiceControlActions}
                             className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
                           >
                             <Headphones className="size-4" />
@@ -239,7 +239,7 @@ export function ChatApp() {
                               size="icon-xs"
                               variant="ghost"
                               onClick={() => app.voiceControlActions?.toggleMute()}
-                              disabled={app.voiceSessionState.listenOnly || !app.voiceControlActions}
+                              disabled={!app.voiceControlActions}
                               className={`hover:bg-[#22334f] ${
                                 app.voiceSessionState.isMuted
                                   ? 'text-[#f3a2a2] hover:text-[#ffd2d2]'
@@ -391,7 +391,6 @@ export function ChatApp() {
                 messageLinkPreviews={app.messageLinkPreviews}
                 authorProfiles={app.authorProfiles}
                 currentUserId={user.id}
-                canSpeakInVoiceChannel={app.canSpeakInVoiceChannel}
                 canManageMessages={app.serverPermissions.canManageMessages}
                 canCreateReports={app.serverPermissions.canCreateReports}
                 canManageBans={app.serverPermissions.canManageBans}
@@ -472,7 +471,6 @@ export function ChatApp() {
                 channelName={app.activeVoiceChannel.name}
                 currentUserId={user.id}
                 currentUserDisplayName={app.userDisplayName}
-                canSpeak={app.canSpeakInVoiceChannel}
                 voiceSettings={app.appSettings.voice}
                 voiceSettingsSaving={app.voiceSettingsSaving}
                 voiceSettingsError={app.voiceSettingsError}

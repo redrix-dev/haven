@@ -36,7 +36,6 @@ type VoicePresencePayload = {
   display_name: string;
   muted: boolean;
   deafened: boolean;
-  listen_only: boolean;
   joined_at: string;
 };
 
@@ -45,7 +44,6 @@ type VoiceParticipant = {
   displayName: string;
   muted: boolean;
   deafened: boolean;
-  listenOnly: boolean;
 };
 
 type VoicePeerDiagnostics = {
@@ -72,7 +70,6 @@ interface VoiceChannelPaneProps {
   channelName: string;
   currentUserId: string;
   currentUserDisplayName: string;
-  canSpeak: boolean;
   voiceSettings: VoiceSettings;
   voiceSettingsSaving?: boolean;
   voiceSettingsError?: string | null;
@@ -86,10 +83,8 @@ interface VoiceChannelPaneProps {
   onLeave?: () => void;
   onSessionStateChange?: (state: {
     joined: boolean;
-    joining: boolean;
     isMuted: boolean;
     isDeafened: boolean;
-    listenOnly: boolean;
   }) => void;
   onControlActionsReady?: (
     actions:
@@ -123,7 +118,6 @@ export function VoiceChannelPane({
   channelName,
   currentUserId,
   currentUserDisplayName,
-  canSpeak,
   voiceSettings,
   voiceSettingsSaving = false,
   voiceSettingsError = null,
@@ -145,7 +139,6 @@ export function VoiceChannelPane({
   const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>({});
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
-  const [listenOnly, setListenOnly] = useState(!canSpeak);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [iceSource, setIceSource] = useState<'xirsys' | 'fallback' | null>(null);
@@ -173,7 +166,6 @@ export function VoiceChannelPane({
   const audioElementRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE_SERVERS);
   const autoJoinAttemptedChannelKeyRef = useRef<string | null>(null);
-  const autoEnableMicAttemptedChannelKeyRef = useRef<string | null>(null);
   const localInputMonitorAudioContextRef = useRef<AudioContext | null>(null);
   const localInputMonitorSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const localInputMonitorAnalyserNodeRef = useRef<AnalyserNode | null>(null);
@@ -545,7 +537,7 @@ export function VoiceChannelPane({
     });
 
     const localStream = localStreamRef.current;
-    if (localStream && !listenOnly) {
+    if (localStream) {
       localStream.getTracks().forEach((track) => {
         peerConnection.addTrack(track, localStream);
       });
@@ -554,8 +546,7 @@ export function VoiceChannelPane({
     }
 
     peerConnection.ontrack = (event) => {
-      const [stream] = event.streams;
-      if (!stream) return;
+      const stream = event.streams[0] ?? new MediaStream([event.track]);
 
       setRemoteStreams((prev) => {
         if (prev[remoteUserId] === stream) return prev;
@@ -698,7 +689,6 @@ export function VoiceChannelPane({
         displayName: latestPresence.display_name ?? userId.slice(0, 12),
         muted: Boolean(latestPresence.muted),
         deafened: Boolean(latestPresence.deafened),
-        listenOnly: Boolean(latestPresence.listen_only),
       });
     }
 
@@ -714,9 +704,8 @@ export function VoiceChannelPane({
     const payload: VoicePresencePayload = {
       user_id: currentUserId,
       display_name: currentUserDisplayName,
-      muted: listenOnly ? true : isMuted,
+      muted: isMuted,
       deafened: isDeafened,
-      listen_only: listenOnly,
       joined_at: new Date().toISOString(),
     };
 
@@ -743,7 +732,7 @@ export function VoiceChannelPane({
     const localStream = localStreamRef.current;
     if (!localStream) return;
 
-    const baseAllowsSend = !listenOnly && !isMuted && !isDeafened;
+    const baseAllowsSend = !isMuted && !isDeafened;
     let modeAllowsSend = true;
 
     if (baseAllowsSend) {
@@ -773,7 +762,7 @@ export function VoiceChannelPane({
       throw new Error('Selected input device has no audio track.');
     }
 
-    const shouldSendAudio = !listenOnly && !isMuted && !isDeafened;
+    const shouldSendAudio = !isMuted && !isDeafened;
     nextTrack.enabled = shouldSendAudio;
 
     const previousStream = localStreamRef.current;
@@ -786,8 +775,8 @@ export function VoiceChannelPane({
         .find((sender) => !sender.track || sender.track.kind === 'audio');
 
       if (audioSender) {
-        // If the peer was created in listen-only mode, the audio transceiver can remain recvonly.
-        // Flip it before renegotiation so replacing the track actually sends microphone audio.
+        // If the audio transceiver is recvonly/inactive, flip to sendrecv before renegotiation
+        // so replacing the track actually sends microphone audio.
         const audioTransceiver = peerConnection
           .getTransceivers()
           .find((transceiver) => transceiver.sender === audioSender);
@@ -836,14 +825,12 @@ export function VoiceChannelPane({
     setJoining(false);
     setIsMuted(false);
     setIsDeafened(false);
-    setListenOnly(!canSpeak);
     setIceSource(null);
     setDiagnosticsUpdatedAt(null);
     setLocalInputLevel(0);
     setVoiceActivityGateOpen(false);
     setPushToTalkPressed(false);
     activePushToTalkCodeRef.current = null;
-    autoEnableMicAttemptedChannelKeyRef.current = null;
 
     if (channel) {
       try {
@@ -861,6 +848,8 @@ export function VoiceChannelPane({
     setJoining(true);
     setError(null);
     setNotice(null);
+    setIsMuted(false);
+    setIsDeafened(false);
 
     const iceConfig = await fetchIceConfig({ communityId, channelId });
     if (iceConfig.blockedReason) {
@@ -877,24 +866,19 @@ export function VoiceChannelPane({
     setIceSource(iceConfig.source);
     if (iceConfig.warning) setNotice(iceConfig.warning);
 
-    let joinAsListener = !canSpeak;
     let localStream: MediaStream | null = null;
 
-    if (canSpeak) {
-      try {
-        localStream = await requestLocalAudioStream(selectedInputDeviceId);
-      } catch (mediaError) {
-        console.error('Microphone permission failed, switching to listener mode:', mediaError);
-        joinAsListener = true;
-        setNotice('Microphone access denied. Joined in listen-only mode.');
-      }
+    try {
+      localStream = await requestLocalAudioStream(selectedInputDeviceId);
+    } catch (mediaError) {
+      console.error('Microphone permission failed during voice join:', mediaError);
+      setNotice('Microphone access unavailable. Joined with microphone disabled.');
     }
 
     localStreamRef.current = localStream;
     await startLocalInputMonitor(localStream);
-    setListenOnly(joinAsListener);
     if (localStream) {
-      const shouldSendAudio = !joinAsListener && !isMuted && !isDeafened;
+      const shouldSendAudio = !isMuted && !isDeafened;
       localStream.getAudioTracks().forEach((track) => {
         track.enabled = shouldSendAudio;
       });
@@ -951,7 +935,7 @@ export function VoiceChannelPane({
   const switchInputDevice = async (deviceId: string) => {
     setSelectedInputDeviceId(deviceId);
     persistVoiceSettingsPatch({ preferredInputDeviceId: deviceId });
-    if (!joined || listenOnly) return;
+    if (!joined) return;
 
     setSwitchingInput(true);
     setError(null);
@@ -963,22 +947,6 @@ export function VoiceChannelPane({
       setError(getErrorMessage(switchError, 'Failed to switch input device.'));
     } finally {
       setSwitchingInput(false);
-    }
-  };
-
-  const enableMicrophone = async () => {
-    if (!canSpeak || !joined || !listenOnly) return;
-    setError(null);
-
-    try {
-      const stream = await requestLocalAudioStream(selectedInputDeviceId);
-      setListenOnly(false);
-      setIsMuted(false);
-      await applyOutgoingTrackToPeers(stream, true);
-      await refreshAudioDevices();
-    } catch (micError: unknown) {
-      console.error('Failed to enable microphone:', micError);
-      setError(getErrorMessage(micError, 'Failed to enable microphone.'));
     }
   };
 
@@ -1032,7 +1000,6 @@ export function VoiceChannelPane({
   }, [
     isMuted,
     isDeafened,
-    listenOnly,
     joined,
     currentUserDisplayName,
     pushToTalkPressed,
@@ -1135,29 +1102,10 @@ export function VoiceChannelPane({
   useEffect(() => {
     onSessionStateChange?.({
       joined,
-      joining,
       isMuted,
       isDeafened,
-      listenOnly,
     });
-  }, [joined, joining, isMuted, isDeafened, listenOnly, onSessionStateChange]);
-
-  useEffect(() => {
-    if (joined || joining) return;
-    setListenOnly(!canSpeak);
-  }, [canSpeak, joined, joining]);
-
-  useEffect(() => {
-    if (!joined || !listenOnly || !canSpeak) return;
-
-    const channelKey = `${communityId}:${channelId}`;
-    if (autoEnableMicAttemptedChannelKeyRef.current === channelKey) {
-      return;
-    }
-
-    autoEnableMicAttemptedChannelKeyRef.current = channelKey;
-    void enableMicrophone();
-  }, [canSpeak, channelId, communityId, joined, listenOnly, enableMicrophone]);
+  }, [joined, isMuted, isDeafened, onSessionStateChange]);
 
   useEffect(() => {
     if (!onParticipantsChange) return;
@@ -1211,7 +1159,6 @@ export function VoiceChannelPane({
   }, [communityId, channelId, currentUserId]);
 
   const toggleMute = () => {
-    if (listenOnly) return;
     setIsMuted((prev) => !prev);
   };
 
@@ -1277,8 +1224,6 @@ export function VoiceChannelPane({
             <Badge variant={joined ? 'default' : 'outline'}>
               {joined ? 'Connected' : 'Disconnected'}
             </Badge>
-            {listenOnly && <Badge variant="secondary">Listen only</Badge>}
-            {!canSpeak && <Badge variant="outline">No speak permission</Badge>}
             {iceSource && (
               <Badge variant={iceSource === 'xirsys' ? 'default' : 'outline'}>
                 ICE: {iceSource === 'xirsys' ? 'Xirsys' : 'STUN fallback'}
@@ -1298,36 +1243,27 @@ export function VoiceChannelPane({
                 className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
               >
                 <PhoneCall className="size-4" />
-                {joining ? 'Joining...' : listenOnly ? 'Join as Listener' : 'Join Voice'}
+                {joining ? 'Joining...' : 'Join Voice'}
               </Button>
             ) : (
               <>
                 <Toggle
                   pressed={isMuted}
-                  onPressedChange={(pressed) => {
-                    if (pressed !== isMuted) {
-                      toggleMute();
-                    }
-                  }}
-                  disabled={listenOnly}
+                  onPressedChange={toggleMute}
                   variant="outline"
                   aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
                   className={`h-9 gap-2 px-3 text-white ${
                     isMuted
                       ? 'border-red-500/40 bg-red-500/15 hover:bg-red-500/20'
                       : 'border-[#304867] bg-[#142033] hover:bg-[#22334f]'
-                  } ${listenOnly ? 'opacity-50' : ''}`}
+                  }`}
                 >
                   {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
                   {isMuted ? 'Unmute' : 'Mute'}
                 </Toggle>
                 <Toggle
                   pressed={isDeafened}
-                  onPressedChange={(pressed) => {
-                    if (pressed !== isDeafened) {
-                      toggleDeafen();
-                    }
-                  }}
+                  onPressedChange={toggleDeafen}
                   variant="outline"
                   aria-label={isDeafened ? 'Undeafen audio' : 'Deafen audio'}
                   className={`h-9 gap-2 px-3 text-white ${
@@ -1339,11 +1275,6 @@ export function VoiceChannelPane({
                   <Headphones className="size-4" />
                   {isDeafened ? 'Undeafen' : 'Deafen'}
                 </Toggle>
-                {listenOnly && canSpeak && (
-                  <Button type="button" variant="secondary" onClick={() => void enableMicrophone()}>
-                    Enable Mic
-                  </Button>
-                )}
                 <Button type="button" variant="outline" onClick={() => void retryIce()}>
                   <RefreshCcw className="size-4" />
                   Retry ICE
@@ -1612,7 +1543,6 @@ export function VoiceChannelPane({
               <div>
                 <p className="text-sm font-medium text-white">{currentUserDisplayName} (You)</p>
                 <div className="mt-1 flex items-center gap-2">
-                  {listenOnly && <Badge variant="secondary">Listen only</Badge>}
                   {isMuted && <Badge variant="outline">Muted</Badge>}
                   {isDeafened && <Badge variant="outline">Deafened</Badge>}
                 </div>
@@ -1632,7 +1562,6 @@ export function VoiceChannelPane({
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white truncate">{participant.displayName}</p>
                   <div className="mt-1 flex items-center gap-2">
-                    {participant.listenOnly && <Badge variant="secondary">Listen only</Badge>}
                     {participant.muted && <Badge variant="outline">Muted</Badge>}
                     {participant.deafened && <Badge variant="outline">Deafened</Badge>}
                   </div>

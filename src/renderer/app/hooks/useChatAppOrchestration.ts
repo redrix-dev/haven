@@ -226,7 +226,6 @@ export function useChatAppOrchestration() {
       voiceConnected,
       voiceParticipants,
       voiceSessionState,
-      canSpeakInVoiceChannel,
       voiceControlActions,
       voiceJoinPrompt,
     },
@@ -1051,7 +1050,7 @@ export function useChatAppOrchestration() {
     canOpenServerSettings, canManageCurrentServer,
     // voice
     activeVoiceChannelId, voicePanelOpen, voiceHardwareDebugPanelOpen,
-    voiceConnected, voiceParticipants, voiceSessionState, canSpeakInVoiceChannel,
+    voiceConnected, voiceParticipants, voiceSessionState,
     voiceControlActions, voiceJoinPrompt, activeVoiceChannel,
     voiceChannelParticipants, activeVoiceParticipantCount,
     setVoicePanelOpen, setVoiceHardwareDebugPanelOpen, setVoiceConnected,

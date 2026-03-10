@@ -32,7 +32,6 @@ interface ChatAreaProps {
   messageLinkPreviews: MessageLinkPreview[];
   authorProfiles: Record<string, AuthorProfile>;
   currentUserId: string;
-  canSpeakInVoiceChannel: boolean;
   canManageMessages: boolean;
   canCreateReports: boolean;
   canManageBans: boolean;
@@ -91,7 +90,6 @@ export function ChatArea({
   messageLinkPreviews,
   authorProfiles,
   currentUserId,
-  canSpeakInVoiceChannel,
   canManageMessages,
   canCreateReports,
   canManageBans,
@@ -220,11 +218,6 @@ export function ChatArea({
             >
               Open Voice Controls
             </Button>
-          )}
-          {!canSpeakInVoiceChannel && (
-            <p className="text-xs text-[#d6a24a]">
-              You can join as listener only in this voice channel.
-            </p>
           )}
           {showVoiceDiagnostics && (
             <p className="text-xs text-[#8ea4c7]">

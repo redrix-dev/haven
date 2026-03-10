@@ -1,5 +1,4 @@
 import React from 'react';
-import { getCommunityDataBackend } from '@/lib/backend';
 import { supabase } from '@/lib/supabase';
 import type { Channel } from '@/lib/backend/types';
 import type { VoicePresenceStateRow, VoiceSidebarParticipant } from '@/renderer/app/types';
@@ -21,10 +20,8 @@ type VoiceJoinPrompt =
 
 type VoiceSessionState = {
   joined: boolean;
-  joining: boolean;
   isMuted: boolean;
   isDeafened: boolean;
-  listenOnly: boolean;
 };
 
 type UseVoiceInput = {
@@ -39,10 +36,8 @@ type UseVoiceInput = {
 
 const createDefaultVoiceSessionState = (): VoiceSessionState => ({
   joined: false,
-  joining: false,
   isMuted: false,
   isDeafened: false,
-  listenOnly: true,
 });
 
 export function useVoice({
@@ -65,7 +60,6 @@ export function useVoice({
   const [voiceSessionState, setVoiceSessionState] = React.useState<VoiceSessionState>(
     createDefaultVoiceSessionState
   );
-  const [canSpeakInVoiceChannel, setCanSpeakInVoiceChannel] = React.useState(false);
   const [voiceControlActions, setVoiceControlActions] = React.useState<VoiceControlActions | null>(null);
   const [voiceJoinPrompt, setVoiceJoinPrompt] = React.useState<VoiceJoinPrompt>(null);
 
@@ -176,42 +170,6 @@ export function useVoice({
     if (!activeVoiceChannelId) return;
     setVoicePanelOpen(false);
   }, [activeVoiceChannelId]);
-
-  React.useEffect(() => {
-    let isMounted = true;
-    const voicePermissionChannelId = activeVoiceChannelId ?? currentChannelId;
-
-    if (!currentUserId || !currentServerId || !voicePermissionChannelId) {
-      setCanSpeakInVoiceChannel(false);
-      return;
-    }
-
-    const selectedChannel = channels.find((channel) => channel.id === voicePermissionChannelId);
-    if (!selectedChannel || selectedChannel.kind !== 'voice') {
-      setCanSpeakInVoiceChannel(false);
-      return;
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-
-    const resolveVoiceSpeakPermission = async () => {
-      try {
-        const canSpeak = await communityBackend.canSendInChannel(voicePermissionChannelId);
-        if (!isMounted) return;
-        setCanSpeakInVoiceChannel(canSpeak);
-      } catch (error) {
-        if (!isMounted) return;
-        console.error('Error resolving voice speak permission:', error);
-        setCanSpeakInVoiceChannel(false);
-      }
-    };
-
-    void resolveVoiceSpeakPermission();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [activeVoiceChannelId, channels, currentChannelId, currentServerId, currentUserId]);
 
   React.useEffect(() => {
     if (!currentServerId || !currentUserId) {
@@ -375,7 +333,6 @@ export function useVoice({
       voiceConnected,
       voiceParticipants,
       voiceSessionState,
-      canSpeakInVoiceChannel,
       voiceControlActions,
       voiceJoinPrompt,
     },
@@ -390,7 +347,6 @@ export function useVoice({
       setVoiceConnected,
       setVoiceParticipants,
       setVoiceSessionState,
-      setCanSpeakInVoiceChannel,
       setVoiceControlActions,
       setVoiceJoinPrompt,
       resetVoiceState,
