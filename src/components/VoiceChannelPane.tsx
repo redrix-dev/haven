@@ -26,6 +26,8 @@ type VoiceSignalEvent = 'offer' | 'answer' | 'ice';
 type VoiceSignalPayload = {
   type: VoiceSignalEvent;
   from: string;
+  senderSessionId: string;
+  targetSessionId?: string;
   to?: string;
   sdp?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
@@ -165,6 +167,7 @@ export function VoiceChannelPane({
   const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const audioElementRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE_SERVERS);
+  const signalingSessionIdRef = useRef<string | null>(null);
   const autoJoinAttemptedChannelKeyRef = useRef<string | null>(null);
   const localInputMonitorAudioContextRef = useRef<AudioContext | null>(null);
   const localInputMonitorSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -396,9 +399,10 @@ export function VoiceChannelPane({
     pendingIceCandidatesRef.current.delete(remoteUserId);
   };
 
-  const sendSignal = async (payload: Omit<VoiceSignalPayload, 'from'>) => {
+  const sendSignal = async (payload: Omit<VoiceSignalPayload, 'from' | 'senderSessionId'>) => {
     const channel = channelRef.current;
-    if (!channel) return;
+    const sessionId = signalingSessionIdRef.current;
+    if (!channel || !sessionId) return;
 
     const sendStatus = await channel.send({
       type: 'broadcast',
@@ -406,6 +410,7 @@ export function VoiceChannelPane({
       payload: {
         ...payload,
         from: currentUserId,
+        senderSessionId: sessionId,
       },
     });
 
@@ -534,6 +539,7 @@ export function VoiceChannelPane({
 
     const peerConnection = new RTCPeerConnection({
       iceServers: iceServersRef.current.length > 0 ? iceServersRef.current : FALLBACK_ICE_SERVERS,
+      iceCandidatePoolSize: 10,
     });
 
     const localStream = localStreamRef.current;
@@ -610,6 +616,9 @@ export function VoiceChannelPane({
   const handleSignal = async (payload: VoiceSignalPayload) => {
     if (!payload || payload.from === currentUserId) return;
     if (payload.to && payload.to !== currentUserId) return;
+    const currentSessionId = signalingSessionIdRef.current;
+    if (!currentSessionId) return;
+    if (payload.targetSessionId && payload.targetSessionId !== currentSessionId) return;
 
     const remoteUserId = payload.from;
     const peerConnection = ensurePeerConnection(remoteUserId);
@@ -629,6 +638,7 @@ export function VoiceChannelPane({
           type: 'answer',
           to: remoteUserId,
           sdp: answer,
+          targetSessionId: payload.senderSessionId,
         });
         return;
       }
@@ -719,7 +729,7 @@ export function VoiceChannelPane({
     const constraints: MediaTrackConstraints = {
       echoCancellation: true,
       noiseSuppression: true,
-      autoGainControl: true,
+      autoGainControl: false,
     };
     if (deviceId && deviceId !== 'default') {
       constraints.deviceId = { exact: deviceId };
@@ -850,6 +860,8 @@ export function VoiceChannelPane({
     setNotice(null);
     setIsMuted(false);
     setIsDeafened(false);
+    const sessionId = crypto.randomUUID();
+    signalingSessionIdRef.current = sessionId;
 
     const iceConfig = await fetchIceConfig({ communityId, channelId });
     if (iceConfig.blockedReason) {
@@ -894,6 +906,12 @@ export function VoiceChannelPane({
 
     voiceChannel
       .on('presence', { event: 'sync' }, () => {
+        syncParticipantsFromPresence();
+      })
+      .on('presence', { event: 'join' }, () => {
+        syncParticipantsFromPresence();
+      })
+      .on('presence', { event: 'leave' }, () => {
         syncParticipantsFromPresence();
       })
       .on('broadcast', { event: 'webrtc-signal' }, ({ payload }) => {
@@ -1156,7 +1174,7 @@ export function VoiceChannelPane({
     return () => {
       void cleanupVoiceSession();
     };
-  }, [communityId, channelId, currentUserId]);
+  }, []);
 
   const toggleMute = () => {
     setIsMuted((prev) => !prev);

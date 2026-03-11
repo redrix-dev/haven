@@ -444,7 +444,7 @@ export function ChatApp() {
         )}
       </div>
 
-      {app.currentServer && app.activeVoiceChannel && (
+      {app.activeVoiceChannel && (
         <div
           className={`fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-6 transition-opacity duration-200 ${
             app.voicePanelOpen
@@ -466,7 +466,8 @@ export function ChatApp() {
           >
             <div className="scrollbar-inset max-h-[88vh] overflow-y-auto">
               <VoiceChannelPane
-                communityId={app.currentServer.id}
+                key={`${app.activeVoiceChannel.community_id}:${app.activeVoiceChannel.id}`}
+                communityId={app.activeVoiceChannel.community_id}
                 channelId={app.activeVoiceChannel.id}
                 channelName={app.activeVoiceChannel.name}
                 currentUserId={user.id}

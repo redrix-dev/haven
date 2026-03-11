@@ -11,9 +11,12 @@ type VoiceControlActions = {
   toggleDeafen: () => void;
 };
 
+type VoiceChannelReference = Pick<Channel, 'id' | 'name' | 'community_id'>;
+
 type VoiceJoinPrompt =
   | {
       channelId: string;
+      channel: VoiceChannelReference;
       mode: 'join' | 'switch';
     }
   | null;
@@ -50,6 +53,9 @@ export function useVoice({
   channels,
 }: UseVoiceInput) {
   const [activeVoiceChannelId, setActiveVoiceChannelId] = React.useState<string | null>(null);
+  const [activeVoiceChannel, setActiveVoiceChannel] = React.useState<VoiceChannelReference | null>(
+    null
+  );
   const [voicePanelOpen, setVoicePanelOpen] = React.useState(false);
   const [voiceHardwareDebugPanelOpen, setVoiceHardwareDebugPanelOpen] = React.useState(false);
   const [voiceConnected, setVoiceConnected] = React.useState(false);
@@ -65,6 +71,7 @@ export function useVoice({
 
   const resetVoiceState = React.useCallback(() => {
     setActiveVoiceChannelId(null);
+    setActiveVoiceChannel(null);
     setVoicePanelOpen(false);
     setVoiceConnected(false);
     setVoiceParticipants([]);
@@ -80,10 +87,16 @@ export function useVoice({
         (channel) => channel.id === channelId && channel.kind === 'voice'
       );
       if (!targetChannel) return;
+      const targetVoiceChannel: VoiceChannelReference = {
+        id: targetChannel.id,
+        name: targetChannel.name,
+        community_id: targetChannel.community_id,
+      };
 
       if (!activeVoiceChannelId) {
         setVoiceJoinPrompt({
-          channelId,
+          channelId: targetChannel.id,
+          channel: targetVoiceChannel,
           mode: 'join',
         });
         return;
@@ -94,7 +107,8 @@ export function useVoice({
       }
 
       setVoiceJoinPrompt({
-        channelId,
+        channelId: targetChannel.id,
+        channel: targetVoiceChannel,
         mode: 'switch',
       });
     },
@@ -104,6 +118,7 @@ export function useVoice({
   const confirmVoiceChannelJoin = React.useCallback(() => {
     if (!voiceJoinPrompt) return;
     setActiveVoiceChannelId(voiceJoinPrompt.channelId);
+    setActiveVoiceChannel(voiceJoinPrompt.channel);
     setVoicePanelOpen(false);
     setVoiceJoinPrompt(null);
   }, [voiceJoinPrompt]);
@@ -118,6 +133,7 @@ export function useVoice({
         voiceControlActions?.leave();
       }
       setActiveVoiceChannelId(null);
+      setActiveVoiceChannel(null);
       setVoicePanelOpen(false);
       setVoiceConnected(false);
       setVoiceParticipants([]);
@@ -150,21 +166,6 @@ export function useVoice({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [currentUserId, voiceHardwareDebugPanelEnabled]);
-
-  React.useEffect(() => {
-    if (!activeVoiceChannelId) return;
-
-    const activeVoiceChannel = channels.find(
-      (channel) => channel.id === activeVoiceChannelId && channel.kind === 'voice'
-    );
-
-    if (!activeVoiceChannel) {
-      setActiveVoiceChannelId(null);
-      setVoiceConnected(false);
-      setVoiceParticipants([]);
-      setVoicePanelOpen(false);
-    }
-  }, [activeVoiceChannelId, channels]);
 
   React.useEffect(() => {
     if (!activeVoiceChannelId) return;
@@ -291,9 +292,6 @@ export function useVoice({
       setCurrentChannelId(firstTextChannel.id);
     }
   }, [channels, currentChannelId, setCurrentChannelId]);
-
-  const activeVoiceChannel =
-    channels.find((channel) => channel.id === activeVoiceChannelId && channel.kind === 'voice') ?? null;
 
   const activeVoiceParticipantsForSidebar: VoiceSidebarParticipant[] =
     activeVoiceChannelId && currentUserId
