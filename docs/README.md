@@ -38,5 +38,5 @@ This repo now separates documentation by audience:
 2. Add/adjust RLS policies or RPC checks that enforce the key.
 3. Map the key in backend permission shaping (`fetchServerPermissions`) if it drives app gating.
 4. Add owner-facing label/scope metadata (or explicitly mark as reserved/hidden).
-5. Add SQL tests covering allow/deny behavior and register the suite in `supabase/tests/run_order.txt`.
-6. Update `scripts/test/generate-test-report.mjs` scenario catalog when a new suite is added.
+5. Add SQL tests covering allow/deny behavior and register the suite in `services/supabase/tests/run_order.txt`.
+6. Update `tooling/scripts/test/generate-test-report.mjs` scenario catalog when a new suite is added.

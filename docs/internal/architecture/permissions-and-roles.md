@@ -8,17 +8,17 @@ The database is the enforcement agent. The app UI reads and writes permission st
 - Channel visibility: `public.can_view_channel(channel_id)`
 - Channel posting/speaking gate: `public.can_send_in_channel(channel_id)`
 - Table-level enforcement: RLS policies on `roles`, `role_permissions`, `member_roles`, `channels`, `messages`, and overwrite tables.
-- Regression coverage: SQL RLS suites in `supabase/tests/sql/*`
+- Regression coverage: SQL RLS suites in `services/supabase/tests/sql/*`
 
 ## Current Server Admin Surface
-`src/components/ServerSettingsModal.tsx` now has four tabs:
+`packages/shared/src/components/ServerSettingsModal.tsx` now has four tabs:
 - `General`: server metadata + report/developer settings.
 - `Roles`: create/edit/delete roles and assign server-wide permission keys.
 - `Members`: assign roles to community members.
 - `Invites`: create/revoke invite links.
 
 ## Data Flow (DB-First)
-1. Renderer calls backend methods in `src/lib/backend/communityDataBackend.ts`.
+1. Renderer calls backend methods in `packages/shared/src/lib/backend/communityDataBackend.ts`.
 2. Backend methods read/write these tables directly:
    - `roles`
    - `role_permissions`
@@ -46,7 +46,7 @@ Database policies now enforce hierarchy by position (not just UI):
 - Non-owners can only edit channel role/member overwrites for targets below their highest role.
 
 Implemented in:
-- `supabase/migrations/20260218_000009_enforce_role_hierarchy_by_position.sql`
+- `services/supabase/migrations/20260218_000009_enforce_role_hierarchy_by_position.sql`
 
 ## Test Matrix (Phase 5)
 Current SQL RLS coverage includes:
@@ -68,9 +68,9 @@ When adding new server capabilities:
 5. Keep actual access control in DB/RLS.
 
 ## Files to Know
-- `src/lib/backend/communityDataBackend.ts`
-- `src/lib/backend/types.ts`
-- `src/components/ServerSettingsModal.tsx`
-- `src/renderer/app/ChatApp.tsx`
-- `supabase/migrations/20260217_000001_reset_discord_like_schema.sql`
-- `supabase/tests/sql/01_core_permissions_rls.sql`
+- `packages/shared/src/lib/backend/communityDataBackend.ts`
+- `packages/shared/src/lib/backend/types.ts`
+- `packages/shared/src/components/ServerSettingsModal.tsx`
+- `packages/shared/src/client/app/ChatApp.tsx`
+- `services/supabase/migrations/20260217_000001_reset_discord_like_schema.sql`
+- `services/supabase/tests/sql/01_core_permissions_rls.sql`

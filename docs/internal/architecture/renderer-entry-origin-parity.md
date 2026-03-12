@@ -4,7 +4,7 @@
 Define and document the renderer entry loading architecture that keeps Electron development and packaged builds on the same HTTP origin model so embedded providers (notably YouTube) behave consistently.
 
 ## Current Design
-Haven uses a main-process `RendererEntryService` (`src/main/renderer-entry-service.js`) that exposes a single loopback HTTP origin for renderer entrypoints:
+Haven uses a main-process `RendererEntryService` (`apps/electron/src/main/renderer-entry-service.js`) that exposes a single loopback HTTP origin for renderer entrypoints:
 - Canonical origin: `http://127.0.0.1:43117`
 - Entry path (current): `/main_window/`
 
@@ -12,7 +12,7 @@ Modes:
 - Dev (`MAIN_WINDOW_WEBPACK_ENTRY` is `http://...`): local loopback server proxies HTTP + websocket traffic to Forge's webpack dev server.
 - Packaged (`MAIN_WINDOW_WEBPACK_ENTRY` is `file://...`): local loopback server statically serves packaged renderer files from the resolved `.webpack` output directory.
 
-`src/main/index.js` does not load Forge entry constants directly anymore. It loads through:
+`apps/electron/src/main/index.js` does not load Forge entry constants directly anymore. It loads through:
 - `rendererEntryService.getEntryUrl('main_window')`
 
 This preserves a consistent renderer origin in both dev and packaged builds.
@@ -37,7 +37,7 @@ Hard rules:
 - prevent path traversal in packaged static serving
 - no open proxy behavior in dev (only registered entry prefixes proxy to the fixed upstream Forge origin)
 
-Renderer security policy is still enforced by Electron header interception in `src/main/index.js`, with renderer-document detection delegated to `rendererEntryService.isRendererDocumentUrl(...)`.
+Renderer security policy is still enforced by Electron header interception in `apps/electron/src/main/index.js`, with renderer-document detection delegated to `rendererEntryService.isRendererDocumentUrl(...)`.
 
 ## Failure Modes
 ### Port conflict (`EADDRINUSE`)
@@ -59,15 +59,15 @@ Expected impact:
 After re-login, session persistence should remain stable because the origin is now fixed.
 
 ## CSP / Referrer Alignment
-- Renderer document CSP is built via `src/main/renderer-entry-csp.js`
+- Renderer document CSP is built via `apps/electron/src/main/renderer-entry-csp.js`
 - `Referrer-Policy: origin` is injected for renderer document responses
-- iframe embeds still use `referrerPolicy="origin"` in `src/components/MessageList.tsx`
+- iframe embeds still use `referrerPolicy="origin"` in `packages/shared/src/components/MessageList.tsx`
 
 This keeps referrer behavior explicit and consistent across modes.
 
 ## Sequence Flow
 ### App startup (dev + packaged)
-1. `app.whenReady()` in `src/main/index.js`
+1. `app.whenReady()` in `apps/electron/src/main/index.js`
 2. `createRendererEntryService(...)`
 3. `rendererEntryService.start()`
 4. Register renderer-document CSP/header policy using `rendererEntryService.isRendererDocumentUrl(...)`
@@ -89,9 +89,9 @@ This keeps referrer behavior explicit and consistent across modes.
 
 ## Release / Smoke Gate
 Changes touching any of the following require packaged parity smoke testing (`npm run make`):
-- `src/main/index.js`
-- `src/main/renderer-entry-service.js`
-- `src/main/renderer-entry-csp.js`
+- `apps/electron/src/main/index.js`
+- `apps/electron/src/main/renderer-entry-service.js`
+- `apps/electron/src/main/renderer-entry-csp.js`
 - renderer embed behavior / iframe policies
 
 Required smoke checks:
@@ -106,9 +106,9 @@ Future windows should register additional renderer entrypoints in `RendererEntry
 Do not introduce parallel renderer-loading strategies (`file://` in one window, loopback HTTP in another).
 
 ## Files to Know
-- `src/main/index.js`
-- `src/main/renderer-entry-service.js`
-- `src/main/renderer-entry-csp.js`
-- `src/components/MessageList.tsx`
+- `apps/electron/src/main/index.js`
+- `apps/electron/src/main/renderer-entry-service.js`
+- `apps/electron/src/main/renderer-entry-csp.js`
+- `packages/shared/src/components/MessageList.tsx`
 - `forge.config.js`
 

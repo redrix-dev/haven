@@ -38,8 +38,8 @@ Findings:
 - Core community role/channel/message authorization regressions were still mostly manual to verify.
 
 Fixes in this pass:
-- Added SQL RLS/RPC regression suites under `supabase/tests/sql/*`
-- Added role/JWT impersonation helpers under `supabase/tests/_helpers/*`
+- Added SQL RLS/RPC regression suites under `services/supabase/tests/sql/*`
+- Added role/JWT impersonation helpers under `services/supabase/tests/_helpers/*`
 
 ### 2) RPC Safety / Mutation Correctness
 Status: `must-fix`
@@ -112,9 +112,9 @@ Fixes in this pass:
 - [ ] docs/runbooks updated
 
 ## Files to Know
-- `supabase/migrations/20260222_000036_phase5_hardening_and_test_support.sql`
-- `supabase/tests/`
-- `scripts/test/*`
+- `services/supabase/migrations/20260222_000036_phase5_hardening_and_test_support.sql`
+- `services/supabase/tests/`
+- `tooling/scripts/test/*`
 - `.github/workflows/ci.yml`
 - `docs/testing/rls-and-hardening-runbook.md`
 

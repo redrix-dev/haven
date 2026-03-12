@@ -15,10 +15,14 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
-    
+      "@electron/*": ["./apps/electron/src/*"],
+      "@web-mobile/*": ["./apps/web-mobile/src/*"],
+      "@shared/*": ["./packages/shared/src/*"],
+      "@client/*": ["./packages/shared/src/client/*"],
+      "@platform/*": ["./packages/shared/src/platform/*"],
+      "@test-support/*": ["./tooling/test-support/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["apps/**/*", "packages/**/*", "tooling/**/*"],
   "exclude": ["node_modules"]
 }

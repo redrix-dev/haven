@@ -126,6 +126,15 @@ supabase/functions/.env.*
 supabase/functions/**/.env
 supabase/functions/**/.env.*
 supabase/tests/.generated/
+services/supabase/.temp/
+services/supabase/.branches/
+services/supabase/.env
+services/supabase/.env.*
+services/supabase/functions/.env
+services/supabase/functions/.env.*
+services/supabase/functions/**/.env
+services/supabase/functions/**/.env.*
+services/supabase/tests/.generated/
 
 # Local packaging artifacts
 dist/

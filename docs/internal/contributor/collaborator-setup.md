@@ -27,7 +27,7 @@ Not covered:
 - Hosted Supabase is for real app runtime environments.
 
 Important:
-- `supabase/config.toml` affects local Supabase only.
+- `services/supabase/config.toml` affects local Supabase only.
 - Running local DB/RLS/backend tests does not require hosted project secrets.
 
 ## What a Collaborator Needs (Minimum)

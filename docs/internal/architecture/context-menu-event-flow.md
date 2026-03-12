@@ -2,7 +2,7 @@
 
 This map documents the current menu surfaces and their trigger hierarchy after the stabilization refactor.
 
-## Message Surface (`src/components/MessageList.tsx`)
+## Message Surface (`packages/shared/src/components/MessageList.tsx`)
 
 - Trigger scope: `data-menu-scope="message"` on each message row container.
 - Menu primitive: `ContextMenu`.
@@ -12,7 +12,7 @@ This map documents the current menu surfaces and their trigger hierarchy after t
   - `entity_profile` -> prevent row menu from opening.
 - Overflow menu (`...`) uses `DropdownMenu` but shares the same action schema via `ActionMenuContent`.
 
-## Profile Surface (`src/components/menus/ProfileActionSurface.tsx`)
+## Profile Surface (`packages/shared/src/components/menus/ProfileActionSurface.tsx`)
 
 - Trigger scope: `data-menu-scope="profile"` on the clickable wrapper.
 - Menu primitive: `DropdownMenu` (single primitive for both left and right click).
@@ -21,12 +21,12 @@ This map documents the current menu surfaces and their trigger hierarchy after t
   - Right click opens profile actions with `preventDefault + stopPropagation`.
   - `native_text` intent bypasses profile actions.
 
-## Server Members Surface (`src/components/ServerMembersModal.tsx`)
+## Server Members Surface (`packages/shared/src/components/ServerMembersModal.tsx`)
 
 - Each row is wrapped in `ProfileContextMenu` (re-export of `ProfileActionSurface`).
 - Behavior is identical to profile surfaces in message rows.
 
-## Channel Surface (`src/components/Sidebar.tsx`)
+## Channel Surface (`packages/shared/src/components/Sidebar.tsx`)
 
 - Trigger scope: `data-menu-scope="channel"` on channel button rows and group headers.
 - Menu primitive: `ContextMenu`.
@@ -35,7 +35,7 @@ This map documents the current menu surfaces and their trigger hierarchy after t
   - `native_text` -> stop propagation.
 - Action content rendered by `ActionMenuContent`.
 
-## Server Surface (`src/components/ServerList.tsx`)
+## Server Surface (`packages/shared/src/components/ServerList.tsx`)
 
 - Trigger scope: `data-menu-scope="server"` on server icon buttons.
 - Menu primitive: `ContextMenu`.
@@ -44,18 +44,18 @@ This map documents the current menu surfaces and their trigger hierarchy after t
   - `native_text` -> stop propagation.
 - Action content rendered by `ActionMenuContent`.
 
-## Native Text Context (`src/main/app/register-native-context-menu.js`)
+## Native Text Context (`apps/electron/src/main/app/register-native-context-menu.js`)
 
-- Source: `webContents.on('context-menu')`, registered from `src/main/app/create-main-window.js`.
+- Source: `webContents.on('context-menu')`, registered from `apps/electron/src/main/app/create-main-window.js`.
 - Editable target menu: `Cut`, `Copy`, `Paste`, `Select All`.
 - Selected non-editable text menu: `Copy`, `Select All`.
 - Debug hook (dev opt-in): `HAVEN_DEBUG_CONTEXT_MENUS=1`.
 
 ## Shared Infrastructure
 
-- Intent resolver: `src/lib/contextMenu.ts`.
-- Debug tracing + prompt trap: `src/lib/contextMenu/debugTrace.ts`.
-- Shared action types: `src/lib/contextMenu/types.ts`.
+- Intent resolver: `packages/shared/src/lib/contextMenu.ts`.
+- Debug tracing + prompt trap: `packages/shared/src/lib/contextMenu/debugTrace.ts`.
+- Shared action types: `packages/shared/src/lib/contextMenu/types.ts`.
 - Shared action renderer + submenu behavior:
-  - `src/components/menus/ActionMenuContent.tsx`
-  - `src/components/menus/useSubmenuController.ts`
+  - `packages/shared/src/components/menus/ActionMenuContent.tsx`
+  - `packages/shared/src/components/menus/useSubmenuController.ts`

@@ -57,22 +57,22 @@ This aggregates:
 
 ## What `npm run test:db` actually does
 
-`npm run test:db` runs `scripts/test/run-db-suite.mjs`, which performs:
+`npm run test:db` runs `tooling/scripts/test/run-db-suite.mjs`, which performs:
 1. `supabase db reset --local`
-2. `node scripts/test/bootstrap-local-auth-users.mjs`
-3. `node scripts/test/run-supabase-sql-suite.mjs`
+2. `node tooling/scripts/test/bootstrap-local-auth-users.mjs`
+3. `node tooling/scripts/test/run-supabase-sql-suite.mjs`
 
 ### SQL suite structure
-- `supabase/tests/_helpers/*`
+- `services/supabase/tests/_helpers/*`
   - assertions, JWT claim helpers, fixture lookup, cleanup utilities
-- `supabase/tests/fixtures/*`
+- `services/supabase/tests/fixtures/*`
   - seeded shared test data / cleanup setup
-- `supabase/tests/sql/*`
+- `services/supabase/tests/sql/*`
   - domain suites (`01` core, `02` notifications, `03` social, `04` DMs, `05` moderation, `06` mentions)
 
 ## What `npm run test:backend` actually does
 
-`npm run test:backend` runs `scripts/test/run-vitest-with-local-env.mjs backend`, which:
+`npm run test:backend` runs `tooling/scripts/test/run-vitest-with-local-env.mjs backend`, which:
 1. resolves local Supabase env (`supabase status -o env`)
 2. injects anon/service-role keys and `POSTGRES_URL` into the test process
 3. runs backend contract test files one at a time
@@ -85,7 +85,7 @@ Backend contract tests also reset fixture domain state before each test for isol
 - Hosted Supabase = real app environments (dev/staging/prod)
 - Local Supabase = disposable test runtime for destructive resets + RLS/contract testing
 
-Local test harness config (like `supabase/config.toml`) does **not** change hosted behavior.
+Local test harness config (like `services/supabase/config.toml`) does **not** change hosted behavior.
 
 If you are onboarding as a real collaborator (shared envs/secrets, local prereqs), start with
 `docs/internal/contributor/collaborator-setup.md` before this doc.
@@ -119,7 +119,7 @@ npm run test:report
 ## Example Report Contents (Generated)
 
 A generated report includes:
-- environment snapshot (branch, commit, node/npm/supabase/psql versions)
+- environment snapshot (branch, commit, node/npm/services/supabase/psql versions)
 - local Supabase status (`supabase status -o env`, keys redacted)
 - per-command pass/fail summary table
 - duration per step
@@ -147,13 +147,13 @@ psql --version
 ```
 
 ## Files to Know
-- `scripts/test/run-db-suite.mjs`
-- `scripts/test/run-supabase-sql-suite.mjs`
-- `scripts/test/bootstrap-local-auth-users.mjs`
-- `scripts/test/resolve-supabase-local-env.mjs`
-- `scripts/test/run-vitest-with-local-env.mjs`
-- `scripts/test/generate-test-report.mjs`
-- `test/setup/supabaseLocal.ts`
-- `supabase/tests/_helpers/*`
-- `supabase/tests/fixtures/*`
-- `supabase/tests/sql/*`
+- `tooling/scripts/test/run-db-suite.mjs`
+- `tooling/scripts/test/run-supabase-sql-suite.mjs`
+- `tooling/scripts/test/bootstrap-local-auth-users.mjs`
+- `tooling/scripts/test/resolve-supabase-local-env.mjs`
+- `tooling/scripts/test/run-vitest-with-local-env.mjs`
+- `tooling/scripts/test/generate-test-report.mjs`
+- `tooling/test-support/setup/supabaseLocal.ts`
+- `services/supabase/tests/_helpers/*`
+- `services/supabase/tests/fixtures/*`
+- `services/supabase/tests/sql/*`

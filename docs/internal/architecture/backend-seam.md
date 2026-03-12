@@ -1,7 +1,7 @@
 # Backend Seam Refactor
 
 ## What Changed
-- Added a backend resolver entrypoint at `src/lib/backend/index.ts`.
+- Added a backend resolver entrypoint at `packages/shared/src/lib/backend/index.ts`.
 - Moved main renderer data flow to backend interfaces instead of direct Supabase calls.
 - Updated server list hook to use the same control-plane interface.
 - Kept existing behavior and permissions logic unchanged (current provider is still central Supabase).
@@ -9,7 +9,7 @@
 ## Current Seam Design
 
 ### 1) Control Plane Backend
-File: `src/lib/backend/controlPlaneBackend.ts`
+File: `packages/shared/src/lib/backend/controlPlaneBackend.ts`
 
 Responsibilities:
 - Profile load/update
@@ -19,11 +19,11 @@ Responsibilities:
 - Invite create/list/redeem/revoke
 
 Used by:
-- `src/lib/hooks/useServers.ts`
-- `src/renderer/app/ChatApp.tsx`
+- `packages/shared/src/lib/hooks/useServers.ts`
+- `packages/shared/src/client/app/ChatApp.tsx`
 
 ### 2) Community Data Backend
-File: `src/lib/backend/communityDataBackend.ts`
+File: `packages/shared/src/lib/backend/communityDataBackend.ts`
 
 Responsibilities:
 - Community permissions lookup
@@ -35,10 +35,10 @@ Responsibilities:
 - Haven developer message posting
 
 Used by:
-- `src/renderer/app/ChatApp.tsx`
+- `packages/shared/src/client/app/ChatApp.tsx`
 
 ### 3) Notification Backend
-File: `src/lib/backend/notificationBackend.ts`
+File: `packages/shared/src/lib/backend/notificationBackend.ts`
 
 Responsibilities:
 - Notification inbox list + unread/unseen counts
@@ -47,10 +47,10 @@ Responsibilities:
 - Notification inbox realtime subscription
 
 Used by:
-- `src/renderer/app/ChatApp.tsx`
+- `packages/shared/src/client/app/ChatApp.tsx`
 
 ### 4) Backend Resolver
-File: `src/lib/backend/index.ts`
+File: `packages/shared/src/lib/backend/index.ts`
 
 Responsibilities:
 - Selects backend mode (`HAVEN_BACKEND_MODE`)
@@ -61,7 +61,7 @@ Current mode:
 - `central_supabase` (default)
 
 ### 5) Social Backend
-File: `src/lib/backend/socialBackend.ts`
+File: `packages/shared/src/lib/backend/socialBackend.ts`
 
 Responsibilities:
 - Friends/requests/blocked users reads
@@ -71,11 +71,11 @@ Responsibilities:
 - Social graph realtime subscription (friend requests/friendships/blocks)
 
 Used by:
-- `src/components/FriendsModal.tsx`
-- `src/renderer/app/ChatApp.tsx` (friends badge counts + notification friend-request actions)
+- `packages/shared/src/components/FriendsModal.tsx`
+- `packages/shared/src/client/app/ChatApp.tsx` (friends badge counts + notification friend-request actions)
 
 ### 6) Direct Message Backend
-File: `src/lib/backend/directMessageBackend.ts`
+File: `packages/shared/src/lib/backend/directMessageBackend.ts`
 
 Responsibilities:
 - DM conversation list + create/load for 1:1 direct messages
@@ -85,10 +85,10 @@ Responsibilities:
 - DM workspace realtime subscriptions
 
 Used by:
-- `src/renderer/app/ChatApp.tsx` (DM workspace navigation + thread state)
+- `packages/shared/src/client/app/ChatApp.tsx` (DM workspace navigation + thread state)
 
 ### 7) Moderation Backend
-File: `src/lib/backend/moderationBackend.ts`
+File: `packages/shared/src/lib/backend/moderationBackend.ts`
 
 Responsibilities:
 - Haven staff DM report review inbox list + filtering
@@ -98,13 +98,13 @@ Responsibilities:
 - DM report audit trail reads
 
 Used by:
-- `src/components/DmReportReviewPanel.tsx` (staff-only DM moderation review surface)
+- `packages/shared/src/components/DmReportReviewPanel.tsx` (staff-only DM moderation review surface)
 
 ## Testing and Hardening Expectations (Phase 5)
 
 Backend seams now have explicit regression expectations:
-- SQL/RLS regression suites under `supabase/tests/sql/*`
-- local-Supabase backend contract tests under `src/lib/backend/__tests__/*`
+- SQL/RLS regression suites under `services/supabase/tests/sql/*`
+- local-Supabase backend contract tests under `packages/shared/src/lib/backend/__tests__/*`
 
 Current coverage focus:
 - `NotificationBackend`
@@ -122,8 +122,8 @@ Runbook:
 - You can swap transport/storage strategy incrementally without rewriting large React surfaces.
 
 ## Out of Scope in This Refactor
-- `src/contexts/AuthContext.tsx` still uses central Supabase auth directly (intentional).
-- `src/lib/voice/ice.ts` still uses central Supabase Edge Function routing (covered in Phase D below).
+- `packages/shared/src/contexts/AuthContext.tsx` still uses central Supabase auth directly (intentional).
+- `packages/shared/src/lib/voice/ice.ts` still uses central Supabase Edge Function routing (covered in Phase D below).
 
 ## Proposed Future Changes
 
@@ -132,7 +132,7 @@ Runbook:
 - Extend `getCommunityDataBackend(communityId)` to resolve backend per community.
 - Cache provider clients per community to avoid repeated setup.
 - Initial schema scaffold now exists in:
-  - `supabase/migrations/20260217_000007_add_community_backend_routing.sql`
+  - `services/supabase/migrations/20260217_000007_add_community_backend_routing.sql`
   - table: `public.community_backend_configs` (default `central_supabase`)
 
 ### Phase B: BYO Community Data Credentials

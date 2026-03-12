@@ -47,9 +47,9 @@ No app is "trust me" safe by default, so Haven is built to be inspectable.
 
 ## How to verify it yourself
 
-1. Review client auth/data usage in `src/lib/supabase.ts` and backend seam files in `src/lib/backend/`.
-2. Review access control logic in `supabase/migrations/`.
-3. Review voice secret handling in `supabase/functions/voice-ice/index.ts`.
+1. Review client auth/data usage in `packages/shared/src/lib/supabase.ts` and backend seam files in `packages/shared/src/lib/backend/`.
+2. Review access control logic in `services/supabase/migrations/`.
+3. Review voice secret handling in `services/supabase/functions/voice-ice/index.ts`.
 4. Run the app against your own Supabase project and inspect network calls in devtools.
 
 ## Current status

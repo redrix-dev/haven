@@ -65,11 +65,11 @@ DM report review is intentionally separate in v1 to avoid destabilizing the olde
 - automated abuse heuristics / rate-limit escalation
 
 ## Files to Know
-- `supabase/migrations/20260222_000034_add_dm_moderation_review_phase2.sql`
-- `supabase/migrations/20260222_000036_phase5_hardening_and_test_support.sql`
-- `src/lib/backend/moderationBackend.ts`
-- `src/components/DmReportReviewPanel.tsx`
-- `src/lib/backend/types.ts`
+- `services/supabase/migrations/20260222_000034_add_dm_moderation_review_phase2.sql`
+- `services/supabase/migrations/20260222_000036_phase5_hardening_and_test_support.sql`
+- `packages/shared/src/lib/backend/moderationBackend.ts`
+- `packages/shared/src/components/DmReportReviewPanel.tsx`
+- `packages/shared/src/lib/backend/types.ts`
 
 ## Deferred / Future
 - Unified moderation inbox

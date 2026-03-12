@@ -54,26 +54,26 @@ When changing code, preserve these invariants unless explicitly redesigning them
 
 ## 3) Repo Structure Cheat Sheet
 
-- `src/main/index.js`, `src/main/app/*`, `src/main/ipc/*`, `src/preload/index.js`, `src/preload/desktop-bridge.js`
+- `apps/electron/src/main/index.js`, `apps/electron/src/main/app/*`, `apps/electron/src/main/ipc/*`, `apps/electron/src/preload/index.js`, `apps/electron/src/preload/desktop-bridge.js`
   - Electron main/preload runtime, desktop bridge, and OS integrations.
-- `src/renderer/index.tsx`, `src/renderer/app/ChatApp.tsx`, `src/renderer/features/*`, `src/components/*`, `src/contexts/*`
+- `src/renderer/index.tsx`, `packages/shared/src/client/app/ChatApp.tsx`, `packages/shared/src/client/features/*`, `packages/shared/src/components/*`, `packages/shared/src/contexts/*`
   - Renderer bootstrap, orchestration, feature hooks, and UI.
-- `src/assets/*`
+- `packages/shared/src/assets/*`
   - Renderer-bundled UI assets (images/audio/fonts) imported by React/TypeScript code.
   - Use for assets that should ship with the renderer bundle via webpack imports.
-- `src/lib/backend/*`
+- `packages/shared/src/lib/backend/*`
   - Backend abstraction layer (control plane + community data).
-- `src/lib/voice/*`
+- `packages/shared/src/lib/voice/*`
   - Voice-specific client behavior (ICE acquisition, etc.).
-- `src/shared/*`
+- `packages/shared/src/platform/*`
   - Shared contracts/utilities (desktop types/client, IPC keys/validation).
 - `assets/*` (repo root)
   - Packaging/build assets (app icons, installer branding, forge/packager-referenced files).
-  - These are separate from `src/assets/*` because they are consumed by build tooling, not treated as
+  - These are separate from `packages/shared/src/assets/*` because they are consumed by build tooling, not treated as
     renderer-public assets unless explicitly copied/packaged for renderer access.
-- `supabase/migrations/*`
+- `services/supabase/migrations/*`
   - Source of truth for schema, RLS, and policy evolution.
-- `supabase/functions/*`
+- `services/supabase/functions/*`
   - Trusted edge logic (voice ICE, workers, maintenance routines).
 - `docs/*`
   - Architecture, process, and operational context.
@@ -111,11 +111,11 @@ When changing code, preserve these invariants unless explicitly redesigning them
 - Treat packaged-vs-dev renderer-origin parity as a release concern for embed/media flows.
 
 ## 4.4 Supabase and DB access
-- Prefer backend seam APIs (`src/lib/backend/*`) rather than raw scattered client queries in UI surfaces.
+- Prefer backend seam APIs (`packages/shared/src/lib/backend/*`) rather than raw scattered client queries in UI surfaces.
 - Treat migrations as auditable contracts; explain *why* in SQL comments where non-obvious.
 - Avoid policy bypasses for convenience.
 - When changing RLS policies or auth-sensitive SQL RPCs, add/update SQL regression coverage in
-  `supabase/tests/sql/*` whenever practical.
+  `services/supabase/tests/sql/*` whenever practical.
 - Prefer the local Supabase + `psql` SQL harness for permission regressions before introducing heavier DB test stacks.
 
 ## 4.5 Security hygiene

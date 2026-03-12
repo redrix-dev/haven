@@ -94,20 +94,20 @@ Outputs:
 6. `npx tsc --noEmit --project tsconfig.json`
 
 ## SQL Suite Structure
-- `supabase/tests/_helpers/*`
+- `services/supabase/tests/_helpers/*`
   - assertions
   - JWT claim helpers
   - fixture lookup helpers
   - cleanup utilities
-- `supabase/tests/fixtures/*`
+- `services/supabase/tests/fixtures/*`
   - shared test community/users/roles/channels/staff rows
-- `supabase/tests/sql/*`
+- `services/supabase/tests/sql/*`
   - domain suites (core permissions, notifications, social, DMs, moderation, mentions)
 
 ## Adding a New RLS/RPC Test
 Checklist:
-1. Add or reuse fixture data in `supabase/tests/fixtures/*`
-2. Add assertions in the relevant `supabase/tests/sql/*.sql` suite
+1. Add or reuse fixture data in `services/supabase/tests/fixtures/*`
+2. Add assertions in the relevant `services/supabase/tests/sql/*.sql` suite
 3. Use `SET LOCAL ROLE ...` plus `test_support.set_jwt_claims(...)`
 4. Prefer `BEGIN; ... ROLLBACK;` for isolated scenarios
 5. Add a backend seam contract test if UI/backends depend on the behavior
@@ -132,9 +132,9 @@ Checklist:
 - Add load/realtime stress testing as the user base grows
 
 ## Files to Know
-- `scripts/test/resolve-supabase-local-env.mjs`
-- `scripts/test/bootstrap-local-auth-users.mjs`
-- `scripts/test/run-supabase-sql-suite.mjs`
-- `scripts/test/run-db-suite.mjs`
-- `scripts/test/run-vitest-with-local-env.mjs`
-- `supabase/tests/run_order.txt`
+- `tooling/scripts/test/resolve-supabase-local-env.mjs`
+- `tooling/scripts/test/bootstrap-local-auth-users.mjs`
+- `tooling/scripts/test/run-supabase-sql-suite.mjs`
+- `tooling/scripts/test/run-db-suite.mjs`
+- `tooling/scripts/test/run-vitest-with-local-env.mjs`
+- `services/supabase/tests/run_order.txt`

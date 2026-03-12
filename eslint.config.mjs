@@ -2,24 +2,24 @@ import tsParser from '@typescript-eslint/parser';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 const rendererBoundaryFiles = [
-  'src/renderer.tsx',
-  'src/components/**/*.{ts,tsx,js,jsx}',
-  'src/contexts/**/*.{ts,tsx,js,jsx}',
-  'src/lib/hooks/**/*.{ts,tsx,js,jsx}',
-  'src/lib/voice/**/*.{ts,tsx,js,jsx}',
-  'src/features/**/*.{ts,tsx,js,jsx}',
-  'src/app/renderer/**/*.{ts,tsx,js,jsx}',
+  'packages/shared/src/client/**/*.{ts,tsx,js,jsx}',
+  'packages/shared/src/components/**/*.{ts,tsx,js,jsx}',
+  'packages/shared/src/contexts/**/*.{ts,tsx,js,jsx}',
+  'packages/shared/src/lib/hooks/**/*.{ts,tsx,js,jsx}',
+  'packages/shared/src/lib/voice/**/*.{ts,tsx,js,jsx}',
+  'apps/web-mobile/src/**/*.{ts,tsx,js,jsx}',
+  'apps/electron/src/renderer/**/*.{ts,tsx,js,jsx}',
 ];
 
 const rendererBoundaryRestrictions = [
   {
-    group: ['@/shared/ipc/*', '**/shared/ipc/*'],
+    group: ['@platform/ipc/*', '**/platform/ipc/*'],
     message:
-      'Renderer/features must not import shared/ipc. Use @/shared/desktop/client for desktop capabilities.',
+      'Renderer/features must not import shared/ipc. Use @platform/desktop/client for desktop capabilities.',
   },
   {
-    group: ['@/app/main/*', '**/app/main/*'],
-    message: 'Renderer/features must not import app/main modules.',
+    group: ['@electron/main/*', '**/apps/electron/src/main/*'],
+    message: 'Renderer/features must not import Electron main-process modules.',
   },
   {
     group: ['electron', 'electron/*'],
@@ -36,7 +36,12 @@ export default [
     ignores: ['node_modules/**', '.webpack/**', 'out/**', 'dist/**'],
   },
   {
-    files: ['src/**/*.{ts,tsx,js,jsx}'],
+    files: [
+      'apps/**/*.{ts,tsx,js,jsx}',
+      'packages/**/*.{ts,tsx,js,jsx}',
+      'tooling/**/*.{ts,tsx,js,jsx}',
+      'services/**/*.{ts,tsx,js,jsx}',
+    ],
     languageOptions: {
       parser: tsParser,
       sourceType: 'module',
@@ -56,18 +61,18 @@ export default [
         {
           object: 'window',
           property: 'desktop',
-          message: 'Use @/shared/desktop/client instead of window.desktop directly.',
+          message: 'Use @platform/desktop/client instead of window.desktop directly.',
         },
         {
           object: 'window',
           property: 'havenDesktop',
-          message: 'Use @/shared/desktop/client instead of legacy window.havenDesktop access.',
+          message: 'Use @platform/desktop/client instead of legacy window.havenDesktop access.',
         },
       ],
     },
   },
   {
-    files: ['src/shared/desktop/client.ts'],
+    files: ['packages/shared/src/platform/desktop/client.ts'],
     rules: {
       'no-restricted-properties': 'off',
     },

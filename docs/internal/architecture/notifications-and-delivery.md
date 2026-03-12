@@ -63,7 +63,7 @@ Realtime is **not** treated as the background delivery transport because browser
   - `dead_letter`
 
 ### Worker
-- `supabase/functions/web-push-worker/index.ts`
+- `services/supabase/functions/web-push-worker/index.ts`
 - Supports:
   - `cron`
   - `manual`
@@ -97,9 +97,9 @@ Haven uses a route policy to prevent duplicate user-facing alerts:
   - in-app fallback
 
 Files:
-- `src/lib/notifications/routePolicy.ts`
-- `src/renderer/features/notifications/hooks/useNotifications.ts`
-- `src/web/public/haven-sw.js`
+- `packages/shared/src/lib/notifications/routePolicy.ts`
+- `packages/shared/src/client/features/notifications/hooks/useNotifications.ts`
+- `apps/web-mobile/public/haven-sw.js`
 
 ## Delivery Traces and Diagnostics (Internal/Dev)
 
@@ -134,13 +134,13 @@ Files:
 
 ## Files to Know
 
-- `src/lib/backend/notificationBackend.ts`
-- `src/renderer/features/notifications/hooks/useNotifications.ts`
-- `src/renderer/features/notifications/hooks/useNotificationInteractions.ts`
-- `src/lib/notifications/routePolicy.ts`
-- `src/web/pwa/webPushClient.ts`
-- `src/web/public/haven-sw.js`
-- `supabase/functions/web-push-worker/index.ts`
-- `supabase/migrations/20260225000041_add_list_my_sound_notifications_rpc.sql`
-- `supabase/migrations/20260226000056_add_web_push_queue_health_diagnostics_rpc.sql`
+- `packages/shared/src/lib/backend/notificationBackend.ts`
+- `packages/shared/src/client/features/notifications/hooks/useNotifications.ts`
+- `packages/shared/src/client/features/notifications/hooks/useNotificationInteractions.ts`
+- `packages/shared/src/lib/notifications/routePolicy.ts`
+- `apps/web-mobile/src/pwa/webPushClient.ts`
+- `apps/web-mobile/public/haven-sw.js`
+- `services/supabase/functions/web-push-worker/index.ts`
+- `services/supabase/migrations/20260225000041_add_list_my_sound_notifications_rpc.sql`
+- `services/supabase/migrations/20260226000056_add_web_push_queue_health_diagnostics_rpc.sql`
 

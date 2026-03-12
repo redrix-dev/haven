@@ -15,7 +15,7 @@ Phase 2 builds on Phase 1 (`docs/architecture/type-safety-phase-1.md`) and focus
 This avoids silent runtime assumptions while still keeping strong typing where deterministic contracts exist.
 
 ## Shared Utility Added
-File: `src/shared/lib/errors.ts`
+File: `packages/shared/src/platform/lib/errors.ts`
 
 - Added `getErrorMessage(error: unknown, fallback?: string): string`.
 - Handles:
@@ -31,22 +31,22 @@ Why:
 ## Files Updated
 
 ### Core
-- `src/shared/lib/errors.ts`
+- `packages/shared/src/platform/lib/errors.ts`
 - `src/renderer.tsx`
-- `src/contexts/AuthContext.tsx`
-- `src/lib/hooks/useServers.ts`
-- `src/lib/voice/ice.ts`
+- `packages/shared/src/contexts/AuthContext.tsx`
+- `packages/shared/src/lib/hooks/useServers.ts`
+- `packages/shared/src/lib/voice/ice.ts`
 
 ### UI Components
-- `src/components/AccountSettingsModal.tsx`
-- `src/components/ChannelSettingsModal.tsx`
-- `src/components/CreateChannelModal.tsx`
-- `src/components/JoinServerModal.tsx`
-- `src/components/LoginScreen.tsx`
-- `src/components/MessageInput.tsx`
-- `src/components/MessageList.tsx`
-- `src/components/ServerSettingsModal.tsx`
-- `src/components/VoiceChannelPane.tsx`
+- `packages/shared/src/components/AccountSettingsModal.tsx`
+- `packages/shared/src/components/ChannelSettingsModal.tsx`
+- `packages/shared/src/components/CreateChannelModal.tsx`
+- `packages/shared/src/components/JoinServerModal.tsx`
+- `packages/shared/src/components/LoginScreen.tsx`
+- `packages/shared/src/components/MessageInput.tsx`
+- `packages/shared/src/components/MessageList.tsx`
+- `packages/shared/src/components/ServerSettingsModal.tsx`
+- `packages/shared/src/components/VoiceChannelPane.tsx`
 
 ## Validation
 - `npm run lint` passed.
@@ -65,7 +65,7 @@ After Phase 2:
 
 Interpretation:
 - Catch/error boundaries now use `unknown`.
-- No explicit `any` remains in `src/` or `supabase/` under this pattern set.
+- No explicit `any` remains in `src/` or `services/supabase/` under this pattern set.
 
 ## Notes
 - This pass intentionally avoided changing runtime control flow.

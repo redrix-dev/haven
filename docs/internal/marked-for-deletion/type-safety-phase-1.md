@@ -21,7 +21,7 @@ Out of scope:
 ## Changes Implemented
 
 ### 1) Auth context contract typing
-File: `src/contexts/AuthContext.tsx`
+File: `packages/shared/src/contexts/AuthContext.tsx`
 
 - Replaced:
   - `Promise<{ error: any }>` for `signUp` and `signIn`.
@@ -34,7 +34,7 @@ Why:
 - Contract now matches actual runtime branches and prevents unsafe downstream assumptions.
 
 ### 2) Create server modal callback typing
-File: `src/components/CreateServerModal.tsx`
+File: `packages/shared/src/components/CreateServerModal.tsx`
 
 - Replaced:
   - `onCreate: (name: string) => Promise<any>`
@@ -46,7 +46,7 @@ Why:
 - Removes ambiguous return typing from a stable component boundary.
 
 ### 3) Community backend member mapping typing
-File: `src/lib/backend/communityDataBackend.ts`
+File: `packages/shared/src/lib/backend/communityDataBackend.ts`
 
 - Added typed relation row alias for `community_members` + joined `profiles`.
 - Replaced:
@@ -59,7 +59,7 @@ Why:
 - Explicit row shape prevents accidental unsafe field access.
 
 ### 4) Control-plane invite/community mapping typing
-File: `src/lib/backend/controlPlaneBackend.ts`
+File: `packages/shared/src/lib/backend/controlPlaneBackend.ts`
 
 - Added:
   - `InviteRecord` for invite mapper input.
@@ -74,7 +74,7 @@ Why:
 - Strong typing guards backend contract drift.
 
 ### 5) Voice diagnostics stats typing
-File: `src/components/VoiceChannelPane.tsx`
+File: `packages/shared/src/components/VoiceChannelPane.tsx`
 
 - Added:
   - `RTCStatsRecord = RTCStats & Record<string, unknown>`

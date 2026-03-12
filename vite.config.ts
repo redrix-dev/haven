@@ -7,10 +7,15 @@ export default defineConfig(({ mode }) => {
   
   return {
     plugins: [react()],
-    root: 'src/web',
+    root: 'apps/web-mobile/src',
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src')
+        '@electron': path.resolve(__dirname, './apps/electron/src'),
+        '@web-mobile': path.resolve(__dirname, './apps/web-mobile/src'),
+        '@shared': path.resolve(__dirname, './packages/shared/src'),
+        '@client': path.resolve(__dirname, './packages/shared/src/client'),
+        '@platform': path.resolve(__dirname, './packages/shared/src/platform'),
+        '@test-support': path.resolve(__dirname, './tooling/test-support'),
       }
     },
     define: {
@@ -24,7 +29,7 @@ export default defineConfig(({ mode }) => {
       'process.env.PUBLIC_WEBCLIENT_URL': JSON.stringify(env.VITE_PUBLIC_WEBCLIENT_URL),
     },
     build: {
-      outDir: '../../dist/web'
+      outDir: '../../../dist/web'
     },
     server: {
       host: true,

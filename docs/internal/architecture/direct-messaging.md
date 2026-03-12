@@ -34,7 +34,7 @@ Document Haven's current 1:1 direct messaging system (friends-only), including a
 
 ### Renderer Model (current)
 - `workspaceMode: 'community' | 'dm'`
-- DM list + thread state in `src/renderer/app/ChatApp.tsx`
+- DM list + thread state in `packages/shared/src/client/app/ChatApp.tsx`
 - UI components:
   - `DirectMessagesSidebar`
   - `DirectMessageArea`
@@ -74,13 +74,13 @@ Document Haven's current 1:1 direct messaging system (friends-only), including a
 - Message jump anchors from DM notifications
 
 ## Files to Know
-- `supabase/migrations/20260222_000033_add_direct_messages_phase2.sql`
-- `supabase/migrations/20260222_000036_phase5_hardening_and_test_support.sql`
-- `src/lib/backend/directMessageBackend.ts`
-- `src/components/DirectMessagesSidebar.tsx`
-- `src/components/DirectMessageArea.tsx`
-- `src/components/DmReportModal.tsx`
-- `src/renderer/app/ChatApp.tsx`
+- `services/supabase/migrations/20260222_000033_add_direct_messages_phase2.sql`
+- `services/supabase/migrations/20260222_000036_phase5_hardening_and_test_support.sql`
+- `packages/shared/src/lib/backend/directMessageBackend.ts`
+- `packages/shared/src/components/DirectMessagesSidebar.tsx`
+- `packages/shared/src/components/DirectMessageArea.tsx`
+- `packages/shared/src/components/DmReportModal.tsx`
+- `packages/shared/src/client/app/ChatApp.tsx`
 
 ## Deferred / Future
 - Group DMs

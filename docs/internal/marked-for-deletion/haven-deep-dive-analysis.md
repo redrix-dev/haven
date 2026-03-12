@@ -30,15 +30,15 @@ This is a mentor-style technical deep dive of Haven as it exists in this reposit
 │   - App orchestration (servers/channels/messages/voice/settings)   │
 │   - Uses backend seam interfaces                                   │
 │                                                                    │
-│  src/contexts/AuthContext.tsx                                      │
+│  packages/shared/src/contexts/AuthContext.tsx                                      │
 │   - Supabase auth session state + protocol-link auth handling      │
 │                                                                    │
-│  src/lib/backend/*.ts                                              │
+│  packages/shared/src/lib/backend/*.ts                                              │
 │   - Control plane backend (profiles, invites, communities)         │
 │   - Community data backend (channels, messages, permissions, bans) │
 │   - Provider resolver (future multi-backend support)               │
 │                                                                    │
-│  src/components/VoiceChannelPane.tsx                               │
+│  packages/shared/src/components/VoiceChannelPane.tsx                               │
 │   - Realtime presence + signaling + WebRTC mesh session manager    │
 └───────────────▲────────────────────────────────────────────────────┘
                 │

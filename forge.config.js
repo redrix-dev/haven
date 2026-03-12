@@ -5,7 +5,7 @@ const packageJson = require('./package.json');
 module.exports = {
   packagerConfig: {
     asar: true,
-    icon: './assets/icon',
+    icon: './apps/electron/assets/icon',
     win32metadata: {
       CompanyName: 'Haven',
       FileDescription: 'Haven',
@@ -35,8 +35,8 @@ module.exports = {
         name: 'haven',
         exe: 'Haven.exe',
         setupExe: `haven-${packageJson.version}.Setup.exe`,
-        setupIcon: './assets/icon.ico',
-        iconUrl: 'https://github.com/redrix-dev/haven/raw/main/assets/icon.ico',
+        setupIcon: './apps/electron/assets/icon.ico',
+        iconUrl: 'https://github.com/redrix-dev/haven/raw/main/apps/electron/assets/icon.ico',
       },
     },
     {
@@ -65,11 +65,11 @@ module.exports = {
           config: './webpack.renderer.config.js',
           entryPoints: [
             {
-              html: './src/index.html',
-              js: './src/renderer/index.tsx',
+              html: './apps/electron/src/renderer/index.html',
+              js: './apps/electron/src/renderer/index.tsx',
               name: 'main_window',
               preload: {
-                js: './src/preload/index.js',
+                js: './apps/electron/src/preload/index.js',
               },
             },
           ],

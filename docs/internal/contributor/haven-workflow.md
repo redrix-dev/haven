@@ -382,7 +382,7 @@ npx supabase status -o env
 ```
 
 #### Important local-only note
-`supabase/config.toml` affects the local Supabase stack only.
+`services/supabase/config.toml` affects the local Supabase stack only.
 It does not change hosted Supabase behavior.
 
 ### 2. Hosted Supabase Usage
