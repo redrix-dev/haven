@@ -48,7 +48,18 @@ export function MobileDmConversationView({
   const longPress = useMobileLongPress();
   const justSentRef = useRef(false);
   const previousMessageCountRef = useRef(0);
-  
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const windowHeightRef = useRef(window.innerHeight);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const handler = () => {
+      const isOpen = vv.height < windowHeightRef.current - 50;
+      setKeyboardOpen(isOpen);
+    };
+    vv.addEventListener('resize', handler);
+    return () => vv.removeEventListener('resize', handler);
+  }, []);
   useEffect(() => {
     const node = scrollRef.current;
     if (!node) return;
@@ -97,7 +108,7 @@ export function MobileDmConversationView({
     if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
-
+  
   // Derive the other user from any non-own message for block action
   const otherUser = messages.find((m) => m.authorUserId !== currentUserId);
   const otherUserId = otherUser?.authorUserId ?? null;
@@ -200,15 +211,15 @@ export function MobileDmConversationView({
           );
         })}
       </div>
-
-      <MobileMessageComposer
-        draft={draft}
-        onDraftChange={setDraft}
-        onSend={handleSend}
-        sending={sendPending}
-        placeholder="Message..."
-      />
-
+        <div style={{ paddingBottom: keyboardOpen ? '0px' : '34px' }}>
+          <MobileMessageComposer
+            draft={draft}
+            onDraftChange={setDraft}
+            onSend={handleSend}
+           sending={sendPending}
+            placeholder="Message..."
+          />
+        </div>
       <MobileLongPressMenu
         open={contextMenu !== null}
         onClose={() => setContextMenu(null)}

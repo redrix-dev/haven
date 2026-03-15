@@ -230,7 +230,7 @@ function ComposerFormattingToolbar({
   };
 
   return (
-    <div className="px-3 pb-1">
+    <div className="px-3 pb-0">
       <div
         className="mx-auto w-full max-w-[24rem] flex items-center gap-1 overflow-x-auto"
         style={{ touchAction: 'pan-x' }}
@@ -481,7 +481,7 @@ export function MobileMessageComposer({
 
       {/* Input row */}
       {/* Preserved: touchAction none on wrapper divs */}
-      <div className="px-3 py-2" style={{ touchAction: 'none' }}>
+      <div className="px-3 pt-1 pb-0" style={{ touchAction: 'none' }}>
         <div className="mx-auto w-full max-w-[24rem]" style={{ touchAction: 'none' }}>
           <div
             className="relative rounded-[1.4rem] border border-white/10 bg-white/5 transition-colors focus-within:border-blue-500/50 flex items-center gap-1 px-2 py-1.5"
