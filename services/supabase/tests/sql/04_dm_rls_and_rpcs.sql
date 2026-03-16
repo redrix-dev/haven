@@ -128,6 +128,210 @@ select test_support.assert_eq_int(
   'DM recipient can list both normal and push-only test messages'
 );
 
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+create temp table tmp_dm_image_upload on commit drop as
+select
+  format(
+    '%s/%s-dm-test.png',
+    (select id::text from dm_ids where key = 'conversation'),
+    gen_random_uuid()::text
+  ) as object_path;
+
+insert into storage.objects (
+  bucket_id,
+  name,
+  owner,
+  metadata
+)
+select
+  'dm-message-media',
+  object_path,
+  test_support.fixture_user_id('member_a'),
+  jsonb_build_object('mimetype', 'image/png', 'size', 2048)
+from tmp_dm_image_upload;
+
+create temp table tmp_dm_image_message on commit drop as
+select * from public.send_dm_message(
+  (select id from dm_ids where key = 'conversation'),
+  '',
+  '{}'::jsonb,
+  jsonb_build_object(
+    'bucketName', 'dm-message-media',
+    'objectPath', (select object_path from tmp_dm_image_upload),
+    'originalFilename', 'dm-test.png',
+    'mimeType', 'image/png',
+    'mediaKind', 'image',
+    'sizeBytes', 2048,
+    'expiresInHours', 24
+  )
+);
+
+insert into dm_ids (key, id)
+select 'message_image', message_id from tmp_dm_image_message
+on conflict (key) do update set id = excluded.id;
+
+reset role;
+select test_support.clear_jwt_claims();
+
+select test_support.assert_eq_text(
+  (
+    select payload->>'message'
+    from public.notification_events
+    where source_id = (select id from dm_ids where key = 'message_image')
+    order by created_at desc
+    limit 1
+  ),
+  'Sent an image',
+  'image-only DM notifications should use the image preview fallback'
+);
+
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_b'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_dm_messages((select id from dm_ids where key = 'conversation'), 50, null, null)
+  ),
+  3,
+  'DM recipient can list text and image messages together'
+);
+
+select test_support.assert_eq_int(
+  (
+    select jsonb_array_length(attachments)::bigint
+    from public.list_dm_messages((select id from dm_ids where key = 'conversation'), 50, null, null)
+    where message_id = (select id from dm_ids where key = 'message_image')
+  ),
+  1,
+  'DM image messages should return one attachment row'
+);
+
+select test_support.assert_eq_text(
+  (
+    select last_message_preview
+    from public.list_my_dm_conversations()
+    where conversation_id = (select id from dm_ids where key = 'conversation')
+  ),
+  'Sent an image',
+  'DM conversation previews should fall back to Sent an image for image-only messages'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from storage.objects
+    where bucket_id = 'dm-message-media'
+      and name = (select object_path from tmp_dm_image_upload)
+  ),
+  1,
+  'DM participants can read the uploaded image object'
+);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('non_member'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from storage.objects
+    where bucket_id = 'dm-message-media'
+      and name = (select object_path from tmp_dm_image_upload)
+  ),
+  0,
+  'non-members cannot read DM image storage objects'
+);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+create temp table tmp_dm_expiring_image_upload on commit drop as
+select
+  format(
+    '%s/%s-dm-expiring-test.png',
+    (select id::text from dm_ids where key = 'conversation'),
+    gen_random_uuid()::text
+  ) as object_path;
+
+insert into storage.objects (
+  bucket_id,
+  name,
+  owner,
+  metadata
+)
+select
+  'dm-message-media',
+  object_path,
+  test_support.fixture_user_id('member_a'),
+  jsonb_build_object('mimetype', 'image/png', 'size', 4096)
+from tmp_dm_expiring_image_upload;
+
+create temp table tmp_dm_expiring_image_message on commit drop as
+select * from public.send_dm_message(
+  (select id from dm_ids where key = 'conversation'),
+  '',
+  '{}'::jsonb,
+  jsonb_build_object(
+    'bucketName', 'dm-message-media',
+    'objectPath', (select object_path from tmp_dm_expiring_image_upload),
+    'originalFilename', 'dm-expiring-test.png',
+    'mimeType', 'image/png',
+    'mediaKind', 'image',
+    'sizeBytes', 4096,
+    'expiresInHours', 1
+  )
+);
+
+insert into dm_ids (key, id)
+select 'message_image_expiring', message_id from tmp_dm_expiring_image_message
+on conflict (key) do update set id = excluded.id;
+
+reset role;
+update public.dm_message_attachments
+set expires_at = timezone('utc', now()) - interval '5 minutes'
+where message_id = (select id from dm_ids where key = 'message_image_expiring');
+
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+select test_support.assert_eq_int(
+  public.cleanup_expired_dm_message_attachments(10),
+  1,
+  'expired DM image cleanup should delete the message'
+);
+
+reset role;
+select test_support.clear_jwt_claims();
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.dm_messages
+    where id = (select id from dm_ids where key = 'message_image_expiring')
+  ),
+  0,
+  'expired DM image cleanup should remove the DM row'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.message_attachment_deletion_jobs
+    where bucket_name = 'dm-message-media'
+      and object_path = (select object_path from tmp_dm_expiring_image_upload)
+  ),
+  1,
+  'expired DM image cleanup should enqueue storage deletion'
+);
+
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_b'));
+
 select test_support.assert_true(
   public.mark_dm_conversation_read((select id from dm_ids where key = 'conversation')),
   'recipient can mark DM conversation read'

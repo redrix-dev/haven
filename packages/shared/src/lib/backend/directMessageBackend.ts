@@ -1,5 +1,13 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@shared/lib/supabase';
+import {
+  removeUploadedMediaObject,
+  uploadMediaToObjectStore,
+} from './mediaAttachmentUtils';
+import {
+  mapDirectMessageAttachmentRowsWithSignedUrls,
+  parseDirectMessageAttachmentRows,
+} from './directMessageAttachmentUtils';
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
@@ -19,6 +27,10 @@ export interface DirectMessageBackend {
     conversationId: string;
     content: string;
     metadata?: Record<string, unknown>;
+    imageUpload?: {
+      file: File;
+      expiresInHours?: number;
+    };
   }): Promise<DirectMessage>;
   markConversationRead(conversationId: string): Promise<boolean>;
   setConversationMuted(input: { conversationId: string; muted: boolean }): Promise<boolean>;
@@ -60,6 +72,7 @@ type DirectMessageRow = {
   created_at: string;
   edited_at: string | null;
   deleted_at: string | null;
+  attachments: unknown;
 };
 
 const asRecord = (value: unknown): Record<string, unknown> =>
@@ -85,18 +98,31 @@ const mapConversation = (row: DirectMessageConversationRow): DirectMessageConver
   mutedUntil: row.muted_until ?? null,
 });
 
-const mapMessage = (row: DirectMessageRow): DirectMessage => ({
-  messageId: row.message_id,
-  conversationId: row.conversation_id,
-  authorUserId: row.author_user_id,
-  authorUsername: row.author_username,
-  authorAvatarUrl: row.author_avatar_url ?? null,
-  content: row.content,
-  metadata: asRecord(row.metadata),
-  createdAt: row.created_at,
-  editedAt: row.edited_at ?? null,
-  deletedAt: row.deleted_at ?? null,
-});
+const mapMessages = async (rows: DirectMessageRow[]): Promise<DirectMessage[]> => {
+  const allAttachmentRows = rows.flatMap((row) => parseDirectMessageAttachmentRows(row.attachments));
+  const signedAttachments = await mapDirectMessageAttachmentRowsWithSignedUrls(allAttachmentRows);
+  const attachmentsByMessageId = new Map<string, DirectMessage['attachments']>();
+
+  for (const attachment of signedAttachments) {
+    const existing = attachmentsByMessageId.get(attachment.messageId) ?? [];
+    existing.push(attachment);
+    attachmentsByMessageId.set(attachment.messageId, existing);
+  }
+
+  return rows.map((row) => ({
+    messageId: row.message_id,
+    conversationId: row.conversation_id,
+    authorUserId: row.author_user_id,
+    authorUsername: row.author_username,
+    authorAvatarUrl: row.author_avatar_url ?? null,
+    content: row.content,
+    metadata: asRecord(row.metadata),
+    createdAt: row.created_at,
+    editedAt: row.edited_at ?? null,
+    deletedAt: row.deleted_at ?? null,
+    attachments: attachmentsByMessageId.get(row.message_id) ?? [],
+  }));
+};
 
 const callBooleanRpc = async (functionName: string, args: Record<string, unknown>): Promise<boolean> => {
   const { data, error } = await supabase.rpc(functionName as never, args as never);
@@ -135,24 +161,51 @@ export const centralDirectMessageBackend: DirectMessageBackend = {
       } as never
     );
     if (error) throw error;
-    return ((data ?? []) as DirectMessageRow[]).map(mapMessage);
+    return await mapMessages((data ?? []) as DirectMessageRow[]);
   },
 
   async sendMessage(input) {
-    const { data, error } = await supabase.rpc(
-      'send_dm_message' as never,
-      {
-        p_conversation_id: input.conversationId,
-        p_content: input.content,
-        p_metadata: input.metadata ?? {},
-      } as never
-    );
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : null) as DirectMessageRow | null;
-    if (!row) {
-      throw new Error('DM send returned no message row.');
+    const uploadedImage = await uploadMediaToObjectStore({
+      bucketName: 'dm-message-media',
+      objectPathPrefix: input.conversationId,
+      mediaUpload: input.imageUpload,
+      allowedMediaKinds: ['image'],
+    });
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'send_dm_message' as never,
+        {
+          p_conversation_id: input.conversationId,
+          p_content: input.content,
+          p_metadata: input.metadata ?? {},
+          p_image_attachment: uploadedImage
+            ? {
+                bucketName: uploadedImage.bucketName,
+                objectPath: uploadedImage.objectPath,
+                originalFilename: uploadedImage.originalFilename,
+                mimeType: uploadedImage.mimeType,
+                mediaKind: uploadedImage.mediaKind,
+                sizeBytes: uploadedImage.sizeBytes,
+                expiresInHours: uploadedImage.expiresInHours,
+              }
+            : null,
+        } as never
+      );
+      if (error) throw error;
+      const row = (Array.isArray(data) ? data[0] : null) as DirectMessageRow | null;
+      if (!row) {
+        throw new Error('DM send returned no message row.');
+      }
+      const [message] = await mapMessages([row]);
+      if (!message) {
+        throw new Error('DM send returned no message row.');
+      }
+      return message;
+    } catch (error) {
+      await removeUploadedMediaObject(uploadedImage);
+      throw error;
     }
-    return mapMessage(row);
   },
 
   async markConversationRead(conversationId) {

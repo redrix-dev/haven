@@ -3,7 +3,7 @@ import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DirectMessageArea } from '@shared/components/DirectMessageArea';
-import type { DirectMessageConversationSummary } from '@shared/lib/backend/types';
+import type { DirectMessage, DirectMessageConversationSummary } from '@shared/lib/backend/types';
 
 const conversation: DirectMessageConversationSummary = {
   conversationId: 'conv-1',
@@ -66,5 +66,44 @@ describe('DirectMessageArea', () => {
       userId: 'user-2',
       username: 'FriendUser',
     });
+  });
+
+  it('renders image attachments and hides placeholder-only text', () => {
+    const messages: DirectMessage[] = [
+      {
+        messageId: 'msg-1',
+        conversationId: 'conv-1',
+        authorUserId: 'user-2',
+        authorUsername: 'FriendUser',
+        authorAvatarUrl: null,
+        content: '\u200B',
+        metadata: {},
+        createdAt: new Date().toISOString(),
+        editedAt: null,
+        deletedAt: null,
+        attachments: [
+          {
+            id: 'att-1',
+            messageId: 'msg-1',
+            conversationId: 'conv-1',
+            ownerUserId: 'user-2',
+            bucketName: 'dm-message-media',
+            objectPath: 'conv-1/test-image.png',
+            originalFilename: 'test-image.png',
+            mimeType: 'image/png',
+            mediaKind: 'image',
+            sizeBytes: 123,
+            createdAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+            signedUrl: 'https://example.com/test-image.png',
+          },
+        ],
+      },
+    ];
+
+    renderArea({ messages });
+
+    expect(screen.queryByText('\u200B')).toBeNull();
+    expect(screen.getByAltText('test-image.png')).toBeTruthy();
   });
 });

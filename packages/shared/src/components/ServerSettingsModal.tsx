@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,41 +8,50 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@shared/components/ui/alert-dialog';
-import { Badge } from '@shared/components/ui/badge';
-import { Button } from '@shared/components/ui/button';
-import { Checkbox } from '@shared/components/ui/checkbox';
+} from "@shared/components/ui/alert-dialog";
+import { Badge } from "@shared/components/ui/badge";
+import { Button } from "@shared/components/ui/button";
+import { Checkbox } from "@shared/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@shared/components/ui/dialog';
-import { Input } from '@shared/components/ui/input';
-import { Label } from '@shared/components/ui/label';
+} from "@shared/components/ui/dialog";
+import { Input } from "@shared/components/ui/input";
+import { Label } from "@shared/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@shared/components/ui/select';
-import { Skeleton } from '@shared/components/ui/skeleton';
-import { Switch } from '@shared/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
-import { Textarea } from '@shared/components/ui/textarea';
-import { getErrorMessage } from '@platform/lib/errors';
+} from "@shared/components/ui/select";
+import { Skeleton } from "@shared/components/ui/skeleton";
+import { Switch } from "@shared/components/ui/switch";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@shared/components/ui/tabs";
+import { Textarea } from "@shared/components/ui/textarea";
+import { getErrorMessage } from "@platform/lib/errors";
 import type {
   CommunityBanItem,
   PermissionCatalogItem,
   ServerMemberRoleItem,
   ServerRoleItem,
-} from '@shared/lib/backend/types';
-import { Database } from '@shared/types/database';
-
-type DeveloperAccessMode = Database['public']['Enums']['developer_access_mode'];
-type SettingsTab = 'general' | 'roles' | 'members' | 'invites' | 'bans';
+} from "@shared/lib/backend/types";
+import { Database } from "@shared/types/database";
+import { BansTab } from "./settingsModals/tabs/BansTab";
+import { InvitesTab } from "./settingsModals/tabs/InvitesTab";
+import { GeneralTab } from "./settingsModals/tabs/GeneralTab";
+import { RolesTab } from "./settingsModals/tabs/RolesTab";
+import { MembersTab } from "./settingsModals/tabs/MembersTab";
+type DeveloperAccessMode = Database["public"]["Enums"]["developer_access_mode"];
+type SettingsTab = "general" | "roles" | "members" | "invites" | "bans";
 
 type RoleDraft = {
   name: string;
@@ -51,8 +60,8 @@ type RoleDraft = {
   permissionKeys: string[];
 };
 type ServerSettingsConfirmState =
-  | { kind: 'deleteRole'; roleId: string; roleName: string }
-  | { kind: 'unbanUser'; targetUserId: string; username: string };
+  | { kind: "deleteRole"; roleId: string; roleName: string }
+  | { kind: "unbanUser"; targetUserId: string; username: string };
 
 export interface ServerSettingsValues {
   name: string;
@@ -99,7 +108,11 @@ interface ServerSettingsModalProps {
   inviteBaseUrl: string;
   onClose: () => void;
   onSave: (values: ServerSettingsValues) => Promise<void>;
-  onCreateRole: (values: { name: string; color: string; position: number }) => Promise<void>;
+  onCreateRole: (values: {
+    name: string;
+    color: string;
+    position: number;
+  }) => Promise<void>;
   onUpdateRole: (values: {
     roleId: string;
     name: string;
@@ -107,29 +120,35 @@ interface ServerSettingsModalProps {
     position: number;
   }) => Promise<void>;
   onDeleteRole: (roleId: string) => Promise<void>;
-  onSaveRolePermissions: (roleId: string, permissionKeys: string[]) => Promise<void>;
+  onSaveRolePermissions: (
+    roleId: string,
+    permissionKeys: string[],
+  ) => Promise<void>;
   onSaveMemberRoles: (memberId: string, roleIds: string[]) => Promise<void>;
   onCreateInvite: (values: {
     maxUses: number | null;
     expiresInHours: number | null;
   }) => Promise<ServerInviteItem>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
-  onUnbanUser: (values: { targetUserId: string; reason?: string | null }) => Promise<void>;
+  onUnbanUser: (values: {
+    targetUserId: string;
+    reason?: string | null;
+  }) => Promise<void>;
 }
 
 type PermissionScope =
-  | 'channel_access'
-  | 'channel_structure'
-  | 'channel_overwrites'
-  | 'community_admin'
-  | 'role_admin'
-  | 'member_admin'
-  | 'message_admin'
-  | 'invite_admin'
-  | 'reporting'
-  | 'developer'
-  | 'moderation'
-  | 'reserved';
+  | "channel_access"
+  | "channel_structure"
+  | "channel_overwrites"
+  | "community_admin"
+  | "role_admin"
+  | "member_admin"
+  | "message_admin"
+  | "invite_admin"
+  | "reporting"
+  | "developer"
+  | "moderation"
+  | "reserved";
 
 type PermissionMetadata = {
   label: string;
@@ -138,75 +157,123 @@ type PermissionMetadata = {
 };
 
 const PERMISSION_SCOPE_ORDER: PermissionScope[] = [
-  'community_admin',
-  'role_admin',
-  'member_admin',
-  'channel_access',
-  'channel_structure',
-  'channel_overwrites',
-  'message_admin',
-  'invite_admin',
-  'reporting',
-  'moderation',
-  'developer',
-  'reserved',
+  "community_admin",
+  "role_admin",
+  "member_admin",
+  "channel_access",
+  "channel_structure",
+  "channel_overwrites",
+  "message_admin",
+  "invite_admin",
+  "reporting",
+  "moderation",
+  "developer",
+  "reserved",
 ];
 
 const PERMISSION_SCOPE_LABELS: Record<PermissionScope, string> = {
-  channel_access: 'Channel Access',
-  channel_structure: 'Channel Structure',
-  channel_overwrites: 'Channel Overwrites',
-  community_admin: 'Community Administration',
-  role_admin: 'Role Management',
-  member_admin: 'Member Management',
-  message_admin: 'Message Moderation',
-  invite_admin: 'Invites',
-  reporting: 'Reports',
-  developer: 'Developer Tools',
-  moderation: 'Safety Moderation',
-  reserved: 'Reserved',
+  channel_access: "Channel Access",
+  channel_structure: "Channel Structure",
+  channel_overwrites: "Channel Overwrites",
+  community_admin: "Community Administration",
+  role_admin: "Role Management",
+  member_admin: "Member Management",
+  message_admin: "Message Moderation",
+  invite_admin: "Invites",
+  reporting: "Reports",
+  developer: "Developer Tools",
+  moderation: "Safety Moderation",
+  reserved: "Reserved",
 };
 
 const COMMUNITY_PERMISSION_METADATA: Record<string, PermissionMetadata> = {
-  view_channels: { label: 'View Channels', scope: 'channel_access', ownerVisible: true },
-  send_messages: { label: 'Send Messages', scope: 'channel_access', ownerVisible: true },
-  create_channels: { label: 'Create Channels', scope: 'channel_structure', ownerVisible: true },
-  manage_channels: { label: 'Manage Channel Structure', scope: 'channel_structure', ownerVisible: true },
+  view_channels: {
+    label: "View Channels",
+    scope: "channel_access",
+    ownerVisible: true,
+  },
+  send_messages: {
+    label: "Send Messages",
+    scope: "channel_access",
+    ownerVisible: true,
+  },
+  create_channels: {
+    label: "Create Channels",
+    scope: "channel_structure",
+    ownerVisible: true,
+  },
+  manage_channels: {
+    label: "Manage Channel Structure",
+    scope: "channel_structure",
+    ownerVisible: true,
+  },
   manage_channel_permissions: {
-    label: 'Manage Channel Overwrites',
-    scope: 'channel_overwrites',
+    label: "Manage Channel Overwrites",
+    scope: "channel_overwrites",
     ownerVisible: true,
   },
-  manage_messages: { label: 'Manage Messages', scope: 'message_admin', ownerVisible: true },
-  manage_server: { label: 'Manage Community', scope: 'community_admin', ownerVisible: true },
-  manage_roles: { label: 'Manage Roles', scope: 'role_admin', ownerVisible: true },
-  manage_members: { label: 'Manage Members', scope: 'member_admin', ownerVisible: true },
-  manage_invites: { label: 'Manage Invites', scope: 'invite_admin', ownerVisible: true },
-  create_reports: { label: 'Create Reports', scope: 'reporting', ownerVisible: true },
-  manage_reports: { label: 'Manage Reports', scope: 'reporting', ownerVisible: true },
+  manage_messages: {
+    label: "Manage Messages",
+    scope: "message_admin",
+    ownerVisible: true,
+  },
+  manage_server: {
+    label: "Manage Community",
+    scope: "community_admin",
+    ownerVisible: true,
+  },
+  manage_roles: {
+    label: "Manage Roles",
+    scope: "role_admin",
+    ownerVisible: true,
+  },
+  manage_members: {
+    label: "Manage Members",
+    scope: "member_admin",
+    ownerVisible: true,
+  },
+  manage_invites: {
+    label: "Manage Invites",
+    scope: "invite_admin",
+    ownerVisible: true,
+  },
+  create_reports: {
+    label: "Create Reports",
+    scope: "reporting",
+    ownerVisible: true,
+  },
+  manage_reports: {
+    label: "Manage Reports",
+    scope: "reporting",
+    ownerVisible: true,
+  },
   manage_developer_access: {
-    label: 'Manage Developer Access',
-    scope: 'developer',
+    label: "Manage Developer Access",
+    scope: "developer",
     ownerVisible: true,
   },
-  manage_bans: { label: 'Manage Bans', scope: 'moderation', ownerVisible: true },
+  manage_bans: {
+    label: "Manage Bans",
+    scope: "moderation",
+    ownerVisible: true,
+  },
   refresh_link_previews: {
-    label: 'Refresh Link Previews',
-    scope: 'developer',
+    label: "Refresh Link Previews",
+    scope: "developer",
     ownerVisible: true,
   },
   mention_haven_developers: {
-    label: 'Mention Haven Developers',
-    scope: 'reserved',
+    label: "Mention Haven Developers",
+    scope: "reserved",
     ownerVisible: false,
   },
 };
 
 const fallbackPermissionLabel = (value: string) =>
   value
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+    .join(" ");
 
 export function ServerSettingsModal({
   channels,
@@ -243,32 +310,39 @@ export function ServerSettingsModal({
   onRevokeInvite,
   onUnbanUser,
 }: ServerSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
-  const [values, setValues] = useState<ServerSettingsValues | null>(initialValues);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [values, setValues] = useState<ServerSettingsValues | null>(
+    initialValues,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [roleDraft, setRoleDraft] = useState<RoleDraft | null>(null);
-  const [newRoleName, setNewRoleName] = useState('');
-  const [newRoleColor, setNewRoleColor] = useState('#7289da');
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleColor, setNewRoleColor] = useState("#7289da");
   const [roleActionSaving, setRoleActionSaving] = useState(false);
   const [roleActionError, setRoleActionError] = useState<string | null>(null);
 
-  const [memberSearch, setMemberSearch] = useState('');
+  const [memberSearch, setMemberSearch] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [memberDraftRoleIds, setMemberDraftRoleIds] = useState<string[]>([]);
   const [memberActionSaving, setMemberActionSaving] = useState(false);
-  const [memberActionError, setMemberActionError] = useState<string | null>(null);
+  const [memberActionError, setMemberActionError] = useState<string | null>(
+    null,
+  );
 
   const [inviteCreating, setInviteCreating] = useState(false);
-  const [inviteMaxUsesInput, setInviteMaxUsesInput] = useState('');
-  const [inviteExpiryHoursInput, setInviteExpiryHoursInput] = useState('1');
-  const [inviteActionError, setInviteActionError] = useState<string | null>(null);
+  const [inviteMaxUsesInput, setInviteMaxUsesInput] = useState("");
+  const [inviteExpiryHoursInput, setInviteExpiryHoursInput] = useState("1");
+  const [inviteActionError, setInviteActionError] = useState<string | null>(
+    null,
+  );
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [unbanActionError, setUnbanActionError] = useState<string | null>(null);
   const [unbanBusyUserId, setUnbanBusyUserId] = useState<string | null>(null);
-  const [pendingConfirm, setPendingConfirm] = useState<ServerSettingsConfirmState | null>(null);
+  const [pendingConfirm, setPendingConfirm] =
+    useState<ServerSettingsConfirmState | null>(null);
 
   useEffect(() => {
     setValues(initialValues);
@@ -276,13 +350,14 @@ export function ServerSettingsModal({
   }, [initialValues]);
 
   useEffect(() => {
-    if (selectedRoleId && roles.some((role) => role.id === selectedRoleId)) return;
+    if (selectedRoleId && roles.some((role) => role.id === selectedRoleId))
+      return;
     setSelectedRoleId(roles[0]?.id ?? null);
   }, [roles, selectedRoleId]);
 
   const selectedRole = useMemo(
     () => roles.find((role) => role.id === selectedRoleId) ?? null,
-    [roles, selectedRoleId]
+    [roles, selectedRoleId],
   );
 
   useEffect(() => {
@@ -300,13 +375,18 @@ export function ServerSettingsModal({
   }, [selectedRole]);
 
   useEffect(() => {
-    if (selectedMemberId && members.some((member) => member.memberId === selectedMemberId)) return;
+    if (
+      selectedMemberId &&
+      members.some((member) => member.memberId === selectedMemberId)
+    )
+      return;
     setSelectedMemberId(members[0]?.memberId ?? null);
   }, [members, selectedMemberId]);
 
   const selectedMember = useMemo(
-    () => members.find((member) => member.memberId === selectedMemberId) ?? null,
-    [members, selectedMemberId]
+    () =>
+      members.find((member) => member.memberId === selectedMemberId) ?? null,
+    [members, selectedMemberId],
   );
 
   useEffect(() => {
@@ -322,22 +402,24 @@ export function ServerSettingsModal({
     () =>
       Boolean(
         values &&
-          values.developerAccessEnabled &&
-          values.developerAccessMode === 'channel_scoped' &&
-          canManageDeveloperAccess
+        values.developerAccessEnabled &&
+        values.developerAccessMode === "channel_scoped" &&
+        canManageDeveloperAccess,
       ),
-    [values, canManageDeveloperAccess]
+    [values, canManageDeveloperAccess],
   );
 
   const filteredMembers = useMemo(() => {
     const query = memberSearch.trim().toLowerCase();
     if (!query) return members;
-    return members.filter((member) => member.displayName.toLowerCase().includes(query));
+    return members.filter((member) =>
+      member.displayName.toLowerCase().includes(query),
+    );
   }, [members, memberSearch]);
 
   const defaultRoleId = useMemo(
     () => roles.find((role) => role.isDefault)?.id ?? null,
-    [roles]
+    [roles],
   );
 
   const visiblePermissionGroups = useMemo(() => {
@@ -351,7 +433,7 @@ export function ServerSettingsModal({
       const ownerVisible = metadata?.ownerVisible ?? true;
       if (!ownerVisible) continue;
 
-      const scope = metadata?.scope ?? 'community_admin';
+      const scope = metadata?.scope ?? "community_admin";
       const group = grouped.get(scope) ?? [];
       group.push({
         key: permission.key,
@@ -361,13 +443,11 @@ export function ServerSettingsModal({
       grouped.set(scope, group);
     }
 
-    return PERMISSION_SCOPE_ORDER
-      .map((scope) => ({
-        scope,
-        label: PERMISSION_SCOPE_LABELS[scope],
-        permissions: grouped.get(scope) ?? [],
-      }))
-      .filter((group) => group.permissions.length > 0);
+    return PERMISSION_SCOPE_ORDER.map((scope) => ({
+      scope,
+      label: PERMISSION_SCOPE_LABELS[scope],
+      permissions: grouped.get(scope) ?? [],
+    })).filter((group) => group.permissions.length > 0);
   }, [permissionsCatalog]);
 
   const canEditSelectedRoleDetails =
@@ -377,7 +457,9 @@ export function ServerSettingsModal({
     !selectedRole?.isDefault;
 
   const canEditSelectedRolePermissions =
-    Boolean(selectedRole) && canManageRoles && (!selectedRole?.isSystem || isOwner);
+    Boolean(selectedRole) &&
+    canManageRoles &&
+    (!selectedRole?.isSystem || isOwner);
 
   const canDeleteSelectedRole =
     Boolean(selectedRole) &&
@@ -398,9 +480,15 @@ export function ServerSettingsModal({
     try {
       await navigator.clipboard.writeText(link);
       setCopiedInviteId(inviteId);
-      setTimeout(() => setCopiedInviteId((current) => (current === inviteId ? null : current)), 1200);
+      setTimeout(
+        () =>
+          setCopiedInviteId((current) =>
+            current === inviteId ? null : current,
+          ),
+        1200,
+      );
     } catch {
-      setInviteActionError('Failed to copy invite link to clipboard.');
+      setInviteActionError("Failed to copy invite link to clipboard.");
     }
   };
 
@@ -418,7 +506,7 @@ export function ServerSettingsModal({
   const handleSave = async () => {
     if (!values) return;
     if (!values.name.trim()) {
-      setError('Community name is required.');
+      setError("Community name is required.");
       return;
     }
     setSaving(true);
@@ -427,10 +515,12 @@ export function ServerSettingsModal({
       await onSave({
         ...values,
         name: values.name.trim(),
-        description: values.description?.trim() ? values.description.trim() : null,
+        description: values.description?.trim()
+          ? values.description.trim()
+          : null,
       });
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to save community settings.'));
+      setError(getErrorMessage(err, "Failed to save community settings."));
     } finally {
       setSaving(false);
     }
@@ -440,17 +530,24 @@ export function ServerSettingsModal({
     if (!canManageRoles) return;
     const trimmedName = newRoleName.trim();
     if (!trimmedName) {
-      setRoleActionError('Role name is required.');
+      setRoleActionError("Role name is required.");
       return;
     }
-    const nextPosition = roles.length === 0 ? 1 : Math.max(...roles.map((role) => role.position)) + 1;
+    const nextPosition =
+      roles.length === 0
+        ? 1
+        : Math.max(...roles.map((role) => role.position)) + 1;
     setRoleActionSaving(true);
     setRoleActionError(null);
     try {
-      await onCreateRole({ name: trimmedName, color: newRoleColor, position: nextPosition });
-      setNewRoleName('');
+      await onCreateRole({
+        name: trimmedName,
+        color: newRoleColor,
+        position: nextPosition,
+      });
+      setNewRoleName("");
     } catch (err: unknown) {
-      setRoleActionError(getErrorMessage(err, 'Failed to create role.'));
+      setRoleActionError(getErrorMessage(err, "Failed to create role."));
     } finally {
       setRoleActionSaving(false);
     }
@@ -471,7 +568,7 @@ export function ServerSettingsModal({
     if (!selectedRoleId || !roleDraft) return;
     const trimmedName = roleDraft.name.trim();
     if (!trimmedName) {
-      setRoleActionError('Role name is required.');
+      setRoleActionError("Role name is required.");
       return;
     }
     setRoleActionSaving(true);
@@ -485,7 +582,7 @@ export function ServerSettingsModal({
       });
       await onSaveRolePermissions(selectedRoleId, roleDraft.permissionKeys);
     } catch (err: unknown) {
-      setRoleActionError(getErrorMessage(err, 'Failed to save role changes.'));
+      setRoleActionError(getErrorMessage(err, "Failed to save role changes."));
     } finally {
       setRoleActionSaving(false);
     }
@@ -493,7 +590,11 @@ export function ServerSettingsModal({
 
   const handleDeleteRole = () => {
     if (!selectedRoleId || !selectedRole) return;
-    setPendingConfirm({ kind: 'deleteRole', roleId: selectedRoleId, roleName: selectedRole.name });
+    setPendingConfirm({
+      kind: "deleteRole",
+      roleId: selectedRoleId,
+      roleName: selectedRole.name,
+    });
   };
 
   const confirmDeleteRole = async (roleId: string) => {
@@ -503,7 +604,7 @@ export function ServerSettingsModal({
       await onDeleteRole(roleId);
       setSelectedRoleId(null);
     } catch (err: unknown) {
-      setRoleActionError(getErrorMessage(err, 'Failed to delete role.'));
+      setRoleActionError(getErrorMessage(err, "Failed to delete role."));
     } finally {
       setRoleActionSaving(false);
     }
@@ -513,21 +614,26 @@ export function ServerSettingsModal({
     setMemberDraftRoleIds((currentRoleIds) =>
       currentRoleIds.includes(roleId)
         ? currentRoleIds.filter((id) => id !== roleId)
-        : [...currentRoleIds, roleId]
+        : [...currentRoleIds, roleId],
     );
   };
 
   const handleSaveMemberRoles = async () => {
     if (!selectedMemberId) return;
     const nextRoleIds = Array.from(
-      new Set([...memberDraftRoleIds, ...(defaultRoleId ? [defaultRoleId] : [])])
+      new Set([
+        ...memberDraftRoleIds,
+        ...(defaultRoleId ? [defaultRoleId] : []),
+      ]),
     );
     setMemberActionSaving(true);
     setMemberActionError(null);
     try {
       await onSaveMemberRoles(selectedMemberId, nextRoleIds);
     } catch (err: unknown) {
-      setMemberActionError(getErrorMessage(err, 'Failed to save member roles.'));
+      setMemberActionError(
+        getErrorMessage(err, "Failed to save member roles."),
+      );
     } finally {
       setMemberActionSaving(false);
     }
@@ -535,15 +641,17 @@ export function ServerSettingsModal({
 
   const handleCreateInvite = async () => {
     const maxUses = parsePositiveIntegerOrNull(inviteMaxUsesInput);
-    const parsedExpiresInHours = parsePositiveIntegerOrNull(inviteExpiryHoursInput);
+    const parsedExpiresInHours = parsePositiveIntegerOrNull(
+      inviteExpiryHoursInput,
+    );
     const expiresInHours = parsedExpiresInHours ?? 1;
 
     if (inviteMaxUsesInput.trim() && maxUses === null) {
-      setInviteActionError('Max uses must be a whole number greater than 0.');
+      setInviteActionError("Max uses must be a whole number greater than 0.");
       return;
     }
     if (inviteExpiryHoursInput.trim() && parsedExpiresInHours === null) {
-      setInviteActionError('Expiration must be a whole number greater than 0.');
+      setInviteActionError("Expiration must be a whole number greater than 0.");
       return;
     }
     setInviteCreating(true);
@@ -552,7 +660,9 @@ export function ServerSettingsModal({
       const invite = await onCreateInvite({ maxUses, expiresInHours });
       await copyInviteLink(invite.code, invite.id);
     } catch (err: unknown) {
-      setInviteActionError(getErrorMessage(err, 'Failed to create invite link.'));
+      setInviteActionError(
+        getErrorMessage(err, "Failed to create invite link."),
+      );
     } finally {
       setInviteCreating(false);
     }
@@ -563,13 +673,15 @@ export function ServerSettingsModal({
     try {
       await onRevokeInvite(inviteId);
     } catch (err: unknown) {
-      setInviteActionError(getErrorMessage(err, 'Failed to revoke invite link.'));
+      setInviteActionError(
+        getErrorMessage(err, "Failed to revoke invite link."),
+      );
     }
   };
 
-  const handleUnban = (vals: { targetUserId: string; username: string }) => {
+  const handleUnban = (targetUserId: string, username: string) => {
     if (!canManageBans) return;
-    setPendingConfirm({ kind: 'unbanUser', targetUserId: vals.targetUserId, username: vals.username });
+    setPendingConfirm({ kind: "unbanUser", targetUserId, username });
   };
 
   const confirmUnban = async (targetUserId: string) => {
@@ -578,7 +690,7 @@ export function ServerSettingsModal({
     try {
       await onUnbanUser({ targetUserId, reason: null });
     } catch (err: unknown) {
-      setUnbanActionError(getErrorMessage(err, 'Failed to unban user.'));
+      setUnbanActionError(getErrorMessage(err, "Failed to unban user."));
     } finally {
       setUnbanBusyUserId(null);
     }
@@ -588,7 +700,7 @@ export function ServerSettingsModal({
     if (!pendingConfirm) return;
     const nextConfirm = pendingConfirm;
     setPendingConfirm(null);
-    if (nextConfirm.kind === 'deleteRole') {
+    if (nextConfirm.kind === "deleteRole") {
       await confirmDeleteRole(nextConfirm.roleId);
       return;
     }
@@ -596,9 +708,10 @@ export function ServerSettingsModal({
   };
 
   const pendingConfirmBusy =
-    pendingConfirm?.kind === 'deleteRole'
+    pendingConfirm?.kind === "deleteRole"
       ? roleActionSaving
-      : pendingConfirm?.kind === 'unbanUser' && unbanBusyUserId === pendingConfirm.targetUserId;
+      : pendingConfirm?.kind === "unbanUser" &&
+        unbanBusyUserId === pendingConfirm.targetUserId;
 
   return (
     <>
@@ -621,7 +734,9 @@ export function ServerSettingsModal({
         >
           {/* ── Fixed header ── */}
           <DialogHeader className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
-            <DialogTitle className="text-2xl font-bold text-white">Community Settings</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-white">
+              Community Settings
+            </DialogTitle>
           </DialogHeader>
 
           {/* ── Scrollable body ── */}
@@ -652,7 +767,15 @@ export function ServerSettingsModal({
                 {/* Tab strip */}
                 <div className="shrink-0 border-b border-[#233753] pb-3">
                   <TabsList className="bg-[#142033] border border-[#304867] w-full flex-wrap justify-start h-auto">
-                    {(['general', 'roles', 'members', 'invites', 'bans'] as SettingsTab[]).map((tab) => (
+                    {(
+                      [
+                        "general",
+                        "roles",
+                        "members",
+                        "invites",
+                        "bans",
+                      ] as SettingsTab[]
+                    ).map((tab) => (
                       <TabsTrigger
                         key={tab}
                         value={tab}
@@ -666,7 +789,6 @@ export function ServerSettingsModal({
 
                 {/* Tab panels — each is flex-1 min-h-0 so they fill the remaining space */}
                 <div className="mt-4 sm:mt-5 min-h-0 flex-1 overflow-hidden flex flex-col">
-
                   {/* ════ GENERAL ════
                       Layout: scrollable content + pinned save footer
                   */}
@@ -674,146 +796,18 @@ export function ServerSettingsModal({
                     value="general"
                     className="flex-1 min-h-0 overflow-hidden flex flex-col gap-0 data-[state=inactive]:hidden"
                   >
-                    <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto pb-4">
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <section className="rounded-md border border-[#304867] bg-[#142033] p-4 space-y-4">
-                          <h3 className="text-white font-semibold">General</h3>
-                          <div className="space-y-2">
-                            <Label htmlFor="server-settings-name" className="text-xs font-semibold uppercase text-[#a9b8cf]">
-                              Community Name
-                            </Label>
-                            <Input
-                              id="server-settings-name"
-                              value={values.name}
-                              onChange={(e) => setValues({ ...values, name: e.target.value })}
-                              className="bg-[#142033] border-[#304867] text-white"
-                              maxLength={100}
-                              required
-                              disabled={!canManageServer}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="server-settings-description" className="text-xs font-semibold uppercase text-[#a9b8cf]">
-                              Description
-                            </Label>
-                            <Textarea
-                              id="server-settings-description"
-                              value={values.description ?? ''}
-                              onChange={(e) => setValues({ ...values, description: e.target.value })}
-                              className="min-h-24 bg-[#142033] border-[#304867] text-white"
-                              maxLength={500}
-                              placeholder="Tell people what this community is about."
-                              disabled={!canManageServer}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between gap-3 rounded-md bg-[#111a2b] px-3 py-2">
-                            <Label htmlFor="allow-public-invites" className="text-sm text-[#e6edf7]">
-                              Allow public invites
-                            </Label>
-                            <Switch
-                              id="allow-public-invites"
-                              checked={values.allowPublicInvites}
-                              onCheckedChange={(checked) => setValues({ ...values, allowPublicInvites: checked })}
-                              disabled={!canManageServer}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between gap-3 rounded-md bg-[#111a2b] px-3 py-2">
-                            <Label htmlFor="require-report-reason" className="text-sm text-[#e6edf7]">
-                              Require a reason when submitting support reports
-                            </Label>
-                            <Switch
-                              id="require-report-reason"
-                              checked={values.requireReportReason}
-                              onCheckedChange={(checked) => setValues({ ...values, requireReportReason: checked })}
-                              disabled={!canManageServer}
-                            />
-                          </div>
-                          {!canManageServer && (
-                            <p className="text-xs text-[#d6a24a]">
-                              You can view these settings, but only members with Manage Community can edit them.
-                            </p>
-                          )}
-                        </section>
-
-                        <section className="rounded-md border border-[#304867] bg-[#142033] p-4 space-y-4">
-                          <h3 className="text-white font-semibold">Haven Developer Access</h3>
-                          <p className="text-sm text-[#a9b8cf]">
-                            Configure whether Haven developers can send official messages inside this community.
-                          </p>
-                          <div className="flex items-center justify-between gap-3 rounded-md bg-[#111a2b] px-3 py-2">
-                            <Label htmlFor="developer-access-enabled" className="text-sm text-[#e6edf7]">
-                              Enable Haven developer access
-                            </Label>
-                            <Switch
-                              id="developer-access-enabled"
-                              checked={values.developerAccessEnabled}
-                              onCheckedChange={(checked) => setValues({ ...values, developerAccessEnabled: checked })}
-                              disabled={!canManageDeveloperAccess}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Access Mode</Label>
-                            <Select
-                              value={values.developerAccessMode}
-                              onValueChange={(value) =>
-                                setValues({ ...values, developerAccessMode: value as DeveloperAccessMode })
-                              }
-                              disabled={!canManageDeveloperAccess || !values.developerAccessEnabled}
-                            >
-                              <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
-                                <SelectValue placeholder="Select access mode" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-[#142033] border-[#304867] text-white">
-                                <SelectItem value="report_only">Report Only</SelectItem>
-                                <SelectItem value="channel_scoped">Channel Scoped</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {canShowChannelScopes && (
-                            <div className="space-y-2">
-                              <p className="text-xs font-semibold uppercase text-[#a9b8cf]">Allowed Channels</p>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {channels.map((channel) => (
-                                  <div
-                                    key={channel.id}
-                                    className="flex items-center gap-3 text-sm text-[#e6edf7] bg-[#111a2b] rounded-md p-2"
-                                  >
-                                    <Checkbox
-                                      id={`dev-channel-${channel.id}`}
-                                      checked={values.developerAccessChannelIds.includes(channel.id)}
-                                      onCheckedChange={(checked) => {
-                                        if (checked === true || checked === false) toggleScopedChannel(channel.id);
-                                      }}
-                                    />
-                                    <Label htmlFor={`dev-channel-${channel.id}`}>#{channel.name}</Label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {!canManageDeveloperAccess && (
-                            <p className="text-xs text-[#d6a24a]">
-                              You can view this section, but only members with Manage Developer Access can change it.
-                            </p>
-                          )}
-                        </section>
-                      </div>
-                    </div>
-
-                    {/* Pinned save footer */}
-                    <div className="shrink-0 space-y-2 border-t border-[#233753] pt-3">
-                      {error && <p className="text-sm text-red-400">{error}</p>}
-                      <div className="flex justify-end">
-                        <Button
-                          type="button"
-                          disabled={saving || !canManageServer}
-                          className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-                          onClick={() => void handleSave()}
-                        >
-                          {saving ? 'Saving...' : 'Save General Settings'}
-                        </Button>
-                      </div>
-                    </div>
+                    <GeneralTab
+                      values={values}
+                      canManageServer={canManageServer}
+                      canManageDeveloperAccess={canManageDeveloperAccess}
+                      channels={channels}
+                      saving={saving}
+                      error={error}
+                      onValuesChange={setValues}
+                      onToggleChannel={toggleScopedChannel}
+                      onSave={handleSave}
+                      canShowChannelScopes={canShowChannelScopes}
+                    />
                   </TabsContent>
 
                   {/* ════ ROLES ════
@@ -825,224 +819,32 @@ export function ServerSettingsModal({
                     value="roles"
                     className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3 data-[state=inactive]:hidden"
                   >
-                    {/* Non-scrolling top matter */}
-                    <div className="shrink-0 space-y-1">
-                      <p className="text-sm text-[#a9b8cf]">
-                        Roles define what people can do community-wide. The database enforces permissions using
-                        role assignments and role permission entries.
-                      </p>
-                      {roleManagementError && <p className="text-sm text-red-400">{roleManagementError}</p>}
-                      {roleActionError && <p className="text-sm text-red-400">{roleActionError}</p>}
-                    </div>
-
-                    {roleManagementLoading ? (
-                      <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
-                        {Array.from({ length: 3 }, (_, i) => (
-                          <div key={i} className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
-                            <Skeleton className="h-4 w-32 bg-[#22334f]" />
-                            <Skeleton className="h-10 w-full bg-[#1b2a42]" />
-                            <Skeleton className="h-10 w-full bg-[#1b2a42]" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      /* Split panel — flex-1 so it fills remaining space */
-                      <div className="flex-1 min-h-0 grid grid-cols-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)] xl:grid-rows-[minmax(0,1fr)]">
-
-                        {/* Left: create form + role list */}
-                        <div className="min-h-0 flex flex-col gap-3">
-                          {/* Create form — fixed height */}
-                          <div className="shrink-0 rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
-                            <p className="text-sm font-semibold text-white">Create Role</p>
-                            <Input
-                              value={newRoleName}
-                              onChange={(e) => setNewRoleName(e.target.value)}
-                              placeholder="Role name"
-                              className="bg-[#101a2b] border-[#304867] text-white"
-                              disabled={!canManageRoles || roleActionSaving}
-                            />
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="color"
-                                value={newRoleColor}
-                                onChange={(e) => setNewRoleColor(e.target.value)}
-                                className="h-9 w-14 p-1 bg-[#101a2b] border-[#304867]"
-                                disabled={!canManageRoles || roleActionSaving}
-                              />
-                              <Button
-                                type="button"
-                                onClick={() => void handleCreateRole()}
-                                disabled={!canManageRoles || roleActionSaving}
-                                className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-                              >
-                                {roleActionSaving ? 'Creating...' : 'Create'}
-                              </Button>
-                            </div>
-                            {!canManageRoles && (
-                              <p className="text-xs text-[#d6a24a]">You need Manage Roles to create or edit roles.</p>
-                            )}
-                          </div>
-
-                          {/* Scrollable role list */}
-                          <div className="min-h-0 flex-1 rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
-                            <div className="scrollbar-inset h-full overflow-y-auto p-2 space-y-1">
-                              {roles.length === 0 ? (
-                                <p className="text-sm text-[#a9b8cf] px-2 py-3">No roles found.</p>
-                              ) : (
-                                roles.map((role) => {
-                                  const isSelected = role.id === selectedRoleId;
-                                  return (
-                                    <button
-                                      key={role.id}
-                                      type="button"
-                                      onClick={() => setSelectedRoleId(role.id)}
-                                      className={`w-full text-left rounded-md px-2 py-2 border transition-colors ${
-                                        isSelected
-                                          ? 'border-[#3f79d8] bg-[#1a2a43]'
-                                          : 'border-transparent hover:border-[#304867] hover:bg-[#17263d]'
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <span
-                                            className="inline-block size-2.5 rounded-full shrink-0"
-                                            style={{ backgroundColor: role.color }}
-                                            aria-hidden
-                                          />
-                                          <span className="text-sm font-medium text-white truncate">{role.name}</span>
-                                        </div>
-                                        <span className="text-[11px] text-[#8ea4c7]">{role.position}</span>
-                                      </div>
-                                    </button>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Right: role editor with pinned footer */}
-                        <div className="min-h-0 flex flex-col rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
-                          {!selectedRole || !roleDraft ? (
-                            <p className="p-4 text-sm text-[#a9b8cf]">Select a role to edit its permissions.</p>
-                          ) : (
-                            <>
-                              {/* Scrollable editor content */}
-                              <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="text-lg font-semibold text-white">{selectedRole.name}</p>
-                                  {selectedRole.isDefault && <Badge variant="outline">Default</Badge>}
-                                  {selectedRole.isSystem && <Badge variant="outline">System</Badge>}
-                                  <Badge variant="outline">{selectedRole.memberCount} members</Badge>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                                  <div className="space-y-2">
-                                    <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Role Name</Label>
-                                    <Input
-                                      value={roleDraft.name}
-                                      onChange={(e) => setRoleDraft({ ...roleDraft, name: e.target.value })}
-                                      className="bg-[#101a2b] border-[#304867] text-white"
-                                      disabled={!canEditSelectedRoleDetails || roleActionSaving}
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Color</Label>
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        type="color"
-                                        value={roleDraft.color}
-                                        onChange={(e) => setRoleDraft({ ...roleDraft, color: e.target.value })}
-                                        className="h-9 w-14 p-1 bg-[#101a2b] border-[#304867]"
-                                        disabled={!canEditSelectedRoleDetails || roleActionSaving}
-                                      />
-                                      <Input
-                                        value={roleDraft.color}
-                                        onChange={(e) => setRoleDraft({ ...roleDraft, color: e.target.value })}
-                                        className="bg-[#101a2b] border-[#304867] text-white"
-                                        disabled={!canEditSelectedRoleDetails || roleActionSaving}
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">Tier</Label>
-                                    <Input
-                                      type="number"
-                                      value={roleDraft.position}
-                                      onChange={(e) => setRoleDraft({ ...roleDraft, position: Number(e.target.value) })}
-                                      className="bg-[#101a2b] border-[#304867] text-white"
-                                      disabled={!canEditSelectedRoleDetails || roleActionSaving}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <p className="text-xs font-semibold uppercase text-[#a9b8cf]">Permissions</p>
-                                  <p className="text-[11px] text-[#8ea4c7]">
-                                    Reserved internal permissions are hidden from this editor.
-                                  </p>
-                                </div>
-
-                                <div className="space-y-3">
-                                  {visiblePermissionGroups.map((group) => (
-                                    <section
-                                      key={group.scope}
-                                      className="rounded-md border border-[#304867] bg-[#101a2b]"
-                                    >
-                                      <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
-                                        {group.label}
-                                      </p>
-                                      <div className="divide-y divide-[#233753]">
-                                        {group.permissions.map((permission) => {
-                                          const checked = roleDraft.permissionKeys.includes(permission.key);
-                                          return (
-                                            <label
-                                              key={permission.key}
-                                              className="flex items-start gap-3 p-3 text-sm text-[#e6edf7]"
-                                            >
-                                              <Checkbox
-                                                checked={checked}
-                                                onCheckedChange={() => toggleDraftPermission(permission.key)}
-                                                disabled={!canEditSelectedRolePermissions || roleActionSaving}
-                                              />
-                                              <span className="space-y-1">
-                                                <span className="block font-medium text-white">{permission.label}</span>
-                                                <span className="block text-xs text-[#a9b8cf]">{permission.description}</span>
-                                              </span>
-                                            </label>
-                                          );
-                                        })}
-                                      </div>
-                                    </section>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Pinned action footer */}
-                              <div className="shrink-0 flex items-center justify-between gap-3 border-t border-[#233753] px-4 py-3">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  onClick={() => void handleDeleteRole()}
-                                  disabled={!canDeleteSelectedRole || roleActionSaving}
-                                  className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
-                                >
-                                  Delete Role
-                                </Button>
-                                <Button
-                                  type="button"
-                                  onClick={() => void handleSaveRole()}
-                                  disabled={roleActionSaving || !canEditSelectedRolePermissions}
-                                  className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-                                >
-                                  {roleActionSaving ? 'Saving...' : 'Save Role'}
-                                </Button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    <RolesTab
+                      roleManagementError={roleManagementError}
+                      roleActionError={roleActionError}
+                      roleActionSaving={roleActionSaving}
+                      roleManagementLoading={roleManagementLoading}
+                      newRoleName={newRoleName}
+                      newRoleColor={newRoleColor}
+                      canManageRoles={canManageRoles}
+                      onNewNameChange={setNewRoleName}
+                      onNewColorChange={setNewRoleColor}
+                      onCreateRole={handleCreateRole}
+                      roles={roles}
+                      selectedRoleId={selectedRoleId}
+                      onSelectRole={setSelectedRoleId}
+                      roleDraft={roleDraft}
+                      onRoleDraftChange={setRoleDraft}
+                      canEditSelectedRoleDetails={canEditSelectedRoleDetails}
+                      canEditSelectedRolePermissions={
+                        canEditSelectedRolePermissions
+                      }
+                      canDeleteSelectedRole={canDeleteSelectedRole}
+                      visiblePermissionGroups={visiblePermissionGroups}
+                      onSaveRole={handleSaveRole}
+                      onDeleteRole={handleDeleteRole}
+                      toggleDraftPermission={toggleDraftPermission}
+                    />
                   </TabsContent>
 
                   {/* ════ MEMBERS ════
@@ -1052,153 +854,23 @@ export function ServerSettingsModal({
                     value="members"
                     className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3 data-[state=inactive]:hidden"
                   >
-                    <div className="shrink-0 space-y-1">
-                      <p className="text-sm text-[#a9b8cf]">
-                        Assign roles to members. Role assignments are stored in the database and enforced by
-                        role-based permission checks.
-                      </p>
-                      {roleManagementError && <p className="text-sm text-red-400">{roleManagementError}</p>}
-                      {memberActionError && <p className="text-sm text-red-400">{memberActionError}</p>}
-                    </div>
-
-                    {roleManagementLoading ? (
-                      <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
-                        <Skeleton className="h-10 w-full bg-[#22334f]" />
-                        {Array.from({ length: 4 }, (_, i) => (
-                          <div key={i} className="rounded-md border border-[#304867] bg-[#142033] p-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="space-y-2">
-                                <Skeleton className="h-4 w-32 bg-[#22334f]" />
-                                <Skeleton className="h-3 w-24 bg-[#1b2a42]" />
-                              </div>
-                              <Skeleton className="h-8 w-24 bg-[#22334f]" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex-1 min-h-0 grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
-
-                        {/* Left: search + member list */}
-                        <div className="min-h-0 flex flex-col gap-3">
-                          <Input
-                            value={memberSearch}
-                            onChange={(e) => setMemberSearch(e.target.value)}
-                            placeholder="Search community members..."
-                            className="shrink-0 bg-[#142033] border-[#304867] text-white"
-                          />
-                          <div className="min-h-0 flex-1 rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
-                            <div className="scrollbar-inset h-full overflow-y-auto p-2 space-y-1">
-                              {filteredMembers.length === 0 ? (
-                                <p className="text-sm text-[#a9b8cf] px-2 py-3">No matching members.</p>
-                              ) : (
-                                filteredMembers.map((member) => {
-                                  const isSelected = member.memberId === selectedMemberId;
-                                  return (
-                                    <button
-                                      key={member.memberId}
-                                      type="button"
-                                      onClick={() => setSelectedMemberId(member.memberId)}
-                                      className={`w-full text-left rounded-md px-2 py-2 border transition-colors ${
-                                        isSelected
-                                          ? 'border-[#3f79d8] bg-[#1a2a43]'
-                                          : 'border-transparent hover:border-[#304867] hover:bg-[#17263d]'
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="min-w-0">
-                                          <p className="text-sm font-medium text-white truncate">{member.displayName}</p>
-                                          <p className="text-[11px] text-[#8ea4c7] truncate">{member.userId}</p>
-                                        </div>
-                                        {member.isOwner && <Badge variant="outline">Owner</Badge>}
-                                      </div>
-                                    </button>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Right: member editor with pinned footer */}
-                        <div className="min-h-0 flex flex-col rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
-                          {!selectedMember ? (
-                            <p className="p-4 text-sm text-[#a9b8cf]">Select a member to assign roles.</p>
-                          ) : (
-                            <>
-                              {/* Scrollable editor content */}
-                              <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
-                                <div>
-                                  <p className="text-lg font-semibold text-white">{selectedMember.displayName}</p>
-                                  <p className="text-xs text-[#8ea4c7] mt-1">{selectedMember.userId}</p>
-                                </div>
-
-                                {selectedMember.isOwner ? (
-                                  <p className="text-xs text-[#d6a24a]">
-                                    Owner membership is fixed and cannot be changed here.
-                                  </p>
-                                ) : !canManageRoles ? (
-                                  <p className="text-xs text-[#d6a24a]">
-                                    You need Manage Roles to change member role assignments.
-                                  </p>
-                                ) : canManageMembers ? null : (
-                                  <p className="text-xs text-[#8ea4c7]">
-                                    Manage Members is available, but role assignment is controlled by Manage Roles.
-                                  </p>
-                                )}
-
-                                <div className="divide-y divide-[#233753] rounded-md border border-[#304867] overflow-hidden">
-                                  {roles.map((role) => {
-                                    const checked =
-                                      memberDraftRoleIds.includes(role.id) ||
-                                      (defaultRoleId !== null && role.id === defaultRoleId);
-                                    const disabled =
-                                      !canManageRoles ||
-                                      selectedMember.isOwner ||
-                                      role.id === defaultRoleId ||
-                                      (role.isSystem && !isOwner);
-                                    return (
-                                      <label
-                                        key={role.id}
-                                        className="flex items-center justify-between gap-3 p-3 text-sm text-[#e6edf7]"
-                                      >
-                                        <span className="flex items-center gap-2 min-w-0">
-                                          <span
-                                            className="inline-block size-2.5 rounded-full shrink-0"
-                                            style={{ backgroundColor: role.color }}
-                                            aria-hidden
-                                          />
-                                          <span className="truncate text-white">{role.name}</span>
-                                          {role.isDefault && <Badge variant="outline">Default</Badge>}
-                                          {role.isSystem && <Badge variant="outline">System</Badge>}
-                                        </span>
-                                        <Checkbox
-                                          checked={checked}
-                                          onCheckedChange={() => toggleMemberRole(role.id)}
-                                          disabled={disabled || memberActionSaving}
-                                        />
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-
-                              {/* Pinned footer */}
-                              <div className="shrink-0 flex justify-end border-t border-[#233753] px-4 py-3">
-                                <Button
-                                  type="button"
-                                  onClick={() => void handleSaveMemberRoles()}
-                                  disabled={!canManageRoles || selectedMember.isOwner || memberActionSaving}
-                                  className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-                                >
-                                  {memberActionSaving ? 'Saving...' : 'Save Member Roles'}
-                                </Button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    <MembersTab
+                      members={members}
+                      roles={roles}
+                      defaultRoleId={defaultRoleId}
+                      onSelectedMemberId={setSelectedMemberId}
+                      selectedMemberId={selectedMemberId}
+                      memberDraftRoleIds={memberDraftRoleIds}
+                      roleManagementLoading={roleManagementLoading}
+                      roleManagementError={roleManagementError}
+                      memberActionSaving={memberActionSaving}
+                      memberActionError={memberActionError}
+                      canManageMembers={canManageMembers}
+                      canManageRoles={canManageRoles}
+                      isOwner={isOwner}
+                      onToggleMemberRole={toggleMemberRole}
+                      onSaveMemberRoles={handleSaveMemberRoles}
+                    />
                   </TabsContent>
 
                   {/* ════ INVITES ════ — simple scrollable list */}
@@ -1206,100 +878,16 @@ export function ServerSettingsModal({
                     value="invites"
                     className="scrollbar-inset flex-1 min-h-0 overflow-y-auto space-y-4 data-[state=inactive]:hidden"
                   >
-                    <h3 className="text-white font-semibold">Invite Links</h3>
-                    <p className="text-sm text-[#a9b8cf]">Create and share invite links for this community.</p>
-
-                    {canManageInvites ? (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                          <Input
-                            value={inviteMaxUsesInput}
-                            onChange={(e) => setInviteMaxUsesInput(e.target.value)}
-                            placeholder="Max uses (blank = unlimited)"
-                            className="bg-[#142033] border-[#304867] text-white"
-                          />
-                          <Input
-                            value={inviteExpiryHoursInput}
-                            onChange={(e) => setInviteExpiryHoursInput(e.target.value)}
-                            placeholder="Expires in hours (blank = 1 hour)"
-                            className="bg-[#142033] border-[#304867] text-white"
-                          />
-                          <Button
-                            type="button"
-                            onClick={() => void handleCreateInvite()}
-                            disabled={inviteCreating}
-                            className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-                          >
-                            {inviteCreating ? 'Creating...' : 'Create Invite'}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-[#8ea4c7]">
-                          Invite expiry defaults to 1 hour unless you enter a different value.
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-[#d6a24a]">
-                        You can view active invites, but only members with Manage Invites can create or revoke them.
-                      </p>
-                    )}
-
-                    {inviteActionError && <p className="text-sm text-red-400">{inviteActionError}</p>}
-                    {invitesError && <p className="text-sm text-red-400">{invitesError}</p>}
-
-                    {invitesLoading ? (
-                      <div className="space-y-2">
-                        {Array.from({ length: 3 }, (_, i) => (
-                          <div key={i} className="rounded-md bg-[#142033] p-3 space-y-2">
-                            <Skeleton className="h-4 w-full bg-[#22334f]" />
-                            <Skeleton className="h-3 w-44 bg-[#1b2a42]" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : invites.length === 0 ? (
-                      <p className="text-sm text-[#a9b8cf]">No active invites.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {invites.map((invite) => (
-                          <div
-                            key={invite.id}
-                            className="bg-[#142033] rounded-md p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-white font-semibold text-sm break-all">
-                                {`${inviteBaseUrl}${invite.code}`}
-                              </p>
-                              <p className="text-xs text-[#a9b8cf] mt-1">
-                                Uses: {invite.currentUses}
-                                {invite.maxUses ? ` / ${invite.maxUses}` : ' / unlimited'}
-                                {' | '}
-                                Expires:{' '}
-                                {invite.expiresAt ? new Date(invite.expiresAt).toLocaleString() : 'never'}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => void copyInviteLink(invite.code, invite.id)}
-                                className="text-white hover:bg-[#22334f]"
-                              >
-                                {copiedInviteId === invite.id ? 'Copied' : 'Copy'}
-                              </Button>
-                              {canManageInvites && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  onClick={() => void handleRevokeInvite(invite.id)}
-                                  className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
-                                >
-                                  Revoke
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <InvitesTab
+                      canManageInvites={canManageInvites}
+                      invites={invites}
+                      invitesLoading={invitesLoading}
+                      invitesError={invitesError}
+                      inviteActionError={inviteActionError}
+                      inviteBaseUrl={inviteBaseUrl}
+                      onCreateInvite={onCreateInvite}
+                      onRevokeInvite={onRevokeInvite}
+                    />
                   </TabsContent>
 
                   {/* ════ BANS ════ — simple scrollable list */}
@@ -1307,63 +895,16 @@ export function ServerSettingsModal({
                     value="bans"
                     className="scrollbar-inset flex-1 min-h-0 overflow-y-auto space-y-4 data-[state=inactive]:hidden"
                   >
-                    <h3 className="text-white font-semibold">Banned Users</h3>
-                    <p className="text-sm text-[#a9b8cf]">
-                      Active bans for this community. Each entry includes who was banned, when, and the ban description.
-                    </p>
-
-                    {!canManageBans && (
-                      <p className="text-xs text-[#d6a24a]">
-                        You can view bans, but only members with Manage Bans can unban users.
-                      </p>
-                    )}
-
-                    {bansError && <p className="text-sm text-red-400">{bansError}</p>}
-                    {unbanActionError && <p className="text-sm text-red-400">{unbanActionError}</p>}
-
-                    {bansLoading ? (
-                      <div className="space-y-2">
-                        {Array.from({ length: 3 }, (_, i) => (
-                          <div key={i} className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3 space-y-2">
-                            <Skeleton className="h-4 w-28 bg-[#22334f]" />
-                            <Skeleton className="h-3 w-40 bg-[#1b2a42]" />
-                            <Skeleton className="h-8 w-20 bg-[#22334f]" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : bans.length === 0 ? (
-                      <p className="text-sm text-[#a9b8cf]">No active bans.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {bans.map((ban) => (
-                          <div
-                            key={ban.id}
-                            className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3 flex flex-col gap-2"
-                          >
-                            <div className="flex flex-col gap-1">
-                              <p className="text-sm font-semibold text-white">{ban.username}</p>
-                              <p className="text-[11px] text-[#8ea4c7]">
-                                Banned on {new Date(ban.bannedAt).toLocaleString()}
-                              </p>
-                            </div>
-                            <p className="text-sm text-[#d4def0] whitespace-pre-wrap">{ban.reason}</p>
-                            <div className="flex justify-end">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => void handleUnban({ targetUserId: ban.bannedUserId, username: ban.username })}
-                                disabled={!canManageBans || unbanBusyUserId === ban.bannedUserId}
-                                className="text-red-300 hover:text-red-200 hover:bg-red-900/20"
-                              >
-                                {unbanBusyUserId === ban.bannedUserId ? 'Unbanning...' : 'Unban'}
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <BansTab
+                      bans={bans}
+                      bansLoading={bansLoading}
+                      bansError={bansError}
+                      canManageBans={canManageBans}
+                      unbanBusyUserId={unbanBusyUserId}
+                      unbanActionError={unbanActionError}
+                      onUnban={handleUnban}
+                    />
                   </TabsContent>
-
                 </div>
               </Tabs>
             )}
@@ -1371,7 +912,12 @@ export function ServerSettingsModal({
 
           {/* ── Fixed footer ── */}
           <DialogFooter className="shrink-0 gap-3 border-t border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
-            <Button type="button" onClick={onClose} variant="ghost" className="text-white hover:underline">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="ghost"
+              className="text-white hover:underline"
+            >
               Close
             </Button>
           </DialogFooter>
@@ -1380,19 +926,23 @@ export function ServerSettingsModal({
 
       <AlertDialog
         open={Boolean(pendingConfirm)}
-        onOpenChange={(open) => { if (!open) setPendingConfirm(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingConfirm(null);
+        }}
       >
         <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pendingConfirm?.kind === 'deleteRole' ? 'Delete Role?' : 'Unban User?'}
+              {pendingConfirm?.kind === "deleteRole"
+                ? "Delete Role?"
+                : "Unban User?"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-[#a9b8cf]">
-              {pendingConfirm?.kind === 'deleteRole'
+              {pendingConfirm?.kind === "deleteRole"
                 ? `Delete role "${pendingConfirm.roleName}"? This cannot be undone.`
                 : pendingConfirm
                   ? `Unban "${pendingConfirm.username}" from this community?`
-                  : ''}
+                  : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1405,11 +955,17 @@ export function ServerSettingsModal({
             <AlertDialogAction
               variant="destructive"
               disabled={Boolean(pendingConfirmBusy)}
-              onClick={() => { void confirmPendingAction(); }}
+              onClick={() => {
+                void confirmPendingAction();
+              }}
             >
               {pendingConfirmBusy
-                ? pendingConfirm?.kind === 'deleteRole' ? 'Deleting...' : 'Unbanning...'
-                : pendingConfirm?.kind === 'deleteRole' ? 'Delete Role' : 'Unban'}
+                ? pendingConfirm?.kind === "deleteRole"
+                  ? "Deleting..."
+                  : "Unbanning..."
+                : pendingConfirm?.kind === "deleteRole"
+                  ? "Delete Role"
+                  : "Unban"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

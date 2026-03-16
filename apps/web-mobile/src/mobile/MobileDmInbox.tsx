@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2, RefreshCcw, BellOff, PencilLine } from 'lucide-react';
 import type { DirectMessageConversationSummary } from '@shared/lib/backend/types';
+import { DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT } from '@shared/lib/backend/directMessageUtils';
 
 interface MobileDmInboxProps {
   conversations: DirectMessageConversationSummary[];
@@ -116,7 +117,8 @@ export function MobileDmInbox({
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <p className={`text-xs truncate ${hasUnread ? 'text-gray-300' : 'text-gray-500'}`}>
-                      {convo.lastMessagePreview ?? 'No messages yet'}
+                      {convo.lastMessagePreview ??
+                        (convo.lastMessageId ? DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT : 'No messages yet')}
                     </p>
                     {hasUnread && (
                       <span className="min-w-[18px] h-[18px] rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0 leading-none">

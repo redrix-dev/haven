@@ -5,6 +5,11 @@ import { centralSocialBackend } from '@shared/lib/backend/socialBackend';
 import { loadBootstrappedTestUsers } from '@test-support/fixtures/users';
 import { resetFixtureDomainState, signInAsTestUser, signOutTestUser } from '@test-support/setup/supabaseLocal';
 
+const createTestImageFile = () =>
+  new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'dm-moderation-test.png', {
+    type: 'image/png',
+  });
+
 async function ensureDmReportFixture(memberAUsername: string) {
   await signInAsTestUser('member_b');
   try {
@@ -26,8 +31,12 @@ async function ensureDmReportFixture(memberAUsername: string) {
   const conversationId = await centralDirectMessageBackend.getOrCreateDirectConversation(loadBootstrappedTestUsers().member_b.id);
   const sent = await centralDirectMessageBackend.sendMessage({
     conversationId,
-    content: 'Message for moderation backend contract test',
+    content: '',
     metadata: {},
+    imageUpload: {
+      file: createTestImageFile(),
+      expiresInHours: 24,
+    },
   });
 
   await signInAsTestUser('member_b');
@@ -63,12 +72,18 @@ describe.sequential('ModerationBackend (contract)', () => {
     const reports = await centralModerationBackend.listDmMessageReportsForReview({ limit: 50 });
     const target = reports.find((report) => report.reportId === fixture.reportId);
     expect(target).toBeTruthy();
+    expect(target?.messagePreview).toBe('Sent an image');
 
     const detail = await centralModerationBackend.getDmMessageReportDetail(fixture.reportId);
     expect(detail?.messageId).toBe(fixture.messageId);
+    expect(detail?.messageAttachments).toHaveLength(1);
+    expect(detail?.messageAttachments[0]?.signedUrl).toBeTruthy();
 
     const context = await centralModerationBackend.listDmMessageContext({ messageId: fixture.messageId, before: 5, after: 5 });
     expect(context.some((row) => row.messageId === fixture.messageId && row.isTarget)).toBe(true);
+    const targetContextRow = context.find((row) => row.messageId === fixture.messageId);
+    expect(targetContextRow?.attachments).toHaveLength(1);
+    expect(targetContextRow?.attachments[0]?.signedUrl).toBeTruthy();
 
     const assigned = await centralModerationBackend.assignDmMessageReport({
       reportId: fixture.reportId,

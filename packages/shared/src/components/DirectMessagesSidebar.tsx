@@ -5,6 +5,7 @@ import { Button } from '@shared/components/ui/button';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import type { DirectMessageConversationSummary } from '@shared/lib/backend/types';
+import { DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT } from '@shared/lib/backend/directMessageUtils';
 import { MessageCircle, RefreshCcw, VolumeX } from 'lucide-react';
 
 const DM_SIDEBAR_BASE_MIN_WIDTH = 280;
@@ -175,7 +176,10 @@ export function DirectMessagesSidebar({
               const isSelected = conversation.conversationId === selectedConversationId;
               const title = conversation.otherUsername ?? 'Direct Message';
               const preview =
-                conversation.lastMessagePreview?.trim() || 'No messages yet. Start the conversation.';
+                conversation.lastMessagePreview?.trim() ||
+                (conversation.lastMessageId
+                  ? DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT
+                  : 'No messages yet. Start the conversation.');
               return (
                 <button
                   key={conversation.conversationId}

@@ -646,6 +646,392 @@ export type Database = {
           },
         ]
       }
+      dm_conversation_members: {
+        Row: {
+          conversation_id: string
+          hidden_at: string | null
+          joined_at: string
+          last_read_at: string | null
+          left_at: string | null
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          hidden_at?: string | null
+          joined_at?: string
+          last_read_at?: string | null
+          left_at?: string | null
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          hidden_at?: string | null
+          joined_at?: string
+          last_read_at?: string | null
+          left_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_conversation_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "dm_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversation_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_conversation_notification_preferences: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          in_app_override: boolean | null
+          muted_until: string | null
+          sound_override: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          in_app_override?: boolean | null
+          muted_until?: string | null
+          sound_override?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          in_app_override?: boolean | null
+          muted_until?: string | null
+          sound_override?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_conversation_notification_preferences_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "dm_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversation_notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_conversations: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          direct_user_high_id: string | null
+          direct_user_low_id: string | null
+          id: string
+          kind: Database["public"]["Enums"]["dm_conversation_kind"]
+          last_message_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          direct_user_high_id?: string | null
+          direct_user_low_id?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["dm_conversation_kind"]
+          last_message_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          direct_user_high_id?: string | null
+          direct_user_low_id?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["dm_conversation_kind"]
+          last_message_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_conversations_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_direct_user_high_id_fkey"
+            columns: ["direct_user_high_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_direct_user_low_id_fkey"
+            columns: ["direct_user_low_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_message_attachments: {
+        Row: {
+          bucket_name: string
+          conversation_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          media_kind: string
+          message_id: string
+          mime_type: string
+          object_path: string
+          original_filename: string | null
+          owner_user_id: string
+          size_bytes: number
+        }
+        Insert: {
+          bucket_name?: string
+          conversation_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          media_kind: string
+          message_id: string
+          mime_type: string
+          object_path: string
+          original_filename?: string | null
+          owner_user_id: string
+          size_bytes: number
+        }
+        Update: {
+          bucket_name?: string
+          conversation_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          media_kind?: string
+          message_id?: string
+          mime_type?: string
+          object_path?: string
+          original_filename?: string | null
+          owner_user_id?: string
+          size_bytes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_message_attachments_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "dm_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "dm_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_message_attachments_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_message_report_actions: {
+        Row: {
+          acted_by_user_id: string
+          action_type: string
+          created_at: string
+          id: string
+          metadata: Json
+          notes: string | null
+          report_id: string
+        }
+        Insert: {
+          acted_by_user_id: string
+          action_type: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          report_id: string
+        }
+        Update: {
+          acted_by_user_id?: string
+          action_type?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          report_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_message_report_actions_acted_by_user_id_fkey"
+            columns: ["acted_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_message_report_actions_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "dm_message_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_message_reports: {
+        Row: {
+          assigned_at: string | null
+          assigned_to_user_id: string | null
+          comment: string
+          conversation_id: string
+          created_at: string
+          id: string
+          kind: string
+          message_id: string
+          reported_user_id: string
+          reporter_user_id: string
+          resolution_notes: string | null
+          status: Database["public"]["Enums"]["dm_message_report_status"]
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_to_user_id?: string | null
+          comment: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          message_id: string
+          reported_user_id: string
+          reporter_user_id: string
+          resolution_notes?: string | null
+          status?: Database["public"]["Enums"]["dm_message_report_status"]
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_to_user_id?: string | null
+          comment?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          message_id?: string
+          reported_user_id?: string
+          reporter_user_id?: string
+          resolution_notes?: string | null
+          status?: Database["public"]["Enums"]["dm_message_report_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_message_reports_assigned_to_user_id_fkey"
+            columns: ["assigned_to_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_message_reports_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "dm_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_message_reports_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "dm_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_message_reports_reported_user_id_fkey"
+            columns: ["reported_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_message_reports_reporter_user_id_fkey"
+            columns: ["reporter_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_messages: {
+        Row: {
+          author_user_id: string
+          content: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          author_user_id: string
+          content: string
+          conversation_id: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          author_user_id?: string
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_messages_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "dm_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           code: string
@@ -1604,6 +1990,31 @@ export type Database = {
         Returns: number
       }
       delete_own_account: { Args: never; Returns: undefined }
+      add_dm_message_report_action: {
+        Args: {
+          p_action_type: string
+          p_metadata?: Json
+          p_notes?: string
+          p_report_id: string
+        }
+        Returns: string
+      }
+      assign_dm_message_report: {
+        Args: {
+          p_assignee_user_id?: string
+          p_notes?: string
+          p_report_id: string
+        }
+        Returns: boolean
+      }
+      can_send_dm_in_conversation: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      cleanup_expired_dm_message_attachments: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       enqueue_link_preview_jobs_for_messages: {
         Args: { p_message_ids: string[]; p_reason?: string }
         Returns: {
@@ -1612,11 +2023,55 @@ export type Database = {
         }[]
       }
       extract_first_http_url: { Args: { p_content: string }; Returns: string }
+      get_dm_message_report_detail: {
+        Args: { p_report_id: string }
+        Returns: {
+          assigned_at: string | null
+          assigned_to_user_id: string | null
+          assigned_to_username: string | null
+          comment: string
+          conversation_id: string
+          created_at: string
+          kind: string
+          message_attachments: Json
+          message_author_avatar_url: string | null
+          message_author_user_id: string
+          message_author_username: string | null
+          message_content: string
+          message_created_at: string
+          message_deleted_at: string | null
+          message_edited_at: string | null
+          message_id: string
+          message_metadata: Json
+          report_id: string
+          reported_avatar_url: string | null
+          reported_user_id: string
+          reported_username: string | null
+          reporter_avatar_url: string | null
+          reporter_user_id: string
+          reporter_username: string | null
+          resolution_notes: string | null
+          status: Database["public"]["Enums"]["dm_message_report_status"]
+          updated_at: string
+        }[]
+      }
+      get_or_create_direct_dm_conversation: {
+        Args: { p_other_user_id: string }
+        Returns: string
+      }
       is_community_member: {
         Args: { p_community_id: string }
         Returns: boolean
       }
       is_community_owner: { Args: { p_community_id: string }; Returns: boolean }
+      is_dm_conversation_member: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      is_haven_moderator: {
+        Args: { p_user_id?: string }
+        Returns: boolean
+      }
       is_platform_staff: { Args: { p_user_id?: string }; Returns: boolean }
       list_bannable_shared_communities: {
         Args: { p_target_user_id: string }
@@ -1625,9 +2080,115 @@ export type Database = {
           community_name: string
         }[]
       }
+      list_dm_message_context: {
+        Args: { p_after?: number; p_before?: number; p_message_id: string }
+        Returns: {
+          attachments: Json
+          author_avatar_url: string | null
+          author_user_id: string
+          author_username: string | null
+          content: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          is_target: boolean
+          message_id: string
+          metadata: Json
+        }[]
+      }
+      list_dm_message_report_actions: {
+        Args: { p_report_id: string }
+        Returns: {
+          acted_by_avatar_url: string | null
+          acted_by_user_id: string
+          acted_by_username: string | null
+          action_id: string
+          action_type: string
+          created_at: string
+          metadata: Json
+          notes: string | null
+          report_id: string
+        }[]
+      }
+      list_dm_message_reports_for_review: {
+        Args: {
+          p_before_created_at?: string
+          p_before_report_id?: string
+          p_limit?: number
+          p_statuses?: Database["public"]["Enums"]["dm_message_report_status"][]
+        }
+        Returns: {
+          assigned_at: string | null
+          assigned_to_user_id: string | null
+          assigned_to_username: string | null
+          comment: string
+          conversation_id: string
+          created_at: string
+          kind: string
+          message_created_at: string | null
+          message_deleted_at: string | null
+          message_id: string
+          message_preview: string | null
+          report_id: string
+          reported_avatar_url: string | null
+          reported_user_id: string
+          reported_username: string | null
+          reporter_avatar_url: string | null
+          reporter_user_id: string
+          reporter_username: string | null
+          status: Database["public"]["Enums"]["dm_message_report_status"]
+          updated_at: string
+        }[]
+      }
+      list_dm_messages: {
+        Args: {
+          p_before_created_at?: string
+          p_before_message_id?: string
+          p_conversation_id: string
+          p_limit?: number
+        }
+        Returns: {
+          attachments: Json
+          author_avatar_url: string | null
+          author_user_id: string
+          author_username: string
+          content: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          message_id: string
+          metadata: Json
+        }[]
+      }
+      list_my_dm_conversations: {
+        Args: never
+        Returns: {
+          conversation_id: string
+          created_at: string
+          is_muted: boolean
+          kind: Database["public"]["Enums"]["dm_conversation_kind"]
+          last_message_at: string | null
+          last_message_author_user_id: string | null
+          last_message_created_at: string | null
+          last_message_id: string | null
+          last_message_preview: string | null
+          muted_until: string | null
+          other_avatar_url: string | null
+          other_user_id: string | null
+          other_username: string | null
+          unread_count: number
+          updated_at: string
+        }[]
+      }
       member_highest_role_position: {
         Args: { p_community_id: string; p_member_id: string }
         Returns: number
+      }
+      mark_dm_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
       }
       post_haven_dev_message: {
         Args: {
@@ -1655,6 +2216,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      report_dm_message: {
+        Args: { p_comment: string; p_kind: string; p_message_id: string }
+        Returns: string
+      }
       redeem_community_invite: {
         Args: { p_code: string }
         Returns: {
@@ -1662,6 +2227,38 @@ export type Database = {
           community_name: string
           joined: boolean
         }[]
+      }
+      resolve_dm_notification_delivery_for_user: {
+        Args: { p_conversation_id: string; p_recipient_user_id: string }
+        Returns: {
+          deliver_in_app: boolean
+          deliver_sound: boolean
+        }[]
+      }
+      send_dm_message: {
+        Args: {
+          p_content: string
+          p_conversation_id: string
+          p_image_attachment?: Json
+          p_metadata?: Json
+        }
+        Returns: {
+          attachments: Json
+          author_avatar_url: string | null
+          author_user_id: string
+          author_username: string
+          content: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          message_id: string
+          metadata: Json
+        }[]
+      }
+      set_dm_conversation_muted: {
+        Args: { p_conversation_id: string; p_muted: boolean }
+        Returns: boolean
       }
       set_haven_background_cron_config: {
         Args: {
@@ -1698,6 +2295,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_dm_message_report_status: {
+        Args: {
+          p_notes?: string
+          p_report_id: string
+          p_status: Database["public"]["Enums"]["dm_message_report_status"]
+        }
+        Returns: boolean
+      }
       user_has_permission: {
         Args: { p_community_id: string; p_permission_key: string }
         Returns: boolean
@@ -1707,6 +2312,14 @@ export type Database = {
       channel_kind: "text" | "voice"
       community_backend_kind: "central_supabase" | "byo_supabase" | "byo_rest"
       developer_access_mode: "report_only" | "channel_scoped"
+      dm_conversation_kind: "direct" | "group"
+      dm_message_report_status:
+        | "open"
+        | "triaged"
+        | "in_review"
+        | "resolved_actioned"
+        | "resolved_no_action"
+        | "dismissed"
       link_embed_provider: "none" | "youtube" | "vimeo"
       link_preview_status: "pending" | "ready" | "unsupported" | "failed"
       message_author_type: "user" | "haven_dev" | "system"
@@ -1844,6 +2457,15 @@ export const Constants = {
       channel_kind: ["text", "voice"],
       community_backend_kind: ["central_supabase", "byo_supabase", "byo_rest"],
       developer_access_mode: ["report_only", "channel_scoped"],
+      dm_conversation_kind: ["direct", "group"],
+      dm_message_report_status: [
+        "open",
+        "triaged",
+        "in_review",
+        "resolved_actioned",
+        "resolved_no_action",
+        "dismissed",
+      ],
       link_embed_provider: ["none", "youtube", "vimeo"],
       link_preview_status: ["pending", "ready", "unsupported", "failed"],
       message_author_type: ["user", "haven_dev", "system"],
