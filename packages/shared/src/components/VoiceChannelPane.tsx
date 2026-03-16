@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@shared/lib/supabase';
 import { fetchIceConfig } from '@shared/lib/voice/ice';
 import { matchesVoicePushToTalkBinding } from '@shared/lib/voice/pushToTalk';
+import { useVoiceMemberVolumes } from '@client/features/voice/hooks/useVoiceMemberVolumes';
 import { getErrorMessage } from '@platform/lib/errors';
 import type { VoiceSettings } from '@platform/desktop/types';
 import { Badge } from '@shared/components/ui/badge';
@@ -19,7 +20,7 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { Toggle } from '@shared/components/ui/toggle';
-import { Headphones, Mic, MicOff, PhoneCall, PhoneOff, RefreshCcw, Volume2 } from 'lucide-react';
+import { Headphones, Mic, MicOff, PhoneCall, PhoneOff, RefreshCcw, RotateCcw, Volume2 } from 'lucide-react';
 
 type VoiceSignalEvent = 'offer' | 'answer' | 'ice';
 
@@ -138,7 +139,6 @@ export function VoiceChannelPane({
   const [joining, setJoining] = useState(false);
   const [participants, setParticipants] = useState<VoiceParticipant[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
-  const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>({});
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -187,6 +187,13 @@ export function VoiceChannelPane({
     () => participants.map((participant) => participant.userId),
     [participants]
   );
+  const {
+    remoteVolumes,
+    setMemberVolume,
+    resetMemberVolume,
+    resetAllMemberVolumes,
+    getMemberVolume,
+  } = useVoiceMemberVolumes(communityId, channelId, remoteParticipantIds);
   const diagnosticsRows = useMemo(
     () => Object.values(peerDiagnostics).sort((a, b) => a.displayName.localeCompare(b.displayName)),
     [peerDiagnostics]
@@ -367,12 +374,6 @@ export function VoiceChannelPane({
       return next;
     });
 
-    setRemoteVolumes((prev) => {
-      if (!(remoteUserId in prev)) return prev;
-      const next = { ...prev };
-      delete next[remoteUserId];
-      return next;
-    });
     setPeerDiagnostics((prev) => {
       if (!(remoteUserId in prev)) return prev;
       const next = { ...prev };
@@ -829,7 +830,6 @@ export function VoiceChannelPane({
 
     setParticipants([]);
     setRemoteStreams({});
-    setRemoteVolumes({});
     setPeerDiagnostics({});
     setJoined(false);
     setJoining(false);
@@ -1080,29 +1080,6 @@ export function VoiceChannelPane({
       clearPressed();
     };
   }, [voiceSettings.pushToTalkBinding, voiceSettings.transmissionMode]);
-
-  useEffect(() => {
-    setRemoteVolumes((prev) => {
-      let changed = false;
-      const next = { ...prev };
-
-      for (const participant of participants) {
-        if (typeof next[participant.userId] !== 'number') {
-          next[participant.userId] = 100;
-          changed = true;
-        }
-      }
-
-      for (const existingUserId of Object.keys(next)) {
-        if (!remoteParticipantIds.includes(existingUserId)) {
-          delete next[existingUserId];
-          changed = true;
-        }
-      }
-
-      return changed ? next : prev;
-    });
-  }, [participants, remoteParticipantIds]);
 
   useEffect(() => {
     for (const [remoteUserId, audioElement] of Object.entries(audioElementRefs.current)) {
@@ -1572,43 +1549,66 @@ export function VoiceChannelPane({
           {participants.length === 0 ? (
             <p className="text-sm text-[#a9b8cf]">No other participants are connected.</p>
           ) : (
-            participants.map((participant) => (
-              <div
-                key={participant.userId}
-                className="flex items-center justify-between rounded-md border border-[#304867] bg-[#142033] px-3 py-2 gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{participant.displayName}</p>
-                  <div className="mt-1 flex items-center gap-2">
-                    {participant.muted && <Badge variant="outline">Muted</Badge>}
-                    {participant.deafened && <Badge variant="outline">Deafened</Badge>}
+            <>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetAllMemberVolumes}
+                  className="h-8 text-xs text-[#c8d7ee] hover:text-white"
+                  disabled={isDeafened}
+                >
+                  <RotateCcw className="mr-1.5 size-3.5" />
+                  Reset all member volumes
+                </Button>
+              </div>
+
+              {participants.map((participant) => (
+                <div
+                  key={participant.userId}
+                  className="flex items-center justify-between rounded-md border border-[#304867] bg-[#142033] px-3 py-2 gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{participant.displayName}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      {participant.muted && <Badge variant="outline">Muted</Badge>}
+                      {participant.deafened && <Badge variant="outline">Deafened</Badge>}
+                    </div>
+                  </div>
+
+                  <div className="flex min-w-[220px] items-center gap-3">
+                    <Volume2 className="size-4 text-[#a9b8cf]" />
+                    <Slider
+                      min={REMOTE_VOLUME_OPTIONS[0]}
+                      max={REMOTE_VOLUME_OPTIONS[REMOTE_VOLUME_OPTIONS.length - 1]}
+                      step={25}
+                      value={[getMemberVolume(participant.userId)]}
+                      onValueChange={(values) => {
+                        const numericValue = values[0];
+                        setMemberVolume(participant.userId, numericValue);
+                      }}
+                      disabled={isDeafened}
+                      className="w-full"
+                      aria-label={`Volume for ${participant.displayName}`}
+                    />
+                    <span className="w-10 shrink-0 text-right text-xs text-[#c8d7ee]">
+                      {getMemberVolume(participant.userId)}%
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => resetMemberVolume(participant.userId)}
+                      disabled={isDeafened}
+                      className="h-8 px-2 text-xs"
+                    >
+                      100%
+                    </Button>
                   </div>
                 </div>
-
-                <div className="flex min-w-[180px] items-center gap-3">
-                  <Volume2 className="size-4 text-[#a9b8cf]" />
-                  <Slider
-                    min={REMOTE_VOLUME_OPTIONS[0]}
-                    max={REMOTE_VOLUME_OPTIONS[REMOTE_VOLUME_OPTIONS.length - 1]}
-                    step={25}
-                    value={[remoteVolumes[participant.userId] ?? 100]}
-                    onValueChange={(values) => {
-                      const numericValue = values[0];
-                      setRemoteVolumes((prev) => ({
-                        ...prev,
-                        [participant.userId]: Number.isFinite(numericValue) ? numericValue : 100,
-                      }));
-                    }}
-                    disabled={isDeafened}
-                    className="w-full"
-                    aria-label={`Volume for ${participant.displayName}`}
-                  />
-                  <span className="w-10 shrink-0 text-right text-xs text-[#c8d7ee]">
-                    {remoteVolumes[participant.userId] ?? 100}%
-                  </span>
-                </div>
-              </div>
-            ))
+              ))}
+            </>
           )}
         </CardContent>
       </Card>
@@ -1641,4 +1641,3 @@ export function VoiceChannelPane({
     </div>
   );
 }
-
