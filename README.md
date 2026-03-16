@@ -151,3 +151,13 @@ Use this repo as a doc hub, not just a README.
   - Web push shadow/wakeup cutover and rollback runbook
 - `docs/users/web-and-mobile-install.md`
   - User-facing install and notification setup guide (web/PWA)
+
+## License
+
+Haven is source-available software, not open source. The source is 
+inspectable and contributions are welcome, but commercial use, competing 
+platforms, and hosted clones are not permitted without a commercial license.
+
+See [LICENSE.md](./LICENSE.md) for full terms.
+
+For licensing inquiries: legal@redrixx.com
