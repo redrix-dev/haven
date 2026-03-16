@@ -21,8 +21,13 @@ import type {
   DmMessageReportStatus,
   DmMessageReportSummary,
 } from '@shared/lib/backend/types';
+import {
+  DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT,
+  getVisibleDirectMessageText,
+} from '@shared/lib/backend/directMessageUtils';
 import { getErrorMessage } from '@platform/lib/errors';
 import { RefreshCcw, ShieldAlert } from 'lucide-react';
+import { MarkdownText } from '@shared/lib/markdownRenderer';
 
 type Props = {
   open: boolean;
@@ -42,8 +47,15 @@ const STATUS_OPTIONS: Array<{ value: DmMessageReportStatus; label: string }> = [
   { value: 'dismissed', label: 'Dismissed' },
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const fmt = (value: string | null) => {
   if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
+};
+
+const safeFmt = (value: string | null) => {
+  if (!value) return '-';
   const date = new Date(value);
   return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
 };
@@ -68,6 +80,9 @@ const statusBadgeClass = (status: DmMessageReportStatus) => {
       return 'border-[#304867] text-[#cfe0ff]';
   }
 };
+
+const getAttachmentLabel = (objectPath: string, originalFilename: string | null): string =>
+  originalFilename ?? objectPath.split('/').pop() ?? 'image';
 
 export function DmReportReviewPanel({
   open,
@@ -303,7 +318,7 @@ export function DmReportReviewPanel({
                           Reporter: {row.reporterUsername || row.reporterUserId}
                         </p>
                         <p className="mt-1 text-xs text-[#8ea4c7]">
-                          {fmt(row.createdAt)} | {row.assignedToUsername ? `Assigned: ${row.assignedToUsername}` : 'Unassigned'}
+                          {safeFmt(row.createdAt)} | {row.assignedToUsername ? `Assigned: ${row.assignedToUsername}` : 'Unassigned'}
                         </p>
                         <p className="mt-2 text-xs text-[#dbe7f8] whitespace-pre-wrap break-words">
                           {row.comment}
@@ -353,7 +368,7 @@ export function DmReportReviewPanel({
                           Reporter: {detail.reporterUsername || detail.reporterUserId} | Reported: {detail.reportedUsername || detail.reportedUserId}
                         </p>
                         <p className="text-xs text-[#a9b8cf]">
-                          Assigned: {detail.assignedToUsername || 'Unassigned'} | Updated: {fmt(detail.updatedAt)}
+                          Assigned: {detail.assignedToUsername || 'Unassigned'} | Updated: {safeFmt(detail.updatedAt)}
                         </p>
                         <div className="rounded border border-[#2a3f60] bg-[#101a2b] p-2">
                           <p className="text-xs uppercase tracking-wide text-[#97acd0]">Report Comment</p>
@@ -370,10 +385,55 @@ export function DmReportReviewPanel({
                       <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-2">
                         <p className="text-sm font-semibold text-white">Reported Message + Context</p>
                         <p className="text-xs text-[#a9b8cf]">
-                          Author: {detail.messageAuthorUsername || detail.messageAuthorUserId} | {fmt(detail.messageCreatedAt)}
+                          Author: {detail.messageAuthorUsername || detail.messageAuthorUserId} | {safeFmt(detail.messageCreatedAt)}
                         </p>
                         <div className="rounded border border-[#2a3f60] bg-[#101a2b] p-2">
-                          <p className="whitespace-pre-wrap break-words text-sm text-[#dbe7f8]">{detail.messageContent}</p>
+                          {getVisibleDirectMessageText(
+                            detail.messageContent,
+                            detail.messageAttachments.length
+                          ) ? (
+                            <div className="text-sm text-[#dbe7f8]">
+                              <MarkdownText
+                                content={
+                                  getVisibleDirectMessageText(
+                                    detail.messageContent,
+                                    detail.messageAttachments.length
+                                  ) ?? ''
+                                }
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-sm text-[#8ea4c7]">{DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT}</p>
+                          )}
+                          {detail.messageAttachments.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {detail.messageAttachments.map((attachment) => {
+                                const attachmentLabel = getAttachmentLabel(
+                                  attachment.objectPath,
+                                  attachment.originalFilename
+                                );
+
+                                return (
+                                  <div key={attachment.id} className="space-y-1">
+                                    {attachment.signedUrl ? (
+                                      <img
+                                        src={attachment.signedUrl}
+                                        alt={attachmentLabel}
+                                        className="max-h-80 rounded-md border border-[#304867] bg-[#0d1626] object-contain"
+                                      />
+                                    ) : (
+                                      <div className="rounded-md border border-dashed border-[#304867] bg-[#0d1626] px-3 py-2 text-xs text-[#a9b8cf]">
+                                        Image unavailable
+                                      </div>
+                                    )}
+                                    <p className="text-[11px] text-[#8ea4c7]">
+                                      {attachmentLabel} | Expires {safeFmt(attachment.expiresAt)}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-2">
                           {context.map((message) => (
@@ -387,16 +447,57 @@ export function DmReportReviewPanel({
                                 <span className="text-xs font-semibold text-white">
                                   {message.authorUsername || message.authorUserId}
                                 </span>
-                                <span className="text-[11px] text-[#8ea4c7]">{fmt(message.createdAt)}</span>
+                                <span className="text-[11px] text-[#8ea4c7]">{safeFmt(message.createdAt)}</span>
                                 {message.isTarget && (
                                   <Badge variant="outline" className="border-[#5b92e8] text-[#cce0ff]">
                                     Reported
                                   </Badge>
                                 )}
                               </div>
-                              <p className="mt-1 whitespace-pre-wrap break-words text-xs text-[#dbe7f8]">
-                                {message.content}
-                              </p>
+                              {getVisibleDirectMessageText(message.content, message.attachments.length) ? (
+                                <div className="mt-1 text-xs text-[#dbe7f8]">
+                                  <MarkdownText
+                                    content={
+                                      getVisibleDirectMessageText(
+                                        message.content,
+                                        message.attachments.length
+                                      ) ?? ''
+                                    }
+                                  />
+                                </div>
+                              ) : (
+                                <p className="mt-1 text-xs text-[#8ea4c7]">
+                                  {message.attachments.length > 0
+                                    ? DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT
+                                    : ''}
+                                </p>
+                              )}
+                              {message.attachments.length > 0 && (
+                                <div className="mt-2 space-y-2">
+                                  {message.attachments.map((attachment) => {
+                                    const attachmentLabel = getAttachmentLabel(
+                                      attachment.objectPath,
+                                      attachment.originalFilename
+                                    );
+
+                                    return (
+                                      <div key={attachment.id} className="space-y-1">
+                                        {attachment.signedUrl ? (
+                                          <img
+                                            src={attachment.signedUrl}
+                                            alt={attachmentLabel}
+                                            className="max-h-64 rounded-md border border-[#304867] bg-[#0d1626] object-contain"
+                                          />
+                                        ) : (
+                                          <div className="rounded-md border border-dashed border-[#304867] bg-[#0d1626] px-3 py-2 text-[11px] text-[#a9b8cf]">
+                                            Image unavailable
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           ))}
                           {context.length === 0 && <p className="text-sm text-[#a9b8cf]">No context available.</p>}
@@ -545,7 +646,7 @@ export function DmReportReviewPanel({
                                 <span className="text-xs text-[#dbe7f8]">
                                   {action.actedByUsername || action.actedByUserId}
                                 </span>
-                                <span className="text-[11px] text-[#8ea4c7]">{fmt(action.createdAt)}</span>
+                                <span className="text-[11px] text-[#8ea4c7]">{safeFmt(action.createdAt)}</span>
                               </div>
                               {action.notes && (
                                 <p className="mt-1 whitespace-pre-wrap break-words text-sm text-[#dbe7f8]">

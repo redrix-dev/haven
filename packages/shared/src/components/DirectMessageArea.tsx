@@ -18,11 +18,26 @@ import { Textarea } from '@shared/components/ui/textarea';
 import { DmReportModal, type DmReportTarget } from '@shared/components/DmReportModal';
 import type {
   DirectMessage,
+  DirectMessageAttachment,
   DirectMessageConversationSummary,
   DirectMessageReportKind,
 } from '@shared/lib/backend/types';
-import { Flag, RefreshCcw, Send, ShieldBan, Volume2, VolumeX } from 'lucide-react';
+import {
+  Flag,
+  ImagePlus,
+  RefreshCcw,
+  Send,
+  ShieldBan,
+  Volume2,
+  VolumeX,
+  X,
+} from 'lucide-react';
 import { MarkdownText } from '@shared/lib/markdownRenderer';
+import {
+  DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT,
+  getDirectMessagePreviewText,
+  getVisibleDirectMessageText,
+} from '@shared/lib/backend/directMessageUtils';
 
 type DirectMessageAreaProps = {
   currentUserId: string;
@@ -34,10 +49,20 @@ type DirectMessageAreaProps = {
   refreshing?: boolean;
   error: string | null;
   onRefresh: () => void;
-  onSendMessage: (content: string) => Promise<void>;
+  onSendMessage: (
+    content: string,
+    options?: {
+      imageFile?: File;
+      imageExpiresInHours?: number;
+    }
+  ) => Promise<void>;
   onToggleMute: (muted: boolean) => Promise<void>;
   onBlockUser: (input: { userId: string; username: string }) => Promise<void>;
-  onReportMessage: (input: { messageId: string; kind: DirectMessageReportKind; comment: string }) => Promise<void>;
+  onReportMessage: (input: {
+    messageId: string;
+    kind: DirectMessageReportKind;
+    comment: string;
+  }) => Promise<void>;
 };
 
 const formatTimestamp = (value: string) => {
@@ -77,6 +102,9 @@ const getUiErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const getAttachmentLabel = (attachment: DirectMessageAttachment): string =>
+  attachment.originalFilename ?? attachment.objectPath.split('/').pop() ?? 'image';
+
 export function DirectMessageArea({
   currentUserId,
   currentUserDisplayName,
@@ -97,11 +125,27 @@ export function DirectMessageArea({
   const [actionNotice, setActionNotice] = React.useState<string | null>(null);
   const [blockingUser, setBlockingUser] = React.useState(false);
   const [reportTarget, setReportTarget] = React.useState<DmReportTarget | null>(null);
+  const [imageAttachment, setImageAttachment] = React.useState<{
+    file: File;
+    previewUrl: string;
+  } | null>(null);
+  const [imageExpiresInHours, setImageExpiresInHours] = React.useState(24);
   const [pendingBlockConfirm, setPendingBlockConfirm] = React.useState<{
     userId: string;
     username: string;
   } | null>(null);
+  const imageInputRef = React.useRef<HTMLInputElement | null>(null);
   const scrollAreaRootRef = React.useRef<HTMLDivElement | null>(null);
+
+  const clearImageAttachment = React.useCallback(() => {
+    setImageAttachment((previousValue) => {
+      if (previousValue) {
+        URL.revokeObjectURL(previousValue.previewUrl);
+      }
+      return null;
+    });
+    setImageExpiresInHours(24);
+  }, []);
 
   React.useEffect(() => {
     setDraft('');
@@ -110,7 +154,15 @@ export function DirectMessageArea({
     setBlockingUser(false);
     setReportTarget(null);
     setPendingBlockConfirm(null);
-  }, [conversation?.conversationId]);
+    clearImageAttachment();
+  }, [clearImageAttachment, conversation?.conversationId]);
+
+  React.useEffect(
+    () => () => {
+      clearImageAttachment();
+    },
+    [clearImageAttachment]
+  );
 
   React.useEffect(() => {
     const viewport = scrollAreaRootRef.current?.querySelector<HTMLDivElement>(
@@ -122,14 +174,18 @@ export function DirectMessageArea({
 
   const handleSend = async () => {
     const next = draft.trim();
-    if (!next || !conversation) return;
+    if ((!next && !imageAttachment) || !conversation) return;
     setActionError(null);
     setActionNotice(null);
     try {
-      await onSendMessage(next);
+      await onSendMessage(next, {
+        imageFile: imageAttachment?.file,
+        imageExpiresInHours: imageAttachment ? imageExpiresInHours : undefined,
+      });
       setDraft('');
-    } catch (error) {
-      setActionError(getUiErrorMessage(error, 'Failed to send DM.'));
+      clearImageAttachment();
+    } catch (sendError) {
+      setActionError(getUiErrorMessage(sendError, 'Failed to send DM.'));
     }
   };
 
@@ -137,6 +193,23 @@ export function DirectMessageArea({
     if (event.key !== 'Enter' || event.shiftKey) return;
     event.preventDefault();
     void handleSend();
+  };
+
+  const handleSelectImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextFile = event.target.files?.[0] ?? null;
+    event.currentTarget.value = '';
+    if (!nextFile) return;
+
+    setImageAttachment((previousValue) => {
+      if (previousValue) {
+        URL.revokeObjectURL(previousValue.previewUrl);
+      }
+      return {
+        file: nextFile,
+        previewUrl: URL.createObjectURL(nextFile),
+      };
+    });
+    setActionError(null);
   };
 
   const handleBlockUser = () => {
@@ -162,8 +235,8 @@ export function DirectMessageArea({
         username,
       });
       setActionNotice(`Blocked ${username}.`);
-    } catch (error) {
-      setActionError(getUiErrorMessage(error, 'Failed to block user.'));
+    } catch (blockError) {
+      setActionError(getUiErrorMessage(blockError, 'Failed to block user.'));
     } finally {
       setBlockingUser(false);
     }
@@ -199,7 +272,7 @@ export function DirectMessageArea({
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-[#111a2b]">
       <div className="h-16 px-4 border-b border-[#22334f] bg-[#142033] flex items-center">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-3 min-w-0">
             <Avatar className="size-10 rounded-xl border border-[#304867] bg-[#1b2a42]">
               {conversation.otherAvatarUrl && <AvatarImage src={conversation.otherAvatarUrl} alt={title} />}
@@ -238,8 +311,8 @@ export function DirectMessageArea({
               variant="outline"
               className="border-[#304867] text-white"
               onClick={() => {
-                void onToggleMute(!conversation.isMuted).catch((error) => {
-                  setActionError(getUiErrorMessage(error, 'Failed to update mute.'));
+                void onToggleMute(!conversation.isMuted).catch((toggleError) => {
+                  setActionError(getUiErrorMessage(toggleError, 'Failed to update mute.'));
                 });
               }}
             >
@@ -251,9 +324,7 @@ export function DirectMessageArea({
               size="sm"
               variant="outline"
               className="border-[#5f3544] text-[#ffd4df] hover:bg-[#341f2a]"
-              onClick={() => {
-                handleBlockUser();
-              }}
+              onClick={handleBlockUser}
               disabled={blockingUser || !conversation.otherUserId}
             >
               <ShieldBan className="size-4" />
@@ -298,6 +369,14 @@ export function DirectMessageArea({
             ) : (
               messages.map((message) => {
                 const isSelf = message.authorUserId === currentUserId;
+                const visibleText = getVisibleDirectMessageText(
+                  message.content,
+                  message.attachments.length
+                );
+                const messagePreview =
+                  getDirectMessagePreviewText(message.content, message.attachments.length) ??
+                  DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT;
+
                 return (
                   <div
                     key={message.messageId}
@@ -329,9 +408,38 @@ export function DirectMessageArea({
                             </Badge>
                           )}
                         </div>
-                        <p className="mt-1 text-sm text-[#dbe7f8]">
-                          <MarkdownText content={message.content} />
-                        </p>
+                        {visibleText && (
+                          <div className="mt-1 text-sm text-[#dbe7f8]">
+                            <MarkdownText content={visibleText} />
+                          </div>
+                        )}
+                        {message.attachments.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            {message.attachments.map((attachment) => {
+                              const attachmentLabel = getAttachmentLabel(attachment);
+                              const expiresAtLabel = new Date(attachment.expiresAt).toLocaleString();
+
+                              return (
+                                <div key={attachment.id} className="space-y-1">
+                                  {attachment.signedUrl ? (
+                                    <img
+                                      src={attachment.signedUrl}
+                                      alt={attachmentLabel}
+                                      className="max-h-80 rounded-md border border-[#304867] bg-[#0d1626] object-contain"
+                                    />
+                                  ) : (
+                                    <div className="rounded-md border border-dashed border-[#304867] bg-[#0d1626] px-3 py-2 text-xs text-[#a9b8cf]">
+                                      Image unavailable
+                                    </div>
+                                  )}
+                                  <p className="text-[11px] text-[#8ea4c7]">
+                                    {attachmentLabel} | Expires {expiresAtLabel}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                         {!isSelf && (
                           <div className="mt-2 flex items-center gap-2">
                             <Button
@@ -345,7 +453,7 @@ export function DirectMessageArea({
                                 setReportTarget({
                                   messageId: message.messageId,
                                   authorUsername: message.authorUsername,
-                                  messagePreview: message.content,
+                                  messagePreview,
                                 });
                               }}
                             >
@@ -366,6 +474,52 @@ export function DirectMessageArea({
 
       <div className="border-t border-[#22334f] bg-[#142033] p-3">
         <div className="space-y-2">
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleSelectImage}
+          />
+          {imageAttachment && (
+            <div className="rounded-md border border-[#304867] bg-[#111a2b] px-3 py-3">
+              <div className="flex items-start gap-3">
+                <img
+                  src={imageAttachment.previewUrl}
+                  alt={imageAttachment.file.name || 'Selected image'}
+                  className="size-16 rounded-md border border-[#304867] object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">Image attached</p>
+                  <p className="mt-1 text-sm text-white truncate">{imageAttachment.file.name}</p>
+                  <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#a9b8cf]">
+                    Expires
+                    <select
+                      value={imageExpiresInHours}
+                      onChange={(event) => setImageExpiresInHours(Number(event.target.value))}
+                      className="rounded border border-[#304867] bg-[#18243a] px-2 py-1 text-xs text-white"
+                      disabled={sending}
+                    >
+                      <option value={1}>1h</option>
+                      <option value={24}>24h</option>
+                      <option value={168}>7d</option>
+                      <option value={720}>30d</option>
+                    </select>
+                  </label>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-[#a9b8cf] hover:text-white"
+                  onClick={clearImageAttachment}
+                  disabled={sending}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            </div>
+          )}
           <Textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -375,8 +529,24 @@ export function DirectMessageArea({
             disabled={sending}
           />
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-[#8ea4c7]">Enter sends • Shift+Enter for newline</p>
-            <Button type="button" onClick={() => void handleSend()} disabled={sending || !draft.trim()}>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-[#304867] text-white"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={sending}
+              >
+                <ImagePlus className="size-4" />
+                Attach Image
+              </Button>
+              <p className="text-xs text-[#8ea4c7]">Enter sends; Shift+Enter for newline</p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => void handleSend()}
+              disabled={sending || (!draft.trim() && !imageAttachment)}
+            >
               <Send className="size-4" />
               Send
             </Button>

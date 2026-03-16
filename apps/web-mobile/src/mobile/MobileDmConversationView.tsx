@@ -6,6 +6,10 @@ import { MobileLongPressMenu } from './MobileLongPressMenu';
 import { useMobileLongPress } from '@web-mobile/mobile/useMobileLongPress';
 import { isNearBottom } from '@web-mobile/mobile/scrollAnchor';
 import { MarkdownText } from '@shared/lib/markdownRenderer';
+import {
+  DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT,
+  getVisibleDirectMessageText,
+} from '@shared/lib/backend/directMessageUtils';
 
 interface ContextMenuState {
   message: DirectMessage;
@@ -20,7 +24,13 @@ interface MobileDmConversationViewProps {
   sendPending: boolean;
   error: string | null;
   isMuted: boolean;
-  onSendMessage: (content: string) => Promise<void>;
+  onSendMessage: (
+    content: string,
+    options?: {
+      imageFile?: File;
+      imageExpiresInHours?: number;
+    }
+  ) => Promise<void>;
   onMuteToggle: (nextMuted: boolean) => Promise<void>;
   onBlock: (input: { userId: string; username: string }) => Promise<void>;
   onReportMessage: (messageId: string) => void;
@@ -43,13 +53,13 @@ export function MobileDmConversationView({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const hasInitializedScrollRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const longPress = useMobileLongPress();
   const justSentRef = useRef(false);
-  const previousMessageCountRef = useRef(0);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const windowHeightRef = useRef(window.innerHeight);
+
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
@@ -60,6 +70,7 @@ export function MobileDmConversationView({
     vv.addEventListener('resize', handler);
     return () => vv.removeEventListener('resize', handler);
   }, []);
+
   useEffect(() => {
     const node = scrollRef.current;
     if (!node) return;
@@ -68,7 +79,6 @@ export function MobileDmConversationView({
     node.scrollTop = node.scrollHeight;
   }, [messages.length]);
 
-// Effect 2 — handles scroll on new messages
   useEffect(() => {
     if (!hasInitializedScrollRef.current) return;
     const node = scrollRef.current;
@@ -84,14 +94,17 @@ export function MobileDmConversationView({
         node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
       }
     });
-}, [messages.length]);
+  }, [messages.length]);
 
-  const handleSend = async (_mediaAttachment?: { file: File; expiresInHours: number }) => {
+  const handleSend = async (mediaAttachment?: { file: File; expiresInHours: number }) => {
     const content = draft.trim();
-    if (!content || sendPending) return;
+    if ((!content && !mediaAttachment) || sendPending) return;
     justSentRef.current = true;
     setDraft('');
-    await onSendMessage(content);
+    await onSendMessage(content, {
+      imageFile: mediaAttachment?.file,
+      imageExpiresInHours: mediaAttachment?.expiresInHours,
+    });
   };
 
   const formatTime = (iso: string) => {
@@ -108,9 +121,8 @@ export function MobileDmConversationView({
     if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
-  
-  // Derive the other user from any non-own message for block action
-  const otherUser = messages.find((m) => m.authorUserId !== currentUserId);
+
+  const otherUser = messages.find((message) => message.authorUserId !== currentUserId);
   const otherUserId = otherUser?.authorUserId ?? null;
   const otherUsername = otherUser?.authorUsername ?? 'this user';
 
@@ -126,11 +138,12 @@ export function MobileDmConversationView({
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* Conversation options bar */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5 shrink-0">
         {conversationTitle ? (
           <div className="min-w-0 mr-2">
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold leading-none mb-0.5">Direct Message</p>
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold leading-none mb-0.5">
+              Direct Message
+            </p>
             <p className="text-sm font-medium text-white truncate">{conversationTitle}</p>
           </div>
         ) : (
@@ -155,6 +168,7 @@ export function MobileDmConversationView({
           const initial = name.charAt(0).toUpperCase();
           const dateLabel = formatDate(message.createdAt);
           const showDateSep = dateLabel !== lastDateLabel;
+          const visibleText = getVisibleDirectMessageText(message.content, message.attachments.length);
           if (showDateSep) lastDateLabel = dateLabel;
 
           return (
@@ -203,7 +217,33 @@ export function MobileDmConversationView({
                         : 'bg-[#1a2840] text-gray-100 rounded-tl-sm border border-white/5'
                     }`}
                   >
-                    <MarkdownText content={message.content} />
+                    {visibleText && <MarkdownText content={visibleText} />}
+                    {message.attachments.length > 0 && (
+                      <div className={visibleText ? 'mt-2 space-y-2' : 'space-y-2'}>
+                        {message.attachments.map((attachment) => {
+                          const attachmentLabel =
+                            attachment.originalFilename ??
+                            attachment.objectPath.split('/').pop() ??
+                            'image';
+
+                          return (
+                            <div key={attachment.id} className="space-y-1">
+                              {attachment.signedUrl ? (
+                                <img
+                                  src={attachment.signedUrl}
+                                  alt={attachmentLabel}
+                                  className="max-h-72 rounded-xl border border-white/10 bg-black/20 object-contain"
+                                />
+                              ) : (
+                                <div className="rounded-xl border border-dashed border-white/10 px-3 py-2 text-xs text-gray-300">
+                                  {DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -211,15 +251,18 @@ export function MobileDmConversationView({
           );
         })}
       </div>
-        <div style={{ paddingBottom: keyboardOpen ? '0px' : '34px' }}>
-          <MobileMessageComposer
-            draft={draft}
-            onDraftChange={setDraft}
-            onSend={handleSend}
-           sending={sendPending}
-            placeholder="Message..."
-          />
-        </div>
+
+      <div style={{ paddingBottom: keyboardOpen ? '0px' : '34px' }}>
+        <MobileMessageComposer
+          draft={draft}
+          onDraftChange={setDraft}
+          onSend={handleSend}
+          sending={sendPending}
+          placeholder="Message..."
+          attachmentMode="images-only"
+        />
+      </div>
+
       <MobileLongPressMenu
         open={contextMenu !== null}
         onClose={() => setContextMenu(null)}
@@ -234,7 +277,6 @@ export function MobileDmConversationView({
         }}
       />
 
-      {/* ── Conversation options sheet ──────────────────────────────────── */}
       {optionsOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={() => setOptionsOpen(false)} />
@@ -247,13 +289,15 @@ export function MobileDmConversationView({
             </div>
             <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
               <p className="text-sm font-semibold text-white">Conversation Options</p>
-              <button onClick={() => setOptionsOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors">
+              <button
+                onClick={() => setOptionsOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors"
+              >
                 <X className="w-4 h-4 text-gray-400" />
               </button>
             </div>
 
             <div className="px-4 pt-3 space-y-1">
-              {/* Mute / Unmute */}
               <button
                 onClick={() => {
                   setOptionsOpen(false);
@@ -274,7 +318,6 @@ export function MobileDmConversationView({
                 </div>
               </button>
 
-              {/* Block */}
               {otherUserId && (
                 <button
                   onClick={() => {
@@ -295,7 +338,6 @@ export function MobileDmConversationView({
         </>
       )}
 
-      {/* ── Block confirmation ──────────────────────────────────────────── */}
       {blockConfirmOpen && otherUserId && (
         <>
           <div className="fixed inset-0 z-50 bg-black/70 touch-none overscroll-none" onClick={() => setBlockConfirmOpen(false)} />

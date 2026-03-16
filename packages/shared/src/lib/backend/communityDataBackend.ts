@@ -2,6 +2,12 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
 import { messageObjectStore } from './messageObjectStore';
+import {
+  MEDIA_ONLY_CONTENT_PLACEHOLDER,
+  createSignedUrlMap,
+  removeUploadedMediaObject,
+  uploadMediaToObjectStore,
+} from './mediaAttachmentUtils';
 import type {
   AuthorProfile,
   BanEligibleServer,
@@ -52,24 +58,6 @@ const getRealtimeRowChannelId = (value: unknown): string | null => {
 
 const MESSAGE_MEDIA_BUCKET = 'message-media';
 const LINK_PREVIEW_IMAGE_BUCKET = 'link-preview-images';
-const DEFAULT_MEDIA_EXPIRES_IN_HOURS = 24;
-const MAX_MEDIA_EXPIRES_IN_HOURS = 24 * 30;
-const MEDIA_ONLY_CONTENT_PLACEHOLDER = '\u200B';
-
-const sanitizeFileName = (value: string): string => {
-  const sanitized = value
-    .trim()
-    .replace(/[\s]+/g, '-')
-    .replace(/[^a-zA-Z0-9._-]/g, '');
-
-  return sanitized.length > 0 ? sanitized.slice(0, 120) : 'media';
-};
-
-const resolveMediaKind = (mimeType: string): 'image' | 'video' | 'file' => {
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('video/')) return 'video';
-  return 'file';
-};
 
 type MessageReactionRow = {
   id: string;
@@ -312,16 +300,6 @@ const waitForConfirmedSupabaseSession = async (timeoutMs = 4000): Promise<boolea
   return false;
 };
 
-type UploadedMessageMedia = {
-  bucketName: string;
-  objectPath: string;
-  originalFilename: string;
-  mimeType: string;
-  mediaKind: 'image' | 'video' | 'file';
-  sizeBytes: number;
-  expiresAt: string;
-};
-
 const uploadMessageMediaToObjectStore = async (input: {
   communityId: string;
   channelId: string;
@@ -329,46 +307,12 @@ const uploadMessageMediaToObjectStore = async (input: {
     file: File;
     expiresInHours?: number;
   };
-}): Promise<UploadedMessageMedia | null> => {
-  if (!input.mediaUpload?.file) return null;
-
-  const nextFile = input.mediaUpload.file;
-  const expiresInHours = input.mediaUpload.expiresInHours ?? DEFAULT_MEDIA_EXPIRES_IN_HOURS;
-  const boundedExpiresInHours = Math.min(
-    Math.max(Math.floor(expiresInHours), 1),
-    MAX_MEDIA_EXPIRES_IN_HOURS
-  );
-  const originalFilename = sanitizeFileName(nextFile.name || 'media');
-  const objectPath = `${input.communityId}/${input.channelId}/${crypto.randomUUID()}-${originalFilename}`;
-  const mimeType = nextFile.type?.trim() || 'application/octet-stream';
-
-  await messageObjectStore.uploadMessageAttachment({
+}) =>
+  uploadMediaToObjectStore({
     bucketName: MESSAGE_MEDIA_BUCKET,
-    objectPath,
-    file: nextFile,
-    contentType: mimeType,
-    cacheControl: '3600',
+    objectPathPrefix: `${input.communityId}/${input.channelId}`,
+    mediaUpload: input.mediaUpload,
   });
-
-  return {
-    bucketName: MESSAGE_MEDIA_BUCKET,
-    objectPath,
-    originalFilename,
-    mimeType,
-    mediaKind: resolveMediaKind(mimeType),
-    sizeBytes: nextFile.size,
-    expiresAt: new Date(Date.now() + boundedExpiresInHours * 60 * 60 * 1000).toISOString(),
-  };
-};
-
-const removeUploadedMediaObject = async (uploadedMedia: UploadedMessageMedia | null): Promise<void> => {
-  if (!uploadedMedia) return;
-  try {
-    await messageObjectStore.removeObjects(uploadedMedia.bucketName, [uploadedMedia.objectPath]);
-  } catch {
-    // Best-effort rollback/cleanup.
-  }
-};
 
 const mapMessageReactionRows = (rows: MessageReactionRow[]): MessageReaction[] =>
   rows.map((row) => ({
@@ -384,23 +328,11 @@ const mapMessageAttachmentRowsWithSignedUrls = async (
 ): Promise<MessageAttachment[]> => {
   if (attachmentRows.length === 0) return [];
 
-  const pathsByBucket = new Map<string, string[]>();
-  for (const row of attachmentRows) {
-    const existingPaths = pathsByBucket.get(row.bucket_name) ?? [];
-    existingPaths.push(row.object_path);
-    pathsByBucket.set(row.bucket_name, existingPaths);
-  }
-
-  const signedUrlByBucketAndPath = new Map<string, string>();
-  for (const [bucketName, paths] of pathsByBucket.entries()) {
-    try {
-      const signedRowsByPath = await messageObjectStore.createSignedUrls(bucketName, paths, 60 * 60);
-      for (const [path, signedUrl] of Object.entries(signedRowsByPath)) {
-        signedUrlByBucketAndPath.set(`${bucketName}/${path}`, signedUrl);
-      }
-    } catch (signedError) {
-      console.error('Failed to create signed URLs for message attachments:', signedError);
-    }
+  let signedUrlByBucketAndPath = new Map<string, string>();
+  try {
+    signedUrlByBucketAndPath = await createSignedUrlMap(attachmentRows, 60 * 60);
+  } catch (signedError) {
+    console.error('Failed to create signed URLs for message attachments:', signedError);
   }
 
   return attachmentRows.map((row) => ({

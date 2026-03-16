@@ -1,4 +1,8 @@
 import { supabase } from '@shared/lib/supabase';
+import {
+  mapDirectMessageAttachmentRowsWithSignedUrls,
+  parseDirectMessageAttachmentRows,
+} from './directMessageAttachmentUtils';
 import type {
   DmMessageReportAction,
   DmMessageReportContextMessage,
@@ -89,6 +93,7 @@ type DmMessageReportDetailRow = {
   message_created_at: string;
   message_edited_at: string | null;
   message_deleted_at: string | null;
+  message_attachments: unknown;
 };
 
 type DmMessageReportActionRow = {
@@ -114,6 +119,7 @@ type DmMessageContextRow = {
   created_at: string;
   edited_at: string | null;
   deleted_at: string | null;
+  attachments: unknown;
   is_target: boolean | null;
 };
 
@@ -151,34 +157,41 @@ const mapSummary = (row: DmMessageReportSummaryRow): DmMessageReportSummary => (
   messagePreview: row.message_preview ?? null,
 });
 
-const mapDetail = (row: DmMessageReportDetailRow): DmMessageReportDetail => ({
-  reportId: row.report_id,
-  conversationId: row.conversation_id,
-  messageId: row.message_id,
-  status: row.status,
-  kind: row.kind,
-  comment: row.comment,
-  resolutionNotes: row.resolution_notes ?? null,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  reporterUserId: row.reporter_user_id,
-  reporterUsername: row.reporter_username ?? null,
-  reporterAvatarUrl: row.reporter_avatar_url ?? null,
-  reportedUserId: row.reported_user_id,
-  reportedUsername: row.reported_username ?? null,
-  reportedAvatarUrl: row.reported_avatar_url ?? null,
-  assignedToUserId: row.assigned_to_user_id ?? null,
-  assignedToUsername: row.assigned_to_username ?? null,
-  assignedAt: row.assigned_at ?? null,
-  messageAuthorUserId: row.message_author_user_id,
-  messageAuthorUsername: row.message_author_username ?? null,
-  messageAuthorAvatarUrl: row.message_author_avatar_url ?? null,
-  messageContent: row.message_content,
-  messageMetadata: asRecord(row.message_metadata),
-  messageCreatedAt: row.message_created_at,
-  messageEditedAt: row.message_edited_at ?? null,
-  messageDeletedAt: row.message_deleted_at ?? null,
-});
+const mapDetail = async (row: DmMessageReportDetailRow): Promise<DmMessageReportDetail> => {
+  const messageAttachments = await mapDirectMessageAttachmentRowsWithSignedUrls(
+    parseDirectMessageAttachmentRows(row.message_attachments)
+  );
+
+  return {
+    reportId: row.report_id,
+    conversationId: row.conversation_id,
+    messageId: row.message_id,
+    status: row.status,
+    kind: row.kind,
+    comment: row.comment,
+    resolutionNotes: row.resolution_notes ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    reporterUserId: row.reporter_user_id,
+    reporterUsername: row.reporter_username ?? null,
+    reporterAvatarUrl: row.reporter_avatar_url ?? null,
+    reportedUserId: row.reported_user_id,
+    reportedUsername: row.reported_username ?? null,
+    reportedAvatarUrl: row.reported_avatar_url ?? null,
+    assignedToUserId: row.assigned_to_user_id ?? null,
+    assignedToUsername: row.assigned_to_username ?? null,
+    assignedAt: row.assigned_at ?? null,
+    messageAuthorUserId: row.message_author_user_id,
+    messageAuthorUsername: row.message_author_username ?? null,
+    messageAuthorAvatarUrl: row.message_author_avatar_url ?? null,
+    messageContent: row.message_content,
+    messageMetadata: asRecord(row.message_metadata),
+    messageCreatedAt: row.message_created_at,
+    messageEditedAt: row.message_edited_at ?? null,
+    messageDeletedAt: row.message_deleted_at ?? null,
+    messageAttachments,
+  };
+};
 
 const mapAction = (row: DmMessageReportActionRow): DmMessageReportAction => ({
   actionId: row.action_id,
@@ -192,19 +205,34 @@ const mapAction = (row: DmMessageReportActionRow): DmMessageReportAction => ({
   createdAt: row.created_at,
 });
 
-const mapContextMessage = (row: DmMessageContextRow): DmMessageReportContextMessage => ({
-  messageId: row.message_id,
-  conversationId: row.conversation_id,
-  authorUserId: row.author_user_id,
-  authorUsername: row.author_username ?? null,
-  authorAvatarUrl: row.author_avatar_url ?? null,
-  content: row.content,
-  metadata: asRecord(row.metadata),
-  createdAt: row.created_at,
-  editedAt: row.edited_at ?? null,
-  deletedAt: row.deleted_at ?? null,
-  isTarget: Boolean(row.is_target),
-});
+const mapContextMessages = async (
+  rows: DmMessageContextRow[]
+): Promise<DmMessageReportContextMessage[]> => {
+  const allAttachmentRows = rows.flatMap((row) => parseDirectMessageAttachmentRows(row.attachments));
+  const signedAttachments = await mapDirectMessageAttachmentRowsWithSignedUrls(allAttachmentRows);
+  const attachmentsByMessageId = new Map<string, DmMessageReportContextMessage['attachments']>();
+
+  for (const attachment of signedAttachments) {
+    const existing = attachmentsByMessageId.get(attachment.messageId) ?? [];
+    existing.push(attachment);
+    attachmentsByMessageId.set(attachment.messageId, existing);
+  }
+
+  return rows.map((row) => ({
+    messageId: row.message_id,
+    conversationId: row.conversation_id,
+    authorUserId: row.author_user_id,
+    authorUsername: row.author_username ?? null,
+    authorAvatarUrl: row.author_avatar_url ?? null,
+    content: row.content,
+    metadata: asRecord(row.metadata),
+    createdAt: row.created_at,
+    editedAt: row.edited_at ?? null,
+    deletedAt: row.deleted_at ?? null,
+    attachments: attachmentsByMessageId.get(row.message_id) ?? [],
+    isTarget: Boolean(row.is_target),
+  }));
+};
 
 export const centralModerationBackend: ModerationBackend = {
   async listDmMessageReportsForReview(input) {
@@ -228,7 +256,7 @@ export const centralModerationBackend: ModerationBackend = {
     );
     if (error) throw error;
     const row = (Array.isArray(data) ? data[0] : null) as DmMessageReportDetailRow | null;
-    return row ? mapDetail(row) : null;
+    return row ? await mapDetail(row) : null;
   },
 
   async listDmMessageReportActions(reportId) {
@@ -250,7 +278,7 @@ export const centralModerationBackend: ModerationBackend = {
       } as never
     );
     if (error) throw error;
-    return ((data ?? []) as DmMessageContextRow[]).map(mapContextMessage);
+    return await mapContextMessages((data ?? []) as DmMessageContextRow[]);
   },
 
   async assignDmMessageReport(input) {

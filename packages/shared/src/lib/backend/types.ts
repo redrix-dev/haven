@@ -29,6 +29,22 @@ export type MessageAttachment = {
   signedUrl: string | null;
 };
 
+export type DirectMessageAttachment = {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  ownerUserId: string;
+  bucketName: string;
+  objectPath: string;
+  originalFilename: string | null;
+  mimeType: string;
+  mediaKind: 'image';
+  sizeBytes: number;
+  createdAt: string;
+  expiresAt: string;
+  signedUrl: string | null;
+};
+
 export type LinkPreviewStatus = 'pending' | 'ready' | 'unsupported' | 'failed';
 export type LinkPreviewEmbedProvider = 'none' | 'youtube' | 'vimeo';
 
@@ -535,6 +551,7 @@ export type DirectMessage = {
   createdAt: string;
   editedAt: string | null;
   deletedAt: string | null;
+  attachments: DirectMessageAttachment[];
 };
 
 export type DirectMessageReportKind = 'content_abuse' | 'bug';
@@ -597,6 +614,7 @@ export type DmMessageReportDetail = {
   messageCreatedAt: string;
   messageEditedAt: string | null;
   messageDeletedAt: string | null;
+  messageAttachments: DirectMessageAttachment[];
 };
 
 export type DmMessageReportContextMessage = {
@@ -610,6 +628,7 @@ export type DmMessageReportContextMessage = {
   createdAt: string;
   editedAt: string | null;
   deletedAt: string | null;
+  attachments: DirectMessageAttachment[];
   isTarget: boolean;
 };
 

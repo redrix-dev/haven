@@ -30,11 +30,42 @@ select public.get_or_create_direct_dm_conversation(test_support.fixture_user_id(
 insert into moderation_ids (key, id)
 select 'conversation', conversation_id from tmp_mod_dm_conversation
 on conflict (key) do update set id = excluded.id;
+
+create temp table tmp_mod_dm_image_upload on commit drop as
+select
+  format(
+    '%s/%s-dm-report-test.png',
+    (select id::text from moderation_ids where key = 'conversation'),
+    gen_random_uuid()::text
+  ) as object_path;
+
+insert into storage.objects (
+  bucket_id,
+  name,
+  owner,
+  metadata
+)
+select
+  'dm-message-media',
+  object_path,
+  test_support.fixture_user_id('member_b'),
+  jsonb_build_object('mimetype', 'image/png', 'size', 3072)
+from tmp_mod_dm_image_upload;
+
 create temp table tmp_mod_dm_message on commit drop as
 select * from public.send_dm_message(
   (select id from moderation_ids where key = 'conversation'),
-  'reportable DM content',
-  '{}'::jsonb
+  '',
+  '{}'::jsonb,
+  jsonb_build_object(
+    'bucketName', 'dm-message-media',
+    'objectPath', (select object_path from tmp_mod_dm_image_upload),
+    'originalFilename', 'dm-report-test.png',
+    'mimeType', 'image/png',
+    'mediaKind', 'image',
+    'sizeBytes', 3072,
+    'expiresInHours', 24
+  )
 );
 
 insert into moderation_ids (key, id)
@@ -109,6 +140,27 @@ select test_support.assert_eq_int(
   'active staff can load report detail'
 );
 
+select test_support.assert_eq_text(
+  (
+    select message_preview
+    from public.list_dm_message_reports_for_review(null, 50, null, null)
+    where report_id = (select id from moderation_ids where key = 'report')
+    limit 1
+  ),
+  'Sent an image',
+  'staff DM moderation summary should use the image preview fallback'
+);
+
+select test_support.assert_eq_int(
+  (
+    select jsonb_array_length(message_attachments)::bigint
+    from public.get_dm_message_report_detail((select id from moderation_ids where key = 'report'))
+    limit 1
+  ),
+  1,
+  'staff DM moderation detail should include message attachments'
+);
+
 select test_support.assert_true(
   public.assign_dm_message_report(
     (select id from moderation_ids where key = 'report'),
@@ -169,6 +221,17 @@ select test_support.assert_true(
     where is_target = true
   ),
   'active staff can load DM context including target message'
+);
+
+select test_support.assert_eq_int(
+  (
+    select jsonb_array_length(attachments)::bigint
+    from public.list_dm_message_context((select id from moderation_ids where key = 'message'), 5, 5)
+    where is_target = true
+    limit 1
+  ),
+  1,
+  'staff DM moderation context should include target message attachments'
 );
 
 rollback;

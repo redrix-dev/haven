@@ -9,6 +9,10 @@ import { getErrorMessage } from '@platform/lib/errors';
 
 type RefreshDmConversationsOptions = { suppressLoadingState?: boolean };
 type RefreshDmMessagesOptions = { suppressLoadingState?: boolean; markRead?: boolean };
+type SendDirectMessageOptions = {
+  imageFile?: File;
+  imageExpiresInHours?: number;
+};
 
 type UseDirectMessagesInput = {
   directMessageBackend: Pick<
@@ -323,7 +327,7 @@ export function useDirectMessages({
   );
 
   const sendDirectMessage = React.useCallback(
-    async (content: string) => {
+    async (content: string, options?: SendDirectMessageOptions) => {
       if (!selectedDmConversationId) {
         throw new Error('No direct message conversation selected.');
       }
@@ -334,6 +338,12 @@ export function useDirectMessages({
         await directMessageBackend.sendMessage({
           conversationId: selectedDmConversationId,
           content,
+          imageUpload: options?.imageFile
+            ? {
+                file: options.imageFile,
+                expiresInHours: options.imageExpiresInHours,
+              }
+            : undefined,
         });
         await Promise.all([
           refreshDmMessages(selectedDmConversationId, { suppressLoadingState: true, markRead: false }),

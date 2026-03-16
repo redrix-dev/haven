@@ -69,6 +69,8 @@ Deno.serve(async (req) => {
   const supabaseAdmin = createServiceClient(env.supabaseUrl, env.serviceRoleKey);
 
   let deletedMessages = 0;
+  let deletedChannelMessages = 0;
+  let deletedDmMessages = 0;
   let claimedDeletionJobs = 0;
   let deletedObjects = 0;
   let retryableFailures = 0;
@@ -82,7 +84,18 @@ Deno.serve(async (req) => {
     console.error('message-media-maintenance cleanup rpc failed:', cleanupError);
     return jsonResponse({ code: 500, message: 'Failed to cleanup expired message attachments' }, 500);
   }
-  deletedMessages = Number(cleanupCount ?? 0) || 0;
+  deletedChannelMessages = Number(cleanupCount ?? 0) || 0;
+
+  const { data: cleanupDmCount, error: cleanupDmError } = await supabaseAdmin.rpc(
+    'cleanup_expired_dm_message_attachments',
+    { p_limit: maxExpiredMessages },
+  );
+  if (cleanupDmError) {
+    console.error('message-media-maintenance DM cleanup rpc failed:', cleanupDmError);
+    return jsonResponse({ code: 500, message: 'Failed to cleanup expired DM image attachments' }, 500);
+  }
+  deletedDmMessages = Number(cleanupDmCount ?? 0) || 0;
+  deletedMessages = deletedChannelMessages + deletedDmMessages;
 
   const { data: claimedJobs, error: claimError } = await supabaseAdmin.rpc(
     'claim_message_attachment_deletion_jobs',
@@ -153,6 +166,8 @@ Deno.serve(async (req) => {
   return jsonResponse({
     mode: isCron ? 'cron' : 'authenticated-fallback',
     deletedMessages,
+    deletedChannelMessages,
+    deletedDmMessages,
     claimedDeletionJobs,
     deletedObjects,
     retryableFailures,

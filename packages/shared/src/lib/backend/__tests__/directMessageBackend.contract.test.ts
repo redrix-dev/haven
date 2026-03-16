@@ -4,6 +4,11 @@ import { centralSocialBackend } from '@shared/lib/backend/socialBackend';
 import { loadBootstrappedTestUsers } from '@test-support/fixtures/users';
 import { resetFixtureDomainState, signInAsTestUser, signOutTestUser } from '@test-support/setup/supabaseLocal';
 
+const createTestImageFile = () =>
+  new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'dm-test.png', {
+    type: 'image/png',
+  });
+
 async function ensureFriendship(memberBUsername: string) {
   try {
     await centralSocialBackend.sendFriendRequest(memberBUsername);
@@ -56,10 +61,34 @@ describe.sequential('DirectMessageBackend (contract)', () => {
       metadata: {},
     });
     expect(sent.conversationId).toBe(conversationId);
+    expect(sent.attachments).toEqual([]);
+
+    const sentImage = await centralDirectMessageBackend.sendMessage({
+      conversationId,
+      content: '',
+      metadata: {},
+      imageUpload: {
+        file: createTestImageFile(),
+        expiresInHours: 24,
+      },
+    });
+    expect(sentImage.attachments).toHaveLength(1);
+    expect(sentImage.attachments[0]?.mediaKind).toBe('image');
+    expect(sentImage.attachments[0]?.signedUrl).toBeTruthy();
 
     await signInAsTestUser('member_b');
     const messages = await centralDirectMessageBackend.listMessages({ conversationId, limit: 20 });
     expect(messages.some((message) => message.messageId === sent.messageId)).toBe(true);
+    const listedImage = messages.find((message) => message.messageId === sentImage.messageId);
+    expect(listedImage?.attachments).toHaveLength(1);
+    expect(listedImage?.attachments[0]?.mimeType).toBe('image/png');
+    expect(listedImage?.attachments[0]?.signedUrl).toBeTruthy();
+
+    const conversations = await centralDirectMessageBackend.listConversations();
+    const listedConversation = conversations.find(
+      (conversation) => conversation.conversationId === conversationId
+    );
+    expect(listedConversation?.lastMessagePreview).toBe('Sent an image');
 
     const read = await centralDirectMessageBackend.markConversationRead(conversationId);
     expect(read).toBe(true);

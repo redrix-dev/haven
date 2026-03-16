@@ -1,27 +1,16 @@
-/**
- * MobileMessageComposer — rich mobile message input.
- *
- * Composition layout:
- *   <MobileMessageComposer>
- *     <ComposerMediaPreview />      ← attachment strip
- *     <ComposerReplyBanner />       ← reply target
- *     <ComposerFormattingToolbar /> ← formatting shortcuts (toggled by Aa button)
- *     <ComposerInputRow>
- *       <ComposerAddButton />       ← + attachment menu
- *       <ComposerTextArea />        ← textarea (touch/scroll logic UNCHANGED)
- *       <ComposerEmojiButton />     ← emoji overlay
- *       <ComposerSendButton />      ← send
- *     </ComposerInputRow>
- *   </MobileMessageComposer>
- *
- * ⚠️  Touch / scroll / z-index logic is intentionally preserved from the
- *     original implementation. Do NOT change touchAction, overscroll, or
- *     safe-area logic without re-testing on iOS Safari.
- */
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Plus, Smile, Bold, Italic, Strikethrough, Code, Quote } from 'lucide-react';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  X,
+  Plus,
+  Smile,
+  Bold,
+  Italic,
+  Strikethrough,
+  Code,
+  Quote,
+  Image as ImageIcon,
+  Paperclip,
+} from 'lucide-react';
 
 interface ReplyTarget {
   id: string;
@@ -42,7 +31,6 @@ export interface MediaAttachment {
 export interface MobileMessageComposerProps {
   draft: string;
   onDraftChange: (value: string) => void;
-  /** Called when user presses send. Receives any attached media so the parent can send both at once. */
   onSend: (mediaAttachment?: MediaAttachment) => void;
   sending?: boolean;
   placeholder?: string;
@@ -50,44 +38,81 @@ export interface MobileMessageComposerProps {
   onClearReply?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
+  attachmentMode?: 'all' | 'images-only';
 }
-
-// ── Emoji data — common emojis by category ────────────────────────────────────
 
 const EMOJI_CATEGORIES: Array<{ label: string; emojis: string[] }> = [
   {
     label: 'Smileys',
     emojis: [
-      '😀','😂','🤣','😊','😍','🥰','😘','😎','🤩','😏',
-      '😅','😇','🙂','😉','🥳','😋','😜','🤪','😝','🤑',
-      '😒','😞','😔','😟','😕','🙁','😣','😖','😫','😩',
-      '🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','😱',
+      '😀', '😂', '🤣', '😊', '😍', '🥰', '😘', '😎', '🤩', '😏',
+      '😅', '😇', '🙂', '😉', '🥳', '😋', '😜', '🤪', '😝', '🤑',
+      '😒', '😞', '😔', '😟', '😕', '🙁', '😣', '😖', '😫', '😩',
+      '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '😱',
     ],
   },
   {
     label: 'Gestures',
     emojis: [
-      '👍','👎','👌','✌️','🤞','🤟','🤙','👏','🙌','🤝',
-      '👋','🤚','🖐️','✋','🖖','💪','🦵','🦶','👀','👁️',
+      '👍', '👎', '👌', '✌️', '🤞', '🤟', '🤙', '👏', '🙌', '🤝',
+      '👋', '🤚', '🖐️', '✋', '🖖', '💪', '🦵', '🦶', '👀', '👁️',
     ],
   },
   {
     label: 'Hearts',
     emojis: [
-      '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔',
-      '❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️',
+      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
+      '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️',
     ],
   },
   {
     label: 'Objects',
     emojis: [
-      '🎉','🎊','🎈','🎁','🔥','⚡','✨','🌟','💫','🌈',
-      '🍕','🍔','🌮','🍣','☕','🍺','🎮','📱','💻','🎵',
+      '🎉', '🎊', '🎈', '🎁', '🔥', '⚡', '✨', '🌟', '💫', '🌈',
+      '🍕', '🍔', '🌮', '🍣', '☕', '🍺', '🎮', '📱', '💻', '🎵',
     ],
   },
 ];
 
-// ── ComposerMediaPreview ──────────────────────────────────────────────────────
+const EMOJI_PICKER_CATEGORIES: Array<{ label: string; emojis: string[] }> =
+  EMOJI_CATEGORIES.slice(0, 0).concat([
+  {
+    label: 'Smileys',
+    emojis: [
+      '\u{1F600}', '\u{1F602}', '\u{1F923}', '\u{1F60A}', '\u{1F60D}',
+      '\u{1F970}', '\u{1F618}', '\u{1F60E}', '\u{1F929}', '\u{1F60F}',
+      '\u{1F605}', '\u{1F607}', '\u{1F642}', '\u{1F609}', '\u{1F973}',
+      '\u{1F61B}', '\u{1F61C}', '\u{1F92A}', '\u{1F914}', '\u{1F97A}',
+    ],
+  },
+  {
+    label: 'Gestures',
+    emojis: [
+      '\u{1F44D}', '\u{1F44E}', '\u{1F44C}', '\u270C\uFE0F', '\u{1F91E}',
+      '\u{1F91F}', '\u{1F919}', '\u{1F44F}', '\u{1F64C}', '\u{1F91D}',
+      '\u{1F44B}', '\u{1F91A}', '\u{1F590}\uFE0F', '\u270B', '\u{1F596}',
+      '\u{1F4AA}', '\u{1F9B5}', '\u{1F9B6}', '\u{1F440}', '\u{1F441}\uFE0F',
+    ],
+  },
+  {
+    label: 'Hearts',
+    emojis: [
+      '\u2764\uFE0F', '\u{1F9E1}', '\u{1F49B}', '\u{1F49A}', '\u{1F499}',
+      '\u{1F49C}', '\u{1F5A4}', '\u{1F90D}', '\u{1F90E}', '\u{1F494}',
+      '\u2763\uFE0F', '\u{1F495}', '\u{1F49E}', '\u{1F493}', '\u{1F497}',
+      '\u{1F496}', '\u{1F498}', '\u{1F49D}', '\u{1F49F}', '\u262E\uFE0F',
+    ],
+  },
+  {
+    label: 'Objects',
+    emojis: [
+      '\u{1F389}', '\u{1F38A}', '\u{1F388}', '\u{1F381}', '\u{1F525}',
+      '\u26A1', '\u2728', '\u{1F31F}', '\u{1F4AB}', '\u{1F308}',
+      '\u{1F355}', '\u{1F354}', '\u{1F32E}', '\u{1F363}', '\u2615',
+      '\u{1F37A}', '\u{1F3AE}', '\u{1F4F1}', '\u{1F4BB}', '\u{1F3B5}',
+    ],
+  },
+  ]);
 
 function ComposerMediaPreview({
   media,
@@ -121,20 +146,19 @@ function ComposerMediaPreview({
 
         <div className="flex-1 min-w-0">
           <p className="text-xs text-gray-300 truncate">{media.file.name}</p>
-          {/* Expiry selector */}
           <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-            {[1, 24, 168, 720].map((h) => (
+            {[1, 24, 168, 720].map((hours) => (
               <button
-                key={h}
+                key={hours}
                 type="button"
-                onClick={() => onExpireChange(h)}
+                onClick={() => onExpireChange(hours)}
                 className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
-                  expiresInHours === h
+                  expiresInHours === hours
                     ? 'bg-blue-600 text-white'
                     : 'bg-white/10 text-gray-400 hover:bg-white/15'
                 }`}
               >
-                {h === 1 ? '1h' : h === 24 ? '1d' : h === 168 ? '7d' : '30d'}
+                {hours === 1 ? '1h' : hours === 24 ? '1d' : hours === 168 ? '7d' : '30d'}
               </button>
             ))}
           </div>
@@ -151,9 +175,6 @@ function ComposerMediaPreview({
     </div>
   );
 }
-
-// ── ComposerReplyBanner ───────────────────────────────────────────────────────
-// Preserving original reply target display exactly.
 
 function ComposerReplyBanner({
   replyTarget,
@@ -184,8 +205,6 @@ function ComposerReplyBanner({
     </div>
   );
 }
-
-// ── ComposerFormattingToolbar ─────────────────────────────────────────────────
 
 const FORMATTING_ACTIONS: Array<{
   label: string;
@@ -220,7 +239,6 @@ function ComposerFormattingToolbar({
     const next = draft.slice(0, start) + wrapped + draft.slice(end);
     onDraftChange(next);
 
-    // Restore cursor after state update
     requestAnimationFrame(() => {
       el.focus();
       const cursorStart = start + prefix.length;
@@ -239,13 +257,12 @@ function ComposerFormattingToolbar({
           <button
             key={action.label}
             type="button"
-            onMouseDown={(e) => {
-              // Prevent blur on textarea
-              e.preventDefault();
+            onMouseDown={(event) => {
+              event.preventDefault();
               applyFormat(action.prefix, action.suffix);
             }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
+            onTouchEnd={(event) => {
+              event.preventDefault();
               applyFormat(action.prefix, action.suffix);
             }}
             aria-label={action.label}
@@ -259,21 +276,20 @@ function ComposerFormattingToolbar({
   );
 }
 
-// ── AttachmentMenu ────────────────────────────────────────────────────────────
-
 function AttachmentMenu({
   onSelectFile,
   onClose,
+  attachmentMode,
 }: {
   onSelectFile: (file: File) => void;
   onClose: () => void;
+  attachmentMode: 'all' | 'images-only';
 }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <>
-      {/* Tap-outside to close */}
       <div className="fixed inset-0 z-[55]" onClick={onClose} style={{ touchAction: 'none' }} />
 
       <div
@@ -287,48 +303,60 @@ function AttachmentMenu({
           <button
             type="button"
             onClick={() => imageInputRef.current?.click()}
-            className="flex-1 flex flex-col items-center gap-2 py-3 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 transition-colors"
+            className="flex-1 flex flex-col items-center gap-2 py-3 rounded-xl bg-white/5 text-transparent hover:bg-white/10 active:bg-white/15 transition-colors"
           >
             <span className="text-2xl">🖼️</span>
-            <span className="text-xs text-gray-300">Photo/Video</span>
+            <ImageIcon className="h-7 w-7 text-gray-300" />
+            <span className="text-xs text-gray-300">
+              {attachmentMode === 'images-only' ? 'Photo' : 'Photo/Video'}
+            </span>
           </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-1 flex flex-col items-center gap-2 py-3 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 transition-colors"
-          >
-            <span className="text-2xl">📎</span>
-            <span className="text-xs text-gray-300">File</span>
-          </button>
+          {attachmentMode === 'all' && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 flex flex-col items-center gap-2 py-3 rounded-xl bg-white/5 text-transparent hover:bg-white/10 active:bg-white/15 transition-colors"
+            >
+              <span className="text-2xl">📎</span>
+              <Paperclip className="h-7 w-7 text-gray-300" />
+              <span className="text-xs text-gray-300">File</span>
+            </button>
+          )}
         </div>
 
         <input
           ref={imageInputRef}
           type="file"
-          accept="image/*,video/*"
+          accept={attachmentMode === 'images-only' ? 'image/*' : 'image/*,video/*'}
           className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) { onSelectFile(f); onClose(); }
-            e.target.value = '';
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              onSelectFile(file);
+              onClose();
+            }
+            event.target.value = '';
           }}
         />
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) { onSelectFile(f); onClose(); }
-            e.target.value = '';
-          }}
-        />
+        {attachmentMode === 'all' && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) {
+                onSelectFile(file);
+                onClose();
+              }
+              event.target.value = '';
+            }}
+          />
+        )}
       </div>
     </>
   );
 }
-
-// ── EmojiPicker ───────────────────────────────────────────────────────────────
 
 function EmojiPicker({
   onSelect,
@@ -338,26 +366,24 @@ function EmojiPicker({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState(0);
-  const category = EMOJI_CATEGORIES[tab];
+  const category = EMOJI_PICKER_CATEGORIES[tab];
 
   return (
     <>
-      {/* Tap-outside to close */}
       <div className="fixed inset-0 z-[55]" onClick={onClose} style={{ touchAction: 'none' }} />
 
       <div
         className="mobile-bottom-card fixed inset-x-0 z-[60] bg-[#0d1525] border-t border-white/10 shadow-xl"
         style={{ height: '280px', touchAction: 'none' }}
       >
-        {/* Category tabs */}
         <div className="flex border-b border-white/5 px-2">
-          {EMOJI_CATEGORIES.map((cat, i) => (
+          {EMOJI_PICKER_CATEGORIES.map((cat, index) => (
             <button
               key={cat.label}
               type="button"
-              onClick={() => setTab(i)}
+              onClick={() => setTab(index)}
               className={`flex-1 py-2.5 text-[11px] font-medium transition-colors ${
-                tab === i ? 'text-blue-400 border-b-2 border-blue-400 -mb-px' : 'text-gray-500'
+                tab === index ? 'text-blue-400 border-b-2 border-blue-400 -mb-px' : 'text-gray-500'
               }`}
             >
               {cat.label}
@@ -365,7 +391,6 @@ function EmojiPicker({
           ))}
         </div>
 
-        {/* Emoji grid */}
         <div
           className="grid grid-cols-8 gap-0.5 px-2 py-2 overflow-y-auto"
           style={{ height: 'calc(100% - 40px)', touchAction: 'pan-y' }}
@@ -374,7 +399,10 @@ function EmojiPicker({
             <button
               key={emoji}
               type="button"
-              onClick={() => { onSelect(emoji); onClose(); }}
+              onClick={() => {
+                onSelect(emoji);
+                onClose();
+              }}
               className="flex items-center justify-center w-full aspect-square text-2xl rounded-lg hover:bg-white/10 active:bg-white/15 transition-colors"
             >
               {emoji}
@@ -386,8 +414,6 @@ function EmojiPicker({
   );
 }
 
-// ── MobileMessageComposer ─────────────────────────────────────────────────────
-
 export function MobileMessageComposer({
   draft,
   onDraftChange,
@@ -398,6 +424,7 @@ export function MobileMessageComposer({
   onClearReply,
   onFocus,
   onBlur,
+  attachmentMode = 'all',
 }: MobileMessageComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showAttachment, setShowAttachment] = useState(false);
@@ -405,7 +432,6 @@ export function MobileMessageComposer({
   const [mediaFile, setMediaFile] = useState<MediaFile | null>(null);
   const [mediaExpiresInHours, setMediaExpiresInHours] = useState(24);
 
-  // ── Preserved original textarea height + touchAction logic ────────────────
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -416,6 +442,23 @@ export function MobileMessageComposer({
     el.style.touchAction = isOverflowing ? 'auto' : 'none';
   }, [draft]);
 
+  const clearSelectedMedia = useCallback(() => {
+    setMediaFile((previousValue) => {
+      if (previousValue) {
+        URL.revokeObjectURL(previousValue.previewUrl);
+      }
+      return null;
+    });
+    setMediaExpiresInHours(24);
+  }, []);
+
+  useEffect(
+    () => () => {
+      clearSelectedMedia();
+    },
+    [clearSelectedMedia]
+  );
+
   const canSend = (draft.trim().length > 0 || mediaFile !== null) && !sending;
 
   const handleSend = () => {
@@ -423,19 +466,17 @@ export function MobileMessageComposer({
       ? { file: mediaFile.file, expiresInHours: mediaExpiresInHours }
       : undefined;
     onSend(attachment);
-    // Clear media after send
-    setMediaFile(null);
-    setMediaExpiresInHours(24);
+    clearSelectedMedia();
   };
 
   const handleSelectMedia = (file: File) => {
     const previewUrl = URL.createObjectURL(file);
-    setMediaFile({ file, previewUrl });
-  };
-
-  const handleRemoveMedia = () => {
-    if (mediaFile) URL.revokeObjectURL(mediaFile.previewUrl);
-    setMediaFile(null);
+    setMediaFile((previousValue) => {
+      if (previousValue) {
+        URL.revokeObjectURL(previousValue.previewUrl);
+      }
+      return { file, previewUrl };
+    });
   };
 
   const handleInsertEmoji = (emoji: string) => {
@@ -444,6 +485,7 @@ export function MobileMessageComposer({
       onDraftChange(draft + emoji);
       return;
     }
+
     const start = el.selectionStart ?? draft.length;
     const end = el.selectionEnd ?? draft.length;
     const next = draft.slice(0, start) + emoji + draft.slice(end);
@@ -456,52 +498,47 @@ export function MobileMessageComposer({
   };
 
   return (
-    // ── Preserved: outer wrapper with touchAction none + safe-area ──────────
     <div
       className="shrink-0 border-t border-white/10 bg-[#0d1525]"
       style={{ paddingBottom: '0px', touchAction: 'none' }}
     >
-      {/* Media preview strip */}
       <ComposerMediaPreview
         media={mediaFile}
         expiresInHours={mediaExpiresInHours}
         onExpireChange={setMediaExpiresInHours}
-        onRemove={handleRemoveMedia}
+        onRemove={clearSelectedMedia}
       />
 
-      {/* Reply target banner — preserved from original */}
       <ComposerReplyBanner replyTarget={replyTarget} onClearReply={onClearReply} />
 
-      {/* Formatting toolbar — toggled by Aa button */}
       <ComposerFormattingToolbar
-          textareaRef={textareaRef}
-          draft={draft}
-          onDraftChange={onDraftChange}
-        />
+        textareaRef={textareaRef}
+        draft={draft}
+        onDraftChange={onDraftChange}
+      />
 
-      {/* Input row */}
-      {/* Preserved: touchAction none on wrapper divs */}
       <div className="px-3 pt-1 pb-0" style={{ touchAction: 'none' }}>
         <div className="mx-auto w-full max-w-[24rem]" style={{ touchAction: 'none' }}>
           <div
             className="relative rounded-[1.4rem] border border-white/10 bg-white/5 transition-colors focus-within:border-blue-500/50 flex items-center gap-1 px-2 py-1.5"
             style={{ touchAction: 'none' }}
           >
-            {/* + Attachment button */}
             <button
               type="button"
-              onClick={() => { setShowAttachment(true); setShowEmoji(false); }}
+              onClick={() => {
+                setShowAttachment(true);
+                setShowEmoji(false);
+              }}
               aria-label="Add attachment"
               className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-gray-400 hover:bg-white/10 hover:text-gray-200 transition-colors"
             >
               <Plus className="w-5 h-5" />
             </button>
 
-            {/* Textarea — touch/scroll logic preserved exactly from original */}
             <textarea
               ref={textareaRef}
               value={draft}
-              onChange={(e) => onDraftChange(e.target.value)}
+              onChange={(event) => onDraftChange(event.target.value)}
               onFocus={onFocus}
               onBlur={onBlur}
               placeholder={placeholder}
@@ -513,12 +550,11 @@ export function MobileMessageComposer({
               style={{ minHeight: '38px', height: '38px', touchAction: 'none' }}
             />
 
-            
-
-            {/* Emoji button */}
             <button
               type="button"
-              onClick={() => { setShowEmoji((v) => !v); }}
+              onClick={() => {
+                setShowEmoji((value) => !value);
+              }}
               aria-label="Emoji"
               className={`shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
                 showEmoji
@@ -529,7 +565,6 @@ export function MobileMessageComposer({
               <Smile className="w-5 h-5" />
             </button>
 
-            {/* Send button — preserved from original */}
             <button
               type="button"
               onClick={handleSend}
@@ -545,11 +580,11 @@ export function MobileMessageComposer({
         </div>
       </div>
 
-      {/* Overlays */}
       {showAttachment && (
         <AttachmentMenu
           onSelectFile={handleSelectMedia}
           onClose={() => setShowAttachment(false)}
+          attachmentMode={attachmentMode}
         />
       )}
       {showEmoji && (
