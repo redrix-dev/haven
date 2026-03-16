@@ -80,6 +80,8 @@ export type DesktopAPI = {
   }) => Promise<SaveFileFromUrlResult>;
   consumeNextProtocolUrl: () => Promise<string | null>;
   onProtocolUrl: (listener: (url: string) => void) => () => void;
+  openVoicePopout: () => Promise<{ opened: boolean }>;
+  setVoicePushToTalkActive: (active: boolean) => Promise<{ active: boolean }>;
 };
 
 declare global {

@@ -8,6 +8,8 @@ import type {
 export type VoiceSidebarParticipant = {
   userId: string;
   displayName: string;
+  avatarUrl?: string | null;
+  isSpeaking?: boolean;
 };
 
 export type VoicePresenceStateRow = {

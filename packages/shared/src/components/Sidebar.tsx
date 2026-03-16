@@ -43,7 +43,7 @@ interface SidebarProps {
   onChannelClick: (channelId: string) => void;
   onVoiceChannelClick?: (channelId: string) => void;
   activeVoiceChannelId?: string | null;
-  voiceChannelParticipants?: Record<string, Array<{ userId: string; displayName: string }>>;
+  voiceChannelParticipants?: Record<string, Array<{ userId: string; displayName: string; avatarUrl?: string | null; isSpeaking?: boolean }>>;
   voiceStatusPanel?: React.ReactNode;
   canManageChannels?: boolean;
   canManageChannelStructure?: boolean;
@@ -230,15 +230,26 @@ export function Sidebar({
       isVoiceChannel &&
       voiceChannelParticipants[channel.id] &&
       voiceChannelParticipants[channel.id].length > 0 ? (
-        <div className="px-2 pt-1 flex items-center gap-1">
-          {voiceChannelParticipants[channel.id].slice(0, 4).map((participant) => {
+        <div className="px-2 pt-1 space-y-1">
+          {voiceChannelParticipants[channel.id].slice(0, 3).map((participant) => {
             const initial = participant.displayName.trim().charAt(0).toUpperCase() || '?';
             return (
               <Tooltip key={participant.userId}>
                 <TooltipTrigger asChild>
-                  <span className="size-5 rounded-full bg-[#304867] text-[10px] text-white font-semibold flex items-center justify-center">
-                    {initial}
-                  </span>
+                  <div className="flex items-center gap-2 text-xs text-[#d1dff4]">
+                    <span
+                      className={`size-5 rounded-full bg-[#304867] text-[10px] text-white font-semibold flex items-center justify-center border ${
+                        participant.isSpeaking ? 'border-[#6dd5a6] shadow-[0_0_0_1px_rgba(109,213,166,0.35)]' : 'border-transparent'
+                      }`}
+                    >
+                      {participant.avatarUrl ? (
+                        <img src={participant.avatarUrl} alt={participant.displayName} className="size-5 rounded-full" />
+                      ) : (
+                        initial
+                      )}
+                    </span>
+                    <span className="truncate">{participant.displayName}</span>
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent side="right" sideOffset={6}>
                   {participant.displayName}
@@ -246,20 +257,6 @@ export function Sidebar({
               </Tooltip>
             );
           })}
-          {voiceChannelParticipants[channel.id].length > 4 && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="size-5 rounded-full bg-[#22334f] text-[10px] text-[#d1dff4] font-semibold flex items-center justify-center">
-                  ...
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={6}>
-                {voiceChannelParticipants[channel.id]
-                  .map((participant) => participant.displayName)
-                  .join(', ')}
-              </TooltipContent>
-            </Tooltip>
-          )}
         </div>
       ) : null;
 

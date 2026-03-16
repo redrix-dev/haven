@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { APP_ASSETS } from '../generated/appAssets.generated';
 
 export function MobileSplashScreen() {
   return (
@@ -8,7 +9,7 @@ export function MobileSplashScreen() {
       style={{ height: 'var(--app-visual-viewport-height, 100dvh)' }}
     >
       <img
-        src="/icon-192.png"
+        src={APP_ASSETS.web.splashIcon}
         alt="Haven"
         className="w-20 h-20 rounded-2xl shadow-lg"
       />

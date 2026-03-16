@@ -58,4 +58,10 @@ export const desktopClient = {
   onProtocolUrl(listener: (url: string) => void): () => void {
     return getDesktopApi().onProtocolUrl(listener);
   },
+  async openVoicePopout(): Promise<{ opened: boolean }> {
+    return getDesktopApi().openVoicePopout();
+  },
+  async setVoicePushToTalkActive(active: boolean): Promise<{ active: boolean }> {
+    return getDesktopApi().setVoicePushToTalkActive(active);
+  },
 };

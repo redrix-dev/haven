@@ -4,8 +4,8 @@
 
 const SW_VERSION = 'push-v1';
 const DEFAULT_NOTIFICATION_TITLE = 'Haven';
-const DEFAULT_NOTIFICATION_ICON = '/icon-192.png';
-const DEFAULT_NOTIFICATION_BADGE = '/icon-192.png';
+const DEFAULT_NOTIFICATION_ICON = '/icon-192.png'; // generated from appAssets
+const DEFAULT_NOTIFICATION_BADGE = '/icon-192.png'; // generated from appAssets
 const DEFAULT_TARGET_PATH = '/';
 const DEBUG_NOTIFICATION_TAG = 'haven:debug:test';
 const ROUTE_TRACE_MESSAGE_TYPE = 'HAVEN_PUSH_DELIVERY_TRACE';

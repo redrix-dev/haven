@@ -11,7 +11,9 @@ export const areVoiceParticipantListsEqual = (
   for (let index = 0; index < left.length; index += 1) {
     if (
       left[index].userId !== right[index].userId ||
-      left[index].displayName !== right[index].displayName
+      left[index].displayName !== right[index].displayName ||
+      left[index].avatarUrl !== right[index].avatarUrl ||
+      left[index].isSpeaking !== right[index].isSpeaking
     ) {
       return false;
     }

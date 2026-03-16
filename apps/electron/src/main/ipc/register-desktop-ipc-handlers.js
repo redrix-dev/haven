@@ -108,6 +108,11 @@ const registerDesktopIpcHandlers = ({
   registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.PROTOCOL_URL_CONSUME_NEXT, async () =>
     pendingProtocolUrls.shift() ?? null
   );
+
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.VOICE_POPOUT_OPEN, async () => ({ opened: true }));
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.VOICE_PTT_SET_ACTIVE, async (_event, payload) => ({
+    active: Boolean(payload?.active),
+  }));
 };
 
 module.exports = {

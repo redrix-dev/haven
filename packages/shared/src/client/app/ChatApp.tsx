@@ -12,6 +12,7 @@ import { ChannelSettingsModal } from '@shared/components/ChannelSettingsModal';
 import { Sidebar } from '@shared/components/Sidebar';
 import { ChatArea } from '@shared/components/ChatArea';
 import { VoiceChannelPane } from '@shared/components/VoiceChannelPane';
+import { VoiceDrawer } from '@shared/components/voice/VoiceDrawer';
 import { VoiceHardwareDebugPanel } from '@shared/components/VoiceHardwareDebugPanel';
 import { VoiceSettingsModal } from '@shared/components/VoiceSettingsModal';
 import { NotificationCenterModal } from '@shared/components/NotificationCenterModal';
@@ -199,121 +200,20 @@ export function ChatApp() {
               voiceChannelParticipants={app.voiceChannelParticipants}
               voiceStatusPanel={
                 app.activeVoiceChannel ? (
-                  <div className="px-2 pt-2 pb-1 border-b border-[#22334f]">
-                    <div className="rounded-md border border-[#304867] bg-[#142033] px-2 py-2 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[11px] uppercase tracking-wide text-[#8ea4c7]">Voice Connected</p>
-                          <p className="text-xs font-semibold text-white truncate flex items-center gap-1">
-                            <Headphones className="size-3.5" />
-                            {app.activeVoiceChannel.name}
-                          </p>
-                          <p className="text-[11px] text-[#95a5bf] truncate">{app.currentServer.name}</p>
-                        </div>
-                        <span
-                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            app.voiceConnected
-                              ? 'bg-[#2f9f73]/20 text-[#6dd5a6]'
-                              : 'bg-[#44546f]/40 text-[#b5c4de]'
-                          }`}
-                        >
-                          {app.voiceConnected ? 'Live' : 'Connecting'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {!app.voiceSessionState.joined ? (
-                          <Button
-                            type="button"
-                            size="icon-xs"
-                            variant="ghost"
-                            onClick={() => app.voiceControlActions?.join()}
-                            disabled={!app.voiceControlActions}
-                            className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
-                          >
-                            <Headphones className="size-4" />
-                          </Button>
-                        ) : (
-                          <>
-                            <Button
-                              type="button"
-                              size="icon-xs"
-                              variant="ghost"
-                              onClick={() => app.voiceControlActions?.toggleMute()}
-                              disabled={!app.voiceControlActions}
-                              className={`hover:bg-[#22334f] ${
-                                app.voiceSessionState.isMuted
-                                  ? 'text-[#f3a2a2] hover:text-[#ffd2d2]'
-                                  : 'text-[#a9b8cf] hover:text-white'
-                              }`}
-                            >
-                              {app.voiceSessionState.isMuted ? (
-                                <MicOff className="size-4" />
-                              ) : (
-                                <Mic className="size-4" />
-                              )}
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon-xs"
-                              variant="ghost"
-                              onClick={() => app.voiceControlActions?.toggleDeafen()}
-                              disabled={!app.voiceControlActions}
-                              className={`hover:bg-[#22334f] ${
-                                app.voiceSessionState.isDeafened
-                                  ? 'text-[#f3a2a2] hover:text-[#ffd2d2]'
-                                  : 'text-[#a9b8cf] hover:text-white'
-                              }`}
-                            >
-                              <VolumeX className="size-4" />
-                            </Button>
-                          </>
-                        )}
-                        <Button
-                          type="button"
-                          size="icon-xs"
-                          variant="ghost"
-                          onClick={() => app.setVoicePanelOpen((prev) => !prev)}
-                          className={`hover:text-white hover:bg-[#22334f] ${
-                            app.voicePanelOpen ? 'text-white' : 'text-[#a9b8cf]'
-                          }`}
-                        >
-                          <Settings2 className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon-xs"
-                          variant="ghost"
-                          onClick={() => app.disconnectVoiceSession()}
-                          className="text-[#f0b0b0] hover:text-[#ffd1d1] hover:bg-[#3b2535]"
-                        >
-                          <PhoneOff className="size-4" />
-                        </Button>
-                        <div className="ml-auto text-[11px] text-[#95a5bf]">
-                          {app.activeVoiceParticipantCount} in call
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <VoiceDrawer
+                    channelName={app.activeVoiceChannel.name}
+                    serverName={app.currentServer.name}
+                    connected={app.voiceConnected}
+                    joined={app.voiceSessionState.joined}
+                    muted={app.voiceSessionState.isMuted}
+                    onNavigateToChannel={() => app.setCurrentChannelId(app.activeVoiceChannel?.id ?? null)}
+                    onJoin={() => app.voiceControlActions?.join()}
+                    onLeave={() => app.voiceControlActions?.leave()}
+                    onToggleMute={() => app.voiceControlActions?.toggleMute()}
+                    onToggleDeafen={() => app.voiceControlActions?.toggleDeafen()}
+                    onOpenAdvanced={() => app.setVoicePanelOpen(true)}
+                  />
                 ) : null
-              }
-              footerStatusActions={
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => app.setShowVoiceSettingsModal(true)}
-                  className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
-                  aria-label="Open voice settings"
-                  title="Voice Settings"
-                >
-                  <Headphones className="size-3.5" />
-                  <span>Voice</span>
-                </Button>
-              }
-              onCreateChannel={
-                app.serverPermissions.canCreateChannels
-                  ? () => app.setShowCreateChannelModal(true)
-                  : undefined
               }
               canManageChannels={canOpenChannelSettings}
               canManageChannelStructure={canManageChannelStructure}

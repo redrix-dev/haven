@@ -10,6 +10,7 @@ import { Button } from '@shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { PushToTalkBindingField } from '@shared/components/PushToTalkBindingField';
 import { isEditableKeyboardTarget } from '@client/app/utils';
+import { useVoiceMemberVolumes } from '@client/features/voice/hooks/useVoiceMemberVolumes';
 import { Slider } from '@shared/components/ui/slider';
 import {
   Select,
@@ -138,7 +139,7 @@ export function VoiceChannelPane({
   const [joining, setJoining] = useState(false);
   const [participants, setParticipants] = useState<VoiceParticipant[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
-  const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>({});
+  const { remoteVolumes, setRemoteVolumes, resetMemberVolume, resetAllMemberVolumes } = useVoiceMemberVolumes();
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1551,6 +1552,9 @@ export function VoiceChannelPane({
       <Card className="bg-[#1c2a43] border-[#263a58] text-white">
         <CardHeader>
           <CardTitle>Participants ({participants.length + (joined ? 1 : 0)})</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={resetAllMemberVolumes}>Reset all volumes</Button>
+          </div>
           <CardDescription className="text-[#a9b8cf]">
             Per-user volume is local to your client.
           </CardDescription>

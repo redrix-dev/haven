@@ -66,3 +66,11 @@ export const playNotificationSound = async ({
   }
 };
 
+
+export const playVoiceEventSound = async (audioSettings: NotificationAudioSettings): Promise<NotificationSoundPlayResult> =>
+  playNotificationSound({
+    kind: 'system',
+    deliverSound: true,
+    audioSettings,
+    suppressWhenUnfocused: false,
+  });

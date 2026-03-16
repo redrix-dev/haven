@@ -8,6 +8,8 @@ const DESKTOP_IPC_KEYS = Object.freeze({
   MEDIA_SAVE_FROM_URL: 'haven:media:save-from-url',
   PROTOCOL_URL_CONSUME_NEXT: 'haven:protocol:consume-next-url',
   PROTOCOL_URL_EVENT: 'haven:protocol:url',
+  VOICE_POPOUT_OPEN: 'haven:voice:popout:open',
+  VOICE_PTT_SET_ACTIVE: 'haven:voice:ptt:set-active',
 });
 
 module.exports = {

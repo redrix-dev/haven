@@ -1,11 +1,12 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const packageJson = require('./package.json');
+const appAssets = require('./tooling/config/app-assets.cjs');
 
 module.exports = {
   packagerConfig: {
     asar: true,
-    icon: './apps/electron/assets/icon',
+    icon: appAssets.desktop.iconBase,
     win32metadata: {
       CompanyName: 'Haven',
       FileDescription: 'Haven',
@@ -35,8 +36,8 @@ module.exports = {
         name: 'haven',
         exe: 'Haven.exe',
         setupExe: `haven-${packageJson.version}.Setup.exe`,
-        setupIcon: './apps/electron/assets/icon.ico',
-        iconUrl: 'https://github.com/redrix-dev/haven/raw/main/apps/electron/assets/icon.ico',
+        setupIcon: appAssets.desktop.setupIcon,
+        iconUrl: appAssets.desktop.iconUrl,
       },
     },
     {

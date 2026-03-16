@@ -13,6 +13,8 @@ const exposeDesktopBridge = ({ contextBridge, ipcRenderer }) => {
     checkForUpdates: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_CHECK_NOW),
     saveFileFromUrl: (payload) => ipcRenderer.invoke(DESKTOP_IPC_KEYS.MEDIA_SAVE_FROM_URL, payload),
     consumeNextProtocolUrl: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.PROTOCOL_URL_CONSUME_NEXT),
+    openVoicePopout: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_POPOUT_OPEN),
+    setVoicePushToTalkActive: (active) => ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_PTT_SET_ACTIVE, { active }),
     onProtocolUrl: (listener) => {
       if (typeof listener !== 'function') {
         return () => {};
