@@ -8,11 +8,15 @@ import type {
 export type VoiceSidebarParticipant = {
   userId: string;
   displayName: string;
+  avatarUrl?: string | null;
+  isSpeaking?: boolean;
 };
 
 export type VoicePresenceStateRow = {
   user_id?: string | null;
   display_name?: string | null;
+  avatar_url?: string | null;
+  is_speaking?: boolean | null;
   joined_at?: string | null;
 };
 

@@ -472,6 +472,7 @@ export function ChatApp() {
                 channelName={app.activeVoiceChannel.name}
                 currentUserId={user.id}
                 currentUserDisplayName={app.userDisplayName}
+                currentUserAvatarUrl={app.profileAvatarUrl}
                 voiceSettings={app.appSettings.voice}
                 voiceSettingsSaving={app.voiceSettingsSaving}
                 voiceSettingsError={app.voiceSettingsError}

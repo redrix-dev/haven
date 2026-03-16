@@ -247,6 +247,7 @@ export function useChatAppOrchestration() {
     currentServerId,
     currentUserId: user?.id,
     currentUserDisplayName: userDisplayName,
+    currentUserAvatarUrl: profileAvatarUrl,
     currentChannelId,
     setCurrentChannelId,
     voiceHardwareDebugPanelEnabled,
