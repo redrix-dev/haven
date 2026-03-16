@@ -1,0 +1,18 @@
+{
+  "desktop": {
+    "iconBasePath": "apps/electron/assets/icon",
+    "iconIcoPath": "apps/electron/assets/icon.ico",
+    "iconPngPath": "apps/electron/assets/icon.png"
+  },
+  "web": {
+    "pwaIcons": {
+      "size192": "/icon-192.png",
+      "size512": "/icon-512.png"
+    },
+    "splashIcon": "/icon-192.png",
+    "notification": {
+      "iconFallback": "/icon-192.png",
+      "badgeFallback": "/icon-192.png"
+    }
+  }
+}

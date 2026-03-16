@@ -32,8 +32,9 @@
     "test:all": "npm run lint && npx tsc --noEmit --project tsconfig.json && npm run test:unit && npm run test:db && npm run test:backend",
     "test:ci": "npm run lint && npx tsc --noEmit --project tsconfig.json && npm run test:unit && npm run test:db && npm run test:backend",
     "ci:verify": "npm run test:ci",
-    "dev:web": "vite",
-    "build:web": "vite build"
+    "dev:web": "npm run assets:generate && vite",
+    "build:web": "npm run assets:generate && vite build",
+    "assets:generate": "node tooling/scripts/assets/generate-app-assets.mjs"
   },
   "keywords": [],
   "author": {
