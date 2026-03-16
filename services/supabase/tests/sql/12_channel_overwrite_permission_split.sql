@@ -34,8 +34,7 @@ select test_support.assert_eq_int(
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('community_owner'));
 
-create temp table tmp_structure_role on commit drop as
-with inserted as (
+with structure_role as (
   insert into public.roles (
     community_id,
     name,
@@ -54,14 +53,11 @@ with inserted as (
   )
   returning id
 )
-select id from inserted;
-
 insert into split_ids (key, id)
-select 'structure_role', id from tmp_structure_role
+select 'structure_role', id from structure_role
 on conflict (key) do update set id = excluded.id;
 
-create temp table tmp_target_role on commit drop as
-with inserted as (
+with target_role as (
   insert into public.roles (
     community_id,
     name,
@@ -80,10 +76,8 @@ with inserted as (
   )
   returning id
 )
-select id from inserted;
-
 insert into split_ids (key, id)
-select 'target_role', id from tmp_target_role
+select 'target_role', id from target_role
 on conflict (key) do update set id = excluded.id;
 
 insert into public.role_permissions (role_id, permission_key)
