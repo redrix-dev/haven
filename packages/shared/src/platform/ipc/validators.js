@@ -25,6 +25,17 @@ function parseSetNotificationAudioPayload(payload) {
     throw new Error('Invalid playSoundsWhenFocused value. Expected a boolean.');
   }
 
+  if (typeof payload.voicePresenceSoundEnabled !== 'boolean') {
+    throw new Error('Invalid voicePresenceSoundEnabled value. Expected a boolean.');
+  }
+
+  if (
+    typeof payload.voicePresenceSoundVolume !== 'number' ||
+    !Number.isFinite(payload.voicePresenceSoundVolume)
+  ) {
+    throw new Error('Invalid voicePresenceSoundVolume value. Expected a number.');
+  }
+
   if (
     typeof payload.notificationSoundVolume !== 'number' ||
     !Number.isFinite(payload.notificationSoundVolume)
@@ -37,9 +48,16 @@ function parseSetNotificationAudioPayload(payload) {
     throw new Error('Invalid notificationSoundVolume value. Expected 0-100.');
   }
 
+  const roundedVoicePresenceVolume = Math.round(payload.voicePresenceSoundVolume);
+  if (roundedVoicePresenceVolume < 0 || roundedVoicePresenceVolume > 100) {
+    throw new Error('Invalid voicePresenceSoundVolume value. Expected 0-100.');
+  }
+
   return {
     masterSoundEnabled: payload.masterSoundEnabled,
     notificationSoundVolume: roundedVolume,
+    voicePresenceSoundEnabled: payload.voicePresenceSoundEnabled,
+    voicePresenceSoundVolume: roundedVoicePresenceVolume,
     playSoundsWhenFocused: payload.playSoundsWhenFocused,
   };
 }

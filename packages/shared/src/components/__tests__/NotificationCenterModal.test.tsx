@@ -26,6 +26,8 @@ const basePreferences: NotificationPreferences = {
 const baseLocalAudioSettings: NotificationAudioSettings = {
   masterSoundEnabled: true,
   notificationSoundVolume: 50,
+  voicePresenceSoundEnabled: true,
+  voicePresenceSoundVolume: 50,
   playSoundsWhenFocused: true,
 };
 

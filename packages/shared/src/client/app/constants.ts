@@ -17,6 +17,8 @@ export const ENHANCED_COMPOSER_FLAG = 'enhanced_composer_v1';
 export const DEFAULT_NOTIFICATION_AUDIO_SETTINGS: NotificationAudioSettings = {
   masterSoundEnabled: true,
   notificationSoundVolume: 70,
+  voicePresenceSoundEnabled: true,
+  voicePresenceSoundVolume: 70,
   playSoundsWhenFocused: true,
 };
 
@@ -37,7 +39,7 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   autoUpdateEnabled: true,
   notifications: { ...DEFAULT_NOTIFICATION_AUDIO_SETTINGS },
   voice: { ...DEFAULT_VOICE_SETTINGS },

@@ -1,6 +1,8 @@
 export type NotificationAudioSettings = {
   masterSoundEnabled: boolean;
   notificationSoundVolume: number;
+  voicePresenceSoundEnabled: boolean;
+  voicePresenceSoundVolume: number;
   playSoundsWhenFocused: boolean;
 };
 

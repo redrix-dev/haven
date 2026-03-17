@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SETTINGS_SCHEMA_VERSION = 3;
+const SETTINGS_SCHEMA_VERSION = 4;
 
 const DEFAULT_APP_SETTINGS = {
   schemaVersion: SETTINGS_SCHEMA_VERSION,
@@ -9,6 +9,8 @@ const DEFAULT_APP_SETTINGS = {
   notifications: {
     masterSoundEnabled: true,
     notificationSoundVolume: 70,
+    voicePresenceSoundEnabled: true,
+    voicePresenceSoundVolume: 70,
     playSoundsWhenFocused: true,
   },
   voice: {
@@ -46,6 +48,7 @@ function createSettingsStore(app) {
         ? candidate.voice
         : {};
     const normalizedVolume = Number(candidateNotifications.notificationSoundVolume);
+    const normalizedVoicePresenceVolume = Number(candidateNotifications.voicePresenceSoundVolume);
     const normalizedVoiceActivationThreshold = Number(candidateVoice.voiceActivationThreshold);
     const candidatePushToTalkBinding =
       candidateVoice.pushToTalkBinding && typeof candidateVoice.pushToTalkBinding === 'object'
@@ -94,6 +97,16 @@ function createSettingsStore(app) {
           Number.isFinite(normalizedVolume) && normalizedVolume >= 0 && normalizedVolume <= 100
             ? Math.round(normalizedVolume)
             : DEFAULT_APP_SETTINGS.notifications.notificationSoundVolume,
+        voicePresenceSoundEnabled:
+          typeof candidateNotifications.voicePresenceSoundEnabled === 'boolean'
+            ? candidateNotifications.voicePresenceSoundEnabled
+            : DEFAULT_APP_SETTINGS.notifications.voicePresenceSoundEnabled,
+        voicePresenceSoundVolume:
+          Number.isFinite(normalizedVoicePresenceVolume) &&
+          normalizedVoicePresenceVolume >= 0 &&
+          normalizedVoicePresenceVolume <= 100
+            ? Math.round(normalizedVoicePresenceVolume)
+            : DEFAULT_APP_SETTINGS.notifications.voicePresenceSoundVolume,
         playSoundsWhenFocused:
           typeof candidateNotifications.playSoundsWhenFocused === 'boolean'
             ? candidateNotifications.playSoundsWhenFocused

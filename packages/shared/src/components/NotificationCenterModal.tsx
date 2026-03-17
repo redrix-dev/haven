@@ -692,6 +692,41 @@ export function NotificationCenterModal({
                         aria-label="Notification sound volume"
                       />
                     </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm">Voice join/leave sounds</span>
+                      <Switch
+                        checked={localAudioSettings.voicePresenceSoundEnabled}
+                        onCheckedChange={(checked) =>
+                          onUpdateLocalAudioSettings({
+                            ...localAudioSettings,
+                            voicePresenceSoundEnabled: checked,
+                          })
+                        }
+                        disabled={localAudioSaving}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2 text-xs text-[#a9b8cf]">
+                        <span>Voice join/leave volume</span>
+                        <span>{localAudioSettings.voicePresenceSoundVolume}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={localAudioSettings.voicePresenceSoundVolume}
+                        onChange={(event) =>
+                          onUpdateLocalAudioSettings({
+                            ...localAudioSettings,
+                            voicePresenceSoundVolume: Number(event.target.value),
+                          })
+                        }
+                        disabled={localAudioSaving || !localAudioSettings.voicePresenceSoundEnabled}
+                        className="w-full accent-[#4f8df5]"
+                        aria-label="Voice join/leave sound volume"
+                      />
+                    </div>
                     {localAudioError && <p className="text-sm text-red-300">{localAudioError}</p>}
                   </div>
 

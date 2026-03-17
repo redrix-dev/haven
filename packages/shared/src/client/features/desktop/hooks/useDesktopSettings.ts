@@ -39,8 +39,11 @@ const readWebNotificationAudioSettings = (): NotificationAudioSettings | null =>
     if (
       typeof parsed.masterSoundEnabled !== 'boolean' ||
       typeof parsed.playSoundsWhenFocused !== 'boolean' ||
+      typeof parsed.voicePresenceSoundEnabled !== 'boolean' ||
       typeof parsed.notificationSoundVolume !== 'number' ||
-      !Number.isFinite(parsed.notificationSoundVolume)
+      !Number.isFinite(parsed.notificationSoundVolume) ||
+      typeof parsed.voicePresenceSoundVolume !== 'number' ||
+      !Number.isFinite(parsed.voicePresenceSoundVolume)
     ) {
       return null;
     }
@@ -49,6 +52,8 @@ const readWebNotificationAudioSettings = (): NotificationAudioSettings | null =>
       masterSoundEnabled: parsed.masterSoundEnabled,
       playSoundsWhenFocused: parsed.playSoundsWhenFocused,
       notificationSoundVolume: Math.max(0, Math.min(100, Math.round(parsed.notificationSoundVolume))),
+      voicePresenceSoundEnabled: parsed.voicePresenceSoundEnabled,
+      voicePresenceSoundVolume: Math.max(0, Math.min(100, Math.round(parsed.voicePresenceSoundVolume))),
     };
   } catch {
     return null;

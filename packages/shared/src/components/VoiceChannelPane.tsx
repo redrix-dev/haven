@@ -5,7 +5,11 @@ import { fetchIceConfig } from "@shared/lib/voice/ice";
 import { matchesVoicePushToTalkBinding } from "@shared/lib/voice/pushToTalk";
 import { useVoiceMemberVolumes } from "@client/features/voice/hooks/useVoiceMemberVolumes";
 import { getErrorMessage } from "@platform/lib/errors";
-import type { VoiceSettings } from "@platform/desktop/types";
+import { playVoicePresenceSound } from "@shared/lib/notifications/sound";
+import type {
+  NotificationAudioSettings,
+  VoiceSettings,
+} from "@platform/desktop/types";
 import { Badge } from "@shared/components/ui/badge";
 import {
   Avatar,
@@ -100,6 +104,7 @@ interface VoiceChannelPaneProps {
   currentUserDisplayName: string;
   currentUserAvatarUrl?: string | null;
   voiceSettings: VoiceSettings;
+  notificationAudioSettings: NotificationAudioSettings;
   voiceSettingsSaving?: boolean;
   voiceSettingsError?: string | null;
   onUpdateVoiceSettings?: (next: VoiceSettings) => void;
@@ -162,6 +167,7 @@ export function VoiceChannelPane({
   currentUserDisplayName,
   currentUserAvatarUrl,
   voiceSettings,
+  notificationAudioSettings,
   voiceSettingsSaving = false,
   voiceSettingsError = null,
   onUpdateVoiceSettings,
@@ -231,6 +237,10 @@ export function VoiceChannelPane({
   const lastVoiceActivityAtRef = useRef<number>(0);
   const activePushToTalkCodeRef = useRef<string | null>(null);
   const voiceSettingsRef = useRef(voiceSettings);
+  const notificationAudioSettingsRef = useRef(notificationAudioSettings);
+  const previousRemoteParticipantIdsRef = useRef<Set<string>>(new Set());
+  const hasPresenceSyncedOnceRef = useRef(false);
+  const lastPresenceSoundAtRef = useRef(0);
   const joinVoiceChannelActionRef = useRef<(() => Promise<void>) | null>(null);
   const leaveVoiceChannelActionRef = useRef<(() => Promise<void>) | null>(null);
   const toggleMuteActionRef = useRef<(() => void) | null>(null);
@@ -820,6 +830,48 @@ export function VoiceChannelPane({
     }
 
     nextParticipants.sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    const nextParticipantIds = new Set(
+      nextParticipants.map((participant) => participant.userId),
+    );
+    if (hasPresenceSyncedOnceRef.current) {
+      const previousIds = previousRemoteParticipantIdsRef.current;
+      let nextSoundEvent:
+        | "voice_presence_join"
+        | "voice_presence_leave"
+        | null = null;
+
+      for (const participantId of nextParticipantIds) {
+        if (!previousIds.has(participantId)) {
+          nextSoundEvent = "voice_presence_join";
+          break;
+        }
+      }
+
+      if (!nextSoundEvent) {
+        for (const participantId of previousIds) {
+          if (!nextParticipantIds.has(participantId)) {
+            nextSoundEvent = "voice_presence_leave";
+            break;
+          }
+        }
+      }
+
+      if (nextSoundEvent) {
+        const now = Date.now();
+        if (now - lastPresenceSoundAtRef.current >= 900) {
+          lastPresenceSoundAtRef.current = now;
+          void playVoicePresenceSound({
+            event: nextSoundEvent,
+            audioSettings: notificationAudioSettingsRef.current,
+          });
+        }
+      }
+    }
+
+    previousRemoteParticipantIdsRef.current = nextParticipantIds;
+    hasPresenceSyncedOnceRef.current = true;
+
     setParticipants(nextParticipants);
     reconcilePeerConnections(
       nextParticipants.map((participant) => participant.userId),
@@ -969,6 +1021,8 @@ export function VoiceChannelPane({
     setVoiceActivityGateOpen(false);
     setPushToTalkPressed(false);
     activePushToTalkCodeRef.current = null;
+    previousRemoteParticipantIdsRef.current = new Set();
+    hasPresenceSyncedOnceRef.current = false;
 
     if (channel) {
       try {
@@ -1120,6 +1174,10 @@ export function VoiceChannelPane({
   useEffect(() => {
     voiceSettingsRef.current = voiceSettings;
   }, [voiceSettings]);
+
+  useEffect(() => {
+    notificationAudioSettingsRef.current = notificationAudioSettings;
+  }, [notificationAudioSettings]);
 
   useEffect(() => {
     setSupportsOutputSelection(
