@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     root: "apps/web-mobile/src",
+    publicDir: path.resolve(__dirname, "./apps/web-mobile/public"),
     resolve: {
       alias: {
         "@electron": path.resolve(__dirname, "./apps/electron/src"),
@@ -36,6 +37,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: "../../../dist/web",
+      emptyOutDir: true,
     },
     server: {
       host: true,

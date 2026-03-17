@@ -9,6 +9,8 @@
       "size192": "/icon-192.png",
       "size512": "/icon-512.png"
     },
+    "browserTabIcon": "/icon-192.png",
+    "appleTouchIcon": "/icon-192.png",
     "splashIcon": "/icon-192.png",
     "notification": {
       "iconFallback": "/icon-192.png",

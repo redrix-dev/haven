@@ -13,8 +13,11 @@ export const assertWebAppAssetsInDev = async (): Promise<void> => {
   if (process.env.NODE_ENV !== 'development') return;
 
   const checks: Array<[string, string]> = [
+    ['Manifest', webAppAssets.manifestUrl],
     ['PWA icon 192', webAppAssets.pwaIcon192],
     ['PWA icon 512', webAppAssets.pwaIcon512],
+    ['Browser tab icon', webAppAssets.browserTabIcon],
+    ['Apple touch icon', webAppAssets.appleTouchIcon],
     ['Splash icon', webAppAssets.splashIcon],
     ['Notification icon fallback', webAppAssets.notificationIconFallback],
     ['Notification badge fallback', webAppAssets.notificationBadgeFallback],
