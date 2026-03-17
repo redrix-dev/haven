@@ -44,7 +44,6 @@ import {
   buildWebPushCutoverReadiness,
   buildWebPushQueueHealthAlerts,
 } from "@shared/lib/notifications/webPushDiagnostics";
-import type { VoicePopoutState } from "@platform/desktop/types";
 import { toast } from "sonner";
 import { useServerOrder } from "@client/features/community/hooks/useServerOrder";
 
