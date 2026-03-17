@@ -154,9 +154,113 @@ function parseSaveFileFromUrlPayload(payload) {
   };
 }
 
+
+function parseVoicePopoutMemberState(member) {
+  if (!member || typeof member !== 'object') {
+    throw new Error('Invalid voice popout member state.');
+  }
+
+  if (typeof member.userId !== 'string' || member.userId.trim().length === 0) {
+    throw new Error('Invalid voice popout member userId.');
+  }
+
+  const displayName = typeof member.displayName === 'string' ? member.displayName.trim() : '';
+  if (displayName.length === 0) {
+    throw new Error('Invalid voice popout member displayName.');
+  }
+
+  if (typeof member.volume !== 'number' || !Number.isFinite(member.volume)) {
+    throw new Error('Invalid voice popout member volume.');
+  }
+
+  const volume = Math.max(0, Math.min(200, Math.round(member.volume)));
+
+  return {
+    userId: member.userId.trim(),
+    displayName,
+    isMuted: Boolean(member.isMuted),
+    isDeafened: Boolean(member.isDeafened),
+    volume,
+  };
+}
+
+function parseVoicePopoutStatePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid payload for voice popout state sync.');
+  }
+
+  const channelName =
+    typeof payload.channelName === 'string' && payload.channelName.trim().length > 0
+      ? payload.channelName.trim()
+      : null;
+
+  if (typeof payload.selectedInputDeviceId !== 'string') {
+    throw new Error('Invalid selectedInputDeviceId for voice popout state.');
+  }
+
+  if (typeof payload.selectedOutputDeviceId !== 'string') {
+    throw new Error('Invalid selectedOutputDeviceId for voice popout state.');
+  }
+
+  const members = Array.isArray(payload.members)
+    ? payload.members.map(parseVoicePopoutMemberState)
+    : [];
+
+  return {
+    isOpen: Boolean(payload.isOpen),
+    channelName,
+    connected: Boolean(payload.connected),
+    joined: Boolean(payload.joined),
+    isMuted: Boolean(payload.isMuted),
+    isDeafened: Boolean(payload.isDeafened),
+    selectedInputDeviceId: payload.selectedInputDeviceId.trim() || 'default',
+    selectedOutputDeviceId: payload.selectedOutputDeviceId.trim() || 'default',
+    members,
+  };
+}
+
+function parseVoicePopoutControlActionPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid payload for voice popout control action.');
+  }
+
+  if (payload.type === 'toggle_mute' || payload.type === 'toggle_deafen') {
+    return { type: payload.type };
+  }
+
+  if (payload.type === 'set_input_device' || payload.type === 'set_output_device') {
+    if (typeof payload.deviceId !== 'string' || payload.deviceId.trim().length === 0) {
+      throw new Error('Invalid deviceId for voice popout control action.');
+    }
+    return {
+      type: payload.type,
+      deviceId: payload.deviceId.trim(),
+    };
+  }
+
+  if (payload.type === 'set_member_volume') {
+    if (typeof payload.userId !== 'string' || payload.userId.trim().length === 0) {
+      throw new Error('Invalid userId for voice popout member volume action.');
+    }
+    if (typeof payload.volume !== 'number' || !Number.isFinite(payload.volume)) {
+      throw new Error('Invalid volume for voice popout member volume action.');
+    }
+
+    return {
+      type: 'set_member_volume',
+      userId: payload.userId.trim(),
+      volume: Math.max(0, Math.min(200, Math.round(payload.volume))),
+    };
+  }
+
+  throw new Error('Invalid type for voice popout control action.');
+}
+
 module.exports = {
   parseSetAutoUpdatePayload,
   parseSetNotificationAudioPayload,
   parseSetVoiceSettingsPayload,
   parseSaveFileFromUrlPayload,
+  parseVoicePopoutStatePayload,
+  parseVoicePopoutControlActionPayload,
 };

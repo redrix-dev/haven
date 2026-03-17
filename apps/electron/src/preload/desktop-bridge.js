@@ -13,6 +13,42 @@ const exposeDesktopBridge = ({ contextBridge, ipcRenderer }) => {
     checkForUpdates: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_CHECK_NOW),
     saveFileFromUrl: (payload) => ipcRenderer.invoke(DESKTOP_IPC_KEYS.MEDIA_SAVE_FROM_URL, payload),
     consumeNextProtocolUrl: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.PROTOCOL_URL_CONSUME_NEXT),
+
+    openVoicePopout: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_POPOUT_OPEN),
+    closeVoicePopout: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_POPOUT_CLOSE),
+    syncVoicePopoutState: (payload) =>
+      ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_POPOUT_STATE_SYNC, payload),
+    dispatchVoicePopoutControlAction: (payload) =>
+      ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_POPOUT_CONTROL_DISPATCH, payload),
+
+    onVoicePopoutState: (listener) => {
+      if (typeof listener !== 'function') {
+        return () => {};
+      }
+
+      const wrappedListener = (_event, state) => {
+        listener(state);
+      };
+
+      ipcRenderer.on(DESKTOP_IPC_KEYS.VOICE_POPOUT_STATE_EVENT, wrappedListener);
+      return () => {
+        ipcRenderer.removeListener(DESKTOP_IPC_KEYS.VOICE_POPOUT_STATE_EVENT, wrappedListener);
+      };
+    },
+    onVoicePopoutControlAction: (listener) => {
+      if (typeof listener !== 'function') {
+        return () => {};
+      }
+
+      const wrappedListener = (_event, action) => {
+        listener(action);
+      };
+
+      ipcRenderer.on(DESKTOP_IPC_KEYS.VOICE_POPOUT_CONTROL_EVENT, wrappedListener);
+      return () => {
+        ipcRenderer.removeListener(DESKTOP_IPC_KEYS.VOICE_POPOUT_CONTROL_EVENT, wrappedListener);
+      };
+    },
     onProtocolUrl: (listener) => {
       if (typeof listener !== 'function') {
         return () => {};

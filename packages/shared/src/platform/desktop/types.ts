@@ -62,6 +62,33 @@ export type SaveFileFromUrlResult = {
   filePath: string | null;
 };
 
+export type VoicePopoutMemberState = {
+  userId: string;
+  displayName: string;
+  isMuted: boolean;
+  isDeafened: boolean;
+  volume: number;
+};
+
+export type VoicePopoutState = {
+  isOpen: boolean;
+  channelName: string | null;
+  connected: boolean;
+  joined: boolean;
+  isMuted: boolean;
+  isDeafened: boolean;
+  selectedInputDeviceId: string;
+  selectedOutputDeviceId: string;
+  members: VoicePopoutMemberState[];
+};
+
+export type VoicePopoutControlAction =
+  | { type: 'toggle_mute' }
+  | { type: 'toggle_deafen' }
+  | { type: 'set_input_device'; deviceId: string }
+  | { type: 'set_output_device'; deviceId: string }
+  | { type: 'set_member_volume'; userId: string; volume: number };
+
 export type DesktopAPI = {
   getAppSettings: () => Promise<AppSettings>;
   setAutoUpdateEnabled: (enabled: boolean) => Promise<{
@@ -81,7 +108,13 @@ export type DesktopAPI = {
     suggestedName?: string | null;
   }) => Promise<SaveFileFromUrlResult>;
   consumeNextProtocolUrl: () => Promise<string | null>;
+  openVoicePopout: () => Promise<{ opened: boolean }>;
+  closeVoicePopout: () => Promise<{ closed: boolean }>;
+  syncVoicePopoutState: (state: VoicePopoutState) => Promise<void>;
+  dispatchVoicePopoutControlAction: (action: VoicePopoutControlAction) => Promise<void>;
   onProtocolUrl: (listener: (url: string) => void) => () => void;
+  onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => () => void;
+  onVoicePopoutControlAction: (listener: (action: VoicePopoutControlAction) => void) => () => void;
 };
 
 declare global {

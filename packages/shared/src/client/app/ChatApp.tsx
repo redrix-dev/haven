@@ -12,6 +12,8 @@ import { ChannelSettingsModal } from "@shared/components/ChannelSettingsModal";
 import { Sidebar } from "@shared/components/Sidebar";
 import { ChatArea } from "@shared/components/ChatArea";
 import { VoiceHardwareDebugPanel } from "@shared/components/VoiceHardwareDebugPanel";
+import { VoiceDrawer } from "@shared/components/VoiceDrawer";
+import { VoicePanel } from "@shared/components/VoicePanel";
 import { VoiceSettingsModal } from "@shared/components/VoiceSettingsModal";
 import { VoiceDrawer } from "@shared/components/voice/VoiceDrawer";
 import { NotificationCenterModal } from "@shared/components/NotificationCenterModal";
@@ -45,6 +47,7 @@ import {
   buildWebPushCutoverReadiness,
   buildWebPushQueueHealthAlerts,
 } from "@shared/lib/notifications/webPushDiagnostics";
+import type { VoicePopoutState } from "@platform/desktop/types";
 import { toast } from "sonner";
 import { useServerOrder } from "@client/features/community/hooks/useServerOrder";
 
@@ -454,6 +457,57 @@ export function ChatApp() {
           </div>
         )}
       </div>
+
+      {app.activeVoiceChannel && (
+        <VoiceDrawer
+          layout="modal"
+          open={app.voicePanelOpen}
+          onDismiss={() => app.setVoicePanelOpen(false)}
+        >
+          <VoicePanel
+            title={app.activeVoiceChannel.name}
+            subtitle="Voice controls"
+          >
+            <VoiceChannelPane
+              key={`${app.activeVoiceChannel.community_id}:${app.activeVoiceChannel.id}`}
+              communityId={app.activeVoiceChannel.community_id}
+              channelId={app.activeVoiceChannel.id}
+              channelName={app.activeVoiceChannel.name}
+              currentUserId={user.id}
+              currentUserDisplayName={app.userDisplayName}
+              voiceSettings={app.appSettings.voice}
+              voiceSettingsSaving={app.voiceSettingsSaving}
+              voiceSettingsError={app.voiceSettingsError}
+              onUpdateVoiceSettings={(next) => {
+                void app.setVoiceSettings(next);
+              }}
+              onOpenVoiceSettings={() => app.setShowVoiceSettingsModal(true)}
+              onOpenVoiceHardwareTest={() =>
+                app.setUserVoiceHardwareTestOpen(true)
+              }
+              showDiagnostics={app.isPlatformStaff}
+              autoJoin
+              onParticipantsChange={app.setVoiceParticipants}
+              onConnectionChange={app.setVoiceConnected}
+              onSessionStateChange={app.setVoiceSessionState}
+              onDeviceSelectionChange={({
+                selectedInputDeviceId,
+                selectedOutputDeviceId,
+              }) => {
+                setSelectedVoiceInputDeviceId(selectedInputDeviceId);
+                setSelectedVoiceOutputDeviceId(selectedOutputDeviceId);
+              }}
+              onMemberVolumeChange={(volumes) => {
+                setVoiceMemberVolumes(volumes);
+              }}
+              onControlActionsReady={app.setVoiceControlActions}
+              onLeave={() =>
+                app.disconnectVoiceSession({ triggerPaneLeave: false })
+              }
+            />
+          </VoicePanel>
+        </VoiceDrawer>
+      )}
 
       <NotificationCenterModal
         open={app.notificationsPanelOpen}

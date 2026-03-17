@@ -7,6 +7,8 @@ const {
   parseSetAutoUpdatePayload,
   parseSetNotificationAudioPayload,
   parseSetVoiceSettingsPayload,
+  parseVoicePopoutStatePayload,
+  parseVoicePopoutControlActionPayload,
 } = require('@platform/ipc/validators');
 
 const registerIpcHandler = (ipcMain, channel, handler) => {
@@ -20,6 +22,7 @@ const registerDesktopIpcHandlers = ({
   updaterService,
   getMainWindow,
   pendingProtocolUrls,
+  voicePopoutWindowManager,
 }) => {
   registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.SETTINGS_GET, async () => settingsStore.getSettings());
 
@@ -108,6 +111,31 @@ const registerDesktopIpcHandlers = ({
   registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.PROTOCOL_URL_CONSUME_NEXT, async () =>
     pendingProtocolUrls.shift() ?? null
   );
+
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.VOICE_POPOUT_OPEN, async () => {
+    voicePopoutWindowManager?.open();
+    return { opened: true };
+  });
+
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.VOICE_POPOUT_CLOSE, async () => {
+    const closed = voicePopoutWindowManager?.close() ?? false;
+    return { closed };
+  });
+
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.VOICE_POPOUT_STATE_SYNC, async (_event, payload) => {
+    const nextState = parseVoicePopoutStatePayload(payload);
+    voicePopoutWindowManager?.sendState(nextState);
+  });
+
+  registerIpcHandler(
+    ipcMain,
+    DESKTOP_IPC_KEYS.VOICE_POPOUT_CONTROL_DISPATCH,
+    async (_event, payload) => {
+      const action = parseVoicePopoutControlActionPayload(payload);
+      voicePopoutWindowManager?.sendControlAction(action);
+    }
+  );
+
 };
 
 module.exports = {

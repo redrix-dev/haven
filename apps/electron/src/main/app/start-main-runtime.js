@@ -21,6 +21,7 @@ const startMainRuntime = async ({
   updaterService,
   getMainWindow,
   pendingProtocolUrls,
+  voicePopoutWindowManager,
   shouldDebugRendererEntry,
   devRendererEntryPortOverride,
   mainWindowWebpackEntry,
@@ -35,12 +36,17 @@ const startMainRuntime = async ({
     updaterService,
     getMainWindow,
     pendingProtocolUrls,
+    voicePopoutWindowManager,
   });
 
   const rendererEntryService = createRendererEntryService({
     entries: [
       {
         entryName: 'main_window',
+        webpackEntryUrl: mainWindowWebpackEntry,
+      },
+      {
+        entryName: 'voice_popout',
         webpackEntryUrl: mainWindowWebpackEntry,
       },
     ],

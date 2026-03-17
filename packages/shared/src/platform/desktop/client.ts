@@ -4,6 +4,8 @@ import type {
   NotificationAudioSettings,
   SaveFileFromUrlResult,
   UpdaterStatus,
+  VoicePopoutControlAction,
+  VoicePopoutState,
   VoiceSettings,
 } from './types';
 
@@ -55,7 +57,27 @@ export const desktopClient = {
   async consumeNextProtocolUrl(): Promise<string | null> {
     return getDesktopApi().consumeNextProtocolUrl();
   },
+
+  async openVoicePopout(): Promise<{ opened: boolean }> {
+    return getDesktopApi().openVoicePopout();
+  },
+  async closeVoicePopout(): Promise<{ closed: boolean }> {
+    return getDesktopApi().closeVoicePopout();
+  },
+  async syncVoicePopoutState(state: VoicePopoutState): Promise<void> {
+    return getDesktopApi().syncVoicePopoutState(state);
+  },
+  async dispatchVoicePopoutControlAction(action: VoicePopoutControlAction): Promise<void> {
+    return getDesktopApi().dispatchVoicePopoutControlAction(action);
+  },
   onProtocolUrl(listener: (url: string) => void): () => void {
     return getDesktopApi().onProtocolUrl(listener);
+  },
+
+  onVoicePopoutState(listener: (state: VoicePopoutState) => void): () => void {
+    return getDesktopApi().onVoicePopoutState(listener);
+  },
+  onVoicePopoutControlAction(listener: (action: VoicePopoutControlAction) => void): () => void {
+    return getDesktopApi().onVoicePopoutControlAction(listener);
   },
 };

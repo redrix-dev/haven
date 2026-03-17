@@ -4,6 +4,7 @@ const { createUpdaterService } = require('./updater-service');
 const { createMainWindow } = require('./app/create-main-window');
 const { registerWindowBehaviors } = require('./app/register-window-behaviors');
 const { startMainRuntime } = require('./app/start-main-runtime');
+const { createVoicePopoutWindowManager } = require('./app/create-voice-popout-window');
 const { createProtocolUrlQueue } = require('./app/protocol-url-queue');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -18,6 +19,7 @@ if (!hasSingleInstanceLock) {
 
 let mainWindow = null;
 let rendererEntryService = null;
+let voicePopoutWindowManager = null;
 const shouldDebugContextMenus =
   !app.isPackaged && process.env.HAVEN_DEBUG_CONTEXT_MENUS === '1';
 const shouldDebugWindowFocus = process.env.HAVEN_DEBUG_WINDOW_FOCUS === '1';
@@ -100,9 +102,21 @@ app.whenReady().then(async () => {
       updaterService,
       getMainWindow: () => mainWindow,
       pendingProtocolUrls,
+      voicePopoutWindowManager: {
+        open: () => voicePopoutWindowManager?.open(),
+        close: () => voicePopoutWindowManager?.close(),
+        sendState: (state) => voicePopoutWindowManager?.sendState(state),
+        sendControlAction: (action) => voicePopoutWindowManager?.sendControlAction(action),
+      },
       shouldDebugRendererEntry,
       devRendererEntryPortOverride,
       mainWindowWebpackEntry: MAIN_WINDOW_WEBPACK_ENTRY,
+    });
+    voicePopoutWindowManager = createVoicePopoutWindowManager({
+      app,
+      preloadEntry: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      rendererEntryService,
+      getMainWindow: () => mainWindow,
     });
     createWindow();
   } catch (error) {
