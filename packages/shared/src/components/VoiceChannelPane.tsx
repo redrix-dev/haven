@@ -1,29 +1,49 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@shared/lib/supabase';
-import { fetchIceConfig } from '@shared/lib/voice/ice';
-import { matchesVoicePushToTalkBinding } from '@shared/lib/voice/pushToTalk';
-import { getErrorMessage } from '@platform/lib/errors';
-import type { VoiceSettings } from '@platform/desktop/types';
-import { Badge } from '@shared/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
-import { Button } from '@shared/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
-import { PushToTalkBindingField } from '@shared/components/PushToTalkBindingField';
-import { isEditableKeyboardTarget } from '@client/app/utils';
-import { Slider } from '@shared/components/ui/slider';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "@shared/lib/supabase";
+import { fetchIceConfig } from "@shared/lib/voice/ice";
+import { matchesVoicePushToTalkBinding } from "@shared/lib/voice/pushToTalk";
+import { useVoiceMemberVolumes } from "@client/features/voice/hooks/useVoiceMemberVolumes";
+import { getErrorMessage } from "@platform/lib/errors";
+import type { VoiceSettings } from "@platform/desktop/types";
+import { Badge } from "@shared/components/ui/badge";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@shared/components/ui/avatar";
+import { Button } from "@shared/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@shared/components/ui/card";
+import { PushToTalkBindingField } from "@shared/components/PushToTalkBindingField";
+import { isEditableKeyboardTarget } from "@client/app/utils";
+import { Slider } from "@shared/components/ui/slider";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@shared/components/ui/select';
-import { Toggle } from '@shared/components/ui/toggle';
-import { cn } from '@shared/lib/utils';
-import { Headphones, Mic, MicOff, PhoneCall, PhoneOff, RefreshCcw, Volume2 } from 'lucide-react';
+} from "@shared/components/ui/select";
+import { Toggle } from "@shared/components/ui/toggle";
+import { cn } from "@shared/lib/utils";
+import {
+  Headphones,
+  Mic,
+  MicOff,
+  PhoneCall,
+  PhoneOff,
+  RefreshCcw,
+  RotateCcw,
+  Volume2,
+} from "lucide-react";
 
-type VoiceSignalEvent = 'offer' | 'answer' | 'ice';
+type VoiceSignalEvent = "offer" | "answer" | "ice";
 
 type VoiceSignalPayload = {
   type: VoiceSignalEvent;
@@ -87,7 +107,14 @@ interface VoiceChannelPaneProps {
   onOpenVoiceHardwareTest?: () => void;
   showDiagnostics?: boolean;
   autoJoin?: boolean;
-  onParticipantsChange?: (participants: Array<{ userId: string; displayName: string; avatarUrl?: string | null; isSpeaking?: boolean }>) => void;
+  onParticipantsChange?: (
+    participants: Array<{
+      userId: string;
+      displayName: string;
+      avatarUrl?: string | null;
+      isSpeaking?: boolean;
+    }>,
+  ) => void;
   onConnectionChange?: (connected: boolean) => void;
   onLeave?: () => void;
   onSessionStateChange?: (state: {
@@ -96,38 +123,35 @@ interface VoiceChannelPaneProps {
     isDeafened: boolean;
   }) => void;
   onControlActionsReady?: (
-    actions:
-      | {
-          join: () => void;
-          leave: () => void;
-          toggleMute: () => void;
-          toggleDeafen: () => void;
-        }
-      | null
+    actions: {
+      join: () => void;
+      leave: () => void;
+      toggleMute: () => void;
+      toggleDeafen: () => void;
+    } | null,
   ) => void;
 }
 
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   {
-    urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'],
+    urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"],
   },
 ];
 
 const REMOTE_VOLUME_OPTIONS = [0, 25, 50, 75, 100, 125, 150, 200] as const;
 const VOICE_ACTIVITY_GATE_RELEASE_MS = 220;
 
-const isAudioInput = (device: MediaDeviceInfo) => device.kind === 'audioinput';
-const isAudioOutput = (device: MediaDeviceInfo) => device.kind === 'audiooutput';
-const hasSelectableDeviceId = (device: MediaDeviceInfo) => device.deviceId.trim().length > 0;
-const formatBytes = (value: number | null) => (value == null ? 'n/a' : `${(value / 1024).toFixed(1)} KB`);
+const isAudioInput = (device: MediaDeviceInfo) => device.kind === "audioinput";
+const isAudioOutput = (device: MediaDeviceInfo) =>
+  device.kind === "audiooutput";
+const hasSelectableDeviceId = (device: MediaDeviceInfo) =>
+  device.deviceId.trim().length > 0;
+const formatBytes = (value: number | null) =>
+  value == null ? "n/a" : `${(value / 1024).toFixed(1)} KB`;
 const getInitials = (displayName: string) => {
-  const parts = displayName
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
-  if (parts.length === 0) return '?';
-  return parts.map((part) => part.charAt(0).toUpperCase()).join('');
+  const parts = displayName.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  if (parts.length === 0) return "?";
+  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
 };
 
 export function VoiceChannelPane({
@@ -154,42 +178,54 @@ export function VoiceChannelPane({
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
   const [participants, setParticipants] = useState<VoiceParticipant[]>([]);
-  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
-  const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>({});
+  const [remoteStreams, setRemoteStreams] = useState<
+    Record<string, MediaStream>
+  >({});
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [iceSource, setIceSource] = useState<'xirsys' | 'fallback' | null>(null);
+  const [iceSource, setIceSource] = useState<"xirsys" | "fallback" | null>(
+    null,
+  );
   const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedInputDeviceId, setSelectedInputDeviceId] = useState(
-    voiceSettings.preferredInputDeviceId || 'default'
+    voiceSettings.preferredInputDeviceId || "default",
   );
   const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState(
-    voiceSettings.preferredOutputDeviceId || 'default'
+    voiceSettings.preferredOutputDeviceId || "default",
   );
   const [switchingInput, setSwitchingInput] = useState(false);
   const [supportsOutputSelection, setSupportsOutputSelection] = useState(false);
   const [localInputLevel, setLocalInputLevel] = useState(0);
   const [voiceActivityGateOpen, setVoiceActivityGateOpen] = useState(false);
   const [pushToTalkPressed, setPushToTalkPressed] = useState(false);
-  const [peerDiagnostics, setPeerDiagnostics] = useState<Record<string, VoicePeerDiagnostics>>({});
-  const [diagnosticsUpdatedAt, setDiagnosticsUpdatedAt] = useState<string | null>(null);
+  const [peerDiagnostics, setPeerDiagnostics] = useState<
+    Record<string, VoicePeerDiagnostics>
+  >({});
+  const [diagnosticsUpdatedAt, setDiagnosticsUpdatedAt] = useState<
+    string | null
+  >(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(
+    new Map(),
+  );
   const audioElementRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE_SERVERS);
   const signalingSessionIdRef = useRef<string | null>(null);
   const autoJoinAttemptedChannelKeyRef = useRef<string | null>(null);
   const localInputMonitorAudioContextRef = useRef<AudioContext | null>(null);
-  const localInputMonitorSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const localInputMonitorSourceNodeRef =
+    useRef<MediaStreamAudioSourceNode | null>(null);
   const localInputMonitorAnalyserNodeRef = useRef<AnalyserNode | null>(null);
-  const localInputMonitorTimeDomainRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const localInputMonitorTimeDomainRef = useRef<Uint8Array<ArrayBuffer> | null>(
+    null,
+  );
   const localInputMonitorRafIdRef = useRef<number | null>(null);
   const localInputMonitorActiveRef = useRef(false);
   const lastVoiceActivityAtRef = useRef<number>(0);
@@ -202,11 +238,21 @@ export function VoiceChannelPane({
 
   const remoteParticipantIds = useMemo(
     () => participants.map((participant) => participant.userId),
-    [participants]
+    [participants],
   );
+  const {
+    remoteVolumes,
+    setMemberVolume,
+    resetMemberVolume,
+    resetAllMemberVolumes,
+    getMemberVolume,
+  } = useVoiceMemberVolumes(communityId, channelId, remoteParticipantIds);
   const diagnosticsRows = useMemo(
-    () => Object.values(peerDiagnostics).sort((a, b) => a.displayName.localeCompare(b.displayName)),
-    [peerDiagnostics]
+    () =>
+      Object.values(peerDiagnostics).sort((a, b) =>
+        a.displayName.localeCompare(b.displayName),
+      ),
+    [peerDiagnostics],
   );
 
   const applySinkId = async (audioElement: HTMLAudioElement) => {
@@ -217,9 +263,9 @@ export function VoiceChannelPane({
     if (!mediaElementWithSink.setSinkId) return;
 
     try {
-      await mediaElementWithSink.setSinkId(selectedOutputDeviceId || 'default');
+      await mediaElementWithSink.setSinkId(selectedOutputDeviceId || "default");
     } catch (sinkError) {
-      console.error('Failed to set output device:', sinkError);
+      console.error("Failed to set output device:", sinkError);
     }
   };
 
@@ -228,8 +274,12 @@ export function VoiceChannelPane({
 
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioInputs = devices.filter((device) => isAudioInput(device) && hasSelectableDeviceId(device));
-      const audioOutputs = devices.filter((device) => isAudioOutput(device) && hasSelectableDeviceId(device));
+      const audioInputs = devices.filter(
+        (device) => isAudioInput(device) && hasSelectableDeviceId(device),
+      );
+      const audioOutputs = devices.filter(
+        (device) => isAudioOutput(device) && hasSelectableDeviceId(device),
+      );
       setInputDevices(audioInputs);
       setOutputDevices(audioOutputs);
 
@@ -238,20 +288,28 @@ export function VoiceChannelPane({
         !audioInputs.some((device) => device.deviceId === selectedInputDeviceId)
       ) {
         setSelectedInputDeviceId(audioInputs[0].deviceId);
-      } else if (audioInputs.length === 0 && selectedInputDeviceId !== 'default') {
-        setSelectedInputDeviceId('default');
+      } else if (
+        audioInputs.length === 0 &&
+        selectedInputDeviceId !== "default"
+      ) {
+        setSelectedInputDeviceId("default");
       }
 
       if (
         audioOutputs.length > 0 &&
-        !audioOutputs.some((device) => device.deviceId === selectedOutputDeviceId)
+        !audioOutputs.some(
+          (device) => device.deviceId === selectedOutputDeviceId,
+        )
       ) {
         setSelectedOutputDeviceId(audioOutputs[0].deviceId);
-      } else if (audioOutputs.length === 0 && selectedOutputDeviceId !== 'default') {
-        setSelectedOutputDeviceId('default');
+      } else if (
+        audioOutputs.length === 0 &&
+        selectedOutputDeviceId !== "default"
+      ) {
+        setSelectedOutputDeviceId("default");
       }
     } catch (deviceError) {
-      console.error('Failed to enumerate audio devices:', deviceError);
+      console.error("Failed to enumerate audio devices:", deviceError);
     }
   };
 
@@ -280,7 +338,10 @@ export function VoiceChannelPane({
       try {
         await localInputMonitorAudioContextRef.current.close();
       } catch (error) {
-        console.warn('Failed to close local input monitor audio context:', error);
+        console.warn(
+          "Failed to close local input monitor audio context:",
+          error,
+        );
       }
       localInputMonitorAudioContextRef.current = null;
     }
@@ -298,7 +359,8 @@ export function VoiceChannelPane({
 
     const AudioContextCtor =
       window.AudioContext ??
-      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      (window as Window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
     if (!AudioContextCtor) return;
 
     try {
@@ -341,24 +403,34 @@ export function VoiceChannelPane({
         const normalizedLevel = Math.min(1, rms * 3);
         const threshold = Math.max(
           0,
-          Math.min(1, voiceSettingsRef.current.voiceActivationThreshold / 100)
+          Math.min(1, voiceSettingsRef.current.voiceActivationThreshold / 100),
         );
 
         if (normalizedLevel >= threshold) {
           lastVoiceActivityAtRef.current = now;
         }
 
-        const gateOpen = normalizedLevel >= threshold || now - lastVoiceActivityAtRef.current <= VOICE_ACTIVITY_GATE_RELEASE_MS;
+        const gateOpen =
+          normalizedLevel >= threshold ||
+          now - lastVoiceActivityAtRef.current <=
+            VOICE_ACTIVITY_GATE_RELEASE_MS;
 
-        setLocalInputLevel((prev) => (Math.abs(prev - normalizedLevel) > 0.01 ? normalizedLevel : prev));
-        setVoiceActivityGateOpen((prev) => (prev === gateOpen ? prev : gateOpen));
+        setLocalInputLevel((prev) =>
+          Math.abs(prev - normalizedLevel) > 0.01 ? normalizedLevel : prev,
+        );
+        setVoiceActivityGateOpen((prev) =>
+          prev === gateOpen ? prev : gateOpen,
+        );
 
         localInputMonitorRafIdRef.current = window.requestAnimationFrame(frame);
       };
 
       localInputMonitorRafIdRef.current = window.requestAnimationFrame(frame);
     } catch (monitorError) {
-      console.warn('Failed to start local input monitor for voice activity gating:', monitorError);
+      console.warn(
+        "Failed to start local input monitor for voice activity gating:",
+        monitorError,
+      );
       void stopLocalInputMonitor();
     }
   };
@@ -384,12 +456,6 @@ export function VoiceChannelPane({
       return next;
     });
 
-    setRemoteVolumes((prev) => {
-      if (!(remoteUserId in prev)) return prev;
-      const next = { ...prev };
-      delete next[remoteUserId];
-      return next;
-    });
     setPeerDiagnostics((prev) => {
       if (!(remoteUserId in prev)) return prev;
       const next = { ...prev };
@@ -400,7 +466,7 @@ export function VoiceChannelPane({
 
   const flushPendingIceCandidates = async (
     remoteUserId: string,
-    peerConnection: RTCPeerConnection
+    peerConnection: RTCPeerConnection,
   ) => {
     const pendingCandidates = pendingIceCandidatesRef.current.get(remoteUserId);
     if (!pendingCandidates || pendingCandidates.length === 0) return;
@@ -409,21 +475,23 @@ export function VoiceChannelPane({
       try {
         await peerConnection.addIceCandidate(candidate);
       } catch (iceError) {
-        console.error('Failed to apply buffered ICE candidate:', iceError);
+        console.error("Failed to apply buffered ICE candidate:", iceError);
       }
     }
 
     pendingIceCandidatesRef.current.delete(remoteUserId);
   };
 
-  const sendSignal = async (payload: Omit<VoiceSignalPayload, 'from' | 'senderSessionId'>) => {
+  const sendSignal = async (
+    payload: Omit<VoiceSignalPayload, "from" | "senderSessionId">,
+  ) => {
     const channel = channelRef.current;
     const sessionId = signalingSessionIdRef.current;
     if (!channel || !sessionId) return;
 
     const sendStatus = await channel.send({
-      type: 'broadcast',
-      event: 'webrtc-signal',
+      type: "broadcast",
+      event: "webrtc-signal",
       payload: {
         ...payload,
         from: currentUserId,
@@ -431,8 +499,8 @@ export function VoiceChannelPane({
       },
     });
 
-    if (sendStatus !== 'ok') {
-      console.error('Failed to send WebRTC signal:', sendStatus);
+    if (sendStatus !== "ok") {
+      console.error("Failed to send WebRTC signal:", sendStatus);
     }
   };
 
@@ -469,15 +537,15 @@ export function VoiceChannelPane({
 
               if (
                 !selectedCandidatePairId &&
-                statsRecord.type === 'transport' &&
-                typeof statsRecord.selectedCandidatePairId === 'string'
+                statsRecord.type === "transport" &&
+                typeof statsRecord.selectedCandidatePairId === "string"
               ) {
                 selectedCandidatePairId = statsRecord.selectedCandidatePairId;
               }
 
               if (
                 !selectedCandidatePairId &&
-                statsRecord.type === 'candidate-pair' &&
+                statsRecord.type === "candidate-pair" &&
                 statsRecord.selected === true
               ) {
                 selectedCandidatePairId = statsRecord.id;
@@ -488,36 +556,50 @@ export function VoiceChannelPane({
               const selectedPair = statsById.get(selectedCandidatePairId);
               if (selectedPair) {
                 selectedCandidatePairState =
-                  typeof selectedPair.state === 'string' ? selectedPair.state : null;
-                writable = typeof selectedPair.writable === 'boolean' ? selectedPair.writable : null;
-                bytesSent = typeof selectedPair.bytesSent === 'number' ? selectedPair.bytesSent : null;
+                  typeof selectedPair.state === "string"
+                    ? selectedPair.state
+                    : null;
+                writable =
+                  typeof selectedPair.writable === "boolean"
+                    ? selectedPair.writable
+                    : null;
+                bytesSent =
+                  typeof selectedPair.bytesSent === "number"
+                    ? selectedPair.bytesSent
+                    : null;
                 bytesReceived =
-                  typeof selectedPair.bytesReceived === 'number' ? selectedPair.bytesReceived : null;
+                  typeof selectedPair.bytesReceived === "number"
+                    ? selectedPair.bytesReceived
+                    : null;
 
                 const localCandidate =
-                  typeof selectedPair.localCandidateId === 'string'
+                  typeof selectedPair.localCandidateId === "string"
                     ? statsById.get(selectedPair.localCandidateId)
                     : null;
                 const remoteCandidate =
-                  typeof selectedPair.remoteCandidateId === 'string'
+                  typeof selectedPair.remoteCandidateId === "string"
                     ? statsById.get(selectedPair.remoteCandidateId)
                     : null;
 
                 localCandidateType =
-                  localCandidate && typeof localCandidate.candidateType === 'string'
+                  localCandidate &&
+                  typeof localCandidate.candidateType === "string"
                     ? localCandidate.candidateType
                     : null;
                 remoteCandidateType =
-                  remoteCandidate && typeof remoteCandidate.candidateType === 'string'
+                  remoteCandidate &&
+                  typeof remoteCandidate.candidateType === "string"
                     ? remoteCandidate.candidateType
                     : null;
               }
             }
           } catch (statsError) {
-            console.error('Failed to collect WebRTC stats:', statsError);
+            console.error("Failed to collect WebRTC stats:", statsError);
           }
 
-          const participant = participants.find((item) => item.userId === remoteUserId);
+          const participant = participants.find(
+            (item) => item.userId === remoteUserId,
+          );
 
           const row: VoicePeerDiagnostics = {
             userId: remoteUserId,
@@ -536,13 +618,16 @@ export function VoiceChannelPane({
           };
 
           return row;
-        })
+        }),
       );
 
-      const nextRows = rows.reduce<Record<string, VoicePeerDiagnostics>>((acc, row) => {
-        acc[row.userId] = row;
-        return acc;
-      }, {});
+      const nextRows = rows.reduce<Record<string, VoicePeerDiagnostics>>(
+        (acc, row) => {
+          acc[row.userId] = row;
+          return acc;
+        },
+        {},
+      );
       setPeerDiagnostics(nextRows);
       setDiagnosticsUpdatedAt(new Date().toISOString());
     } finally {
@@ -555,7 +640,10 @@ export function VoiceChannelPane({
     if (existing) return existing;
 
     const peerConnection = new RTCPeerConnection({
-      iceServers: iceServersRef.current.length > 0 ? iceServersRef.current : FALLBACK_ICE_SERVERS,
+      iceServers:
+        iceServersRef.current.length > 0
+          ? iceServersRef.current
+          : FALLBACK_ICE_SERVERS,
       iceCandidatePoolSize: 10,
     });
 
@@ -565,7 +653,7 @@ export function VoiceChannelPane({
         peerConnection.addTrack(track, localStream);
       });
     } else {
-      peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+      peerConnection.addTransceiver("audio", { direction: "recvonly" });
     }
 
     peerConnection.ontrack = (event) => {
@@ -584,14 +672,17 @@ export function VoiceChannelPane({
       if (!event.candidate) return;
 
       void sendSignal({
-        type: 'ice',
+        type: "ice",
         to: remoteUserId,
         candidate: event.candidate.toJSON(),
       });
     };
 
     peerConnection.onconnectionstatechange = () => {
-      if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'closed') {
+      if (
+        peerConnection.connectionState === "failed" ||
+        peerConnection.connectionState === "closed"
+      ) {
         closePeerConnection(remoteUserId);
       } else if (showDiagnostics) {
         void refreshVoiceDiagnostics();
@@ -619,12 +710,12 @@ export function VoiceChannelPane({
 
   const createAndSendOffer = async (remoteUserId: string) => {
     const peerConnection = ensurePeerConnection(remoteUserId);
-    if (peerConnection.signalingState !== 'stable') return;
+    if (peerConnection.signalingState !== "stable") return;
 
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     await sendSignal({
-      type: 'offer',
+      type: "offer",
       to: remoteUserId,
       sdp: offer,
     });
@@ -635,15 +726,18 @@ export function VoiceChannelPane({
     if (payload.to && payload.to !== currentUserId) return;
     const currentSessionId = signalingSessionIdRef.current;
     if (!currentSessionId) return;
-    if (payload.targetSessionId && payload.targetSessionId !== currentSessionId) return;
+    if (payload.targetSessionId && payload.targetSessionId !== currentSessionId)
+      return;
 
     const remoteUserId = payload.from;
     const peerConnection = ensurePeerConnection(remoteUserId);
 
     try {
-      if (payload.type === 'offer' && payload.sdp) {
-        if (peerConnection.signalingState !== 'stable') {
-          await peerConnection.setLocalDescription({ type: 'rollback' }).catch(() => undefined);
+      if (payload.type === "offer" && payload.sdp) {
+        if (peerConnection.signalingState !== "stable") {
+          await peerConnection
+            .setLocalDescription({ type: "rollback" })
+            .catch(() => undefined);
         }
 
         await peerConnection.setRemoteDescription(payload.sdp);
@@ -652,7 +746,7 @@ export function VoiceChannelPane({
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         await sendSignal({
-          type: 'answer',
+          type: "answer",
           to: remoteUserId,
           sdp: answer,
           targetSessionId: payload.senderSessionId,
@@ -660,23 +754,24 @@ export function VoiceChannelPane({
         return;
       }
 
-      if (payload.type === 'answer' && payload.sdp) {
+      if (payload.type === "answer" && payload.sdp) {
         await peerConnection.setRemoteDescription(payload.sdp);
         await flushPendingIceCandidates(remoteUserId, peerConnection);
         return;
       }
 
-      if (payload.type === 'ice' && payload.candidate) {
+      if (payload.type === "ice" && payload.candidate) {
         if (peerConnection.remoteDescription) {
           await peerConnection.addIceCandidate(payload.candidate);
         } else {
-          const pendingCandidates = pendingIceCandidatesRef.current.get(remoteUserId) ?? [];
+          const pendingCandidates =
+            pendingIceCandidatesRef.current.get(remoteUserId) ?? [];
           pendingCandidates.push(payload.candidate);
           pendingIceCandidatesRef.current.set(remoteUserId, pendingCandidates);
         }
       }
     } catch (signalError) {
-      console.error('Failed to handle WebRTC signal:', signalError);
+      console.error("Failed to handle WebRTC signal:", signalError);
     }
   };
 
@@ -701,7 +796,10 @@ export function VoiceChannelPane({
     const channel = channelRef.current;
     if (!channel) return;
 
-    const presenceState = channel.presenceState() as Record<string, VoicePresencePayload[]>;
+    const presenceState = channel.presenceState() as Record<
+      string,
+      VoicePresencePayload[]
+    >;
     const nextParticipants: VoiceParticipant[] = [];
 
     for (const [presenceKey, presenceRows] of Object.entries(presenceState)) {
@@ -723,7 +821,9 @@ export function VoiceChannelPane({
 
     nextParticipants.sort((a, b) => a.displayName.localeCompare(b.displayName));
     setParticipants(nextParticipants);
-    reconcilePeerConnections(nextParticipants.map((participant) => participant.userId));
+    reconcilePeerConnections(
+      nextParticipants.map((participant) => participant.userId),
+    );
   };
 
   const trackPresenceState = async () => {
@@ -736,15 +836,16 @@ export function VoiceChannelPane({
       avatar_url: currentUserAvatarUrl,
       muted: isMuted,
       deafened: isDeafened,
-      is_speaking: voiceSettings.transmissionMode !== 'push_to_talk'
-        ? !isMuted && !isDeafened && voiceActivityGateOpen
-        : !isMuted && !isDeafened && pushToTalkPressed,
+      is_speaking:
+        voiceSettings.transmissionMode !== "push_to_talk"
+          ? !isMuted && !isDeafened && voiceActivityGateOpen
+          : !isMuted && !isDeafened && pushToTalkPressed,
       joined_at: new Date().toISOString(),
     };
 
     const trackStatus = await channel.track(payload);
-    if (trackStatus !== 'ok') {
-      console.error('Failed to update voice presence:', trackStatus);
+    if (trackStatus !== "ok") {
+      console.error("Failed to update voice presence:", trackStatus);
     }
   };
 
@@ -754,7 +855,7 @@ export function VoiceChannelPane({
       noiseSuppression: true,
       autoGainControl: false,
     };
-    if (deviceId && deviceId !== 'default') {
+    if (deviceId && deviceId !== "default") {
       constraints.deviceId = { exact: deviceId };
     }
 
@@ -770,13 +871,14 @@ export function VoiceChannelPane({
 
     if (baseAllowsSend) {
       switch (voiceSettings.transmissionMode) {
-        case 'push_to_talk':
-          modeAllowsSend = Boolean(voiceSettings.pushToTalkBinding) && pushToTalkPressed;
+        case "push_to_talk":
+          modeAllowsSend =
+            Boolean(voiceSettings.pushToTalkBinding) && pushToTalkPressed;
           break;
-        case 'voice_activity':
+        case "voice_activity":
           modeAllowsSend = voiceActivityGateOpen;
           break;
-        case 'open_mic':
+        case "open_mic":
         default:
           modeAllowsSend = true;
           break;
@@ -789,10 +891,13 @@ export function VoiceChannelPane({
     });
   };
 
-  const applyOutgoingTrackToPeers = async (stream: MediaStream, renegotiate: boolean) => {
+  const applyOutgoingTrackToPeers = async (
+    stream: MediaStream,
+    renegotiate: boolean,
+  ) => {
     const nextTrack = stream.getAudioTracks()[0];
     if (!nextTrack) {
-      throw new Error('Selected input device has no audio track.');
+      throw new Error("Selected input device has no audio track.");
     }
 
     const shouldSendAudio = !isMuted && !isDeafened;
@@ -805,7 +910,7 @@ export function VoiceChannelPane({
     for (const [remoteUserId, peerConnection] of peersRef.current.entries()) {
       const audioSender = peerConnection
         .getSenders()
-        .find((sender) => !sender.track || sender.track.kind === 'audio');
+        .find((sender) => !sender.track || sender.track.kind === "audio");
 
       if (audioSender) {
         // If the audio transceiver is recvonly/inactive, flip to sendrecv before renegotiation
@@ -815,16 +920,17 @@ export function VoiceChannelPane({
           .find((transceiver) => transceiver.sender === audioSender);
         if (
           audioTransceiver &&
-          (audioTransceiver.direction === 'recvonly' || audioTransceiver.direction === 'inactive')
+          (audioTransceiver.direction === "recvonly" ||
+            audioTransceiver.direction === "inactive")
         ) {
-          audioTransceiver.direction = 'sendrecv';
+          audioTransceiver.direction = "sendrecv";
         }
         await audioSender.replaceTrack(nextTrack);
       } else {
         peerConnection.addTrack(nextTrack, stream);
       }
 
-      if (renegotiate && peerConnection.signalingState === 'stable') {
+      if (renegotiate && peerConnection.signalingState === "stable") {
         await createAndSendOffer(remoteUserId);
       }
     }
@@ -852,7 +958,6 @@ export function VoiceChannelPane({
 
     setParticipants([]);
     setRemoteStreams({});
-    setRemoteVolumes({});
     setPeerDiagnostics({});
     setJoined(false);
     setJoining(false);
@@ -897,7 +1002,9 @@ export function VoiceChannelPane({
     }
 
     iceServersRef.current =
-      iceConfig.iceServers.length > 0 ? iceConfig.iceServers : FALLBACK_ICE_SERVERS;
+      iceConfig.iceServers.length > 0
+        ? iceConfig.iceServers
+        : FALLBACK_ICE_SERVERS;
     setIceSource(iceConfig.source);
     if (iceConfig.warning) setNotice(iceConfig.warning);
 
@@ -906,8 +1013,13 @@ export function VoiceChannelPane({
     try {
       localStream = await requestLocalAudioStream(selectedInputDeviceId);
     } catch (mediaError) {
-      console.error('Microphone permission failed during voice join:', mediaError);
-      setNotice('Microphone access unavailable. Joined with microphone disabled.');
+      console.error(
+        "Microphone permission failed during voice join:",
+        mediaError,
+      );
+      setNotice(
+        "Microphone access unavailable. Joined with microphone disabled.",
+      );
     }
 
     localStreamRef.current = localStream;
@@ -921,23 +1033,26 @@ export function VoiceChannelPane({
 
     await refreshAudioDevices();
 
-    const voiceChannel = supabase.channel(`voice:presence:${communityId}:${channelId}`, {
-      config: {
-        presence: { key: currentUserId },
+    const voiceChannel = supabase.channel(
+      `voice:presence:${communityId}:${channelId}`,
+      {
+        config: {
+          presence: { key: currentUserId },
+        },
       },
-    });
+    );
 
     voiceChannel
-      .on('presence', { event: 'sync' }, () => {
+      .on("presence", { event: "sync" }, () => {
         syncParticipantsFromPresence();
       })
-      .on('presence', { event: 'join' }, () => {
+      .on("presence", { event: "join" }, () => {
         syncParticipantsFromPresence();
       })
-      .on('presence', { event: 'leave' }, () => {
+      .on("presence", { event: "leave" }, () => {
         syncParticipantsFromPresence();
       })
-      .on('broadcast', { event: 'webrtc-signal' }, ({ payload }) => {
+      .on("broadcast", { event: "webrtc-signal" }, ({ payload }) => {
         void handleSignal(payload as VoiceSignalPayload);
       });
 
@@ -946,28 +1061,28 @@ export function VoiceChannelPane({
     try {
       await new Promise<void>((resolve, reject) => {
         const timeoutId = window.setTimeout(() => {
-          reject(new Error('Timed out connecting to voice.'));
+          reject(new Error("Timed out connecting to voice."));
         }, 12000);
 
         voiceChannel.subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
+          if (status === "SUBSCRIBED") {
             window.clearTimeout(timeoutId);
             setJoined(true);
             await trackPresenceState();
             resolve();
-          } else if (status === 'CHANNEL_ERROR') {
+          } else if (status === "CHANNEL_ERROR") {
             window.clearTimeout(timeoutId);
-            reject(new Error('Voice channel connection failed.'));
-          } else if (status === 'TIMED_OUT') {
+            reject(new Error("Voice channel connection failed."));
+          } else if (status === "TIMED_OUT") {
             window.clearTimeout(timeoutId);
-            reject(new Error('Voice channel connection timed out.'));
+            reject(new Error("Voice channel connection timed out."));
           }
         });
       });
     } catch (joinError: unknown) {
-      console.error('Failed to join voice channel:', joinError);
+      console.error("Failed to join voice channel:", joinError);
       await cleanupVoiceSession();
-      setError(getErrorMessage(joinError, 'Failed to join voice channel.'));
+      setError(getErrorMessage(joinError, "Failed to join voice channel."));
     } finally {
       setJoining(false);
     }
@@ -984,8 +1099,8 @@ export function VoiceChannelPane({
       const newStream = await requestLocalAudioStream(deviceId);
       await applyOutgoingTrackToPeers(newStream, false);
     } catch (switchError: unknown) {
-      console.error('Failed to switch input device:', switchError);
-      setError(getErrorMessage(switchError, 'Failed to switch input device.'));
+      console.error("Failed to switch input device:", switchError);
+      setError(getErrorMessage(switchError, "Failed to switch input device."));
     } finally {
       setSwitchingInput(false);
     }
@@ -993,10 +1108,10 @@ export function VoiceChannelPane({
 
   const retryIce = async () => {
     for (const [remoteUserId, peerConnection] of peersRef.current.entries()) {
-      if (typeof peerConnection.restartIce === 'function') {
+      if (typeof peerConnection.restartIce === "function") {
         peerConnection.restartIce();
       }
-      if (peerConnection.signalingState === 'stable') {
+      if (peerConnection.signalingState === "stable") {
         await createAndSendOffer(remoteUserId);
       }
     }
@@ -1008,7 +1123,8 @@ export function VoiceChannelPane({
 
   useEffect(() => {
     setSupportsOutputSelection(
-      typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype
+      typeof HTMLMediaElement !== "undefined" &&
+        "setSinkId" in HTMLMediaElement.prototype,
     );
     void refreshAudioDevices();
 
@@ -1019,20 +1135,24 @@ export function VoiceChannelPane({
       void refreshAudioDevices();
     };
 
-    mediaDevices.addEventListener('devicechange', onDeviceChange);
+    mediaDevices.addEventListener("devicechange", onDeviceChange);
     return () => {
-      mediaDevices.removeEventListener('devicechange', onDeviceChange);
+      mediaDevices.removeEventListener("devicechange", onDeviceChange);
     };
   }, []);
 
   useEffect(() => {
-    const nextInputId = voiceSettings.preferredInputDeviceId || 'default';
-    setSelectedInputDeviceId((prev) => (prev === nextInputId ? prev : nextInputId));
+    const nextInputId = voiceSettings.preferredInputDeviceId || "default";
+    setSelectedInputDeviceId((prev) =>
+      prev === nextInputId ? prev : nextInputId,
+    );
   }, [voiceSettings.preferredInputDeviceId]);
 
   useEffect(() => {
-    const nextOutputId = voiceSettings.preferredOutputDeviceId || 'default';
-    setSelectedOutputDeviceId((prev) => (prev === nextOutputId ? prev : nextOutputId));
+    const nextOutputId = voiceSettings.preferredOutputDeviceId || "default";
+    setSelectedOutputDeviceId((prev) =>
+      prev === nextOutputId ? prev : nextOutputId,
+    );
   }, [voiceSettings.preferredOutputDeviceId]);
 
   useEffect(() => {
@@ -1043,7 +1163,7 @@ export function VoiceChannelPane({
     isDeafened,
     joined,
     currentUserDisplayName,
-  currentUserAvatarUrl,
+    currentUserAvatarUrl,
     pushToTalkPressed,
     voiceActivityGateOpen,
     voiceSettings.transmissionMode,
@@ -1056,7 +1176,7 @@ export function VoiceChannelPane({
   }, [voiceSettings.voiceActivationThreshold]);
 
   useEffect(() => {
-    if (voiceSettings.transmissionMode !== 'push_to_talk') {
+    if (voiceSettings.transmissionMode !== "push_to_talk") {
       activePushToTalkCodeRef.current = null;
       setPushToTalkPressed(false);
       return;
@@ -1092,50 +1212,35 @@ export function VoiceChannelPane({
       setPushToTalkPressed(false);
     };
 
-    window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('keyup', handleKeyUp, true);
-    window.addEventListener('blur', clearPressed);
-    document.addEventListener('visibilitychange', clearPressed);
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
+    window.addEventListener("blur", clearPressed);
+    document.addEventListener("visibilitychange", clearPressed);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('keyup', handleKeyUp, true);
-      window.removeEventListener('blur', clearPressed);
-      document.removeEventListener('visibilitychange', clearPressed);
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
+      window.removeEventListener("blur", clearPressed);
+      document.removeEventListener("visibilitychange", clearPressed);
       clearPressed();
     };
   }, [voiceSettings.pushToTalkBinding, voiceSettings.transmissionMode]);
 
   useEffect(() => {
-    setRemoteVolumes((prev) => {
-      let changed = false;
-      const next = { ...prev };
-
-      for (const participant of participants) {
-        if (typeof next[participant.userId] !== 'number') {
-          next[participant.userId] = 100;
-          changed = true;
-        }
-      }
-
-      for (const existingUserId of Object.keys(next)) {
-        if (!remoteParticipantIds.includes(existingUserId)) {
-          delete next[existingUserId];
-          changed = true;
-        }
-      }
-
-      return changed ? next : prev;
-    });
-  }, [participants, remoteParticipantIds]);
-
-  useEffect(() => {
-    for (const [remoteUserId, audioElement] of Object.entries(audioElementRefs.current)) {
+    for (const [remoteUserId, audioElement] of Object.entries(
+      audioElementRefs.current,
+    )) {
       if (!audioElement) continue;
       audioElement.muted = isDeafened;
       audioElement.volume = (remoteVolumes[remoteUserId] ?? 100) / 100;
       void applySinkId(audioElement);
     }
-  }, [isDeafened, remoteVolumes, remoteStreams, selectedOutputDeviceId, supportsOutputSelection]);
+  }, [
+    isDeafened,
+    remoteVolumes,
+    remoteStreams,
+    selectedOutputDeviceId,
+    supportsOutputSelection,
+  ]);
 
   useEffect(() => {
     onConnectionChange?.(joined);
@@ -1162,7 +1267,7 @@ export function VoiceChannelPane({
         displayName: participant.displayName,
         avatarUrl: participant.avatarUrl ?? null,
         isSpeaking: participant.isSpeaking ?? false,
-      }))
+      })),
     );
   }, [joined, onParticipantsChange, participants]);
 
@@ -1170,7 +1275,11 @@ export function VoiceChannelPane({
     if (!autoJoin) return;
 
     const channelKey = `${communityId}:${channelId}`;
-    if (joined || joining || autoJoinAttemptedChannelKeyRef.current === channelKey) {
+    if (
+      joined ||
+      joining ||
+      autoJoinAttemptedChannelKeyRef.current === channelKey
+    ) {
       return;
     }
 
@@ -1259,18 +1368,18 @@ export function VoiceChannelPane({
             <span>{channelName}</span>
           </CardTitle>
           <CardDescription className="text-[#a9b8cf]">
-            P2P voice with Supabase signaling. Relay credentials are fetched via provider-agnostic ICE
-            endpoint.
+            P2P voice with Supabase signaling. Relay credentials are fetched via
+            provider-agnostic ICE endpoint.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={joined ? 'default' : 'outline'}>
-              {joined ? 'Connected' : 'Disconnected'}
+            <Badge variant={joined ? "default" : "outline"}>
+              {joined ? "Connected" : "Disconnected"}
             </Badge>
             {iceSource && (
-              <Badge variant={iceSource === 'xirsys' ? 'default' : 'outline'}>
-                ICE: {iceSource === 'xirsys' ? 'Xirsys' : 'STUN fallback'}
+              <Badge variant={iceSource === "xirsys" ? "default" : "outline"}>
+                ICE: {iceSource === "xirsys" ? "Xirsys" : "STUN fallback"}
               </Badge>
             )}
           </div>
@@ -1287,7 +1396,7 @@ export function VoiceChannelPane({
                 className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
               >
                 <PhoneCall className="size-4" />
-                {joining ? 'Joining...' : 'Join Voice'}
+                {joining ? "Joining..." : "Join Voice"}
               </Button>
             ) : (
               <>
@@ -1295,31 +1404,39 @@ export function VoiceChannelPane({
                   pressed={isMuted}
                   onPressedChange={toggleMute}
                   variant="outline"
-                  aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                  aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
                   className={`h-9 gap-2 px-3 text-white ${
                     isMuted
-                      ? 'border-red-500/40 bg-red-500/15 hover:bg-red-500/20'
-                      : 'border-[#304867] bg-[#142033] hover:bg-[#22334f]'
+                      ? "border-red-500/40 bg-red-500/15 hover:bg-red-500/20"
+                      : "border-[#304867] bg-[#142033] hover:bg-[#22334f]"
                   }`}
                 >
-                  {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
-                  {isMuted ? 'Unmute' : 'Mute'}
+                  {isMuted ? (
+                    <MicOff className="size-4" />
+                  ) : (
+                    <Mic className="size-4" />
+                  )}
+                  {isMuted ? "Unmute" : "Mute"}
                 </Toggle>
                 <Toggle
                   pressed={isDeafened}
                   onPressedChange={toggleDeafen}
                   variant="outline"
-                  aria-label={isDeafened ? 'Undeafen audio' : 'Deafen audio'}
+                  aria-label={isDeafened ? "Undeafen audio" : "Deafen audio"}
                   className={`h-9 gap-2 px-3 text-white ${
                     isDeafened
-                      ? 'border-red-500/40 bg-red-500/15 hover:bg-red-500/20'
-                      : 'border-[#304867] bg-[#142033] hover:bg-[#22334f]'
+                      ? "border-red-500/40 bg-red-500/15 hover:bg-red-500/20"
+                      : "border-[#304867] bg-[#142033] hover:bg-[#22334f]"
                   }`}
                 >
                   <Headphones className="size-4" />
-                  {isDeafened ? 'Undeafen' : 'Deafen'}
+                  {isDeafened ? "Undeafen" : "Deafen"}
                 </Toggle>
-                <Button type="button" variant="outline" onClick={() => void retryIce()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void retryIce()}
+                >
                   <RefreshCcw className="size-4" />
                   Retry ICE
                 </Button>
@@ -1344,32 +1461,40 @@ export function VoiceChannelPane({
             <span>Voice Transmission</span>
           </CardTitle>
           <CardDescription className="text-[#a9b8cf]">
-            Control how your mic transmits while unmuted. These settings are stored locally on this
-            device.
+            Control how your mic transmits while unmuted. These settings are
+            stored locally on this device.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">Mode: {voiceSettings.transmissionMode.replace(/_/g, ' ')}</Badge>
-            {voiceSettings.transmissionMode === 'voice_activity' && (
-              <Badge variant={voiceActivityGateOpen ? 'default' : 'outline'}>
-                Gate {voiceActivityGateOpen ? 'Open' : 'Closed'}
+            <Badge variant="outline">
+              Mode: {voiceSettings.transmissionMode.replace(/_/g, " ")}
+            </Badge>
+            {voiceSettings.transmissionMode === "voice_activity" && (
+              <Badge variant={voiceActivityGateOpen ? "default" : "outline"}>
+                Gate {voiceActivityGateOpen ? "Open" : "Closed"}
               </Badge>
             )}
-            {voiceSettings.transmissionMode === 'push_to_talk' && (
-              <Badge variant={pushToTalkPressed ? 'default' : 'outline'}>
-                PTT {pushToTalkPressed ? 'Held' : 'Idle'}
+            {voiceSettings.transmissionMode === "push_to_talk" && (
+              <Badge variant={pushToTalkPressed ? "default" : "outline"}>
+                PTT {pushToTalkPressed ? "Held" : "Idle"}
               </Badge>
             )}
-            <Badge variant="outline">Input {Math.round(localInputLevel * 100)}%</Badge>
+            <Badge variant="outline">
+              Input {Math.round(localInputLevel * 100)}%
+            </Badge>
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Transmission mode</p>
+            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              Transmission mode
+            </p>
             <Select
               value={voiceSettings.transmissionMode}
               onValueChange={(value) =>
-                persistVoiceSettingsPatch({ transmissionMode: value as VoiceSettings['transmissionMode'] })
+                persistVoiceSettingsPatch({
+                  transmissionMode: value as VoiceSettings["transmissionMode"],
+                })
               }
               disabled={voiceSettingsSaving}
             >
@@ -1384,7 +1509,7 @@ export function VoiceChannelPane({
             </Select>
           </div>
 
-          {voiceSettings.transmissionMode === 'voice_activity' && (
+          {voiceSettings.transmissionMode === "voice_activity" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2 text-xs text-[#a9b8cf]">
                 <span>Gate threshold</span>
@@ -1397,7 +1522,7 @@ export function VoiceChannelPane({
                 value={[voiceSettings.voiceActivationThreshold]}
                 onValueChange={(values) => {
                   const nextValue = values[0];
-                  if (typeof nextValue !== 'number') return;
+                  if (typeof nextValue !== "number") return;
                   persistVoiceSettingsPatch({
                     voiceActivationThreshold: nextValue,
                   });
@@ -1407,23 +1532,30 @@ export function VoiceChannelPane({
                 aria-label="Voice activity gate threshold"
               />
               <p className="text-[11px] text-[#90a5c4]">
-                Lower values open the mic more easily. Use Voice Hardware Test for tuning.
+                Lower values open the mic more easily. Use Voice Hardware Test
+                for tuning.
               </p>
             </div>
           )}
 
-          {voiceSettings.transmissionMode === 'push_to_talk' && (
+          {voiceSettings.transmissionMode === "push_to_talk" && (
             <PushToTalkBindingField
               value={voiceSettings.pushToTalkBinding}
               disabled={voiceSettingsSaving}
-              onChange={(nextBinding) => persistVoiceSettingsPatch({ pushToTalkBinding: nextBinding })}
+              onChange={(nextBinding) =>
+                persistVoiceSettingsPatch({ pushToTalkBinding: nextBinding })
+              }
               helperText="PTT works while Haven is focused. F13-F24 bindings work when your pedal/driver emits those key events."
             />
           )}
 
           <div className="flex flex-wrap gap-2">
             {onOpenVoiceSettings && (
-              <Button type="button" variant="secondary" onClick={onOpenVoiceSettings}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onOpenVoiceSettings}
+              >
                 Open Full Voice Settings
               </Button>
             )}
@@ -1439,7 +1571,9 @@ export function VoiceChannelPane({
             )}
           </div>
 
-          {voiceSettingsError && <p className="text-sm text-red-300">{voiceSettingsError}</p>}
+          {voiceSettingsError && (
+            <p className="text-sm text-red-300">{voiceSettingsError}</p>
+          )}
         </CardContent>
       </Card>
 
@@ -1447,13 +1581,19 @@ export function VoiceChannelPane({
         <CardHeader>
           <CardTitle>Devices</CardTitle>
           <CardDescription className="text-[#a9b8cf]">
-            Select microphone and speaker devices. Input switching applies live while connected.
+            Select microphone and speaker devices. Input switching applies live
+            while connected.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Microphone</p>
-            <Select value={selectedInputDeviceId} onValueChange={(value) => void switchInputDevice(value)}>
+            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              Microphone
+            </p>
+            <Select
+              value={selectedInputDeviceId}
+              onValueChange={(value) => void switchInputDevice(value)}
+            >
               <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
                 <SelectValue placeholder="Select microphone" />
               </SelectTrigger>
@@ -1469,11 +1609,15 @@ export function VoiceChannelPane({
                 )}
               </SelectContent>
             </Select>
-            {switchingInput && <p className="text-xs text-[#a9b8cf]">Switching microphone...</p>}
+            {switchingInput && (
+              <p className="text-xs text-[#a9b8cf]">Switching microphone...</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Speaker</p>
+            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              Speaker
+            </p>
             <Select
               value={selectedOutputDeviceId}
               onValueChange={(value) => {
@@ -1499,7 +1643,8 @@ export function VoiceChannelPane({
             </Select>
             {!supportsOutputSelection && (
               <p className="text-xs text-[#a9b8cf]">
-                Output selection is not supported by this runtime. Your system default speaker is used.
+                Output selection is not supported by this runtime. Your system
+                default speaker is used.
               </p>
             )}
           </div>
@@ -1520,10 +1665,15 @@ export function VoiceChannelPane({
           <CardContent className="space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-xs text-[#a9b8cf]">
               <span>Peers: {diagnosticsRows.length}</span>
-              <span>ICE source: {iceSource === 'xirsys' ? 'xirsys' : iceSource ?? 'unknown'}</span>
               <span>
-                Last refresh:{' '}
-                {diagnosticsUpdatedAt ? new Date(diagnosticsUpdatedAt).toLocaleTimeString() : 'never'}
+                ICE source:{" "}
+                {iceSource === "xirsys" ? "xirsys" : (iceSource ?? "unknown")}
+              </span>
+              <span>
+                Last refresh:{" "}
+                {diagnosticsUpdatedAt
+                  ? new Date(diagnosticsUpdatedAt).toLocaleTimeString()
+                  : "never"}
               </span>
             </div>
 
@@ -1535,12 +1685,14 @@ export function VoiceChannelPane({
                 disabled={!joined || diagnosticsLoading}
               >
                 <RefreshCcw className="size-4" />
-                {diagnosticsLoading ? 'Refreshing...' : 'Refresh Diagnostics'}
+                {diagnosticsLoading ? "Refreshing..." : "Refresh Diagnostics"}
               </Button>
             </div>
 
             {!joined ? (
-              <p className="text-sm text-[#a9b8cf]">Join voice to view diagnostics.</p>
+              <p className="text-sm text-[#a9b8cf]">
+                Join voice to view diagnostics.
+              </p>
             ) : diagnosticsRows.length === 0 ? (
               <p className="text-sm text-[#a9b8cf]">No peer connections yet.</p>
             ) : (
@@ -1558,11 +1710,22 @@ export function VoiceChannelPane({
                       <p>ICE connection: {diag.iceConnectionState}</p>
                       <p>Signaling: {diag.signalingState}</p>
                       <p>ICE gathering: {diag.iceGatheringState}</p>
-                      <p>Pair ID: {diag.selectedCandidatePairId ?? 'n/a'}</p>
-                      <p>Pair state: {diag.selectedCandidatePairState ?? 'n/a'}</p>
-                      <p>Local candidate: {diag.localCandidateType ?? 'n/a'}</p>
-                      <p>Remote candidate: {diag.remoteCandidateType ?? 'n/a'}</p>
-                      <p>Writable: {diag.writable == null ? 'n/a' : diag.writable ? 'yes' : 'no'}</p>
+                      <p>Pair ID: {diag.selectedCandidatePairId ?? "n/a"}</p>
+                      <p>
+                        Pair state: {diag.selectedCandidatePairState ?? "n/a"}
+                      </p>
+                      <p>Local candidate: {diag.localCandidateType ?? "n/a"}</p>
+                      <p>
+                        Remote candidate: {diag.remoteCandidateType ?? "n/a"}
+                      </p>
+                      <p>
+                        Writable:{" "}
+                        {diag.writable == null
+                          ? "n/a"
+                          : diag.writable
+                            ? "yes"
+                            : "no"}
+                      </p>
                       <p>Bytes sent: {formatBytes(diag.bytesSent)}</p>
                       <p>Bytes received: {formatBytes(diag.bytesReceived)}</p>
                     </div>
@@ -1576,7 +1739,9 @@ export function VoiceChannelPane({
 
       <Card className="bg-[#1c2a43] border-[#263a58] text-white">
         <CardHeader>
-          <CardTitle>Participants ({participants.length + (joined ? 1 : 0)})</CardTitle>
+          <CardTitle>
+            Participants ({participants.length + (joined ? 1 : 0)})
+          </CardTitle>
           <CardDescription className="text-[#a9b8cf]">
             Per-user volume is local to your client.
           </CardDescription>
@@ -1588,15 +1753,26 @@ export function VoiceChannelPane({
                 <Avatar
                   size="sm"
                   className={cn(
-                    'ring-2 ring-transparent transition-colors',
-                    voiceActivityGateOpen && !isMuted && !isDeafened && 'ring-[#64f0a8]'
+                    "ring-2 ring-transparent transition-colors",
+                    voiceActivityGateOpen &&
+                      !isMuted &&
+                      !isDeafened &&
+                      "ring-[#64f0a8]",
                   )}
                 >
-                  <AvatarImage src={currentUserAvatarUrl ?? undefined} alt={currentUserDisplayName} />
-                  <AvatarFallback>{getInitials(currentUserDisplayName)}</AvatarFallback>
+                  <AvatarImage
+                    src={currentUserAvatarUrl ?? undefined}
+                    alt={currentUserDisplayName}
+                  />
+                  <AvatarFallback>
+                    {getInitials(currentUserDisplayName)}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-white truncate" title={currentUserDisplayName}>
+                  <p
+                    className="text-sm font-medium text-white truncate"
+                    title={currentUserDisplayName}
+                  >
                     {currentUserDisplayName} (You)
                   </p>
                   <div className="mt-1 flex items-center gap-2">
@@ -1610,59 +1786,98 @@ export function VoiceChannelPane({
           )}
 
           {participants.length === 0 ? (
-            <p className="text-sm text-[#a9b8cf]">No other participants are connected.</p>
+            <p className="text-sm text-[#a9b8cf]">
+              No other participants are connected.
+            </p>
           ) : (
-            participants.map((participant) => (
-              <div
-                key={participant.userId}
-                className="flex items-center justify-between rounded-md border border-[#304867] bg-[#142033] px-3 py-2 gap-3"
-              >
-                <div className="min-w-0 flex items-center gap-3">
-                  <Avatar
-                    size="sm"
-                    className={cn(
-                      'ring-2 ring-transparent transition-colors',
-                      participant.isSpeaking && 'ring-[#64f0a8]'
-                    )}
-                  >
-                    <AvatarImage src={participant.avatarUrl ?? undefined} alt={participant.displayName} />
-                    <AvatarFallback>{getInitials(participant.displayName)}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-white truncate" title={participant.displayName}>
-                      {participant.displayName}
-                    </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      {participant.muted && <Badge variant="outline">Muted</Badge>}
-                      {participant.deafened && <Badge variant="outline">Deafened</Badge>}
+            <>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetAllMemberVolumes}
+                  className="h-8 text-xs text-[#c8d7ee] hover:text-white"
+                  disabled={isDeafened}
+                >
+                  <RotateCcw className="mr-1.5 size-3.5" />
+                  Reset all member volumes
+                </Button>
+              </div>
+
+              {participants.map((participant) => (
+                <div
+                  key={participant.userId}
+                  className="flex items-center justify-between rounded-md border border-[#304867] bg-[#142033] px-3 py-2 gap-3"
+                >
+                  <div className="min-w-0 flex items-center gap-3">
+                    <Avatar
+                      size="sm"
+                      className={cn(
+                        "ring-2 ring-transparent transition-colors",
+                        participant.isSpeaking && "ring-[#64f0a8]",
+                      )}
+                    >
+                      <AvatarImage
+                        src={participant.avatarUrl ?? undefined}
+                        alt={participant.displayName}
+                      />
+                      <AvatarFallback>
+                        {getInitials(participant.displayName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p
+                        className="text-sm font-medium text-white truncate"
+                        title={participant.displayName}
+                      >
+                        {participant.displayName}
+                      </p>
+                      <div className="mt-1 flex items-center gap-2">
+                        {participant.muted && (
+                          <Badge variant="outline">Muted</Badge>
+                        )}
+                        {participant.deafened && (
+                          <Badge variant="outline">Deafened</Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex min-w-[180px] items-center gap-3">
-                  <Volume2 className="size-4 text-[#a9b8cf]" />
-                  <Slider
-                    min={REMOTE_VOLUME_OPTIONS[0]}
-                    max={REMOTE_VOLUME_OPTIONS[REMOTE_VOLUME_OPTIONS.length - 1]}
-                    step={25}
-                    value={[remoteVolumes[participant.userId] ?? 100]}
-                    onValueChange={(values) => {
-                      const numericValue = values[0];
-                      setRemoteVolumes((prev) => ({
-                        ...prev,
-                        [participant.userId]: Number.isFinite(numericValue) ? numericValue : 100,
-                      }));
-                    }}
-                    disabled={isDeafened}
-                    className="w-full"
-                    aria-label={`Volume for ${participant.displayName}`}
-                  />
-                  <span className="w-10 shrink-0 text-right text-xs text-[#c8d7ee]">
-                    {remoteVolumes[participant.userId] ?? 100}%
-                  </span>
+                  <div className="flex min-w-[220px] items-center gap-3">
+                    <Volume2 className="size-4 text-[#a9b8cf]" />
+                    <Slider
+                      min={REMOTE_VOLUME_OPTIONS[0]}
+                      max={
+                        REMOTE_VOLUME_OPTIONS[REMOTE_VOLUME_OPTIONS.length - 1]
+                      }
+                      step={25}
+                      value={[getMemberVolume(participant.userId)]}
+                      onValueChange={(values) => {
+                        const numericValue = values[0];
+                        setMemberVolume(participant.userId, numericValue);
+                      }}
+                      disabled={isDeafened}
+                      className="w-full"
+                      aria-label={`Volume for ${participant.displayName}`}
+                    />
+                    <span className="w-10 shrink-0 text-right text-xs text-[#c8d7ee]">
+                      {getMemberVolume(participant.userId)}%
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => resetMemberVolume(participant.userId)}
+                      disabled={isDeafened}
+                      className="h-8 px-2 text-xs"
+                    >
+                      100%
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </>
           )}
         </CardContent>
       </Card>
@@ -1676,16 +1891,21 @@ export function VoiceChannelPane({
             ref={(element) => {
               audioElementRefs.current[participant.userId] = element;
               if (!element) return;
-              const nextRemoteStream = remoteStreams[participant.userId] ?? null;
+              const nextRemoteStream =
+                remoteStreams[participant.userId] ?? null;
               element.srcObject = nextRemoteStream;
               element.muted = isDeafened;
               element.volume = (remoteVolumes[participant.userId] ?? 100) / 100;
               void applySinkId(element);
               if (nextRemoteStream) {
                 void element.play().catch((playError) => {
-                  const errorName = playError instanceof Error ? playError.name : '';
-                  if (errorName === 'AbortError') return;
-                  console.error('Failed to start remote audio playback:', playError);
+                  const errorName =
+                    playError instanceof Error ? playError.name : "";
+                  if (errorName === "AbortError") return;
+                  console.error(
+                    "Failed to start remote audio playback:",
+                    playError,
+                  );
                 });
               }
             }}
@@ -1695,4 +1915,3 @@ export function VoiceChannelPane({
     </div>
   );
 }
-
