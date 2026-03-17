@@ -249,6 +249,7 @@ export function ChatApp() {
               voiceStatusPanel={
                 app.activeVoiceChannel ? (
                   <VoiceDrawer
+                    notificationAudioSettings={app.appSettings.notifications}
                     communityId={app.activeVoiceChannel.community_id}
                     serverName={app.currentServer.name}
                     channelId={app.activeVoiceChannel.id}
