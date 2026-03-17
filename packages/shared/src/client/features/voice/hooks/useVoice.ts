@@ -10,8 +10,8 @@ import {
 } from '@client/features/voice/store/voiceSessionStore';
 
 type VoiceControlActions = {
-  join: () => Promise<void>;
-  leave: () => Promise<void>;
+  join: () => void;
+  leave: () => void;
   toggleMute: () => void;
   toggleDeafen: () => void;
 };

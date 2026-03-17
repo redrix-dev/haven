@@ -12,8 +12,6 @@ import { ChannelSettingsModal } from "@shared/components/ChannelSettingsModal";
 import { Sidebar } from "@shared/components/Sidebar";
 import { ChatArea } from "@shared/components/ChatArea";
 import { VoiceHardwareDebugPanel } from "@shared/components/VoiceHardwareDebugPanel";
-import { VoiceDrawer } from "@shared/components/VoiceDrawer";
-import { VoicePanel } from "@shared/components/VoicePanel";
 import { VoiceSettingsModal } from "@shared/components/VoiceSettingsModal";
 import { VoiceDrawer } from "@shared/components/voice/VoiceDrawer";
 import { NotificationCenterModal } from "@shared/components/NotificationCenterModal";
@@ -22,7 +20,6 @@ import { DirectMessagesSidebar } from "@shared/components/DirectMessagesSidebar"
 import { DirectMessageArea } from "@shared/components/DirectMessageArea";
 import { DmReportReviewPanel } from "@shared/components/DmReportReviewPanel";
 import { PasswordRecoveryDialog } from "@shared/components/PasswordRecoveryDialog";
-import { Button } from "@shared/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,7 +57,7 @@ export function ChatApp() {
 
   const activeVoiceServer = app.activeVoiceChannel
     ? (app.servers.find(
-        (server) => server.id === app.activeVoiceChannel.community_id,
+        (server) => server.id === app.activeVoiceChannel?.community_id,
       ) ?? null)
     : null;
 
@@ -79,7 +76,7 @@ export function ChatApp() {
       activeVoiceServer.id === app.currentServerId &&
       !app.channels.some(
         (channel) =>
-          channel.id === app.activeVoiceChannel.id && channel.kind === "voice",
+          channel.id === app.activeVoiceChannel?.id && channel.kind === "voice",
       );
 
     if (isKnownMissingVoiceChannelInCurrentServer) {
@@ -457,57 +454,6 @@ export function ChatApp() {
           </div>
         )}
       </div>
-
-      {app.activeVoiceChannel && (
-        <VoiceDrawer
-          layout="modal"
-          open={app.voicePanelOpen}
-          onDismiss={() => app.setVoicePanelOpen(false)}
-        >
-          <VoicePanel
-            title={app.activeVoiceChannel.name}
-            subtitle="Voice controls"
-          >
-            <VoiceChannelPane
-              key={`${app.activeVoiceChannel.community_id}:${app.activeVoiceChannel.id}`}
-              communityId={app.activeVoiceChannel.community_id}
-              channelId={app.activeVoiceChannel.id}
-              channelName={app.activeVoiceChannel.name}
-              currentUserId={user.id}
-              currentUserDisplayName={app.userDisplayName}
-              voiceSettings={app.appSettings.voice}
-              voiceSettingsSaving={app.voiceSettingsSaving}
-              voiceSettingsError={app.voiceSettingsError}
-              onUpdateVoiceSettings={(next) => {
-                void app.setVoiceSettings(next);
-              }}
-              onOpenVoiceSettings={() => app.setShowVoiceSettingsModal(true)}
-              onOpenVoiceHardwareTest={() =>
-                app.setUserVoiceHardwareTestOpen(true)
-              }
-              showDiagnostics={app.isPlatformStaff}
-              autoJoin
-              onParticipantsChange={app.setVoiceParticipants}
-              onConnectionChange={app.setVoiceConnected}
-              onSessionStateChange={app.setVoiceSessionState}
-              onDeviceSelectionChange={({
-                selectedInputDeviceId,
-                selectedOutputDeviceId,
-              }) => {
-                setSelectedVoiceInputDeviceId(selectedInputDeviceId);
-                setSelectedVoiceOutputDeviceId(selectedOutputDeviceId);
-              }}
-              onMemberVolumeChange={(volumes) => {
-                setVoiceMemberVolumes(volumes);
-              }}
-              onControlActionsReady={app.setVoiceControlActions}
-              onLeave={() =>
-                app.disconnectVoiceSession({ triggerPaneLeave: false })
-              }
-            />
-          </VoicePanel>
-        </VoiceDrawer>
-      )}
 
       <NotificationCenterModal
         open={app.notificationsPanelOpen}
