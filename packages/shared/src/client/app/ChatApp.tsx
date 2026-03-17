@@ -55,6 +55,38 @@ export function ChatApp() {
     app.servers,
   );
 
+  const activeVoiceServer = app.activeVoiceChannel
+    ? (app.servers.find(
+        (server) => server.id === app.activeVoiceChannel.community_id,
+      ) ?? null)
+    : null;
+
+  const handleVoiceHeaderChannelNavigate = () => {
+    if (!app.activeVoiceChannel) return;
+
+    if (!activeVoiceServer) {
+      toast.error("This voice channel is no longer available.");
+      return;
+    }
+
+    app.setWorkspaceMode("community");
+    app.setCurrentServerId(activeVoiceServer.id);
+
+    const isKnownMissingVoiceChannelInCurrentServer =
+      activeVoiceServer.id === app.currentServerId &&
+      !app.channels.some(
+        (channel) =>
+          channel.id === app.activeVoiceChannel.id && channel.kind === "voice",
+      );
+
+    if (isKnownMissingVoiceChannelInCurrentServer) {
+      toast.message("Voice channel unavailable. Opened a safe default view.");
+      return;
+    }
+
+    app.setCurrentChannelId(app.activeVoiceChannel.id);
+  };
+
   if (app.authStatus === "initializing") {
     return (
       <div className="flex items-center justify-center h-screen bg-[#111a2b] text-white">
