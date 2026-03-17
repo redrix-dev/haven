@@ -6,6 +6,7 @@ import { matchesVoicePushToTalkBinding } from '@shared/lib/voice/pushToTalk';
 import { getErrorMessage } from '@platform/lib/errors';
 import type { VoiceSettings } from '@platform/desktop/types';
 import { Badge } from '@shared/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
 import { Button } from '@shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { PushToTalkBindingField } from '@shared/components/PushToTalkBindingField';
@@ -19,6 +20,7 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { Toggle } from '@shared/components/ui/toggle';
+import { cn } from '@shared/lib/utils';
 import { Headphones, Mic, MicOff, PhoneCall, PhoneOff, RefreshCcw, Volume2 } from 'lucide-react';
 
 type VoiceSignalEvent = 'offer' | 'answer' | 'ice';
@@ -36,14 +38,18 @@ type VoiceSignalPayload = {
 type VoicePresencePayload = {
   user_id: string;
   display_name: string;
+  avatar_url?: string | null;
   muted: boolean;
   deafened: boolean;
+  is_speaking?: boolean;
   joined_at: string;
 };
 
 type VoiceParticipant = {
   userId: string;
   displayName: string;
+  avatarUrl?: string | null;
+  isSpeaking?: boolean;
   muted: boolean;
   deafened: boolean;
 };
@@ -72,6 +78,7 @@ interface VoiceChannelPaneProps {
   channelName: string;
   currentUserId: string;
   currentUserDisplayName: string;
+  currentUserAvatarUrl?: string | null;
   voiceSettings: VoiceSettings;
   voiceSettingsSaving?: boolean;
   voiceSettingsError?: string | null;
@@ -80,7 +87,7 @@ interface VoiceChannelPaneProps {
   onOpenVoiceHardwareTest?: () => void;
   showDiagnostics?: boolean;
   autoJoin?: boolean;
-  onParticipantsChange?: (participants: Array<{ userId: string; displayName: string }>) => void;
+  onParticipantsChange?: (participants: Array<{ userId: string; displayName: string; avatarUrl?: string | null; isSpeaking?: boolean }>) => void;
   onConnectionChange?: (connected: boolean) => void;
   onLeave?: () => void;
   onSessionStateChange?: (state: {
@@ -113,6 +120,15 @@ const isAudioInput = (device: MediaDeviceInfo) => device.kind === 'audioinput';
 const isAudioOutput = (device: MediaDeviceInfo) => device.kind === 'audiooutput';
 const hasSelectableDeviceId = (device: MediaDeviceInfo) => device.deviceId.trim().length > 0;
 const formatBytes = (value: number | null) => (value == null ? 'n/a' : `${(value / 1024).toFixed(1)} KB`);
+const getInitials = (displayName: string) => {
+  const parts = displayName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+  if (parts.length === 0) return '?';
+  return parts.map((part) => part.charAt(0).toUpperCase()).join('');
+};
 
 export function VoiceChannelPane({
   communityId,
@@ -120,6 +136,7 @@ export function VoiceChannelPane({
   channelName,
   currentUserId,
   currentUserDisplayName,
+  currentUserAvatarUrl,
   voiceSettings,
   voiceSettingsSaving = false,
   voiceSettingsError = null,
@@ -697,6 +714,8 @@ export function VoiceChannelPane({
       nextParticipants.push({
         userId,
         displayName: latestPresence.display_name ?? userId.slice(0, 12),
+        avatarUrl: latestPresence.avatar_url ?? null,
+        isSpeaking: Boolean(latestPresence.is_speaking),
         muted: Boolean(latestPresence.muted),
         deafened: Boolean(latestPresence.deafened),
       });
@@ -714,8 +733,12 @@ export function VoiceChannelPane({
     const payload: VoicePresencePayload = {
       user_id: currentUserId,
       display_name: currentUserDisplayName,
+      avatar_url: currentUserAvatarUrl,
       muted: isMuted,
       deafened: isDeafened,
+      is_speaking: voiceSettings.transmissionMode !== 'push_to_talk'
+        ? !isMuted && !isDeafened && voiceActivityGateOpen
+        : !isMuted && !isDeafened && pushToTalkPressed,
       joined_at: new Date().toISOString(),
     };
 
@@ -898,7 +921,7 @@ export function VoiceChannelPane({
 
     await refreshAudioDevices();
 
-    const voiceChannel = supabase.channel(`voice:${communityId}:${channelId}`, {
+    const voiceChannel = supabase.channel(`voice:presence:${communityId}:${channelId}`, {
       config: {
         presence: { key: currentUserId },
       },
@@ -1020,6 +1043,7 @@ export function VoiceChannelPane({
     isDeafened,
     joined,
     currentUserDisplayName,
+  currentUserAvatarUrl,
     pushToTalkPressed,
     voiceActivityGateOpen,
     voiceSettings.transmissionMode,
@@ -1136,6 +1160,8 @@ export function VoiceChannelPane({
       participants.map((participant) => ({
         userId: participant.userId,
         displayName: participant.displayName,
+        avatarUrl: participant.avatarUrl ?? null,
+        isSpeaking: participant.isSpeaking ?? false,
       }))
     );
   }, [joined, onParticipantsChange, participants]);
@@ -1557,12 +1583,26 @@ export function VoiceChannelPane({
         </CardHeader>
         <CardContent className="space-y-2">
           {joined && (
-            <div className="flex items-center justify-between rounded-md border border-[#304867] bg-[#142033] px-3 py-2">
-              <div>
-                <p className="text-sm font-medium text-white">{currentUserDisplayName} (You)</p>
-                <div className="mt-1 flex items-center gap-2">
-                  {isMuted && <Badge variant="outline">Muted</Badge>}
-                  {isDeafened && <Badge variant="outline">Deafened</Badge>}
+            <div className="flex items-center justify-between rounded-md border border-[#304867] bg-[#142033] px-3 py-2 gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar
+                  size="sm"
+                  className={cn(
+                    'ring-2 ring-transparent transition-colors',
+                    voiceActivityGateOpen && !isMuted && !isDeafened && 'ring-[#64f0a8]'
+                  )}
+                >
+                  <AvatarImage src={currentUserAvatarUrl ?? undefined} alt={currentUserDisplayName} />
+                  <AvatarFallback>{getInitials(currentUserDisplayName)}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white truncate" title={currentUserDisplayName}>
+                    {currentUserDisplayName} (You)
+                  </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    {isMuted && <Badge variant="outline">Muted</Badge>}
+                    {isDeafened && <Badge variant="outline">Deafened</Badge>}
+                  </div>
                 </div>
               </div>
               <Badge variant="secondary">Local</Badge>
@@ -1577,11 +1617,25 @@ export function VoiceChannelPane({
                 key={participant.userId}
                 className="flex items-center justify-between rounded-md border border-[#304867] bg-[#142033] px-3 py-2 gap-3"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{participant.displayName}</p>
-                  <div className="mt-1 flex items-center gap-2">
-                    {participant.muted && <Badge variant="outline">Muted</Badge>}
-                    {participant.deafened && <Badge variant="outline">Deafened</Badge>}
+                <div className="min-w-0 flex items-center gap-3">
+                  <Avatar
+                    size="sm"
+                    className={cn(
+                      'ring-2 ring-transparent transition-colors',
+                      participant.isSpeaking && 'ring-[#64f0a8]'
+                    )}
+                  >
+                    <AvatarImage src={participant.avatarUrl ?? undefined} alt={participant.displayName} />
+                    <AvatarFallback>{getInitials(participant.displayName)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-white truncate" title={participant.displayName}>
+                      {participant.displayName}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      {participant.muted && <Badge variant="outline">Muted</Badge>}
+                      {participant.deafened && <Badge variant="outline">Deafened</Badge>}
+                    </div>
                   </div>
                 </div>
 

@@ -31,6 +31,7 @@ type UseVoiceInput = {
   currentServerId: string | null;
   currentUserId: string | null | undefined;
   currentUserDisplayName: string;
+  currentUserAvatarUrl: string | null;
   currentChannelId: string | null;
   setCurrentChannelId: React.Dispatch<React.SetStateAction<string | null>>;
   voiceHardwareDebugPanelEnabled: boolean;
@@ -47,6 +48,7 @@ export function useVoice({
   currentServerId,
   currentUserId,
   currentUserDisplayName,
+  currentUserAvatarUrl,
   currentChannelId,
   setCurrentChannelId,
   voiceHardwareDebugPanelEnabled,
@@ -198,7 +200,7 @@ export function useVoice({
     let disposed = false;
 
     const subscriptionChannels = voiceChannelIds.map((voiceChannelId) => {
-      const subscriptionChannel = supabase.channel(`voice:${currentServerId}:${voiceChannelId}`);
+      const subscriptionChannel = supabase.channel(`voice:presence:${currentServerId}:${voiceChannelId}`);
 
       const syncPresenceState = () => {
         if (disposed) return;
@@ -223,6 +225,8 @@ export function useVoice({
             participantsByUserId.set(userId, {
               userId,
               displayName,
+              avatarUrl: latestPresence.avatar_url ?? null,
+              isSpeaking: Boolean(latestPresence.is_speaking),
             });
           }
         }
@@ -301,6 +305,8 @@ export function useVoice({
                 {
                   userId: currentUserId,
                   displayName: currentUserDisplayName,
+                  avatarUrl: currentUserAvatarUrl,
+                  isSpeaking: false,
                 },
               ]
             : []),

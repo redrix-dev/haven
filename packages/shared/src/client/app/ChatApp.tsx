@@ -1,26 +1,26 @@
-import React from 'react';
-import { LoginScreen } from '@shared/components/LoginScreen';
-import { ServerList } from '@shared/components/ServerList';
-import { CreateServerModal } from '@shared/components/CreateServerModal';
-import { CreateChannelModal } from '@shared/components/CreateChannelModal';
-import { JoinServerModal } from '@shared/components/JoinServerModal';
-import { AccountSettingsModal } from '@shared/components/AccountSettingsModal';
-import { QuickRenameDialog } from '@shared/components/QuickRenameDialog';
-import { ServerMembersModal } from '@shared/components/ServerMembersModal';
-import { ServerSettingsModal } from '@shared/components/ServerSettingsModal';
-import { ChannelSettingsModal } from '@shared/components/ChannelSettingsModal';
-import { Sidebar } from '@shared/components/Sidebar';
-import { ChatArea } from '@shared/components/ChatArea';
-import { VoiceHardwareDebugPanel } from '@shared/components/VoiceHardwareDebugPanel';
-import { VoiceSettingsModal } from '@shared/components/VoiceSettingsModal';
-import { VoiceDrawer } from '@shared/components/voice/VoiceDrawer';
-import { NotificationCenterModal } from '@shared/components/NotificationCenterModal';
-import { FriendsModal } from '@shared/components/FriendsModal';
-import { DirectMessagesSidebar } from '@shared/components/DirectMessagesSidebar';
-import { DirectMessageArea } from '@shared/components/DirectMessageArea';
-import { DmReportReviewPanel } from '@shared/components/DmReportReviewPanel';
-import { PasswordRecoveryDialog } from '@shared/components/PasswordRecoveryDialog';
-import { Button } from '@shared/components/ui/button';
+import React from "react";
+import { LoginScreen } from "@shared/components/LoginScreen";
+import { ServerList } from "@shared/components/ServerList";
+import { CreateServerModal } from "@shared/components/CreateServerModal";
+import { CreateChannelModal } from "@shared/components/CreateChannelModal";
+import { JoinServerModal } from "@shared/components/JoinServerModal";
+import { AccountSettingsModal } from "@shared/components/AccountSettingsModal";
+import { QuickRenameDialog } from "@shared/components/QuickRenameDialog";
+import { ServerMembersModal } from "@shared/components/ServerMembersModal";
+import { ServerSettingsModal } from "@shared/components/ServerSettingsModal";
+import { ChannelSettingsModal } from "@shared/components/ChannelSettingsModal";
+import { Sidebar } from "@shared/components/Sidebar";
+import { ChatArea } from "@shared/components/ChatArea";
+import { VoiceHardwareDebugPanel } from "@shared/components/VoiceHardwareDebugPanel";
+import { VoiceSettingsModal } from "@shared/components/VoiceSettingsModal";
+import { VoiceDrawer } from "@shared/components/voice/VoiceDrawer";
+import { NotificationCenterModal } from "@shared/components/NotificationCenterModal";
+import { FriendsModal } from "@shared/components/FriendsModal";
+import { DirectMessagesSidebar } from "@shared/components/DirectMessagesSidebar";
+import { DirectMessageArea } from "@shared/components/DirectMessageArea";
+import { DmReportReviewPanel } from "@shared/components/DmReportReviewPanel";
+import { PasswordRecoveryDialog } from "@shared/components/PasswordRecoveryDialog";
+import { Button } from "@shared/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,11 +30,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@shared/components/ui/alert-dialog';
-import { desktopClient } from '@platform/desktop/client';
-import { getErrorMessage } from '@platform/lib/errors';
-import { VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL } from '@client/app/constants';
-import { useChatAppOrchestration } from '@client/app/hooks/useChatAppOrchestration';
+} from "@shared/components/ui/alert-dialog";
+import { desktopClient } from "@platform/desktop/client";
+import { getErrorMessage } from "@platform/lib/errors";
+import { VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL } from "@client/app/constants";
+import { useChatAppOrchestration } from "@client/app/hooks/useChatAppOrchestration";
 import {
   WebPushCutoverReadiness,
   WebPushBackendTraceParitySummary,
@@ -44,15 +44,18 @@ import {
   buildBackendWakeSourceCounts,
   buildWebPushCutoverReadiness,
   buildWebPushQueueHealthAlerts,
-} from '@shared/lib/notifications/webPushDiagnostics';
-import { toast } from 'sonner';
-import { useServerOrder } from '@client/features/community/hooks/useServerOrder';
+} from "@shared/lib/notifications/webPushDiagnostics";
+import { toast } from "sonner";
+import { useServerOrder } from "@client/features/community/hooks/useServerOrder";
 
 export function ChatApp() {
   const app = useChatAppOrchestration();
-  const { orderedServers, setOrder: setServerOrder } = useServerOrder(app.user?.id ?? null, app.servers);
+  const { orderedServers, setOrder: setServerOrder } = useServerOrder(
+    app.user?.id ?? null,
+    app.servers,
+  );
 
-  if (app.authStatus === 'initializing') {
+  if (app.authStatus === "initializing") {
     return (
       <div className="flex items-center justify-center h-screen bg-[#111a2b] text-white">
         Loading...
@@ -60,10 +63,12 @@ export function ChatApp() {
     );
   }
 
-  if (app.authStatus === 'error') {
+  if (app.authStatus === "error") {
     return (
       <div className="flex items-center justify-center h-screen bg-[#111a2b] text-white">
-        <p>{app.authError ?? 'Authentication failed. Please restart the app.'}</p>
+        <p>
+          {app.authError ?? "Authentication failed. Please restart the app."}
+        </p>
       </div>
     );
   }
@@ -73,9 +78,12 @@ export function ChatApp() {
   }
 
   const { user } = app;
-  const canManageChannelStructure = app.serverPermissions.canManageChannelStructure;
-  const canManageChannelPermissions = app.serverPermissions.canManageChannelPermissions;
-  const canOpenChannelSettings = canManageChannelStructure || canManageChannelPermissions;
+  const canManageChannelStructure =
+    app.serverPermissions.canManageChannelStructure;
+  const canManageChannelPermissions =
+    app.serverPermissions.canManageChannelPermissions;
+  const canOpenChannelSettings =
+    canManageChannelStructure || canManageChannelPermissions;
 
   return (
     <>
@@ -94,7 +102,7 @@ export function ChatApp() {
           canManageCurrentServer={app.canManageCurrentServer}
           canOpenCurrentServerSettings={app.canOpenServerSettings}
           onServerClick={(serverId) => {
-            app.setWorkspaceMode('community');
+            app.setWorkspaceMode("community");
             app.setCurrentServerId(serverId);
           }}
           onCreateServer={() => app.setShowCreateModal(true)}
@@ -102,7 +110,9 @@ export function ChatApp() {
           onOpenNotifications={() => app.setNotificationsPanelOpen(true)}
           notificationUnseenCount={app.notificationCounts.unseenCount}
           notificationHasUnseenPulse={app.notificationCounts.unseenCount > 0}
-          onOpenDirectMessages={app.dmWorkspaceEnabled ? app.openDirectMessagesWorkspace : undefined}
+          onOpenDirectMessages={
+            app.dmWorkspaceEnabled ? app.openDirectMessagesWorkspace : undefined
+          }
           directMessagesActive={app.dmWorkspaceIsActive}
           onOpenFriends={
             app.friendsSocialPanelEnabled
@@ -113,8 +123,12 @@ export function ChatApp() {
                 }
               : undefined
           }
-          friendRequestIncomingCount={app.socialCounts.incomingPendingRequestCount}
-          friendRequestHasPendingPulse={app.socialCounts.incomingPendingRequestCount > 0}
+          friendRequestIncomingCount={
+            app.socialCounts.incomingPendingRequestCount
+          }
+          friendRequestHasPendingPulse={
+            app.socialCounts.incomingPendingRequestCount > 0
+          }
           onOpenDmReportReview={
             app.dmReportReviewPanelEnabled
               ? () => app.setDmReportReviewPanelOpen(true)
@@ -144,9 +158,13 @@ export function ChatApp() {
               refreshing={app.dmConversationsRefreshing}
               error={app.dmConversationsError}
               onSelectConversation={(conversationId) => {
-                void app.openDirectMessageConversation(conversationId).catch((error: unknown) => {
-                  toast.error(getErrorMessage(error, 'Failed to open direct message.'));
-                });
+                void app
+                  .openDirectMessageConversation(conversationId)
+                  .catch((error: unknown) => {
+                    toast.error(
+                      getErrorMessage(error, "Failed to open direct message."),
+                    );
+                  });
               }}
               onRefresh={() => {
                 void app.refreshDmConversations({ suppressLoadingState: true });
@@ -207,7 +225,8 @@ export function ChatApp() {
                     currentUserDisplayName={app.userDisplayName}
                     participantCount={app.activeVoiceParticipantCount}
                     participantPreview={
-                      app.voiceChannelParticipants[app.activeVoiceChannel.id] ?? []
+                      app.voiceChannelParticipants[app.activeVoiceChannel.id] ??
+                      []
                     }
                     voiceConnected={app.voiceConnected}
                     voicePanelOpen={app.voicePanelOpen}
@@ -217,12 +236,18 @@ export function ChatApp() {
                     voiceSettingsSaving={app.voiceSettingsSaving}
                     voiceSettingsError={app.voiceSettingsError}
                     onToggleOpen={() => app.setVoicePanelOpen((prev) => !prev)}
-                    onDisconnect={() => app.disconnectVoiceSession({ triggerPaneLeave: false })}
+                    onDisconnect={() =>
+                      app.disconnectVoiceSession({ triggerPaneLeave: false })
+                    }
                     onUpdateVoiceSettings={(next) => {
                       void app.setVoiceSettings(next);
                     }}
-                    onOpenAdvancedOptions={() => app.setShowVoiceSettingsModal(true)}
-                    onOpenVoiceHardwareTest={() => app.setUserVoiceHardwareTestOpen(true)}
+                    onOpenAdvancedOptions={() =>
+                      app.setShowVoiceSettingsModal(true)
+                    }
+                    onOpenVoiceHardwareTest={() =>
+                      app.setUserVoiceHardwareTestOpen(true)
+                    }
                     showDiagnostics={app.isPlatformStaff}
                     onParticipantsChange={app.setVoiceParticipants}
                     onConnectionChange={app.setVoiceConnected}
@@ -255,23 +280,36 @@ export function ChatApp() {
               onAddChannelToGroup={
                 canManageChannelStructure
                   ? (channelId, groupId) => {
-                      void app.assignChannelToGroup(channelId, groupId).catch((error: unknown) => {
-                        toast.error(getErrorMessage(error, 'Failed to assign channel to group.'), {
-                          id: 'assign-channel-group-error',
+                      void app
+                        .assignChannelToGroup(channelId, groupId)
+                        .catch((error: unknown) => {
+                          toast.error(
+                            getErrorMessage(
+                              error,
+                              "Failed to assign channel to group.",
+                            ),
+                            {
+                              id: "assign-channel-group-error",
+                            },
+                          );
                         });
-                      });
                     }
                   : undefined
               }
               onRemoveChannelFromGroup={
                 canManageChannelStructure
                   ? (channelId) => {
-                      void app.removeChannelFromGroup(channelId).catch((error: unknown) => {
-                        toast.error(
-                          getErrorMessage(error, 'Failed to remove channel from group.'),
-                          { id: 'remove-channel-group-error' }
-                        );
-                      });
+                      void app
+                        .removeChannelFromGroup(channelId)
+                        .catch((error: unknown) => {
+                          toast.error(
+                            getErrorMessage(
+                              error,
+                              "Failed to remove channel from group.",
+                            ),
+                            { id: "remove-channel-group-error" },
+                          );
+                        });
                     }
                   : undefined
               }
@@ -281,15 +319,24 @@ export function ChatApp() {
                   : undefined
               }
               onToggleChannelGroup={(groupId, isCollapsed) => {
-                void app.setChannelGroupCollapsed(groupId, isCollapsed).catch((error: unknown) => {
-                  console.error('Failed to persist channel group collapse state:', error);
-                });
+                void app
+                  .setChannelGroupCollapsed(groupId, isCollapsed)
+                  .catch((error: unknown) => {
+                    console.error(
+                      "Failed to persist channel group collapse state:",
+                      error,
+                    );
+                  });
               }}
               onRenameChannelGroup={
-                canManageChannelStructure ? app.handleRenameChannelGroup : undefined
+                canManageChannelStructure
+                  ? app.handleRenameChannelGroup
+                  : undefined
               }
               onDeleteChannelGroup={
-                canManageChannelStructure ? app.handleDeleteChannelGroup : undefined
+                canManageChannelStructure
+                  ? app.handleDeleteChannelGroup
+                  : undefined
               }
               onOpenServerSettings={
                 app.canOpenServerSettings
@@ -316,11 +363,16 @@ export function ChatApp() {
                 canManageMessages={app.serverPermissions.canManageMessages}
                 canCreateReports={app.serverPermissions.canCreateReports}
                 canManageBans={app.serverPermissions.canManageBans}
-                canRefreshLinkPreviews={app.serverPermissions.canRefreshLinkPreviews}
+                canRefreshLinkPreviews={
+                  app.serverPermissions.canRefreshLinkPreviews
+                }
                 showVoiceDiagnostics={app.isPlatformStaff}
                 onOpenChannelSettings={
                   canOpenChannelSettings
-                    ? () => void app.openChannelSettingsModal(app.currentRenderableChannel!.id)
+                    ? () =>
+                        void app.openChannelSettingsModal(
+                          app.currentRenderableChannel!.id,
+                        )
                     : undefined
                 }
                 onOpenVoiceControls={() => app.setVoicePanelOpen(true)}
@@ -329,7 +381,9 @@ export function ChatApp() {
                 onDeleteMessage={app.deleteMessage}
                 onToggleMessageReaction={app.toggleMessageReaction}
                 onReportMessage={app.reportMessage}
-                onRequestMessageLinkPreviewRefresh={app.requestMessageLinkPreviewRefresh}
+                onRequestMessageLinkPreviewRefresh={
+                  app.requestMessageLinkPreviewRefresh
+                }
                 hasOlderMessages={app.hasOlderMessages}
                 isLoadingOlderMessages={app.isLoadingOlderMessages}
                 onRequestOlderMessages={app.requestOlderMessages}
@@ -346,13 +400,16 @@ export function ChatApp() {
                 onDirectMessageUser={app.directMessageUser}
                 onComposerHeightChange={app.setComposerHeight}
                 onSendHavenDeveloperMessage={
-                  app.canSendHavenDeveloperMessage ? app.sendHavenDeveloperMessage : undefined
+                  app.canSendHavenDeveloperMessage
+                    ? app.sendHavenDeveloperMessage
+                    : undefined
                 }
               />
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <p className="text-[#a9b8cf]">
-                  {app.channelsError ?? 'No channels yet. Create one to get started!'}
+                  {app.channelsError ??
+                    "No channels yet. Create one to get started!"}
                 </p>
               </div>
             )}
@@ -360,7 +417,7 @@ export function ChatApp() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <p className="text-[#a9b8cf]">
-              {app.serversError ?? 'No servers yet. Create one to get started!'}
+              {app.serversError ?? "No servers yet. Create one to get started!"}
             </p>
           </div>
         )}
@@ -376,24 +433,46 @@ export function ChatApp() {
         refreshing={app.notificationsRefreshing}
         onRefresh={() => void app.refreshNotificationsManually()}
         onMarkAllSeen={() => void app.markAllNotificationsSeen()}
-        onMarkNotificationRead={(recipientId) => void app.markNotificationRead(recipientId)}
-        onDismissNotification={(recipientId) => void app.dismissNotification(recipientId)}
-        onOpenNotificationItem={(notification) => void app.openNotificationItem(notification)}
-        onAcceptFriendRequestNotification={({ recipientId, friendRequestId }) => {
-          void app.acceptFriendRequestFromNotification({ recipientId, friendRequestId });
+        onMarkNotificationRead={(recipientId) =>
+          void app.markNotificationRead(recipientId)
+        }
+        onDismissNotification={(recipientId) =>
+          void app.dismissNotification(recipientId)
+        }
+        onOpenNotificationItem={(notification) =>
+          void app.openNotificationItem(notification)
+        }
+        onAcceptFriendRequestNotification={({
+          recipientId,
+          friendRequestId,
+        }) => {
+          void app.acceptFriendRequestFromNotification({
+            recipientId,
+            friendRequestId,
+          });
         }}
-        onDeclineFriendRequestNotification={({ recipientId, friendRequestId }) => {
-          void app.declineFriendRequestFromNotification({ recipientId, friendRequestId });
+        onDeclineFriendRequestNotification={({
+          recipientId,
+          friendRequestId,
+        }) => {
+          void app.declineFriendRequestFromNotification({
+            recipientId,
+            friendRequestId,
+          });
         }}
         preferences={app.notificationPreferences}
         preferencesLoading={app.notificationPreferencesLoading}
         preferencesSaving={app.notificationPreferencesSaving}
         preferencesError={app.notificationPreferencesError}
-        onUpdatePreferences={(next) => void app.saveNotificationPreferences(next)}
+        onUpdatePreferences={(next) =>
+          void app.saveNotificationPreferences(next)
+        }
         localAudioSettings={app.appSettings.notifications}
         localAudioSaving={app.notificationAudioSettingsSaving}
         localAudioError={app.notificationAudioSettingsError}
-        onUpdateLocalAudioSettings={(next) => void app.setNotificationAudioSettings(next)}
+        onUpdateLocalAudioSettings={(next) =>
+          void app.setNotificationAudioSettings(next)
+        }
         webPushControls={
           desktopClient.isAvailable()
             ? undefined
@@ -419,7 +498,8 @@ export function ChatApp() {
                         void app.showServiceWorkerTestNotification(),
                       onSimulateNotificationClick: () =>
                         void app.simulateServiceWorkerNotificationClick(),
-                      onRunWorkerOnce: () => void app.runWebPushWorkerOnceForTesting(),
+                      onRunWorkerOnce: () =>
+                        void app.runWebPushWorkerOnceForTesting(),
                       onRunWorkerShadowOnce: () =>
                         void app.runWebPushWorkerShadowOnceForTesting(),
                       onRunWorkerWakeupOnce: () =>
@@ -431,12 +511,14 @@ export function ChatApp() {
                           cutoverReadiness: WebPushCutoverReadiness;
                         } => {
                           const paritySummary = buildBackendTraceParitySummary(
-                            app.webPushBackendTraces
+                            app.webPushBackendTraces,
                           );
-                          const parityDrift = buildBackendTraceParityDrift(paritySummary);
-                          const queueHealthAlerts = buildWebPushQueueHealthAlerts(
-                            app.webPushQueueHealthDiagnostics
-                          );
+                          const parityDrift =
+                            buildBackendTraceParityDrift(paritySummary);
+                          const queueHealthAlerts =
+                            buildWebPushQueueHealthAlerts(
+                              app.webPushQueueHealthDiagnostics,
+                            );
                           return {
                             backendParitySummary: paritySummary,
                             backendParityDrift: parityDrift,
@@ -450,30 +532,38 @@ export function ChatApp() {
                         })(),
                         loading: app.webPushDiagnosticsLoading,
                         error: app.webPushDiagnosticsError,
-                        devMode: app.webPushRouteDiagnostics?.mode ?? 'real',
-                        routeMode: app.webPushRouteDiagnostics?.decision.routeMode ?? 'unknown',
-                        routeReasons: app.webPushRouteDiagnostics?.decision.reasonCodes ?? [],
+                        devMode: app.webPushRouteDiagnostics?.mode ?? "real",
+                        routeMode:
+                          app.webPushRouteDiagnostics?.decision.routeMode ??
+                          "unknown",
+                        routeReasons:
+                          app.webPushRouteDiagnostics?.decision.reasonCodes ??
+                          [],
                         queueHealthState: app.webPushQueueHealthDiagnostics,
                         queueHealthAlerts: buildWebPushQueueHealthAlerts(
-                          app.webPushQueueHealthDiagnostics
+                          app.webPushQueueHealthDiagnostics,
                         ),
                         wakeupState: app.webPushWakeupDiagnostics,
                         backendWakeSourceCounts: buildBackendWakeSourceCounts(
-                          app.webPushBackendTraces
+                          app.webPushBackendTraces,
                         ),
                         onSetWakeupConfig: (input) =>
                           void app.updateWebPushWakeupConfigForTesting(input),
                         onRefresh: () => void app.refreshWebPushDiagnostics(),
-                        onSetDevMode: (mode) => void app.setWebPushNotificationDevMode(mode),
+                        onSetDevMode: (mode) =>
+                          void app.setWebPushNotificationDevMode(mode),
                         onSimulateFocused: () =>
                           void app.setNotificationRouteSimulationFocus(true),
                         onSimulateBackground: () =>
                           void app.setNotificationRouteSimulationFocus(false),
-                        onClearSimulation: () => void app.clearNotificationRouteSimulation(),
+                        onClearSimulation: () =>
+                          void app.clearNotificationRouteSimulation(),
                         onRecordSimulationTrace: () =>
                           void app.recordNotificationRouteSimulationTrace(),
-                        onClearLocalTraces: () => void app.clearLocalNotificationTraces(),
-                        localTraces: app.webPushRouteDiagnostics?.localTraces ?? [],
+                        onClearLocalTraces: () =>
+                          void app.clearLocalNotificationTraces(),
+                        localTraces:
+                          app.webPushRouteDiagnostics?.localTraces ?? [],
                         backendTraces: app.webPushBackendTraces,
                       },
                     }
@@ -521,14 +611,14 @@ export function ChatApp() {
         <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {app.voiceJoinPrompt?.mode === 'switch'
-                ? 'Switch voice channel?'
-                : 'Join voice channel?'}
+              {app.voiceJoinPrompt?.mode === "switch"
+                ? "Switch voice channel?"
+                : "Join voice channel?"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-[#a9b8cf]">
-              {app.voiceJoinPrompt?.mode === 'switch'
-                ? 'You are already connected to voice. Switching will move your session to the new channel.'
-                : 'Join this voice channel now? You can keep browsing text channels while connected.'}
+              {app.voiceJoinPrompt?.mode === "switch"
+                ? "You are already connected to voice. Switching will move your session to the new channel."
+                : "Join this voice channel now? You can keep browsing text channels while connected."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -539,7 +629,7 @@ export function ChatApp() {
               onClick={app.confirmVoiceChannelJoin}
               className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
             >
-              {app.voiceJoinPrompt?.mode === 'switch' ? 'Switch' : 'Join'}
+              {app.voiceJoinPrompt?.mode === "switch" ? "Switch" : "Join"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -553,7 +643,9 @@ export function ChatApp() {
       >
         <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>{app.pendingUiConfirmationTitle}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {app.pendingUiConfirmationTitle}
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-[#a9b8cf]">
               {app.pendingUiConfirmationDescription}
             </AlertDialogDescription>
@@ -569,8 +661,8 @@ export function ChatApp() {
               }}
               className={
                 app.pendingUiConfirmationIsDestructive
-                  ? 'bg-red-600 text-white hover:bg-red-500'
-                  : 'bg-[#3f79d8] hover:bg-[#325fae] text-white'
+                  ? "bg-red-600 text-white hover:bg-red-500"
+                  : "bg-[#3f79d8] hover:bg-[#325fae] text-white"
               }
             >
               {app.pendingUiConfirmationConfirmLabel}
@@ -586,12 +678,14 @@ export function ChatApp() {
         />
       )}
 
-      {app.showCreateChannelModal && app.currentServerId && app.serverPermissions.canCreateChannels && (
-        <CreateChannelModal
-          onClose={() => app.setShowCreateChannelModal(false)}
-          onCreate={app.createChannel}
-        />
-      )}
+      {app.showCreateChannelModal &&
+        app.currentServerId &&
+        app.serverPermissions.canCreateChannels && (
+          <CreateChannelModal
+            onClose={() => app.setShowCreateChannelModal(false)}
+            onCreate={app.createChannel}
+          />
+        )}
 
       {app.showJoinServerModal && (
         <JoinServerModal
@@ -600,43 +694,50 @@ export function ChatApp() {
         />
       )}
 
-      {app.showServerSettingsModal && app.currentServerId && app.canOpenServerSettings && (
-        <ServerSettingsModal
-          channels={app.channels.map((channel) => ({ id: channel.id, name: channel.name }))}
-          initialValues={app.serverSettingsInitialValues}
-          loadingInitialValues={app.serverSettingsLoading}
-          initialLoadError={app.serverSettingsLoadError}
-          canManageServer={app.serverPermissions.canManageServer}
-          canManageRoles={app.serverPermissions.canManageRoles}
-          canManageMembers={app.serverPermissions.canManageMembers}
-          canManageBans={app.serverPermissions.canManageBans}
-          isOwner={app.serverPermissions.isOwner}
-          roles={app.serverRoles}
-          members={app.serverMembers}
-          permissionsCatalog={app.serverPermissionCatalog}
-          roleManagementLoading={app.serverRoleManagementLoading}
-          roleManagementError={app.serverRoleManagementError}
-          canManageDeveloperAccess={app.serverPermissions.canManageDeveloperAccess}
-          canManageInvites={app.serverPermissions.canManageInvites}
-          invites={app.serverInvites}
-          invitesLoading={app.serverInvitesLoading}
-          invitesError={app.serverInvitesError}
-          bans={app.communityBans}
-          bansLoading={app.communityBansLoading}
-          bansError={app.communityBansError}
-          inviteBaseUrl={app.getPlatformInviteBaseUrl()}
-          onClose={() => app.setShowServerSettingsModal(false)}
-          onSave={app.saveServerSettings}
-          onCreateRole={app.createServerRole}
-          onUpdateRole={app.updateServerRole}
-          onDeleteRole={app.deleteServerRole}
-          onSaveRolePermissions={app.saveServerRolePermissions}
-          onSaveMemberRoles={app.saveServerMemberRoles}
-          onCreateInvite={app.createServerInvite}
-          onRevokeInvite={app.revokeServerInvite}
-          onUnbanUser={app.unbanUserFromCurrentServer}
-        />
-      )}
+      {app.showServerSettingsModal &&
+        app.currentServerId &&
+        app.canOpenServerSettings && (
+          <ServerSettingsModal
+            channels={app.channels.map((channel) => ({
+              id: channel.id,
+              name: channel.name,
+            }))}
+            initialValues={app.serverSettingsInitialValues}
+            loadingInitialValues={app.serverSettingsLoading}
+            initialLoadError={app.serverSettingsLoadError}
+            canManageServer={app.serverPermissions.canManageServer}
+            canManageRoles={app.serverPermissions.canManageRoles}
+            canManageMembers={app.serverPermissions.canManageMembers}
+            canManageBans={app.serverPermissions.canManageBans}
+            isOwner={app.serverPermissions.isOwner}
+            roles={app.serverRoles}
+            members={app.serverMembers}
+            permissionsCatalog={app.serverPermissionCatalog}
+            roleManagementLoading={app.serverRoleManagementLoading}
+            roleManagementError={app.serverRoleManagementError}
+            canManageDeveloperAccess={
+              app.serverPermissions.canManageDeveloperAccess
+            }
+            canManageInvites={app.serverPermissions.canManageInvites}
+            invites={app.serverInvites}
+            invitesLoading={app.serverInvitesLoading}
+            invitesError={app.serverInvitesError}
+            bans={app.communityBans}
+            bansLoading={app.communityBansLoading}
+            bansError={app.communityBansError}
+            inviteBaseUrl={app.getPlatformInviteBaseUrl()}
+            onClose={() => app.setShowServerSettingsModal(false)}
+            onSave={app.saveServerSettings}
+            onCreateRole={app.createServerRole}
+            onUpdateRole={app.updateServerRole}
+            onDeleteRole={app.deleteServerRole}
+            onSaveRolePermissions={app.saveServerRolePermissions}
+            onSaveMemberRoles={app.saveServerMemberRoles}
+            onCreateInvite={app.createServerInvite}
+            onRevokeInvite={app.revokeServerInvite}
+            onUnbanUser={app.unbanUserFromCurrentServer}
+          />
+        )}
 
       {app.showChannelSettingsModal &&
         app.channelSettingsTarget &&
@@ -691,7 +792,7 @@ export function ChatApp() {
       <QuickRenameDialog
         open={Boolean(app.renameServerDraft)}
         title="Rename Community"
-        initialValue={app.renameServerDraft?.currentName ?? ''}
+        initialValue={app.renameServerDraft?.currentName ?? ""}
         confirmLabel="Rename"
         onClose={() => app.setRenameServerDraft(null)}
         onConfirm={async (value) => {
@@ -704,7 +805,7 @@ export function ChatApp() {
       <QuickRenameDialog
         open={Boolean(app.renameChannelDraft)}
         title="Rename Channel"
-        initialValue={app.renameChannelDraft?.currentName ?? ''}
+        initialValue={app.renameChannelDraft?.currentName ?? ""}
         confirmLabel="Rename"
         onClose={() => app.setRenameChannelDraft(null)}
         onConfirm={async (value) => {
@@ -717,7 +818,7 @@ export function ChatApp() {
       <QuickRenameDialog
         open={Boolean(app.renameGroupDraft)}
         title="Rename Channel Group"
-        initialValue={app.renameGroupDraft?.currentName ?? ''}
+        initialValue={app.renameGroupDraft?.currentName ?? ""}
         confirmLabel="Rename"
         onClose={() => app.setRenameGroupDraft(null)}
         onConfirm={async (value) => {
@@ -734,19 +835,24 @@ export function ChatApp() {
         confirmLabel="Create"
         onClose={() => app.setCreateGroupDraft(null)}
         onConfirm={async (value) => {
-          await app.createChannelGroup(value, app.createGroupDraft?.channelId ?? null);
+          await app.createChannelGroup(
+            value,
+            app.createGroupDraft?.channelId ?? null,
+          );
           app.setCreateGroupDraft(null);
         }}
       />
 
       {app.showAccountModal && (
         <AccountSettingsModal
-          userEmail={user.email ?? 'No email'}
+          userEmail={user.email ?? "No email"}
           initialUsername={app.baseUserDisplayName}
           initialAvatarUrl={app.profileAvatarUrl}
           autoUpdateEnabled={app.appSettings.autoUpdateEnabled}
           updaterStatus={app.updaterStatus}
-          updaterStatusLoading={app.updaterStatusLoading || app.appSettingsLoading}
+          updaterStatusLoading={
+            app.updaterStatusLoading || app.appSettingsLoading
+          }
           checkingForUpdates={app.checkingForUpdates}
           onClose={() => app.setShowAccountModal(false)}
           onSave={app.saveAccountSettings}
