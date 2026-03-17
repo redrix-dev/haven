@@ -34,6 +34,8 @@ import { desktopClient } from "@platform/desktop/client";
 import { getErrorMessage } from "@platform/lib/errors";
 import { VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL } from "@client/app/constants";
 import { useChatAppOrchestration } from "@client/app/hooks/useChatAppOrchestration";
+import { useVoiceSessionController } from "@client/features/voice/hooks/useVoiceSessionController";
+import type { VoicePopoutState } from "@platform/desktop/types";
 import {
   WebPushCutoverReadiness,
   WebPushBackendTraceParitySummary,
@@ -53,12 +55,192 @@ export function ChatApp() {
     app.user?.id ?? null,
     app.servers,
   );
-
+  const canOpenVoicePopout = desktopClient.isAvailable();
+  const [voicePopoutState, setVoicePopoutState] =
+    React.useState<VoicePopoutState | null>(null);
+  const setVoicePanelOpen = app.setVoicePanelOpen;
+  const disconnectVoiceSession = app.disconnectVoiceSession;
+  const setShowVoiceSettingsModal = app.setShowVoiceSettingsModal;
+  const setUserVoiceHardwareTestOpen = app.setUserVoiceHardwareTestOpen;
   const activeVoiceServer = app.activeVoiceChannel
     ? (app.servers.find(
         (server) => server.id === app.activeVoiceChannel?.community_id,
       ) ?? null)
     : null;
+  const activeVoiceControllerChannel = React.useMemo(
+    () =>
+      app.activeVoiceChannel
+        ? {
+            communityId: app.activeVoiceChannel.community_id,
+            channelId: app.activeVoiceChannel.id,
+            channelName: app.activeVoiceChannel.name,
+          }
+        : null,
+    [app.activeVoiceChannel],
+  );
+  const handleVoiceSessionError = React.useCallback(
+    (message: string) => {
+      toast.error(message);
+      void disconnectVoiceSession({ triggerPaneLeave: false }).catch(
+        (error: unknown) => {
+          console.error("Failed to reset voice session after error:", error);
+        },
+      );
+    },
+    [disconnectVoiceSession],
+  );
+  const voiceController = useVoiceSessionController({
+    activeChannel: activeVoiceControllerChannel,
+    currentUserId: app.user?.id,
+    currentUserDisplayName: app.userDisplayName,
+    currentUserAvatarUrl: app.profileAvatarUrl,
+    voiceSettings: app.appSettings.voice,
+    notificationAudioSettings: app.appSettings.notifications,
+    showDiagnostics: app.isPlatformStaff,
+    onUpdateVoiceSettings: (next) => {
+      void app.setVoiceSettings(next);
+    },
+    onParticipantsChange: app.setVoiceParticipants,
+    onConnectionChange: app.setVoiceConnected,
+    onSessionStateChange: app.setVoiceSessionState,
+    onControlActionsReady: app.setVoiceControlActions,
+    onSessionError: handleVoiceSessionError,
+  });
+  const voicePopoutWindowOpen = canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
+
+  React.useEffect(() => {
+    if (!canOpenVoicePopout) return;
+
+    return desktopClient.onVoicePopoutState((nextState) => {
+      setVoicePopoutState(nextState);
+    });
+  }, [canOpenVoicePopout]);
+
+  React.useEffect(() => {
+    if (!voicePopoutWindowOpen) return;
+    setVoicePanelOpen(false);
+  }, [setVoicePanelOpen, voicePopoutWindowOpen]);
+
+  React.useEffect(() => {
+    if (!canOpenVoicePopout) return;
+
+    void desktopClient.syncVoicePopoutState({
+      isOpen: voicePopoutWindowOpen,
+      serverName:
+        activeVoiceServer?.name ?? app.currentServer?.name ?? null,
+      channelName: app.activeVoiceChannel?.name ?? null,
+      connected: voiceController.state.joined,
+      joined: voiceController.state.joined,
+      joining: voiceController.state.joining,
+      isMuted: voiceController.state.isMuted,
+      isDeafened: voiceController.state.isDeafened,
+      transmissionMode: app.appSettings.voice.transmissionMode,
+      participantCount: app.activeVoiceParticipantCount,
+      selectedInputDeviceId: voiceController.state.selectedInputDeviceId,
+      selectedOutputDeviceId: voiceController.state.selectedOutputDeviceId,
+      inputDevices: voiceController.state.inputDevices.map((device, index) => ({
+        deviceId: device.deviceId,
+        label: device.label || `Microphone ${index + 1}`,
+      })),
+      outputDevices: voiceController.state.outputDevices.map((device, index) => ({
+        deviceId: device.deviceId,
+        label: device.label || `Speaker ${index + 1}`,
+      })),
+      supportsOutputSelection: voiceController.state.supportsOutputSelection,
+      members: voiceController.state.participants.map((participant) => ({
+        userId: participant.userId,
+        displayName: participant.displayName,
+        isMuted: participant.muted,
+        isDeafened: participant.deafened,
+        volume: voiceController.state.remoteVolumes[participant.userId] ?? 100,
+      })),
+    }).catch((error: unknown) => {
+      console.error("Failed to sync voice popout state:", error);
+    });
+  }, [
+    app.activeVoiceChannel,
+    app.activeVoiceParticipantCount,
+    app.appSettings.voice.transmissionMode,
+    canOpenVoicePopout,
+    activeVoiceServer?.name,
+    app.currentServer?.name,
+    voicePopoutWindowOpen,
+    voiceController.state.isDeafened,
+    voiceController.state.isMuted,
+    voiceController.state.joined,
+    voiceController.state.joining,
+    voiceController.state.inputDevices,
+    voiceController.state.outputDevices,
+    voiceController.state.participants,
+    voiceController.state.remoteVolumes,
+    voiceController.state.selectedInputDeviceId,
+    voiceController.state.selectedOutputDeviceId,
+    voiceController.state.supportsOutputSelection,
+  ]);
+
+  React.useEffect(() => {
+    if (!canOpenVoicePopout) return;
+
+    return desktopClient.onVoicePopoutControlAction((action) => {
+      switch (action.type) {
+        case "toggle_mute":
+          voiceController.actions.toggleMute();
+          return;
+        case "toggle_deafen":
+          voiceController.actions.toggleDeafen();
+          return;
+        case "join_voice":
+          void voiceController.actions.joinVoiceChannel();
+          return;
+        case "leave_voice":
+          void disconnectVoiceSession();
+          return;
+        case "set_transmission_mode":
+          voiceController.actions.updateVoiceSettingsPatch({
+            transmissionMode: action.mode,
+          });
+          return;
+        case "set_input_device":
+          void voiceController.actions.switchInputDevice(action.deviceId);
+          return;
+        case "set_output_device":
+          voiceController.actions.setOutputDevice(action.deviceId);
+          return;
+        case "set_member_volume":
+          voiceController.actions.setMemberVolume(action.userId, action.volume);
+          return;
+        case "open_voice_settings":
+          setShowVoiceSettingsModal(true);
+          return;
+        case "open_voice_hardware_test":
+          setUserVoiceHardwareTestOpen(true);
+          return;
+        default:
+          return;
+      }
+    });
+  }, [
+    canOpenVoicePopout,
+    disconnectVoiceSession,
+    setShowVoiceSettingsModal,
+    setUserVoiceHardwareTestOpen,
+    voiceController.actions.setMemberVolume,
+    voiceController.actions.setOutputDevice,
+    voiceController.actions.switchInputDevice,
+    voiceController.actions.joinVoiceChannel,
+    voiceController.actions.toggleDeafen,
+    voiceController.actions.toggleMute,
+    voiceController.actions.updateVoiceSettingsPatch,
+  ]);
+
+  const handleOpenVoicePopout = React.useCallback(() => {
+    if (!canOpenVoicePopout) return;
+    setVoicePanelOpen(false);
+
+    void desktopClient.openVoicePopout().catch((error: unknown) => {
+      toast.error(getErrorMessage(error, "Failed to open voice popout."));
+    });
+  }, [canOpenVoicePopout, setVoicePanelOpen]);
 
   const handleVoiceHeaderChannelNavigate = () => {
     if (!app.activeVoiceChannel) return;
@@ -246,45 +428,68 @@ export function ChatApp() {
               activeVoiceChannelId={app.activeVoiceChannelId}
               voiceChannelParticipants={app.voiceChannelParticipants}
               voiceStatusPanel={
-                app.activeVoiceChannel ? (
+                app.activeVoiceChannel && !voicePopoutWindowOpen ? (
                   <VoiceDrawer
-                    notificationAudioSettings={app.appSettings.notifications}
-                    communityId={app.activeVoiceChannel.community_id}
-                    serverName={app.currentServer.name}
-                    channelId={app.activeVoiceChannel.id}
+                    surface="sidebar"
+                    serverName={
+                      activeVoiceServer?.name ??
+                      app.currentServer?.name ??
+                      "Unknown server"
+                    }
                     channelName={app.activeVoiceChannel.name}
-                    currentUserId={user.id}
-                    currentUserDisplayName={app.userDisplayName}
                     participantCount={app.activeVoiceParticipantCount}
                     participantPreview={
                       app.voiceChannelParticipants[app.activeVoiceChannel.id] ??
                       []
                     }
-                    voiceConnected={app.voiceConnected}
+                    voiceConnected={voiceController.state.joined}
                     voicePanelOpen={app.voicePanelOpen}
-                    voiceSessionState={app.voiceSessionState}
-                    voiceControlActions={app.voiceControlActions}
-                    voiceSettings={app.appSettings.voice}
-                    voiceSettingsSaving={app.voiceSettingsSaving}
-                    voiceSettingsError={app.voiceSettingsError}
-                    onToggleOpen={() => app.setVoicePanelOpen((prev) => !prev)}
-                    onDisconnect={() =>
-                      app.disconnectVoiceSession({ triggerPaneLeave: false })
-                    }
-                    onUpdateVoiceSettings={(next) => {
-                      void app.setVoiceSettings(next);
+                    joining={voiceController.state.joining}
+                    voiceSessionState={{
+                      joined: voiceController.state.joined,
+                      isMuted: voiceController.state.isMuted,
+                      isDeafened: voiceController.state.isDeafened,
                     }}
+                    transmissionMode={app.appSettings.voice.transmissionMode}
+                    inputDevices={voiceController.state.inputDevices}
+                    outputDevices={voiceController.state.outputDevices}
+                    selectedInputDeviceId={
+                      voiceController.state.selectedInputDeviceId
+                    }
+                    selectedOutputDeviceId={
+                      voiceController.state.selectedOutputDeviceId
+                    }
+                    supportsOutputSelection={
+                      voiceController.state.supportsOutputSelection
+                    }
+                    onOpenChange={app.setVoicePanelOpen}
+                    onJoin={() => {
+                      void voiceController.actions.joinVoiceChannel();
+                    }}
+                    onToggleMute={voiceController.actions.toggleMute}
+                    onToggleDeafen={voiceController.actions.toggleDeafen}
+                    onDisconnect={() => {
+                      void app.disconnectVoiceSession();
+                    }}
+                    onSelectTransmissionMode={(mode) => {
+                      voiceController.actions.updateVoiceSettingsPatch({
+                        transmissionMode: mode,
+                      });
+                    }}
+                    onSelectInputDevice={(deviceId) => {
+                      void voiceController.actions.switchInputDevice(deviceId);
+                    }}
+                    onSelectOutputDevice={
+                      voiceController.actions.setOutputDevice
+                    }
                     onOpenAdvancedOptions={() =>
                       app.setShowVoiceSettingsModal(true)
                     }
                     onOpenVoiceHardwareTest={() =>
                       app.setUserVoiceHardwareTestOpen(true)
                     }
-                    showDiagnostics={app.isPlatformStaff}
-                    onParticipantsChange={app.setVoiceParticipants}
-                    onConnectionChange={app.setVoiceConnected}
-                    onSessionStateChange={app.setVoiceSessionState}
-                    onControlActionsReady={app.setVoiceControlActions}
+                    canOpenVoicePopout={canOpenVoicePopout}
+                    onOpenVoicePopout={handleOpenVoicePopout}
                   />
                 ) : null
               }
@@ -407,7 +612,7 @@ export function ChatApp() {
                         )
                     : undefined
                 }
-                onOpenVoiceControls={() => app.setVoicePanelOpen(true)}
+                onOpenVoiceControls={() => app.setShowVoiceSettingsModal(true)}
                 onSendMessage={app.sendMessage}
                 onEditMessage={app.editMessage}
                 onDeleteMessage={app.deleteMessage}
@@ -902,7 +1107,17 @@ export function ChatApp() {
         settings={app.appSettings.voice}
         saving={app.voiceSettingsSaving}
         error={app.voiceSettingsError}
-        onUpdateSettings={(next) => void app.setVoiceSettings(next)}
+        activeChannelName={app.activeVoiceChannel?.name ?? null}
+        currentUserDisplayName={app.userDisplayName}
+        currentUserAvatarUrl={app.profileAvatarUrl}
+        voiceSessionState={voiceController.state}
+        voiceSessionActions={voiceController.actions}
+        showDiagnostics={app.isPlatformStaff}
+        canOpenVoicePopout={canOpenVoicePopout}
+        onDisconnect={() => {
+          void app.disconnectVoiceSession();
+        }}
+        onOpenVoicePopout={handleOpenVoicePopout}
         onOpenVoiceHardwareTest={() => app.setUserVoiceHardwareTestOpen(true)}
       />
 
@@ -914,6 +1129,18 @@ export function ChatApp() {
         description="Test microphone capture and speaker playback locally before joining a voice channel."
         showDebugWorkflow={false}
       />
+
+      {Object.keys(voiceController.state.remoteStreams).map((userId) => (
+        <audio
+          key={userId}
+          autoPlay
+          playsInline
+          className="hidden"
+          ref={(element) => {
+            voiceController.actions.bindAudioElement(userId, element);
+          }}
+        />
+      ))}
     </>
   );
 }

@@ -1,12 +1,16 @@
 import React from "react";
+import { VoiceChannelPane } from "@shared/components/VoiceChannelPane";
 import { Button } from "@shared/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@shared/components/ui/dialog";
+import type { VoiceSessionControllerActions } from "@client/features/voice/types";
+import type { VoiceSessionControllerState } from "@client/features/voice/types";
 import type { VoiceSettings } from "@platform/desktop/types";
 
 type VoiceSettingsModalProps = {
@@ -15,73 +19,109 @@ type VoiceSettingsModalProps = {
   settings: VoiceSettings;
   saving: boolean;
   error?: string | null;
-  onUpdateSettings: (next: VoiceSettings) => void;
+  activeChannelName: string | null;
+  currentUserDisplayName: string;
+  currentUserAvatarUrl?: string | null;
+  voiceSessionState: VoiceSessionControllerState;
+  voiceSessionActions: VoiceSessionControllerActions;
+  showDiagnostics?: boolean;
+  canOpenVoicePopout?: boolean;
+  onDisconnect?: () => void;
+  onOpenVoicePopout?: () => void;
   onOpenVoiceHardwareTest?: () => void;
 };
 
 export function VoiceSettingsModal({
   open,
   onOpenChange,
+  settings,
   saving,
   error = null,
+  activeChannelName,
+  currentUserDisplayName,
+  currentUserAvatarUrl,
+  voiceSessionState,
+  voiceSessionActions,
+  showDiagnostics = false,
+  canOpenVoicePopout = false,
+  onDisconnect,
+  onOpenVoicePopout,
   onOpenVoiceHardwareTest,
 }: VoiceSettingsModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        size="lg"
-        className="max-h-[88vh] bg-[#18243a] border-[#142033] text-white md:w-[min(92vw,700px)] md:max-w-none min-h-0 flex flex-col gap-0 overflow-hidden p-0"
+        size="xl"
+        className="max-h-[90vh] bg-[#18243a] border-[#142033] text-white md:w-[min(94vw,1040px)] md:max-w-none min-h-0 flex flex-col gap-0 overflow-hidden p-0"
         showCloseButton={false}
       >
         <DialogHeader className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
           <DialogTitle className="text-2xl font-bold text-white">
             Voice Settings
           </DialogTitle>
+          <DialogDescription className="text-sm text-[#9fb2cf]">
+            {activeChannelName
+              ? "Advanced controls for the active voice session. The sidebar footer stays compact and only exposes quick actions."
+              : "Configure voice devices, transmission defaults, and diagnostics before you join a channel."}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="scrollbar-inset min-h-0 flex-1 overflow-y-auto space-y-4 px-4 py-4 sm:px-6 sm:py-5">
-          <div className="rounded-xl border border-[#304867] bg-[#142033] p-4 space-y-3">
-            <p className="text-sm font-semibold text-white">
-              In-channel voice controls
-            </p>
-            <p className="text-xs text-[#9fb2cf]">
-              Microphone/speaker selection and transmission mode tuning now live
-              in the expanded voice drawer so you can adjust them while
-              connected.
-            </p>
-            <p className="text-[11px] text-[#90a5c4]">
-              Open voice controls from a voice channel to configure open mic,
-              voice activity threshold, and push-to-talk binding with live meter
-              feedback.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-[#304867] bg-[#142033] p-4 space-y-3">
-            <div>
-              <p className="text-sm font-semibold text-white">Voice Testing</p>
-              <p className="text-xs text-[#9fb2cf]">
-                Test microphone capture, meter activity, and speaker playback
-                before joining a call.
-              </p>
-            </div>
-            <Button
-              type="button"
-              onClick={onOpenVoiceHardwareTest}
-              disabled={saving || !onOpenVoiceHardwareTest}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
-            >
-              Open Voice Hardware Test
-            </Button>
-            <p className="text-[11px] text-[#90a5c4]">
-              The hardware test runs locally and does not connect to a voice
-              channel.
-            </p>
-          </div>
-
-          {saving && (
-            <p className="text-sm text-[#a9b8cf]">Saving voice settings...</p>
-          )}
-          {error && <p className="text-sm text-red-300">{error}</p>}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <VoiceChannelPane
+            channelName={activeChannelName}
+            joined={voiceSessionState.joined}
+            joining={voiceSessionState.joining}
+            isMuted={voiceSessionState.isMuted}
+            isDeafened={voiceSessionState.isDeafened}
+            participants={voiceSessionState.participants}
+            currentUserDisplayName={currentUserDisplayName}
+            currentUserAvatarUrl={currentUserAvatarUrl}
+            voiceSettings={settings}
+            voiceSettingsSaving={saving}
+            voiceSettingsError={error}
+            notice={voiceSessionState.notice}
+            error={voiceSessionState.error}
+            iceSource={voiceSessionState.iceSource}
+            inputDevices={voiceSessionState.inputDevices}
+            outputDevices={voiceSessionState.outputDevices}
+            selectedInputDeviceId={voiceSessionState.selectedInputDeviceId}
+            selectedOutputDeviceId={voiceSessionState.selectedOutputDeviceId}
+            switchingInput={voiceSessionState.switchingInput}
+            supportsOutputSelection={voiceSessionState.supportsOutputSelection}
+            localInputLevel={voiceSessionState.localInputLevel}
+            voiceActivityGateOpen={voiceSessionState.voiceActivityGateOpen}
+            pushToTalkPressed={voiceSessionState.pushToTalkPressed}
+            showDiagnostics={showDiagnostics}
+            diagnosticsRows={voiceSessionState.diagnosticsRows}
+            diagnosticsUpdatedAt={voiceSessionState.diagnosticsUpdatedAt}
+            diagnosticsLoading={voiceSessionState.diagnosticsLoading}
+            canOpenVoicePopout={canOpenVoicePopout}
+            onUpdateVoiceSettingsPatch={
+              voiceSessionActions.updateVoiceSettingsPatch
+            }
+            onOpenVoiceHardwareTest={onOpenVoiceHardwareTest}
+            onOpenVoicePopout={onOpenVoicePopout}
+            onJoin={() => {
+              void voiceSessionActions.joinVoiceChannel();
+            }}
+            onLeave={onDisconnect}
+            onToggleMute={voiceSessionActions.toggleMute}
+            onToggleDeafen={voiceSessionActions.toggleDeafen}
+            onRetryIce={() => {
+              void voiceSessionActions.retryIce();
+            }}
+            onRefreshDiagnostics={() => {
+              void voiceSessionActions.refreshVoiceDiagnostics();
+            }}
+            onSelectInputDevice={(deviceId) => {
+              void voiceSessionActions.switchInputDevice(deviceId);
+            }}
+            onSelectOutputDevice={voiceSessionActions.setOutputDevice}
+            setMemberVolume={voiceSessionActions.setMemberVolume}
+            resetMemberVolume={voiceSessionActions.resetMemberVolume}
+            resetAllMemberVolumes={voiceSessionActions.resetAllMemberVolumes}
+            getMemberVolume={voiceSessionActions.getMemberVolume}
+          />
         </div>
 
         <DialogFooter className="shrink-0 border-t border-[#233753] px-4 py-3 sm:px-6 sm:py-4">

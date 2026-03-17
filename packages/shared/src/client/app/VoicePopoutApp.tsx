@@ -1,24 +1,30 @@
 import React from 'react';
-import { Button } from '@shared/components/ui/button';
-import { VoiceDrawer } from '@shared/components/VoiceDrawer';
-import { VoicePanel } from '@shared/components/VoicePanel';
+import { VoiceDrawer as VoiceQuickControlsDrawer } from '@shared/components/voice/VoiceDrawer';
 import { desktopClient } from '@platform/desktop/client';
 import type { VoicePopoutControlAction, VoicePopoutState } from '@platform/desktop/types';
 
 const EMPTY_STATE: VoicePopoutState = {
   isOpen: false,
+  serverName: null,
   channelName: null,
   connected: false,
   joined: false,
+  joining: false,
   isMuted: false,
   isDeafened: false,
+  transmissionMode: 'voice_activity',
+  participantCount: 0,
   selectedInputDeviceId: 'default',
   selectedOutputDeviceId: 'default',
+  inputDevices: [],
+  outputDevices: [],
+  supportsOutputSelection: false,
   members: [],
 };
 
 export function VoicePopoutApp() {
   const [state, setState] = React.useState<VoicePopoutState>(EMPTY_STATE);
+  const [quickSettingsOpen, setQuickSettingsOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!desktopClient.isAvailable()) return;
@@ -33,47 +39,50 @@ export function VoicePopoutApp() {
   }, []);
 
   return (
-    <VoiceDrawer layout="popout" open>
-      <VoicePanel
-        layout="popout"
-        title={state.channelName ?? 'Voice'}
-        subtitle={state.connected ? 'Connected' : 'Disconnected'}
-      >
-        <div className="space-y-3 p-3">
-          <div className="flex gap-2">
-            <Button type="button" onClick={() => dispatch({ type: 'toggle_mute' })}>
-              {state.isMuted ? 'Unmute' : 'Mute'}
-            </Button>
-            <Button type="button" onClick={() => dispatch({ type: 'toggle_deafen' })}>
-              {state.isDeafened ? 'Undeafen' : 'Deafen'}
-            </Button>
-          </div>
-          <div className="space-y-2 text-sm text-[#a9b8cf]">
-            {state.members.map((member) => (
-              <div key={member.userId} className="rounded border border-[#304867] bg-[#142033] p-2">
-                <div className="text-white">{member.displayName}</div>
-                <div className="mt-1 flex items-center justify-between gap-2">
-                  <span>{member.volume}%</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={200}
-                    step={25}
-                    value={member.volume}
-                    onChange={(event) => {
-                      dispatch({
-                        type: 'set_member_volume',
-                        userId: member.userId,
-                        volume: Number(event.currentTarget.value),
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </VoicePanel>
-    </VoiceDrawer>
+    <div className="min-h-screen bg-[#0f1726] p-3">
+      <VoiceQuickControlsDrawer
+        surface="popout"
+        serverName={state.serverName ?? 'Voice'}
+        channelName={state.channelName ?? 'No active call'}
+        participantCount={state.participantCount}
+        participantPreview={state.members.map((member) => ({
+          userId: member.userId,
+          displayName: member.displayName,
+        }))}
+        voiceConnected={state.connected}
+        voicePanelOpen={quickSettingsOpen}
+        joining={state.joining}
+        voiceSessionState={{
+          joined: state.joined,
+          isMuted: state.isMuted,
+          isDeafened: state.isDeafened,
+        }}
+        transmissionMode={state.transmissionMode}
+        inputDevices={state.inputDevices}
+        outputDevices={state.outputDevices}
+        selectedInputDeviceId={state.selectedInputDeviceId}
+        selectedOutputDeviceId={state.selectedOutputDeviceId}
+        supportsOutputSelection={state.supportsOutputSelection}
+        canOpenVoicePopout={false}
+        onOpenChange={setQuickSettingsOpen}
+        onJoin={() => dispatch({ type: 'join_voice' })}
+        onToggleMute={() => dispatch({ type: 'toggle_mute' })}
+        onToggleDeafen={() => dispatch({ type: 'toggle_deafen' })}
+        onDisconnect={() => dispatch({ type: 'leave_voice' })}
+        onSelectTransmissionMode={(mode) =>
+          dispatch({ type: 'set_transmission_mode', mode })
+        }
+        onSelectInputDevice={(deviceId) =>
+          dispatch({ type: 'set_input_device', deviceId })
+        }
+        onSelectOutputDevice={(deviceId) =>
+          dispatch({ type: 'set_output_device', deviceId })
+        }
+        onOpenAdvancedOptions={() => dispatch({ type: 'open_voice_settings' })}
+        onOpenVoiceHardwareTest={() =>
+          dispatch({ type: 'open_voice_hardware_test' })
+        }
+      />
+    </div>
   );
 }

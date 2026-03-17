@@ -1,11 +1,23 @@
 import React from "react";
 import { Button } from "@shared/components/ui/button";
-import { VoiceChannelPane } from "@shared/components/VoiceChannelPane";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@shared/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/components/ui/select";
 import type {
+  VoicePopoutDeviceOption,
   VoiceSettings,
-  NotificationAudioSettings,
 } from "@platform/desktop/types";
 import {
+  ExternalLink,
   Headphones,
   Mic,
   MicOff,
@@ -15,118 +27,296 @@ import {
 } from "lucide-react";
 
 interface VoiceDrawerProps {
-  communityId: string;
+  surface?: "sidebar" | "popout";
   serverName: string;
-  channelId: string;
   channelName: string;
-  currentUserId: string;
-  currentUserDisplayName: string;
-  notificationAudioSettings: NotificationAudioSettings;
   participantCount: number;
   participantPreview: Array<{ userId: string; displayName: string }>;
   voiceConnected: boolean;
   voicePanelOpen: boolean;
+  joining?: boolean;
   voiceSessionState: {
     joined: boolean;
     isMuted: boolean;
     isDeafened: boolean;
   };
-  voiceControlActions: {
-    join: () => void;
-    leave: () => void;
-    toggleMute: () => void;
-    toggleDeafen: () => void;
-  } | null;
-  voiceSettings: VoiceSettings;
-  voiceSettingsSaving?: boolean;
-  voiceSettingsError?: string | null;
-  showDiagnostics?: boolean;
-  onToggleOpen: () => void;
+  transmissionMode: VoiceSettings["transmissionMode"];
+  inputDevices: VoicePopoutDeviceOption[];
+  outputDevices: VoicePopoutDeviceOption[];
+  selectedInputDeviceId: string;
+  selectedOutputDeviceId: string;
+  supportsOutputSelection?: boolean;
+  canOpenVoicePopout?: boolean;
+  onOpenChange: (open: boolean) => void;
+  onJoin: () => void;
+  onToggleMute: () => void;
+  onToggleDeafen: () => void;
   onDisconnect: () => void;
-  onUpdateVoiceSettings: (next: VoiceSettings) => void;
+  onSelectTransmissionMode: (mode: VoiceSettings["transmissionMode"]) => void;
+  onSelectInputDevice: (deviceId: string) => void;
+  onSelectOutputDevice: (deviceId: string) => void;
   onOpenAdvancedOptions: () => void;
   onOpenVoiceHardwareTest: () => void;
-  onParticipantsChange: (
-    participants: Array<{ userId: string; displayName: string }>,
-  ) => void;
-  onConnectionChange: (connected: boolean) => void;
-  onSessionStateChange: (state: {
-    joined: boolean;
-    isMuted: boolean;
-    isDeafened: boolean;
-  }) => void;
-  onControlActionsReady: (
-    actions: {
-      join: () => void;
-      leave: () => void;
-      toggleMute: () => void;
-      toggleDeafen: () => void;
-    } | null,
-  ) => void;
+  onOpenVoicePopout?: () => void;
 }
 
+const TRANSMISSION_MODE_LABELS: Record<
+  VoiceSettings["transmissionMode"],
+  string
+> = {
+  voice_activity: "Voice Activity",
+  push_to_talk: "Push to Talk",
+  open_mic: "Open Mic",
+};
+
 export function VoiceDrawer({
-  communityId,
+  surface = "sidebar",
   serverName,
-  channelId,
   channelName,
-  currentUserId,
-  currentUserDisplayName,
   participantCount,
   participantPreview,
   voiceConnected,
   voicePanelOpen,
+  joining = false,
   voiceSessionState,
-  voiceControlActions,
-  voiceSettings,
-  voiceSettingsSaving = false,
-  voiceSettingsError = null,
-  showDiagnostics = false,
-  onToggleOpen,
+  transmissionMode,
+  inputDevices,
+  outputDevices,
+  selectedInputDeviceId,
+  selectedOutputDeviceId,
+  supportsOutputSelection = false,
+  canOpenVoicePopout = false,
+  onOpenChange,
+  onJoin,
+  onToggleMute,
+  onToggleDeafen,
   onDisconnect,
-  onUpdateVoiceSettings,
+  onSelectTransmissionMode,
+  onSelectInputDevice,
+  onSelectOutputDevice,
   onOpenAdvancedOptions,
   onOpenVoiceHardwareTest,
-  onParticipantsChange,
-  onConnectionChange,
-  onSessionStateChange,
-  onControlActionsReady,
-  notificationAudioSettings,
+  onOpenVoicePopout,
 }: VoiceDrawerProps) {
+  const statusLabel = voiceConnected
+    ? "Live"
+    : joining
+      ? "Connecting"
+      : voiceSessionState.joined
+        ? "Connected"
+        : "Standby";
+  const isPopoutSurface = surface === "popout";
+
   return (
-    <div className="px-2 pt-2 pb-1 border-b border-[#22334f]">
-      <div className="rounded-md border border-[#304867] bg-[#142033] px-2 py-2 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wide text-[#8ea4c7]">
-              Voice Connected
-            </p>
-            <p className="text-xs font-semibold text-white truncate flex items-center gap-1">
-              <Headphones className="size-3.5" />
+    <div
+      className={
+        isPopoutSurface
+          ? "p-0"
+          : "px-2 pt-2 pb-1 border-b border-[#22334f]"
+      }
+    >
+      <div className="rounded-md border border-[#304867] bg-[#142033] px-2.5 py-2.5">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8ea4c7]">
+                Voice
+              </span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                  voiceConnected
+                    ? "bg-[#2f9f73]/20 text-[#6dd5a6]"
+                    : "bg-[#44546f]/40 text-[#c6d2e7]"
+                }`}
+              >
+                {statusLabel}
+              </span>
+            </div>
+            <p className="mt-1 truncate text-sm font-semibold text-white">
               {channelName}
             </p>
-            <p className="text-[11px] text-[#95a5bf] truncate">{serverName}</p>
+            <p className="truncate text-[11px] text-[#95a5bf]">{serverName}</p>
           </div>
-          <span
-            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-              voiceConnected
-                ? "bg-[#2f9f73]/20 text-[#6dd5a6]"
-                : "bg-[#44546f]/40 text-[#b5c4de]"
-            }`}
-          >
-            {voiceConnected ? "Live" : "Connecting"}
-          </span>
+
+          <Popover open={voicePanelOpen} onOpenChange={onOpenChange}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                className={`shrink-0 hover:bg-[#22334f] hover:text-white ${
+                  voicePanelOpen ? "text-white" : "text-[#a9b8cf]"
+                }`}
+                aria-label={
+                  voicePanelOpen
+                    ? "Close voice quick settings"
+                    : "Open voice quick settings"
+                }
+              >
+                <Settings2 className="size-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-[300px] border-[#304867] bg-[#111a2b] p-3 text-white"
+            >
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">
+                    Voice Quick Settings
+                  </p>
+                  <p className="text-xs text-[#9fb2cf]">
+                    Fast device and mode changes. Thresholds, bindings, and
+                    diagnostics stay in Voice Settings.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                    Microphone
+                  </p>
+                  <Select
+                    value={selectedInputDeviceId}
+                    onValueChange={onSelectInputDevice}
+                  >
+                    <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+                      <SelectValue placeholder="Select microphone" />
+                    </SelectTrigger>
+                    <SelectContent className="border-[#304867] bg-[#142033] text-white">
+                      {inputDevices.length === 0 ? (
+                        <SelectItem value="default">
+                          Default microphone
+                        </SelectItem>
+                      ) : (
+                        inputDevices.map((device, index) => (
+                          <SelectItem
+                            key={device.deviceId}
+                            value={device.deviceId}
+                          >
+                            {device.label || `Microphone ${index + 1}`}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                    Speaker
+                  </p>
+                  <Select
+                    value={selectedOutputDeviceId}
+                    onValueChange={onSelectOutputDevice}
+                    disabled={!supportsOutputSelection}
+                  >
+                    <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+                      <SelectValue placeholder="Select speaker" />
+                    </SelectTrigger>
+                    <SelectContent className="border-[#304867] bg-[#142033] text-white">
+                      {outputDevices.length === 0 ? (
+                        <SelectItem value="default">
+                          Default speaker
+                        </SelectItem>
+                      ) : (
+                        outputDevices.map((device, index) => (
+                          <SelectItem
+                            key={device.deviceId}
+                            value={device.deviceId}
+                          >
+                            {device.label || `Speaker ${index + 1}`}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {!supportsOutputSelection && (
+                    <p className="text-[11px] text-[#90a5c4]">
+                      This runtime uses your system default output device.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                    Transmission
+                  </p>
+                  <Select
+                    value={transmissionMode}
+                    onValueChange={(value) =>
+                      onSelectTransmissionMode(
+                        value as VoiceSettings["transmissionMode"],
+                      )
+                    }
+                  >
+                    <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+                      <SelectValue placeholder="Select mode" />
+                    </SelectTrigger>
+                    <SelectContent className="border-[#304867] bg-[#142033] text-white">
+                      <SelectItem value="voice_activity">
+                        Voice Activity
+                      </SelectItem>
+                      <SelectItem value="push_to_talk">
+                        Push to Talk
+                      </SelectItem>
+                      <SelectItem value="open_mic">Open Mic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-[#90a5c4]">
+                    {TRANSMISSION_MODE_LABELS[transmissionMode]}{" "}
+                    selected. Use Voice Settings for threshold and binding
+                    changes.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onOpenAdvancedOptions();
+                    }}
+                    className="justify-start border-[#304867] bg-[#142033] text-white hover:bg-[#22334f]"
+                  >
+                    Open Voice Settings
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onOpenVoiceHardwareTest();
+                    }}
+                    className="justify-start border-[#304867] bg-[#142033] text-white hover:bg-[#22334f]"
+                  >
+                    Open Voice Hardware Test
+                  </Button>
+                  {canOpenVoicePopout && onOpenVoicePopout && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={onOpenVoicePopout}
+                      className="justify-start border-[#304867] bg-[#142033] text-white hover:bg-[#22334f]"
+                    >
+                      <ExternalLink className="size-4" />
+                      Open Voice Popout
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="mt-3 flex items-center gap-1.5">
           {!voiceSessionState.joined ? (
             <Button
               type="button"
               size="icon-xs"
               variant="ghost"
-              onClick={() => voiceControlActions?.join()}
-              disabled={!voiceControlActions}
-              className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
+              onClick={onJoin}
+              className="text-[#a9b8cf] hover:bg-[#22334f] hover:text-white"
               aria-label="Join voice"
             >
               <Headphones className="size-4" />
@@ -137,8 +327,7 @@ export function VoiceDrawer({
                 type="button"
                 size="icon-xs"
                 variant="ghost"
-                onClick={() => voiceControlActions?.toggleMute()}
-                disabled={!voiceControlActions}
+                onClick={onToggleMute}
                 className={`hover:bg-[#22334f] ${
                   voiceSessionState.isMuted
                     ? "text-[#f3a2a2] hover:text-[#ffd2d2]"
@@ -156,8 +345,7 @@ export function VoiceDrawer({
                 type="button"
                 size="icon-xs"
                 variant="ghost"
-                onClick={() => voiceControlActions?.toggleDeafen()}
-                disabled={!voiceControlActions}
+                onClick={onToggleDeafen}
                 className={`hover:bg-[#22334f] ${
                   voiceSessionState.isDeafened
                     ? "text-[#f3a2a2] hover:text-[#ffd2d2]"
@@ -175,22 +363,8 @@ export function VoiceDrawer({
             type="button"
             size="icon-xs"
             variant="ghost"
-            onClick={onToggleOpen}
-            className={`hover:text-white hover:bg-[#22334f] ${
-              voicePanelOpen ? "text-white" : "text-[#a9b8cf]"
-            }`}
-            aria-label={
-              voicePanelOpen ? "Collapse voice drawer" : "Expand voice drawer"
-            }
-          >
-            <Settings2 className="size-4" />
-          </Button>
-          <Button
-            type="button"
-            size="icon-xs"
-            variant="ghost"
             onClick={onDisconnect}
-            className="text-[#f0b0b0] hover:text-[#ffd1d1] hover:bg-[#3b2535]"
+            className="text-[#f0b0b0] hover:bg-[#3b2535] hover:text-[#ffd1d1]"
             aria-label="Leave voice"
           >
             <PhoneOff className="size-4" />
@@ -200,7 +374,7 @@ export function VoiceDrawer({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 pl-0.5">
+        <div className="mt-3 flex min-h-5 items-center gap-1 pl-0.5">
           {participantPreview.slice(0, 4).map((participant) => {
             const initial =
               participant.displayName.trim().charAt(0).toUpperCase() || "?";
@@ -208,58 +382,23 @@ export function VoiceDrawer({
               <span
                 key={participant.userId}
                 title={participant.displayName}
-                className="size-5 rounded-full bg-[#304867] text-[10px] text-white font-semibold flex items-center justify-center"
+                className="size-5 rounded-full bg-[#304867] text-[10px] font-semibold text-white flex items-center justify-center"
               >
                 {initial}
               </span>
             );
           })}
           {participantPreview.length > 4 && (
-            <span className="size-5 rounded-full bg-[#22334f] text-[10px] text-[#d1dff4] font-semibold flex items-center justify-center">
+            <span className="size-5 rounded-full bg-[#22334f] text-[10px] font-semibold text-[#d1dff4] flex items-center justify-center">
               +{participantPreview.length - 4}
             </span>
           )}
+          {participantPreview.length === 0 && (
+            <span className="text-[11px] text-[#90a5c4]">
+              Waiting for participants.
+            </span>
+          )}
         </div>
-
-        {voicePanelOpen && (
-          <div className="rounded-md border border-[#22334f] bg-[#111a2b] overflow-hidden">
-            <div className="max-h-[60vh] overflow-y-auto scrollbar-inset p-2">
-              <VoiceChannelPane
-                notificationAudioSettings={notificationAudioSettings}
-                key={`${communityId}:${channelId}`}
-                communityId={communityId}
-                channelId={channelId}
-                channelName={channelName}
-                currentUserId={currentUserId}
-                currentUserDisplayName={currentUserDisplayName}
-                voiceSettings={voiceSettings}
-                voiceSettingsSaving={voiceSettingsSaving}
-                voiceSettingsError={voiceSettingsError}
-                onUpdateVoiceSettings={onUpdateVoiceSettings}
-                onOpenVoiceSettings={onOpenAdvancedOptions}
-                onOpenVoiceHardwareTest={onOpenVoiceHardwareTest}
-                showDiagnostics={showDiagnostics}
-                autoJoin
-                onParticipantsChange={onParticipantsChange}
-                onConnectionChange={onConnectionChange}
-                onSessionStateChange={onSessionStateChange}
-                onControlActionsReady={onControlActionsReady}
-                onLeave={onDisconnect}
-              />
-              <div className="pt-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={onOpenAdvancedOptions}
-                  className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
-                >
-                  Advanced options
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -79,6 +79,7 @@ export function useVoice({
 
   const resetVoiceState = React.useCallback(() => {
     dispatchVoiceSessionStoreEvent({ type: 'COMPLETE_DISCONNECT' });
+    setVoicePanelOpen(false);
     setVoiceConnected(false);
     setVoiceParticipants([]);
     setVoicePresenceByChannelId({});
@@ -88,11 +89,21 @@ export function useVoice({
   }, []);
 
   const cleanupStaleVoicePresenceChannels = React.useCallback(async () => {
+    if (!activeVoiceChannel) return;
+
+    const expectedTopic = `voice:presence:${activeVoiceChannel.community_id}:${activeVoiceChannel.id}`;
     const channels = supabase
       .getChannels()
-      .filter((channel) => channel.topic === `realtime:voice:${currentServerId}:${activeVoiceChannelId}`);
+      .filter((channel) => {
+        const topic = channel.topic ?? '';
+        return (
+          topic === expectedTopic ||
+          topic === `realtime:${expectedTopic}` ||
+          topic.endsWith(expectedTopic)
+        );
+      });
     await Promise.all(channels.map((channel) => supabase.removeChannel(channel)));
-  }, [activeVoiceChannelId, currentServerId]);
+  }, [activeVoiceChannel]);
 
   const requestVoiceChannelJoin = React.useCallback(
     (channelId: string) => {
@@ -158,6 +169,7 @@ export function useVoice({
       setVoiceParticipants([]);
       setVoiceControlActions(null);
       setVoiceSessionState(createDefaultVoiceSessionState());
+      setVoicePanelOpen(false);
     },
     [cleanupStaleVoicePresenceChannels, voiceControlActions]
   );

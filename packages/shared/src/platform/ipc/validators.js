@@ -184,15 +184,48 @@ function parseVoicePopoutMemberState(member) {
   };
 }
 
+function parseVoicePopoutDeviceOption(option) {
+  if (!option || typeof option !== 'object') {
+    throw new Error('Invalid voice popout device option.');
+  }
+
+  if (typeof option.deviceId !== 'string' || option.deviceId.trim().length === 0) {
+    throw new Error('Invalid voice popout device deviceId.');
+  }
+
+  const label = typeof option.label === 'string' ? option.label.trim() : '';
+  if (label.length === 0) {
+    throw new Error('Invalid voice popout device label.');
+  }
+
+  return {
+    deviceId: option.deviceId.trim(),
+    label,
+  };
+}
+
 function parseVoicePopoutStatePayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Invalid payload for voice popout state sync.');
   }
 
+  const serverName =
+    typeof payload.serverName === 'string' && payload.serverName.trim().length > 0
+      ? payload.serverName.trim()
+      : null;
   const channelName =
     typeof payload.channelName === 'string' && payload.channelName.trim().length > 0
       ? payload.channelName.trim()
       : null;
+
+  const transmissionMode = payload.transmissionMode;
+  if (
+    transmissionMode !== 'open_mic' &&
+    transmissionMode !== 'voice_activity' &&
+    transmissionMode !== 'push_to_talk'
+  ) {
+    throw new Error('Invalid transmissionMode for voice popout state.');
+  }
 
   if (typeof payload.selectedInputDeviceId !== 'string') {
     throw new Error('Invalid selectedInputDeviceId for voice popout state.');
@@ -205,16 +238,33 @@ function parseVoicePopoutStatePayload(payload) {
   const members = Array.isArray(payload.members)
     ? payload.members.map(parseVoicePopoutMemberState)
     : [];
+  const inputDevices = Array.isArray(payload.inputDevices)
+    ? payload.inputDevices.map(parseVoicePopoutDeviceOption)
+    : [];
+  const outputDevices = Array.isArray(payload.outputDevices)
+    ? payload.outputDevices.map(parseVoicePopoutDeviceOption)
+    : [];
+  const participantCount =
+    typeof payload.participantCount === 'number' && Number.isFinite(payload.participantCount)
+      ? Math.max(0, Math.trunc(payload.participantCount))
+      : 0;
 
   return {
     isOpen: Boolean(payload.isOpen),
+    serverName,
     channelName,
     connected: Boolean(payload.connected),
     joined: Boolean(payload.joined),
+    joining: Boolean(payload.joining),
     isMuted: Boolean(payload.isMuted),
     isDeafened: Boolean(payload.isDeafened),
+    transmissionMode,
+    participantCount,
     selectedInputDeviceId: payload.selectedInputDeviceId.trim() || 'default',
     selectedOutputDeviceId: payload.selectedOutputDeviceId.trim() || 'default',
+    inputDevices,
+    outputDevices,
+    supportsOutputSelection: Boolean(payload.supportsOutputSelection),
     members,
   };
 }
@@ -224,8 +274,29 @@ function parseVoicePopoutControlActionPayload(payload) {
     throw new Error('Invalid payload for voice popout control action.');
   }
 
-  if (payload.type === 'toggle_mute' || payload.type === 'toggle_deafen') {
+  if (
+    payload.type === 'join_voice' ||
+    payload.type === 'leave_voice' ||
+    payload.type === 'toggle_mute' ||
+    payload.type === 'toggle_deafen' ||
+    payload.type === 'open_voice_settings' ||
+    payload.type === 'open_voice_hardware_test'
+  ) {
     return { type: payload.type };
+  }
+
+  if (payload.type === 'set_transmission_mode') {
+    if (
+      payload.mode !== 'open_mic' &&
+      payload.mode !== 'voice_activity' &&
+      payload.mode !== 'push_to_talk'
+    ) {
+      throw new Error('Invalid mode for voice popout transmission action.');
+    }
+    return {
+      type: payload.type,
+      mode: payload.mode,
+    };
   }
 
   if (payload.type === 'set_input_device' || payload.type === 'set_output_device') {

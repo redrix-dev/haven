@@ -207,8 +207,9 @@ export function ChatArea({
           <Headphones className="size-7 text-[#8ea4c7]" />
           <p className="text-white font-semibold">Voice channel selected: {channelName}</p>
           <p className="text-sm text-[#a9b8cf] max-w-xl">
-            Voice stays connected while you browse text channels. Open voice controls from the sidebar
-            panel.
+            Voice stays connected while you browse text channels. Use the footer
+            controls for quick actions, or open Voice Settings for devices,
+            transmission tuning, and diagnostics.
           </p>
           {onOpenVoiceControls && (
             <Button
@@ -216,12 +217,12 @@ export function ChatArea({
               onClick={onOpenVoiceControls}
               className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
             >
-              Open Voice Controls
+              Open Voice Settings
             </Button>
           )}
           {showVoiceDiagnostics && (
             <p className="text-xs text-[#8ea4c7]">
-              Staff diagnostics are available in voice controls.
+              Staff diagnostics are available in Voice Settings.
             </p>
           )}
         </div>

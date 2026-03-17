@@ -70,24 +70,41 @@ export type VoicePopoutMemberState = {
   volume: number;
 };
 
+export type VoicePopoutDeviceOption = {
+  deviceId: string;
+  label: string;
+};
+
 export type VoicePopoutState = {
   isOpen: boolean;
+  serverName: string | null;
   channelName: string | null;
   connected: boolean;
   joined: boolean;
+  joining: boolean;
   isMuted: boolean;
   isDeafened: boolean;
+  transmissionMode: VoiceTransmissionMode;
+  participantCount: number;
   selectedInputDeviceId: string;
   selectedOutputDeviceId: string;
+  inputDevices: VoicePopoutDeviceOption[];
+  outputDevices: VoicePopoutDeviceOption[];
+  supportsOutputSelection: boolean;
   members: VoicePopoutMemberState[];
 };
 
 export type VoicePopoutControlAction =
+  | { type: 'join_voice' }
+  | { type: 'leave_voice' }
   | { type: 'toggle_mute' }
   | { type: 'toggle_deafen' }
+  | { type: 'set_transmission_mode'; mode: VoiceTransmissionMode }
   | { type: 'set_input_device'; deviceId: string }
   | { type: 'set_output_device'; deviceId: string }
-  | { type: 'set_member_volume'; userId: string; volume: number };
+  | { type: 'set_member_volume'; userId: string; volume: number }
+  | { type: 'open_voice_settings' }
+  | { type: 'open_voice_hardware_test' };
 
 export type DesktopAPI = {
   getAppSettings: () => Promise<AppSettings>;
