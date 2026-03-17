@@ -2,10 +2,13 @@
  * No offline caching yet. Push notifications and click-through deep links are supported.
  */
 
+importScripts('/app-assets.generated.js');
+
 const SW_VERSION = 'push-v1';
 const DEFAULT_NOTIFICATION_TITLE = 'Haven';
-const DEFAULT_NOTIFICATION_ICON = '/icon-192.png';
-const DEFAULT_NOTIFICATION_BADGE = '/icon-192.png';
+const ASSETS = self.HAVEN_APP_ASSETS || {};
+const DEFAULT_NOTIFICATION_ICON = ASSETS.notificationIconFallback || ASSETS.pwaIcon192 || '';
+const DEFAULT_NOTIFICATION_BADGE = ASSETS.notificationBadgeFallback || ASSETS.pwaIcon192 || '';
 const DEFAULT_TARGET_PATH = '/';
 const DEBUG_NOTIFICATION_TAG = 'haven:debug:test';
 const ROUTE_TRACE_MESSAGE_TYPE = 'HAVEN_PUSH_DELIVERY_TRACE';

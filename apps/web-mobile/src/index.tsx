@@ -6,12 +6,14 @@ import { AppRoot } from '@client/app/AppRoot';
 import { MobileRoot } from '@web-mobile/mobile/MobileRoot';
 import { registerHavenServiceWorker } from './pwa/registerServiceWorker';
 import { startHavenWebPushClient } from './pwa/webPushClient';
+import { assertWebAppAssetsInDev } from './pwa/assertWebAppAssets';
 import '@shared/styles/globals.css';
 
 document.documentElement.classList.add('haven-web-shell');
 document.body.classList.add('haven-web-shell');
 
 void (async () => {
+  await assertWebAppAssetsInDev();
   const serviceWorkerResult = await registerHavenServiceWorker();
   await startHavenWebPushClient(serviceWorkerResult);
 })();
