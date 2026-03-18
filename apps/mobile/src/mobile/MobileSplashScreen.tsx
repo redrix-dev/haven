@@ -1,0 +1,19 @@
+import React from 'react';
+import { Loader2 } from 'lucide-react';
+import appAssets from '@shared/config/appAssets.json';
+
+export function MobileSplashScreen() {
+  return (
+    <div
+      className="flex flex-col items-center justify-center bg-[#111a2b] gap-6"
+      style={{ height: 'var(--mobile-shell-height, 100dvh)' }}
+    >
+      <img
+        src={appAssets.web.splashIcon}
+        alt="Haven"
+        className="w-20 h-20 rounded-2xl shadow-lg"
+      />
+      <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+    </div>
+  );
+}

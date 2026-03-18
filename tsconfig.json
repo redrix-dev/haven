@@ -16,13 +16,25 @@
     "baseUrl": ".",
     "paths": {
       "@electron/*": ["./apps/electron/src/*"],
-      "@web-mobile/*": ["./apps/web-mobile/src/*"],
+      "@web/*": ["./apps/web/src/*"],
+      "@mobile/*": ["./apps/mobile/src/*"],
       "@shared/*": ["./packages/shared/src/*"],
       "@client/*": ["./packages/shared/src/client/*"],
       "@platform/*": ["./packages/shared/src/platform/*"],
       "@test-support/*": ["./tooling/test-support/*"]
     }
   },
-  "include": ["apps/**/*", "packages/**/*", "tooling/**/*"],
-  "exclude": ["node_modules"]
+  "include": [
+    "apps/electron/**/*",
+    "apps/web/**/*",
+    "apps/mobile/**/*",
+    "packages/**/*",
+    "tooling/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "apps/web/vite.config.ts",
+    "apps/mobile/vite.config.ts",
+    "apps/mobile/capacitor.config.ts"
+  ]
 }

@@ -1,6 +1,14 @@
 import React from 'react';
-import { X, Mic, Volume2 } from 'lucide-react';
+import { Mic, Volume2 } from 'lucide-react';
 import type { VoiceSettings, VoiceTransmissionMode } from '@platform/desktop/types';
+import {
+  MobileScrollableBody,
+  MobileSheet,
+  MobileSheetCloseButton,
+  MobileSheetHandle,
+  MobileSheetHeader,
+  MobileSheetTitle,
+} from '@web-mobile/mobile/layout/MobileSurfacePrimitives';
 
 interface MobileVoiceSettingsSheetProps {
   open: boolean;
@@ -81,32 +89,22 @@ export function MobileVoiceSettingsSheet({
   const activeMode = settings.transmissionMode === 'push_to_talk' ? 'voice_activity' : settings.transmissionMode;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/60 touch-none" onClick={onClose} />
+    <MobileSheet
+      open={open}
+      onClose={onClose}
+      label="Voice Settings"
+      id="mobile-voice-settings"
+    >
+      <MobileSheetHandle />
+      <MobileSheetHeader className="px-5 pb-3 border-white/5">
+        <MobileSheetTitle>Voice Settings</MobileSheetTitle>
+        <MobileSheetCloseButton
+          onClick={onClose}
+          className="rounded-full text-gray-500 hover:text-white hover:bg-white/5"
+        />
+      </MobileSheetHeader>
 
-      {/* Sheet */}
-      <div className="mobile-bottom-sheet fixed inset-x-0 bottom-0 z-50 bg-[#0d1525] rounded-t-2xl flex flex-col">
-        {/* Drag handle */}
-        <div className="shrink-0 flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-white/20" />
-        </div>
-
-        {/* Header */}
-        <div className="shrink-0 flex items-center justify-between px-5 pb-3 border-b border-white/5">
-          <h2 className="text-base font-semibold text-white">Voice Settings</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-5">
+      <MobileScrollableBody className="px-5 py-4 space-y-5">
 
           {/* Transmission mode */}
           <div className="space-y-3">
@@ -224,8 +222,7 @@ export function MobileVoiceSettingsSheet({
 
           {saving && <p className="text-sm text-gray-400 text-center">Saving...</p>}
           {error && <p className="text-sm text-red-400 text-center">{error}</p>}
-        </div>
-      </div>
-    </>
+      </MobileScrollableBody>
+    </MobileSheet>
   );
 }

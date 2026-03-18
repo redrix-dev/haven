@@ -20,6 +20,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Plus, Smile, Bold, Italic, Strikethrough, Code, Quote } from 'lucide-react';
+import { MobilePopoverCard } from '@web-mobile/mobile/layout/MobileSurfacePrimitives';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -263,14 +264,14 @@ function AttachmentMenu({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <>
-      {/* Tap-outside to close */}
-      <div className="fixed inset-0 z-[55]" onClick={onClose} style={{ touchAction: 'none' }} />
-
-      <div
-        className="mobile-bottom-card fixed inset-x-4 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-4 shadow-xl"
-        style={{ touchAction: 'none' }}
-      >
+    <MobilePopoverCard
+      open
+      onClose={onClose}
+      label="Attachment Menu"
+      id="mobile-enhanced-attachment-menu"
+      placement="docked"
+    >
+      <div className="p-4">
         <p className="text-[11px] uppercase tracking-widest text-gray-500 font-semibold mb-3">
           Attach
         </p>
@@ -315,7 +316,7 @@ function AttachmentMenu({
           }}
         />
       </div>
-    </>
+    </MobilePopoverCard>
   );
 }
 
@@ -332,14 +333,15 @@ function EmojiPicker({
   const category = EMOJI_CATEGORIES[tab];
 
   return (
-    <>
-      {/* Tap-outside to close */}
-      <div className="fixed inset-0 z-[55]" onClick={onClose} style={{ touchAction: 'none' }} />
-
-      <div
-        className="mobile-bottom-card fixed inset-x-0 z-[60] bg-[#0d1525] border-t border-white/10 shadow-xl"
-        style={{ height: '280px', touchAction: 'none' }}
-      >
+    <MobilePopoverCard
+      open
+      onClose={onClose}
+      label="Emoji Picker"
+      id="mobile-enhanced-emoji-picker"
+      placement="docked"
+      className="inset-x-0 bottom-0 rounded-t-2xl border-t border-white/10 bg-[#0d1525]"
+    >
+      <div style={{ height: '280px' }}>
         {/* Category tabs */}
         <div className="flex border-b border-white/5 px-2">
           {EMOJI_CATEGORIES.map((cat, i) => (
@@ -373,7 +375,7 @@ function EmojiPicker({
           ))}
         </div>
       </div>
-    </>
+    </MobilePopoverCard>
   );
 }
 

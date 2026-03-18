@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@shared/lib/supabase';
-import { desktopClient } from '@platform/desktop/client';
 import { getPlatformAuthConfirmRedirectUrl } from '@platform/urls';
 import { getErrorMessage } from '@platform/lib/errors';
+import { usePlatformRuntime } from '@platform/runtime/PlatformRuntimeContext';
 import type {
   AuthError,
   EmailOtpType,
@@ -83,6 +83,7 @@ const parseAuthConfirmParams = (parsed: URL): Record<string, string> => {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const runtime = usePlatformRuntime();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthStatus>('initializing');
@@ -191,26 +192,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!desktopClient.isAvailable()) return;
-
     let disposed = false;
-    let unsubscribe = () => {};
-
-    const handleProtocolUrl = (url: string) => {
+    const handleIncomingUrl = (url: string) => {
       if (disposed) return;
       void consumeAuthConfirmUrl(url);
     };
-
-    try {
-      unsubscribe = desktopClient.onProtocolUrl(handleProtocolUrl);
-    } catch (eventError) {
-      console.error('Failed to subscribe to protocol URL events:', eventError);
-    }
+    const unsubscribe = runtime.links.subscribeIncoming(handleIncomingUrl);
 
     const drainPendingProtocolUrls = async () => {
       try {
         while (!disposed) {
-          const url = await desktopClient.consumeNextProtocolUrl();
+          const url = await runtime.links.consumePendingUrl();
           if (!url) break;
           if (disposed) break;
           await consumeAuthConfirmUrl(url);
@@ -228,16 +220,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       disposed = true;
       unsubscribe();
     };
-  }, [consumeAuthConfirmUrl]);
+  }, [consumeAuthConfirmUrl, runtime]);
 
   useEffect(() => {
-    if (desktopClient.isAvailable()) return;
-    if (typeof window === 'undefined') return;
+    if (runtime.kind !== 'web') return;
 
     let disposed = false;
 
     const consumeBrowserAuthConfirmUrl = async () => {
-      const currentUrl = window.location.href;
+      const currentUrl = runtime.links.getCurrentUrl();
+      if (!currentUrl) return;
       const didProcess = await consumeAuthConfirmUrl(currentUrl);
       if (!didProcess || disposed) return;
 
@@ -259,7 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       disposed = true;
     };
-  }, [consumeAuthConfirmUrl]);
+  }, [consumeAuthConfirmUrl, runtime]);
 
   const signUp = async (email: string, password: string, username: string) => {
     const { error } = await supabase.auth.signUp({

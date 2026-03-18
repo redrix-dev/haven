@@ -10,8 +10,8 @@ import {
   WebAppDeepLinkTarget,
 } from '@shared/lib/deepLinks';
 import { recordLocalNotificationDeliveryTrace } from '@shared/lib/notifications/devTrace';
-import { desktopClient } from '@platform/desktop/client';
 import { getErrorMessage } from '@platform/lib/errors';
+import { usePlatformRuntime } from '@platform/runtime/PlatformRuntimeContext';
 import { toast } from 'sonner';
 import type { FriendsPanelTab } from '@client/app/types';
 
@@ -44,6 +44,7 @@ export function useDeepLinks({
   setCurrentServerId,
   setCurrentChannelId,
 }: UseDeepLinksOptions) {
+  const runtime = usePlatformRuntime();
   const processedWebDeepLinkKeysRef = useRef<Map<string, number>>(new Map());
   const pendingWebDeepLinkRef = useRef<{
     target: WebAppDeepLinkTarget;
@@ -231,18 +232,6 @@ export function useDeepLinks({
       }
 
       if (data.type !== 'HAVEN_PUSH_NOTIFICATION_CLICK') return;
-
-      const targetUrl = getRecordString(data, 'targetUrl');
-      const target =
-        (targetUrl ? parseWebAppDeepLinkUrl(targetUrl) : null) ??
-        parseWebPushClickPayloadTarget(data.payload);
-      if (!target) return;
-      const dedupeKey = `sw:${targetUrl ?? ''}:${safeStableStringify(data.payload)}`;
-
-      void openWebDeepLinkTarget(target, {
-        clearBrowserUrlAfterOpen: Boolean(targetUrl),
-        dedupeKey,
-      });
     };
 
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
@@ -251,20 +240,66 @@ export function useDeepLinks({
     };
   }, [openWebDeepLinkTarget]);
 
+  useEffect(() => {
+    return runtime.notifications.subscribeOpen((event) => {
+      const target =
+        (event.targetUrl ? parseWebAppDeepLinkUrl(event.targetUrl) : null) ??
+        parseWebPushClickPayloadTarget(event.payload);
+      if (!target) return;
+      const dedupeKey = `${event.source}:${event.targetUrl ?? ''}:${safeStableStringify(event.payload)}`;
+      void openWebDeepLinkTarget(target, {
+        clearBrowserUrlAfterOpen: runtime.kind === 'web' && Boolean(event.targetUrl),
+        dedupeKey,
+      });
+    });
+  }, [openWebDeepLinkTarget, runtime]);
+
+  useEffect(() => {
+    return runtime.links.subscribeIncoming((url) => {
+      const target = parseWebAppDeepLinkUrl(url);
+      if (!target) return;
+      void openWebDeepLinkTarget(target, {
+        clearBrowserUrlAfterOpen: runtime.kind === 'web',
+        dedupeKey: `incoming:${url}`,
+      });
+    });
+  }, [openWebDeepLinkTarget, runtime]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    const drainPendingUrls = async () => {
+      while (!disposed) {
+        const url = await runtime.links.consumePendingUrl();
+        if (!url) break;
+        const target = parseWebAppDeepLinkUrl(url);
+        if (!target) continue;
+        await openWebDeepLinkTarget(target, {
+          clearBrowserUrlAfterOpen: runtime.kind === 'web',
+          dedupeKey: `pending:${url}`,
+        });
+      }
+    };
+
+    void drainPendingUrls();
+
+    return () => {
+      disposed = true;
+    };
+  }, [openWebDeepLinkTarget, runtime]);
+
   // Handle deep link in the initial page URL (web PWA only)
   useEffect(() => {
-    if (desktopClient.isAvailable()) return;
-    if (typeof window === 'undefined') return;
-
-    const currentUrl = window.location.href;
+    const currentUrl = runtime.links.getCurrentUrl();
+    if (!currentUrl) return;
     const target = parseWebAppDeepLinkUrl(currentUrl);
     if (!target) return;
 
     void openWebDeepLinkTarget(target, {
-      clearBrowserUrlAfterOpen: true,
+      clearBrowserUrlAfterOpen: runtime.kind === 'web',
       dedupeKey: `url:${currentUrl}`,
     });
-  }, [openWebDeepLinkTarget]);
+  }, [openWebDeepLinkTarget, runtime]);
 
   // Flush any deep link that was queued before auth or feature flags were ready
   useEffect(() => {

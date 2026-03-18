@@ -13,13 +13,13 @@ const appAssetsJsonPath = path.resolve(
 );
 const appAssets = JSON.parse(await fs.readFile(appAssetsJsonPath, 'utf8'));
 
-const publicDir = path.resolve(repoRoot, 'apps/web-mobile/public');
-const generatedTsDir = path.resolve(repoRoot, 'apps/web-mobile/src/generated');
+const publicDir = path.resolve(repoRoot, 'apps/web/public');
+const generatedTsDir = path.resolve(repoRoot, 'apps/web/src/generated');
 const indexTemplatePath = path.resolve(
   repoRoot,
-  'apps/web-mobile/src/index.template.html'
+  'apps/web/src/index.template.html'
 );
-const indexHtmlPath = path.resolve(repoRoot, 'apps/web-mobile/src/index.html');
+const indexHtmlPath = path.resolve(repoRoot, 'apps/web/src/index.html');
 
 const write = async (filePath, content) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -148,7 +148,7 @@ const generatedHeadMarkup = [
   '    <meta name="theme-color" content="#3f79d8" />',
   '    <meta name="mobile-web-app-capable" content="yes" />',
   '    <meta name="apple-mobile-web-app-capable" content="yes" />',
-  '    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />',
+  '    <meta name="apple-mobile-web-app-status-bar-style" content="default" />',
   '    <meta name="apple-mobile-web-app-title" content="Haven" />',
   '    <meta name="application-name" content="Haven" />',
   `    <link rel="icon" type="image/png" sizes="192x192" href="${webRuntimeAssets.browserTabIcon}" />`,

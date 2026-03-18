@@ -1,7 +1,7 @@
 import React from 'react';
 import { VoiceDrawer as VoiceQuickControlsDrawer } from '@shared/components/voice/VoiceDrawer';
-import { desktopClient } from '@platform/desktop/client';
 import type { VoicePopoutControlAction, VoicePopoutState } from '@platform/desktop/types';
+import { usePlatformRuntime } from '@platform/runtime/PlatformRuntimeContext';
 
 const EMPTY_STATE: VoicePopoutState = {
   isOpen: false,
@@ -23,20 +23,22 @@ const EMPTY_STATE: VoicePopoutState = {
 };
 
 export function VoicePopoutApp() {
+  const runtime = usePlatformRuntime();
+  const desktop = runtime.desktop;
   const [state, setState] = React.useState<VoicePopoutState>(EMPTY_STATE);
   const [quickSettingsOpen, setQuickSettingsOpen] = React.useState(false);
 
   React.useEffect(() => {
-    if (!desktopClient.isAvailable()) return;
-    return desktopClient.onVoicePopoutState((nextState) => {
+    if (!desktop?.isAvailable()) return;
+    return desktop.onVoicePopoutState((nextState) => {
       setState(nextState);
     });
-  }, []);
+  }, [desktop]);
 
   const dispatch = React.useCallback((action: VoicePopoutControlAction) => {
-    if (!desktopClient.isAvailable()) return;
-    void desktopClient.dispatchVoicePopoutControlAction(action);
-  }, []);
+    if (!desktop?.isAvailable()) return;
+    void desktop.dispatchVoicePopoutControlAction(action);
+  }, [desktop]);
 
   return (
     <div className="min-h-screen bg-[#0f1726] p-3">

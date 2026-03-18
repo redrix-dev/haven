@@ -40,6 +40,12 @@
   --scrollbar-track: #142033;
   --scrollbar-thumb: #304867;
   --scrollbar-thumb-hover: #3f79d8;
+  --mobile-shell-height: 100dvh;
+  --mobile-safe-top: env(safe-area-inset-top, 0px);
+  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-header-height: 0px;
+  --mobile-subheader-height: 0px;
+  --mobile-bottom-dock-height: 0px;
 }
 
 .dark {
@@ -163,19 +169,36 @@
   }
 
   html.haven-web-shell,
-  body.haven-web-shell {
+  body.haven-web-shell,
+  html.haven-mobile-shell,
+  body.haven-mobile-shell {
     margin: 0;
-    width: 100%;
     height: 100%;
+    width: 100%;
+  }
+
+  html.haven-mobile-shell,
+  body.haven-mobile-shell {
     overflow: hidden;
     overscroll-behavior: none;
   }
 
-  body.haven-web-shell {
-    position: fixed;
+  body.haven-mobile-shell {
     inset: 0;
     max-width: 100vw;
     max-height: 100dvh;
+    overflow: hidden;
+    position: fixed;
+  }
+
+  #haven-web-root {
+    height: 100%;
+    min-height: 100%;
+  }
+
+  #haven-mobile-root {
+    height: 100%;
+    min-height: 100%;
   }
 
   body {
@@ -195,31 +218,25 @@
 
   .mobile-bottom-sheet {
     bottom: 0;
-    max-height: calc(
-      var(--app-visual-viewport-height, 100dvh) - env(safe-area-inset-top, 0px)
-    );
+    max-height: calc(var(--mobile-shell-height, 100dvh) - var(--mobile-safe-top, 0px));
   }
 
   .mobile-bottom-sheet--keyboard-aware {
-  bottom: calc(
-    var(--app-keyboard-inset, 0px) + var(--app-keyboard-accessory-inset, 0px)
-  );
+    bottom: 0;
   }
 
   .mobile-bottom-card {
-    bottom: 2rem;
+    bottom: calc(var(--mobile-safe-bottom, 0px) + 1rem);
   }
 
   .mobile-bottom-card--keyboard-aware {
-    bottom: calc(
-      var(--app-keyboard-inset, 0px) + var(--app-keyboard-accessory-inset, 0px) + 2rem
-    );
+    bottom: calc(var(--mobile-safe-bottom, 0px) + 1rem);
   }
 
   @media (max-width: 768px), (pointer: coarse) {
-    .haven-web-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]),
-    .haven-web-shell textarea,
-    .haven-web-shell select {
+    .haven-mobile-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]),
+    .haven-mobile-shell textarea,
+    .haven-mobile-shell select {
       font-size: 16px !important;
       line-height: 1.4;
       -webkit-text-size-adjust: 100%;

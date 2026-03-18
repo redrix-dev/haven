@@ -1,5 +1,9 @@
 import React from 'react';
 import { X, Settings } from 'lucide-react';
+import {
+  MobileAnchoredPanel,
+  MobileScrollableBody,
+} from '@web-mobile/mobile/layout/MobileSurfacePrimitives';
 
 interface Server {
   id: string;
@@ -29,21 +33,19 @@ export function MobileServerDrawer({
   if (!open) return null;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 z-40 touch-none overscroll-none"
-        onClick={onClose}
-      />
-
-      {/* Drawer panel — drops from below the header */}
-      <div className="fixed top-14 left-0 right-0 z-50 bg-[#0d1525] border-b border-white/10 max-h-[65vh] flex flex-col">
-
-        {/* Drawer title row */}
+    <MobileAnchoredPanel
+      open={open}
+      onClose={onClose}
+      anchor="below-primary-header"
+      label="Server Drawer"
+      id="mobile-server-drawer"
+      className="border-b border-white/10"
+    >
+      <div className="flex max-h-full flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
           <span className="text-white font-semibold text-sm">
             {currentServerId
-              ? servers.find((s) => s.id === currentServerId)?.name ?? 'Server'
+              ? servers.find((server) => server.id === currentServerId)?.name ?? 'Server'
               : 'Your Servers'}
           </span>
           <button
@@ -54,7 +56,6 @@ export function MobileServerDrawer({
           </button>
         </div>
 
-        {/* Server Settings — at the top, only if user has access */}
         {canManageCurrentServer && currentServerId && (
           <div className="px-4 pt-3 pb-2 shrink-0">
             <button
@@ -70,15 +71,13 @@ export function MobileServerDrawer({
           </div>
         )}
 
-        {/* Divider + "Your Servers" label */}
         <div className="px-4 pt-2 pb-1 shrink-0">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
             Your Servers
           </span>
         </div>
 
-        {/* Server list */}
-        <div className="overflow-y-auto overscroll-contain flex-1 pb-2">
+        <MobileScrollableBody className="pb-2">
           {servers.map((server) => {
             const isActive = server.id === currentServerId;
             return (
@@ -112,8 +111,8 @@ export function MobileServerDrawer({
               </button>
             );
           })}
-        </div>
+        </MobileScrollableBody>
       </div>
-    </>
+    </MobileAnchoredPanel>
   );
 }

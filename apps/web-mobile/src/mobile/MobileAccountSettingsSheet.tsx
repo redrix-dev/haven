@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
-import { X, Loader2, ChevronRight, AlertTriangle, Volume2 } from 'lucide-react';
+import { Loader2, ChevronRight, AlertTriangle, Volume2 } from 'lucide-react';
 import { getErrorMessage } from '@platform/lib/errors';
 import type { UpdaterStatus } from '@platform/desktop/types';
+import {
+  MobilePopoverCard,
+  MobileScrollableBody,
+  MobileSheet,
+  MobileSheetCloseButton,
+  MobileSheetFooter,
+  MobileSheetHandle,
+  MobileSheetHeader,
+  MobileSheetTitle,
+} from '@web-mobile/mobile/layout/MobileSurfacePrimitives';
 
 interface MobileAccountSettingsSheetProps {
   open: boolean;
@@ -183,35 +193,25 @@ export function MobileAccountSettingsSheet({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none"
-        onClick={() => {
-          if (confirmState !== 'none') { setConfirmState('none'); return; }
+      <MobileSheet
+        open={open}
+        onClose={() => {
+          if (confirmState !== 'none') {
+            setConfirmState('none');
+            return;
+          }
           onClose();
         }}
-      />
+        label="Account Settings"
+        id="mobile-account-settings"
+      >
+        <MobileSheetHandle />
+        <MobileSheetHeader>
+          <MobileSheetTitle>Account Settings</MobileSheetTitle>
+          <MobileSheetCloseButton onClick={onClose} />
+        </MobileSheetHeader>
 
-      {/* Sheet */}
-      <div className="mobile-bottom-sheet fixed inset-x-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 flex flex-col">
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-9 h-1 rounded-full bg-white/20" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
-          <h2 className="text-base font-semibold text-white">Account Settings</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors"
-          >
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
+        <MobileScrollableBody className="px-4 pb-6">
 
           {/* Profile section */}
           <div className="mt-4 flex items-center gap-3 mb-5">
@@ -352,10 +352,9 @@ export function MobileAccountSettingsSheet({
               </button>
             </div>
           </div>
-        </div>
+        </MobileScrollableBody>
 
-        {/* Save button */}
-        <div className="px-4 pb-8 pt-3 border-t border-white/10 shrink-0">
+        <MobileSheetFooter>
           <button
             onClick={() => void handleSave()}
             disabled={saving || processingAction}
@@ -363,12 +362,17 @@ export function MobileAccountSettingsSheet({
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Save Changes'}
           </button>
-        </div>
-      </div>
+        </MobileSheetFooter>
+      </MobileSheet>
 
       {/* Inline confirm: disable auto-updates */}
-      {confirmState === 'disable-updates' && (
-        <div className="mobile-bottom-card fixed inset-x-4 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-5 shadow-xl">
+      <MobilePopoverCard
+        open={confirmState === 'disable-updates'}
+        onClose={() => setConfirmState('none')}
+        label="Disable automatic updates"
+        id="mobile-disable-updates-confirm"
+      >
+        <div className="p-5">
           <div className="flex items-start gap-3 mb-4">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
@@ -394,11 +398,16 @@ export function MobileAccountSettingsSheet({
             </button>
           </div>
         </div>
-      )}
+      </MobilePopoverCard>
 
       {/* Inline confirm: sign out */}
-      {confirmState === 'sign-out' && (
-        <div className="mobile-bottom-card fixed inset-x-4 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-5 shadow-xl">
+      <MobilePopoverCard
+        open={confirmState === 'sign-out'}
+        onClose={() => setConfirmState('none')}
+        label="Sign out"
+        id="mobile-sign-out-confirm"
+      >
+        <div className="p-5">
           <div className="flex items-start gap-3 mb-4">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
@@ -424,11 +433,16 @@ export function MobileAccountSettingsSheet({
             </button>
           </div>
         </div>
-      )}
+      </MobilePopoverCard>
 
       {/* Inline confirm: delete account */}
-      {confirmState === 'delete-account' && (
-        <div className="mobile-bottom-card fixed inset-x-4 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-5 shadow-xl">
+      <MobilePopoverCard
+        open={confirmState === 'delete-account'}
+        onClose={() => setConfirmState('none')}
+        label="Delete account"
+        id="mobile-delete-account-confirm"
+      >
+        <div className="p-5">
           <div className="flex items-start gap-3 mb-4">
             <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
             <div>
@@ -456,7 +470,7 @@ export function MobileAccountSettingsSheet({
             </button>
           </div>
         </div>
-      )}
+      </MobilePopoverCard>
     </>
   );
 }

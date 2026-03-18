@@ -3,7 +3,6 @@ import { playNotificationSound } from '@shared/lib/notifications/sound';
 import type { NotificationBackend } from '@shared/lib/backend/notificationBackend';
 import { recordLocalNotificationDeliveryTrace } from '@shared/lib/notifications/devTrace';
 import { resolveNotificationRoutePolicy } from '@shared/lib/notifications/routePolicy';
-import { getHavenWebPushRoutingSignalsSync } from '@web-mobile/pwa/webPushClient';
 import type {
   NotificationCounts,
   NotificationItem,
@@ -12,6 +11,7 @@ import type {
 } from '@shared/lib/backend/types';
 import type { NotificationAudioSettings } from '@platform/desktop/types';
 import { getErrorMessage } from '@platform/lib/errors';
+import { usePlatformRuntime } from '@platform/runtime/PlatformRuntimeContext';
 import { DEFAULT_NOTIFICATION_COUNTS } from '@client/app/constants';
 
 type UseNotificationsInput = {
@@ -40,6 +40,7 @@ export function useNotifications({
   audioSettings,
   autoMarkSeenOnPanelOpen = false,
 }: UseNotificationsInput) {
+  const runtime = usePlatformRuntime();
   const [notificationItems, setNotificationItems] = React.useState<NotificationItem[]>([]);
   const [notificationCounts, setNotificationCounts] = React.useState<NotificationCounts>(
     DEFAULT_NOTIFICATION_COUNTS
@@ -78,7 +79,7 @@ export function useNotifications({
       const previousKnownSoundIds = knownSoundNotificationRecipientIdsRef.current;
       const canPlaySounds = notificationsBootstrappedRef.current && playSoundsForNew;
       const routePolicy = (() => {
-        const signals = getHavenWebPushRoutingSignalsSync();
+        const signals = runtime.notifications.getRoutingSignalsSync();
         const hasFocus = typeof document !== 'undefined' ? document.hasFocus() : true;
         return resolveNotificationRoutePolicy({
           hasFocus,
@@ -128,7 +129,7 @@ export function useNotifications({
 
       notificationsBootstrappedRef.current = true;
     },
-    [notificationBackend, userId]
+    [notificationBackend, runtime, userId]
   );
 
   const refreshNotificationPreferences = React.useCallback(async () => {

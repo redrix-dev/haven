@@ -8,9 +8,9 @@ import {
   getNotificationBackend,
   getSocialBackend,
 } from '@shared/lib/backend';
-import { desktopClient } from '@platform/desktop/client';
 import { getPlatformInviteBaseUrl } from '@platform/urls';
 import { getErrorMessage } from '@platform/lib/errors';
+import { usePlatformRuntime } from '@platform/runtime/PlatformRuntimeContext';
 import { installPromptTrap } from '@shared/lib/contextMenu/debugTrace';
 import {
   DM_REPORT_REVIEW_PANEL_FLAG,
@@ -60,6 +60,7 @@ const normalizeInviteCode = (value: string): string => {
 };
 
 export function useChatAppOrchestration() {
+  const runtime = usePlatformRuntime();
   // ── Backend singletons ────────────────────────────────────────────────────
   const controlPlaneBackend = getControlPlaneBackend();
   const directMessageBackend = getDirectMessageBackend();
@@ -122,7 +123,7 @@ export function useChatAppOrchestration() {
     ? `${platformStaffPrefix ?? 'Haven'}-${baseUserDisplayName}`
     : baseUserDisplayName;
   const webPushTestToolsEnabled =
-    !desktopClient.isAvailable() &&
+    !runtime.desktop &&
     notificationDevToolsEnabled &&
     (isPlatformStaff || process.env.NODE_ENV === 'development');
 
@@ -637,14 +638,14 @@ export function useChatAppOrchestration() {
 
   const saveAttachment = useCallback(async (attachment: MessageAttachment) => {
     if (!attachment.signedUrl) throw new Error('Media link is not available.');
-    if (!desktopClient.isAvailable()) {
-      window.open(attachment.signedUrl, '_blank', 'noopener,noreferrer');
+    if (!runtime.capabilities.fileSave) {
+      await runtime.files.openExternalUrl(attachment.signedUrl);
       return;
     }
     const suggestedName =
       attachment.originalFilename ?? attachment.objectPath.split('/').pop() ?? 'media';
-    await desktopClient.saveFileFromUrl({ url: attachment.signedUrl, suggestedName });
-  }, []);
+    await runtime.files.saveFileFromUrl({ url: attachment.signedUrl, suggestedName });
+  }, [runtime]);
 
   const reportUserProfile = useCallback(
     async (input: { targetUserId: string; reason: string; communityId?: string }) => {

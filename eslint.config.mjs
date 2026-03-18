@@ -1,3 +1,4 @@
+import tsEslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import reactHooks from 'eslint-plugin-react-hooks';
 
@@ -7,7 +8,8 @@ const rendererBoundaryFiles = [
   'packages/shared/src/contexts/**/*.{ts,tsx,js,jsx}',
   'packages/shared/src/lib/hooks/**/*.{ts,tsx,js,jsx}',
   'packages/shared/src/lib/voice/**/*.{ts,tsx,js,jsx}',
-  'apps/web-mobile/src/**/*.{ts,tsx,js,jsx}',
+  'apps/web/src/**/*.{ts,tsx,js,jsx}',
+  'apps/mobile/src/**/*.{ts,tsx,js,jsx}',
   'apps/electron/src/renderer/**/*.{ts,tsx,js,jsx}',
 ];
 
@@ -28,6 +30,21 @@ const rendererBoundaryRestrictions = [
   {
     group: ['node:*'],
     message: 'Renderer/features must not import Node built-ins.',
+  },
+];
+
+const sharedBoundaryRestrictions = [
+  {
+    group: ['@web/*', '**/apps/web/src/*'],
+    message: 'Shared code must not import web app modules. Use @platform/runtime interfaces instead.',
+  },
+  {
+    group: ['@mobile/*', '**/apps/mobile/src/*'],
+    message: 'Shared code must not import mobile app modules. Use @platform/runtime interfaces instead.',
+  },
+  {
+    group: ['@electron/*', '**/apps/electron/src/*'],
+    message: 'Shared code must not import app modules. Use shared platform/runtime abstractions instead.',
   },
 ];
 
@@ -53,6 +70,7 @@ export default [
       },
     },
     plugins: {
+      '@typescript-eslint': tsEslint,
       'react-hooks': reactHooks,
     },
     rules: {
@@ -84,6 +102,19 @@ export default [
         'error',
         {
           patterns: rendererBoundaryRestrictions,
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'packages/shared/src/**/*.{ts,tsx,js,jsx}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: sharedBoundaryRestrictions,
         },
       ],
     },

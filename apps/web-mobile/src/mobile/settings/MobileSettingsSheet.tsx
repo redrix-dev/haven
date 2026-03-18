@@ -22,6 +22,14 @@
  */
 import React from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import {
+  MobileScrollableBody,
+  MobileSheet,
+  MobileSheetCloseButton,
+  MobileSheetHandle,
+  MobileSheetHeader,
+  MobileSheetTitle,
+} from '@web-mobile/mobile/layout/MobileSurfacePrimitives';
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -186,24 +194,14 @@ function MobileSettingsSheetRoot({ open, onClose, title, children }: MobileSetti
 
   return (
     <SheetContext.Provider value={{ activePage, setActivePage }}>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none"
-        onClick={handleBackdropClick}
-      />
-
-      {/* Sheet */}
-      <div
-        className="mobile-bottom-sheet fixed inset-x-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 flex flex-col"
-        style={{ height: '92dvh' }}
+      <MobileSheet
+        open={open}
+        onClose={handleBackdropClick}
+        label={title}
+        id={`mobile-settings-sheet:${title}`}
       >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-9 h-1 rounded-full bg-white/20" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 shrink-0">
+        <MobileSheetHandle />
+        <MobileSheetHeader>
           {activePage !== null && (
             <button
               type="button"
@@ -214,22 +212,14 @@ function MobileSettingsSheetRoot({ open, onClose, title, children }: MobileSetti
               <ChevronLeft className="w-5 h-5 text-gray-300" />
             </button>
           )}
-          <h2 className="flex-1 text-base font-semibold text-white">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors shrink-0"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
+          <MobileSheetTitle>{title}</MobileSheetTitle>
+          <MobileSheetCloseButton onClick={onClose} />
+        </MobileSheetHeader>
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto overscroll-contain">
+        <MobileScrollableBody>
           {children}
-        </div>
-      </div>
+        </MobileScrollableBody>
+      </MobileSheet>
     </SheetContext.Provider>
   );
 }

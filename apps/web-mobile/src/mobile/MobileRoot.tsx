@@ -1,14 +1,14 @@
 import React from 'react';
 import { AuthProvider } from '@shared/contexts/AuthContext';
 import { MobileChatApp } from '@web-mobile/mobile/MobileChatApp';
-import { useMobileViewportStabilizer } from '@web-mobile/mobile/hooks/useMobileViewportStabilizer';
+import { MobileViewportProvider } from '@web-mobile/mobile/layout/MobileViewportContext';
 
 export function MobileRoot() {
-  useMobileViewportStabilizer();
-
   return (
-    <AuthProvider>
-      <MobileChatApp />
-    </AuthProvider>
+    <MobileViewportProvider>
+      <AuthProvider>
+        <MobileChatApp />
+      </AuthProvider>
+    </MobileViewportProvider>
   );
 }

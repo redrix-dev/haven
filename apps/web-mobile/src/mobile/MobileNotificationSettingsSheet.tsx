@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bell, BellOff, Smartphone, Loader2 } from 'lucide-react';
+import { Bell, BellOff, Smartphone, Loader2 } from 'lucide-react';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Switch } from '@shared/components/ui/switch';
 import type { NotificationPreferences, NotificationPreferenceUpdate } from '@shared/lib/backend/types';
 import type { HavenWebPushClientStatus } from '@web-mobile/pwa/webPushClient';
+import {
+  MobileScrollableBody,
+  MobileSheet,
+  MobileSheetCloseButton,
+  MobileSheetFooter,
+  MobileSheetHandle,
+  MobileSheetHeader,
+  MobileSheetTitle,
+} from '@web-mobile/mobile/layout/MobileSurfacePrimitives';
 
 interface MobileNotificationSettingsSheetProps {
   open: boolean;
@@ -161,29 +170,19 @@ export function MobileNotificationSettingsSheet({
   if (!open) return null;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={onClose} />
+    <MobileSheet
+      open={open}
+      onClose={onClose}
+      label="Notification Settings"
+      id="mobile-notification-settings"
+    >
+      <MobileSheetHandle />
+      <MobileSheetHeader>
+        <MobileSheetTitle>Notification Settings</MobileSheetTitle>
+        <MobileSheetCloseButton onClick={onClose} />
+      </MobileSheetHeader>
 
-      {/* Sheet */}
-      <div className="mobile-bottom-sheet fixed inset-x-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 flex flex-col">
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-9 h-1 rounded-full bg-white/20" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
-          <h2 className="text-base font-semibold text-white">Notification Settings</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors"
-          >
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
+      <MobileScrollableBody className="px-4 pb-6">
           {/* Push notifications CTA */}
           {!pushUnavailable && (
             <div className="mt-4 mb-2">
@@ -362,25 +361,23 @@ export function MobileNotificationSettingsSheet({
               </div>
             </>
           ) : null}
-        </div>
+      </MobileScrollableBody>
 
-        {/* Save button */}
-        {draft && (
-          <div className="px-4 pb-8 pt-3 border-t border-white/10 shrink-0">
-            <button
-              onClick={handleSave}
-              disabled={notificationPreferencesSaving}
-              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm transition-colors disabled:opacity-60"
-            >
-              {notificationPreferencesSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-              ) : (
-                'Save Settings'
-              )}
-            </button>
-          </div>
-        )}
-      </div>
-    </>
+      {draft && (
+        <MobileSheetFooter>
+          <button
+            onClick={handleSave}
+            disabled={notificationPreferencesSaving}
+            className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm transition-colors disabled:opacity-60"
+          >
+            {notificationPreferencesSaving ? (
+              <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+            ) : (
+              'Save Settings'
+            )}
+          </button>
+        </MobileSheetFooter>
+      )}
+    </MobileSheet>
   );
 }

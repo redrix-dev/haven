@@ -30,7 +30,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/components/ui/alert-dialog";
-import { desktopClient } from "@platform/desktop/client";
 import { getErrorMessage } from "@platform/lib/errors";
 import { VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL } from "@client/app/constants";
 import { useChatAppOrchestration } from "@client/app/hooks/useChatAppOrchestration";
@@ -48,14 +47,17 @@ import {
 } from "@shared/lib/notifications/webPushDiagnostics";
 import { toast } from "sonner";
 import { useServerOrder } from "@client/features/community/hooks/useServerOrder";
+import { usePlatformRuntime } from "@platform/runtime/PlatformRuntimeContext";
 
 export function ChatApp() {
+  const runtime = usePlatformRuntime();
+  const desktop = runtime.desktop;
   const app = useChatAppOrchestration();
   const { orderedServers, setOrder: setServerOrder } = useServerOrder(
     app.user?.id ?? null,
     app.servers,
   );
-  const canOpenVoicePopout = desktopClient.isAvailable();
+  const canOpenVoicePopout = runtime.capabilities.voicePopout && Boolean(desktop?.isAvailable());
   const [voicePopoutState, setVoicePopoutState] =
     React.useState<VoicePopoutState | null>(null);
   const setVoicePanelOpen = app.setVoicePanelOpen;
@@ -109,12 +111,12 @@ export function ChatApp() {
   const voicePopoutWindowOpen = canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
 
   React.useEffect(() => {
-    if (!canOpenVoicePopout) return;
+    if (!canOpenVoicePopout || !desktop) return;
 
-    return desktopClient.onVoicePopoutState((nextState) => {
+    return desktop.onVoicePopoutState((nextState) => {
       setVoicePopoutState(nextState);
     });
-  }, [canOpenVoicePopout]);
+  }, [canOpenVoicePopout, desktop]);
 
   React.useEffect(() => {
     if (!voicePopoutWindowOpen) return;
@@ -122,9 +124,9 @@ export function ChatApp() {
   }, [setVoicePanelOpen, voicePopoutWindowOpen]);
 
   React.useEffect(() => {
-    if (!canOpenVoicePopout) return;
+    if (!canOpenVoicePopout || !desktop) return;
 
-    void desktopClient.syncVoicePopoutState({
+    void desktop.syncVoicePopoutState({
       isOpen: voicePopoutWindowOpen,
       serverName:
         activeVoiceServer?.name ?? app.currentServer?.name ?? null,
@@ -162,6 +164,7 @@ export function ChatApp() {
     app.activeVoiceParticipantCount,
     app.appSettings.voice.transmissionMode,
     canOpenVoicePopout,
+    desktop,
     activeVoiceServer?.name,
     app.currentServer?.name,
     voicePopoutWindowOpen,
@@ -179,9 +182,9 @@ export function ChatApp() {
   ]);
 
   React.useEffect(() => {
-    if (!canOpenVoicePopout) return;
+    if (!canOpenVoicePopout || !desktop) return;
 
-    return desktopClient.onVoicePopoutControlAction((action) => {
+    return desktop.onVoicePopoutControlAction((action) => {
       switch (action.type) {
         case "toggle_mute":
           voiceController.actions.toggleMute();
@@ -221,6 +224,7 @@ export function ChatApp() {
     });
   }, [
     canOpenVoicePopout,
+    desktop,
     disconnectVoiceSession,
     setShowVoiceSettingsModal,
     setUserVoiceHardwareTestOpen,
@@ -234,13 +238,13 @@ export function ChatApp() {
   ]);
 
   const handleOpenVoicePopout = React.useCallback(() => {
-    if (!canOpenVoicePopout) return;
+    if (!canOpenVoicePopout || !desktop) return;
     setVoicePanelOpen(false);
 
-    void desktopClient.openVoicePopout().catch((error: unknown) => {
+    void desktop.openVoicePopout().catch((error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to open voice popout."));
     });
-  }, [canOpenVoicePopout, setVoicePanelOpen]);
+  }, [canOpenVoicePopout, desktop, setVoicePanelOpen]);
 
   const handleVoiceHeaderChannelNavigate = () => {
     if (!app.activeVoiceChannel) return;
@@ -711,7 +715,7 @@ export function ChatApp() {
           void app.setNotificationAudioSettings(next)
         }
         webPushControls={
-          desktopClient.isAvailable()
+          desktop
             ? undefined
             : {
                 status: app.webPushStatus,

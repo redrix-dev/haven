@@ -19,21 +19,85 @@ const popoutMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@platform/desktop/client', () => ({
-  desktopClient: {
-    isAvailable: () => true,
-    dispatchVoicePopoutControlAction: (action: VoicePopoutControlAction) =>
-      popoutMocks.dispatchVoicePopoutControlAction(action),
-    onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => {
-      popoutMocks.listeners.push(listener);
-      return () => {
-        const index = popoutMocks.listeners.indexOf(listener);
-        if (index >= 0) {
-          popoutMocks.listeners.splice(index, 1);
-        }
-      };
+vi.mock('@platform/runtime/PlatformRuntimeContext', () => ({
+  usePlatformRuntime: () => ({
+    kind: 'electron-desktop',
+    capabilities: {
+      voicePopout: true,
+      browserPush: false,
+      nativePush: false,
+      nativeKeyboard: false,
+      fileSave: true,
+      universalLinks: false,
     },
-  },
+    links: {
+      getAuthConfirmRedirectUrl: () => 'haven://auth/confirm',
+      getInviteBaseUrl: () => 'haven://invite/',
+      getCurrentUrl: () => null,
+      subscribeIncoming: () => () => {},
+      consumePendingUrl: async () => null,
+    },
+    notifications: {
+      transport: 'none',
+      getRoutingSignalsSync: () => ({
+        pushSupported: false,
+        pushPermission: 'unsupported',
+        swRegistered: false,
+        pushSubscriptionActive: false,
+        pushSyncEnabled: false,
+        serviceWorkerRegistrationEnabled: false,
+      }),
+      subscribeOpen: () => () => {},
+      browserPush: null,
+      nativePush: null,
+    },
+    files: {
+      openExternalUrl: () => {},
+      saveFileFromUrl: async () => null,
+    },
+    keyboard: null,
+    desktop: {
+      isAvailable: () => true,
+      getAppSettings: async () => {
+        throw new Error('not implemented in test');
+      },
+      setAutoUpdateEnabled: async () => {
+        throw new Error('not implemented in test');
+      },
+      setNotificationAudioSettings: async () => {
+        throw new Error('not implemented in test');
+      },
+      setVoiceSettings: async () => {
+        throw new Error('not implemented in test');
+      },
+      getUpdaterStatus: async () => {
+        throw new Error('not implemented in test');
+      },
+      checkForUpdates: async () => {
+        throw new Error('not implemented in test');
+      },
+      saveFileFromUrl: async () => {
+        throw new Error('not implemented in test');
+      },
+      consumeNextProtocolUrl: async () => null,
+      openVoicePopout: async () => ({ opened: true }),
+      closeVoicePopout: async () => ({ closed: true }),
+      syncVoicePopoutState: async () => {},
+      dispatchVoicePopoutControlAction: (action: VoicePopoutControlAction) =>
+        popoutMocks.dispatchVoicePopoutControlAction(action),
+      onProtocolUrl: () => () => {},
+      onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => {
+        popoutMocks.listeners.push(listener);
+        return () => {
+          const index = popoutMocks.listeners.indexOf(listener);
+          if (index >= 0) {
+            popoutMocks.listeners.splice(index, 1);
+          }
+        };
+      },
+      onVoicePopoutControlAction: () => () => {},
+    },
+  }),
 }));
 
 describe('VoicePopoutApp', () => {

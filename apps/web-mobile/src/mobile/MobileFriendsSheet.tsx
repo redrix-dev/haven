@@ -12,6 +12,15 @@ import type {
 } from '@shared/lib/backend/types';
 import { ToggleGroup, ToggleGroupItem } from '@shared/components/ui/toggle-group';
 import { getErrorMessage } from '@platform/lib/errors';
+import {
+  MobilePopoverCard,
+  MobileScrollableBody,
+  MobileSheet,
+  MobileSheetCloseButton,
+  MobileSheetHandle,
+  MobileSheetHeader,
+  MobileSheetTitle,
+} from '@web-mobile/mobile/layout/MobileSurfacePrimitives';
 
 type FriendsTab = 'friends' | 'add' | 'requests' | 'blocked';
 
@@ -200,21 +209,17 @@ export function MobileFriendsSheet({
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/60 touch-none overscroll-none" onClick={() => onOpenChange(false)} />
-
-      {/* Sheet */}
-      <div className="mobile-bottom-sheet fixed inset-x-0 z-50 rounded-t-2xl bg-[#0d1525] border-t border-white/10 flex flex-col" style={{ height: '92dvh' }}>
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-9 h-1 rounded-full bg-white/20" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
+      <MobileSheet
+        open={open}
+        onClose={() => onOpenChange(false)}
+        label="Friends"
+        id="mobile-friends-sheet"
+      >
+        <MobileSheetHandle />
+        <MobileSheetHeader>
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-[#9ac0ff]" />
-            <h2 className="text-base font-semibold text-white">Friends</h2>
+            <MobileSheetTitle className="flex-none">Friends</MobileSheetTitle>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -224,14 +229,9 @@ export function MobileFriendsSheet({
             >
               <RefreshCcw className={`w-4 h-4 text-gray-400 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="flex items-center justify-center w-8 h-8 rounded-xl hover:bg-white/10 transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-400" />
-            </button>
+            <MobileSheetCloseButton onClick={() => onOpenChange(false)} />
           </div>
-        </div>
+        </MobileSheetHeader>
 
         {/* Tabs */}
         <div className="px-3 pt-3 pb-1 shrink-0 overflow-x-auto">
@@ -275,7 +275,7 @@ export function MobileFriendsSheet({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 min-h-0">
+        <MobileScrollableBody className="px-4 py-3 min-h-0">
           {loading && (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
@@ -570,14 +570,19 @@ export function MobileFriendsSheet({
               )}
             </>
           )}
-        </div>
-      </div>
+        </MobileScrollableBody>
+      </MobileSheet>
 
       {/* Confirm action sheet */}
-      {pendingConfirm && (
-        <>
-          <div className="fixed inset-0 z-60 bg-black/70 touch-none overscroll-none" onClick={() => setPendingConfirm(null)} />
-          <div className="mobile-bottom-card fixed inset-x-4 z-70 rounded-2xl bg-[#18243a] border border-white/10 p-5">
+      <MobilePopoverCard
+        open={pendingConfirm !== null}
+        onClose={() => setPendingConfirm(null)}
+        label="Friends Action Confirmation"
+        id="mobile-friends-confirm"
+        className="bg-[#18243a]"
+      >
+        {pendingConfirm && (
+          <div className="p-5">
             <p className="text-white font-semibold text-center mb-1">
               {pendingConfirm.kind === 'removeFriend' ? 'Remove friend?' : 'Block user?'}
             </p>
@@ -605,8 +610,8 @@ export function MobileFriendsSheet({
               </button>
             </div>
           </div>
-        </>
-      )}
+        )}
+      </MobilePopoverCard>
     </>
   );
 }

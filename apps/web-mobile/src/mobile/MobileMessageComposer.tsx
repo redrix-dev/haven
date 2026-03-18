@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   Paperclip,
 } from 'lucide-react';
+import { MobilePopoverCard } from '@web-mobile/mobile/layout/MobileSurfacePrimitives';
 
 interface ReplyTarget {
   id: string;
@@ -220,10 +221,12 @@ const FORMATTING_ACTIONS: Array<{
 ];
 
 function ComposerFormattingToolbar({
+  focusComposerInput,
   textareaRef,
   draft,
   onDraftChange,
 }: {
+  focusComposerInput: () => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   draft: string;
   onDraftChange: (v: string) => void;
@@ -240,7 +243,7 @@ function ComposerFormattingToolbar({
     onDraftChange(next);
 
     requestAnimationFrame(() => {
-      el.focus();
+      focusComposerInput();
       const cursorStart = start + prefix.length;
       const cursorEnd = cursorStart + (selected || 'text').length;
       el.setSelectionRange(cursorStart, cursorEnd);
@@ -289,13 +292,14 @@ function AttachmentMenu({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <>
-      <div className="fixed inset-0 z-[55]" onClick={onClose} style={{ touchAction: 'none' }} />
-
-      <div
-        className="mobile-bottom-card fixed inset-x-4 z-[60] rounded-2xl bg-[#111c30] border border-white/10 p-4 shadow-xl"
-        style={{ touchAction: 'none' }}
-      >
+    <MobilePopoverCard
+      open
+      onClose={onClose}
+      label="Attachment Menu"
+      id="mobile-attachment-menu"
+      placement="docked"
+    >
+      <div className="p-4">
         <p className="text-[11px] uppercase tracking-widest text-gray-500 font-semibold mb-3">
           Attach
         </p>
@@ -354,7 +358,7 @@ function AttachmentMenu({
           />
         )}
       </div>
-    </>
+    </MobilePopoverCard>
   );
 }
 
@@ -369,13 +373,15 @@ function EmojiPicker({
   const category = EMOJI_PICKER_CATEGORIES[tab];
 
   return (
-    <>
-      <div className="fixed inset-0 z-[55]" onClick={onClose} style={{ touchAction: 'none' }} />
-
-      <div
-        className="mobile-bottom-card fixed inset-x-0 z-[60] bg-[#0d1525] border-t border-white/10 shadow-xl"
-        style={{ height: '280px', touchAction: 'none' }}
-      >
+    <MobilePopoverCard
+      open
+      onClose={onClose}
+      label="Emoji Picker"
+      id="mobile-emoji-picker"
+      placement="docked"
+      className="inset-x-0 bottom-0 rounded-t-2xl border-t border-white/10 bg-[#0d1525]"
+    >
+      <div style={{ height: '280px' }}>
         <div className="flex border-b border-white/5 px-2">
           {EMOJI_PICKER_CATEGORIES.map((cat, index) => (
             <button
@@ -410,7 +416,7 @@ function EmojiPicker({
           ))}
         </div>
       </div>
-    </>
+    </MobilePopoverCard>
   );
 }
 
@@ -432,14 +438,23 @@ export function MobileMessageComposer({
   const [mediaFile, setMediaFile] = useState<MediaFile | null>(null);
   const [mediaExpiresInHours, setMediaExpiresInHours] = useState(24);
 
+  const focusComposerInput = useCallback(() => {
+    const element = textareaRef.current;
+    if (!element) return;
+
+    try {
+      element.focus({ preventScroll: true });
+    } catch {
+      element.focus();
+    }
+  }, []);
+
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-
-    const isOverflowing = el.scrollHeight > 120;
-    el.style.touchAction = isOverflowing ? 'auto' : 'none';
+    el.style.touchAction = el.scrollHeight > 120 ? 'auto' : 'none';
   }, [draft]);
 
   const clearSelectedMedia = useCallback(() => {
@@ -491,17 +506,14 @@ export function MobileMessageComposer({
     const next = draft.slice(0, start) + emoji + draft.slice(end);
     onDraftChange(next);
     requestAnimationFrame(() => {
-      el.focus();
+      focusComposerInput();
       const pos = start + emoji.length;
       el.setSelectionRange(pos, pos);
     });
   };
 
   return (
-    <div
-      className="shrink-0 border-t border-white/10 bg-[#0d1525]"
-      style={{ paddingBottom: '0px', touchAction: 'none' }}
-    >
+    <div className="shrink-0" style={{ touchAction: 'none' }}>
       <ComposerMediaPreview
         media={mediaFile}
         expiresInHours={mediaExpiresInHours}
@@ -512,6 +524,7 @@ export function MobileMessageComposer({
       <ComposerReplyBanner replyTarget={replyTarget} onClearReply={onClearReply} />
 
       <ComposerFormattingToolbar
+        focusComposerInput={focusComposerInput}
         textareaRef={textareaRef}
         draft={draft}
         onDraftChange={onDraftChange}
@@ -519,10 +532,7 @@ export function MobileMessageComposer({
 
       <div className="px-3 pt-1 pb-0" style={{ touchAction: 'none' }}>
         <div className="mx-auto w-full max-w-[24rem]" style={{ touchAction: 'none' }}>
-          <div
-            className="relative rounded-[1.4rem] border border-white/10 bg-white/5 transition-colors focus-within:border-blue-500/50 flex items-center gap-1 px-2 py-1.5"
-            style={{ touchAction: 'none' }}
-          >
+          <div className="relative rounded-[1.4rem] border border-white/10 bg-white/5 transition-colors focus-within:border-blue-500/50 flex items-center gap-1 px-2 py-1.5">
             <button
               type="button"
               onClick={() => {

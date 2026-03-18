@@ -1,35 +1,11 @@
-import { desktopClient } from '@platform/desktop/client';
-
-const DESKTOP_AUTH_CONFIRM_REDIRECT_URL = 'haven://auth/confirm';
-const DESKTOP_INVITE_BASE_URL = 'haven://invite/';
-
-const getBrowserOrigin = (): string | null => {
-  if (typeof window === 'undefined') return null;
-
-  const origin = window.location?.origin;
-  if (typeof origin !== 'string' || !origin || origin === 'null') {
-    return null;
-  }
-
-  return origin;
-};
+import { getPlatformRuntime } from '@platform/runtime/PlatformRuntimeContext';
 
 export const getPlatformAuthConfirmRedirectUrl = (): string => {
-  if (desktopClient.isAvailable()) return DESKTOP_AUTH_CONFIRM_REDIRECT_URL;
-
-  const origin = getBrowserOrigin();
-  if (!origin) return DESKTOP_AUTH_CONFIRM_REDIRECT_URL;
-
-  return new URL('/auth/confirm', origin).toString();
+  return getPlatformRuntime().links.getAuthConfirmRedirectUrl();
 };
 
 export const getPlatformInviteBaseUrl = (): string => {
-  if (desktopClient.isAvailable()) return DESKTOP_INVITE_BASE_URL;
-
-  const origin = getBrowserOrigin();
-  if (!origin) return DESKTOP_INVITE_BASE_URL;
-
-  return new URL('/invite/', origin).toString();
+  return getPlatformRuntime().links.getInviteBaseUrl();
 };
 
 export const getPlatformInviteInputPlaceholder = (): string =>
