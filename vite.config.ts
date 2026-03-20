@@ -7,12 +7,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    root: "apps/web-mobile/src",
-    publicDir: path.resolve(__dirname, "./apps/web-mobile/public"),
+    root: "apps/web/src",
+    publicDir: path.resolve(__dirname, "./apps/web/public"),
     resolve: {
       alias: {
         "@electron": path.resolve(__dirname, "./apps/electron/src"),
-        "@web-mobile": path.resolve(__dirname, "./apps/web-mobile/src"),
+        "@web": path.resolve(__dirname, "./apps/web/src"),
         "@shared": path.resolve(__dirname, "./packages/shared/src"),
         "@client": path.resolve(__dirname, "./packages/shared/src/client"),
         "@platform": path.resolve(__dirname, "./packages/shared/src/platform"),
@@ -25,15 +25,6 @@ export default defineConfig(({ mode }) => {
         env.VITE_SUPABASE_ANON_KEY,
       ),
       "process.env.NODE_ENV": JSON.stringify(env.NODE_ENV),
-      "process.env.WEB_PUSH_VAPID_PUBLIC_KEY": JSON.stringify(
-        env.VITE_WEB_PUSH_VAPID_PUBLIC_KEY,
-      ),
-      "process.env.ENABLE_NOTIFICATION_DEVTOOLS": JSON.stringify(
-        env.VITE_ENABLE_NOTIFICATION_DEVTOOLS,
-      ),
-      "process.env.PUBLIC_WEBCLIENT_URL": JSON.stringify(
-        env.VITE_PUBLIC_WEBCLIENT_URL,
-      ),
     },
     build: {
       outDir: "../../../dist/web",

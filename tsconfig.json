@@ -8,6 +8,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "types": ["vitest/globals", "node"],
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
@@ -16,7 +17,7 @@
     "baseUrl": ".",
     "paths": {
       "@electron/*": ["./apps/electron/src/*"],
-      "@web-mobile/*": ["./apps/web-mobile/src/*"],
+      "@web/*": ["./apps/web/src/*"],
       "@shared/*": ["./packages/shared/src/*"],
       "@client/*": ["./packages/shared/src/client/*"],
       "@platform/*": ["./packages/shared/src/platform/*"],

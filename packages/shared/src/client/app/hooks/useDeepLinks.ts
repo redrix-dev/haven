@@ -2,14 +2,11 @@ import React, { useEffect, useRef } from 'react';
 import { asRecord, getRecordString } from '@platform/lib/records';
 import {
   WEB_DEEP_LINK_DEDUPE_WINDOW_MS,
-  safeStableStringify,
   parseWebAppDeepLinkUrl,
-  parseWebPushClickPayloadTarget,
   getMergedUrlParams,
   normalizeDeepLinkPathname,
   WebAppDeepLinkTarget,
 } from '@shared/lib/deepLinks';
-import { recordLocalNotificationDeliveryTrace } from '@shared/lib/notifications/devTrace';
 import { desktopClient } from '@platform/desktop/client';
 import { getErrorMessage } from '@platform/lib/errors';
 import { toast } from 'sonner';
@@ -202,56 +199,7 @@ export function useDeepLinks({
     ]
   );
 
-  // Listen for push notification clicks from the service worker
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
-
-    const handleServiceWorkerMessage = (event: MessageEvent) => {
-      const data = asRecord(event.data);
-      if (!data) return;
-
-      if (data.type === 'HAVEN_PUSH_DELIVERY_TRACE') {
-        recordLocalNotificationDeliveryTrace({
-          notificationRecipientId: getRecordString(asRecord(data.payload), 'recipientId'),
-          eventId: getRecordString(asRecord(data.payload), 'eventId'),
-          transport: 'web_push',
-          stage: 'client_route',
-          decision:
-            data.decision === 'send' || data.decision === 'skip' || data.decision === 'defer'
-              ? data.decision
-              : 'defer',
-          reasonCode:
-            typeof data.reasonCode === 'string' ? (data.reasonCode as never) : 'sent',
-          details: {
-            source: 'service_worker',
-            ...((asRecord(data.details) ?? {}) as Record<string, unknown>),
-          },
-        });
-        return;
-      }
-
-      if (data.type !== 'HAVEN_PUSH_NOTIFICATION_CLICK') return;
-
-      const targetUrl = getRecordString(data, 'targetUrl');
-      const target =
-        (targetUrl ? parseWebAppDeepLinkUrl(targetUrl) : null) ??
-        parseWebPushClickPayloadTarget(data.payload);
-      if (!target) return;
-      const dedupeKey = `sw:${targetUrl ?? ''}:${safeStableStringify(data.payload)}`;
-
-      void openWebDeepLinkTarget(target, {
-        clearBrowserUrlAfterOpen: Boolean(targetUrl),
-        dedupeKey,
-      });
-    };
-
-    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
-    return () => {
-      navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
-    };
-  }, [openWebDeepLinkTarget]);
-
-  // Handle deep link in the initial page URL (web PWA only)
+  // Handle deep link in the initial page URL for the browser client.
   useEffect(() => {
     if (desktopClient.isAvailable()) return;
     if (typeof window === 'undefined') return;

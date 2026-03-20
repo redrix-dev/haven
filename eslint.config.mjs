@@ -1,3 +1,4 @@
+import tsPlugin from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import reactHooks from 'eslint-plugin-react-hooks';
 
@@ -7,7 +8,7 @@ const rendererBoundaryFiles = [
   'packages/shared/src/contexts/**/*.{ts,tsx,js,jsx}',
   'packages/shared/src/lib/hooks/**/*.{ts,tsx,js,jsx}',
   'packages/shared/src/lib/voice/**/*.{ts,tsx,js,jsx}',
-  'apps/web-mobile/src/**/*.{ts,tsx,js,jsx}',
+  'apps/web/src/**/*.{ts,tsx,js,jsx}',
   'apps/electron/src/renderer/**/*.{ts,tsx,js,jsx}',
 ];
 
@@ -53,6 +54,7 @@ export default [
       },
     },
     plugins: {
+      '@typescript-eslint': tsPlugin,
       'react-hooks': reactHooks,
     },
     rules: {

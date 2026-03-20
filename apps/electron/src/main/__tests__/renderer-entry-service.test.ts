@@ -4,6 +4,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const rendererEntryServiceModule = require('../renderer-entry-service.js');
 const { createRendererEntryService, _private } = rendererEntryServiceModule;

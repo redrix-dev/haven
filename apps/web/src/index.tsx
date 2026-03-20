@@ -3,30 +3,18 @@ import { createRoot } from 'react-dom/client';
 import { TooltipProvider } from '@shared/components/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppRoot } from '@client/app/AppRoot';
-import { MobileRoot } from '@web-mobile/mobile/MobileRoot';
-import { registerHavenServiceWorker } from './pwa/registerServiceWorker';
-import { startHavenWebPushClient } from './pwa/webPushClient';
-import { assertWebAppAssetsInDev } from './pwa/assertWebAppAssets';
 import '@shared/styles/globals.css';
 
 document.documentElement.classList.add('haven-web-shell');
 document.body.classList.add('haven-web-shell');
 
-void (async () => {
-  await assertWebAppAssetsInDev();
-  const serviceWorkerResult = await registerHavenServiceWorker();
-  await startHavenWebPushClient(serviceWorkerResult);
-})();
-
-const isMobile = window.innerWidth <= 768;
-console.log('isMobile:', isMobile, 'width:', window.innerWidth);
 const appHost = document.getElementById('haven-web-root') ?? document.body;
 const root = createRoot(appHost);
 
 root.render(
   <TooltipProvider>
     <>
-      {isMobile ? <MobileRoot /> : <AppRoot />}
+      <AppRoot />
 
       <SonnerToaster
         position="top-right"

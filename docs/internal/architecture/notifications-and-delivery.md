@@ -11,13 +11,13 @@ Describe how Haven notifications are created, stored, delivered (foreground and 
 - `public.notification_recipients`
   - per-user delivery row (`deliver_in_app`, `deliver_sound`, read/seen/dismiss state)
 
-### Delivery split (intentional)
+### Delivery split (current)
 - `Supabase Realtime`:
   - foreground/in-app inbox refreshes and counts
-- `Web Push + Service Worker`:
-  - background/minimized/lock-screen OS notifications
+- Retained backend web-push stack:
+  - currently not wired into the active browser client
 
-Realtime is **not** treated as the background delivery transport because browsers/PWAs suspend.
+Realtime is the active notification transport used by the current browser and Electron clients.
 
 ## Delivery Stages
 
@@ -26,10 +26,8 @@ Realtime is **not** treated as the background delivery transport because browser
    - in-app inbox visibility
    - sound eligibility
    - push queue fanout eligibility
-3. Web push jobs are queued per recipient x subscription
-4. `web-push-worker` claims jobs and sends push
-5. Service worker shows notification (or suppresses based on route policy)
-6. Renderer opens deep links and marks notifications read/dismissed as appropriate
+3. Web push jobs may still be queued for retained backend compatibility
+4. Renderer opens deep links and marks notifications read/dismissed as appropriate
 
 ## Producers (Current)
 - Friend requests / social graph RPCs
@@ -83,23 +81,16 @@ Realtime is **not** treated as the background delivery transport because browser
 
 This is the current production-target design.
 
-## Client Route Arbiter (Foreground vs Background)
+## Active Client Delivery
 
-Haven uses a route policy to prevent duplicate user-facing alerts:
+The active clients use:
 
-- Focused app:
-  - in-app notification path
-  - suppress OS push display
-- Background/minimized app with active push:
-  - OS push display
-  - suppress Haven in-app sound
-- No push support / permission:
-  - in-app fallback
+- in-app inbox updates via realtime
+- local sound playback gated by notification preferences and local audio settings
 
 Files:
-- `packages/shared/src/lib/notifications/routePolicy.ts`
 - `packages/shared/src/client/features/notifications/hooks/useNotifications.ts`
-- `apps/web-mobile/public/haven-sw.js`
+- `packages/shared/src/components/NotificationCenterModal.tsx`
 
 ## Delivery Traces and Diagnostics (Internal/Dev)
 
@@ -128,18 +119,15 @@ Files:
 
 ## Known Platform Variances
 
-- Windows Edge PWA push (WNS endpoints) may fail to deliver/receive even when provider accepts sends
-- Chrome (Windows) and iOS installed web app are the primary canary validation targets
-- Edge/WNS is tracked as a known issue, not a blocker for Chrome+iOS canary rollouts
+- The retained backend web-push stack includes historical platform-specific behavior and diagnostics.
+- Current active validation targets are Electron desktop and the desktop browser client.
 
 ## Files to Know
 
 - `packages/shared/src/lib/backend/notificationBackend.ts`
 - `packages/shared/src/client/features/notifications/hooks/useNotifications.ts`
 - `packages/shared/src/client/features/notifications/hooks/useNotificationInteractions.ts`
-- `packages/shared/src/lib/notifications/routePolicy.ts`
-- `apps/web-mobile/src/pwa/webPushClient.ts`
-- `apps/web-mobile/public/haven-sw.js`
+- `packages/shared/src/components/NotificationCenterModal.tsx`
 - `services/supabase/functions/web-push-worker/index.ts`
 - `services/supabase/migrations/20260225000041_add_list_my_sound_notifications_rpc.sql`
 - `services/supabase/migrations/20260226000056_add_web_push_queue_health_diagnostics_rpc.sql`

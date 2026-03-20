@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { getCommunityDataBackend } from '@shared/lib/backend';
 import { MESSAGE_PAGE_SIZE } from '@client/app/constants';
 import type { ChannelMessageBundleCacheEntry } from '@client/app/types';
@@ -151,6 +151,7 @@ export function useMessages({
   const olderLoadInFlightRef = React.useRef(false);
   const currentHasOlderMessagesRef = React.useRef(false);
   const oldestLoadedCursorRef = React.useRef<{ createdAt: string; id: string } | null>(null);
+  const cleanupIntervalRef = useRef<number | null>(null);
 
   const getChannelBundleCacheKey = React.useCallback(
     (communityId: string, channelId: string) => `${communityId}:${channelId}`,
@@ -989,7 +990,6 @@ export function useMessages({
 
   const createMessageReloadLifecycle = React.useCallback(
     (input: MessageReloadLifecycleInput) => {
-      let cleanupIntervalId: number | null = null;
       const maintenanceBatchLimit = input.maintenanceBatchLimit ?? 100;
       const maintenanceIntervalMs = input.maintenanceIntervalMs ?? 60 * 1000;
 
@@ -1029,7 +1029,7 @@ export function useMessages({
 
       const start = () => {
         void runMessageMediaMaintenanceForLifecycle();
-        cleanupIntervalId = window.setInterval(() => {
+        cleanupIntervalRef.current = window.setInterval(() => {
           void runMessageMediaMaintenanceForLifecycle();
         }, maintenanceIntervalMs);
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -1038,10 +1038,10 @@ export function useMessages({
       };
 
       const cleanup = () => {
-        if (cleanupIntervalId !== null) {
-          window.clearInterval(cleanupIntervalId);
+        if (cleanupIntervalRef.current !== null) {
+          window.clearInterval(cleanupIntervalRef.current);
         }
-        cleanupIntervalId = null;
+        cleanupIntervalRef.current = null;
         document.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('focus', handleWindowFocus);
         window.removeEventListener('blur', handleWindowBlur);

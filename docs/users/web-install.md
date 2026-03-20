@@ -1,64 +1,36 @@
-# Haven Web & Mobile Install Guide
+# Haven Web Access Guide
 
 ## What this is
-Haven can run as a normal website and as an installable web app (PWA) on desktop and mobile.
+Haven can run directly in the browser on desktop.
 
 This guide covers:
-- installing Haven on desktop/mobile
-- enabling notifications for this device
+- opening Haven in the browser
+- expected notification behavior while the app is open
 - basic troubleshooting
 
-## Recommended browsers (current rollout)
+## Recommended browsers
 
-- **Windows:** Chrome PWA (recommended)
-- **iPhone/iPad:** Safari + Add to Home Screen
+- **Windows/macOS/Linux:** Chrome or Edge
+- **Electron desktop:** preferred when you want the packaged desktop client
 
-Known issue:
-- Windows Edge PWA push notifications may be inconsistent (under investigation).
+## Open Haven In The Browser
 
-## Desktop Install (Chrome on Windows/macOS)
-
-1. Open Haven in Chrome (`https://haven.redrixx.com` or your staging URL).
+1. Open Haven in Chrome or Edge (`https://haven.redrixx.com` or your staging URL).
 2. Sign in.
-3. Use the install icon in the address bar (or `⋮ -> Cast, save, and share -> Install page as app`).
-4. Open the installed Haven app window.
-
-## iPhone / iPad Install
-
-1. Open Haven in Safari.
-2. Sign in (or sign in after install).
-3. Tap **Share**.
-4. Tap **Add to Home Screen**.
-5. Open Haven from the Home Screen icon.
-
-## Enable Notifications (This Device)
-
-Haven uses browser/system notifications for background alerts.
-
-1. Open Haven and sign in.
-2. Open the Notification Center.
-3. Use the notification enable action/CTA when prompted.
-4. Approve the browser/system permission prompt.
-
-If permission is granted, Haven will subscribe this device automatically.
+3. Keep the tab open while using Haven.
 
 ## Expected Behavior
 
-- **App focused/open:** Haven uses in-app notification behavior
-- **App background/minimized/locked:** system push notifications are used (when supported/enabled)
+- **App focused/open:** Haven uses in-app notification behavior.
+- **Sound playback:** local sound settings apply on the current device.
 
 ## Quick Troubleshooting
 
-### I don’t see install options
-- Make sure you are on HTTPS (not `http://` except localhost during local dev)
-- Reload the page once
-- Confirm the site manifest loads and service worker is registered
+### The page does not load correctly
+- Confirm you are using the expected HTTPS URL.
+- Reload the page once after a deploy.
+- Make sure you are not mixing staging and production URLs in the same browser session.
 
-### Notifications do not arrive
-- Confirm browser/system notification permission is granted
-- Reopen the installed app once after granting permission
-- Disable/re-enable notifications for the device in Haven settings if available
-- Ensure you are testing from the canonical environment URL (avoid mixing staging aliases)
-
-### Windows Edge specific note
-If push works in Chrome but not Edge on the same machine, you are likely seeing the known Edge/WNS issue. Chrome is the recommended Windows canary browser for now.
+### Notifications do not appear in the app
+- Open the Notification Center and confirm the relevant in-app and sound preferences are enabled.
+- Keep the Haven tab open while testing browser usage.

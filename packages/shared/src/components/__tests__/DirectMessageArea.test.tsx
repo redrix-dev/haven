@@ -2,6 +2,7 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { DirectMessageArea } from '@shared/components/DirectMessageArea';
 import type { DirectMessage, DirectMessageConversationSummary } from '@shared/lib/backend/types';
 

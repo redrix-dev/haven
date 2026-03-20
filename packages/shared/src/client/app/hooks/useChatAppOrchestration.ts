@@ -28,7 +28,6 @@ import { useChannelGroups } from '@client/features/community/hooks/useChannelGro
 import { useMessages } from '@client/features/messages/hooks/useMessages';
 import { useNotifications } from '@client/features/notifications/hooks/useNotifications';
 import { useNotificationInteractions } from '@client/features/notifications/hooks/useNotificationInteractions';
-import { useWebPush } from '@client/features/notifications/hooks/useWebPush';
 import { useDeepLinks } from '@client/app/hooks/useDeepLinks';
 import { useSocialWorkspace } from '@client/features/social/hooks/useSocialWorkspace';
 import { useDirectMessages } from '@client/features/direct-messages/hooks/useDirectMessages';
@@ -99,7 +98,6 @@ export function useChatAppOrchestration() {
   const voiceHardwareDebugPanelEnabled = hasFeatureFlag(VOICE_HARDWARE_DEBUG_PANEL_FLAG);
   const friendsSocialPanelEnabled = hasFeatureFlag(FRIENDS_SOCIAL_PANEL_FLAG);
   const dmWorkspaceEnabled = friendsSocialPanelEnabled;
-  const notificationDevToolsEnabled = process.env.ENABLE_NOTIFICATION_DEVTOOLS === 'true';
 
   // ── Platform session ──────────────────────────────────────────────────────
   const {
@@ -121,10 +119,6 @@ export function useChatAppOrchestration() {
   const userDisplayName = isPlatformStaff
     ? `${platformStaffPrefix ?? 'Haven'}-${baseUserDisplayName}`
     : baseUserDisplayName;
-  const webPushTestToolsEnabled =
-    !desktopClient.isAvailable() &&
-    notificationDevToolsEnabled &&
-    (isPlatformStaff || process.env.NODE_ENV === 'development');
 
   // ── UI / workspace state ──────────────────────────────────────────────────
   const [workspaceMode, setWorkspaceMode] = useState<'community' | 'dm'>('community');
@@ -429,44 +423,7 @@ export function useChatAppOrchestration() {
     },
   } = useDesktopSettings();
 
-  // ── Web push ──────────────────────────────────────────────────────────────
-  const {
-    state: {
-      webPushStatus,
-      webPushStatusLoading,
-      webPushActionBusy,
-      webPushStatusError,
-      webPushTestBusy,
-      webPushTestError,
-      webPushTestLastResult,
-      webPushDiagnosticsLoading,
-      webPushDiagnosticsError,
-      webPushRouteDiagnostics,
-      webPushBackendTraces,
-      webPushQueueHealthDiagnostics,
-      webPushWakeupDiagnostics,
-    },
-    actions: {
-      enableWebPushOnThisDevice,
-      disableWebPushOnThisDevice,
-      refreshWebPushStatus,
-      refreshWebPushDiagnostics,
-      showServiceWorkerTestNotification,
-      simulateServiceWorkerNotificationClick,
-      runWebPushWorkerOnceForTesting,
-      runWebPushWorkerShadowOnceForTesting,
-      runWebPushWorkerWakeupOnceForTesting,
-      updateWebPushWakeupConfigForTesting,
-      setWebPushNotificationDevMode,
-      setNotificationRouteSimulationFocus,
-      clearNotificationRouteSimulation,
-      recordNotificationRouteSimulationTrace,
-      clearLocalNotificationTraces,
-      reset: resetWebPush,
-    },
-  } = useWebPush({ notificationBackend, webPushTestToolsEnabled, notificationsPanelOpen });
-
-  // ── Notifications ─────────────────────────────────────────────────────────
+  // â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const {
     state: {
       notificationItems,
@@ -497,7 +454,7 @@ export function useChatAppOrchestration() {
     autoMarkSeenOnPanelOpen: false,
   });
 
-  // ── Social / Friends ──────────────────────────────────────────────────────
+  // â”€â”€ Social / Friends â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const {
     state: {
       friendsPanelOpen,
@@ -900,7 +857,6 @@ export function useChatAppOrchestration() {
     authorProfileCacheRef.current = {};
     resetFeatureFlags();
     resetNotifications();
-    resetWebPush();
     resetSocialWorkspace();
     resetDirectMessages();
     resetChannelsWorkspace();
@@ -937,9 +893,7 @@ export function useChatAppOrchestration() {
     resetServerPermissions,
     resetServerRoleManagement,
     resetServerSettingsState,
-    resetSocialWorkspace,
     resetVoiceState,
-    resetWebPush,
     user,
   ]);
 
@@ -977,7 +931,6 @@ export function useChatAppOrchestration() {
     resetMembersModal,
     resetServerInvites,
     resetServerRoleManagement,
-    resetServerSettingsState,
     resetVoiceState,
   ]);
 
@@ -1042,7 +995,6 @@ export function useChatAppOrchestration() {
     // feature flags
     hasFeatureFlag, friendsSocialPanelEnabled, dmWorkspaceEnabled,
     dmWorkspaceIsActive, dmReportReviewPanelEnabled, voiceHardwareDebugPanelEnabled,
-    webPushTestToolsEnabled, notificationDevToolsEnabled,
     // community
     channels, channelsLoading, channelsError, currentChannelId, currentServerId,
     serverPermissions, currentServer, currentChannel, channelSettingsTarget,
@@ -1081,7 +1033,6 @@ export function useChatAppOrchestration() {
     createChannel, saveChannelSettings, renameChannel, deleteChannel,
     deleteCurrentChannel, openChannelSettingsModal,
     saveRoleChannelPermissions, saveMemberChannelPermissions,
-    // messages
     messages, messageReactions, messageAttachments, messageLinkPreviews,
     authorProfiles, hasOlderMessages, isLoadingOlderMessages,
     requestOlderMessages, sendMessage, toggleMessageReaction,
@@ -1092,19 +1043,6 @@ export function useChatAppOrchestration() {
     checkingForUpdates, notificationAudioSettingsSaving, notificationAudioSettingsError,
     voiceSettingsSaving, voiceSettingsError,
     setAutoUpdateEnabled, setNotificationAudioSettings, setVoiceSettings, checkForUpdatesNow,
-    // web push
-    webPushStatus, webPushStatusLoading, webPushActionBusy, webPushStatusError,
-    webPushTestBusy, webPushTestError, webPushTestLastResult,
-    webPushDiagnosticsLoading, webPushDiagnosticsError, webPushRouteDiagnostics,
-    webPushBackendTraces, webPushQueueHealthDiagnostics, webPushWakeupDiagnostics,
-    enableWebPushOnThisDevice, disableWebPushOnThisDevice,
-    refreshWebPushStatus, refreshWebPushDiagnostics,
-    showServiceWorkerTestNotification, simulateServiceWorkerNotificationClick,
-    runWebPushWorkerOnceForTesting, runWebPushWorkerShadowOnceForTesting,
-    runWebPushWorkerWakeupOnceForTesting, updateWebPushWakeupConfigForTesting,
-    setWebPushNotificationDevMode, setNotificationRouteSimulationFocus,
-    clearNotificationRouteSimulation, recordNotificationRouteSimulationTrace,
-    clearLocalNotificationTraces,
     // notifications
     notificationsPanelOpen, setNotificationsPanelOpen,
     notificationItems, notificationCounts, notificationsLoading,

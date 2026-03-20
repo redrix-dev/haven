@@ -43,18 +43,6 @@ const supabaseUrl = process.env.SUPABASE_URL || envFromFile.SUPABASE_URL || '';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || envFromFile.SUPABASE_ANON_KEY || '';
 const havenBackendMode =
   process.env.HAVEN_BACKEND_MODE || envFromFile.HAVEN_BACKEND_MODE || 'central_supabase';
-const enableNotificationDevtools =
-  process.env.ENABLE_NOTIFICATION_DEVTOOLS ||
-  process.env.VITE_ENABLE_NOTIFICATION_DEVTOOLS ||
-  envFromFile.ENABLE_NOTIFICATION_DEVTOOLS ||
-  envFromFile.VITE_ENABLE_NOTIFICATION_DEVTOOLS ||
-  '';
-const publicWebclientUrl =
-  process.env.PUBLIC_WEBCLIENT_URL ||
-  process.env.VITE_PUBLIC_WEBCLIENT_URL ||
-  envFromFile.PUBLIC_WEBCLIENT_URL ||
-  envFromFile.VITE_PUBLIC_WEBCLIENT_URL ||
-  '';
 
 module.exports = {
   devtool: 'source-map',
@@ -66,15 +54,13 @@ module.exports = {
       'process.env.SUPABASE_URL': JSON.stringify(supabaseUrl),
       'process.env.SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
       'process.env.HAVEN_BACKEND_MODE': JSON.stringify(havenBackendMode),
-      'process.env.ENABLE_NOTIFICATION_DEVTOOLS': JSON.stringify(enableNotificationDevtools),
-      'process.env.PUBLIC_WEBCLIENT_URL': JSON.stringify(publicWebclientUrl),
     }),
   ],
   resolve: {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
     alias: {
       '@electron': path.resolve(__dirname, 'apps/electron/src'),
-      '@web-mobile': path.resolve(__dirname, 'apps/web-mobile/src'),
+      '@web': path.resolve(__dirname, 'apps/web/src'),
       '@shared': path.resolve(__dirname, 'packages/shared/src'),
       '@client': path.resolve(__dirname, 'packages/shared/src/client'),
       '@platform': path.resolve(__dirname, 'packages/shared/src/platform'),

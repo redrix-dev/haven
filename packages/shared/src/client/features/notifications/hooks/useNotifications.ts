@@ -2,8 +2,6 @@ import React from 'react';
 import { playNotificationSound } from '@shared/lib/notifications/sound';
 import type { NotificationBackend } from '@shared/lib/backend/notificationBackend';
 import { recordLocalNotificationDeliveryTrace } from '@shared/lib/notifications/devTrace';
-import { resolveNotificationRoutePolicy } from '@shared/lib/notifications/routePolicy';
-import { getHavenWebPushRoutingSignalsSync } from '@web-mobile/pwa/webPushClient';
 import type {
   NotificationCounts,
   NotificationItem,
@@ -77,21 +75,6 @@ export function useNotifications({
       const nextKnownSoundIds = new Set(soundItems.map((item) => item.recipientId));
       const previousKnownSoundIds = knownSoundNotificationRecipientIdsRef.current;
       const canPlaySounds = notificationsBootstrappedRef.current && playSoundsForNew;
-      const routePolicy = (() => {
-        const signals = getHavenWebPushRoutingSignalsSync();
-        const hasFocus = typeof document !== 'undefined' ? document.hasFocus() : true;
-        return resolveNotificationRoutePolicy({
-          hasFocus,
-          pushSupported: signals.pushSupported,
-          pushPermission: signals.pushPermission,
-          swRegistered: signals.swRegistered,
-          pushSubscriptionActive: signals.pushSubscriptionActive,
-          pushSyncEnabled: signals.pushSyncEnabled,
-          serviceWorkerRegistrationEnabled: signals.serviceWorkerRegistrationEnabled,
-          audioSettings: notificationAudioSettingsRef.current,
-        });
-      })();
-      const suppressHavenSoundsWhenUnfocused = canPlaySounds && !routePolicy.allowInAppSound;
 
       setNotificationItems(items);
       setNotificationCounts(counts);
@@ -105,7 +88,7 @@ export function useNotifications({
             kind: item.kind,
             deliverSound: item.deliverSound,
             audioSettings: notificationAudioSettingsRef.current,
-            suppressWhenUnfocused: suppressHavenSoundsWhenUnfocused,
+            suppressWhenUnfocused: false,
           }).then((result) => {
             recordLocalNotificationDeliveryTrace({
               notificationRecipientId: item.recipientId,
@@ -116,10 +99,7 @@ export function useNotifications({
               reasonCode: result.reasonCode,
               details: {
                 kind: item.kind,
-                routeMode: routePolicy.routeMode,
-                allowOsPushDisplay: routePolicy.allowOsPushDisplay,
-                allowInAppSound: routePolicy.allowInAppSound,
-                routeReasons: routePolicy.reasonCodes,
+                allowInAppSound: result.played,
               },
             });
           });

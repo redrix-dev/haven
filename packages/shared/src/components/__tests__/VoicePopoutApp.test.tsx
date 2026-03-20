@@ -2,6 +2,7 @@
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VoicePopoutApp } from '@client/app/VoicePopoutApp';
 import type { VoicePopoutControlAction, VoicePopoutState } from '@platform/desktop/types';
 

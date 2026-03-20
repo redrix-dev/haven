@@ -246,10 +246,10 @@ Before stopping for the day:
 
 ---
 
-## Web/PWA Staging Validation (Root Domain)
+## Web Staging Validation (Root Domain)
 
-For PWA/push validation, use one canonical origin per environment to avoid stale service worker registrations and
-duplicate push subscriptions.
+For browser validation, use one canonical origin per environment to avoid stale cached assets and mixed-environment
+sessions.
 
 Recommended:
 - Staging: `https://staging-haven.redrixx.com`
@@ -258,12 +258,12 @@ Recommended:
 Avoid mixing:
 - `*.vercel.app` URLs
 - previous staging aliases
-- multiple origins for the same build during push testing
+- multiple origins for the same build during browser validation
 
-Primary canary validation targets:
-1. Windows Chrome PWA
-2. iOS installed web app
-3. Windows Edge PWA (known-issue verification only, unless fixed)
+Primary browser validation targets:
+1. Windows Chrome
+2. Windows Edge
+3. macOS Chrome
 
 ## Commit Workflow and Commit Message Conventions
 

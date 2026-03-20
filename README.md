@@ -1,6 +1,6 @@
 # Haven
 
-Haven is a community chat app with a primary Electron desktop client and a web/PWA client.
+Haven is a community chat app with a primary Electron desktop client and a browser-based web client.
 
 The goal is simple. Keep the parts people actually love about community chat, cut the bloat, and keep the system understandable enough that anyone can inspect how it works.
 
@@ -28,7 +28,7 @@ I care more about correctness and trust than fancy abstractions.
 ## Stack
 
 - Electron Forge
-- Vite (web/PWA entry)
+- Vite (web entry)
 - React + TypeScript
 - Tailwind + shadcn/ui components
 - Supabase (Auth, Postgres, Realtime, Edge Functions)
@@ -54,8 +54,8 @@ No app is "trust me" safe by default, so Haven is built to be inspectable.
 
 ## Current status
 
-Haven is early and actively evolving. Current focus is a clean root-hosted PWA, near-instant push notifications,
-permission correctness, and stable desktop updates.
+Haven is early and actively evolving. Current focus is a clean desktop and web experience, permission correctness,
+and stable desktop updates.
 
 ## Local development
 
@@ -63,7 +63,7 @@ Haven supports three practical local workflows:
 
 1. Code + UI work (no hosted backend access required)
 2. Full backend/runtime work with a compatible Supabase project and required secrets
-3. Web/PWA validation (Vite + browser/PWA + push testing)
+3. Web validation (Vite + browser smoke testing)
 
 If you do not have a shared backend setup, you can still:
 - run packaged builds
@@ -147,10 +147,8 @@ Use this repo as a doc hub, not just a README.
   - Operational runbook for local Supabase-backed DB/RLS/backend tests
 - `docs/internal/testing/test-suite-breakdown.md`
   - How the test stack works and how to read generated test reports
-- `docs/internal/operations/web-push-cutover-runbook.md`
-  - Web push shadow/wakeup cutover and rollback runbook
-- `docs/users/web-and-mobile-install.md`
-  - User-facing install and notification setup guide (web/PWA)
+- `docs/users/web-install.md`
+  - User-facing web access guide
 
 ## License
 

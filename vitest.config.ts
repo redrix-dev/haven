@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@electron': path.resolve(__dirname, 'apps/electron/src'),
-      '@web-mobile': path.resolve(__dirname, 'apps/web-mobile/src'),
+      '@web': path.resolve(__dirname, 'apps/web/src'),
       '@shared': path.resolve(__dirname, 'packages/shared/src'),
       '@client': path.resolve(__dirname, 'packages/shared/src/client'),
       '@platform': path.resolve(__dirname, 'packages/shared/src/platform'),

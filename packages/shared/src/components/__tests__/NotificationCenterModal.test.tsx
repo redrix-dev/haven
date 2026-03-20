@@ -2,6 +2,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { NotificationCenterModal } from '@shared/components/NotificationCenterModal';
 import type { NotificationItem, NotificationPreferences } from '@shared/lib/backend/types';
 import type { NotificationAudioSettings } from '@platform/desktop/types';

@@ -47,12 +47,6 @@ const STATUS_OPTIONS: Array<{ value: DmMessageReportStatus; label: string }> = [
   { value: 'dismissed', label: 'Dismissed' },
 ];
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const fmt = (value: string | null) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
-};
 
 const safeFmt = (value: string | null) => {
   if (!value) return '-';

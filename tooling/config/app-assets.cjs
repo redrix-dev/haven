@@ -12,16 +12,6 @@ const desktopAssetPaths = {
   iconPngPath: resolveRepoPath(appAssets.desktop.iconPngPath),
 };
 
-const webAssetRelativeToPublic = {
-  pwaIcon192: appAssets.web.pwaIcons.size192.replace(/^\//, ''),
-  pwaIcon512: appAssets.web.pwaIcons.size512.replace(/^\//, ''),
-  browserTabIcon: appAssets.web.browserTabIcon.replace(/^\//, ''),
-  appleTouchIcon: appAssets.web.appleTouchIcon.replace(/^\//, ''),
-  splashIcon: appAssets.web.splashIcon.replace(/^\//, ''),
-  notificationIconFallback: appAssets.web.notification.iconFallback.replace(/^\//, ''),
-  notificationBadgeFallback: appAssets.web.notification.badgeFallback.replace(/^\//, ''),
-};
-
 const verifyDesktopAssetsExist = () => {
   const checks = [
     ['desktop icon base PNG', `${desktopAssetPaths.iconBasePath}.png`],
@@ -39,6 +29,5 @@ const verifyDesktopAssetsExist = () => {
 module.exports = {
   appAssets,
   desktopAssetPaths,
-  webAssetRelativeToPublic,
   verifyDesktopAssetsExist,
 };

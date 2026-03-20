@@ -36,16 +36,6 @@ import { VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL } from "@client/app/constants";
 import { useChatAppOrchestration } from "@client/app/hooks/useChatAppOrchestration";
 import { useVoiceSessionController } from "@client/features/voice/hooks/useVoiceSessionController";
 import type { VoicePopoutState } from "@platform/desktop/types";
-import {
-  WebPushCutoverReadiness,
-  WebPushBackendTraceParitySummary,
-  WebPushBackendTraceParityDriftRow,
-  buildBackendTraceParityDrift,
-  buildBackendTraceParitySummary,
-  buildBackendWakeSourceCounts,
-  buildWebPushCutoverReadiness,
-  buildWebPushQueueHealthAlerts,
-} from "@shared/lib/notifications/webPushDiagnostics";
 import { toast } from "sonner";
 import { useServerOrder } from "@client/features/community/hooks/useServerOrder";
 
@@ -709,103 +699,6 @@ export function ChatApp() {
         localAudioError={app.notificationAudioSettingsError}
         onUpdateLocalAudioSettings={(next) =>
           void app.setNotificationAudioSettings(next)
-        }
-        webPushControls={
-          desktopClient.isAvailable()
-            ? undefined
-            : {
-                status: app.webPushStatus,
-                loading: app.webPushStatusLoading,
-                busy: app.webPushActionBusy,
-                error: app.webPushStatusError,
-                onRefreshStatus: () => void app.refreshWebPushStatus(),
-                onToggleOnThisDevice: () => {
-                  if (app.webPushStatus?.webPushSyncEnabled) {
-                    void app.disableWebPushOnThisDevice();
-                    return;
-                  }
-                  void app.enableWebPushOnThisDevice();
-                },
-                testTools: app.webPushTestToolsEnabled
-                  ? {
-                      busy: app.webPushTestBusy,
-                      error: app.webPushTestError,
-                      lastResult: app.webPushTestLastResult,
-                      onShowServiceWorkerTestNotification: () =>
-                        void app.showServiceWorkerTestNotification(),
-                      onSimulateNotificationClick: () =>
-                        void app.simulateServiceWorkerNotificationClick(),
-                      onRunWorkerOnce: () =>
-                        void app.runWebPushWorkerOnceForTesting(),
-                      onRunWorkerShadowOnce: () =>
-                        void app.runWebPushWorkerShadowOnceForTesting(),
-                      onRunWorkerWakeupOnce: () =>
-                        void app.runWebPushWorkerWakeupOnceForTesting(),
-                      diagnostics: {
-                        ...((): {
-                          backendParitySummary: WebPushBackendTraceParitySummary;
-                          backendParityDrift: WebPushBackendTraceParityDriftRow[];
-                          cutoverReadiness: WebPushCutoverReadiness;
-                        } => {
-                          const paritySummary = buildBackendTraceParitySummary(
-                            app.webPushBackendTraces,
-                          );
-                          const parityDrift =
-                            buildBackendTraceParityDrift(paritySummary);
-                          const queueHealthAlerts =
-                            buildWebPushQueueHealthAlerts(
-                              app.webPushQueueHealthDiagnostics,
-                            );
-                          return {
-                            backendParitySummary: paritySummary,
-                            backendParityDrift: parityDrift,
-                            cutoverReadiness: buildWebPushCutoverReadiness({
-                              wakeupState: app.webPushWakeupDiagnostics,
-                              queueHealthAlerts,
-                              backendParitySummary: paritySummary,
-                              backendParityDrift: parityDrift,
-                            }),
-                          };
-                        })(),
-                        loading: app.webPushDiagnosticsLoading,
-                        error: app.webPushDiagnosticsError,
-                        devMode: app.webPushRouteDiagnostics?.mode ?? "real",
-                        routeMode:
-                          app.webPushRouteDiagnostics?.decision.routeMode ??
-                          "unknown",
-                        routeReasons:
-                          app.webPushRouteDiagnostics?.decision.reasonCodes ??
-                          [],
-                        queueHealthState: app.webPushQueueHealthDiagnostics,
-                        queueHealthAlerts: buildWebPushQueueHealthAlerts(
-                          app.webPushQueueHealthDiagnostics,
-                        ),
-                        wakeupState: app.webPushWakeupDiagnostics,
-                        backendWakeSourceCounts: buildBackendWakeSourceCounts(
-                          app.webPushBackendTraces,
-                        ),
-                        onSetWakeupConfig: (input) =>
-                          void app.updateWebPushWakeupConfigForTesting(input),
-                        onRefresh: () => void app.refreshWebPushDiagnostics(),
-                        onSetDevMode: (mode) =>
-                          void app.setWebPushNotificationDevMode(mode),
-                        onSimulateFocused: () =>
-                          void app.setNotificationRouteSimulationFocus(true),
-                        onSimulateBackground: () =>
-                          void app.setNotificationRouteSimulationFocus(false),
-                        onClearSimulation: () =>
-                          void app.clearNotificationRouteSimulation(),
-                        onRecordSimulationTrace: () =>
-                          void app.recordNotificationRouteSimulationTrace(),
-                        onClearLocalTraces: () =>
-                          void app.clearLocalNotificationTraces(),
-                        localTraces:
-                          app.webPushRouteDiagnostics?.localTraces ?? [],
-                        backendTraces: app.webPushBackendTraces,
-                      },
-                    }
-                  : undefined,
-              }
         }
       />
 

@@ -20,25 +20,13 @@ const commandSets = {
       command: 'npm',
       args: ['run', 'test:notifications:smoke', '--', '--skip-worker', '--json'],
     },
-    {
-      id: 'route_sim',
-      label: 'Notification Route Policy Matrix',
-      command: 'npm',
-      args: ['run', 'test:notifications:route-sim', '--', '--assert-matrix'],
-    },
   ],
   quick: [
     { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
     { id: 'typecheck', label: 'TypeScript', command: 'npx', args: ['tsc', '--noEmit', '--project', 'tsconfig.json'] },
     { id: 'unit', label: 'Unit / Component Tests', command: 'npm', args: ['run', 'test:unit'] },
-    {
-      id: 'route_sim',
-      label: 'Notification Route Policy Matrix',
-      command: 'npm',
-      args: ['run', 'test:notifications:route-sim', '--', '--assert-matrix'],
-    },
   ],
-  'web-pwa': [
+  web: [
     { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
     { id: 'typecheck', label: 'TypeScript', command: 'npx', args: ['tsc', '--noEmit', '--project', 'tsconfig.json'] },
     { id: 'build_web', label: 'Web Build', command: 'npm', args: ['run', 'build:web'] },
@@ -47,12 +35,6 @@ const commandSets = {
       label: 'Notification Dispatch Smoke',
       command: 'npm',
       args: ['run', 'test:notifications:smoke', '--', '--skip-worker', '--json'],
-    },
-    {
-      id: 'route_sim',
-      label: 'Notification Route Policy Matrix',
-      command: 'npm',
-      args: ['run', 'test:notifications:route-sim', '--', '--assert-matrix'],
     },
   ],
 };
@@ -68,7 +50,7 @@ Required:
   --run-by <name>             person who executed the run
 
 Optional:
-  --mode <release|quick|web-pwa>   default: release
+  --mode <release|quick|web>   default: release
   --candidate-commit <sha>
   --notes <text>
   --json                          print summary JSON to stdout
@@ -76,7 +58,7 @@ Optional:
 
 Examples:
   npm run test:signoff -- --release-label staging-2026-02-26 --environment staging --test-author "Churro" --run-by "Churro"
-  npm run test:signoff -- --release-label v1.4.0-rc1 --environment staging --test-author "Churro" --run-by "Churro" --mode web-pwa --json
+  npm run test:signoff -- --release-label v1.4.0-rc1 --environment staging --test-author "Churro" --run-by "Churro" --mode web --json
 `;
 
 function parseArgs(argv) {
