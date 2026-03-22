@@ -106,9 +106,9 @@ When changing code, preserve these invariants unless explicitly redesigning them
   2) preload implementation,
   3) renderer desktop client.
 - Reuse centralized IPC keys/validators; avoid ad hoc channel strings.
-- BrowserWindow renderer loads must go through the renderer entry service (loopback HTTP parity path);
-  do not directly call `loadURL(MAIN_*_WEBPACK_ENTRY)` in main-process window code.
-- Treat packaged-vs-dev renderer-origin parity as a release concern for embed/media flows.
+- BrowserWindow renderer loads should use the Forge webpack entry constants directly
+  (`MAIN_WINDOW_WEBPACK_ENTRY`, matching preload entry), not a custom proxy/router layer.
+- Treat Electron runtime asset loading as a release concern for media/audio flows, and validate packaged builds.
 
 ## 4.4 Supabase and DB access
 - Prefer backend seam APIs (`packages/shared/src/lib/backend/*`) rather than raw scattered client queries in UI surfaces.
@@ -194,7 +194,7 @@ For notification/DM UI regressions, run:
 npm run test:unit
 ```
 
-For Electron main bootstrapping / renderer-entry / CSP changes that can affect packaged runtime parity,
+For Electron main bootstrapping / renderer asset loading / CSP changes that can affect packaged runtime behavior,
 run a packaged smoke check (`npm run make`) and verify embedded media behavior in the packaged app.
 
 ---

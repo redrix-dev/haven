@@ -7,6 +7,7 @@ import { useVoiceMemberVolumes } from '@client/features/voice/hooks/useVoiceMemb
 import { isEditableKeyboardTarget } from '@client/app/utils';
 import { playVoicePresenceSound } from '@shared/lib/notifications/sound';
 import { getErrorMessage } from '@platform/lib/errors';
+import { useVoiceStore } from '@shared/stores/voiceStore';
 import type {
   NotificationAudioSettings,
   VoiceSettings,
@@ -111,14 +112,14 @@ export function useVoiceSessionController({
   state: VoiceSessionControllerState;
   actions: VoiceSessionControllerActions;
 } {
-  const [joined, setJoined] = React.useState(false);
+  const joined = useVoiceStore((state) => state.joined);
   const [joining, setJoining] = React.useState(false);
   const [participants, setParticipants] = React.useState<VoiceParticipant[]>([]);
   const [remoteStreams, setRemoteStreams] = React.useState<
     Record<string, MediaStream>
   >({});
-  const [isMuted, setIsMuted] = React.useState(false);
-  const [isDeafened, setIsDeafened] = React.useState(false);
+  const isMuted = useVoiceStore((state) => state.isMuted);
+  const isDeafened = useVoiceStore((state) => state.isDeafened);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [iceSource, setIceSource] = React.useState<
@@ -190,6 +191,53 @@ export function useVoiceSessionController({
   );
   const toggleMuteActionRef = React.useRef<(() => void) | null>(null);
   const toggleDeafenActionRef = React.useRef<(() => void) | null>(null);
+
+  const setStoredJoined = React.useCallback(
+    (value: React.SetStateAction<boolean>) => {
+      const previousValue = useVoiceStore.getState().joined;
+      const nextValue =
+        typeof value === 'function'
+          ? (value as (previousState: boolean) => boolean)(previousValue)
+          : value;
+      useVoiceStore.getState().setJoined(nextValue);
+    },
+    []
+  );
+
+  const setStoredIsMuted = React.useCallback(
+    (value: React.SetStateAction<boolean>) => {
+      const previousValue = useVoiceStore.getState().isMuted;
+      const nextValue =
+        typeof value === 'function'
+          ? (value as (previousState: boolean) => boolean)(previousValue)
+          : value;
+      useVoiceStore.getState().setIsMuted(nextValue);
+    },
+    []
+  );
+
+  const setStoredIsDeafened = React.useCallback(
+    (value: React.SetStateAction<boolean>) => {
+      const previousValue = useVoiceStore.getState().isDeafened;
+      const nextValue =
+        typeof value === 'function'
+          ? (value as (previousState: boolean) => boolean)(previousValue)
+          : value;
+      useVoiceStore.getState().setIsDeafened(nextValue);
+    },
+    []
+  );
+
+  const setStoredParticipants = React.useCallback((nextParticipants: VoiceParticipant[]) => {
+    useVoiceStore.getState().setParticipants(
+      nextParticipants.map((participant) => ({
+        userId: participant.userId,
+        displayName: participant.displayName,
+        avatarUrl: participant.avatarUrl ?? null,
+        isSpeaking: participant.isSpeaking ?? false,
+      }))
+    );
+  }, []);
 
   const activeChannelKey = activeChannel
     ? `${activeChannel.communityId}:${activeChannel.channelId}`
@@ -1008,12 +1056,13 @@ export function useVoiceSessionController({
     await stopLocalInputMonitor();
 
     setParticipants([]);
+    setStoredParticipants([]);
     setRemoteStreams({});
     setPeerDiagnostics({});
-    setJoined(false);
+    setStoredJoined(false);
     setJoining(false);
-    setIsMuted(false);
-    setIsDeafened(false);
+    setStoredIsMuted(false);
+    setStoredIsDeafened(false);
     setError(null);
     setNotice(null);
     setIceSource(null);
@@ -1033,7 +1082,7 @@ export function useVoiceSessionController({
       }
       await supabase.removeChannel(channel);
     }
-  }, [closePeerConnection, stopLocalInputMonitor]);
+  }, [closePeerConnection, setStoredIsDeafened, setStoredIsMuted, setStoredJoined, setStoredParticipants, stopLocalInputMonitor]);
 
   const joinVoiceChannel = React.useCallback(
     async (targetChannel: VoiceControllerChannel | null = activeChannel) => {
@@ -1043,8 +1092,8 @@ export function useVoiceSessionController({
       setJoining(true);
       setError(null);
       setNotice(null);
-      setIsMuted(false);
-      setIsDeafened(false);
+      setStoredIsMuted(false);
+      setStoredIsDeafened(false);
       signalingSessionIdRef.current = crypto.randomUUID();
 
       const iceConfig = await fetchIceConfig({
@@ -1119,7 +1168,7 @@ export function useVoiceSessionController({
           voiceChannel.subscribe(async (status) => {
             if (status === 'SUBSCRIBED') {
               window.clearTimeout(timeoutId);
-              setJoined(true);
+              setStoredJoined(true);
               await trackPresenceState();
               resolve();
             } else if (status === 'CHANNEL_ERROR') {
@@ -1153,6 +1202,9 @@ export function useVoiceSessionController({
       refreshAudioDevices,
       requestLocalAudioStream,
       selectedInputDeviceId,
+      setStoredIsDeafened,
+      setStoredIsMuted,
+      setStoredJoined,
       startLocalInputMonitor,
       syncParticipantsFromPresence,
       trackPresenceState,
@@ -1205,18 +1257,18 @@ export function useVoiceSessionController({
   }, [createAndSendOffer]);
 
   const toggleMute = React.useCallback(() => {
-    setIsMuted((previousMuted) => !previousMuted);
-  }, []);
+    setStoredIsMuted((previousMuted) => !previousMuted);
+  }, [setStoredIsMuted]);
 
   const toggleDeafen = React.useCallback(() => {
-    setIsDeafened((previousDeafened) => {
+    setStoredIsDeafened((previousDeafened) => {
       const nextDeafened = !previousDeafened;
       if (nextDeafened) {
-        setIsMuted(true);
+        setStoredIsMuted(true);
       }
       return nextDeafened;
     });
-  }, []);
+  }, [setStoredIsDeafened, setStoredIsMuted]);
 
   const leaveVoiceChannel = React.useCallback(async () => {
     await cleanupVoiceSession();
@@ -1378,6 +1430,10 @@ export function useVoiceSessionController({
     selectedOutputDeviceId,
     supportsOutputSelection,
   ]);
+
+  React.useEffect(() => {
+    setStoredParticipants(participants);
+  }, [participants, setStoredParticipants]);
 
   React.useEffect(() => {
     onConnectionChange?.(joined);

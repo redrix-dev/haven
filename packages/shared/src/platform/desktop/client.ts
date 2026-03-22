@@ -67,6 +67,9 @@ export const desktopClient = {
   async syncVoicePopoutState(state: VoicePopoutState): Promise<void> {
     return getDesktopApi().syncVoicePopoutState(state);
   },
+  async requestVoicePopoutStateSync(): Promise<void> {
+    return getDesktopApi().requestVoicePopoutStateSync();
+  },
   async dispatchVoicePopoutControlAction(action: VoicePopoutControlAction): Promise<void> {
     return getDesktopApi().dispatchVoicePopoutControlAction(action);
   },

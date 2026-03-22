@@ -4,8 +4,8 @@ import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import type { DirectMessageConversationSummary } from '@shared/lib/backend/types';
 import { DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT } from '@shared/lib/backend/directMessageUtils';
+import { useDmStore } from '@shared/stores/dmStore';
 import { MessageCircle, RefreshCcw, VolumeX } from 'lucide-react';
 
 const DM_SIDEBAR_BASE_MIN_WIDTH = 280;
@@ -14,9 +14,6 @@ const DM_SIDEBAR_WIDTH_STORAGE_KEY = 'haven:dm-sidebar-width';
 
 type DirectMessagesSidebarProps = {
   currentUserDisplayName: string;
-  conversations: DirectMessageConversationSummary[];
-  selectedConversationId: string | null;
-  loading: boolean;
   refreshing?: boolean;
   error: string | null;
   onSelectConversation: (conversationId: string) => void;
@@ -34,14 +31,15 @@ const getInitial = (value: string | null) => value?.trim().charAt(0).toUpperCase
 
 export function DirectMessagesSidebar({
   currentUserDisplayName,
-  conversations,
-  selectedConversationId,
-  loading,
   refreshing = false,
   error,
   onSelectConversation,
   onRefresh,
 }: DirectMessagesSidebarProps) {
+  const conversations = useDmStore((state) => state.conversations);
+  const selectedConversationId = useDmStore((state) => state.currentConversationId);
+  const loading = useDmStore((state) => state.isLoading);
+  const unreadCounts = useDmStore((state) => state.unreadCounts);
   const sidebarRef = React.useRef<HTMLDivElement | null>(null);
   const userTitleRef = React.useRef<HTMLParagraphElement | null>(null);
   const [autoMinWidth, setAutoMinWidth] = React.useState(DM_SIDEBAR_BASE_MIN_WIDTH);
@@ -207,9 +205,11 @@ export function DirectMessagesSidebar({
                         {conversation.isMuted && (
                           <VolumeX className="size-3.5 text-[#95a5bf] shrink-0" />
                         )}
-                        {conversation.unreadCount > 0 && (
+                        {(unreadCounts[conversation.conversationId] ?? conversation.unreadCount) > 0 && (
                           <Badge variant="default" className="bg-[#3f79d8] text-white ml-auto">
-                            {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                            {(unreadCounts[conversation.conversationId] ?? conversation.unreadCount) > 99
+                              ? '99+'
+                              : unreadCounts[conversation.conversationId] ?? conversation.unreadCount}
                           </Badge>
                         )}
                       </div>

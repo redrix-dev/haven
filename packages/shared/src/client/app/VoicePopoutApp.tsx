@@ -28,9 +28,11 @@ export function VoicePopoutApp() {
 
   React.useEffect(() => {
     if (!desktopClient.isAvailable()) return;
-    return desktopClient.onVoicePopoutState((nextState) => {
+    const unsubscribe = desktopClient.onVoicePopoutState((nextState) => {
       setState(nextState);
     });
+    void desktopClient.requestVoicePopoutStateSync();
+    return unsubscribe;
   }, []);
 
   const dispatch = React.useCallback((action: VoicePopoutControlAction) => {

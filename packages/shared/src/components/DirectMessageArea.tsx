@@ -38,11 +38,11 @@ import {
   getDirectMessagePreviewText,
   getVisibleDirectMessageText,
 } from '@shared/lib/backend/directMessageUtils';
+import { useDmStore } from '@shared/stores/dmStore';
 
 type DirectMessageAreaProps = {
   currentUserId: string;
   currentUserDisplayName: string;
-  conversation: DirectMessageConversationSummary | null;
   messages: DirectMessage[];
   loading: boolean;
   sending: boolean;
@@ -108,7 +108,6 @@ const getAttachmentLabel = (attachment: DirectMessageAttachment): string =>
 export function DirectMessageArea({
   currentUserId,
   currentUserDisplayName,
-  conversation,
   messages,
   loading,
   sending,
@@ -120,6 +119,7 @@ export function DirectMessageArea({
   onBlockUser,
   onReportMessage,
 }: DirectMessageAreaProps) {
+  const conversation = useDmStore((state) => state.currentConversation);
   const [draft, setDraft] = React.useState('');
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [actionNotice, setActionNotice] = React.useState<string | null>(null);

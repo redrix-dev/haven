@@ -138,6 +138,18 @@ export function useNotificationInteractions({
     ]
   );
 
+  const dismissFriendRequestNotification = React.useCallback(
+    async (input: { recipientId: string; friendRequestId: string }) => {
+      try {
+        await notificationBackend.dismissNotifications([input.recipientId]);
+        await refreshNotificationInbox({ playSoundsForNew: false });
+      } catch (error) {
+        setNotificationsError(getErrorMessage(error, 'Failed to dismiss friend request notification.'));
+      }
+    },
+    [notificationBackend, refreshNotificationInbox, setNotificationsError]
+  );
+
   return {
     state: {},
     derived: {},
@@ -145,6 +157,7 @@ export function useNotificationInteractions({
       openNotificationItem,
       acceptFriendRequestFromNotification,
       declineFriendRequestFromNotification,
+      dismissFriendRequestNotification,
     },
   };
 }

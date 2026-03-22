@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { getCommunityDataBackend } from '@shared/lib/backend';
 import { MESSAGE_PAGE_SIZE } from '@client/app/constants';
 import type { ChannelMessageBundleCacheEntry } from '@client/app/types';
+import { useMessagesStore } from '@shared/stores/messagesStore';
 import type {
   AuthorProfile,
   Channel,
@@ -13,6 +14,8 @@ import type {
   MessageReportTarget,
 } from '@shared/lib/backend/types';
 import { asRecord } from '@platform/lib/records';
+
+const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000;
 
 const getStringField = (value: unknown, key: string): string | null => {
   const record = asRecord(value);
@@ -122,6 +125,7 @@ type UseMessagesInput = {
   currentUserId: string | null;
   debugChannelReloads: boolean;
   channels: Channel[];
+  // Retained for compatibility with the current orchestration call site.
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setMessageReactions: React.Dispatch<React.SetStateAction<MessageReaction[]>>;
   setMessageAttachments: React.Dispatch<React.SetStateAction<MessageAttachment[]>>;
@@ -136,15 +140,8 @@ export function useMessages({
   currentUserId,
   debugChannelReloads,
   channels,
-  setMessages,
-  setMessageReactions,
-  setMessageAttachments,
-  setMessageLinkPreviews,
-  setAuthorProfiles,
   authorProfileCacheRef,
 }: UseMessagesInput) {
-  const [hasOlderMessages, setHasOlderMessages] = React.useState(false);
-  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = React.useState(false);
   const requestOlderMessagesRef = React.useRef<(() => Promise<void>) | null>(null);
   const messageBundleByChannelCacheRef = React.useRef<Record<string, ChannelMessageBundleCacheEntry>>({});
   const latestLoadIdRef = React.useRef(0);
@@ -152,6 +149,48 @@ export function useMessages({
   const currentHasOlderMessagesRef = React.useRef(false);
   const oldestLoadedCursorRef = React.useRef<{ createdAt: string; id: string } | null>(null);
   const cleanupIntervalRef = useRef<number | null>(null);
+  const lastFreshMessageLoadAtRef = React.useRef(0);
+
+  const setStoredMessages = React.useCallback((messages: Message[]) => {
+    useMessagesStore.getState().setMessages(messages);
+  }, []);
+
+  const setStoredReactions = React.useCallback((reactions: MessageReaction[]) => {
+    useMessagesStore.getState().setReactions(reactions);
+  }, []);
+
+  const setStoredAttachments = React.useCallback((attachments: MessageAttachment[]) => {
+    useMessagesStore.getState().setAttachments(attachments);
+  }, []);
+
+  const setStoredLinkPreviews = React.useCallback((linkPreviews: MessageLinkPreview[]) => {
+    useMessagesStore.getState().setLinkPreviews(linkPreviews);
+  }, []);
+
+  const setStoredProfiles = React.useCallback((profiles: Record<string, AuthorProfile>) => {
+    useMessagesStore.getState().setProfiles(profiles);
+  }, []);
+
+  const setStoredIsLoading = React.useCallback((isLoading: boolean) => {
+    useMessagesStore.getState().setIsLoading(isLoading);
+  }, []);
+
+  const setStoredHasMore = React.useCallback((hasMore: boolean) => {
+    useMessagesStore.getState().setHasMore(hasMore);
+  }, []);
+
+  const resetStoredMessages = React.useCallback(() => {
+    useMessagesStore.getState().reset();
+  }, []);
+
+  const markMessagesFresh = React.useCallback(() => {
+    lastFreshMessageLoadAtRef.current = Date.now();
+  }, []);
+
+  const areMessagesFresh = React.useCallback(
+    () => Date.now() - lastFreshMessageLoadAtRef.current < MESSAGE_RELOAD_FRESHNESS_WINDOW_MS,
+    []
+  );
 
   const getChannelBundleCacheKey = React.useCallback(
     (communityId: string, channelId: string) => `${communityId}:${channelId}`,
@@ -247,9 +286,9 @@ export function useMessages({
       currentHasOlderMessagesRef.current = hasOlder;
       oldestLoadedCursorRef.current =
         messageList.length > 0 ? { createdAt: messageList[0].created_at, id: messageList[0].id } : null;
-      setHasOlderMessages(hasOlder);
+      setStoredHasMore(hasOlder);
     },
-    []
+    [setStoredHasMore]
   );
 
   const tryBeginOlderMessagesLoad = React.useCallback(() => {
@@ -257,7 +296,7 @@ export function useMessages({
     if (!currentHasOlderMessagesRef.current || !oldestLoadedCursorRef.current) return null;
 
     olderLoadInFlightRef.current = true;
-    setIsLoadingOlderMessages(true);
+    setStoredIsLoading(true);
     latestLoadIdRef.current += 1;
 
     return {
@@ -269,22 +308,18 @@ export function useMessages({
   const finishOlderMessagesLoad = React.useCallback((options?: { updateUi?: boolean }) => {
     olderLoadInFlightRef.current = false;
     if (options?.updateUi === false) return;
-    setIsLoadingOlderMessages(false);
-  }, []);
+    setStoredIsLoading(false);
+  }, [setStoredIsLoading]);
 
   const resetMessageState = React.useCallback(() => {
-    setMessages([]);
-    setMessageReactions([]);
-    setMessageAttachments([]);
-    setMessageLinkPreviews([]);
+    resetStoredMessages();
     latestLoadIdRef.current = 0;
     olderLoadInFlightRef.current = false;
     currentHasOlderMessagesRef.current = false;
     oldestLoadedCursorRef.current = null;
-    setHasOlderMessages(false);
-    setIsLoadingOlderMessages(false);
+    lastFreshMessageLoadAtRef.current = 0;
     requestOlderMessagesRef.current = null;
-  }, [setMessageAttachments, setMessageLinkPreviews, setMessageReactions, setMessages]);
+  }, [resetStoredMessages]);
 
   const sendMessage = React.useCallback(
     async (
@@ -351,18 +386,18 @@ export function useMessages({
         communityId: currentServerId,
         messageId,
       });
-      setMessages((prev) => prev.filter((message) => message.id !== messageId));
-      setMessageReactions((prev) => prev.filter((reaction) => reaction.messageId !== messageId));
-      setMessageAttachments((prev) => prev.filter((attachment) => attachment.messageId !== messageId));
-      setMessageLinkPreviews((prev) => prev.filter((preview) => preview.messageId !== messageId));
+      const { messages, reactions, attachments, linkPreviews } = useMessagesStore.getState();
+      setStoredMessages(messages.filter((message) => message.id !== messageId));
+      setStoredReactions(Object.values(reactions).filter((reaction) => reaction.messageId !== messageId));
+      setStoredAttachments(
+        Object.values(attachments).filter((attachment) => attachment.messageId !== messageId)
+      );
+      setStoredLinkPreviews(
+        Object.values(linkPreviews).filter((preview) => preview.messageId !== messageId)
+      );
+      markMessagesFresh();
     },
-    [
-      currentServerId,
-      setMessageAttachments,
-      setMessageLinkPreviews,
-      setMessageReactions,
-      setMessages,
-    ]
+    [currentServerId, markMessagesFresh, setStoredAttachments, setStoredLinkPreviews, setStoredMessages, setStoredReactions]
   );
 
   const reportMessage = React.useCallback(
@@ -1014,12 +1049,26 @@ export function useMessages({
         const visibility = document.visibilityState;
         input.onLogReload('visibility', { state: visibility });
         if (visibility === 'visible') {
+          if (areMessagesFresh()) {
+            input.onLogReload('load:skip_fresh', {
+              reason: 'visibility_resume',
+              freshnessWindowMs: MESSAGE_RELOAD_FRESHNESS_WINDOW_MS,
+            });
+            return;
+          }
           input.scheduleMessageReload('visibility_resume', 120);
         }
       };
 
       const handleWindowFocus = () => {
         input.onLogReload('window_focus');
+        if (areMessagesFresh()) {
+          input.onLogReload('load:skip_fresh', {
+            reason: 'window_focus',
+            freshnessWindowMs: MESSAGE_RELOAD_FRESHNESS_WINDOW_MS,
+          });
+          return;
+        }
         input.scheduleMessageReload('window_focus', 120);
       };
 
@@ -1052,7 +1101,7 @@ export function useMessages({
         cleanup,
       };
     },
-    [runMessageMediaMaintenance]
+    [areMessagesFresh, runMessageMediaMaintenance]
   );
 
   const createMessageBundleController = React.useCallback(
@@ -1092,10 +1141,11 @@ export function useMessages({
         syncLoadedMessageWindow(inputBundle.messageList, inputBundle.hasOlder);
 
         if (input.isMounted()) {
-          setMessages(inputBundle.messageList);
-          setMessageReactions(inputBundle.reactionList);
-          setMessageAttachments(inputBundle.attachmentList);
-          setMessageLinkPreviews(inputBundle.linkPreviewList);
+          setStoredMessages(inputBundle.messageList);
+          setStoredReactions(inputBundle.reactionList);
+          setStoredAttachments(inputBundle.attachmentList);
+          setStoredLinkPreviews(inputBundle.linkPreviewList);
+          markMessagesFresh();
         }
 
         persistCurrentChannelBundleCache();
@@ -1113,10 +1163,10 @@ export function useMessages({
         syncLoadedMessageWindow(cachedBundle.messages, cachedBundle.hasOlderMessages);
 
         if (input.isMounted()) {
-          setMessages(cachedBundle.messages);
-          setMessageReactions(cachedBundle.reactions);
-          setMessageAttachments(cachedBundle.attachments);
-          setMessageLinkPreviews(cachedBundle.linkPreviews);
+          setStoredMessages(cachedBundle.messages);
+          setStoredReactions(cachedBundle.reactions);
+          setStoredAttachments(cachedBundle.attachments);
+          setStoredLinkPreviews(cachedBundle.linkPreviews);
           input.onMessagesCommitted?.('channel_cache_hydrate', cachedBundle.messages);
         }
 
@@ -1128,7 +1178,8 @@ export function useMessages({
         syncOldestLoadedCursor(nextMessages);
         persistCurrentChannelBundleCache();
         if (!input.isMounted()) return;
-        setMessages(nextMessages);
+        setStoredMessages(nextMessages);
+        markMessagesFresh();
         input.onMessagesCommitted?.(reason, nextMessages);
       };
 
@@ -1136,21 +1187,24 @@ export function useMessages({
         currentReactionList = nextReactions;
         persistCurrentChannelBundleCache();
         if (!input.isMounted()) return;
-        setMessageReactions(nextReactions);
+        setStoredReactions(nextReactions);
+        markMessagesFresh();
       };
 
       const commitAttachments = (nextAttachments: MessageAttachment[]) => {
         currentAttachmentList = nextAttachments;
         persistCurrentChannelBundleCache();
         if (!input.isMounted()) return;
-        setMessageAttachments(nextAttachments);
+        setStoredAttachments(nextAttachments);
+        markMessagesFresh();
       };
 
       const commitLinkPreviews = (nextLinkPreviews: MessageLinkPreview[]) => {
         currentLinkPreviewList = nextLinkPreviews;
         persistCurrentChannelBundleCache();
         if (!input.isMounted()) return;
-        setMessageLinkPreviews(nextLinkPreviews);
+        setStoredLinkPreviews(nextLinkPreviews);
+        markMessagesFresh();
       };
 
       return {
@@ -1171,10 +1225,11 @@ export function useMessages({
       currentChannelId,
       currentServerId,
       getCachedChannelBundle,
-      setMessageAttachments,
-      setMessageLinkPreviews,
-      setMessageReactions,
-      setMessages,
+      markMessagesFresh,
+      setStoredAttachments,
+      setStoredLinkPreviews,
+      setStoredMessages,
+      setStoredReactions,
       syncLoadedMessageWindow,
       syncOldestLoadedCursor,
     ]
@@ -1185,20 +1240,20 @@ export function useMessages({
 
     if (!currentUserId || !currentServerId || !currentChannelId) {
       resetMessageState();
-      setAuthorProfiles({});
+      setStoredProfiles({});
       return;
     }
 
     const selectedChannel = channels.find((channel) => channel.id === currentChannelId);
     if (!selectedChannel || selectedChannel.community_id !== currentServerId) {
       resetMessageState();
-      setAuthorProfiles({});
+      setStoredProfiles({});
       return;
     }
 
     if (selectedChannel.kind !== 'text') {
       resetMessageState();
-      setAuthorProfiles({});
+      setStoredProfiles({});
       return;
     }
 
@@ -1225,7 +1280,7 @@ export function useMessages({
 
       if (authorIds.length === 0) {
         if (!isMounted) return { authorCount: 0, fetchedAuthorCount: 0 };
-        setAuthorProfiles({});
+        setStoredProfiles({});
         return { authorCount: 0, fetchedAuthorCount: 0 };
       }
 
@@ -1247,7 +1302,7 @@ export function useMessages({
       }
 
       if (!isMounted) return { authorCount: authorIds.length, fetchedAuthorCount: missingAuthorIds.length };
-      setAuthorProfiles(profileMap);
+      setStoredProfiles(profileMap);
       return { authorCount: authorIds.length, fetchedAuthorCount: missingAuthorIds.length };
     };
 
@@ -1537,7 +1592,7 @@ export function useMessages({
     debugChannelReloads,
     channels,
     resetMessageState,
-    setAuthorProfiles,
+    setStoredProfiles,
     authorProfileCacheRef,
     isCurrentMessageLoad,
     syncLoadedMessageWindow,
@@ -1556,10 +1611,12 @@ export function useMessages({
     clearRequestOlderMessagesLoader,
   ]);
 
+  const messagesStoreState = useMessagesStore.getState();
+
   return {
     state: {
-      hasOlderMessages,
-      isLoadingOlderMessages,
+      hasOlderMessages: messagesStoreState.hasMore,
+      isLoadingOlderMessages: messagesStoreState.isLoading,
     },
     derived: {},
     actions: {

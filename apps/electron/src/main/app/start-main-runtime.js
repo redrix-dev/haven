@@ -1,5 +1,4 @@
 const path = require('node:path');
-const { createRendererEntryService } = require('../renderer-entry-service');
 const { registerDesktopIpcHandlers } = require('../ipc/register-desktop-ipc-handlers');
 const { registerRendererDocumentHeaderPolicy } = require('./register-header-policy');
 const { registerPermissionHandlers } = require('./register-permission-handlers');
@@ -22,8 +21,6 @@ const startMainRuntime = async ({
   getMainWindow,
   pendingProtocolUrls,
   voicePopoutWindowManager,
-  shouldDebugRendererEntry,
-  devRendererEntryPortOverride,
   mainWindowWebpackEntry,
 }) => {
   registerHavenProtocolClient(app);
@@ -39,32 +36,15 @@ const startMainRuntime = async ({
     voicePopoutWindowManager,
   });
 
-  const rendererEntryService = createRendererEntryService({
-    entries: [
-      {
-        entryName: 'main_window',
-        webpackEntryUrl: mainWindowWebpackEntry,
-      },
-      {
-        entryName: 'voice_popout',
-        webpackEntryUrl: mainWindowWebpackEntry,
-      },
-    ],
-    ...(devRendererEntryPortOverride ? { port: devRendererEntryPortOverride } : {}),
-    debug: shouldDebugRendererEntry,
-  });
-  await rendererEntryService.start();
-
   registerRendererDocumentHeaderPolicy({
     sessionRef,
-    rendererEntryServiceRef: rendererEntryService,
+    rendererDocumentUrls: [mainWindowWebpackEntry],
+    rendererOriginUrl: mainWindowWebpackEntry,
   });
 
   registerPermissionHandlers({
     sessionRef,
   });
-
-  return rendererEntryService;
 };
 
 module.exports = {

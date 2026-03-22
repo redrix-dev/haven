@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DirectMessageArea } from '@shared/components/DirectMessageArea';
+import { useDmStore } from '@shared/stores/dmStore';
 import type { DirectMessage, DirectMessageConversationSummary } from '@shared/lib/backend/types';
 
 const conversation: DirectMessageConversationSummary = {
@@ -25,11 +26,12 @@ const conversation: DirectMessageConversationSummary = {
 };
 
 function renderArea(overrides?: Partial<React.ComponentProps<typeof DirectMessageArea>>) {
+  useDmStore.getState().setCurrentConversation(conversation);
+  useDmStore.getState().setCurrentConversationId(conversation.conversationId);
   return render(
     <DirectMessageArea
       currentUserId="user-1"
       currentUserDisplayName="Me"
-      conversation={conversation}
       messages={[]}
       loading={false}
       sending={false}

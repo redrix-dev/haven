@@ -4,17 +4,19 @@ const { registerNativeContextMenu } = require('./register-native-context-menu');
 const createMainWindow = ({
   app,
   preloadEntry,
-  rendererEntryService,
+  rendererEntryUrl,
   shouldDebugWindowFocus,
   debugWindowFocus,
   debugContextMenu,
   onClosed,
+  BrowserWindowClass = BrowserWindow,
+  registerNativeContextMenuFn = registerNativeContextMenu,
 }) => {
-  if (!rendererEntryService) {
-    throw new Error('Renderer entry service must be started before creating the main window.');
+  if (!rendererEntryUrl) {
+    throw new Error('Renderer entry URL must be provided before creating the main window.');
   }
 
-  const window = new BrowserWindow({
+  const window = new BrowserWindowClass({
     width: 1400,
     height: 900,
     minWidth: 800,
@@ -48,15 +50,14 @@ const createMainWindow = ({
     });
   }
 
-  // Load the app renderer through the unified loopback entry service.
-  window.loadURL(rendererEntryService.getEntryUrl('main_window'));
+  window.loadURL(rendererEntryUrl);
 
   if (!app.isPackaged) {
     // Open the DevTools only in development.
     window.webContents.openDevTools();
   }
 
-  registerNativeContextMenu({
+  registerNativeContextMenuFn({
     window,
     debugContextMenu,
   });

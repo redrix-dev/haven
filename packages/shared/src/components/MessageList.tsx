@@ -54,6 +54,7 @@ import type {
 } from '@shared/lib/backend/types';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { MarkdownText } from '@shared/lib/markdownRenderer';
+import { useMessagesStore } from '@shared/stores/messagesStore';
 
 type Message = Database['public']['Tables']['messages']['Row'];
 const QUICK_REACTION_EMOJI = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}'] as const;
@@ -66,11 +67,6 @@ type AuthorProfile = {
 
 interface MessageListProps {
   channelId: string;
-  messages: Message[];
-  messageReactions: MessageReaction[];
-  messageAttachments: MessageAttachment[];
-  messageLinkPreviews: MessageLinkPreview[];
-  authorProfiles: Record<string, AuthorProfile>;
   currentUserId: string;
   canManageMessages: boolean;
   canCreateReports: boolean;
@@ -96,8 +92,6 @@ interface MessageListProps {
     comment: string;
   }) => Promise<void>;
   onRequestMessageLinkPreviewRefresh: (messageId: string) => Promise<void>;
-  hasOlderMessages?: boolean;
-  isLoadingOlderMessages?: boolean;
   onRequestOlderMessages?: () => Promise<void>;
 }
 
@@ -283,11 +277,6 @@ const getFallbackEmbedUrl = (preview: MessageLinkPreview): string | null => {
 
 export function MessageList({
   channelId,
-  messages,
-  messageReactions,
-  messageAttachments,
-  messageLinkPreviews,
-  authorProfiles,
   currentUserId,
   canManageMessages,
   canCreateReports,
@@ -304,10 +293,15 @@ export function MessageList({
   onReplyToMessage,
   onReportMessage,
   onRequestMessageLinkPreviewRefresh,
-  hasOlderMessages = false,
-  isLoadingOlderMessages = false,
   onRequestOlderMessages,
 }: MessageListProps) {
+  const messages = useMessagesStore((state) => state.messages);
+  const reactionRecord = useMessagesStore((state) => state.reactions);
+  const attachmentRecord = useMessagesStore((state) => state.attachments);
+  const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
+  const authorProfiles = useMessagesStore((state) => state.profiles);
+  const hasOlderMessages = useMessagesStore((state) => state.hasMore);
+  const isLoadingOlderMessages = useMessagesStore((state) => state.isLoading);
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);
   const isAtBottomRef = useRef(true);
   const previousChannelIdRef = useRef(channelId);
@@ -345,6 +339,10 @@ export function MessageList({
     () => messages.filter(canCurrentUserViewMessage),
     [messages]
   );
+
+  const messageReactions = useMemo(() => Object.values(reactionRecord), [reactionRecord]);
+  const messageAttachments = useMemo(() => Object.values(attachmentRecord), [attachmentRecord]);
+  const messageLinkPreviews = useMemo(() => Object.values(linkPreviewRecord), [linkPreviewRecord]);
 
   const messageById = useMemo(() => {
     const next = new Map<string, Message>();
@@ -954,17 +952,22 @@ export function MessageList({
 
                         return (
                           <div className="space-y-2">
-                            <div className="overflow-hidden rounded-md border border-[#304867] bg-[#0d1626]">
+                            <div
+                              className="overflow-hidden rounded-md border border-[#304867] bg-[#0d1626]"
+                              style={{ maxWidth: '480px' }}
+                            >
                               <div
-                                className="w-full bg-[#0d1626]"
+                                className="bg-[#0d1626]"
                                 style={{
                                   aspectRatio: String(messageLinkPreviewRow.snapshot.embed?.aspectRatio || 16 / 9),
+                                  maxWidth: '480px',
+                                  width: '100%',
                                 }}
                               >
                                 <iframe
                                 src={embedUrl}
                                 title={messageLinkPreviewRow.snapshot.title ?? 'Embedded video'}
-                                className="h-full w-full"
+                                className="h-full w-full max-h-64 max-w-lg aspect-video"
                                 loading="lazy"
                                 // YouTube returns error 153 when no referrer/client identity is provided.
                                 referrerPolicy="origin"

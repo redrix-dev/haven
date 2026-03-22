@@ -11,10 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
-import voiceDebugSpeakerTestUrl from '@shared/assets/audio/voice-debug-speaker-test.mp3';
+import { RUNTIME_AUDIO_URLS } from '@platform/assets/runtimeAudio';
 import { Headphones, Mic, Play, Square, Volume2, VolumeX, Waves } from 'lucide-react';
 
-const DEFAULT_SPEAKER_TEST_AUDIO_PATH = voiceDebugSpeakerTestUrl;
+const DEFAULT_SPEAKER_TEST_AUDIO_PATH = RUNTIME_AUDIO_URLS.voice.speakerTest;
 const MIC_METER_BAR_COUNT = 28;
 const MIC_METER_MIN_BAR = 0.06;
 const INPUT_GAIN_MIN = 0;
@@ -208,7 +208,7 @@ export function VoiceHardwareDebugPanel({
     audio.onerror = () => {
       setSpeakerTestPlaying(false);
       setSpeakerError(
-        `Speaker test audio failed to load. Ensure the bundled test clip is present in packages/shared/src/assets/audio.`
+        'Speaker test audio failed to load. Rebuild the app so the bundled runtime audio is emitted again.'
       );
     };
     speakerAudioRef.current = audio;
@@ -242,7 +242,7 @@ export function VoiceHardwareDebugPanel({
       console.error('Failed to play speaker test audio:', error);
       setSpeakerTestPlaying(false);
       setSpeakerError(
-        'Unable to play speaker test audio. Verify the imported test clip exists and rebuild the app.'
+        'Unable to play speaker test audio. Verify the runtime audio bundle is present and rebuild the app.'
       );
     }
   }, [
@@ -763,7 +763,7 @@ export function VoiceHardwareDebugPanel({
                     </div>
 
                     <p className="text-[11px] text-[#90a5c4]">
-                      Test clip is bundled from `packages/shared/src/assets/audio` so it ships with the app.
+                      Test clip is bundled through the shared runtime audio helper so it ships in web and desktop builds.
                     </p>
                     {speakerError && <p className="text-sm text-red-300">{speakerError}</p>}
                   </div>

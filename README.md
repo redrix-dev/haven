@@ -119,17 +119,18 @@ For release/canary validation signoff (timestamp + command table + signatures):
 npm run test:signoff -- --release-label <label> --environment <env> --test-author "<name>" --run-by "<name>"
 ```
 
-## Packaged renderer parity (embedded media)
+## Build Outputs and Runtime Assets
 
-Haven now uses a unified loopback HTTP renderer entry origin in both dev and packaged builds to keep
-embedded video provider behavior (for example YouTube embeds) consistent across environments.
+The repo now uses the default Forge renderer entry flow for Electron, plus one shared runtime audio helper for
+notification and voice sounds.
 
-Important rollout note:
-- Existing packaged users may need to sign in once again after upgrading to the parity refactor build,
-  because packaged renderer storage moves from a `file://` origin to a fixed local HTTP origin.
+Authoritative output folders:
+- `.webpack/` for Electron intermediates
+- `out/` for packaged Electron builds and `npm run make`
+- `dist/web/` for the web production build
 
 Architecture doc:
-- `docs/internal/architecture/renderer-entry-origin-parity.md`
+- `docs/internal/architecture/electron-build-paths-and-runtime-assets.md`
 
 ## Documentation map
 

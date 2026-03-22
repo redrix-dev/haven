@@ -1,6 +1,10 @@
 function toWebsocketOrigin(origin) {
   try {
     const parsed = new URL(origin);
+    if (!parsed.host) {
+      return '';
+    }
+
     const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${wsProtocol}//${parsed.host}`;
   } catch {
@@ -59,4 +63,3 @@ module.exports = {
     toWebsocketOrigin,
   },
 };
-

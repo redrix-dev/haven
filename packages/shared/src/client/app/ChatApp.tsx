@@ -38,6 +38,8 @@ import { useVoiceSessionController } from "@client/features/voice/hooks/useVoice
 import type { VoicePopoutState } from "@platform/desktop/types";
 import { toast } from "sonner";
 import { useServerOrder } from "@client/features/community/hooks/useServerOrder";
+import { useServersStore } from "@shared/stores/serversStore";
+import { useVoiceStore } from "@shared/stores/voiceStore";
 
 export function ChatApp() {
   const app = useChatAppOrchestration();
@@ -45,6 +47,18 @@ export function ChatApp() {
     app.user?.id ?? null,
     app.servers,
   );
+  // TODO: bridge — remove when useServers writes directly to store (orchestration cleanup pass)
+  const setStoredServers = useServersStore((state) => state.setServers);
+  const setStoredCurrentServerId = useServersStore(
+    (state) => state.setCurrentServerId,
+  );
+  const setStoredCurrentServer = useServersStore(
+    (state) => state.setCurrentServer,
+  );
+  const voiceJoined = useVoiceStore((state) => state.joined);
+  const voiceMuted = useVoiceStore((state) => state.isMuted);
+  const voiceDeafened = useVoiceStore((state) => state.isDeafened);
+  const voiceParticipants = useVoiceStore((state) => state.participants);
   const canOpenVoicePopout = desktopClient.isAvailable();
   const [voicePopoutState, setVoicePopoutState] =
     React.useState<VoicePopoutState | null>(null);
@@ -96,12 +110,30 @@ export function ChatApp() {
     onControlActionsReady: app.setVoiceControlActions,
     onSessionError: handleVoiceSessionError,
   });
-  const voicePopoutWindowOpen = canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
+  const voicePopoutWindowOpen =
+    canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
+
+  React.useEffect(() => {
+    setStoredServers(orderedServers);
+    setStoredCurrentServerId(app.currentServerId);
+    setStoredCurrentServer(app.currentServer);
+  }, [
+    app.currentServer,
+    app.currentServerId,
+    orderedServers,
+    setStoredCurrentServer,
+    setStoredCurrentServerId,
+    setStoredServers,
+  ]);
 
   React.useEffect(() => {
     if (!canOpenVoicePopout) return;
 
     return desktopClient.onVoicePopoutState((nextState) => {
+      console.log(
+        "[VoicePopoutApp] received state:",
+        JSON.stringify(nextState),
+      );
       setVoicePopoutState(nextState);
     });
   }, [canOpenVoicePopout]);
@@ -114,50 +146,61 @@ export function ChatApp() {
   React.useEffect(() => {
     if (!canOpenVoicePopout) return;
 
-    void desktopClient.syncVoicePopoutState({
-      isOpen: voicePopoutWindowOpen,
-      serverName:
-        activeVoiceServer?.name ?? app.currentServer?.name ?? null,
-      channelName: app.activeVoiceChannel?.name ?? null,
-      connected: voiceController.state.joined,
-      joined: voiceController.state.joined,
-      joining: voiceController.state.joining,
-      isMuted: voiceController.state.isMuted,
-      isDeafened: voiceController.state.isDeafened,
-      transmissionMode: app.appSettings.voice.transmissionMode,
-      participantCount: app.activeVoiceParticipantCount,
-      selectedInputDeviceId: voiceController.state.selectedInputDeviceId,
-      selectedOutputDeviceId: voiceController.state.selectedOutputDeviceId,
-      inputDevices: voiceController.state.inputDevices.map((device, index) => ({
-        deviceId: device.deviceId,
-        label: device.label || `Microphone ${index + 1}`,
-      })),
-      outputDevices: voiceController.state.outputDevices.map((device, index) => ({
-        deviceId: device.deviceId,
-        label: device.label || `Speaker ${index + 1}`,
-      })),
-      supportsOutputSelection: voiceController.state.supportsOutputSelection,
-      members: voiceController.state.participants.map((participant) => ({
-        userId: participant.userId,
-        displayName: participant.displayName,
-        isMuted: participant.muted,
-        isDeafened: participant.deafened,
-        volume: voiceController.state.remoteVolumes[participant.userId] ?? 100,
-      })),
-    }).catch((error: unknown) => {
-      console.error("Failed to sync voice popout state:", error);
-    });
+    void desktopClient
+      .syncVoicePopoutState({
+        isOpen: voicePopoutWindowOpen,
+        serverName: activeVoiceServer?.name ?? app.currentServer?.name ?? null,
+        channelName: app.activeVoiceChannel?.name ?? null,
+        connected: voiceJoined,
+        joined: voiceJoined,
+        joining: voiceController.state.joining,
+        isMuted: voiceMuted,
+        isDeafened: voiceDeafened,
+        transmissionMode: app.appSettings.voice.transmissionMode,
+        participantCount: voiceParticipants.length + (voiceJoined ? 1 : 0),
+        selectedInputDeviceId: voiceController.state.selectedInputDeviceId,
+        selectedOutputDeviceId: voiceController.state.selectedOutputDeviceId,
+        inputDevices: voiceController.state.inputDevices.map(
+          (device, index) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Microphone ${index + 1}`,
+          }),
+        ),
+        outputDevices: voiceController.state.outputDevices.map(
+          (device, index) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Speaker ${index + 1}`,
+          }),
+        ),
+        supportsOutputSelection: voiceController.state.supportsOutputSelection,
+        members: voiceParticipants.map((participant) => {
+          const controllerParticipant = voiceController.state.participants.find(
+            (entry) => entry.userId === participant.userId,
+          );
+          return {
+            userId: participant.userId,
+            displayName: participant.displayName,
+            isMuted: controllerParticipant?.muted ?? false,
+            isDeafened: controllerParticipant?.deafened ?? false,
+            volume:
+              voiceController.state.remoteVolumes[participant.userId] ?? 100,
+          };
+        }),
+      })
+      .catch((error: unknown) => {
+        console.error("Failed to sync voice popout state:", error);
+      });
   }, [
     app.activeVoiceChannel,
-    app.activeVoiceParticipantCount,
     app.appSettings.voice.transmissionMode,
     canOpenVoicePopout,
     activeVoiceServer?.name,
     app.currentServer?.name,
+    voiceDeafened,
+    voiceJoined,
+    voiceMuted,
+    voiceParticipants,
     voicePopoutWindowOpen,
-    voiceController.state.isDeafened,
-    voiceController.state.isMuted,
-    voiceController.state.joined,
     voiceController.state.joining,
     voiceController.state.inputDevices,
     voiceController.state.outputDevices,
@@ -298,9 +341,7 @@ export function ChatApp() {
 
       <div className="flex h-screen overflow-hidden bg-[#111a2b] text-[#e6edf7]">
         <ServerList
-          servers={orderedServers}
           onReorder={setServerOrder}
-          currentServerId={app.currentServerId}
           currentServerIsOwner={app.serverPermissions.isOwner}
           canManageCurrentServer={app.canManageCurrentServer}
           canOpenCurrentServerSettings={app.canOpenServerSettings}
@@ -355,9 +396,6 @@ export function ChatApp() {
           <>
             <DirectMessagesSidebar
               currentUserDisplayName={app.userDisplayName}
-              conversations={app.dmConversations}
-              selectedConversationId={app.selectedDmConversationId}
-              loading={app.dmConversationsLoading}
               refreshing={app.dmConversationsRefreshing}
               error={app.dmConversationsError}
               onSelectConversation={(conversationId) => {
@@ -376,7 +414,6 @@ export function ChatApp() {
             <DirectMessageArea
               currentUserId={user.id}
               currentUserDisplayName={app.userDisplayName}
-              conversation={app.selectedDmConversation}
               messages={app.dmMessages}
               loading={app.dmMessagesLoading}
               sending={app.dmMessageSendPending}
@@ -581,11 +618,6 @@ export function ChatApp() {
                 channelId={app.currentRenderableChannel.id}
                 channelName={app.currentRenderableChannel.name}
                 channelKind={app.currentRenderableChannel.kind}
-                messages={app.messages}
-                messageReactions={app.messageReactions}
-                messageAttachments={app.messageAttachments}
-                messageLinkPreviews={app.messageLinkPreviews}
-                authorProfiles={app.authorProfiles}
                 currentUserId={user.id}
                 canManageMessages={app.serverPermissions.canManageMessages}
                 canCreateReports={app.serverPermissions.canCreateReports}
@@ -611,8 +643,6 @@ export function ChatApp() {
                 onRequestMessageLinkPreviewRefresh={
                   app.requestMessageLinkPreviewRefresh
                 }
-                hasOlderMessages={app.hasOlderMessages}
-                isLoadingOlderMessages={app.isLoadingOlderMessages}
                 onRequestOlderMessages={app.requestOlderMessages}
                 onSaveAttachment={app.saveAttachment}
                 onReportUserProfile={({ targetUserId, reason }) =>
@@ -653,13 +683,12 @@ export function ChatApp() {
       <NotificationCenterModal
         open={app.notificationsPanelOpen}
         onOpenChange={app.setNotificationsPanelOpen}
-        notifications={app.notificationItems}
         counts={app.notificationCounts}
-        loading={app.notificationsLoading}
         error={app.notificationsError}
         refreshing={app.notificationsRefreshing}
         onRefresh={() => void app.refreshNotificationsManually()}
         onMarkAllSeen={() => void app.markAllNotificationsSeen()}
+        onDismissAll={() => void app.dismissAllNotifications()}
         onMarkNotificationRead={(recipientId) =>
           void app.markNotificationRead(recipientId)
         }
@@ -683,6 +712,15 @@ export function ChatApp() {
           friendRequestId,
         }) => {
           void app.declineFriendRequestFromNotification({
+            recipientId,
+            friendRequestId,
+          });
+        }}
+        onDismissFriendRequestNotification={({
+          recipientId,
+          friendRequestId,
+        }) => {
+          void app.dismissFriendRequestNotification({
             recipientId,
             friendRequestId,
           });

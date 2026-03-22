@@ -9,13 +9,16 @@ import type { VoicePopoutControlAction, VoicePopoutState } from '@platform/deskt
 const popoutMocks = vi.hoisted(() => {
   const listeners: Array<(state: VoicePopoutState) => void> = [];
   const dispatchVoicePopoutControlAction = vi.fn();
+  const requestVoicePopoutStateSync = vi.fn();
 
   return {
     listeners,
     dispatchVoicePopoutControlAction,
+    requestVoicePopoutStateSync,
     reset: () => {
       listeners.splice(0, listeners.length);
       dispatchVoicePopoutControlAction.mockClear();
+      requestVoicePopoutStateSync.mockClear();
     },
   };
 });
@@ -23,6 +26,7 @@ const popoutMocks = vi.hoisted(() => {
 vi.mock('@platform/desktop/client', () => ({
   desktopClient: {
     isAvailable: () => true,
+    requestVoicePopoutStateSync: () => popoutMocks.requestVoicePopoutStateSync(),
     dispatchVoicePopoutControlAction: (action: VoicePopoutControlAction) =>
       popoutMocks.dispatchVoicePopoutControlAction(action),
     onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => {
@@ -46,6 +50,8 @@ describe('VoicePopoutApp', () => {
     const user = userEvent.setup();
 
     render(<VoicePopoutApp />);
+
+    expect(popoutMocks.requestVoicePopoutStateSync).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       popoutMocks.listeners[0]?.({

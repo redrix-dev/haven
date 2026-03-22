@@ -127,6 +127,11 @@ const registerDesktopIpcHandlers = ({
     voicePopoutWindowManager?.sendState(nextState);
   });
 
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.VOICE_POPOUT_REQUEST_SYNC, async () => {
+    if (!voicePopoutWindowManager?.getState) return;
+    voicePopoutWindowManager.sendState(voicePopoutWindowManager.getState());
+  });
+
   registerIpcHandler(
     ipcMain,
     DESKTOP_IPC_KEYS.VOICE_POPOUT_CONTROL_DISPATCH,

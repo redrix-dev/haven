@@ -16,6 +16,7 @@ import type {
   VoicePopoutDeviceOption,
   VoiceSettings,
 } from "@platform/desktop/types";
+import { useVoiceStore } from "@shared/stores/voiceStore";
 import {
   ExternalLink,
   Headphones,
@@ -75,10 +76,10 @@ export function VoiceDrawer({
   channelName,
   participantCount,
   participantPreview,
-  voiceConnected,
+  voiceConnected: voiceConnectedProp,
   voicePanelOpen,
   joining = false,
-  voiceSessionState,
+  voiceSessionState: voiceSessionStateProp,
   transmissionMode,
   inputDevices,
   outputDevices,
@@ -98,6 +99,21 @@ export function VoiceDrawer({
   onOpenVoiceHardwareTest,
   onOpenVoicePopout,
 }: VoiceDrawerProps) {
+  const storedVoiceConnected = useVoiceStore((state) => state.voiceConnected);
+  const storedVoiceSessionState = useVoiceStore((state) => state.sessionState);
+  const voiceConnected =
+    surface === "popout" ? voiceConnectedProp : storedVoiceConnected;
+  const voiceSessionState = React.useMemo(
+    () =>
+      surface === "popout"
+        ? voiceSessionStateProp
+        : storedVoiceSessionState ?? {
+            joined: false,
+            isMuted: false,
+            isDeafened: false,
+          },
+    [storedVoiceSessionState, surface, voiceSessionStateProp],
+  );
   const statusLabel = voiceConnected
     ? "Live"
     : joining

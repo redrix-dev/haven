@@ -47,7 +47,7 @@ It is designed for solo-maintainer use and AI-assisted sessions.
 1. `main` is the release source of truth.
 2. Prefer reproducible, logged steps over memory/manual improvisation.
 3. DB auth/permissions changes require DB/RLS validation.
-4. Electron main/CSP/renderer-entry changes require packaged parity checks (`npm run make` + manual smoke).
+4. Electron main/CSP/runtime asset changes require packaged validation (`npm run make` + manual smoke).
 5. Release assets are immutable (never replace assets for an existing version/tag).
 6. SQL Editor is acceptable for emergencies; long-term target is CLI-managed hosted migrations.
 7. Keep local notes (`SESSION_HANDOFF.local`) and GitHub issues in sync, but do not duplicate them blindly.
@@ -177,13 +177,13 @@ npm run test:db
 npm run test:backend
 ```
 
-#### Tier D: Electron main / updater / CSP / renderer-entry / media parity changes
+#### Tier D: Electron main / updater / CSP / runtime asset changes
 ```bash
 npm run make
 ```
 
 Then perform packaged smoke checks (manual), especially for:
-- embedded media parity
+- embedded media and runtime audio loading
 - auth/session persistence after relaunch
 - updater checks
 - permissions/device access if touched
@@ -437,7 +437,7 @@ Before releasing to users (especially with auto-update enabled):
 5. Release notes drafted
 
 Examples of release-sensitive changes:
-- Electron main/updater/CSP/renderer-entry changes
+- Electron main/updater/CSP/runtime asset changes
 - Supabase auth/RLS/RPC changes
 - DM/notification paths
 - media/embed behavior
@@ -536,8 +536,8 @@ Always include:
 - any one-time migration effects (login, local settings, etc.)
 - known limitations or flags if relevant
 
-Example (renderer-origin parity builds):
-- "You may need to sign in once after updating due to a renderer runtime origin migration."
+Example (runtime asset / Electron boot changes):
+- "Packaged Electron runtime was rebuilt; verify notification sounds, voice sounds, and media paths after update."
 
 ---
 

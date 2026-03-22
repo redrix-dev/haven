@@ -12,6 +12,7 @@ const DESKTOP_IPC_KEYS = Object.freeze({
   VOICE_POPOUT_OPEN: 'haven:voice-popout:open',
   VOICE_POPOUT_CLOSE: 'haven:voice-popout:close',
   VOICE_POPOUT_STATE_SYNC: 'haven:voice-popout:state-sync',
+  VOICE_POPOUT_REQUEST_SYNC: 'haven:voice-popout:request-sync',
   VOICE_POPOUT_STATE_EVENT: 'haven:voice-popout:state',
   VOICE_POPOUT_CONTROL_DISPATCH: 'haven:voice-popout:control-dispatch',
   VOICE_POPOUT_CONTROL_EVENT: 'haven:voice-popout:control',

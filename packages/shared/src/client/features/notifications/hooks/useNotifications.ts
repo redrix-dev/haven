@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNotificationsStore } from '@shared/stores/notificationsStore';
 import { playNotificationSound } from '@shared/lib/notifications/sound';
 import type { NotificationBackend } from '@shared/lib/backend/notificationBackend';
 import { recordLocalNotificationDeliveryTrace } from '@shared/lib/notifications/devTrace';
@@ -38,11 +39,11 @@ export function useNotifications({
   audioSettings,
   autoMarkSeenOnPanelOpen = false,
 }: UseNotificationsInput) {
-  const [notificationItems, setNotificationItems] = React.useState<NotificationItem[]>([]);
+  const notificationItems = useNotificationsStore((state) => state.notifications);
   const [notificationCounts, setNotificationCounts] = React.useState<NotificationCounts>(
     DEFAULT_NOTIFICATION_COUNTS
   );
-  const [notificationsLoading, setNotificationsLoading] = React.useState(false);
+  const notificationsLoading = useNotificationsStore((state) => state.isLoading);
   const [notificationsRefreshing, setNotificationsRefreshing] = React.useState(false);
   const [notificationsError, setNotificationsError] = React.useState<string | null>(null);
   const [notificationPreferences, setNotificationPreferences] =
@@ -56,6 +57,22 @@ export function useNotifications({
   const knownSoundNotificationRecipientIdsRef = React.useRef<Set<string>>(new Set());
   const notificationsBootstrappedRef = React.useRef(false);
   const notificationAudioSettingsRef = React.useRef<NotificationAudioSettings>(audioSettings);
+
+  const setStoredNotifications = React.useCallback((notifications: NotificationItem[]) => {
+    useNotificationsStore.getState().setNotifications(notifications);
+  }, []);
+
+  const setStoredUnreadCount = React.useCallback((unreadCount: number) => {
+    useNotificationsStore.getState().setUnreadCount(unreadCount);
+  }, []);
+
+  const setStoredIsLoading = React.useCallback((isLoading: boolean) => {
+    useNotificationsStore.getState().setIsLoading(isLoading);
+  }, []);
+
+  const resetStoredNotifications = React.useCallback(() => {
+    useNotificationsStore.getState().reset();
+  }, []);
 
   React.useEffect(() => {
     notificationAudioSettingsRef.current = audioSettings;
@@ -76,8 +93,9 @@ export function useNotifications({
       const previousKnownSoundIds = knownSoundNotificationRecipientIdsRef.current;
       const canPlaySounds = notificationsBootstrappedRef.current && playSoundsForNew;
 
-      setNotificationItems(items);
+      setStoredNotifications(items);
       setNotificationCounts(counts);
+      setStoredUnreadCount(counts.unreadCount);
       knownSoundNotificationRecipientIdsRef.current = nextKnownSoundIds;
 
       if (canPlaySounds) {
@@ -108,7 +126,7 @@ export function useNotifications({
 
       notificationsBootstrappedRef.current = true;
     },
-    [notificationBackend, userId]
+    [notificationBackend, setStoredNotifications, setStoredUnreadCount, userId]
   );
 
   const refreshNotificationPreferences = React.useCallback(async () => {
@@ -118,9 +136,8 @@ export function useNotifications({
   }, [notificationBackend, userId]);
 
   const resetNotifications = React.useCallback(() => {
-    setNotificationItems([]);
+    resetStoredNotifications();
     setNotificationCounts(DEFAULT_NOTIFICATION_COUNTS);
-    setNotificationsLoading(false);
     setNotificationsRefreshing(false);
     setNotificationsError(null);
     setNotificationPreferences(null);
@@ -129,7 +146,7 @@ export function useNotifications({
     setNotificationPreferencesError(null);
     knownSoundNotificationRecipientIdsRef.current = new Set();
     notificationsBootstrappedRef.current = false;
-  }, []);
+  }, [resetStoredNotifications]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -141,7 +158,7 @@ export function useNotifications({
       };
     }
 
-    setNotificationsLoading(true);
+    setStoredIsLoading(true);
     setNotificationsError(null);
     notificationsBootstrappedRef.current = false;
     knownSoundNotificationRecipientIdsRef.current = new Set();
@@ -155,7 +172,7 @@ export function useNotifications({
         setNotificationsError(getErrorMessage(error, 'Failed to load notifications.'));
       } finally {
         if (!isMounted) return;
-        setNotificationsLoading(false);
+        setStoredIsLoading(false);
       }
     };
 
@@ -164,7 +181,7 @@ export function useNotifications({
     return () => {
       isMounted = false;
     };
-  }, [refreshNotificationInbox, resetNotifications, userId]);
+  }, [refreshNotificationInbox, resetNotifications, setStoredIsLoading, userId]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -311,6 +328,18 @@ export function useNotifications({
     [notificationBackend, refreshNotificationInbox]
   );
 
+  const dismissAllNotifications = React.useCallback(async () => {
+    const recipientIds = notificationItems.map((notification) => notification.recipientId);
+    if (recipientIds.length === 0) return;
+
+    try {
+      await notificationBackend.dismissNotifications(recipientIds);
+      await refreshNotificationInbox({ playSoundsForNew: false });
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to dismiss all notifications.'));
+    }
+  }, [notificationBackend, notificationItems, refreshNotificationInbox]);
+
   return {
     state: {
       notificationItems,
@@ -333,6 +362,7 @@ export function useNotifications({
       markAllNotificationsSeen,
       markNotificationRead,
       dismissNotification,
+      dismissAllNotifications,
       setNotificationsError,
     },
   };

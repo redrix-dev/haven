@@ -4,33 +4,21 @@ import { MessageInput } from './MessageInput';
 import { Database } from '@shared/types/database';
 import { Button } from '@shared/components/ui/button';
 import { Headphones } from 'lucide-react';
+import { useMessagesStore } from '@shared/stores/messagesStore';
 import type {
   BanEligibleServer,
   MessageAttachment,
-  MessageLinkPreview,
-  MessageReaction,
   MessageReportKind,
   MessageReportTarget,
 } from '@shared/lib/backend/types';
 
 type Message = Database['public']['Tables']['messages']['Row'];
 type ChannelKind = Database['public']['Enums']['channel_kind'];
-type AuthorProfile = {
-  username: string;
-  isPlatformStaff: boolean;
-  displayPrefix: string | null;
-  avatarUrl: string | null;
-};
 
 interface ChatAreaProps {
   channelId: string;
   channelName: string;
   channelKind: ChannelKind;
-  messages: Message[];
-  messageReactions: MessageReaction[];
-  messageAttachments: MessageAttachment[];
-  messageLinkPreviews: MessageLinkPreview[];
-  authorProfiles: Record<string, AuthorProfile>;
   currentUserId: string;
   canManageMessages: boolean;
   canCreateReports: boolean;
@@ -57,8 +45,6 @@ interface ChatAreaProps {
     comment: string;
   }) => Promise<void>;
   onRequestMessageLinkPreviewRefresh: (messageId: string) => Promise<void>;
-  hasOlderMessages?: boolean;
-  isLoadingOlderMessages?: boolean;
   onRequestOlderMessages?: () => Promise<void>;
   onSaveAttachment: (attachment: MessageAttachment) => Promise<void>;
   onReportUserProfile: (input: { targetUserId: string; reason: string }) => Promise<void>;
@@ -84,11 +70,6 @@ export function ChatArea({
   channelId,
   channelName,
   channelKind,
-  messages,
-  messageReactions,
-  messageAttachments,
-  messageLinkPreviews,
-  authorProfiles,
   currentUserId,
   canManageMessages,
   canCreateReports,
@@ -103,8 +84,6 @@ export function ChatArea({
   onToggleMessageReaction,
   onReportMessage,
   onRequestMessageLinkPreviewRefresh,
-  hasOlderMessages = false,
-  isLoadingOlderMessages = false,
   onRequestOlderMessages,
   onSaveAttachment,
   onReportUserProfile,
@@ -115,6 +94,7 @@ export function ChatArea({
   onSendHavenDeveloperMessage,
 }: ChatAreaProps) {
   const isVoiceChannel = channelKind === 'voice';
+  const messages = useMessagesStore((state) => state.messages);
   const [replyTarget, setReplyTarget] = React.useState<{
     id: string;
     authorLabel: string;
@@ -231,11 +211,6 @@ export function ChatArea({
           {/* Messages */}
           <MessageList
             channelId={channelId}
-            messages={messages}
-            messageReactions={messageReactions}
-            messageAttachments={messageAttachments}
-            messageLinkPreviews={messageLinkPreviews}
-            authorProfiles={authorProfiles}
             currentUserId={currentUserId}
             canManageMessages={canManageMessages}
             canCreateReports={canCreateReports}
@@ -252,8 +227,6 @@ export function ChatArea({
             onReplyToMessage={setReplyTarget}
             onReportMessage={onReportMessage}
             onRequestMessageLinkPreviewRefresh={onRequestMessageLinkPreviewRefresh}
-            hasOlderMessages={hasOlderMessages}
-            isLoadingOlderMessages={isLoadingOlderMessages}
             onRequestOlderMessages={onRequestOlderMessages}
           />
 

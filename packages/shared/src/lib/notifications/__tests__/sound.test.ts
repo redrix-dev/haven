@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AUDIO_ASSET_PATHS } from "@shared/assets/manifest";
+import { RUNTIME_AUDIO_URLS } from "@platform/assets/runtimeAudio";
 import type { NotificationAudioSettings } from "@platform/desktop/types";
 
 const baseAudioSettings: NotificationAudioSettings = {
@@ -74,7 +74,7 @@ describe("notification sound helpers", () => {
       reasonCode: "sent",
     });
     expect((globalThis.Audio as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
-      AUDIO_ASSET_PATHS.notifications.default,
+      RUNTIME_AUDIO_URLS.notifications.default,
     );
     expect(audioInstances[0]?.volume).toBe(0.7);
     expect(audioInstances[0]?.play).toHaveBeenCalledTimes(1);
@@ -95,9 +95,9 @@ describe("notification sound helpers", () => {
       audioSettings: baseAudioSettings,
     });
 
-    expect(audioInstances[0]?.src).toBe(AUDIO_ASSET_PATHS.voicePresence.join);
+    expect(audioInstances[0]?.src).toBe(RUNTIME_AUDIO_URLS.voicePresence.join);
     expect(audioInstances[0]?.volume).toBe(0.55);
-    expect(audioInstances[1]?.src).toBe(AUDIO_ASSET_PATHS.voicePresence.leave);
+    expect(audioInstances[1]?.src).toBe(RUNTIME_AUDIO_URLS.voicePresence.leave);
     expect(audioInstances[1]?.volume).toBe(0.55);
   });
 

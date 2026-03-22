@@ -444,6 +444,7 @@ export function useChatAppOrchestration() {
       markAllNotificationsSeen,
       markNotificationRead,
       dismissNotification,
+      dismissAllNotifications,
       setNotificationsError,
     },
   } = useNotifications({
@@ -552,6 +553,7 @@ export function useChatAppOrchestration() {
       openNotificationItem,
       acceptFriendRequestFromNotification,
       declineFriendRequestFromNotification,
+      dismissFriendRequestNotification,
     },
   } = useNotificationInteractions({
     notificationBackend,
@@ -1050,9 +1052,9 @@ export function useChatAppOrchestration() {
     notificationPreferences, notificationPreferencesLoading,
     notificationPreferencesSaving, notificationPreferencesError,
     refreshNotificationsManually, markAllNotificationsSeen,
-    markNotificationRead, dismissNotification, saveNotificationPreferences,
+    markNotificationRead, dismissNotification, dismissAllNotifications, saveNotificationPreferences,
     openNotificationItem, acceptFriendRequestFromNotification,
-    declineFriendRequestFromNotification,
+    declineFriendRequestFromNotification, dismissFriendRequestNotification,
     // social
     friendsPanelOpen, setFriendsPanelOpen,
     friendsPanelRequestedTab, setFriendsPanelRequestedTab,

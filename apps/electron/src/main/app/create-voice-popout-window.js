@@ -1,7 +1,7 @@
 const createVoicePopoutWindowManager = ({
   app,
   preloadEntry,
-  rendererEntryService,
+  rendererEntryUrl,
   getMainWindow,
   onClosed = null,
   desktopIpcKeys = null,
@@ -9,6 +9,10 @@ const createVoicePopoutWindowManager = ({
 }) => {
   const ipcKeys = desktopIpcKeys ?? require('@platform/ipc/keys').DESKTOP_IPC_KEYS;
   const WindowConstructor = BrowserWindowClass ?? require('electron').BrowserWindow;
+  if (!rendererEntryUrl) {
+    throw new Error('Renderer entry URL must be provided before creating the voice popout window.');
+  }
+
   let voicePopoutWindow = null;
   let currentState = {
     isOpen: false,
@@ -78,7 +82,7 @@ const createVoicePopoutWindowManager = ({
     window.webContents.once('did-finish-load', () => {
       broadcastState();
     });
-    window.loadURL(`${rendererEntryService.getEntryUrl('voice_popout')}?view=voice-popout`);
+    window.loadURL(`${rendererEntryUrl}?view=voice-popout`);
 
     if (!app.isPackaged) {
       window.webContents.openDevTools({ mode: 'detach' });

@@ -24,10 +24,9 @@
 - Invalid payloads must fail closed in renderer (no implicit fallback data reads).
 
 ### Renderer entry loading boundary
-- BrowserWindows must load renderer entrypoints through the main-process renderer entry service (loopback HTTP parity path).
-- Do not load Forge `MAIN_*_WEBPACK_ENTRY` constants directly from `BrowserWindow.loadURL(...)`.
-- Renderer entry transport (proxy/static) is a local content transport only, not a privileged API surface.
-- Renderer-document CSP injection must target only the renderer entry service origin/path, not third-party iframe responses.
+- BrowserWindows must load renderer entrypoints through Forge's webpack entry constants and preload bridge, not through a custom proxy layer.
+- `BrowserWindow.loadURL(...)` should use the Forge `MAIN_*_WEBPACK_ENTRY` constant for the renderer being loaded.
+- Renderer-document CSP injection must target only Haven renderer documents, not third-party iframe responses.
 
 ### DM moderation boundary
 - Reporter-side DM report creation is user-scoped (`report_dm_message(...)`).
@@ -48,4 +47,4 @@
 - [ ] New notification producers are server-side (RPC/trigger), not renderer-side row inserts.
 - [ ] Notification deep-link routes do not assume access; routed views still rely on DB authorization.
 - [ ] DM moderation review UI uses moderation RPCs/backend seam (not raw DM table reads).
-- [ ] BrowserWindows load renderer entry via renderer entry service (no direct `MAIN_*_WEBPACK_ENTRY` loads).
+- [ ] BrowserWindows load renderer entry via the Forge `MAIN_*_WEBPACK_ENTRY` constant and matching preload bridge.

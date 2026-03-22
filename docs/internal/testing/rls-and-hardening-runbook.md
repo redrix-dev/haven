@@ -15,8 +15,8 @@ Operational runbook for running Haven's local Supabase-backed hardening and regr
 
 Note:
 - This runbook covers DB/RLS/backend regression testing only.
-- It is separate from Electron renderer-origin parity work (packaged vs dev embed behavior), which is
-  documented in `docs/internal/architecture/renderer-entry-origin-parity.md`.
+- It is separate from Electron build/runtime asset behavior, which is documented in
+  `docs/internal/architecture/electron-build-paths-and-runtime-assets.md`.
 
 ## Trust Boundary
 - RLS/permission checks are validated in DB, not mocked in tests

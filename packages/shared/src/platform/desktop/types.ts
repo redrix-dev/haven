@@ -128,6 +128,7 @@ export type DesktopAPI = {
   openVoicePopout: () => Promise<{ opened: boolean }>;
   closeVoicePopout: () => Promise<{ closed: boolean }>;
   syncVoicePopoutState: (state: VoicePopoutState) => Promise<void>;
+  requestVoicePopoutStateSync: () => Promise<void>;
   dispatchVoicePopoutControlAction: (action: VoicePopoutControlAction) => Promise<void>;
   onProtocolUrl: (listener: (url: string) => void) => () => void;
   onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => () => void;

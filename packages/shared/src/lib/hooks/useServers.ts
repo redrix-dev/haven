@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@shared/contexts/AuthContext';
 import { getControlPlaneBackend } from '@shared/lib/backend';
 import { getErrorMessage } from '@platform/lib/errors';
+import { useAuthStore } from '@shared/stores/authStore';
+import { useServersStore } from '@shared/stores/serversStore';
 import type { ServerSummary } from '@shared/lib/backend/types';
 
 const controlPlaneBackend = getControlPlaneBackend();
@@ -9,37 +10,64 @@ const controlPlaneBackend = getControlPlaneBackend();
 type ServersStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export function useServers() {
-  const { user } = useAuth();
-  const [servers, setServers] = useState<ServerSummary[]>([]);
+  const user = useAuthStore((state) => state.user);
   const [status, setStatus] = useState<ServersStatus>('idle');
   const [error, setError] = useState<string | null>(null);
-  const loading = status === 'loading';
+  const servers = useServersStore((state) => state.servers);
+  const loading = useServersStore((state) => state.isLoading);
+
+  const setStoredServers = useCallback((serverList: ServerSummary[]) => {
+    useServersStore.getState().setServers(serverList);
+  }, []);
+
+  const setStoredCurrentServer = useCallback((currentServer: ServerSummary | null) => {
+    useServersStore.getState().setCurrentServer(currentServer);
+  }, []);
+
+  const setStoredIsLoading = useCallback((isLoading: boolean) => {
+    useServersStore.getState().setIsLoading(isLoading);
+  }, []);
+
+  const resetStoredServers = useCallback(() => {
+    useServersStore.getState().reset();
+  }, []);
+
+  const syncStoredCurrentServer = useCallback((serverList: ServerSummary[]) => {
+    const { currentServerId } = useServersStore.getState();
+    const nextCurrentServer =
+      currentServerId ? serverList.find((server) => server.id === currentServerId) ?? null : null;
+    setStoredCurrentServer(nextCurrentServer);
+  }, [setStoredCurrentServer]);
 
   const loadServers = useCallback(async () => {
     if (!user) {
-      setServers([]);
+      resetStoredServers();
       setStatus('idle');
       setError(null);
       return;
     }
 
     setStatus('loading');
+    setStoredIsLoading(true);
     setError(null);
 
     try {
       const serverList = await controlPlaneBackend.listUserCommunities(user.id);
-      setServers(serverList);
+      setStoredServers(serverList);
+      syncStoredCurrentServer(serverList);
       setStatus('success');
     } catch (err: unknown) {
       console.error('Error loading servers:', err);
       setStatus('error');
       setError(getErrorMessage(err, 'Failed to load servers.'));
+    } finally {
+      setStoredIsLoading(false);
     }
-  }, [user]);
+  }, [resetStoredServers, setStoredIsLoading, setStoredServers, syncStoredCurrentServer, user]);
 
   useEffect(() => {
     if (!user) {
-      setServers([]);
+      resetStoredServers();
       setStatus('idle');
       setError(null);
       return;
@@ -53,7 +81,7 @@ export function useServers() {
     return () => {
       void subscription.unsubscribe();
     };
-  }, [user, loadServers]);
+  }, [user, loadServers, resetStoredServers]);
 
   async function createServer(name: string) {
     if (!user) throw new Error('Not authenticated');

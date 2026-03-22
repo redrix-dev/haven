@@ -24,7 +24,7 @@ Audit index for internal documentation after the renderer/main/preload refactor.
 | `docs/internal/architecture/moderation-reports.md` | Internal engineers | Moderation report system architecture | High | Domain architecture reference |
 | `docs/internal/architecture/notifications-and-delivery.md` | Internal engineers | Notification model and delivery flow | High | Domain architecture reference |
 | `docs/internal/architecture/permissions-and-roles.md` | Internal engineers | Permission/role enforcement model | High | Security-sensitive reference |
-| `docs/internal/architecture/renderer-entry-origin-parity.md` | Internal engineers | Renderer entry service parity and failure modes | High | Electron security/runtime behavior |
+| `docs/internal/architecture/electron-build-paths-and-runtime-assets.md` | Internal engineers | Electron renderer entry flow, output folders, and bundled runtime asset behavior | High | Canonical Electron build/runtime path reference |
 | `docs/internal/architecture/backend-seam.md` | Internal engineers | Backend seam design and layering | Medium-High | Still useful after refactor; path references updated |
 | `docs/internal/architecture/voice-architecture.md` | Internal engineers | Voice architecture and future SFU path | Medium-High | Strategic architecture reference |
 

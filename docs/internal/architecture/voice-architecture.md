@@ -48,7 +48,7 @@
   - debug-only input gain slider (client-side meter gain),
   - speaker output device selection (`setSinkId` when supported),
   - speaker test playback + speaker volume slider.
-- Speaker test clip is bundled from `packages/shared/src/assets/audio/voice-debug-speaker-test.mp3` via webpack
+- Speaker test clip is bundled from `packages/shared/src/assets/audio/voice/voice-debug-speaker-test.mp3` via the shared runtime audio helper
   asset import so it ships with the renderer build.
 
 ### 5) Security Boundary

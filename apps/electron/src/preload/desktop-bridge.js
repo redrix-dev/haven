@@ -18,6 +18,8 @@ const exposeDesktopBridge = ({ contextBridge, ipcRenderer }) => {
     closeVoicePopout: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_POPOUT_CLOSE),
     syncVoicePopoutState: (payload) =>
       ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_POPOUT_STATE_SYNC, payload),
+    requestVoicePopoutStateSync: () =>
+      ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_POPOUT_REQUEST_SYNC),
     dispatchVoicePopoutControlAction: (payload) =>
       ipcRenderer.invoke(DESKTOP_IPC_KEYS.VOICE_POPOUT_CONTROL_DISPATCH, payload),
 

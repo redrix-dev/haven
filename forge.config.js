@@ -1,7 +1,10 @@
-const { FusesPlugin } = require('@electron-forge/plugin-fuses');
-const { FuseV1Options, FuseVersion } = require('@electron/fuses');
-const packageJson = require('./package.json');
-const { desktopAssetPaths, verifyDesktopAssetsExist } = require('./tooling/config/app-assets.cjs');
+const { FusesPlugin } = require("@electron-forge/plugin-fuses");
+const { FuseV1Options, FuseVersion } = require("@electron/fuses");
+const packageJson = require("./package.json");
+const {
+  desktopAssetPaths,
+  verifyDesktopAssetsExist,
+} = require("./tooling/config/app-assets.cjs");
 
 verifyDesktopAssetsExist();
 
@@ -10,20 +13,20 @@ module.exports = {
     asar: true,
     icon: desktopAssetPaths.iconBasePath,
     win32metadata: {
-      CompanyName: 'Haven',
-      FileDescription: 'Haven',
-      InternalName: 'Haven',
-      OriginalFilename: 'Haven.exe',
-      ProductName: 'Haven',
+      CompanyName: "Haven",
+      FileDescription: "Haven",
+      InternalName: "Haven",
+      OriginalFilename: "Haven.exe",
+      ProductName: "Haven",
     },
   },
   publishers: [
     {
-      name: '@electron-forge/publisher-github',
+      name: "@electron-forge/publisher-github",
       config: {
         repository: {
-          owner: 'redrix-dev',
-          name: 'haven',
+          owner: "redrix-dev",
+          name: "haven",
         },
         prerelease: false,
         draft: true,
@@ -33,46 +36,47 @@ module.exports = {
   rebuildConfig: {},
   makers: [
     {
-      name: '@electron-forge/maker-squirrel',
+      name: "@electron-forge/maker-squirrel",
       config: {
-        name: 'haven',
-        exe: 'Haven.exe',
+        name: "haven",
+        exe: "Haven.exe",
         setupExe: `haven-${packageJson.version}.Setup.exe`,
         setupIcon: desktopAssetPaths.iconIcoPath,
-        iconUrl: 'https://github.com/redrix-dev/haven/raw/main/apps/electron/assets/icon.ico',
+        iconUrl:
+          "https://github.com/redrix-dev/haven/raw/main/apps/electron/assets/icon.ico",
       },
     },
     {
-      name: '@electron-forge/maker-zip',
-      platforms: ['darwin'],
+      name: "@electron-forge/maker-zip",
+      platforms: ["darwin"],
     },
     {
-      name: '@electron-forge/maker-deb',
+      name: "@electron-forge/maker-deb",
       config: {},
     },
     {
-      name: '@electron-forge/maker-rpm',
+      name: "@electron-forge/maker-rpm",
       config: {},
     },
   ],
   plugins: [
     {
-      name: '@electron-forge/plugin-auto-unpack-natives',
+      name: "@electron-forge/plugin-auto-unpack-natives",
       config: {},
     },
     {
-      name: '@electron-forge/plugin-webpack',
+      name: "@electron-forge/plugin-webpack",
       config: {
-        mainConfig: './webpack.main.config.js',
+        mainConfig: "./webpack.main.config.js",
         renderer: {
-          config: './webpack.renderer.config.js',
+          config: "./webpack.renderer.config.js",
           entryPoints: [
             {
-              html: './apps/electron/src/renderer/index.html',
-              js: './apps/electron/src/renderer/index.tsx',
-              name: 'main_window',
+              html: "./apps/electron/src/renderer/index.html",
+              js: "./apps/electron/src/renderer/index.tsx",
+              name: "main_window",
               preload: {
-                js: './apps/electron/src/preload/index.js',
+                js: "./apps/electron/src/preload/index.js",
               },
             },
           ],

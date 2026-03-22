@@ -43,6 +43,7 @@ export function MembersTab({
   onToggleMemberRole,
   onSaveMemberRoles,
 }: MembersTabProps) {
+  const [memberSearch, setMemberSearch] = useState("");
   const filteredMembers = members.filter(
     (member) =>
       member.displayName.toLowerCase().includes(memberSearch.toLowerCase()) ||
@@ -50,7 +51,6 @@ export function MembersTab({
   );
   const selectedMember =
     members.find((m) => m.memberId === selectedMemberId) || null;
-  const [memberSearch, setMemberSearch] = useState("");
   return (
     <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3">
       <div className="shrink-0 space-y-1">

@@ -18,20 +18,10 @@ if (!hasSingleInstanceLock) {
 }
 
 let mainWindow = null;
-let rendererEntryService = null;
 let voicePopoutWindowManager = null;
 const shouldDebugContextMenus =
   !app.isPackaged && process.env.HAVEN_DEBUG_CONTEXT_MENUS === '1';
 const shouldDebugWindowFocus = process.env.HAVEN_DEBUG_WINDOW_FOCUS === '1';
-const shouldDebugRendererEntry = process.env.HAVEN_DEBUG_RENDERER_ENTRY === '1';
-const rendererEntryPortFromEnv = Number.parseInt(process.env.HAVEN_RENDERER_HTTP_PORT ?? '', 10);
-const devRendererEntryPortOverride =
-  !app.isPackaged &&
-  Number.isInteger(rendererEntryPortFromEnv) &&
-  rendererEntryPortFromEnv >= 1 &&
-  rendererEntryPortFromEnv <= 65535
-    ? rendererEntryPortFromEnv
-    : undefined;
 
 const debugContextMenu = (scope, eventName, details) => {
   if (!shouldDebugContextMenus) return;
@@ -65,7 +55,7 @@ const createWindow = () => {
   const window = createMainWindow({
     app,
     preloadEntry: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
-    rendererEntryService,
+    rendererEntryUrl: MAIN_WINDOW_WEBPACK_ENTRY,
     shouldDebugWindowFocus,
     debugWindowFocus,
     debugContextMenu,
@@ -84,7 +74,6 @@ registerWindowBehaviors({
   app,
   BrowserWindow,
   createWindow,
-  getRendererEntryService: () => rendererEntryService,
 });
 
 // This method will be called when Electron has finished
@@ -94,7 +83,7 @@ app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
 
   try {
-    rendererEntryService = await startMainRuntime({
+    await startMainRuntime({
       app,
       sessionRef: session.defaultSession,
       ipcMain,
@@ -105,28 +94,26 @@ app.whenReady().then(async () => {
       voicePopoutWindowManager: {
         open: () => voicePopoutWindowManager?.open(),
         close: () => voicePopoutWindowManager?.close(),
+        getState: () => voicePopoutWindowManager?.getState(),
         sendState: (state) => voicePopoutWindowManager?.sendState(state),
         sendControlAction: (action) => voicePopoutWindowManager?.sendControlAction(action),
       },
-      shouldDebugRendererEntry,
-      devRendererEntryPortOverride,
       mainWindowWebpackEntry: MAIN_WINDOW_WEBPACK_ENTRY,
     });
     voicePopoutWindowManager = createVoicePopoutWindowManager({
       app,
       preloadEntry: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
-      rendererEntryService,
+      rendererEntryUrl: MAIN_WINDOW_WEBPACK_ENTRY,
       getMainWindow: () => mainWindow,
     });
     createWindow();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const isPortConflict = Boolean(error && typeof error === 'object' && error.code === 'EADDRINUSE');
-    const errorBody = isPortConflict
-      ? `Haven could not bind the unified renderer entry server because the required local port is already in use.\n\n${message}\n\nClose the conflicting process and try again.`
-      : `Haven could not start the unified renderer entry service.\n\n${message}\n\nCheck for a loopback port conflict and try again.`;
     console.error('Failed to initialize Haven main process:', error);
-    dialog.showErrorBox('Haven failed to start', errorBody);
+    dialog.showErrorBox(
+      'Haven failed to start',
+      `Haven could not initialize the main process.\n\n${message}`,
+    );
     app.quit();
   }
 });

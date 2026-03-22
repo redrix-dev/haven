@@ -12,17 +12,10 @@ import {
 import { ActionMenuContent } from '@shared/components/menus/ActionMenuContent';
 import { resolveContextMenuIntent } from '@shared/lib/contextMenu';
 import { traceContextMenuEvent } from '@shared/lib/contextMenu/debugTrace';
+import { useServersStore } from '@shared/stores/serversStore';
 import type { MenuActionNode } from '@shared/lib/contextMenu/types';
 
-interface Server {
-  id: string;
-  name: string;
-  icon?: string;
-}
-
 interface ServerListProps {
-  servers: Server[];
-  currentServerId: string | null;
   currentServerIsOwner: boolean;
   canManageCurrentServer: boolean;
   canOpenCurrentServerSettings: boolean;
@@ -51,8 +44,6 @@ interface ServerListProps {
 }
 
 export function ServerList({
-  servers,
-  currentServerId,
   currentServerIsOwner,
   canManageCurrentServer,
   canOpenCurrentServerSettings,
@@ -78,6 +69,8 @@ export function ServerList({
   onOpenServerSettingsForServer,
   onReorder,
 }: ServerListProps) {
+  const servers = useServersStore((state) => state.servers);
+  const currentServerId = useServersStore((state) => state.currentServerId);
   const avatarInitial = userDisplayName.trim().charAt(0).toUpperCase() || 'U';
 
   // Drag-to-reorder state
@@ -208,7 +201,7 @@ export function ServerList({
                             }`}
                           >
                             <span className="text-base leading-none">
-                              {server.icon || server.name.charAt(0).toUpperCase()}
+                              {server.name.charAt(0).toUpperCase()}
                             </span>
                           </Button>
                         </ContextMenuTrigger>

@@ -79,9 +79,7 @@ describe('createVoicePopoutWindowManager', () => {
     const manager = createVoicePopoutWindowManager({
       app: { isPackaged: true },
       preloadEntry: 'preload.js',
-      rendererEntryService: {
-        getEntryUrl: () => 'http://127.0.0.1:3000/voice_popout/',
-      },
+      rendererEntryUrl: 'http://127.0.0.1:3000/main_window',
       getMainWindow: () => mainWindow,
       desktopIpcKeys: DESKTOP_IPC_KEYS,
       BrowserWindowClass: FakeBrowserWindow,
@@ -126,6 +124,9 @@ describe('createVoicePopoutWindowManager', () => {
     manager.open();
 
     expect(browserWindows).toHaveLength(1);
+    expect(browserWindows[0]?.loadURL).toHaveBeenCalledWith(
+      'http://127.0.0.1:3000/main_window?view=voice-popout',
+    );
     expect(mainWindow.webContents.send).toHaveBeenLastCalledWith(
       'haven:voice-popout:state',
       expect.objectContaining({

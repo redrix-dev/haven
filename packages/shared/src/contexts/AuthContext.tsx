@@ -10,6 +10,7 @@ import { supabase } from "@shared/lib/supabase";
 import { desktopClient } from "@platform/desktop/client";
 import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
+import { useAuthStore } from "@shared/stores/authStore";
 import type {
   AuthError,
   EmailOtpType,
@@ -24,12 +25,9 @@ type AuthStatus =
   | "unauthenticated"
   | "error";
 
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+interface AuthContextValue {
   status: AuthStatus;
   error: string | null;
-  loading: boolean;
   passwordRecoveryRequired: boolean;
   signUp: (
     email: string,
@@ -48,7 +46,13 @@ interface AuthContextType {
   deleteAccount: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+type UseAuthResult = AuthContextValue & {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+};
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const SUPPORTED_EMAIL_OTP_TYPES = new Set<EmailOtpType>([
   "signup",
@@ -104,13 +108,10 @@ const parseAuthConfirmParams = (parsed: URL): Record<string, string> => {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthStatus>("initializing");
   const [error, setError] = useState<string | null>(null);
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
     useState(false);
-  const loading = status === "initializing";
   const processedAuthConfirmUrlsRef = useRef<Set<string>>(new Set());
 
   const consumeAuthConfirmUrl = useCallback(
@@ -176,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
 
     const initializeAuth = async () => {
+      useAuthStore.getState().setIsLoading(true);
       try {
         const {
           data: { session },
@@ -185,14 +187,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error;
         if (!isMounted) return;
 
+        const { setSession, setUser, setIsLoading } = useAuthStore.getState();
         setSession(session);
         setUser(session?.user ?? null);
+        setIsLoading(false);
         setStatus(session?.user ? "authenticated" : "unauthenticated");
         setError(null);
       } catch (err: unknown) {
         if (!isMounted) return;
+        const { setSession, setUser, setIsLoading } = useAuthStore.getState();
         setSession(null);
         setUser(null);
+        setIsLoading(false);
         setStatus("error");
         setError(getErrorMessage(err, "Failed to initialize authentication."));
       }
@@ -205,9 +211,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("[AuthContext] auth event:", event, session?.user?.id); //FUTURE CODY REMOVE THIS LATER ALSO IM SORRY
+      if (event === "TOKEN_REFRESHED") {
+        const currentId = useAuthStore.getState().user?.id;
+        console.log(
+          "[AuthContext] TOKEN_REFRESHED — store id:",
+          currentId,
+          "incoming id:",
+          session?.user?.id,
+          "skipping:",
+          currentId === session?.user?.id,
+        );
+      }
       if (!isMounted) return;
+      const nextUser = session?.user ?? null;
+      const currentUserId = useAuthStore.getState().user?.id ?? null;
+      const shouldSkipUserUpdate =
+        event === "TOKEN_REFRESHED" ||
+        (event === "SIGNED_IN" &&
+          nextUser?.id != null &&
+          nextUser.id === currentUserId);
+      const { setSession, setUser, setIsLoading } = useAuthStore.getState();
       setSession(session);
-      setUser(session?.user ?? null);
+      if (!shouldSkipUserUpdate) {
+        setUser(nextUser);
+      }
+      setIsLoading(false);
       setStatus(session?.user ? "authenticated" : "unauthenticated");
       setError(null);
       if (event === "PASSWORD_RECOVERY") {
@@ -362,8 +390,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("Failed to sign out after account deletion:", signOutError);
     }
 
+    const { setSession, setUser, setIsLoading } = useAuthStore.getState();
     setSession(null);
     setUser(null);
+    setIsLoading(false);
     setStatus("unauthenticated");
     setError(null);
     setPasswordRecoveryRequired(false);
@@ -372,11 +402,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user,
-        session,
         status,
         error,
-        loading,
         passwordRecoveryRequired,
         signUp,
         signIn,
@@ -391,10 +418,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAuth() {
+export function useAuth(): UseAuthResult {
   const context = useContext(AuthContext);
+  const user = useAuthStore((state) => state.user);
+  const session = useAuthStore((state) => state.session);
+  const loading = useAuthStore((state) => state.isLoading);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context;
+  const {
+    status,
+    error,
+    passwordRecoveryRequired,
+    signUp,
+    signIn,
+    requestPasswordReset,
+    completePasswordRecovery,
+    signOut,
+    deleteAccount,
+  } = context;
+
+  return React.useMemo(
+    () => ({
+      status,
+      error,
+      passwordRecoveryRequired,
+      signUp,
+      signIn,
+      requestPasswordReset,
+      completePasswordRecovery,
+      signOut,
+      deleteAccount,
+      user,
+      session,
+      loading,
+    }),
+    [
+      status,
+      error,
+      passwordRecoveryRequired,
+      signUp,
+      signIn,
+      requestPasswordReset,
+      completePasswordRecovery,
+      signOut,
+      deleteAccount,
+      user,
+      session,
+      loading,
+    ],
+  );
 }

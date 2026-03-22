@@ -1,6 +1,5 @@
-const registerWindowBehaviors = ({ app, BrowserWindow, createWindow, getRendererEntryService }) => {
+const registerWindowBehaviors = ({ app, BrowserWindow, createWindow }) => {
   app.on('activate', () => {
-    if (!getRendererEntryService()) return;
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
@@ -10,14 +9,6 @@ const registerWindowBehaviors = ({ app, BrowserWindow, createWindow, getRenderer
     if (process.platform !== 'darwin') {
       app.quit();
     }
-  });
-
-  app.on('before-quit', () => {
-    const rendererEntryService = getRendererEntryService();
-    if (!rendererEntryService) return;
-    void rendererEntryService.stop().catch((error) => {
-      console.error('Failed to stop renderer entry service:', error);
-    });
   });
 };
 

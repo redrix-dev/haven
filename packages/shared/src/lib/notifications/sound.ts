@@ -1,8 +1,7 @@
-import { AUDIO_ASSET_PATHS } from '@shared/assets/manifest';
-import type { NotificationAudioSettings } from '@platform/desktop/types';
-import type { NotificationKind } from '@shared/lib/backend/types';
-import type { NotificationDeliveryReasonCode } from '@shared/lib/notifications/routePolicy';
-
+import { RUNTIME_AUDIO_URLS } from "@platform/assets/runtimeAudio";
+import type { NotificationAudioSettings } from "@platform/desktop/types";
+import type { NotificationKind } from "@shared/lib/backend/types";
+import type { NotificationDeliveryReasonCode } from "@shared/lib/notifications/routePolicy";
 type NotificationSoundRequest = {
   kind: NotificationKind;
   deliverSound: boolean;
@@ -15,7 +14,9 @@ type VoicePresenceSoundRequest = {
   audioSettings: NotificationAudioSettings;
 };
 
-export type VoicePresenceSoundEvent = 'voice_presence_join' | 'voice_presence_leave';
+export type VoicePresenceSoundEvent =
+  | "voice_presence_join"
+  | "voice_presence_leave";
 export type AppSoundEvent = NotificationKind | VoicePresenceSoundEvent;
 
 export type NotificationSoundPlayResult = {
@@ -35,37 +36,37 @@ const SOUND_CONFIG_BY_EVENT: Record<
   }
 > = {
   friend_request_received: {
-    url: AUDIO_ASSET_PATHS.notifications.default,
+    url: RUNTIME_AUDIO_URLS.notifications.default,
     getVolume: (audioSettings) => audioSettings.notificationSoundVolume,
     enabledWhen: () => true,
   },
   friend_request_accepted: {
-    url: AUDIO_ASSET_PATHS.notifications.default,
+    url: RUNTIME_AUDIO_URLS.notifications.default,
     getVolume: (audioSettings) => audioSettings.notificationSoundVolume,
     enabledWhen: () => true,
   },
   dm_message: {
-    url: AUDIO_ASSET_PATHS.notifications.default,
+    url: RUNTIME_AUDIO_URLS.notifications.default,
     getVolume: (audioSettings) => audioSettings.notificationSoundVolume,
     enabledWhen: () => true,
   },
   channel_mention: {
-    url: AUDIO_ASSET_PATHS.notifications.default,
+    url: RUNTIME_AUDIO_URLS.notifications.default,
     getVolume: (audioSettings) => audioSettings.notificationSoundVolume,
     enabledWhen: () => true,
   },
   system: {
-    url: AUDIO_ASSET_PATHS.notifications.default,
+    url: RUNTIME_AUDIO_URLS.notifications.default,
     getVolume: (audioSettings) => audioSettings.notificationSoundVolume,
     enabledWhen: () => true,
   },
   voice_presence_join: {
-    url: AUDIO_ASSET_PATHS.voicePresence.join,
+    url: RUNTIME_AUDIO_URLS.voicePresence.join,
     getVolume: (audioSettings) => audioSettings.voicePresenceSoundVolume,
     enabledWhen: (audioSettings) => audioSettings.voicePresenceSoundEnabled,
   },
   voice_presence_leave: {
-    url: AUDIO_ASSET_PATHS.voicePresence.leave,
+    url: RUNTIME_AUDIO_URLS.voicePresence.leave,
     getVolume: (audioSettings) => audioSettings.voicePresenceSoundVolume,
     enabledWhen: (audioSettings) => audioSettings.voicePresenceSoundEnabled,
   },
@@ -84,37 +85,49 @@ const playSoundEvent = async ({
 }): Promise<NotificationSoundPlayResult> => {
   const soundConfig = SOUND_CONFIG_BY_EVENT[event];
 
-  if (!deliverSound) return { played: false, reasonCode: 'sound_pref_disabled' };
-  if (!audioSettings.masterSoundEnabled) return { played: false, reasonCode: 'sound_pref_disabled' };
-  if (!soundConfig.enabledWhen(audioSettings)) return { played: false, reasonCode: 'sound_pref_disabled' };
-  if (suppressWhenUnfocused && typeof document !== 'undefined' && !document.hasFocus()) {
-    return { played: false, reasonCode: 'in_app_suppressed_due_to_push_active_background' };
+  if (!deliverSound)
+    return { played: false, reasonCode: "sound_pref_disabled" };
+  if (!audioSettings.masterSoundEnabled)
+    return { played: false, reasonCode: "sound_pref_disabled" };
+  if (!soundConfig.enabledWhen(audioSettings))
+    return { played: false, reasonCode: "sound_pref_disabled" };
+  if (
+    suppressWhenUnfocused &&
+    typeof document !== "undefined" &&
+    !document.hasFocus()
+  ) {
+    return {
+      played: false,
+      reasonCode: "in_app_suppressed_due_to_push_active_background",
+    };
   }
   if (
-    typeof document !== 'undefined' &&
+    typeof document !== "undefined" &&
     document.hasFocus() &&
     audioSettings.playSoundsWhenFocused === false
   ) {
-    return { played: false, reasonCode: 'sound_pref_disabled' };
+    return { played: false, reasonCode: "sound_pref_disabled" };
   }
 
   const now = Date.now();
   if (now - lastPlayedAt < MIN_SOUND_INTERVAL_MS) {
-    return { played: false, reasonCode: 'sound_pref_disabled' };
+    return { played: false, reasonCode: "sound_pref_disabled" };
   }
 
-  const volume = Math.max(0, Math.min(100, Math.round(soundConfig.getVolume(audioSettings))));
-  if (volume === 0) return { played: false, reasonCode: 'sound_pref_disabled' };
-
+  const volume = Math.max(
+    0,
+    Math.min(100, Math.round(soundConfig.getVolume(audioSettings))),
+  );
+  if (volume === 0) return { played: false, reasonCode: "sound_pref_disabled" };
   try {
     const audio = new Audio(soundConfig.url);
     audio.volume = volume / 100;
     await audio.play();
     lastPlayedAt = now;
-    return { played: true, reasonCode: 'sent' };
+    return { played: true, reasonCode: "sent" };
   } catch (error) {
-    console.warn('Failed to play notification sound:', error);
-    return { played: false, reasonCode: 'provider_retryable_failure' };
+    console.warn("Failed to play notification sound:", error);
+    return { played: false, reasonCode: "provider_retryable_failure" };
   }
 };
 
