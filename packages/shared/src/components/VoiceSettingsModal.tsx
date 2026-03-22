@@ -26,9 +26,11 @@ type VoiceSettingsModalProps = {
   voiceSessionActions: VoiceSessionControllerActions;
   showDiagnostics?: boolean;
   canOpenVoicePopout?: boolean;
+  canKickParticipants?: boolean;
   onDisconnect?: () => void;
   onOpenVoicePopout?: () => void;
   onOpenVoiceHardwareTest?: () => void;
+  onKickParticipant?: (targetUserId: string, displayName: string) => void;
 };
 
 export function VoiceSettingsModal({
@@ -44,9 +46,11 @@ export function VoiceSettingsModal({
   voiceSessionActions,
   showDiagnostics = false,
   canOpenVoicePopout = false,
+  canKickParticipants = false,
   onDisconnect,
   onOpenVoicePopout,
   onOpenVoiceHardwareTest,
+  onKickParticipant,
 }: VoiceSettingsModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,6 +100,7 @@ export function VoiceSettingsModal({
             diagnosticsUpdatedAt={voiceSessionState.diagnosticsUpdatedAt}
             diagnosticsLoading={voiceSessionState.diagnosticsLoading}
             canOpenVoicePopout={canOpenVoicePopout}
+            canKickParticipants={canKickParticipants}
             onUpdateVoiceSettingsPatch={
               voiceSessionActions.updateVoiceSettingsPatch
             }
@@ -121,6 +126,7 @@ export function VoiceSettingsModal({
             resetMemberVolume={voiceSessionActions.resetMemberVolume}
             resetAllMemberVolumes={voiceSessionActions.resetAllMemberVolumes}
             getMemberVolume={voiceSessionActions.getMemberVolume}
+            onKickParticipant={onKickParticipant}
           />
         </div>
 

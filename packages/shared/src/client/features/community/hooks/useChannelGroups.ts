@@ -6,7 +6,9 @@ import type { Channel, ChannelGroupState } from '@shared/lib/backend/types';
 type UseChannelGroupsInput = {
   currentServerId: string | null;
   currentUserId: string | null;
+  currentChannelId: string | null;
   channels: Channel[];
+  onActiveChannelAccessLost?: (channelId: string, channelName: string) => void;
 };
 
 const createEmptyChannelGroupState = (ungroupedChannelIds: string[] = []): ChannelGroupState => ({
@@ -15,10 +17,22 @@ const createEmptyChannelGroupState = (ungroupedChannelIds: string[] = []): Chann
   collapsedGroupIds: [],
 });
 
-export function useChannelGroups({ currentServerId, currentUserId, channels }: UseChannelGroupsInput) {
+export function useChannelGroups({
+  currentServerId,
+  currentUserId,
+  currentChannelId,
+  channels,
+  onActiveChannelAccessLost,
+}: UseChannelGroupsInput) {
   const [channelGroupState, setChannelGroupState] = React.useState<ChannelGroupState>(
     createEmptyChannelGroupState()
   );
+  const lastAccessLostChannelIdRef = React.useRef<string | null>(null);
+  const trackedActiveChannelRef = React.useRef<{ serverId: string | null; channelId: string | null }>({
+    serverId: null,
+    channelId: null,
+  });
+  const channelNameByIdRef = React.useRef<Record<string, string>>({});
 
   const resetChannelGroups = React.useCallback(() => {
     setChannelGroupState(createEmptyChannelGroupState());
@@ -45,6 +59,38 @@ export function useChannelGroups({ currentServerId, currentUserId, channels }: U
   );
 
   React.useEffect(() => {
+    const nextChannelNames = { ...channelNameByIdRef.current };
+    for (const channel of channels) {
+      nextChannelNames[channel.id] = channel.name;
+    }
+    channelNameByIdRef.current = nextChannelNames;
+  }, [channels]);
+
+  const detectActiveChannelAccessLoss = React.useCallback(
+    (accessibleChannelIds: string[], channelIdToValidate: string | null) => {
+      if (!channelIdToValidate) {
+        lastAccessLostChannelIdRef.current = null;
+        return;
+      }
+
+      const stillHasAccess = accessibleChannelIds.includes(channelIdToValidate);
+      if (stillHasAccess) {
+        if (lastAccessLostChannelIdRef.current === channelIdToValidate) {
+          lastAccessLostChannelIdRef.current = null;
+        }
+        return;
+      }
+
+      if (lastAccessLostChannelIdRef.current === channelIdToValidate) return;
+
+      lastAccessLostChannelIdRef.current = channelIdToValidate;
+      const channelName = channelNameByIdRef.current[channelIdToValidate] ?? channelIdToValidate;
+      onActiveChannelAccessLost?.(channelIdToValidate, channelName); // CHECKPOINT 4 COMPLETE
+    },
+    [onActiveChannelAccessLost]
+  );
+
+  React.useEffect(() => {
     let isMounted = true;
 
     if (!currentServerId) {
@@ -56,6 +102,10 @@ export function useChannelGroups({ currentServerId, currentUserId, channels }: U
 
     const communityBackend = getCommunityDataBackend(currentServerId);
     const channelIds = channels.map((channel) => channel.id);
+    const channelIdToValidate =
+      trackedActiveChannelRef.current.serverId === currentServerId
+        ? trackedActiveChannelRef.current.channelId ?? currentChannelId
+        : currentChannelId;
 
     const loadChannelGroups = async () => {
       try {
@@ -65,10 +115,12 @@ export function useChannelGroups({ currentServerId, currentUserId, channels }: U
         });
         if (!isMounted) return;
         setChannelGroupState(state);
+        detectActiveChannelAccessLoss(channelIds, channelIdToValidate);
       } catch (error) {
         console.error('Failed to load channel groups:', error);
         if (!isMounted) return;
         setChannelGroupState(createEmptyChannelGroupState(channelIds));
+        detectActiveChannelAccessLoss(channelIds, channelIdToValidate);
       }
     };
 
@@ -118,7 +170,14 @@ export function useChannelGroups({ currentServerId, currentUserId, channels }: U
       isMounted = false;
       void groupSubscription.unsubscribe();
     };
-  }, [channels, currentServerId, resetChannelGroups]);
+  }, [channels, currentServerId, detectActiveChannelAccessLoss, resetChannelGroups]);
+
+  React.useEffect(() => {
+    trackedActiveChannelRef.current = {
+      serverId: currentServerId,
+      channelId: currentChannelId,
+    };
+  }, [currentChannelId, currentServerId]);
 
   const createChannelGroup = React.useCallback(
     async (name: string, channelIdToAssign?: string | null) => {

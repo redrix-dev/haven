@@ -32,6 +32,12 @@ type VoiceSignalPayload = {
   candidate?: RTCIceCandidateInit;
 };
 
+type VoiceKickPayload = {
+  targetUserId: string;
+  channelId: string;
+  kickedBy: string;
+};
+
 type VoicePresencePayload = {
   user_id: string;
   display_name: string;
@@ -78,6 +84,7 @@ type UseVoiceSessionControllerInput = {
       | null
   ) => void;
   onSessionError?: (message: string) => void;
+  onVoiceKick?: (payload: VoiceKickPayload) => void;
 };
 
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
@@ -108,6 +115,7 @@ export function useVoiceSessionController({
   onSessionStateChange,
   onControlActionsReady,
   onSessionError,
+  onVoiceKick,
 }: UseVoiceSessionControllerInput): {
   state: VoiceSessionControllerState;
   actions: VoiceSessionControllerActions;
@@ -1155,6 +1163,12 @@ export function useVoiceSessionController({
         .on('presence', { event: 'leave' }, syncParticipantsFromPresence)
         .on('broadcast', { event: 'webrtc-signal' }, ({ payload }) => {
           void handleSignal(payload as VoiceSignalPayload);
+        })
+        .on('broadcast', { event: 'voice_kick' }, ({ payload }) => {
+          const kickPayload = payload as VoiceKickPayload;
+          if (kickPayload.targetUserId !== currentUserId) return;
+          if (kickPayload.channelId !== targetChannel.channelId) return;
+          onVoiceKick?.(kickPayload);
         });
 
       channelRef.current = voiceChannel;
@@ -1199,6 +1213,7 @@ export function useVoiceSessionController({
       joined,
       joining,
       onSessionError,
+      onVoiceKick,
       refreshAudioDevices,
       requestLocalAudioStream,
       selectedInputDeviceId,
@@ -1273,6 +1288,35 @@ export function useVoiceSessionController({
   const leaveVoiceChannel = React.useCallback(async () => {
     await cleanupVoiceSession();
   }, [cleanupVoiceSession]);
+
+  const kickFromVoice = React.useCallback(
+    async (targetUserId: string, channelId: string) => {
+      const channel = channelRef.current;
+      const currentChannel = activeChannelRef.current;
+      if (!channel || !currentChannel || !currentUserId) {
+        throw new Error('Not connected to a voice channel.');
+      }
+      if (currentChannel.channelId !== channelId) {
+        throw new Error('Voice channel mismatch.');
+      }
+
+      // CHECKPOINT 4 COMPLETE
+      const sendStatus = await channel.send({
+        type: 'broadcast',
+        event: 'voice_kick',
+        payload: {
+          targetUserId,
+          channelId,
+          kickedBy: currentUserId,
+        } satisfies VoiceKickPayload,
+      });
+
+      if (sendStatus !== 'ok') {
+        throw new Error('Failed to remove member from the voice channel.');
+      }
+    },
+    [currentUserId]
+  );
 
   const bindAudioElement = React.useCallback(
     (userId: string, element: HTMLAudioElement | null) => {
@@ -1576,6 +1620,7 @@ export function useVoiceSessionController({
     actions: {
       joinVoiceChannel: () => joinVoiceChannel(activeChannel),
       leaveVoiceChannel,
+      kickFromVoice,
       toggleMute,
       toggleDeafen,
       retryIce,

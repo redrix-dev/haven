@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getControlPlaneBackend } from '@shared/lib/backend';
 import { getErrorMessage } from '@platform/lib/errors';
 import { useAuthStore } from '@shared/stores/authStore';
@@ -9,12 +9,17 @@ const controlPlaneBackend = getControlPlaneBackend();
 
 type ServersStatus = 'idle' | 'loading' | 'success' | 'error';
 
-export function useServers() {
+type UseServersInput = {
+  onActiveServerAccessLost?: (serverId: string) => void;
+};
+
+export function useServers({ onActiveServerAccessLost }: UseServersInput = {}) {
   const user = useAuthStore((state) => state.user);
   const [status, setStatus] = useState<ServersStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const servers = useServersStore((state) => state.servers);
   const loading = useServersStore((state) => state.isLoading);
+  const lastAccessLostServerIdRef = useRef<string | null>(null);
 
   const setStoredServers = useCallback((serverList: ServerSummary[]) => {
     useServersStore.getState().setServers(serverList);
@@ -39,6 +44,30 @@ export function useServers() {
     setStoredCurrentServer(nextCurrentServer);
   }, [setStoredCurrentServer]);
 
+  const detectActiveServerAccessLoss = useCallback(
+    (serverList: ServerSummary[]) => {
+      const { currentServerId } = useServersStore.getState();
+      if (!currentServerId) {
+        lastAccessLostServerIdRef.current = null;
+        return;
+      }
+
+      const stillHasAccess = serverList.some((server) => server.id === currentServerId);
+      if (stillHasAccess) {
+        if (lastAccessLostServerIdRef.current === currentServerId) {
+          lastAccessLostServerIdRef.current = null;
+        }
+        return;
+      }
+
+      if (lastAccessLostServerIdRef.current === currentServerId) return;
+
+      lastAccessLostServerIdRef.current = currentServerId;
+      onActiveServerAccessLost?.(currentServerId); // CHECKPOINT 1 COMPLETE
+    },
+    [onActiveServerAccessLost]
+  );
+
   const loadServers = useCallback(async () => {
     if (!user) {
       resetStoredServers();
@@ -55,6 +84,7 @@ export function useServers() {
       const serverList = await controlPlaneBackend.listUserCommunities(user.id);
       setStoredServers(serverList);
       syncStoredCurrentServer(serverList);
+      detectActiveServerAccessLoss(serverList);
       setStatus('success');
     } catch (err: unknown) {
       console.error('Error loading servers:', err);
@@ -63,7 +93,14 @@ export function useServers() {
     } finally {
       setStoredIsLoading(false);
     }
-  }, [resetStoredServers, setStoredIsLoading, setStoredServers, syncStoredCurrentServer, user]);
+  }, [
+    detectActiveServerAccessLoss,
+    resetStoredServers,
+    setStoredIsLoading,
+    setStoredServers,
+    syncStoredCurrentServer,
+    user,
+  ]);
 
   useEffect(() => {
     if (!user) {

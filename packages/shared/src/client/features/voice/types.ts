@@ -6,6 +6,8 @@ export type VoiceControllerChannel = {
   channelName: string;
 };
 
+export type ForceDisconnectVoiceReason = 'access_lost' | 'kicked' | 'ban';
+
 export type VoiceParticipant = {
   userId: string;
   displayName: string;
@@ -60,6 +62,7 @@ export type VoiceSessionControllerState = {
 export type VoiceSessionControllerActions = {
   joinVoiceChannel: () => Promise<void>;
   leaveVoiceChannel: () => Promise<void>;
+  kickFromVoice: (targetUserId: string, channelId: string) => Promise<void>;
   toggleMute: () => void;
   toggleDeafen: () => void;
   retryIce: () => Promise<void>;

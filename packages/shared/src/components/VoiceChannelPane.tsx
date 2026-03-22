@@ -84,6 +84,7 @@ type VoiceChannelPaneProps = {
   diagnosticsUpdatedAt?: string | null;
   diagnosticsLoading?: boolean;
   canOpenVoicePopout?: boolean;
+  canKickParticipants?: boolean;
   onUpdateVoiceSettingsPatch?: (patch: Partial<VoiceSettings>) => void;
   onOpenVoiceHardwareTest?: () => void;
   onOpenVoicePopout?: () => void;
@@ -99,6 +100,7 @@ type VoiceChannelPaneProps = {
   resetMemberVolume: (userId: string) => void;
   resetAllMemberVolumes: () => void;
   getMemberVolume: (userId: string) => number;
+  onKickParticipant?: (targetUserId: string, displayName: string) => void;
 };
 
 export function VoiceChannelPane({
@@ -130,6 +132,7 @@ export function VoiceChannelPane({
   diagnosticsUpdatedAt = null,
   diagnosticsLoading = false,
   canOpenVoicePopout = false,
+  canKickParticipants = false,
   onUpdateVoiceSettingsPatch,
   onOpenVoiceHardwareTest,
   onOpenVoicePopout,
@@ -145,6 +148,7 @@ export function VoiceChannelPane({
   resetMemberVolume,
   resetAllMemberVolumes,
   getMemberVolume,
+  onKickParticipant,
 }: VoiceChannelPaneProps) {
   const updateVoiceSettingsPatch = (patch: Partial<VoiceSettings>) => {
     onUpdateVoiceSettingsPatch?.(patch);
@@ -616,6 +620,19 @@ export function VoiceChannelPane({
                     >
                       100%
                     </Button>
+                    {canKickParticipants && onKickParticipant && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          onKickParticipant(participant.userId, participant.displayName)
+                        }
+                        className="h-8 border-red-500/40 bg-red-500/10 px-2 text-xs text-red-100 hover:bg-red-500/20"
+                      >
+                        Remove
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

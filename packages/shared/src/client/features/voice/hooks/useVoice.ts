@@ -3,6 +3,7 @@ import { supabase } from '@shared/lib/supabase';
 import type { Channel } from '@shared/lib/backend/types';
 import type { VoicePresenceStateRow, VoiceSidebarParticipant } from '@client/app/types';
 import { areVoiceParticipantListsEqual, isEditableKeyboardTarget } from '@client/app/utils';
+import type { ForceDisconnectVoiceReason } from '@client/features/voice/types';
 import { useVoiceStore } from '@shared/stores/voiceStore';
 import {
   createInitialVoiceSessionStoreState,
@@ -193,6 +194,15 @@ export function useVoice({
       setVoicePanelOpen(false);
     },
     [cleanupStaleVoicePresenceChannels, resetStoredVoiceState, voiceControlActions]
+  );
+
+  const forceDisconnectVoice = React.useCallback(
+    async (reason: ForceDisconnectVoiceReason) => {
+      void reason;
+      // CHECKPOINT 1 COMPLETE
+      await disconnectVoiceSession();
+    },
+    [disconnectVoiceSession]
   );
 
 
@@ -420,6 +430,7 @@ export function useVoice({
       confirmVoiceChannelJoin,
       cancelVoiceChannelJoinPrompt,
       disconnectVoiceSession,
+      forceDisconnectVoice,
     },
   };
 }

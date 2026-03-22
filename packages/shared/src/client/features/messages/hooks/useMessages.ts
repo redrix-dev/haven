@@ -213,6 +213,27 @@ export function useMessages({
     [getChannelBundleCacheKey]
   );
 
+  const purgeMessageBundleCacheForServer = React.useCallback(
+    (communityId: string) => {
+      if (!communityId) return;
+
+      for (const cacheKey of Object.keys(messageBundleByChannelCacheRef.current)) {
+        if (!cacheKey.startsWith(`${communityId}:`)) continue;
+        delete messageBundleByChannelCacheRef.current[cacheKey];
+      }
+    },
+    []
+  );
+
+  const purgeMessageBundleCacheForChannel = React.useCallback(
+    (communityId: string, channelId: string) => {
+      if (!communityId || !channelId) return;
+      const cacheKey = getChannelBundleCacheKey(communityId, channelId);
+      delete messageBundleByChannelCacheRef.current[cacheKey];
+    },
+    [getChannelBundleCacheKey]
+  );
+
   const prefetchChannelMessages = React.useCallback(
     async (serverId: string, channelId: string) => {
       const cacheKey = getChannelBundleCacheKey(serverId, channelId);
@@ -1629,6 +1650,8 @@ export function useMessages({
       reportMessage,
       requestMessageLinkPreviewRefresh,
       prefetchChannelMessages,
+      purgeMessageBundleCacheForServer,
+      purgeMessageBundleCacheForChannel,
     },
   };
 }

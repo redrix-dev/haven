@@ -43,6 +43,8 @@ import type {
   MessageReaction,
   Message,
 } from '@shared/lib/backend/types';
+import type { ForceDisconnectVoiceReason } from '@client/features/voice/types';
+import { useServersStore } from '@shared/stores/serversStore';
 import { toast } from 'sonner';
 
 // Pure utility — no hook deps, stable across renders.
@@ -59,6 +61,18 @@ const normalizeInviteCode = (value: string): string => {
 };
 
 export function useChatAppOrchestration() {
+  const activeServerAccessLostHandlerRef = useRef<(serverId: string) => void>(() => {});
+  const activeChannelAccessLostHandlerRef = useRef<
+    (channelId: string, channelName: string) => void
+  >(() => {});
+  const serverNameByIdRef = useRef<Record<string, string>>({});
+  const handleActiveServerAccessLost = useCallback((serverId: string) => {
+    activeServerAccessLostHandlerRef.current(serverId);
+  }, []);
+  const handleActiveChannelAccessLost = useCallback((channelId: string, channelName: string) => {
+    activeChannelAccessLostHandlerRef.current(channelId, channelName);
+  }, []);
+
   // ── Backend singletons ────────────────────────────────────────────────────
   const controlPlaneBackend = getControlPlaneBackend();
   const directMessageBackend = getDirectMessageBackend();
@@ -83,7 +97,9 @@ export function useChatAppOrchestration() {
     error: serversError,
     createServer,
     refreshServers,
-  } = useServers();
+  } = useServers({
+    onActiveServerAccessLost: handleActiveServerAccessLost,
+  });
   const isServersLoading = serversStatus === 'loading';
 
   // ── Feature flags ─────────────────────────────────────────────────────────
@@ -236,6 +252,7 @@ export function useChatAppOrchestration() {
       confirmVoiceChannelJoin,
       cancelVoiceChannelJoinPrompt,
       disconnectVoiceSession,
+      forceDisconnectVoice,
     },
   } = useVoice({
     currentServerId,
@@ -263,7 +280,9 @@ export function useChatAppOrchestration() {
   } = useChannelGroups({
     currentServerId,
     currentUserId: user?.id ?? null,
+    currentChannelId,
     channels,
+    onActiveChannelAccessLost: handleActiveChannelAccessLost,
   });
 
   const sidebarChannelGroups = channelGroupState.groups.map((group) => ({
@@ -387,6 +406,8 @@ export function useChatAppOrchestration() {
       reportMessage,
       requestMessageLinkPreviewRefresh,
       prefetchChannelMessages,
+      purgeMessageBundleCacheForServer,
+      purgeMessageBundleCacheForChannel,
     },
   } = useMessages({
     currentServerId,
@@ -401,6 +422,181 @@ export function useChatAppOrchestration() {
     setAuthorProfiles,
     authorProfileCacheRef,
   });
+
+  const handleServerAccessLossReset = useCallback(
+    (serverId: string) => {
+      if (!serverId) return;
+
+      // CHECKPOINT 2 COMPLETE
+      useServersStore.getState().setCurrentServerId(null);
+      useServersStore.getState().setCurrentServer(null);
+      resetMessageState();
+      resetChannelGroups();
+      resetChannelsWorkspace();
+      resetServerPermissions();
+      purgeMessageBundleCacheForServer(serverId);
+      setCurrentServerId(null);
+      setWorkspaceMode('community');
+    },
+    [
+      purgeMessageBundleCacheForServer,
+      resetChannelGroups,
+      resetChannelsWorkspace,
+      resetMessageState,
+      resetServerPermissions,
+      setCurrentServerId,
+    ]
+  );
+
+  const disconnectVoiceForAccessLoss = useCallback(
+    async (input: { serverId?: string; channelId?: string }) => {
+      const activeChannel = activeVoiceChannel;
+      if (!activeChannel) return;
+
+      const losesServerAccess =
+        Boolean(input.serverId) && activeChannel.community_id === input.serverId;
+      const losesChannelAccess =
+        Boolean(input.channelId) && activeChannel.id === input.channelId;
+      if (!losesServerAccess && !losesChannelAccess) return false;
+
+      // CHECKPOINT 2 COMPLETE
+      await forceDisconnectVoice('access_lost');
+      return true;
+    },
+    [activeVoiceChannel, forceDisconnectVoice]
+  );
+
+  const showVoiceDisconnectToast = useCallback(
+    (input: {
+      reason: ForceDisconnectVoiceReason;
+      accessScope?: 'server' | 'channel';
+    }) => {
+      let message = 'You have been disconnected from voice.';
+      switch (input.reason) {
+        case 'access_lost':
+          message =
+            input.accessScope === 'channel'
+              ? 'You have been disconnected from voice. You no longer have access to this channel.'
+              : 'You have been disconnected from voice. You no longer have access to this server.';
+          break;
+        case 'kicked':
+          message = 'You have been removed from this voice channel.';
+          break;
+        case 'ban':
+          message = 'You have been disconnected from voice.';
+          break;
+        default:
+          break;
+      }
+
+      const toastId = `voice-disconnect:${input.reason}:${input.accessScope ?? 'generic'}`;
+      // CHECKPOINT 3 COMPLETE
+      toast(message, {
+        id: toastId,
+        action: {
+          label: 'Dismiss',
+          onClick: () => {
+            toast.dismiss(toastId);
+          },
+        },
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    const nextServerNameById = { ...serverNameByIdRef.current };
+    for (const server of servers) {
+      nextServerNameById[server.id] = server.name;
+    }
+    if (currentServer) {
+      nextServerNameById[currentServer.id] = currentServer.name;
+    }
+    serverNameByIdRef.current = nextServerNameById;
+  }, [currentServer, servers]);
+
+  const handleServerAccessLostCascade = useCallback(
+    async (serverId: string) => {
+      if (!serverId) return;
+
+      const lostServerName =
+        (currentServerId === serverId ? currentServer?.name : null) ??
+        serverNameByIdRef.current[serverId] ??
+        'Unknown server';
+
+      const disconnectedFromVoice = await disconnectVoiceForAccessLoss({ serverId });
+      if (disconnectedFromVoice) {
+        showVoiceDisconnectToast({ reason: 'access_lost', accessScope: 'server' });
+      }
+      handleServerAccessLossReset(serverId);
+
+      const toastId = `server-access-lost:${serverId}`;
+      // CHECKPOINT 3 COMPLETE
+      toast(`You have been removed from ${lostServerName}.`, {
+        id: toastId,
+        action: {
+          label: 'Dismiss',
+          onClick: () => {
+            toast.dismiss(toastId);
+          },
+        },
+      });
+    },
+    [
+      currentServer,
+      currentServerId,
+      disconnectVoiceForAccessLoss,
+      handleServerAccessLossReset,
+      showVoiceDisconnectToast,
+    ]
+  );
+
+  activeServerAccessLostHandlerRef.current = handleServerAccessLostCascade;
+
+  const handleChannelAccessLostCascade = useCallback(
+    async (channelId: string, channelName: string) => {
+      if (!channelId || !currentServerId) return;
+
+      const nextChannelId =
+        channels.find(
+          (channel) =>
+            channel.community_id === currentServerId &&
+            channel.kind === 'text' &&
+            channel.id !== channelId
+        )?.id ?? null;
+
+      const disconnectedFromVoice = await disconnectVoiceForAccessLoss({ channelId });
+      if (disconnectedFromVoice) {
+        showVoiceDisconnectToast({ reason: 'access_lost', accessScope: 'channel' });
+      }
+      // CHECKPOINT 4 COMPLETE
+      purgeMessageBundleCacheForChannel(currentServerId, channelId);
+      resetMessageState();
+      setCurrentChannelId(nextChannelId);
+
+      const toastId = `channel-access-lost:${currentServerId}:${channelId}`;
+      toast(`Your access to #${channelName} has been revoked.`, {
+        id: toastId,
+        action: {
+          label: 'Dismiss',
+          onClick: () => {
+            toast.dismiss(toastId);
+          },
+        },
+      });
+    },
+    [
+      channels,
+      currentServerId,
+      disconnectVoiceForAccessLoss,
+      purgeMessageBundleCacheForChannel,
+      resetMessageState,
+      setCurrentChannelId,
+      showVoiceDisconnectToast,
+    ]
+  );
+
+  activeChannelAccessLostHandlerRef.current = handleChannelAccessLostCascade;
 
   // ── Desktop settings ──────────────────────────────────────────────────────
   const {
@@ -1011,7 +1207,8 @@ export function useChatAppOrchestration() {
     setVoicePanelOpen, setVoiceHardwareDebugPanelOpen, setVoiceConnected,
     setVoiceParticipants, setVoiceSessionState, setVoiceControlActions,
     requestVoiceChannelJoin, confirmVoiceChannelJoin,
-    cancelVoiceChannelJoinPrompt, disconnectVoiceSession,
+    cancelVoiceChannelJoinPrompt, disconnectVoiceSession, forceDisconnectVoice,
+    showVoiceDisconnectToast,
     // channel groups
     channelGroupState, sidebarChannelGroups, createChannelGroup, assignChannelToGroup,
     removeChannelFromGroup, setChannelGroupCollapsed, renameChannelGroup, deleteChannelGroup,

@@ -93,6 +93,15 @@ export function ChatApp() {
     },
     [disconnectVoiceSession],
   );
+  const handleVoiceKickReceived = React.useCallback(() => {
+    void app.forceDisconnectVoice("kicked")
+      .then(() => {
+        app.showVoiceDisconnectToast({ reason: "kicked" });
+      })
+      .catch((error: unknown) => {
+        console.error("Failed to force disconnect voice after kick:", error);
+      });
+  }, [app]);
   const voiceController = useVoiceSessionController({
     activeChannel: activeVoiceControllerChannel,
     currentUserId: app.user?.id,
@@ -109,6 +118,7 @@ export function ChatApp() {
     onSessionStateChange: app.setVoiceSessionState,
     onControlActionsReady: app.setVoiceControlActions,
     onSessionError: handleVoiceSessionError,
+    onVoiceKick: handleVoiceKickReceived,
   });
   const voicePopoutWindowOpen =
     canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
@@ -324,12 +334,37 @@ export function ChatApp() {
   }
 
   const { user } = app;
+  const canKickVoiceParticipants =
+    app.serverPermissions.isOwner ||
+    app.serverPermissions.canManageServer ||
+    app.serverPermissions.canManageMembers ||
+    app.serverPermissions.canManageBans;
   const canManageChannelStructure =
     app.serverPermissions.canManageChannelStructure;
   const canManageChannelPermissions =
     app.serverPermissions.canManageChannelPermissions;
   const canOpenChannelSettings =
     canManageChannelStructure || canManageChannelPermissions;
+
+  const handleKickVoiceParticipant = async (
+    targetUserId: string,
+    displayName: string,
+  ) => {
+    if (!canKickVoiceParticipants || !app.activeVoiceChannelId) return;
+    await voiceController.actions.kickFromVoice(
+      targetUserId,
+      app.activeVoiceChannelId,
+    );
+    toast(`${displayName} has been removed from the voice channel.`, {
+      id: `voice-kick:${app.activeVoiceChannelId}:${targetUserId}`,
+      action: {
+        label: "Dismiss",
+        onClick: () => {
+          toast.dismiss(`voice-kick:${app.activeVoiceChannelId}:${targetUserId}`);
+        },
+      },
+    });
+  };
 
   return (
     <>
@@ -1045,11 +1080,27 @@ export function ChatApp() {
         voiceSessionActions={voiceController.actions}
         showDiagnostics={app.isPlatformStaff}
         canOpenVoicePopout={canOpenVoicePopout}
+        canKickParticipants={canKickVoiceParticipants}
         onDisconnect={() => {
           void app.disconnectVoiceSession();
         }}
         onOpenVoicePopout={handleOpenVoicePopout}
         onOpenVoiceHardwareTest={() => app.setUserVoiceHardwareTestOpen(true)}
+        onKickParticipant={(targetUserId, displayName) => {
+          void handleKickVoiceParticipant(targetUserId, displayName).catch(
+            (error: unknown) => {
+              toast.error(
+                getErrorMessage(
+                  error,
+                  "Failed to remove member from the voice channel.",
+                ),
+                {
+                  id: "voice-kick-error",
+                },
+              );
+            },
+          );
+        }}
       />
 
       <VoiceHardwareDebugPanel
