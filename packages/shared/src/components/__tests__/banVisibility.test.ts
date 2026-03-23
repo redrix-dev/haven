@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   BANNED_REPLY_PLACEHOLDER_CONTENT,
   applyBanVisibilityToMessageBundle,
+  applyChannelAccessVisibilityToMessageBundle,
   isBanRemovedReplyPlaceholder,
+  isModerationRemovedReplyPlaceholder,
 } from '@client/features/messages/lib/banVisibility';
 import type {
   Message,
@@ -17,12 +19,13 @@ const makeMessage = (
   id: string,
   authorUserId: string,
   content: string,
-  metadata: Record<string, unknown> | null = null
+  metadata: Record<string, unknown> | null = null,
+  channelId = 'channel-1'
 ) =>
   ({
     id,
     community_id: 'server-1',
-    channel_id: 'channel-1',
+    channel_id: channelId,
     author_user_id: authorUserId,
     author_type: 'user',
     content,
@@ -40,11 +43,16 @@ const makeReaction = (id: string, messageId: string, userId: string): MessageRea
   createdAt: nowIso,
 });
 
-const makeAttachment = (id: string, messageId: string, ownerUserId: string): MessageAttachment => ({
+const makeAttachment = (
+  id: string,
+  messageId: string,
+  ownerUserId: string,
+  channelId = 'channel-1'
+): MessageAttachment => ({
   id,
   messageId,
   communityId: 'server-1',
-  channelId: 'channel-1',
+  channelId,
   ownerUserId,
   bucketName: 'message-media',
   objectPath: `attachments/${id}`,
@@ -57,11 +65,11 @@ const makeAttachment = (id: string, messageId: string, ownerUserId: string): Mes
   signedUrl: null,
 });
 
-const makeLinkPreview = (id: string, messageId: string): MessageLinkPreview => ({
+const makeLinkPreview = (id: string, messageId: string, channelId = 'channel-1'): MessageLinkPreview => ({
   id,
   messageId,
   communityId: 'server-1',
-  channelId: 'channel-1',
+  channelId,
   sourceUrl: 'https://haven.test',
   normalizedUrl: 'https://haven.test',
   status: 'ready',
@@ -126,6 +134,59 @@ describe('applyBanVisibilityToMessageBundle', () => {
     expect(filtered.messages.map((message) => message.id)).toEqual(['root', 'reply', 'descendant']);
     expect(placeholderReply?.content).toBe(BANNED_REPLY_PLACEHOLDER_CONTENT);
     expect(isBanRemovedReplyPlaceholder(placeholderReply as Message)).toBe(true);
+    expect(filtered.reactions.map((reaction) => reaction.id)).toEqual(['reaction-2']);
+    expect(filtered.attachments.map((attachment) => attachment.id)).toEqual(['attachment-2']);
+    expect(filtered.linkPreviews.map((preview) => preview.id)).toEqual(['preview-2']);
+  });
+
+  it('filters channel access revocation content only in the targeted channel', () => {
+    const revokedRoot = makeMessage('revoked-root', 'revoked-user', 'Hidden root');
+    const revokedReply = makeMessage(
+      'revoked-reply',
+      'revoked-user',
+      'Hidden reply',
+      { replyToMessageId: 'visible-root' }
+    );
+    const visibleRoot = makeMessage('visible-root', 'user-1', 'Visible root');
+    const otherChannelMessage = makeMessage(
+      'other-channel',
+      'revoked-user',
+      'Still visible elsewhere',
+      null,
+      'channel-2'
+    );
+
+    const filtered = applyChannelAccessVisibilityToMessageBundle(
+      {
+        messages: [revokedRoot, visibleRoot, revokedReply, otherChannelMessage],
+        reactions: [
+          makeReaction('reaction-1', 'revoked-reply', 'user-2'),
+          makeReaction('reaction-2', 'other-channel', 'revoked-user'),
+        ],
+        attachments: [
+          makeAttachment('attachment-1', 'revoked-reply', 'revoked-user'),
+          makeAttachment('attachment-2', 'other-channel', 'revoked-user', 'channel-2'),
+        ],
+        linkPreviews: [
+          makeLinkPreview('preview-1', 'revoked-reply'),
+          makeLinkPreview('preview-2', 'other-channel', 'channel-2'),
+        ],
+      },
+      {
+        channelId: 'channel-1',
+        revokedUserIds: ['revoked-user'],
+      }
+    );
+
+    const placeholderReply = filtered.messages.find((message) => message.id === 'revoked-reply');
+
+    expect(filtered.messages.map((message) => message.id)).toEqual([
+      'visible-root',
+      'revoked-reply',
+      'other-channel',
+    ]);
+    expect(placeholderReply?.content).toBe(BANNED_REPLY_PLACEHOLDER_CONTENT);
+    expect(isModerationRemovedReplyPlaceholder(placeholderReply as Message)).toBe(true);
     expect(filtered.reactions.map((reaction) => reaction.id)).toEqual(['reaction-2']);
     expect(filtered.attachments.map((attachment) => attachment.id)).toEqual(['attachment-2']);
     expect(filtered.linkPreviews.map((preview) => preview.id)).toEqual(['preview-2']);

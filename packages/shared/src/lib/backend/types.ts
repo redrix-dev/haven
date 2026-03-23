@@ -158,6 +158,18 @@ export type MemberBannedBroadcastPayload = {
   communityId: string;
 };
 
+export type ChannelAccessRevokedResult = {
+  revokedUserId: string;
+  channelId: string;
+  communityId: string;
+};
+
+export type MemberChannelAccessRevokedBroadcastPayload = {
+  revokedUserId: string;
+  channelId: string;
+  communityId: string;
+};
+
 export type BanEligibleServer = {
   communityId: string;
   communityName: string;

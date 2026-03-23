@@ -30,7 +30,9 @@ import type {
   MessageAttachment,
   MessageLinkPreview,
   MessageReaction,
+  ChannelAccessRevokedResult,
   MemberBannedBroadcastPayload,
+  MemberChannelAccessRevokedBroadcastPayload,
   ServerMemberRoleItem,
   ServerPermissions,
   ServerRoleItem,
@@ -123,6 +125,8 @@ type BanCommunityMemberRpcRow = {
   banned_user_id?: unknown;
   community_id?: unknown;
 };
+
+const activeCommunityChannelsById = new Map<string, RealtimeChannel>();
 
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -462,9 +466,15 @@ export interface CommunityDataBackend {
     onChange: () => void,
     options?: {
       onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
+      onMemberChannelAccessRevoked?: (
+        payload: MemberChannelAccessRevokedBroadcastPayload
+      ) => void;
     }
   ): RealtimeChannel;
   broadcastMemberBanned(input: MemberBannedBroadcastPayload): Promise<void>;
+  broadcastMemberChannelAccessRevoked(
+    input: MemberChannelAccessRevokedBroadcastPayload
+  ): Promise<void>;
   listChannelGroups(input: {
     communityId: string;
     channelIds: string[];
@@ -598,7 +608,11 @@ export interface CommunityDataBackend {
     channelId: string;
     memberId: string;
     permissions: ChannelPermissionState;
-  }): Promise<void>;
+  }): Promise<ChannelAccessRevokedResult | null>;
+  listChannelRevokedUserIds(input: {
+    communityId: string;
+    channelId: string;
+  }): Promise<string[]>;
   updateChannel(input: {
     communityId: string;
     channelId: string;
@@ -1052,7 +1066,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   subscribeToChannels(communityId, onChange, options) {
-    return supabase
+    const channel = supabase
       .channel(`channels:${communityId}`)
       .on(
         'postgres_changes',
@@ -1080,45 +1094,86 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           communityId: payloadCommunityId,
         });
       })
+      .on('broadcast', { event: 'member_channel_access_revoked' }, ({ payload }) => {
+        const payloadRecord = asObjectRecord(payload);
+        const revokedUserId =
+          payloadRecord && typeof payloadRecord.revokedUserId === 'string'
+            ? payloadRecord.revokedUserId
+            : null;
+        const channelId =
+          payloadRecord && typeof payloadRecord.channelId === 'string'
+            ? payloadRecord.channelId
+            : null;
+        const payloadCommunityId =
+          payloadRecord && typeof payloadRecord.communityId === 'string'
+            ? payloadRecord.communityId
+            : null;
+        if (!revokedUserId || !channelId || payloadCommunityId !== communityId) return;
+        options?.onMemberChannelAccessRevoked?.({
+          revokedUserId,
+          channelId,
+          communityId: payloadCommunityId,
+        }); // CHECKPOINT 3 COMPLETE
+      })
       .subscribe();
+
+    activeCommunityChannelsById.set(communityId, channel);
+
+    const originalUnsubscribe = channel.unsubscribe.bind(channel);
+    channel.unsubscribe = async (...args) => {
+      if (activeCommunityChannelsById.get(communityId) === channel) {
+        activeCommunityChannelsById.delete(communityId);
+      }
+      return originalUnsubscribe(...args);
+    };
+
+    return channel;
   },
 
   async broadcastMemberBanned({ communityId, bannedUserId }) {
-    const broadcastChannel = supabase.channel(`channels:${communityId}`);
+    const broadcastChannel = activeCommunityChannelsById.get(communityId);
+    if (!broadcastChannel) {
+      console.warn(
+        `Skipping member_banned broadcast for ${communityId}: no active channels subscription.`
+      );
+      return;
+    }
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const timeoutId = window.setTimeout(() => {
-          reject(new Error('Timed out connecting community moderation broadcast.'));
-        }, 12_000);
+    const sendStatus = await broadcastChannel.send({
+      type: 'broadcast',
+      event: 'member_banned',
+      payload: {
+        bannedUserId,
+        communityId,
+      } satisfies MemberBannedBroadcastPayload,
+    });
 
-        broadcastChannel.subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            window.clearTimeout(timeoutId);
-            resolve();
-            return;
-          }
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            window.clearTimeout(timeoutId);
-            reject(new Error('Failed to connect community moderation broadcast.'));
-          }
-        });
-      });
+    if (sendStatus !== 'ok') {
+      throw new Error('Failed to broadcast member ban.');
+    }
+  },
 
-      const sendStatus = await broadcastChannel.send({
-        type: 'broadcast',
-        event: 'member_banned',
-        payload: {
-          bannedUserId,
-          communityId,
-        } satisfies MemberBannedBroadcastPayload,
-      });
+  async broadcastMemberChannelAccessRevoked({ communityId, channelId, revokedUserId }) {
+    const broadcastChannel = activeCommunityChannelsById.get(communityId);
+    if (!broadcastChannel) {
+      console.warn(
+        `Skipping member_channel_access_revoked broadcast for ${communityId}: no active channels subscription.`
+      );
+      return;
+    }
 
-      if (sendStatus !== 'ok') {
-        throw new Error('Failed to broadcast member ban.');
-      }
-    } finally {
-      void broadcastChannel.unsubscribe();
+    const sendStatus = await broadcastChannel.send({
+      type: 'broadcast',
+      event: 'member_channel_access_revoked',
+      payload: {
+        revokedUserId,
+        channelId,
+        communityId,
+      } satisfies MemberChannelAccessRevokedBroadcastPayload,
+    });
+
+    if (sendStatus !== 'ok') {
+      throw new Error('Failed to broadcast channel access revocation.');
     }
   },
 
@@ -2269,6 +2324,33 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async saveMemberChannelPermissions({ communityId, channelId, memberId, permissions }) {
+    const [
+      { data: memberRow, error: memberError },
+      { data: existingOverwrite, error: existingOverwriteError },
+    ] = await Promise.all([
+      supabase
+        .from('community_members')
+        .select('user_id')
+        .eq('community_id', communityId)
+        .eq('id', memberId)
+        .maybeSingle(),
+      supabase
+        .from('channel_member_overwrites')
+        .select('can_view')
+        .eq('community_id', communityId)
+        .eq('channel_id', channelId)
+        .eq('member_id', memberId)
+        .maybeSingle(),
+    ]);
+    if (memberError) throw memberError;
+    if (existingOverwriteError) throw existingOverwriteError;
+
+    const revokedUserId = memberRow?.user_id ?? null;
+    if (!revokedUserId) {
+      throw new Error('Channel member overwrite target was not found.');
+    }
+
+    const wasExplicitlyRevoked = existingOverwrite?.can_view === false;
     const allInherited =
       permissions.canView === null &&
       permissions.canSend === null &&
@@ -2282,7 +2364,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         .eq('channel_id', channelId)
         .eq('member_id', memberId);
       if (error) throw error;
-      return;
+      return null;
     }
 
     const { error } = await supabase
@@ -2299,6 +2381,51 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         { onConflict: 'channel_id,member_id' }
       );
     if (error) throw error;
+    if (permissions.canView !== false || wasExplicitlyRevoked) {
+      return null;
+    }
+
+    return {
+      revokedUserId,
+      channelId,
+      communityId,
+    };
+  },
+
+  async listChannelRevokedUserIds({ communityId, channelId }) {
+    const { data: overwriteRows, error: overwriteError } = await supabase
+      .from('channel_member_overwrites')
+      .select('member_id')
+      .eq('community_id', communityId)
+      .eq('channel_id', channelId)
+      .eq('can_view', false);
+    if (overwriteError) throw overwriteError;
+
+    const memberIds = Array.from(
+      new Set(
+        (overwriteRows ?? [])
+          .map((row) => row.member_id)
+          .filter((memberId): memberId is string => Boolean(memberId))
+      )
+    );
+    if (memberIds.length === 0) {
+      return [] as string[];
+    }
+
+    const { data: memberRows, error: memberError } = await supabase
+      .from('community_members')
+      .select('user_id')
+      .eq('community_id', communityId)
+      .in('id', memberIds);
+    if (memberError) throw memberError;
+
+    return Array.from(
+      new Set(
+        (memberRows ?? [])
+          .map((row) => row.user_id)
+          .filter((userId): userId is string => Boolean(userId))
+      )
+    ); // CHECKPOINT 4 COMPLETE
   },
 
   async updateChannel({ communityId, channelId, name, topic }) {

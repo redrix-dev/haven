@@ -3,6 +3,7 @@ import { getCommunityDataBackend } from '@shared/lib/backend';
 import type {
   Channel,
   MemberBannedBroadcastPayload,
+  MemberChannelAccessRevokedBroadcastPayload,
   ServerPermissions,
   ServerSummary,
 } from '@shared/lib/backend/types';
@@ -29,6 +30,7 @@ type UseCommunityWorkspaceInput = {
   currentUserId: string | null;
   channelSettingsTargetId: string | null;
   onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
+  onMemberChannelAccessRevoked?: (payload: MemberChannelAccessRevokedBroadcastPayload) => void;
 };
 
 export function useCommunityWorkspace({
@@ -36,6 +38,7 @@ export function useCommunityWorkspace({
   currentUserId,
   channelSettingsTargetId,
   onMemberBanned,
+  onMemberChannelAccessRevoked,
 }: UseCommunityWorkspaceInput) {
   const [currentServerId, setCurrentServerId] = React.useState<string | null>(null);
   const [channels, setChannels] = React.useState<Channel[]>([]);
@@ -177,6 +180,7 @@ export function useCommunityWorkspace({
       },
       {
         onMemberBanned,
+        onMemberChannelAccessRevoked,
       }
     );
 
@@ -184,7 +188,7 @@ export function useCommunityWorkspace({
       isMounted = false;
       void subscription.unsubscribe();
     };
-  }, [currentServerId, onMemberBanned, resetChannelsWorkspace]);
+  }, [currentServerId, onMemberBanned, onMemberChannelAccessRevoked, resetChannelsWorkspace]);
 
   React.useEffect(() => {
     let isMounted = true;

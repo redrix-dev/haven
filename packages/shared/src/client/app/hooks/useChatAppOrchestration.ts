@@ -43,6 +43,7 @@ import type {
   MessageReaction,
   Message,
   MemberBannedBroadcastPayload,
+  MemberChannelAccessRevokedBroadcastPayload,
 } from '@shared/lib/backend/types';
 import type { ForceDisconnectVoiceReason } from '@client/features/voice/types';
 import { useServersStore } from '@shared/stores/serversStore';
@@ -67,6 +68,9 @@ export function useChatAppOrchestration() {
     (channelId: string, channelName: string) => void
   >(() => {});
   const memberBannedHandlerRef = useRef<(payload: MemberBannedBroadcastPayload) => void>(() => {});
+  const memberChannelAccessRevokedHandlerRef = useRef<
+    (payload: MemberChannelAccessRevokedBroadcastPayload) => void
+  >(() => {});
   const serverNameByIdRef = useRef<Record<string, string>>({});
   const handleActiveServerAccessLost = useCallback((serverId: string) => {
     activeServerAccessLostHandlerRef.current(serverId);
@@ -77,6 +81,12 @@ export function useChatAppOrchestration() {
   const handleMemberBanned = useCallback((payload: MemberBannedBroadcastPayload) => {
     memberBannedHandlerRef.current(payload);
   }, []);
+  const handleMemberChannelAccessRevoked = useCallback(
+    (payload: MemberChannelAccessRevokedBroadcastPayload) => {
+      memberChannelAccessRevokedHandlerRef.current(payload);
+    },
+    []
+  );
 
   // ── Backend singletons ────────────────────────────────────────────────────
   const controlPlaneBackend = getControlPlaneBackend();
@@ -217,6 +227,7 @@ export function useChatAppOrchestration() {
     currentUserId: user?.id ?? null,
     channelSettingsTargetId,
     onMemberBanned: handleMemberBanned,
+    onMemberChannelAccessRevoked: handleMemberChannelAccessRevoked,
   });
 
   const canOpenServerSettings =
@@ -385,7 +396,7 @@ export function useChatAppOrchestration() {
       deleteCurrentChannel,
       openChannelSettingsModal,
       saveRoleChannelPermissions,
-      saveMemberChannelPermissions,
+      saveMemberChannelPermissions: saveMemberChannelPermissionsRaw,
     },
   } = useChannelManagement({
     currentServerId,
@@ -415,6 +426,7 @@ export function useChatAppOrchestration() {
       purgeMessageBundleCacheForServer,
       purgeMessageBundleCacheForChannel,
       applyBannedUserContentVisibility,
+      applyChannelAccessRevokedContentVisibility,
     },
   } = useMessages({
     currentServerId,
@@ -564,6 +576,7 @@ export function useChatAppOrchestration() {
     async (channelId: string, channelName: string) => {
       if (!channelId || !currentServerId) return;
 
+      const communityBackend = getCommunityDataBackend(currentServerId);
       const nextChannelId =
         channels.find(
           (channel) =>
@@ -575,6 +588,22 @@ export function useChatAppOrchestration() {
       const disconnectedFromVoice = await disconnectVoiceForAccessLoss({ channelId });
       if (disconnectedFromVoice) {
         showVoiceDisconnectToast({ reason: 'access_lost', accessScope: 'channel' });
+      }
+      if (user?.id) {
+        applyChannelAccessRevokedContentVisibility({
+          communityId: currentServerId,
+          channelId,
+          revokedUserId: user.id,
+        });
+        try {
+          await communityBackend.broadcastMemberChannelAccessRevoked({
+            communityId: currentServerId,
+            channelId,
+            revokedUserId: user.id,
+          }); // CHECKPOINT 3 COMPLETE
+        } catch (error) {
+          console.error('Failed to broadcast channel access revocation:', error);
+        }
       }
       // CHECKPOINT 4 COMPLETE
       purgeMessageBundleCacheForChannel(currentServerId, channelId);
@@ -596,10 +625,12 @@ export function useChatAppOrchestration() {
       channels,
       currentServerId,
       disconnectVoiceForAccessLoss,
+      applyChannelAccessRevokedContentVisibility,
       purgeMessageBundleCacheForChannel,
       resetMessageState,
       setCurrentChannelId,
       showVoiceDisconnectToast,
+      user?.id,
     ]
   );
 
@@ -615,6 +646,17 @@ export function useChatAppOrchestration() {
   );
 
   memberBannedHandlerRef.current = handleMemberBannedBroadcast;
+
+  const handleMemberChannelAccessRevokedBroadcast = useCallback(
+    (payload: MemberChannelAccessRevokedBroadcastPayload) => {
+      if (!payload.communityId || !payload.channelId || !payload.revokedUserId) return;
+      if (payload.revokedUserId === user?.id) return;
+      applyChannelAccessRevokedContentVisibility(payload);
+    },
+    [applyChannelAccessRevokedContentVisibility, user?.id]
+  );
+
+  memberChannelAccessRevokedHandlerRef.current = handleMemberChannelAccessRevokedBroadcast;
 
   // ── Desktop settings ──────────────────────────────────────────────────────
   const {
@@ -869,6 +911,15 @@ export function useChatAppOrchestration() {
       showServerSettingsModal,
       currentServerId,
     ]
+  );
+
+  const saveMemberChannelPermissions = useCallback(
+    async (memberId: string, permissions: { canView: boolean | null; canSend: boolean | null; canManage: boolean | null }) => {
+      const accessRevokedResult = await saveMemberChannelPermissionsRaw(memberId, permissions);
+      if (!accessRevokedResult) return;
+      applyChannelAccessRevokedContentVisibility(accessRevokedResult); // CHECKPOINT 2 COMPLETE
+    },
+    [applyChannelAccessRevokedContentVisibility, saveMemberChannelPermissionsRaw]
   );
 
   const resolveBanEligibleServers = useCallback(

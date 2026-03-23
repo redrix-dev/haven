@@ -2,6 +2,7 @@ import React from 'react';
 import { getCommunityDataBackend } from '@shared/lib/backend';
 import type {
   Channel,
+  ChannelAccessRevokedResult,
   ChannelKind,
   ChannelMemberOption,
   ChannelMemberPermissionItem,
@@ -255,12 +256,12 @@ export function useChannelManagement({
   );
 
   const saveMemberChannelPermissions = React.useCallback(
-    async (memberId: string, permissions: ChannelPermissionState) => {
+    async (memberId: string, permissions: ChannelPermissionState): Promise<ChannelAccessRevokedResult | null> => {
       const targetChannelId = channelSettingsTargetId ?? currentChannelId;
       if (!currentServerId || !targetChannelId) throw new Error('No channel selected.');
 
       const communityBackend = getCommunityDataBackend(currentServerId);
-      await communityBackend.saveMemberChannelPermissions({
+      const accessRevokedResult = await communityBackend.saveMemberChannelPermissions({
         communityId: currentServerId,
         channelId: targetChannelId,
         memberId,
@@ -279,6 +280,8 @@ export function useChannelManagement({
             : row
         )
       );
+
+      return accessRevokedResult;
     },
     [channelSettingsTargetId, currentChannelId, currentServerId]
   );

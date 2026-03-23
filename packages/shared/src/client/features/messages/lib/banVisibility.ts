@@ -8,11 +8,18 @@ import { asRecord } from '@platform/lib/records';
 
 export const BANNED_REPLY_PLACEHOLDER_CONTENT = '[content removed]';
 
+type ModerationRemovalReason = 'ban' | 'channel_access_revoked';
+
 type BanVisibilityBundle = {
   messages: Message[];
   reactions: MessageReaction[];
   attachments: MessageAttachment[];
   linkPreviews: MessageLinkPreview[];
+};
+
+type ChannelAccessVisibilityInput = {
+  channelId: string;
+  revokedUserIds: string[];
 };
 
 const getReplyToMessageId = (message: Message): string | null => {
@@ -24,12 +31,15 @@ const getReplyToMessageId = (message: Message): string | null => {
     : null;
 };
 
-const createRemovedReplyPlaceholder = (message: Message): Message => {
+const createRemovedReplyPlaceholder = (
+  message: Message,
+  reason: ModerationRemovalReason
+): Message => {
   const nextMetadata = {
     ...(asRecord(message.metadata) ?? {}),
     moderation: {
       contentRemoved: true,
-      reason: 'ban',
+      reason,
     },
   } as Message['metadata'];
 
@@ -41,24 +51,41 @@ const createRemovedReplyPlaceholder = (message: Message): Message => {
   };
 };
 
+export const isModerationRemovedReplyPlaceholder = (message: Message): boolean => {
+  const metadata = asRecord(message.metadata);
+  const moderation = asRecord(metadata?.moderation);
+  const reason = moderation?.reason;
+  return (
+    moderation?.contentRemoved === true &&
+    (reason === 'ban' || reason === 'channel_access_revoked')
+  );
+};
+
 export const isBanRemovedReplyPlaceholder = (message: Message): boolean => {
   const metadata = asRecord(message.metadata);
   const moderation = asRecord(metadata?.moderation);
   return moderation?.contentRemoved === true && moderation?.reason === 'ban';
 };
 
-export const applyBanVisibilityToMessageBundle = (
+const applyRemovedAuthorVisibilityToMessageBundle = (
   bundle: BanVisibilityBundle,
-  bannedUserIds: string[]
+  removedAuthorUserIds: string[],
+  options: {
+    reason: ModerationRemovalReason;
+    channelId?: string;
+  }
 ): BanVisibilityBundle => {
-  if (bannedUserIds.length === 0) {
+  if (removedAuthorUserIds.length === 0) {
     return bundle;
   }
 
-  const bannedUserIdSet = new Set(bannedUserIds);
+  const removedAuthorUserIdSet = new Set(removedAuthorUserIds);
+  const isTargetChannelMessage = (message: Message): boolean =>
+    !options.channelId || message.channel_id === options.channelId;
   const repliesByParentId = new Map<string, Message[]>();
 
   for (const message of bundle.messages) {
+    if (!isTargetChannelMessage(message)) continue;
     const parentId = getReplyToMessageId(message);
     if (!parentId || parentId === message.id) continue;
     const existingReplies = repliesByParentId.get(parentId) ?? [];
@@ -70,7 +97,8 @@ export const applyBanVisibilityToMessageBundle = (
   const pendingThreadRootIds: string[] = [];
 
   for (const message of bundle.messages) {
-    if (!message.author_user_id || !bannedUserIdSet.has(message.author_user_id)) continue;
+    if (!isTargetChannelMessage(message)) continue;
+    if (!message.author_user_id || !removedAuthorUserIdSet.has(message.author_user_id)) continue;
     const parentId = getReplyToMessageId(message);
     const isThreadOwner = !parentId || parentId === message.id;
     if (isThreadOwner) {
@@ -94,10 +122,14 @@ export const applyBanVisibilityToMessageBundle = (
   for (const message of bundle.messages) {
     if (removedThreadMessageIds.has(message.id)) continue;
 
-    if (message.author_user_id && bannedUserIdSet.has(message.author_user_id)) {
+    if (
+      isTargetChannelMessage(message) &&
+      message.author_user_id &&
+      removedAuthorUserIdSet.has(message.author_user_id)
+    ) {
       // CHECKPOINT 5 COMPLETE
       placeholderMessageIds.add(message.id);
-      moderatedMessages.push(createRemovedReplyPlaceholder(message));
+      moderatedMessages.push(createRemovedReplyPlaceholder(message, options.reason));
       continue;
     }
 
@@ -106,18 +138,22 @@ export const applyBanVisibilityToMessageBundle = (
 
   const visibleMessageIds = new Set(moderatedMessages.map((message) => message.id));
   const hiddenMessageIds = new Set<string>([...removedThreadMessageIds, ...placeholderMessageIds]);
+  const targetMessageIds = new Set(
+    bundle.messages.filter((message) => isTargetChannelMessage(message)).map((message) => message.id)
+  );
 
   return {
     messages: moderatedMessages,
     reactions: bundle.reactions.filter(
       (reaction) =>
-        !bannedUserIdSet.has(reaction.userId) &&
+        (!targetMessageIds.has(reaction.messageId) || !removedAuthorUserIdSet.has(reaction.userId)) &&
         visibleMessageIds.has(reaction.messageId) &&
         !hiddenMessageIds.has(reaction.messageId)
     ),
     attachments: bundle.attachments.filter(
       (attachment) =>
-        !bannedUserIdSet.has(attachment.ownerUserId) &&
+        (attachment.channelId !== options.channelId ||
+          !removedAuthorUserIdSet.has(attachment.ownerUserId)) &&
         visibleMessageIds.has(attachment.messageId) &&
         !hiddenMessageIds.has(attachment.messageId)
     ),
@@ -125,4 +161,23 @@ export const applyBanVisibilityToMessageBundle = (
       (preview) => visibleMessageIds.has(preview.messageId) && !hiddenMessageIds.has(preview.messageId)
     ),
   };
+};
+
+export const applyBanVisibilityToMessageBundle = (
+  bundle: BanVisibilityBundle,
+  bannedUserIds: string[]
+): BanVisibilityBundle =>
+  applyRemovedAuthorVisibilityToMessageBundle(bundle, bannedUserIds, {
+    reason: 'ban',
+  });
+
+export const applyChannelAccessVisibilityToMessageBundle = (
+  bundle: BanVisibilityBundle,
+  input: ChannelAccessVisibilityInput
+): BanVisibilityBundle => {
+  if (!input.channelId) return bundle;
+  return applyRemovedAuthorVisibilityToMessageBundle(bundle, input.revokedUserIds, {
+    reason: 'channel_access_revoked',
+    channelId: input.channelId,
+  });
 };

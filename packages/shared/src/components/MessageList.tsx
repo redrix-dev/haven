@@ -56,7 +56,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { MarkdownText } from '@shared/lib/markdownRenderer';
 import {
   BANNED_REPLY_PLACEHOLDER_CONTENT,
-  isBanRemovedReplyPlaceholder,
+  isModerationRemovedReplyPlaceholder,
 } from '@client/features/messages/lib/banVisibility';
 import { useMessagesStore } from '@shared/stores/messagesStore';
 
@@ -609,7 +609,7 @@ export function MessageList({
   );
 
   const renderMessageRow = (message: Message, depth = 0) => {
-    const isModerationPlaceholder = isBanRemovedReplyPlaceholder(message);
+    const isModerationPlaceholder = isModerationRemovedReplyPlaceholder(message);
     const isReply = depth > 0;
     const replyIndent = Math.min(depth, 4) * 20;
 
