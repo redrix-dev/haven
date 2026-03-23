@@ -13,6 +13,12 @@ function storageKey(userId: string) {
   return `haven:user-${userId}:server-order`;
 }
 
+function hasSameIdSequence(left: readonly string[] | null, right: readonly string[]) {
+  if (!left) return right.length === 0;
+  if (left.length !== right.length) return false;
+  return left.every((id, index) => id === right[index]);
+}
+
 function readOrder(userId: string): string[] | null {
   try {
     const raw = window.localStorage.getItem(storageKey(userId));
@@ -72,15 +78,20 @@ export function useServerOrder<T extends ServerLike>(userId: string | null, serv
       ordered.push(s);
     }
 
-    return ordered;
+    return ordered.every((server, index) => server.id === servers[index]?.id) ? servers : ordered;
   }, [servers, savedOrder]);
 
   const setOrder = React.useCallback(
     (ids: string[]) => {
+      const currentOrderedIds = orderedServers.map((server) => server.id);
+      if (hasSameIdSequence(currentOrderedIds, ids)) {
+        return;
+      }
+
       setSavedOrder(ids);
       if (userId) writeOrder(userId, ids);
     },
-    [userId]
+    [orderedServers, userId]
   );
 
   const resetOrder = React.useCallback(() => {

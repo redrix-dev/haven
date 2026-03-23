@@ -41,6 +41,14 @@ import { useServerOrder } from "@client/features/community/hooks/useServerOrder"
 import { useServersStore } from "@shared/stores/serversStore";
 import { useVoiceStore } from "@shared/stores/voiceStore";
 
+function hasSameServerIdOrder(
+  left: ReadonlyArray<{ id: string }>,
+  right: ReadonlyArray<{ id: string }>,
+) {
+  if (left.length !== right.length) return false;
+  return left.every((server, index) => server.id === right[index]?.id);
+}
+
 export function ChatApp() {
   const app = useChatAppOrchestration();
   const { orderedServers, setOrder: setServerOrder } = useServerOrder(
@@ -124,12 +132,15 @@ export function ChatApp() {
     canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
 
   React.useEffect(() => {
-    setStoredServers(orderedServers);
+    if (!hasSameServerIdOrder(app.servers, orderedServers)) {
+      setStoredServers(orderedServers);
+    }
     setStoredCurrentServerId(app.currentServerId);
     setStoredCurrentServer(app.currentServer);
   }, [
     app.currentServer,
     app.currentServerId,
+    app.servers,
     orderedServers,
     setStoredCurrentServer,
     setStoredCurrentServerId,
