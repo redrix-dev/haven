@@ -42,6 +42,7 @@ import type {
   MessageLinkPreview,
   MessageReaction,
   Message,
+  MemberBannedBroadcastPayload,
 } from '@shared/lib/backend/types';
 import type { ForceDisconnectVoiceReason } from '@client/features/voice/types';
 import { useServersStore } from '@shared/stores/serversStore';
@@ -65,12 +66,16 @@ export function useChatAppOrchestration() {
   const activeChannelAccessLostHandlerRef = useRef<
     (channelId: string, channelName: string) => void
   >(() => {});
+  const memberBannedHandlerRef = useRef<(payload: MemberBannedBroadcastPayload) => void>(() => {});
   const serverNameByIdRef = useRef<Record<string, string>>({});
   const handleActiveServerAccessLost = useCallback((serverId: string) => {
     activeServerAccessLostHandlerRef.current(serverId);
   }, []);
   const handleActiveChannelAccessLost = useCallback((channelId: string, channelName: string) => {
     activeChannelAccessLostHandlerRef.current(channelId, channelName);
+  }, []);
+  const handleMemberBanned = useCallback((payload: MemberBannedBroadcastPayload) => {
+    memberBannedHandlerRef.current(payload);
   }, []);
 
   // ── Backend singletons ────────────────────────────────────────────────────
@@ -211,6 +216,7 @@ export function useChatAppOrchestration() {
     servers,
     currentUserId: user?.id ?? null,
     channelSettingsTargetId,
+    onMemberBanned: handleMemberBanned,
   });
 
   const canOpenServerSettings =
@@ -408,6 +414,7 @@ export function useChatAppOrchestration() {
       prefetchChannelMessages,
       purgeMessageBundleCacheForServer,
       purgeMessageBundleCacheForChannel,
+      applyBannedUserContentVisibility,
     },
   } = useMessages({
     currentServerId,
@@ -597,6 +604,17 @@ export function useChatAppOrchestration() {
   );
 
   activeChannelAccessLostHandlerRef.current = handleChannelAccessLostCascade;
+
+  const handleMemberBannedBroadcast = useCallback(
+    (payload: MemberBannedBroadcastPayload) => {
+      if (!payload.communityId || !payload.bannedUserId) return;
+      if (payload.bannedUserId === user?.id) return;
+      applyBannedUserContentVisibility(payload); // CHECKPOINT 4 COMPLETE
+    },
+    [applyBannedUserContentVisibility, user?.id]
+  );
+
+  memberBannedHandlerRef.current = handleMemberBannedBroadcast;
 
   // ── Desktop settings ──────────────────────────────────────────────────────
   const {
@@ -820,11 +838,17 @@ export function useChatAppOrchestration() {
   const banUserFromServer = useCallback(
     async (input: { targetUserId: string; communityId: string; reason: string }) => {
       const communityBackend = getCommunityDataBackend(input.communityId);
-      await communityBackend.banCommunityMember({
+      const banResult = await communityBackend.banCommunityMember({
         communityId: input.communityId,
         targetUserId: input.targetUserId,
         reason: input.reason,
       });
+      applyBannedUserContentVisibility(banResult); // CHECKPOINT 3 COMPLETE
+      try {
+        await communityBackend.broadcastMemberBanned(banResult); // CHECKPOINT 4 COMPLETE
+      } catch (error) {
+        console.error('Failed to broadcast member ban:', error);
+      }
       try {
         await refreshMembersModalMembersIfOpen(input.communityId);
       } catch (error) {
@@ -838,7 +862,13 @@ export function useChatAppOrchestration() {
         }
       }
     },
-    [refreshMembersModalMembersIfOpen, loadCommunityBans, showServerSettingsModal, currentServerId]
+    [
+      applyBannedUserContentVisibility,
+      refreshMembersModalMembersIfOpen,
+      loadCommunityBans,
+      showServerSettingsModal,
+      currentServerId,
+    ]
   );
 
   const resolveBanEligibleServers = useCallback(

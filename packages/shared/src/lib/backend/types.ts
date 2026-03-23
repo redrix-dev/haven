@@ -148,6 +148,16 @@ export type CommunityBanItem = {
   avatarUrl: string | null;
 };
 
+export type BanCommunityMemberResult = {
+  bannedUserId: string;
+  communityId: string;
+};
+
+export type MemberBannedBroadcastPayload = {
+  bannedUserId: string;
+  communityId: string;
+};
+
 export type BanEligibleServer = {
   communityId: string;
   communityName: string;

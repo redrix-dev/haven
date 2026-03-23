@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { getCommunityDataBackend } from '@shared/lib/backend';
 import { MESSAGE_PAGE_SIZE } from '@client/app/constants';
 import type { ChannelMessageBundleCacheEntry } from '@client/app/types';
+import { applyBanVisibilityToMessageBundle } from '@client/features/messages/lib/banVisibility';
 import { useMessagesStore } from '@shared/stores/messagesStore';
 import type {
   AuthorProfile,
@@ -148,6 +149,12 @@ export function useMessages({
   const olderLoadInFlightRef = React.useRef(false);
   const currentHasOlderMessagesRef = React.useRef(false);
   const oldestLoadedCursorRef = React.useRef<{ createdAt: string; id: string } | null>(null);
+  const currentMessageListRef = React.useRef<Message[]>([]);
+  const currentReactionListRef = React.useRef<MessageReaction[]>([]);
+  const currentAttachmentListRef = React.useRef<MessageAttachment[]>([]);
+  const currentLinkPreviewListRef = React.useRef<MessageLinkPreview[]>([]);
+  const bannedUserIdsByServerRef = React.useRef<Record<string, string[]>>({});
+  const loadedBannedUserIdsByServerRef = React.useRef<Record<string, boolean>>({});
   const cleanupIntervalRef = useRef<number | null>(null);
   const lastFreshMessageLoadAtRef = React.useRef(0);
 
@@ -213,6 +220,74 @@ export function useMessages({
     [getChannelBundleCacheKey]
   );
 
+  const getCachedBannedUserIds = React.useCallback((communityId: string): string[] | null => {
+    if (!communityId) return null;
+    return Object.prototype.hasOwnProperty.call(bannedUserIdsByServerRef.current, communityId)
+      ? bannedUserIdsByServerRef.current[communityId] ?? []
+      : null;
+  }, []);
+
+  const cacheBannedUserIds = React.useCallback(
+    (communityId: string, bannedUserIds: string[], options?: { loaded?: boolean }) => {
+      if (!communityId) return [] as string[];
+      const nextBannedUserIds = Array.from(new Set(bannedUserIds.filter(Boolean)));
+      bannedUserIdsByServerRef.current[communityId] = nextBannedUserIds;
+      if (options?.loaded === true) {
+        loadedBannedUserIdsByServerRef.current[communityId] = true;
+      }
+      return nextBannedUserIds;
+    },
+    []
+  );
+
+  const ensureBannedUserIdsLoaded = React.useCallback(
+    async (communityId: string) => {
+      if (!communityId) return [] as string[];
+      const cachedBannedUserIds = getCachedBannedUserIds(communityId);
+      if (cachedBannedUserIds && loadedBannedUserIdsByServerRef.current[communityId] === true) {
+        return cachedBannedUserIds;
+      }
+
+      const communityBackend = getCommunityDataBackend(communityId);
+      const bans = await communityBackend.listCommunityBans(communityId);
+      // CHECKPOINT 6 COMPLETE
+      return cacheBannedUserIds(
+        communityId,
+        bans
+          .map((ban) => ban.bannedUserId)
+          .filter((bannedUserId): bannedUserId is string => Boolean(bannedUserId)),
+        { loaded: true }
+      );
+    },
+    [cacheBannedUserIds, getCachedBannedUserIds]
+  );
+
+  const addBannedUserIdToCache = React.useCallback(
+    (communityId: string, bannedUserId: string) => {
+      if (!communityId || !bannedUserId) return [] as string[];
+      const existingBannedUserIds = getCachedBannedUserIds(communityId) ?? [];
+      if (existingBannedUserIds.includes(bannedUserId)) {
+        return existingBannedUserIds;
+      }
+      return cacheBannedUserIds(communityId, [...existingBannedUserIds, bannedUserId]);
+    },
+    [cacheBannedUserIds, getCachedBannedUserIds]
+  );
+
+  const applyCurrentServerBanVisibility = React.useCallback(
+    (bundle: {
+      messages: Message[];
+      reactions: MessageReaction[];
+      attachments: MessageAttachment[];
+      linkPreviews: MessageLinkPreview[];
+    }) =>
+      applyBanVisibilityToMessageBundle(
+        bundle,
+        currentServerId ? getCachedBannedUserIds(currentServerId) ?? [] : []
+      ),
+    [currentServerId, getCachedBannedUserIds]
+  );
+
   const purgeMessageBundleCacheForServer = React.useCallback(
     (communityId: string) => {
       if (!communityId) return;
@@ -256,13 +331,23 @@ export function useMessages({
                 communityBackend.listMessageLinkPreviewsForMessages({ communityId: serverId, channelId, messageIds }),
               ])
             : [[] as MessageReaction[], [] as MessageAttachment[], [] as MessageLinkPreview[]];
-        // Only write if not already populated — avoid clobbering an active channel load
-        if (!messageBundleByChannelCacheRef.current[cacheKey]) {
-          messageBundleByChannelCacheRef.current[cacheKey] = {
+        const bannedUserIds = await ensureBannedUserIdsLoaded(serverId);
+        const filteredBundle = applyBanVisibilityToMessageBundle(
+          {
             messages,
             reactions,
             attachments,
             linkPreviews,
+          },
+          bannedUserIds
+        );
+        // Only write if not already populated — avoid clobbering an active channel load
+        if (!messageBundleByChannelCacheRef.current[cacheKey]) {
+          messageBundleByChannelCacheRef.current[cacheKey] = {
+            messages: filteredBundle.messages,
+            reactions: filteredBundle.reactions,
+            attachments: filteredBundle.attachments,
+            linkPreviews: filteredBundle.linkPreviews,
             hasOlderMessages: page.hasMore,
           };
         }
@@ -270,7 +355,7 @@ export function useMessages({
         // silent — prefetch failures are non-fatal
       }
     },
-    [getChannelBundleCacheKey]
+    [ensureBannedUserIdsLoaded, getChannelBundleCacheKey]
   );
 
   const setRequestOlderMessagesLoader = React.useCallback(
@@ -338,6 +423,10 @@ export function useMessages({
     olderLoadInFlightRef.current = false;
     currentHasOlderMessagesRef.current = false;
     oldestLoadedCursorRef.current = null;
+    currentMessageListRef.current = [];
+    currentReactionListRef.current = [];
+    currentAttachmentListRef.current = [];
+    currentLinkPreviewListRef.current = [];
     lastFreshMessageLoadAtRef.current = 0;
     requestOlderMessagesRef.current = null;
   }, [resetStoredMessages]);
@@ -408,17 +497,44 @@ export function useMessages({
         messageId,
       });
       const { messages, reactions, attachments, linkPreviews } = useMessagesStore.getState();
-      setStoredMessages(messages.filter((message) => message.id !== messageId));
-      setStoredReactions(Object.values(reactions).filter((reaction) => reaction.messageId !== messageId));
-      setStoredAttachments(
-        Object.values(attachments).filter((attachment) => attachment.messageId !== messageId)
-      );
-      setStoredLinkPreviews(
-        Object.values(linkPreviews).filter((preview) => preview.messageId !== messageId)
-      );
+      const nextMessages = messages.filter((message) => message.id !== messageId);
+      const nextReactions = Object.values(reactions).filter((reaction) => reaction.messageId !== messageId);
+      const nextAttachments = Object.values(attachments).filter((attachment) => attachment.messageId !== messageId);
+      const nextLinkPreviews = Object.values(linkPreviews).filter((preview) => preview.messageId !== messageId);
+
+      currentMessageListRef.current = nextMessages;
+      currentReactionListRef.current = nextReactions;
+      currentAttachmentListRef.current = nextAttachments;
+      currentLinkPreviewListRef.current = nextLinkPreviews;
+      syncOldestLoadedCursor(nextMessages);
+
+      if (currentChannelId) {
+        cacheChannelBundle(currentServerId, currentChannelId, {
+          messages: nextMessages,
+          reactions: nextReactions,
+          attachments: nextAttachments,
+          linkPreviews: nextLinkPreviews,
+          hasOlderMessages: currentHasOlderMessagesRef.current,
+        });
+      }
+
+      setStoredMessages(nextMessages);
+      setStoredReactions(nextReactions);
+      setStoredAttachments(nextAttachments);
+      setStoredLinkPreviews(nextLinkPreviews);
       markMessagesFresh();
     },
-    [currentServerId, markMessagesFresh, setStoredAttachments, setStoredLinkPreviews, setStoredMessages, setStoredReactions]
+    [
+      cacheChannelBundle,
+      currentChannelId,
+      currentServerId,
+      markMessagesFresh,
+      setStoredAttachments,
+      setStoredLinkPreviews,
+      setStoredMessages,
+      setStoredReactions,
+      syncOldestLoadedCursor,
+    ]
   );
 
   const reportMessage = React.useCallback(
@@ -620,27 +736,51 @@ export function useMessages({
 
   const loadLatestMessagesWithRelated = React.useCallback(
     async (currentMessageCount: number) => {
+      if (!currentServerId) {
+        throw new Error('No server selected.');
+      }
+
       const loadId = createNextMessageLoadId();
       const startedAt = Date.now();
       const targetCount = Math.max(currentMessageCount, MESSAGE_PAGE_SIZE);
       const { messageList, hasMore } = await fetchLatestMessageWindow(targetCount);
       const { reactionList, attachmentList, linkPreviewList } = await fetchRelatedForMessages(messageList);
+      const bannedUserIds = await ensureBannedUserIdsLoaded(currentServerId);
+      const filteredBundle = applyBanVisibilityToMessageBundle(
+        {
+          messages: messageList,
+          reactions: reactionList,
+          attachments: attachmentList,
+          linkPreviews: linkPreviewList,
+        },
+        bannedUserIds
+      );
 
       return {
         loadId,
         startedAt,
-        messageList,
-        reactionList,
-        attachmentList,
-        linkPreviewList,
+        messageList: filteredBundle.messages,
+        reactionList: filteredBundle.reactions,
+        attachmentList: filteredBundle.attachments,
+        linkPreviewList: filteredBundle.linkPreviews,
         hasOlder: hasMore,
       };
     },
-    [createNextMessageLoadId, fetchLatestMessageWindow, fetchRelatedForMessages]
+    [
+      createNextMessageLoadId,
+      currentServerId,
+      ensureBannedUserIdsLoaded,
+      fetchLatestMessageWindow,
+      fetchRelatedForMessages,
+    ]
   );
 
   const loadOlderMessagesWithRelated = React.useCallback(
     async (currentMessageList: Message[]) => {
+      if (!currentServerId) {
+        throw new Error('No server selected.');
+      }
+
       const olderLoad = tryBeginOlderMessagesLoad();
       if (!olderLoad) {
         return { kind: 'skipped' as const };
@@ -664,6 +804,16 @@ export function useMessages({
       const prependMessages = page.messages.filter((message) => !existingIds.has(message.id));
       const nextMessageList = [...prependMessages, ...currentMessageList];
       const { reactionList, attachmentList, linkPreviewList } = await fetchRelatedForMessages(nextMessageList);
+      const bannedUserIds = await ensureBannedUserIdsLoaded(currentServerId);
+      const filteredBundle = applyBanVisibilityToMessageBundle(
+        {
+          messages: nextMessageList,
+          reactions: reactionList,
+          attachments: attachmentList,
+          linkPreviews: linkPreviewList,
+        },
+        bannedUserIds
+      );
 
       return {
         kind: 'loaded' as const,
@@ -671,14 +821,16 @@ export function useMessages({
         startedAt,
         oldestLoadedCursor,
         prependCount: prependMessages.length,
-        messageList: nextMessageList,
-        reactionList,
-        attachmentList,
-        linkPreviewList,
+        messageList: filteredBundle.messages,
+        reactionList: filteredBundle.reactions,
+        attachmentList: filteredBundle.attachments,
+        linkPreviewList: filteredBundle.linkPreviews,
         hasOlder: page.hasMore,
       };
     },
     [
+      currentServerId,
+      ensureBannedUserIdsLoaded,
       fetchMessagesPageBeforeCursor,
       fetchRelatedForMessages,
       tryBeginOlderMessagesLoad,
@@ -756,10 +908,22 @@ export function useMessages({
         nextMessages.push(messageRow);
       }
       nextMessages.sort(compareMessagesAsc);
-      commitMessages(nextMessages, existingIndex >= 0 ? 'messages_sub_update' : 'messages_sub_insert');
+      const moderatedBundle = applyCurrentServerBanVisibility({
+        messages: nextMessages,
+        reactions: currentReactionList,
+        attachments: currentAttachmentList,
+        linkPreviews: currentLinkPreviewList,
+      });
+      commitMessages(
+        moderatedBundle.messages,
+        existingIndex >= 0 ? 'messages_sub_update' : 'messages_sub_insert'
+      );
+      commitReactions(moderatedBundle.reactions);
+      commitAttachments(moderatedBundle.attachments);
+      commitLinkPreviews(moderatedBundle.linkPreviews);
       return true;
     },
-    []
+    [applyCurrentServerBanVisibility]
   );
 
   const applyIncrementalReactionRealtimePayload = React.useCallback(
@@ -795,10 +959,16 @@ export function useMessages({
         if (left.id > right.id) return 1;
         return 0;
       });
-      commitReactions(nextReactions);
+      const moderatedBundle = applyCurrentServerBanVisibility({
+        messages: currentMessageList,
+        reactions: nextReactions,
+        attachments: [] as MessageAttachment[],
+        linkPreviews: [] as MessageLinkPreview[],
+      });
+      commitReactions(moderatedBundle.reactions);
       return true;
     },
-    []
+    [applyCurrentServerBanVisibility]
   );
 
   const subscribeToMessageRealtimeStreams = React.useCallback(
@@ -870,7 +1040,14 @@ export function useMessages({
             return 0;
           });
 
-          input.commitAttachments(nextAttachments);
+          const moderatedBundle = applyCurrentServerBanVisibility({
+            messages: currentMessageList,
+            reactions: [] as MessageReaction[],
+            attachments: nextAttachments,
+            linkPreviews: input.getCurrentLinkPreviewList(),
+          });
+
+          input.commitAttachments(moderatedBundle.attachments);
         })()
           .catch((error) => {
             input.onAttachmentRefreshFallback(error);
@@ -929,7 +1106,14 @@ export function useMessages({
             return 0;
           });
 
-          input.commitLinkPreviews(nextLinkPreviews);
+          const moderatedBundle = applyCurrentServerBanVisibility({
+            messages: currentMessageList,
+            reactions: [] as MessageReaction[],
+            attachments: input.getCurrentAttachmentList(),
+            linkPreviews: nextLinkPreviews,
+          });
+
+          input.commitLinkPreviews(moderatedBundle.linkPreviews);
         })()
           .catch((error) => {
             input.onLinkPreviewRefreshFallback(error);
@@ -980,7 +1164,71 @@ export function useMessages({
         cleanup,
       };
     },
-    [fetchMessageAttachmentsForMessageIds, fetchMessageLinkPreviewsForMessageIds]
+    [applyCurrentServerBanVisibility, fetchMessageAttachmentsForMessageIds, fetchMessageLinkPreviewsForMessageIds]
+  );
+
+  const applyBannedUserContentVisibility = React.useCallback(
+    (input: { communityId: string; bannedUserId: string }) => {
+      if (!input.communityId || !input.bannedUserId) return;
+
+      const bannedUserIds = addBannedUserIdToCache(input.communityId, input.bannedUserId);
+
+      for (const [cacheKey, cachedBundle] of Object.entries(messageBundleByChannelCacheRef.current)) {
+        if (!cacheKey.startsWith(`${input.communityId}:`)) continue;
+        const filteredBundle = applyBanVisibilityToMessageBundle(
+          {
+            messages: cachedBundle.messages,
+            reactions: cachedBundle.reactions,
+            attachments: cachedBundle.attachments,
+            linkPreviews: cachedBundle.linkPreviews,
+          },
+          bannedUserIds
+        );
+        messageBundleByChannelCacheRef.current[cacheKey] = {
+          ...cachedBundle,
+          messages: filteredBundle.messages,
+          reactions: filteredBundle.reactions,
+          attachments: filteredBundle.attachments,
+          linkPreviews: filteredBundle.linkPreviews,
+        };
+      }
+
+      if (currentServerId !== input.communityId) return;
+
+      const filteredBundle = applyBanVisibilityToMessageBundle(
+        {
+          messages: currentMessageListRef.current,
+          reactions: currentReactionListRef.current,
+          attachments: currentAttachmentListRef.current,
+          linkPreviews: currentLinkPreviewListRef.current,
+        },
+        bannedUserIds
+      );
+
+      currentMessageListRef.current = filteredBundle.messages;
+      currentReactionListRef.current = filteredBundle.reactions;
+      currentAttachmentListRef.current = filteredBundle.attachments;
+      currentLinkPreviewListRef.current = filteredBundle.linkPreviews;
+      syncLoadedMessageWindow(filteredBundle.messages, currentHasOlderMessagesRef.current);
+      const remainingAuthorIds = new Set(
+        filteredBundle.messages
+          .map((message) => message.author_user_id)
+          .filter((authorUserId): authorUserId is string => Boolean(authorUserId))
+      );
+      const nextProfiles = Object.fromEntries(
+        Object.entries(useMessagesStore.getState().profiles).filter(([authorUserId]) =>
+          remainingAuthorIds.has(authorUserId)
+        )
+      );
+
+      useMessagesStore.getState().setMessages(filteredBundle.messages);
+      useMessagesStore.getState().setReactions(filteredBundle.reactions);
+      useMessagesStore.getState().setAttachments(filteredBundle.attachments);
+      useMessagesStore.getState().setLinkPreviews(filteredBundle.linkPreviews);
+      useMessagesStore.getState().setProfiles(nextProfiles);
+      markMessagesFresh();
+    },
+    [addBannedUserIdToCache, currentServerId, markMessagesFresh, syncLoadedMessageWindow]
   );
 
   const createMessageReloadScheduler = React.useCallback((input: MessageReloadSchedulerInput) => {
@@ -1127,26 +1375,21 @@ export function useMessages({
 
   const createMessageBundleController = React.useCallback(
     (input: MessageBundleControllerInput) => {
-      let currentMessageList: Message[] = [];
-      let currentReactionList: MessageReaction[] = [];
-      let currentAttachmentList: MessageAttachment[] = [];
-      let currentLinkPreviewList: MessageLinkPreview[] = [];
-
       const persistCurrentChannelBundleCache = () => {
         if (!currentServerId || !currentChannelId) return;
         cacheChannelBundle(currentServerId, currentChannelId, {
-          messages: currentMessageList,
-          reactions: currentReactionList,
-          attachments: currentAttachmentList,
-          linkPreviews: currentLinkPreviewList,
+          messages: currentMessageListRef.current,
+          reactions: currentReactionListRef.current,
+          attachments: currentAttachmentListRef.current,
+          linkPreviews: currentLinkPreviewListRef.current,
           hasOlderMessages: currentHasOlderMessagesRef.current,
         });
       };
 
-      const getCurrentMessageList = () => currentMessageList;
-      const getCurrentReactionList = () => currentReactionList;
-      const getCurrentAttachmentList = () => currentAttachmentList;
-      const getCurrentLinkPreviewList = () => currentLinkPreviewList;
+      const getCurrentMessageList = () => currentMessageListRef.current;
+      const getCurrentReactionList = () => currentReactionListRef.current;
+      const getCurrentAttachmentList = () => currentAttachmentListRef.current;
+      const getCurrentLinkPreviewList = () => currentLinkPreviewListRef.current;
 
       const applyLoadedBundle = (inputBundle: {
         messageList: Message[];
@@ -1155,10 +1398,10 @@ export function useMessages({
         linkPreviewList: MessageLinkPreview[];
         hasOlder: boolean;
       }) => {
-        currentMessageList = inputBundle.messageList;
-        currentReactionList = inputBundle.reactionList;
-        currentAttachmentList = inputBundle.attachmentList;
-        currentLinkPreviewList = inputBundle.linkPreviewList;
+        currentMessageListRef.current = inputBundle.messageList;
+        currentReactionListRef.current = inputBundle.reactionList;
+        currentAttachmentListRef.current = inputBundle.attachmentList;
+        currentLinkPreviewListRef.current = inputBundle.linkPreviewList;
         syncLoadedMessageWindow(inputBundle.messageList, inputBundle.hasOlder);
 
         if (input.isMounted()) {
@@ -1177,10 +1420,10 @@ export function useMessages({
         const cachedBundle = getCachedChannelBundle(currentServerId, currentChannelId);
         if (!cachedBundle) return null;
 
-        currentMessageList = cachedBundle.messages;
-        currentReactionList = cachedBundle.reactions;
-        currentAttachmentList = cachedBundle.attachments;
-        currentLinkPreviewList = cachedBundle.linkPreviews;
+        currentMessageListRef.current = cachedBundle.messages;
+        currentReactionListRef.current = cachedBundle.reactions;
+        currentAttachmentListRef.current = cachedBundle.attachments;
+        currentLinkPreviewListRef.current = cachedBundle.linkPreviews;
         syncLoadedMessageWindow(cachedBundle.messages, cachedBundle.hasOlderMessages);
 
         if (input.isMounted()) {
@@ -1195,7 +1438,7 @@ export function useMessages({
       };
 
       const commitMessages = (nextMessages: Message[], reason: string) => {
-        currentMessageList = nextMessages;
+        currentMessageListRef.current = nextMessages;
         syncOldestLoadedCursor(nextMessages);
         persistCurrentChannelBundleCache();
         if (!input.isMounted()) return;
@@ -1205,7 +1448,7 @@ export function useMessages({
       };
 
       const commitReactions = (nextReactions: MessageReaction[]) => {
-        currentReactionList = nextReactions;
+        currentReactionListRef.current = nextReactions;
         persistCurrentChannelBundleCache();
         if (!input.isMounted()) return;
         setStoredReactions(nextReactions);
@@ -1213,7 +1456,7 @@ export function useMessages({
       };
 
       const commitAttachments = (nextAttachments: MessageAttachment[]) => {
-        currentAttachmentList = nextAttachments;
+        currentAttachmentListRef.current = nextAttachments;
         persistCurrentChannelBundleCache();
         if (!input.isMounted()) return;
         setStoredAttachments(nextAttachments);
@@ -1221,7 +1464,7 @@ export function useMessages({
       };
 
       const commitLinkPreviews = (nextLinkPreviews: MessageLinkPreview[]) => {
-        currentLinkPreviewList = nextLinkPreviews;
+        currentLinkPreviewListRef.current = nextLinkPreviews;
         persistCurrentChannelBundleCache();
         if (!input.isMounted()) return;
         setStoredLinkPreviews(nextLinkPreviews);
@@ -1652,6 +1895,7 @@ export function useMessages({
       prefetchChannelMessages,
       purgeMessageBundleCacheForServer,
       purgeMessageBundleCacheForChannel,
+      applyBannedUserContentVisibility,
     },
   };
 }

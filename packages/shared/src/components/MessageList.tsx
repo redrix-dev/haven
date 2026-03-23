@@ -54,6 +54,10 @@ import type {
 } from '@shared/lib/backend/types';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { MarkdownText } from '@shared/lib/markdownRenderer';
+import {
+  BANNED_REPLY_PLACEHOLDER_CONTENT,
+  isBanRemovedReplyPlaceholder,
+} from '@client/features/messages/lib/banVisibility';
 import { useMessagesStore } from '@shared/stores/messagesStore';
 
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -605,6 +609,24 @@ export function MessageList({
   );
 
   const renderMessageRow = (message: Message, depth = 0) => {
+    const isModerationPlaceholder = isBanRemovedReplyPlaceholder(message);
+    const isReply = depth > 0;
+    const replyIndent = Math.min(depth, 4) * 20;
+
+    if (isModerationPlaceholder) {
+      // CHECKPOINT 5 COMPLETE
+      return (
+        <div
+          className="flex gap-3"
+          style={isReply ? { marginLeft: `${replyIndent}px` } : undefined}
+        >
+          <div className="min-w-0 flex-1 rounded-xl border border-dashed border-[#304867] bg-[#142033] px-4 py-3 text-sm italic text-[#8ea4c7]">
+            {BANNED_REPLY_PLACEHOLDER_CONTENT}
+          </div>
+        </div>
+      );
+    }
+
     const authorProfile = message.author_user_id ? authorProfiles[message.author_user_id] : undefined;
     const isStaffUserMessage = message.author_type === 'user' && Boolean(authorProfile?.isPlatformStaff);
     const isOwnMessage = message.author_type === 'user' && message.author_user_id === currentUserId;
@@ -614,8 +636,6 @@ export function MessageList({
     const authorLabel = getAuthorLabel(message, authorProfile, currentUserId);
     const authorColor = getAuthorColor(message, authorProfile, currentUserId);
     const isEditing = editingMessageId === message.id;
-    const isReply = depth > 0;
-    const replyIndent = Math.min(depth, 4) * 20;
     const messageReactionMap = reactionsByMessageId.get(message.id) ?? new Map();
     const reactionSummaries = Array.from(messageReactionMap.entries());
     const messageAttachmentRows = attachmentsByMessageId.get(message.id) ?? [];

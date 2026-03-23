@@ -10,6 +10,7 @@ import {
 } from './mediaAttachmentUtils';
 import type {
   AuthorProfile,
+  BanCommunityMemberResult,
   BanEligibleServer,
   Channel,
   ChannelCreateInput,
@@ -29,6 +30,7 @@ import type {
   MessageAttachment,
   MessageLinkPreview,
   MessageReaction,
+  MemberBannedBroadcastPayload,
   ServerMemberRoleItem,
   ServerPermissions,
   ServerRoleItem,
@@ -115,6 +117,11 @@ type MessagePageCursor = {
 type MessagePageResult = {
   messages: Message[];
   hasMore: boolean;
+};
+
+type BanCommunityMemberRpcRow = {
+  banned_user_id?: unknown;
+  community_id?: unknown;
 };
 
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
@@ -442,7 +449,7 @@ export interface CommunityDataBackend {
     communityId: string;
     targetUserId: string;
     reason: string;
-  }): Promise<void>;
+  }): Promise<BanCommunityMemberResult>;
   unbanCommunityMember(input: {
     communityId: string;
     targetUserId: string;
@@ -450,7 +457,14 @@ export interface CommunityDataBackend {
   }): Promise<void>;
   listBanEligibleServersForUser(targetUserId: string): Promise<BanEligibleServer[]>;
   listChannels(communityId: string): Promise<Channel[]>;
-  subscribeToChannels(communityId: string, onChange: () => void): RealtimeChannel;
+  subscribeToChannels(
+    communityId: string,
+    onChange: () => void,
+    options?: {
+      onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
+    }
+  ): RealtimeChannel;
+  broadcastMemberBanned(input: MemberBannedBroadcastPayload): Promise<void>;
   listChannelGroups(input: {
     communityId: string;
     channelIds: string[];
@@ -818,12 +832,27 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       throw new Error('Ban reason is required.');
     }
 
-    const { error } = await supabase.rpc('ban_community_member', {
+    const { data, error } = await supabase.rpc('ban_community_member', {
       p_community_id: communityId,
       p_target_user_id: targetUserId,
       p_reason: normalizedReason,
     });
     if (error) throw error;
+
+    const row = (Array.isArray(data) ? data[0] : data) as BanCommunityMemberRpcRow | null;
+    const bannedUserId =
+      row && typeof row.banned_user_id === 'string' ? row.banned_user_id : null;
+    const returnedCommunityId =
+      row && typeof row.community_id === 'string' ? row.community_id : null;
+
+    if (!bannedUserId || !returnedCommunityId) {
+      throw new Error('Ban RPC returned incomplete moderation context.');
+    }
+
+    return {
+      bannedUserId,
+      communityId: returnedCommunityId,
+    };
   },
 
   async unbanCommunityMember({ communityId, targetUserId, reason }) {
@@ -1022,7 +1051,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
-  subscribeToChannels(communityId, onChange) {
+  subscribeToChannels(communityId, onChange, options) {
     return supabase
       .channel(`channels:${communityId}`)
       .on(
@@ -1035,7 +1064,62 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         },
         onChange
       )
+      .on('broadcast', { event: 'member_banned' }, ({ payload }) => {
+        const payloadRecord = asObjectRecord(payload);
+        const bannedUserId =
+          payloadRecord && typeof payloadRecord.bannedUserId === 'string'
+            ? payloadRecord.bannedUserId
+            : null;
+        const payloadCommunityId =
+          payloadRecord && typeof payloadRecord.communityId === 'string'
+            ? payloadRecord.communityId
+            : null;
+        if (!bannedUserId || payloadCommunityId !== communityId) return;
+        options?.onMemberBanned?.({
+          bannedUserId,
+          communityId: payloadCommunityId,
+        });
+      })
       .subscribe();
+  },
+
+  async broadcastMemberBanned({ communityId, bannedUserId }) {
+    const broadcastChannel = supabase.channel(`channels:${communityId}`);
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = window.setTimeout(() => {
+          reject(new Error('Timed out connecting community moderation broadcast.'));
+        }, 12_000);
+
+        broadcastChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            window.clearTimeout(timeoutId);
+            resolve();
+            return;
+          }
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            window.clearTimeout(timeoutId);
+            reject(new Error('Failed to connect community moderation broadcast.'));
+          }
+        });
+      });
+
+      const sendStatus = await broadcastChannel.send({
+        type: 'broadcast',
+        event: 'member_banned',
+        payload: {
+          bannedUserId,
+          communityId,
+        } satisfies MemberBannedBroadcastPayload,
+      });
+
+      if (sendStatus !== 'ok') {
+        throw new Error('Failed to broadcast member ban.');
+      }
+    } finally {
+      void broadcastChannel.unsubscribe();
+    }
   },
 
   async listMessages(communityId, channelId) {

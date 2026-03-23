@@ -1,6 +1,11 @@
 import React from 'react';
 import { getCommunityDataBackend } from '@shared/lib/backend';
-import type { Channel, ServerPermissions, ServerSummary } from '@shared/lib/backend/types';
+import type {
+  Channel,
+  MemberBannedBroadcastPayload,
+  ServerPermissions,
+  ServerSummary,
+} from '@shared/lib/backend/types';
 import { getErrorMessage } from '@platform/lib/errors';
 
 const EMPTY_SERVER_PERMISSIONS: ServerPermissions = {
@@ -23,12 +28,14 @@ type UseCommunityWorkspaceInput = {
   servers: ServerSummary[];
   currentUserId: string | null;
   channelSettingsTargetId: string | null;
+  onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
 };
 
 export function useCommunityWorkspace({
   servers,
   currentUserId,
   channelSettingsTargetId,
+  onMemberBanned,
 }: UseCommunityWorkspaceInput) {
   const [currentServerId, setCurrentServerId] = React.useState<string | null>(null);
   const [channels, setChannels] = React.useState<Channel[]>([]);
@@ -163,15 +170,21 @@ export function useCommunityWorkspace({
 
     void loadChannels({ blocking: !hasCachedChannels });
 
-    const subscription = communityBackend.subscribeToChannels(currentServerId, () => {
-      void loadChannels({ blocking: false });
-    });
+    const subscription = communityBackend.subscribeToChannels(
+      currentServerId,
+      () => {
+        void loadChannels({ blocking: false });
+      },
+      {
+        onMemberBanned,
+      }
+    );
 
     return () => {
       isMounted = false;
       void subscription.unsubscribe();
     };
-  }, [currentServerId, resetChannelsWorkspace]);
+  }, [currentServerId, onMemberBanned, resetChannelsWorkspace]);
 
   React.useEffect(() => {
     let isMounted = true;
