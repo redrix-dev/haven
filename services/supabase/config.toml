@@ -260,6 +260,9 @@ verify_jwt = false
 [functions.web-push-worker]
 verify_jwt = false
 
+[functions.report-alert]
+verify_jwt = false
+
 # Configure logged in session timeouts.
 # [auth.sessions]
 # Force log out after the specified duration.
