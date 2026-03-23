@@ -558,6 +558,7 @@ export interface CommunityDataBackend {
     communityId: string;
     channelId: string;
   }): Promise<boolean>;
+  isElevatedInServer(communityId: string): Promise<boolean>;
   canSendInChannel(channelId: string): Promise<boolean>;
   fetchServerSettings(communityId: string): Promise<ServerSettingsSnapshot>;
   updateServerSettings(input: {
@@ -1114,10 +1115,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           channelId,
           communityId: payloadCommunityId,
         }); // CHECKPOINT 3 COMPLETE
-      })
-      .subscribe();
+      });
 
-    activeCommunityChannelsById.set(communityId, channel);
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        activeCommunityChannelsById.set(communityId, channel);
+      } // CHECKPOINT 4 COMPLETE
+    });
 
     const originalUnsubscribe = channel.unsubscribe.bind(channel);
     channel.unsubscribe = async (...args) => {
@@ -1729,6 +1733,54 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     }
 
     return false;
+  },
+
+  async isElevatedInServer(communityId) {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    if (!user?.id || !communityId) return false;
+
+    const { data: memberRow, error: memberError } = await supabase
+      .from('community_members')
+      .select('id, is_owner')
+      .eq('community_id', communityId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (memberError) throw memberError;
+    if (!memberRow) return false;
+    if (memberRow.is_owner) return true;
+
+    const { data: memberRoleRows, error: memberRoleError } = await supabase
+      .from('member_roles')
+      .select('role_id')
+      .eq('community_id', communityId)
+      .eq('member_id', memberRow.id);
+    if (memberRoleError) throw memberRoleError;
+
+    const roleIds = Array.from(
+      new Set(
+        (memberRoleRows ?? [])
+          .map((row) => row.role_id)
+          .filter((roleId): roleId is string => Boolean(roleId))
+      )
+    );
+    if (roleIds.length === 0) return false;
+
+    const { data: roleRows, error: roleError } = await supabase
+      .from('roles')
+      .select('name, is_system')
+      .eq('community_id', communityId)
+      .in('id', roleIds);
+    if (roleError) throw roleError;
+
+    return (roleRows ?? []).some(
+      (role) =>
+        role.is_system === true &&
+        (role.name === 'Admin' || role.name === 'Moderator')
+    ); // CHECKPOINT 4 COMPLETE
   },
 
   async canSendInChannel(channelId) {

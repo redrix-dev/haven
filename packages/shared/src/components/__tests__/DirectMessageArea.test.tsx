@@ -109,4 +109,12 @@ describe('DirectMessageArea', () => {
     expect(screen.queryByText('\u200B')).toBeNull();
     expect(screen.getByAltText('test-image.png')).toBeTruthy();
   });
+
+  it('replaces the composer with an unavailable indicator when messaging is blocked', () => {
+    renderArea({ messagingUnavailable: true });
+
+    expect(screen.getByText('Messaging is unavailable in this conversation.')).toBeTruthy();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /send/i })).toBeNull();
+  });
 });

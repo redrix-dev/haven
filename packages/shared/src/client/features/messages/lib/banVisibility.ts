@@ -181,3 +181,57 @@ export const applyChannelAccessVisibilityToMessageBundle = (
     channelId: input.channelId,
   });
 };
+
+export const filterBlockedUserContent = (
+  bundle: BanVisibilityBundle,
+  blockedUserIds: ReadonlySet<string>,
+  isElevated: boolean
+): BanVisibilityBundle => {
+  if (isElevated || blockedUserIds.size === 0) {
+    return bundle;
+  }
+
+  const repliesByParentId = new Map<string, Message[]>();
+  for (const message of bundle.messages) {
+    const parentId = getReplyToMessageId(message);
+    if (!parentId || parentId === message.id) continue;
+    const existingReplies = repliesByParentId.get(parentId) ?? [];
+    existingReplies.push(message);
+    repliesByParentId.set(parentId, existingReplies);
+  }
+
+  const hiddenMessageIds = new Set<string>();
+  const pendingHiddenRootIds: string[] = [];
+
+  for (const message of bundle.messages) {
+    if (!message.author_user_id || !blockedUserIds.has(message.author_user_id)) continue;
+    pendingHiddenRootIds.push(message.id);
+  }
+
+  while (pendingHiddenRootIds.length > 0) {
+    const nextMessageId = pendingHiddenRootIds.pop();
+    if (!nextMessageId || hiddenMessageIds.has(nextMessageId)) continue;
+    hiddenMessageIds.add(nextMessageId);
+    for (const reply of repliesByParentId.get(nextMessageId) ?? []) {
+      pendingHiddenRootIds.push(reply.id);
+    }
+  }
+
+  const visibleMessages = bundle.messages.filter((message) => !hiddenMessageIds.has(message.id));
+  const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
+
+  return {
+    messages: visibleMessages,
+    reactions: bundle.reactions.filter(
+      (reaction) =>
+        !blockedUserIds.has(reaction.userId) && visibleMessageIds.has(reaction.messageId)
+    ),
+    attachments: bundle.attachments.filter(
+      (attachment) =>
+        !blockedUserIds.has(attachment.ownerUserId) && visibleMessageIds.has(attachment.messageId)
+    ),
+    linkPreviews: bundle.linkPreviews.filter((preview) =>
+      visibleMessageIds.has(preview.messageId)
+    ),
+  }; // CHECKPOINT 5 COMPLETE
+};

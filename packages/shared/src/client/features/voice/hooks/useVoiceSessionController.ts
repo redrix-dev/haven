@@ -55,6 +55,8 @@ type UseVoiceSessionControllerInput = {
   currentUserId: string | null | undefined;
   currentUserDisplayName: string;
   currentUserAvatarUrl?: string | null;
+  blockedUserIds: ReadonlySet<string>;
+  isElevatedInActiveServer: boolean;
   voiceSettings: VoiceSettings;
   notificationAudioSettings: NotificationAudioSettings;
   showDiagnostics?: boolean;
@@ -106,6 +108,8 @@ export function useVoiceSessionController({
   currentUserId,
   currentUserDisplayName,
   currentUserAvatarUrl,
+  blockedUserIds,
+  isElevatedInActiveServer,
   voiceSettings,
   notificationAudioSettings,
   showDiagnostics = false,
@@ -1318,6 +1322,17 @@ export function useVoiceSessionController({
     [currentUserId]
   );
 
+  const applyAudioElementPlaybackState = React.useCallback(
+    (userId: string, element: HTMLAudioElement | null) => {
+      if (!element) return;
+      const isBlockedParticipant =
+        !isElevatedInActiveServer && blockedUserIds.has(userId);
+      element.muted = isDeafened || isBlockedParticipant;
+      element.volume = isBlockedParticipant ? 0 : (remoteVolumes[userId] ?? 100) / 100;
+    },
+    [blockedUserIds, isDeafened, isElevatedInActiveServer, remoteVolumes]
+  );
+
   const bindAudioElement = React.useCallback(
     (userId: string, element: HTMLAudioElement | null) => {
       audioElementRefs.current[userId] = element;
@@ -1325,8 +1340,7 @@ export function useVoiceSessionController({
 
       const nextRemoteStream = remoteStreams[userId] ?? null;
       element.srcObject = nextRemoteStream;
-      element.muted = isDeafened;
-      element.volume = (remoteVolumes[userId] ?? 100) / 100;
+      applyAudioElementPlaybackState(userId, element); // CHECKPOINT 7 COMPLETE
       void applySinkId(element);
 
       if (nextRemoteStream) {
@@ -1337,8 +1351,14 @@ export function useVoiceSessionController({
         });
       }
     },
-    [applySinkId, isDeafened, remoteStreams, remoteVolumes]
+    [applyAudioElementPlaybackState, applySinkId, remoteStreams]
   );
+
+  React.useEffect(() => {
+    for (const [userId, element] of Object.entries(audioElementRefs.current)) {
+      applyAudioElementPlaybackState(userId, element);
+    }
+  }, [applyAudioElementPlaybackState]);
 
   React.useEffect(() => {
     voiceSettingsRef.current = voiceSettings;

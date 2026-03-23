@@ -27,6 +27,7 @@ interface ServerListProps {
   notificationHasUnseenPulse?: boolean;
   onOpenDirectMessages?: () => void;
   directMessagesActive?: boolean;
+  directMessageUnreadCount?: number;
   onOpenFriends?: () => void;
   friendRequestIncomingCount?: number;
   friendRequestHasPendingPulse?: boolean;
@@ -55,6 +56,7 @@ export function ServerList({
   notificationHasUnseenPulse = false,
   onOpenDirectMessages,
   directMessagesActive = false,
+  directMessageUnreadCount = 0,
   onOpenFriends,
   friendRequestIncomingCount = 0,
   friendRequestHasPendingPulse = false,
@@ -313,13 +315,19 @@ export function ServerList({
                 <Button
                   type="button"
                   onClick={onOpenDirectMessages}
-                  className={`${squareButtonBaseClass} ${
+                  className={`${squareButtonBaseClass} relative overflow-visible ${
                     directMessagesActive
                       ? 'bg-[#3f79d8] hover:bg-[#3f79d8] text-white'
                       : 'bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white'
                   }`}
                 >
                   <MessageCircle className="size-5" />
+                  {directMessageUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d95c5c] text-white text-[10px] leading-[18px] font-semibold">
+                      {directMessageUnreadCount > 99 ? '99+' : directMessageUnreadCount}
+                    </span>
+                  )}
+                  {/* CHECKPOINT 3 COMPLETE */}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={8}>

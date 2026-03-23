@@ -38,6 +38,7 @@ import { useVoiceSessionController } from "@client/features/voice/hooks/useVoice
 import type { VoicePopoutState } from "@platform/desktop/types";
 import { toast } from "sonner";
 import { useServerOrder } from "@client/features/community/hooks/useServerOrder";
+import { useDmStore } from "@shared/stores/dmStore";
 import { useServersStore } from "@shared/stores/serversStore";
 import { useVoiceStore } from "@shared/stores/voiceStore";
 
@@ -49,8 +50,40 @@ function hasSameServerIdOrder(
   return left.every((server, index) => server.id === right[index]?.id);
 }
 
+function filterBlockedUsersFromParticipantList<T extends { userId: string }>(
+  participants: ReadonlyArray<T>,
+  blockedUserIds: ReadonlySet<string>,
+  isElevatedViewer: boolean,
+) {
+  if (isElevatedViewer || blockedUserIds.size === 0) {
+    return [...participants];
+  }
+
+  return participants.filter((participant) => !blockedUserIds.has(participant.userId));
+}
+
+function filterBlockedUsersFromParticipantRecord<T extends { userId: string }>(
+  participantsByChannelId: Record<string, T[]>,
+  blockedUserIds: ReadonlySet<string>,
+  isElevatedViewer: boolean,
+) {
+  if (isElevatedViewer || blockedUserIds.size === 0) {
+    return participantsByChannelId;
+  }
+
+  return Object.fromEntries(
+    Object.entries(participantsByChannelId).map(([channelId, participants]) => [
+      channelId,
+      participants.filter((participant) => !blockedUserIds.has(participant.userId)),
+    ]),
+  ) as Record<string, T[]>;
+}
+
 export function ChatApp() {
   const app = useChatAppOrchestration();
+  const totalDmUnreadCount = useDmStore((state) =>
+    Object.values(state.unreadCounts).reduce((total, count) => total + count, 0),
+  );
   const { orderedServers, setOrder: setServerOrder } = useServerOrder(
     app.user?.id ?? null,
     app.servers,
@@ -66,7 +99,6 @@ export function ChatApp() {
   const voiceJoined = useVoiceStore((state) => state.joined);
   const voiceMuted = useVoiceStore((state) => state.isMuted);
   const voiceDeafened = useVoiceStore((state) => state.isDeafened);
-  const voiceParticipants = useVoiceStore((state) => state.participants);
   const canOpenVoicePopout = desktopClient.isAvailable();
   const [voicePopoutState, setVoicePopoutState] =
     React.useState<VoicePopoutState | null>(null);
@@ -110,11 +142,50 @@ export function ChatApp() {
         console.error("Failed to force disconnect voice after kick:", error);
       });
   }, [app]);
+  const visibleVoiceChannelParticipants = React.useMemo(
+    () =>
+      filterBlockedUsersFromParticipantRecord(
+        app.voiceChannelParticipants,
+        app.blockedUserIds,
+        app.isCurrentUserElevatedInCurrentServer,
+      ),
+    [
+      app.blockedUserIds,
+      app.isCurrentUserElevatedInCurrentServer,
+      app.voiceChannelParticipants,
+    ],
+  );
+  const visibleActiveVoiceParticipantPreview = React.useMemo(
+    () =>
+      app.activeVoiceChannel
+        ? filterBlockedUsersFromParticipantList(
+            app.voiceChannelParticipants[app.activeVoiceChannel.id] ?? [],
+            app.blockedUserIds,
+            app.isCurrentUserElevatedInActiveVoiceServer,
+          )
+        : [],
+    [
+      app.activeVoiceChannel,
+      app.blockedUserIds,
+      app.isCurrentUserElevatedInActiveVoiceServer,
+      app.voiceChannelParticipants,
+    ],
+  );
+  const isSelectedDmConversationBlocked = React.useMemo(
+    () =>
+      Boolean(
+        app.selectedDmConversation?.otherUserId &&
+          app.blockedUserIds.has(app.selectedDmConversation.otherUserId),
+      ),
+    [app.blockedUserIds, app.selectedDmConversation?.otherUserId],
+  );
   const voiceController = useVoiceSessionController({
     activeChannel: activeVoiceControllerChannel,
     currentUserId: app.user?.id,
     currentUserDisplayName: app.userDisplayName,
     currentUserAvatarUrl: app.profileAvatarUrl,
+    blockedUserIds: app.blockedUserIds,
+    isElevatedInActiveServer: app.isCurrentUserElevatedInActiveVoiceServer,
     voiceSettings: app.appSettings.voice,
     notificationAudioSettings: app.appSettings.notifications,
     showDiagnostics: app.isPlatformStaff,
@@ -128,6 +199,19 @@ export function ChatApp() {
     onSessionError: handleVoiceSessionError,
     onVoiceKick: handleVoiceKickReceived,
   });
+  const visibleActiveVoiceParticipants = React.useMemo(
+    () =>
+      filterBlockedUsersFromParticipantList(
+        voiceController.state.participants,
+        app.blockedUserIds,
+        app.isCurrentUserElevatedInActiveVoiceServer,
+      ),
+    [
+      app.blockedUserIds,
+      app.isCurrentUserElevatedInActiveVoiceServer,
+      voiceController.state.participants,
+    ],
+  );
   const voicePopoutWindowOpen =
     canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
 
@@ -178,7 +262,7 @@ export function ChatApp() {
         isMuted: voiceMuted,
         isDeafened: voiceDeafened,
         transmissionMode: app.appSettings.voice.transmissionMode,
-        participantCount: voiceParticipants.length + (voiceJoined ? 1 : 0),
+        participantCount: visibleActiveVoiceParticipants.length + (voiceJoined ? 1 : 0),
         selectedInputDeviceId: voiceController.state.selectedInputDeviceId,
         selectedOutputDeviceId: voiceController.state.selectedOutputDeviceId,
         inputDevices: voiceController.state.inputDevices.map(
@@ -194,7 +278,7 @@ export function ChatApp() {
           }),
         ),
         supportsOutputSelection: voiceController.state.supportsOutputSelection,
-        members: voiceParticipants.map((participant) => {
+        members: visibleActiveVoiceParticipants.map((participant) => {
           const controllerParticipant = voiceController.state.participants.find(
             (entry) => entry.userId === participant.userId,
           );
@@ -220,7 +304,7 @@ export function ChatApp() {
     voiceDeafened,
     voiceJoined,
     voiceMuted,
-    voiceParticipants,
+    visibleActiveVoiceParticipants,
     voicePopoutWindowOpen,
     voiceController.state.joining,
     voiceController.state.inputDevices,
@@ -404,6 +488,7 @@ export function ChatApp() {
             app.dmWorkspaceEnabled ? app.openDirectMessagesWorkspace : undefined
           }
           directMessagesActive={app.dmWorkspaceIsActive}
+          directMessageUnreadCount={totalDmUnreadCount}
           onOpenFriends={
             app.friendsSocialPanelEnabled
               ? () => {
@@ -465,6 +550,7 @@ export function ChatApp() {
               sending={app.dmMessageSendPending}
               refreshing={app.dmMessagesRefreshing}
               error={app.dmMessagesError}
+              messagingUnavailable={isSelectedDmConversationBlocked}
               onRefresh={() => {
                 if (!app.selectedDmConversationId) return;
                 void app.refreshDmMessages(app.selectedDmConversationId, {
@@ -499,7 +585,7 @@ export function ChatApp() {
               onChannelClick={app.setCurrentChannelId}
               onVoiceChannelClick={app.requestVoiceChannelJoin}
               activeVoiceChannelId={app.activeVoiceChannelId}
-              voiceChannelParticipants={app.voiceChannelParticipants}
+              voiceChannelParticipants={visibleVoiceChannelParticipants}
               voiceStatusPanel={
                 app.activeVoiceChannel && !voicePopoutWindowOpen ? (
                   <VoiceDrawer
@@ -510,11 +596,8 @@ export function ChatApp() {
                       "Unknown server"
                     }
                     channelName={app.activeVoiceChannel.name}
-                    participantCount={app.activeVoiceParticipantCount}
-                    participantPreview={
-                      app.voiceChannelParticipants[app.activeVoiceChannel.id] ??
-                      []
-                    }
+                    participantCount={visibleActiveVoiceParticipantPreview.length}
+                    participantPreview={visibleActiveVoiceParticipantPreview}
                     voiceConnected={voiceController.state.joined}
                     voicePanelOpen={app.voicePanelOpen}
                     joining={voiceController.state.joining}
@@ -665,6 +748,8 @@ export function ChatApp() {
                 channelName={app.currentRenderableChannel.name}
                 channelKind={app.currentRenderableChannel.kind}
                 currentUserId={user.id}
+                blockedUserIds={app.blockedUserIds}
+                isElevatedViewer={app.isCurrentUserElevatedInCurrentServer}
                 canManageMessages={app.serverPermissions.canManageMessages}
                 canCreateReports={app.serverPermissions.canCreateReports}
                 canManageBans={app.serverPermissions.canManageBans}
@@ -985,6 +1070,8 @@ export function ChatApp() {
         loading={app.membersModalLoading}
         error={app.membersModalError}
         members={app.membersModalMembers}
+        blockedUserIds={app.blockedUserIds}
+        isElevatedViewer={app.isCurrentUserElevatedInMembersModalServer}
         canReportProfiles={app.membersModalCanCreateReports}
         canBanProfiles={app.membersModalCanManageBans}
         onResolveBanServers={app.resolveBanEligibleServers}
@@ -1087,7 +1174,10 @@ export function ChatApp() {
         activeChannelName={app.activeVoiceChannel?.name ?? null}
         currentUserDisplayName={app.userDisplayName}
         currentUserAvatarUrl={app.profileAvatarUrl}
-        voiceSessionState={voiceController.state}
+        voiceSessionState={{
+          ...voiceController.state,
+          participants: visibleActiveVoiceParticipants,
+        }}
         voiceSessionActions={voiceController.actions}
         showDiagnostics={app.isPlatformStaff}
         canOpenVoicePopout={canOpenVoicePopout}

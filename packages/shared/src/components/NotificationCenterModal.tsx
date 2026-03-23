@@ -136,10 +136,11 @@ export function NotificationCenterModal({
   onUpdateLocalAudioSettings,
 }: NotificationCenterModalProps) {
   const notifications = useNotificationsStore((state) => state.notifications);
-  const unreadCount = useNotificationsStore((state) => state.unreadCount);
   const loading = useNotificationsStore((state) => state.isLoading);
   // dm_message notifications are handled by the DM panel, not surfaced here
   const visibleNotifications = notifications.filter((notification) => notification.kind !== 'dm_message');
+  const visibleUnreadCount = visibleNotifications.filter((notification) => notification.readAt == null).length;
+  // CHECKPOINT 2 COMPLETE
 
   // Retain these props until the dedicated notification settings surface is wired.
   void [
@@ -177,7 +178,7 @@ export function NotificationCenterModal({
                   Unseen: {counts.unseenCount}
                 </Badge>
                 <Badge variant="outline" className="border-[#355077] text-[#d5e4ff]">
-                  Unread: {unreadCount}
+                  Unread: {visibleUnreadCount}
                 </Badge>
                 <Button
                   type="button"

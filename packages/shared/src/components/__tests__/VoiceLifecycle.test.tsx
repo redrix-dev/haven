@@ -208,6 +208,8 @@ function VoiceControllerHarness({
     currentUserId: "user-1",
     currentUserDisplayName: "Test User",
     currentUserAvatarUrl: null,
+    blockedUserIds: new Set(),
+    isElevatedInActiveServer: false,
     voiceSettings,
     notificationAudioSettings: DEFAULT_NOTIFICATION_AUDIO_SETTINGS,
     onUpdateVoiceSettings: setVoiceSettings,

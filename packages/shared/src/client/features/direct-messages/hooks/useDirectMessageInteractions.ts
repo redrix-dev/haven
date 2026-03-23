@@ -10,7 +10,6 @@ type UseDirectMessageInteractionsInput = {
   setDmConversationsError: React.Dispatch<React.SetStateAction<string | null>>;
   refreshDmConversations: (options?: { suppressLoadingState?: boolean }) => Promise<void>;
   openDirectMessageWithUser: (targetUserId: string) => Promise<void>;
-  clearSelectedDmConversation: () => void;
   socialBackend: Pick<SocialBackend, 'blockUser'>;
   refreshSocialCounts: () => Promise<void>;
   refreshNotificationInbox: (options?: { playSoundsForNew?: boolean }) => Promise<void>;
@@ -26,7 +25,6 @@ export function useDirectMessageInteractions({
   setDmConversationsError,
   refreshDmConversations,
   openDirectMessageWithUser,
-  clearSelectedDmConversation,
   socialBackend,
   refreshSocialCounts,
   refreshNotificationInbox,
@@ -127,7 +125,6 @@ export function useDirectMessageInteractions({
   const blockDirectMessageUser = React.useCallback(
     async (input: { userId: string; username: string }) => {
       await socialBackend.blockUser(input.userId);
-      clearSelectedDmConversation();
 
       await Promise.all([
         refreshSocialCounts(),
@@ -136,7 +133,6 @@ export function useDirectMessageInteractions({
       ]);
     },
     [
-      clearSelectedDmConversation,
       refreshDmConversations,
       refreshNotificationInbox,
       refreshSocialCounts,

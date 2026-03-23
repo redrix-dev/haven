@@ -72,6 +72,13 @@ export function useChatAppOrchestration() {
     (payload: MemberChannelAccessRevokedBroadcastPayload) => void
   >(() => {});
   const serverNameByIdRef = useRef<Record<string, string>>({});
+  const elevatedServerAccessByIdRef = useRef<Map<string, boolean>>(new Map());
+  const [isCurrentUserElevatedInCurrentServer, setIsCurrentUserElevatedInCurrentServer] =
+    useState(false);
+  const [isCurrentUserElevatedInActiveVoiceServer, setIsCurrentUserElevatedInActiveVoiceServer] =
+    useState(false);
+  const [isCurrentUserElevatedInMembersModalServer, setIsCurrentUserElevatedInMembersModalServer] =
+    useState(false);
   const handleActiveServerAccessLost = useCallback((serverId: string) => {
     activeServerAccessLostHandlerRef.current(serverId);
   }, []);
@@ -282,6 +289,43 @@ export function useChatAppOrchestration() {
     channels,
   });
 
+  const {
+    state: {
+      friendsPanelOpen,
+      friendsPanelRequestedTab,
+      friendsPanelHighlightedRequestId,
+      socialCounts,
+      blockedUserIds,
+    },
+    actions: {
+      setFriendsPanelOpen,
+      setFriendsPanelRequestedTab,
+      setFriendsPanelHighlightedRequestId,
+      refreshSocialCounts,
+      resetSocialWorkspace,
+    },
+  } = useSocialWorkspace({
+    socialBackend,
+    userId: user?.id,
+    enabled: friendsSocialPanelEnabled,
+  });
+
+  const ensureIsElevatedInServer = useCallback(
+    async (communityId: string): Promise<boolean> => {
+      if (!communityId || !user?.id) return false;
+      const cachedValue = elevatedServerAccessByIdRef.current.get(communityId);
+      if (typeof cachedValue === 'boolean') {
+        return cachedValue;
+      }
+
+      const communityBackend = getCommunityDataBackend(communityId);
+      const nextValue = await communityBackend.isElevatedInServer(communityId);
+      elevatedServerAccessByIdRef.current.set(communityId, nextValue);
+      return nextValue;
+    },
+    [user?.id]
+  );
+
   // ── Channel groups ────────────────────────────────────────────────────────
   const {
     state: { channelGroupState },
@@ -432,6 +476,9 @@ export function useChatAppOrchestration() {
     currentServerId,
     currentChannelId,
     currentUserId: user?.id ?? null,
+    blockedUserIds,
+    isCurrentUserElevatedInServer: isCurrentUserElevatedInCurrentServer,
+    ensureIsElevatedInServer,
     debugChannelReloads,
     channels,
     setMessages,
@@ -712,26 +759,6 @@ export function useChatAppOrchestration() {
   });
 
   // â”€â”€ Social / Friends â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const {
-    state: {
-      friendsPanelOpen,
-      friendsPanelRequestedTab,
-      friendsPanelHighlightedRequestId,
-      socialCounts,
-    },
-    actions: {
-      setFriendsPanelOpen,
-      setFriendsPanelRequestedTab,
-      setFriendsPanelHighlightedRequestId,
-      refreshSocialCounts,
-      resetSocialWorkspace,
-    },
-  } = useSocialWorkspace({
-    socialBackend,
-    userId: user?.id,
-    enabled: friendsSocialPanelEnabled,
-  });
-
   // ── Direct messages ───────────────────────────────────────────────────────
   const {
     state: {
@@ -748,7 +775,6 @@ export function useChatAppOrchestration() {
     },
     actions: {
       resetDirectMessages,
-      clearSelectedDmConversation,
       refreshDmConversations,
       refreshDmMessages,
       setSelectedDmConversationId,
@@ -782,7 +808,6 @@ export function useChatAppOrchestration() {
     setDmConversationsError,
     refreshDmConversations,
     openDirectMessageWithUser,
-    clearSelectedDmConversation,
     socialBackend,
     refreshSocialCounts,
     refreshNotificationInbox,
@@ -804,6 +829,92 @@ export function useChatAppOrchestration() {
   });
 
   // ── Notification interactions ─────────────────────────────────────────────
+  useEffect(() => {
+    elevatedServerAccessByIdRef.current.clear();
+    setIsCurrentUserElevatedInCurrentServer(false);
+    setIsCurrentUserElevatedInActiveVoiceServer(false);
+    setIsCurrentUserElevatedInMembersModalServer(false);
+  }, [currentServerId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentServerId || !user?.id) {
+      setIsCurrentUserElevatedInCurrentServer(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void ensureIsElevatedInServer(currentServerId)
+      .then((isElevated) => {
+        if (!cancelled) {
+          setIsCurrentUserElevatedInCurrentServer(isElevated);
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Failed to resolve elevated current server status:', error);
+        setIsCurrentUserElevatedInCurrentServer(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentServerId, ensureIsElevatedInServer, user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const activeVoiceCommunityId = activeVoiceChannel?.community_id ?? null;
+    if (!activeVoiceCommunityId || !user?.id) {
+      setIsCurrentUserElevatedInActiveVoiceServer(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void ensureIsElevatedInServer(activeVoiceCommunityId)
+      .then((isElevated) => {
+        if (!cancelled) {
+          setIsCurrentUserElevatedInActiveVoiceServer(isElevated);
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Failed to resolve elevated voice server status:', error);
+        setIsCurrentUserElevatedInActiveVoiceServer(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeVoiceChannel?.community_id, ensureIsElevatedInServer, user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!membersModalCommunityId || !user?.id) {
+      setIsCurrentUserElevatedInMembersModalServer(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void ensureIsElevatedInServer(membersModalCommunityId)
+      .then((isElevated) => {
+        if (!cancelled) {
+          setIsCurrentUserElevatedInMembersModalServer(isElevated);
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Failed to resolve elevated members modal status:', error);
+        setIsCurrentUserElevatedInMembersModalServer(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ensureIsElevatedInServer, membersModalCommunityId, user?.id]);
+
   const {
     actions: {
       openNotificationItem,
@@ -1280,11 +1391,14 @@ export function useChatAppOrchestration() {
     currentRenderableChannel, currentChannelKind,
     setCurrentChannelId, setCurrentServerId,
     canOpenServerSettings, canManageCurrentServer,
+    isCurrentUserElevatedInCurrentServer,
+    isCurrentUserElevatedInMembersModalServer,
     // voice
     activeVoiceChannelId, voicePanelOpen, voiceHardwareDebugPanelOpen,
     voiceConnected, voiceParticipants, voiceSessionState,
     voiceControlActions, voiceJoinPrompt, activeVoiceChannel,
     voiceChannelParticipants, activeVoiceParticipantCount,
+    isCurrentUserElevatedInActiveVoiceServer,
     setVoicePanelOpen, setVoiceHardwareDebugPanelOpen, setVoiceConnected,
     setVoiceParticipants, setVoiceSessionState, setVoiceControlActions,
     requestVoiceChannelJoin, confirmVoiceChannelJoin,
@@ -1337,7 +1451,7 @@ export function useChatAppOrchestration() {
     friendsPanelOpen, setFriendsPanelOpen,
     friendsPanelRequestedTab, setFriendsPanelRequestedTab,
     friendsPanelHighlightedRequestId, setFriendsPanelHighlightedRequestId,
-    socialCounts, directMessageUser, blockDirectMessageUser, openDirectMessagesWorkspace,
+    socialCounts, blockedUserIds, directMessageUser, blockDirectMessageUser, openDirectMessagesWorkspace,
     // direct messages
     dmConversations, dmConversationsLoading, dmConversationsRefreshing,
     dmConversationsError, selectedDmConversationId, selectedDmConversation,

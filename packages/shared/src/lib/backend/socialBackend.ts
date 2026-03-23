@@ -13,6 +13,8 @@ export interface SocialBackend {
   listFriends(): Promise<FriendSummary[]>;
   listFriendRequests(): Promise<FriendRequestSummary[]>;
   listBlockedUsers(): Promise<BlockedUserSummary[]>;
+  listMyBlocks(): Promise<string[]>;
+  listUsersBlockingMe(): Promise<string[]>;
   searchUsersForFriendAdd(query: string): Promise<FriendSearchResult[]>;
   sendFriendRequest(username: string): Promise<string>;
   acceptFriendRequest(requestId: string): Promise<string>;
@@ -60,6 +62,10 @@ type BlockedUserRow = {
   username: string;
   avatar_url: string | null;
   blocked_at: string;
+};
+
+type UserBlockingMeRow = {
+  blocker_user_id: string;
 };
 
 type FriendSearchRow = {
@@ -120,6 +126,18 @@ const mapFriendSearchResult = (row: FriendSearchRow): FriendSearchResult => ({
   mutualCommunityNames: Array.isArray(row.mutual_community_names) ? row.mutual_community_names : [],
 });
 
+const getAuthenticatedUserId = async (): Promise<string> => {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!user?.id) {
+    throw new Error('Not authenticated.');
+  }
+  return user.id;
+};
+
 const callBooleanRpc = async (functionName: string, args: Record<string, unknown>): Promise<boolean> => {
   const { data, error } = await supabase.rpc(functionName as never, args as never);
   if (error) throw error;
@@ -150,6 +168,35 @@ export const centralSocialBackend: SocialBackend = {
     const { data, error } = await supabase.rpc('list_my_blocked_users' as never);
     if (error) throw error;
     return ((data ?? []) as BlockedUserRow[]).map(mapBlockedUser);
+  },
+
+  async listMyBlocks() {
+    const userId = await getAuthenticatedUserId();
+    const { data, error } = await supabase
+      .from('user_blocks' as never)
+      .select('blocked_user_id')
+      .eq('blocker_user_id', userId);
+    if (error) throw error;
+    const rows = (data ?? []) as Array<{ blocked_user_id: string | null }>;
+    return Array.from(
+      new Set(
+        rows
+          .map((row) => row.blocked_user_id)
+          .filter((blockedUserId): blockedUserId is string => Boolean(blockedUserId))
+      )
+    );
+  },
+
+  async listUsersBlockingMe() {
+    const { data, error } = await supabase.rpc('list_users_blocking_me' as never);
+    if (error) throw error;
+    return Array.from(
+      new Set(
+        ((data ?? []) as UserBlockingMeRow[])
+          .map((row) => row.blocker_user_id)
+          .filter((blockerUserId): blockerUserId is string => Boolean(blockerUserId))
+      )
+    );
   },
 
   async searchUsersForFriendAdd(query) {
@@ -202,11 +249,21 @@ export const centralSocialBackend: SocialBackend = {
   },
 
   async blockUser(targetUserId) {
-    return callBooleanRpc('block_user_social', { p_target_user_id: targetUserId });
+    const { error } = await supabase.rpc(
+      'block_user' as never,
+      { p_target_user_id: targetUserId } as never
+    );
+    if (error) throw error;
+    return true;
   },
 
   async unblockUser(targetUserId) {
-    return callBooleanRpc('unblock_user_social', { p_target_user_id: targetUserId });
+    const { error } = await supabase.rpc(
+      'unblock_user' as never,
+      { p_target_user_id: targetUserId } as never
+    );
+    if (error) throw error;
+    return true;
   },
 
   subscribeToSocialGraph(userId, onChange) {
@@ -259,6 +316,16 @@ export const centralSocialBackend: SocialBackend = {
           schema: 'public',
           table: 'user_blocks',
           filter: `blocker_user_id=eq.${userId}`,
+        },
+        (payload) => onChange(payload)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_blocks',
+          filter: `blocked_user_id=eq.${userId}`,
         },
         (payload) => onChange(payload)
       )

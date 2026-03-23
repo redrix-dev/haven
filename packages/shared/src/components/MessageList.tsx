@@ -56,6 +56,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { MarkdownText } from '@shared/lib/markdownRenderer';
 import {
   BANNED_REPLY_PLACEHOLDER_CONTENT,
+  filterBlockedUserContent,
   isModerationRemovedReplyPlaceholder,
 } from '@client/features/messages/lib/banVisibility';
 import { useMessagesStore } from '@shared/stores/messagesStore';
@@ -72,6 +73,8 @@ type AuthorProfile = {
 interface MessageListProps {
   channelId: string;
   currentUserId: string;
+  blockedUserIds: ReadonlySet<string>;
+  isElevatedViewer: boolean;
   canManageMessages: boolean;
   canCreateReports: boolean;
   canManageBans: boolean;
@@ -104,11 +107,6 @@ const getReplyToMessageId = (message: Message): string | null => {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
   const replyTo = (metadata as Record<string, unknown>).replyToMessageId;
   return typeof replyTo === 'string' && replyTo.trim().length > 0 ? replyTo : null;
-};
-
-const canCurrentUserViewMessage = (_message: Message): boolean => {
-  // Blocking/visibility policy hooks will be wired here once moderation graph lands.
-  return true;
 };
 
 const getAuthorLabel = (
@@ -282,6 +280,8 @@ const getFallbackEmbedUrl = (preview: MessageLinkPreview): string | null => {
 export function MessageList({
   channelId,
   currentUserId,
+  blockedUserIds,
+  isElevatedViewer,
   canManageMessages,
   canCreateReports,
   canManageBans,
@@ -339,14 +339,29 @@ export function MessageList({
   const [banSubmitting, setBanSubmitting] = useState(false);
   const [banConfirmOpen, setBanConfirmOpen] = useState(false);
 
-  const visibleMessages = useMemo(
-    () => messages.filter(canCurrentUserViewMessage),
-    [messages]
-  );
-
   const messageReactions = useMemo(() => Object.values(reactionRecord), [reactionRecord]);
   const messageAttachments = useMemo(() => Object.values(attachmentRecord), [attachmentRecord]);
   const messageLinkPreviews = useMemo(() => Object.values(linkPreviewRecord), [linkPreviewRecord]);
+
+  const visibleBundle = useMemo(
+    () =>
+      filterBlockedUserContent(
+        {
+          messages,
+          reactions: messageReactions,
+          attachments: messageAttachments,
+          linkPreviews: messageLinkPreviews,
+        },
+        blockedUserIds,
+        isElevatedViewer
+      ),
+    [blockedUserIds, isElevatedViewer, messageAttachments, messageLinkPreviews, messageReactions, messages]
+  );
+
+  const visibleMessages = visibleBundle.messages;
+  const visibleReactions = visibleBundle.reactions;
+  const visibleAttachments = visibleBundle.attachments;
+  const visibleLinkPreviews = visibleBundle.linkPreviews;
 
   const messageById = useMemo(() => {
     const next = new Map<string, Message>();
@@ -358,23 +373,23 @@ export function MessageList({
 
   const attachmentsByMessageId = useMemo(() => {
     const next = new Map<string, MessageAttachment[]>();
-    for (const attachment of messageAttachments) {
+    for (const attachment of visibleAttachments) {
       if (!messageById.has(attachment.messageId)) continue;
       const existing = next.get(attachment.messageId) ?? [];
       existing.push(attachment);
       next.set(attachment.messageId, existing);
     }
     return next;
-  }, [messageAttachments, messageById]);
+  }, [messageById, visibleAttachments]);
 
   const linkPreviewByMessageId = useMemo(() => {
     const next = new Map<string, MessageLinkPreview>();
-    for (const preview of messageLinkPreviews) {
+    for (const preview of visibleLinkPreviews) {
       if (!messageById.has(preview.messageId)) continue;
       next.set(preview.messageId, preview);
     }
     return next;
-  }, [messageLinkPreviews, messageById]);
+  }, [messageById, visibleLinkPreviews]);
 
   const getRenderableEmbedUrl = React.useCallback((preview: MessageLinkPreview): string | null => {
     const embed = preview.snapshot?.embed;
@@ -401,7 +416,7 @@ export function MessageList({
 
   const reactionsByMessageId = useMemo(() => {
     const next = new Map<string, Map<string, { count: number; reactedByCurrentUser: boolean }>>();
-    for (const reaction of messageReactions) {
+    for (const reaction of visibleReactions) {
       if (!messageById.has(reaction.messageId)) continue;
       const byEmoji = next.get(reaction.messageId) ?? new Map<string, { count: number; reactedByCurrentUser: boolean }>();
       const current = byEmoji.get(reaction.emoji) ?? { count: 0, reactedByCurrentUser: false };
@@ -413,7 +428,7 @@ export function MessageList({
       next.set(reaction.messageId, byEmoji);
     }
     return next;
-  }, [currentUserId, messageById, messageReactions]);
+  }, [currentUserId, messageById, visibleReactions]);
 
   const replyTree = useMemo(() => {
     const repliesByParentId = new Map<string, Message[]>();

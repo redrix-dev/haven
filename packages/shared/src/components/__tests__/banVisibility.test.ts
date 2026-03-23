@@ -3,6 +3,7 @@ import {
   BANNED_REPLY_PLACEHOLDER_CONTENT,
   applyBanVisibilityToMessageBundle,
   applyChannelAccessVisibilityToMessageBundle,
+  filterBlockedUserContent,
   isBanRemovedReplyPlaceholder,
   isModerationRemovedReplyPlaceholder,
 } from '@client/features/messages/lib/banVisibility';
@@ -190,5 +191,63 @@ describe('applyBanVisibilityToMessageBundle', () => {
     expect(filtered.reactions.map((reaction) => reaction.id)).toEqual(['reaction-2']);
     expect(filtered.attachments.map((attachment) => attachment.id)).toEqual(['attachment-2']);
     expect(filtered.linkPreviews.map((preview) => preview.id)).toEqual(['preview-2']);
+  });
+
+  it('hides blocked user content without placeholders and removes descendant replies', () => {
+    const visibleRoot = makeMessage('visible-root', 'user-1', 'Visible root');
+    const blockedThreadRoot = makeMessage('blocked-root', 'blocked-user', 'Blocked root');
+    const blockedThreadReply = makeMessage('blocked-thread-reply', 'user-2', 'Reply in blocked thread', {
+      replyToMessageId: 'blocked-root',
+    });
+    const blockedReply = makeMessage('blocked-reply', 'blocked-user', 'Blocked reply', {
+      replyToMessageId: 'visible-root',
+    });
+    const visibleReply = makeMessage('visible-reply', 'user-3', 'Visible reply', {
+      replyToMessageId: 'visible-root',
+    });
+
+    const filtered = filterBlockedUserContent(
+      {
+        messages: [visibleRoot, blockedThreadRoot, blockedThreadReply, blockedReply, visibleReply],
+        reactions: [
+          makeReaction('reaction-1', 'blocked-reply', 'user-4'),
+          makeReaction('reaction-2', 'visible-reply', 'blocked-user'),
+          makeReaction('reaction-3', 'visible-reply', 'user-4'),
+        ],
+        attachments: [
+          makeAttachment('attachment-1', 'blocked-reply', 'blocked-user'),
+          makeAttachment('attachment-2', 'visible-reply', 'user-3'),
+        ],
+        linkPreviews: [makeLinkPreview('preview-1', 'blocked-reply'), makeLinkPreview('preview-2', 'visible-reply')],
+      },
+      new Set(['blocked-user']),
+      false
+    );
+
+    expect(filtered.messages.map((message) => message.id)).toEqual(['visible-root', 'visible-reply']);
+    expect(filtered.messages.some((message) => message.content === BANNED_REPLY_PLACEHOLDER_CONTENT)).toBe(false);
+    expect(filtered.reactions.map((reaction) => reaction.id)).toEqual(['reaction-3']);
+    expect(filtered.attachments.map((attachment) => attachment.id)).toEqual(['attachment-2']);
+    expect(filtered.linkPreviews.map((preview) => preview.id)).toEqual(['preview-2']);
+  });
+
+  it('leaves blocked user content visible for elevated viewers', () => {
+    const blockedMessage = makeMessage('blocked-root', 'blocked-user', 'Blocked root');
+
+    const filtered = filterBlockedUserContent(
+      {
+        messages: [blockedMessage],
+        reactions: [makeReaction('reaction-1', 'blocked-root', 'blocked-user')],
+        attachments: [makeAttachment('attachment-1', 'blocked-root', 'blocked-user')],
+        linkPreviews: [makeLinkPreview('preview-1', 'blocked-root')],
+      },
+      new Set(['blocked-user']),
+      true
+    );
+
+    expect(filtered.messages).toHaveLength(1);
+    expect(filtered.reactions).toHaveLength(1);
+    expect(filtered.attachments).toHaveLength(1);
+    expect(filtered.linkPreviews).toHaveLength(1);
   });
 });

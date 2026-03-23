@@ -33,6 +33,8 @@ interface ServerMembersModalProps {
   loading: boolean;
   error: string | null;
   members: CommunityMemberListItem[];
+  blockedUserIds: ReadonlySet<string>;
+  isElevatedViewer: boolean;
   canReportProfiles: boolean;
   canBanProfiles: boolean;
   onResolveBanServers: (targetUserId: string) => Promise<BanEligibleServer[]>;
@@ -49,6 +51,8 @@ export function ServerMembersModal({
   loading,
   error,
   members,
+  blockedUserIds,
+  isElevatedViewer,
   canReportProfiles,
   canBanProfiles,
   onResolveBanServers,
@@ -90,9 +94,12 @@ export function ServerMembersModal({
 
   const filteredMembers = React.useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    if (!normalized) return members;
-    return members.filter((member) => member.displayName.toLowerCase().includes(normalized));
-  }, [members, search]);
+    const visibleMembers = isElevatedViewer
+      ? members
+      : members.filter((member) => !blockedUserIds.has(member.userId));
+    if (!normalized) return visibleMembers;
+    return visibleMembers.filter((member) => member.displayName.toLowerCase().includes(normalized));
+  }, [blockedUserIds, isElevatedViewer, members, search]); // CHECKPOINT 8 COMPLETE
 
   const membersByUserId = React.useMemo(
     () => new Map(members.map((member) => [member.userId, member])),

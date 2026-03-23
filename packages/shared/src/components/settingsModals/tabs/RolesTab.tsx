@@ -6,6 +6,7 @@ import { Skeleton } from "@shared/components/ui/skeleton";
 import { Badge } from "@shared/components/ui/badge";
 import { Checkbox } from "@shared/components/ui/checkbox";
 import type { ServerRoleItem } from "@shared/lib/backend/types";
+import { Lock } from "lucide-react";
 
 interface RolesTabProps {
   roleManagementError: string | null;
@@ -200,7 +201,10 @@ function RoleEditor({
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">
-              Role Name
+              <span className="inline-flex items-center gap-1">
+                Role Name
+                {selectedRole.isSystem && <Lock className="size-3.5 text-[#d6a24a]" />}
+              </span>
             </Label>
             <Input
               value={roleDraft.name}
@@ -208,8 +212,14 @@ function RoleEditor({
                 onRoleDraftChange({ ...roleDraft, name: e.target.value })
               }
               className="bg-[#101a2b] border-[#304867] text-white"
-              disabled={!canEditSelectedRoleDetails || roleActionSaving}
+              disabled={selectedRole.isSystem || !canEditSelectedRoleDetails || roleActionSaving}
+              readOnly={selectedRole.isSystem}
             />
+            {selectedRole.isSystem && (
+              <p className="text-[11px] text-[#d6a24a]">
+                System role names are protected. Custom roles do not inherit block visibility protection.
+              </p>
+            )} 
           </div>
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">

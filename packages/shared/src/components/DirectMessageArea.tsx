@@ -48,6 +48,7 @@ type DirectMessageAreaProps = {
   sending: boolean;
   refreshing?: boolean;
   error: string | null;
+  messagingUnavailable?: boolean;
   onRefresh: () => void;
   onSendMessage: (
     content: string,
@@ -113,6 +114,7 @@ export function DirectMessageArea({
   sending,
   refreshing = false,
   error,
+  messagingUnavailable = false,
   onRefresh,
   onSendMessage,
   onToggleMute,
@@ -474,83 +476,92 @@ export function DirectMessageArea({
 
       <div className="border-t border-[#22334f] bg-[#142033] p-3">
         <div className="space-y-2">
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleSelectImage}
-          />
-          {imageAttachment && (
-            <div className="rounded-md border border-[#304867] bg-[#111a2b] px-3 py-3">
-              <div className="flex items-start gap-3">
-                <img
-                  src={imageAttachment.previewUrl}
-                  alt={imageAttachment.file.name || 'Selected image'}
-                  className="size-16 rounded-md border border-[#304867] object-cover"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">Image attached</p>
-                  <p className="mt-1 text-sm text-white truncate">{imageAttachment.file.name}</p>
-                  <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#a9b8cf]">
-                    Expires
-                    <select
-                      value={imageExpiresInHours}
-                      onChange={(event) => setImageExpiresInHours(Number(event.target.value))}
-                      className="rounded border border-[#304867] bg-[#18243a] px-2 py-1 text-xs text-white"
+          {messagingUnavailable ? (
+            <div className="rounded-md border border-[#304867] bg-[#111a2b] px-3 py-3 text-sm text-[#a9b8cf]">
+              Messaging is unavailable in this conversation.
+            </div>
+          ) : (
+            <>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleSelectImage}
+              />
+              {imageAttachment && (
+                <div className="rounded-md border border-[#304867] bg-[#111a2b] px-3 py-3">
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={imageAttachment.previewUrl}
+                      alt={imageAttachment.file.name || 'Selected image'}
+                      className="size-16 rounded-md border border-[#304867] object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">Image attached</p>
+                      <p className="mt-1 text-sm text-white truncate">{imageAttachment.file.name}</p>
+                      <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#a9b8cf]">
+                        Expires
+                        <select
+                          value={imageExpiresInHours}
+                          onChange={(event) => setImageExpiresInHours(Number(event.target.value))}
+                          className="rounded border border-[#304867] bg-[#18243a] px-2 py-1 text-xs text-white"
+                          disabled={sending}
+                        >
+                          <option value={1}>1h</option>
+                          <option value={24}>24h</option>
+                          <option value={168}>7d</option>
+                          <option value={720}>30d</option>
+                        </select>
+                      </label>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="text-[#a9b8cf] hover:text-white"
+                      onClick={clearImageAttachment}
                       disabled={sending}
                     >
-                      <option value={1}>1h</option>
-                      <option value={24}>24h</option>
-                      <option value={168}>7d</option>
-                      <option value={720}>30d</option>
-                    </select>
-                  </label>
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <Textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder={`Message ${title}`}
+                className="min-h-[84px] resize-y bg-[#111a2b] border-[#304867] text-white placeholder:text-[#89a1c3]"
+                disabled={sending}
+              />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-[#304867] text-white"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={sending}
+                  >
+                    <ImagePlus className="size-4" />
+                    Attach Image
+                  </Button>
+                  <p className="text-xs text-[#8ea4c7]">Enter sends; Shift+Enter for newline</p>
                 </div>
                 <Button
                   type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="text-[#a9b8cf] hover:text-white"
-                  onClick={clearImageAttachment}
-                  disabled={sending}
+                  onClick={() => void handleSend()}
+                  disabled={sending || (!draft.trim() && !imageAttachment)}
                 >
-                  <X className="size-4" />
+                  <Send className="size-4" />
+                  Send
                 </Button>
               </div>
-            </div>
+            </>
           )}
-          <Textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleComposerKeyDown}
-            placeholder={`Message ${title}`}
-            className="min-h-[84px] resize-y bg-[#111a2b] border-[#304867] text-white placeholder:text-[#89a1c3]"
-            disabled={sending}
-          />
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="border-[#304867] text-white"
-                onClick={() => imageInputRef.current?.click()}
-                disabled={sending}
-              >
-                <ImagePlus className="size-4" />
-                Attach Image
-              </Button>
-              <p className="text-xs text-[#8ea4c7]">Enter sends; Shift+Enter for newline</p>
-            </div>
-            <Button
-              type="button"
-              onClick={() => void handleSend()}
-              disabled={sending || (!draft.trim() && !imageAttachment)}
-            >
-              <Send className="size-4" />
-              Send
-            </Button>
-          </div>
+          {/* CHECKPOINT 6 COMPLETE */}
           {actionNotice && <p className="text-sm text-[#bfe1b8]">{actionNotice}</p>}
           {actionError && <p className="text-sm text-red-300">{actionError}</p>}
         </div>
