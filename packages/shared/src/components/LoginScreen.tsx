@@ -15,10 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
+import { Checkbox } from '@shared/components/ui/checkbox';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
 import { useAuth } from '@shared/contexts/AuthContext';
 import { getErrorMessage } from '@platform/lib/errors';
+import {
+  HAVEN_PRIVACY_URL,
+  HAVEN_TERMS_URL,
+  openPlatformExternalUrl,
+} from '@platform/urls';
 
 const isEmailNotConfirmedError = (error: unknown): boolean => {
   if (!error || typeof error !== 'object') return false;
@@ -50,6 +56,7 @@ export function LoginScreen() {
   const [forgotPasswordSending, setForgotPasswordSending] = useState(false);
   const [forgotPasswordStatus, setForgotPasswordStatus] = useState('');
   const [forgotPasswordError, setForgotPasswordError] = useState('');
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [pendingVerificationCredentials, setPendingVerificationCredentials] = useState<{
     email: string;
     password: string;
@@ -123,8 +130,14 @@ export function LoginScreen() {
           return;
         }
 
+        if (!acceptedLegal) {
+          setError('You must agree to the Terms of Service and Privacy Policy.');
+          setLoading(false);
+          return;
+        }
+
         const normalizedEmail = email.trim();
-        const { error } = await signUp(normalizedEmail, password, username);
+        const { error } = await signUp(normalizedEmail, password, username, acceptedLegal);
         if (error) throw error;
 
         setPendingVerificationCredentials({
@@ -137,6 +150,7 @@ export function LoginScreen() {
         setVerificationStatus(
           `We sent a verification link to ${normalizedEmail}. Open it to finish verification.`
         );
+        setAcceptedLegal(false);
         setIsSignUp(false);
       } else {
         const { error } = await signIn(email, password);
@@ -249,6 +263,48 @@ export function LoginScreen() {
             </div>
           )}
 
+          {isSignUp && (
+            <div className="rounded-md border border-[#304867] bg-[#18243a] px-3 py-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="signup-legal-acceptance"
+                  checked={acceptedLegal}
+                  onCheckedChange={(checked) => setAcceptedLegal(checked === true)}
+                  className="mt-0.5 border-[#4d6484] data-[state=checked]:bg-[#3f79d8] data-[state=checked]:border-[#3f79d8]"
+                />
+                <Label
+                  htmlFor="signup-legal-acceptance"
+                  className="text-sm font-normal leading-5 text-[#d7e3f5]"
+                >
+                  I agree to the{' '}
+                  <button
+                    type="button"
+                    className="text-[#59b7ff] underline underline-offset-2 hover:text-[#86ccff]"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void openPlatformExternalUrl(HAVEN_TERMS_URL);
+                    }}
+                  >
+                    Terms of Service
+                  </button>{' '}
+                  and{' '}
+                  <button
+                    type="button"
+                    className="text-[#59b7ff] underline underline-offset-2 hover:text-[#86ccff]"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void openPlatformExternalUrl(HAVEN_PRIVACY_URL);
+                    }}
+                  >
+                    Privacy Policy
+                  </button>
+                </Label>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="text-red-400 text-sm bg-red-900/20 p-3 rounded">
               {error}
@@ -257,7 +313,7 @@ export function LoginScreen() {
 
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || (isSignUp && !acceptedLegal)}
             className="w-full bg-[#3f79d8] hover:bg-[#325fae] text-white"
           >
             {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
@@ -270,6 +326,7 @@ export function LoginScreen() {
           onClick={() => {
             setIsSignUp(!isSignUp);
             setError('');
+            setAcceptedLegal(false);
           }}
           className="mt-4 text-sm text-[#59b7ff] hover:text-[#86ccff] w-full text-center"
         >
@@ -277,6 +334,7 @@ export function LoginScreen() {
             ? 'Already have an account? Sign in'
             : "Don't have an account? Sign up"}
         </Button>
+        {/* CHECKPOINT 5 COMPLETE */}
         </CardContent>
       </Card>
 

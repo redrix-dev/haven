@@ -154,6 +154,25 @@ function parseSaveFileFromUrlPayload(payload) {
   };
 }
 
+function parseOpenExternalUrlPayload(payload) {
+  if (typeof payload !== 'string' || payload.trim().length === 0) {
+    throw new Error('Invalid URL for external open request.');
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(payload.trim());
+  } catch {
+    throw new Error('Invalid URL for external open request.');
+  }
+
+  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+    throw new Error('Only http and https URLs can be opened externally.');
+  }
+
+  return parsedUrl.toString();
+}
+
 
 function parseVoicePopoutMemberState(member) {
   if (!member || typeof member !== 'object') {
@@ -332,6 +351,7 @@ module.exports = {
   parseSetNotificationAudioPayload,
   parseSetVoiceSettingsPayload,
   parseSaveFileFromUrlPayload,
+  parseOpenExternalUrlPayload,
   parseVoicePopoutStatePayload,
   parseVoicePopoutControlActionPayload,
 };

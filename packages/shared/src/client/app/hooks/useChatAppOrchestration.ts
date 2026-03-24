@@ -1102,17 +1102,18 @@ export function useChatAppOrchestration() {
   );
 
   const saveAccountSettings = useCallback(
-    async (values: { username: string; avatarUrl: string | null }) => {
+    async (values: { username: string; avatarUrl: string | null; avatarFile?: File | null }) => {
       if (!user) throw new Error('Not authenticated');
-      await controlPlaneBackend.updateUserProfile({
+      const updatedProfile = await controlPlaneBackend.updateUserProfile({
         userId: user.id,
         username: values.username,
         avatarUrl: values.avatarUrl,
+        avatarFile: values.avatarFile ?? null,
       });
-      applyLocalProfileUpdate(values);
+      applyLocalProfileUpdate(updatedProfile);
     },
     [user, controlPlaneBackend, applyLocalProfileUpdate]
-  );
+  ); // CHECKPOINT 4 COMPLETE
 
   // ── Deep links ────────────────────────────────────────────────────────────
   useDeepLinks({

@@ -15,6 +15,10 @@ import {
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { Textarea } from '@shared/components/ui/textarea';
+import {
+  MessageToolbar,
+  type MessageToolbarHandle,
+} from '@shared/components/MessageToolbar';
 import { DmReportModal, type DmReportTarget } from '@shared/components/DmReportModal';
 import type {
   DirectMessage,
@@ -136,6 +140,8 @@ export function DirectMessageArea({
     userId: string;
     username: string;
   } | null>(null);
+  const dmInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const toolbarRef = React.useRef<MessageToolbarHandle | null>(null);
   const imageInputRef = React.useRef<HTMLInputElement | null>(null);
   const scrollAreaRootRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -192,6 +198,7 @@ export function DirectMessageArea({
   };
 
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (toolbarRef.current?.handleKeyboardShortcut(event)) return;
     if (event.key !== 'Enter' || event.shiftKey) return;
     event.preventDefault();
     void handleSend();
@@ -528,7 +535,14 @@ export function DirectMessageArea({
                   </div>
                 </div>
               )}
+              <MessageToolbar
+                inputRef={dmInputRef}
+                value={draft}
+                onChange={setDraft}
+                ref={toolbarRef}
+              />
               <Textarea
+                ref={dmInputRef}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
@@ -561,6 +575,7 @@ export function DirectMessageArea({
               </div>
             </>
           )}
+          {/* CHECKPOINT 5 COMPLETE */}
           {/* CHECKPOINT 6 COMPLETE */}
           {actionNotice && <p className="text-sm text-[#bfe1b8]">{actionNotice}</p>}
           {actionError && <p className="text-sm text-red-300">{actionError}</p>}

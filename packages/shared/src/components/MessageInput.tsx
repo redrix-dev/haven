@@ -1,6 +1,10 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Input } from '@shared/components/ui/input';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@shared/components/ui/button';
+import { Textarea } from '@shared/components/ui/textarea';
+import {
+  MessageToolbar,
+  type MessageToolbarHandle,
+} from '@shared/components/MessageToolbar';
 import { getErrorMessage } from '@platform/lib/errors';
 
 interface MessageInputProps {
@@ -32,11 +36,22 @@ export function MessageInput({
   onContainerHeightChange,
 }: MessageInputProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const toolbarRef = useRef<MessageToolbarHandle | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaExpiresInHours, setMediaExpiresInHours] = useState(24);
   const [sendError, setSendError] = useState<string | null>(null);
+
+  const syncInputHeight = useCallback(() => {
+    const node = inputRef.current;
+    if (!node) return;
+    node.style.height = 'auto';
+    const nextHeight = Math.min(node.scrollHeight, 200);
+    node.style.height = `${nextHeight}px`;
+    node.style.overflowY = node.scrollHeight > 200 ? 'auto' : 'hidden';
+  }, []);
 
   useEffect(() => {
     setMediaFile(null);
@@ -86,6 +101,10 @@ export function MessageInput({
     };
   }, [onContainerHeightChange]);
 
+  useLayoutEffect(() => {
+    syncInputHeight();
+  }, [input, syncInputHeight]);
+
   const handleSubmit = async () => {
     const content = input.trim();
     if ((!content && !mediaFile) || sending) return;
@@ -109,6 +128,13 @@ export function MessageInput({
     } finally {
       setSending(false);
     }
+  };
+
+  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (toolbarRef.current?.handleKeyboardShortcut(event)) return;
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    void handleSubmit();
   };
 
   return (
@@ -166,7 +192,8 @@ export function MessageInput({
           </div>
         </div>
       )}
-      <div className="flex items-center gap-2">
+      <MessageToolbar inputRef={inputRef} value={input} onChange={setInput} ref={toolbarRef} />
+      <div className="flex items-end gap-2">
         <label className="shrink-0">
           <input
             type="file"
@@ -186,18 +213,18 @@ export function MessageInput({
             Attach
           </span>
         </label>
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              void handleSubmit();
-            }
-          }}
-          placeholder={`Message #${channelName}`}
-          className="bg-[#243754] border-none text-[#e6edf7] placeholder:text-[#8897b1]"
-        />
+        <div className="min-w-0 flex-1">
+          <Textarea
+            ref={inputRef}
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={handleInputKeyDown}
+            rows={1}
+            placeholder={`Message #${channelName}`}
+            className="min-h-[36px] max-h-[200px] resize-none bg-[#243754] border-none text-[#e6edf7] placeholder:text-[#8897b1] leading-5 shadow-none focus-visible:ring-0"
+          />
+          <p className="mt-1 text-[11px] text-[#8ea4c7]">Enter sends; Shift+Enter for newline</p>
+        </div>
         <Button
           type="button"
           onClick={() => void handleSubmit()}
@@ -207,7 +234,8 @@ export function MessageInput({
           {sending ? 'Sending...' : 'Send'}
         </Button>
       </div>
-      {/* CHECKPOINT 2 COMPLETE */}
+      {/* CHECKPOINT 3 COMPLETE */}
+      {/* CHECKPOINT 5 COMPLETE */}
       {sendError && <p className="text-xs text-[#f87171]">{sendError}</p>}
     </div>
   );

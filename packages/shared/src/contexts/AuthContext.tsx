@@ -33,7 +33,8 @@ interface AuthContextValue {
     email: string,
     password: string,
     username: string,
-  ) => Promise<{ error: AuthError | PostgrestError | null }>;
+    acceptedLegal: boolean,
+  ) => Promise<{ error: AuthError | PostgrestError | Error | null }>;
   signIn: (
     email: string,
     password: string,
@@ -62,6 +63,8 @@ const SUPPORTED_EMAIL_OTP_TYPES = new Set<EmailOtpType>([
   "email_change",
   "email",
 ]);
+
+const CURRENT_TOS_VERSION = "2026-03-24";
 
 const normalizePathname = (pathname: string): string => {
   const normalized = pathname.replace(/\/+$/, "");
@@ -316,7 +319,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [consumeAuthConfirmUrl]);
 
-  const signUp = async (email: string, password: string, username: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    username: string,
+    acceptedLegal: boolean,
+  ) => {
+    if (!acceptedLegal) {
+      return {
+        error: new Error("You must agree to the Terms of Service and Privacy Policy."),
+      };
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -324,9 +338,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailRedirectTo: getPlatformAuthConfirmRedirectUrl(),
         data: {
           username: username.trim(),
+          accepted_tos: true,
+          tos_version: CURRENT_TOS_VERSION,
+          tos_accepted_at: new Date().toISOString(),
         },
       },
-    });
+    }); // CHECKPOINT 5 COMPLETE
 
     if (error) return { error };
 

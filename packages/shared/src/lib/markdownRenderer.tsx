@@ -1,227 +1,206 @@
-/**
- * markdownRenderer — lightweight Discord-style markdown renderer.
- *
- * Supports:
- *   **bold**            → <strong>
- *   *italic* _italic_   → <em>
- *   ~~strikethrough~~   → <del>
- *   `inline code`       → <code>
- *   ```code block```    → <pre><code>
- *   > blockquote        → <blockquote>
- *   URLs                → <a> (auto-linked)
- *
- * Returns React elements — no dangerouslySetInnerHTML.
- * Pure / memoizable: same input → same output.
- */
 import React from 'react';
+import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
+import { cn } from '@shared/lib/utils';
 
-// ── Block parsing ─────────────────────────────────────────────────────────────
+type MarkdownParent = {
+  children?: MarkdownNode[];
+};
 
-type Block =
-  | { kind: 'paragraph'; text: string }
-  | { kind: 'code_block'; code: string }
-  | { kind: 'blockquote'; text: string };
+type MarkdownPosition = {
+  start?: { offset?: number | null };
+  end?: { offset?: number | null };
+};
 
-function parseBlocks(input: string): Block[] {
-  const lines = input.split('\n');
-  const blocks: Block[] = [];
-  let i = 0;
+type MarkdownNode = MarkdownParent & {
+  type?: string;
+  data?: Record<string, unknown>;
+  position?: MarkdownPosition;
+};
 
-  while (i < lines.length) {
-    const line = lines[i];
-
-    // Fenced code block — ``` or ~~~
-    if (/^```|^~~~/.test(line)) {
-      const fence = line.slice(0, 3);
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].startsWith(fence)) {
-        codeLines.push(lines[i]);
-        i++;
-      }
-      i++; // consume closing fence
-      blocks.push({ kind: 'code_block', code: codeLines.join('\n') });
-      continue;
-    }
-
-    // Blockquote — lines starting with >
-    if (/^>[ \t]?/.test(line)) {
-      const quoteLines: string[] = [];
-      while (i < lines.length && /^>[ \t]?/.test(lines[i])) {
-        quoteLines.push(lines[i].replace(/^>[ \t]?/, ''));
-        i++;
-      }
-      blocks.push({ kind: 'blockquote', text: quoteLines.join('\n') });
-      continue;
-    }
-
-    // Paragraph — collect until a line that starts a different block type or is blank
-    const paraLines: string[] = [];
-    while (
-      i < lines.length &&
-      !/^```|^~~~/.test(lines[i]) &&
-      !/^>[ \t]?/.test(lines[i])
-    ) {
-      paraLines.push(lines[i]);
-      i++;
-    }
-    const text = paraLines.join('\n');
-    if (text.trim()) {
-      blocks.push({ kind: 'paragraph', text });
-    } else if (paraLines.length > 0) {
-      // Preserve blank lines between blocks as an empty paragraph
-      // (gives visual spacing, avoided for purely empty strings)
-    }
-    continue;
-  }
-
-  return blocks;
-}
-
-// ── Inline parsing ────────────────────────────────────────────────────────────
-
-// Tokenise a plain-text segment into inline React nodes
-type InlineSegment =
-  | { kind: 'text'; value: string }
-  | { kind: 'bold'; value: string }
-  | { kind: 'italic'; value: string }
-  | { kind: 'strike'; value: string }
-  | { kind: 'code'; value: string }
-  | { kind: 'url'; href: string; label: string };
-
-const INLINE_RE = new RegExp(
-  [
-    '(`[^`]+`)',               // inline code
-    '(\\*\\*[^*]+\\*\\*)',     // **bold**
-    '(__[^_]+__)',              // __underline__ treated as bold-italic
-    '(\\*[^*]+\\*)',           // *italic*
-    '(_[^_]+_)',               // _italic_
-    '(~~[^~]+~~)',             // ~~strike~~
-    '(https?://[^\\s<>)"\']+)', // URL
-  ].join('|'),
-  'g'
-);
-
-function parseInline(text: string): InlineSegment[] {
-  const segments: InlineSegment[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  INLINE_RE.lastIndex = 0;
-
-  while ((match = INLINE_RE.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({ kind: 'text', value: text.slice(lastIndex, match.index) });
-    }
-
-    const raw = match[0];
-
-    if (raw.startsWith('`')) {
-      segments.push({ kind: 'code', value: raw.slice(1, -1) });
-    } else if (raw.startsWith('**')) {
-      segments.push({ kind: 'bold', value: raw.slice(2, -2) });
-    } else if (raw.startsWith('__')) {
-      segments.push({ kind: 'italic', value: raw.slice(2, -2) });
-    } else if (raw.startsWith('*') || raw.startsWith('_')) {
-      segments.push({ kind: 'italic', value: raw.slice(1, -1) });
-    } else if (raw.startsWith('~~')) {
-      segments.push({ kind: 'strike', value: raw.slice(2, -2) });
-    } else if (raw.startsWith('http')) {
-      segments.push({ kind: 'url', href: raw, label: raw });
-    } else {
-      segments.push({ kind: 'text', value: raw });
-    }
-
-    lastIndex = INLINE_RE.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    segments.push({ kind: 'text', value: text.slice(lastIndex) });
-  }
-
-  return segments;
-}
-
-function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
-  return parseInline(text).map((seg, i) => {
-    const key = `${keyPrefix}-${i}`;
-    switch (seg.kind) {
-      case 'bold':
-        return <strong key={key} className="font-semibold">{seg.value}</strong>;
-      case 'italic':
-        return <em key={key} className="italic">{seg.value}</em>;
-      case 'strike':
-        return <del key={key} className="line-through opacity-70">{seg.value}</del>;
-      case 'code':
-        return (
-          <code
-            key={key}
-            className="rounded px-1 py-0.5 text-[0.85em] font-mono bg-white/10 text-gray-200"
-          >
-            {seg.value}
-          </code>
-        );
-      case 'url':
-        return (
-          <a
-            key={key}
-            href={seg.href}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="underline text-blue-400 hover:text-blue-300 break-all"
-          >
-            {seg.label}
-          </a>
-        );
-      default:
-        return <React.Fragment key={key}>{seg.value}</React.Fragment>;
-    }
+const walkMarkdownTree = (node: MarkdownNode, visit: (value: MarkdownNode) => void) => {
+  visit(node);
+  node.children?.forEach((child) => {
+    walkMarkdownTree(child, visit);
   });
-}
+};
 
-// ── Block rendering ───────────────────────────────────────────────────────────
+const createUnderlineRemarkPlugin = (source: string) => () => (tree: MarkdownNode) => {
+  walkMarkdownTree(tree, (node) => {
+    if (node.type !== 'strong') return;
+    const start = node.position?.start?.offset;
+    const end = node.position?.end?.offset;
+    if (typeof start !== 'number' || typeof end !== 'number') return;
+    const raw = source.slice(start, end);
+    if (!raw.startsWith('__') || !raw.endsWith('__')) return;
+    node.data = {
+      ...(node.data ?? {}),
+      hName: 'u',
+    };
+  });
+};
 
-function renderBlock(block: Block, idx: number): React.ReactNode {
-  switch (block.kind) {
-    case 'code_block':
+type CodeComponentProps = React.ComponentProps<'code'> &
+  ExtraProps & {
+    inline?: boolean;
+  };
+
+const markdownComponents: Components = {
+  strong({ children, ...props }) {
+    return (
+      <strong className="font-semibold" {...props}>
+        {children}
+      </strong>
+    );
+  },
+  em({ children, ...props }) {
+    return (
+      <em className="italic" {...props}>
+        {children}
+      </em>
+    );
+  },
+  u({ children, ...props }) {
+    return (
+      <u className="underline" {...props}>
+        {children}
+      </u>
+    );
+  },
+  del({ children, ...props }) {
+    return (
+      <del className="line-through opacity-70" {...props}>
+        {children}
+      </del>
+    );
+  },
+  code(props) {
+    const { children, inline, ...rest } = props as CodeComponentProps;
+    if (inline) {
       return (
-        <pre
-          key={idx}
-          className="my-1.5 rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 overflow-x-auto"
+        <code
+          className="rounded px-1 py-0.5 text-[0.85em] font-mono bg-white/10 text-gray-200"
+          {...rest}
         >
-          <code className="text-[0.8em] font-mono text-gray-200 whitespace-pre">
-            {block.code}
-          </code>
-        </pre>
+          {children}
+        </code>
       );
-
-    case 'blockquote':
-      return (
-        <blockquote
-          key={idx}
-          className="my-1 border-l-2 border-gray-500 pl-3 text-gray-400 italic"
-        >
-          {renderInline(block.text, `bq-${idx}`)}
-        </blockquote>
-      );
-
-    case 'paragraph':
-    default: {
-      // Preserve newlines within a paragraph as line breaks
-      const lines = block.text.split('\n');
-      const nodes: React.ReactNode[] = [];
-      lines.forEach((line, li) => {
-        nodes.push(...renderInline(line, `p-${idx}-${li}`));
-        if (li < lines.length - 1) {
-          nodes.push(<br key={`br-${idx}-${li}`} />);
-        }
-      });
-      return <React.Fragment key={idx}>{nodes}</React.Fragment>;
     }
-  }
-}
 
-// ── Public component ──────────────────────────────────────────────────────────
+    return (
+      <code className="text-[0.8em] font-mono text-gray-200 whitespace-pre" {...rest}>
+        {children}
+      </code>
+    );
+  },
+  pre({ children, ...props }) {
+    return (
+      <pre
+        className="my-1.5 rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 overflow-x-auto"
+        {...props}
+      >
+        {children}
+      </pre>
+    );
+  },
+  blockquote({ children, ...props }) {
+    return (
+      <blockquote
+        className="my-1 border-l-2 border-gray-500 pl-3 text-gray-400 italic"
+        {...props}
+      >
+        {children}
+      </blockquote>
+    );
+  },
+  a({ children, href, ...props }) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline text-blue-400 hover:text-blue-300 break-all"
+        {...props}
+      >
+        {children}
+      </a>
+    );
+  },
+  p({ children, ...props }) {
+    return (
+      <p className="break-words leading-relaxed" {...props}>
+        {children}
+      </p>
+    );
+  },
+  h1({ children, ...props }) {
+    return (
+      <h1 className="text-xl font-bold mt-2 mb-1" {...props}>
+        {children}
+      </h1>
+    );
+  },
+  h2({ children, ...props }) {
+    return (
+      <h2 className="text-lg font-bold mt-2 mb-1" {...props}>
+        {children}
+      </h2>
+    );
+  },
+  h3({ children, ...props }) {
+    return (
+      <h3 className="text-base font-bold mt-1 mb-1" {...props}>
+        {children}
+      </h3>
+    );
+  },
+  ul({ children, ...props }) {
+    return (
+      <ul className="list-disc list-inside my-1 space-y-0.5" {...props}>
+        {children}
+      </ul>
+    );
+  },
+  ol({ children, ...props }) {
+    return (
+      <ol className="list-decimal list-inside my-1 space-y-0.5" {...props}>
+        {children}
+      </ol>
+    );
+  },
+  li({ children, ...props }) {
+    return (
+      <li className="leading-relaxed" {...props}>
+        {children}
+      </li>
+    );
+  },
+  hr(props) {
+    return <hr className="my-2 border-white/20" {...props} />;
+  },
+  table({ children, ...props }) {
+    return (
+      <table className="my-2 text-sm border-collapse" {...props}>
+        {children}
+      </table>
+    );
+  },
+  th({ children, ...props }) {
+    return (
+      <th className="border border-white/20 px-2 py-1 font-semibold bg-white/5" {...props}>
+        {children}
+      </th>
+    );
+  },
+  td({ children, ...props }) {
+    return (
+      <td className="border border-white/20 px-2 py-1" {...props}>
+        {children}
+      </td>
+    );
+  },
+};
 
 interface MarkdownTextProps {
   content: string;
@@ -232,11 +211,18 @@ export const MarkdownText = React.memo(function MarkdownText({
   content,
   className,
 }: MarkdownTextProps) {
-  const blocks = React.useMemo(() => parseBlocks(content), [content]);
+  const remarkPlugins = React.useMemo(
+    () => [remarkGfm, remarkBreaks, createUnderlineRemarkPlugin(content)],
+    [content]
+  );
 
   return (
-    <span className={`break-words leading-relaxed ${className ?? ''}`}>
-      {blocks.map((block, i) => renderBlock(block, i))}
+    <span className={cn('break-words leading-relaxed', className)}>
+      <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+        {content}
+      </ReactMarkdown>
     </span>
   );
 });
+
+// CHECKPOINT 2 COMPLETE

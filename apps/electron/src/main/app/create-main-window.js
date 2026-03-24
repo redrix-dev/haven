@@ -1,4 +1,4 @@
-const { BrowserWindow } = require('electron');
+const { BrowserWindow, Menu } = require('electron');
 const { registerNativeContextMenu } = require('./register-native-context-menu');
 
 const createMainWindow = ({
@@ -10,18 +10,30 @@ const createMainWindow = ({
   debugContextMenu,
   onClosed,
   BrowserWindowClass = BrowserWindow,
+  MenuRef = Menu,
   registerNativeContextMenuFn = registerNativeContextMenu,
 }) => {
   if (!rendererEntryUrl) {
     throw new Error('Renderer entry URL must be provided before creating the main window.');
   }
 
+  const isMac = process.platform === 'darwin';
+  const platformWindowOptions = isMac
+    ? {
+        frame: true,
+        titleBarStyle: 'hiddenInset',
+      }
+    : {
+        frame: false,
+      };
+
   const window = new BrowserWindowClass({
     width: 1400,
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    frame: true,
+    backgroundColor: '#0d1626',
+    ...platformWindowOptions,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -50,6 +62,16 @@ const createMainWindow = ({
     });
   }
 
+  window.setMenuBarVisibility(false);
+  MenuRef.setApplicationMenu(null);
+
+  if (!app.isPackaged) {
+    window.webContents.on('before-input-event', (_event, input) => {
+      if (input.type !== 'keyDown' || input.key !== 'F12') return;
+      window.webContents.toggleDevTools();
+    });
+  }
+
   window.loadURL(rendererEntryUrl);
 
   if (!app.isPackaged) {
@@ -66,6 +88,8 @@ const createMainWindow = ({
     onClosed?.(window);
   });
 
+  // CHECKPOINT 1 COMPLETE
+  // CHECKPOINT 5 COMPLETE
   return window;
 };
 

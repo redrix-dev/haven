@@ -124,7 +124,11 @@ export type DesktopAPI = {
     url: string;
     suggestedName?: string | null;
   }) => Promise<SaveFileFromUrlResult>;
+  openExternalUrl: (url: string) => Promise<void>;
   consumeNextProtocolUrl: () => Promise<string | null>;
+  minimizeWindow: () => Promise<void>;
+  maximizeWindow: () => Promise<void>;
+  closeWindow: () => Promise<void>;
   openVoicePopout: () => Promise<{ opened: boolean }>;
   closeVoicePopout: () => Promise<{ closed: boolean }>;
   syncVoicePopoutState: (state: VoicePopoutState) => Promise<void>;

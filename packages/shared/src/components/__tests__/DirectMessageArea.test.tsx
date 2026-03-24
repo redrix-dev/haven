@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DirectMessageArea } from '@shared/components/DirectMessageArea';
@@ -116,5 +116,22 @@ describe('DirectMessageArea', () => {
     expect(screen.getByText('Messaging is unavailable in this conversation.')).toBeTruthy();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /send/i })).toBeNull();
+  });
+
+  it('applies markdown shortcuts through the shared DM toolbar path', async () => {
+    const user = userEvent.setup();
+
+    renderArea();
+
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
+    await user.type(textarea, 'hello');
+    textarea.focus();
+    textarea.setSelectionRange(0, 5);
+
+    fireEvent.keyDown(textarea, { key: 'b', ctrlKey: true });
+
+    await waitFor(() => {
+      expect(textarea.value).toBe('**hello**');
+    });
   });
 });

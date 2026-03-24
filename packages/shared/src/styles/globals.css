@@ -184,6 +184,26 @@
 }
 
 @layer utilities {
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  .desktop-app-shell {
+    height: 100vh;
+    padding-top: 32px;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: #0d1626;
+  }
+
+  .desktop-app-shell > *:last-child {
+    height: calc(100vh - 32px) !important;
+  }
+
   .scrollbar-inset {
     scrollbar-gutter: stable;
   }

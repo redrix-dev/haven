@@ -54,8 +54,20 @@ export const desktopClient = {
   }): Promise<SaveFileFromUrlResult> {
     return getDesktopApi().saveFileFromUrl(input);
   },
+  async openExternalUrl(url: string): Promise<void> {
+    return getDesktopApi().openExternalUrl(url);
+  },
   async consumeNextProtocolUrl(): Promise<string | null> {
     return getDesktopApi().consumeNextProtocolUrl();
+  },
+  async minimizeWindow(): Promise<void> {
+    return getDesktopApi().minimizeWindow();
+  },
+  async maximizeWindow(): Promise<void> {
+    return getDesktopApi().maximizeWindow();
+  },
+  async closeWindow(): Promise<void> {
+    return getDesktopApi().closeWindow();
   },
 
   async openVoicePopout(): Promise<{ opened: boolean }> {

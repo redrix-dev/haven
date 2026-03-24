@@ -1,9 +1,10 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { BrowserWindow, dialog } = require('electron');
+const { BrowserWindow, dialog, shell } = require('electron');
 const { DESKTOP_IPC_KEYS } = require('@platform/ipc/keys');
 const {
   parseSaveFileFromUrlPayload,
+  parseOpenExternalUrlPayload,
   parseSetAutoUpdatePayload,
   parseSetNotificationAudioPayload,
   parseSetVoiceSettingsPayload,
@@ -108,9 +109,34 @@ const registerDesktopIpcHandlers = ({
     };
   });
 
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.EXTERNAL_URL_OPEN, async (_event, payload) => {
+    const url = parseOpenExternalUrlPayload(payload);
+    await shell.openExternal(url);
+  });
+
   registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.PROTOCOL_URL_CONSUME_NEXT, async () =>
     pendingProtocolUrls.shift() ?? null
   );
+
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.WINDOW_MINIMIZE, async () => {
+    getMainWindow()?.minimize();
+  });
+
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.WINDOW_MAXIMIZE_TOGGLE, async () => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return;
+
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+      return;
+    }
+
+    mainWindow.maximize();
+  });
+
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.WINDOW_CLOSE, async () => {
+    getMainWindow()?.close();
+  });
 
   registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.VOICE_POPOUT_OPEN, async () => {
     voicePopoutWindowManager?.open();
@@ -141,6 +167,7 @@ const registerDesktopIpcHandlers = ({
     }
   );
 
+  // CHECKPOINT 2 COMPLETE
 };
 
 module.exports = {

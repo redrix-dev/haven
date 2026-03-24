@@ -20,11 +20,50 @@ export type UserProfileInfo = {
   avatarUrl: string | null;
 };
 
+const PROFILE_AVATAR_BUCKET = 'profile-avatars';
+const PROFILE_AVATAR_FILE_SIZE_LIMIT = 5 * 1024 * 1024;
+const PROFILE_AVATAR_PUBLIC_PATH_SEGMENT = `/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/`;
+
+const requireAuthenticatedUserId = async (): Promise<string> => {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) throw error;
+  if (!user?.id) {
+    throw new Error('Not authenticated.');
+  }
+
+  return user.id;
+};
+
+const getProfileAvatarObjectPathFromUrl = (avatarUrl: string): string | null => {
+  try {
+    const parsed = new URL(avatarUrl);
+    const bucketPathStart = parsed.pathname.indexOf(PROFILE_AVATAR_PUBLIC_PATH_SEGMENT);
+    if (bucketPathStart === -1) return null;
+    const objectPath = decodeURIComponent(
+      parsed.pathname.slice(bucketPathStart + PROFILE_AVATAR_PUBLIC_PATH_SEGMENT.length)
+    ).trim();
+    return objectPath.length > 0 ? objectPath : null;
+  } catch {
+    return null;
+  }
+};
+
 export interface ControlPlaneBackend {
   fetchUserProfile(userId: string): Promise<UserProfileInfo | null>;
   fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
   listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
-  updateUserProfile(input: { userId: string; username: string; avatarUrl: string | null }): Promise<void>;
+  uploadAvatar(file: File): Promise<string>;
+  deleteAvatar(avatarUrl: string): Promise<void>;
+  updateUserProfile(input: {
+    userId: string;
+    username: string;
+    avatarUrl: string | null;
+    avatarFile?: File | null;
+  }): Promise<UserProfileInfo>;
   listUserCommunities(userId: string): Promise<ServerSummary[]>;
   renameCommunity(input: { communityId: string; name: string }): Promise<void>;
   deleteCommunity(communityId: string): Promise<void>;
@@ -109,17 +148,78 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
     return snapshot;
   },
 
-  async updateUserProfile({ userId, username, avatarUrl }) {
+  async uploadAvatar(file) {
+    if (file.size > PROFILE_AVATAR_FILE_SIZE_LIMIT) {
+      throw new Error('Avatar images must be 5MB or smaller.');
+    }
+
+    const userId = await requireAuthenticatedUserId();
+    const objectPath = `${userId}/${Date.now()}.webp`;
+    const { error: uploadError } = await supabase.storage
+      .from(PROFILE_AVATAR_BUCKET)
+      .upload(objectPath, file, {
+        cacheControl: '3600',
+        contentType: file.type || 'image/webp',
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from(PROFILE_AVATAR_BUCKET).getPublicUrl(objectPath);
+    if (!data.publicUrl) {
+      throw new Error('Failed to resolve avatar URL.');
+    }
+
+    return data.publicUrl;
+  },
+
+  async deleteAvatar(avatarUrl) {
+    const objectPath = getProfileAvatarObjectPathFromUrl(avatarUrl);
+    if (!objectPath) return;
+
+    try {
+      await supabase.storage.from(PROFILE_AVATAR_BUCKET).remove([objectPath]);
+    } catch {
+      // Intentionally ignore avatar cleanup failures during profile updates.
+    }
+  },
+
+  async updateUserProfile({ userId, username, avatarUrl, avatarFile = null }) {
+    const { data: existingProfile, error: existingProfileError } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (existingProfileError) throw existingProfileError;
+
+    const existingAvatarUrl = existingProfile?.avatar_url ?? null;
+    let nextAvatarUrl = avatarUrl;
+
+    if (avatarFile) {
+      if (existingAvatarUrl) {
+        await centralControlPlaneBackend.deleteAvatar(existingAvatarUrl);
+      }
+      nextAvatarUrl = await centralControlPlaneBackend.uploadAvatar(avatarFile);
+    } else if (avatarUrl === null && existingAvatarUrl) {
+      await centralControlPlaneBackend.deleteAvatar(existingAvatarUrl);
+    }
+
     const { error } = await supabase
       .from('profiles')
       .update({
         username,
-        avatar_url: avatarUrl,
+        avatar_url: nextAvatarUrl,
       })
       .eq('id', userId);
 
     if (error) throw error;
-  },
+
+    return {
+      username,
+      avatarUrl: nextAvatarUrl,
+    };
+  }, // CHECKPOINT 2 COMPLETE
 
   async listUserCommunities(userId) {
     const { data, error } = await supabase
