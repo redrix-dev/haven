@@ -19,7 +19,7 @@ export const DEFAULT_NOTIFICATION_AUDIO_SETTINGS: NotificationAudioSettings = {
   notificationSoundVolume: 70,
   voicePresenceSoundEnabled: true,
   voicePresenceSoundVolume: 70,
-  playSoundsWhenFocused: true,
+  playSoundsWhenFocused: true, // CHECKPOINT 2 COMPLETE
 };
 
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {

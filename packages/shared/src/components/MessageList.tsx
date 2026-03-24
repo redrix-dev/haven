@@ -78,6 +78,7 @@ interface MessageListProps {
   canManageMessages: boolean;
   canCreateReports: boolean;
   canManageBans: boolean;
+  canManageMembers: boolean;
   canRefreshLinkPreviews: boolean;
   onSaveAttachment: (attachment: MessageAttachment) => Promise<void>;
   onReportUserProfile: (input: { targetUserId: string; reason: string }) => Promise<void>;
@@ -85,6 +86,10 @@ interface MessageListProps {
     targetUserId: string;
     communityId: string;
     reason: string;
+  }) => Promise<void>;
+  onKickUserFromCurrentServer: (input: {
+    targetUserId: string;
+    username: string;
   }) => Promise<void>;
   onResolveBanEligibleServers: (targetUserId: string) => Promise<BanEligibleServer[]>;
   onDirectMessageUser: (targetUserId: string) => void;
@@ -114,15 +119,12 @@ const getAuthorLabel = (
   authorProfile: AuthorProfile | undefined,
   currentUserId: string
 ): string => {
-  if (message.author_type === 'haven_dev') return 'Haven Developer';
+  if (message.author_type === 'haven_dev') return 'Haven Moderation Team';
   if (message.author_type === 'system') return 'System';
 
   const username = authorProfile?.username ?? message.author_user_id?.substring(0, 12) ?? 'Unknown User';
-  if (authorProfile?.isPlatformStaff) {
-    return `${authorProfile.displayPrefix ?? 'Haven'}-${username}`;
-  }
   if (message.author_user_id === currentUserId) return `${username} (You)`;
-  return username;
+  return username; // CHECKPOINT 1 COMPLETE
 };
 
 const getAuthorColor = (
@@ -285,10 +287,12 @@ export function MessageList({
   canManageMessages,
   canCreateReports,
   canManageBans,
+  canManageMembers,
   canRefreshLinkPreviews,
   onSaveAttachment,
   onReportUserProfile,
   onBanUserFromServer,
+  onKickUserFromCurrentServer,
   onResolveBanEligibleServers,
   onDirectMessageUser,
   onDeleteMessage,
@@ -320,7 +324,7 @@ export function MessageList({
   const [actionBusyMessageId, setActionBusyMessageId] = useState<string | null>(null);
   const [reactionBusyKeys, setReactionBusyKeys] = useState<Record<string, boolean>>({});
   const [reportDialogMessageId, setReportDialogMessageId] = useState<string | null>(null);
-  const [reportTarget, setReportTarget] = useState<MessageReportTarget>('server_admins');
+  const [reportTarget, setReportTarget] = useState<MessageReportTarget>('haven_staff');
   const [reportKind, setReportKind] = useState<MessageReportKind>('content_abuse');
   const [reportComment, setReportComment] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
@@ -335,9 +339,14 @@ export function MessageList({
     communityId: string;
     username: string;
   } | null>(null);
+  const [kickDraft, setKickDraft] = useState<{
+    targetUserId: string;
+    username: string;
+  } | null>(null);
   const [banReason, setBanReason] = useState('');
   const [banSubmitting, setBanSubmitting] = useState(false);
   const [banConfirmOpen, setBanConfirmOpen] = useState(false);
+  const [kickSubmitting, setKickSubmitting] = useState(false);
 
   const messageReactions = useMemo(() => Object.values(reactionRecord), [reactionRecord]);
   const messageAttachments = useMemo(() => Object.values(attachmentRecord), [attachmentRecord]);
@@ -623,6 +632,20 @@ export function MessageList({
     [authorProfiles]
   );
 
+  const openKickDialog = React.useCallback(
+    (targetUserId: string) => {
+      const profile = authorProfiles[targetUserId];
+      const username = profile?.username ?? targetUserId.substring(0, 12);
+      setKickDraft({
+        targetUserId,
+        username,
+      });
+      setKickSubmitting(false);
+      setActionError(null);
+    },
+    [authorProfiles]
+  );
+
   const renderMessageRow = (message: Message, depth = 0) => {
     const isModerationPlaceholder = isModerationRemovedReplyPlaceholder(message);
     const isReply = depth > 0;
@@ -796,7 +819,7 @@ export function MessageList({
       disabled: !canCreateReports,
       onSelect: () => {
         setReportDialogMessageId(message.id);
-        setReportTarget('server_admins');
+        setReportTarget('haven_staff');
         setReportKind('content_abuse');
         setReportComment('');
         setActionError(null);
@@ -861,12 +884,16 @@ export function MessageList({
                     canDirectMessage={message.author_user_id !== currentUserId}
                     canReport={canCreateReports && message.author_user_id !== currentUserId}
                     canBan={canManageBans && message.author_user_id !== currentUserId}
+                    canKick={canManageMembers && message.author_user_id !== currentUserId}
                     onDirectMessage={onDirectMessageUser}
                     onReport={(targetUserId) => {
                       void reportProfile(targetUserId);
                     }}
                     onBan={(targetUserId, communityId) => {
                       openBanDialog(targetUserId, communityId);
+                    }}
+                    onKick={(targetUserId) => {
+                      openKickDialog(targetUserId);
                     }}
                     resolveBanServers={onResolveBanEligibleServers}
                   >
@@ -1373,8 +1400,9 @@ export function MessageList({
           <DialogHeader>
             <DialogTitle>Report Message</DialogTitle>
             <DialogDescription className="text-[#a9b8cf]">
-              Route this report to moderators now, while keeping structured data ready for future moderation automation.
+              Route this report to server staff, the Haven Moderation Team, or both while preserving a snapshot of the current context.
             </DialogDescription>
+            {/* CHECKPOINT 6 COMPLETE */}
           </DialogHeader>
 
           <div className="space-y-3">
@@ -1385,10 +1413,11 @@ export function MessageList({
                 onChange={(event) => setReportTarget(event.target.value as MessageReportTarget)}
                 className="w-full rounded-md border border-[#304867] bg-[#142033] px-3 py-2 text-sm text-white"
               >
-                <option value="server_admins">Server admins only</option>
-                <option value="haven_developers">Haven developers only</option>
+                <option value="haven_staff">Haven Moderation Team</option>
+                <option value="server_admins">Server Staff</option>
                 <option value="both">Both</option>
               </select>
+              {/* CHECKPOINT 3 COMPLETE */}
             </div>
 
             <div className="space-y-1">
@@ -1561,6 +1590,51 @@ export function MessageList({
               }}
             >
               {banSubmitting ? 'Banning...' : 'Ban User'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(kickDraft)}
+        onOpenChange={(open) => {
+          if (open) return;
+          setKickDraft(null);
+          setKickSubmitting(false);
+        }}
+      >
+        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Removal</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a9b8cf]">
+              Remove this user from the server now. They can rejoin later if they still have a valid invite.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={kickSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-500"
+              disabled={kickSubmitting || !kickDraft}
+              onClick={() => {
+                if (!kickDraft) return;
+                setKickSubmitting(true);
+                setActionError(null);
+                void onKickUserFromCurrentServer({
+                  targetUserId: kickDraft.targetUserId,
+                  username: kickDraft.username,
+                })
+                  .then(() => {
+                    setKickDraft(null);
+                  })
+                  .catch((error: unknown) => {
+                    setActionError(getErrorMessage(error, 'Failed to remove user from the server.'));
+                  })
+                  .finally(() => {
+                    setKickSubmitting(false);
+                  });
+              }}
+            >
+              {kickSubmitting ? 'Removing...' : 'Remove from Server'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

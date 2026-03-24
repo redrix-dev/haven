@@ -12,6 +12,8 @@ import {
 } from '@shared/components/ui/dialog';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Skeleton } from '@shared/components/ui/skeleton';
+import { Slider } from '@shared/components/ui/slider';
+import { Switch } from '@shared/components/ui/switch';
 import type {
   NotificationCounts,
   NotificationItem,
@@ -137,6 +139,7 @@ export function NotificationCenterModal({
 }: NotificationCenterModalProps) {
   const notifications = useNotificationsStore((state) => state.notifications);
   const loading = useNotificationsStore((state) => state.isLoading);
+  const [showSettings, setShowSettings] = React.useState(false);
   // dm_message notifications are handled by the DM panel, not surfaced here
   const visibleNotifications = notifications.filter((notification) => notification.kind !== 'dm_message');
   const visibleUnreadCount = visibleNotifications.filter((notification) => notification.readAt == null).length;
@@ -149,11 +152,17 @@ export function NotificationCenterModal({
     preferencesSaving,
     preferencesError,
     onUpdatePreferences,
-    localAudioSettings,
-    localAudioSaving,
-    localAudioError,
-    onUpdateLocalAudioSettings,
   ];
+
+  const updateLocalAudioSettings = React.useCallback(
+    (patch: Partial<NotificationAudioSettings>) => {
+      onUpdateLocalAudioSettings({
+        ...localAudioSettings,
+        ...patch,
+      });
+    },
+    [localAudioSettings, onUpdateLocalAudioSettings]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -195,6 +204,126 @@ export function NotificationCenterModal({
           </DialogHeader>
 
           <div className="flex min-h-0 flex-1 flex-col">
+            {showSettings && (
+              <div className="border-b border-[#263a58] bg-[#13233c]/70 px-4 py-4">
+                {/* CHECKPOINT 1 COMPLETE */}
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-white">Local sound settings</p>
+                  <p className="mt-1 text-xs text-[#a9b8cf]">
+                    These controls only affect sounds played on this device.
+                  </p>
+                </div>
+
+                <div className="rounded-md border border-[#304867] bg-[#142033]">
+                  <div className="flex items-center justify-between gap-3 border-b border-[#263a58] px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">Master sounds</p>
+                      <p className="text-xs text-[#a9b8cf]">
+                        Turn all Haven notification and voice presence sounds on or off.
+                      </p>
+                    </div>
+                    <Switch
+                      aria-label="Master sounds"
+                      checked={localAudioSettings.masterSoundEnabled}
+                      onCheckedChange={(checked) => {
+                        updateLocalAudioSettings({ masterSoundEnabled: checked });
+                      }}
+                      disabled={localAudioSaving}
+                    />
+                  </div>
+
+                  <div className="border-b border-[#263a58] px-4 py-3">
+                    <div className="mb-2 flex items-center justify-between gap-2 text-sm">
+                      <span className="font-semibold text-white">Notification volume</span>
+                      <span className="text-[#a9b8cf]">{localAudioSettings.notificationSoundVolume}%</span>
+                    </div>
+                    <Slider
+                      aria-label="Notification volume"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={[localAudioSettings.notificationSoundVolume]}
+                      onValueChange={(values) => {
+                        const nextValue = values[0];
+                        if (typeof nextValue !== 'number') return;
+                        updateLocalAudioSettings({ notificationSoundVolume: nextValue });
+                      }}
+                      disabled={localAudioSaving}
+                      className="w-full py-1"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 border-b border-[#263a58] px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">Play sounds while Haven is focused</p>
+                      <p className="text-xs text-[#a9b8cf]">
+                        Turn this off if you only want sounds while Haven is in the background.
+                      </p>
+                    </div>
+                    <Switch
+                      aria-label="Play sounds while Haven is focused"
+                      checked={localAudioSettings.playSoundsWhenFocused}
+                      onCheckedChange={(checked) => {
+                        updateLocalAudioSettings({ playSoundsWhenFocused: checked });
+                      }}
+                      disabled={localAudioSaving}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">Voice join/leave sounds</p>
+                      <p className="text-xs text-[#a9b8cf]">
+                        Play a sound when someone joins or leaves a voice channel you&apos;re in
+                      </p>
+                    </div>
+                    <Switch
+                      aria-label="Voice join/leave sounds"
+                      checked={localAudioSettings.voicePresenceSoundEnabled}
+                      onCheckedChange={(checked) => {
+                        updateLocalAudioSettings({ voicePresenceSoundEnabled: checked });
+                      }}
+                      disabled={localAudioSaving}
+                    />
+                  </div>
+
+                  {localAudioSettings.voicePresenceSoundEnabled && (
+                    <div className="border-t border-[#263a58] px-4 py-3">
+                      <div className="mb-2 flex items-center justify-between gap-2 text-sm">
+                        <span className="font-semibold text-white">Join/leave volume</span>
+                        <span className="text-[#a9b8cf]">{localAudioSettings.voicePresenceSoundVolume}%</span>
+                      </div>
+                      <Slider
+                        aria-label="Join/leave volume"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={[localAudioSettings.voicePresenceSoundVolume]}
+                        onValueChange={(values) => {
+                          const nextValue = values[0];
+                          if (typeof nextValue !== 'number') return;
+                          updateLocalAudioSettings({ voicePresenceSoundVolume: nextValue });
+                        }}
+                        disabled={localAudioSaving}
+                        className="w-full py-1"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {(localAudioSaving || localAudioError) && (
+                  <div className="mt-3 space-y-1">
+                    {localAudioSaving && (
+                      <p className="text-xs text-[#a9b8cf]">Saving local sound settings...</p>
+                    )}
+                    {localAudioError && (
+                      <p className="text-xs text-red-300">{localAudioError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#263a58]">
                 <div className="flex items-center gap-2">
@@ -433,14 +562,14 @@ export function NotificationCenterModal({
               </ScrollArea>
             </div>
             <div className="border-t border-[#263a58] px-4 py-3">
-              {/* TODO: wire to settings page/modal */}
               <Button
                 type="button"
                 variant="outline"
                 className="border-[#304867] text-white"
-                onClick={() => {}}
+                onClick={() => setShowSettings((current) => !current)}
+                aria-expanded={showSettings}
               >
-                Notification Settings
+                {showSettings ? 'Hide Notification Settings' : 'Notification Settings'}
               </Button>
             </div>
           </div>

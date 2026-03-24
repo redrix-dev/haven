@@ -4,6 +4,7 @@ import type {
   Channel,
   MemberBannedBroadcastPayload,
   MemberChannelAccessRevokedBroadcastPayload,
+  ReportStatusUpdatedBroadcastPayload,
   ServerPermissions,
   ServerSummary,
 } from '@shared/lib/backend/types';
@@ -20,8 +21,8 @@ const EMPTY_SERVER_PERMISSIONS: ServerPermissions = {
   canManageMessages: false,
   canManageBans: false,
   canCreateReports: false,
+  canManageReports: false,
   canRefreshLinkPreviews: false,
-  canManageDeveloperAccess: false,
   canManageInvites: false,
 };
 
@@ -31,6 +32,7 @@ type UseCommunityWorkspaceInput = {
   channelSettingsTargetId: string | null;
   onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
   onMemberChannelAccessRevoked?: (payload: MemberChannelAccessRevokedBroadcastPayload) => void;
+  onReportStatusUpdated?: (payload: ReportStatusUpdatedBroadcastPayload) => void;
 };
 
 export function useCommunityWorkspace({
@@ -39,12 +41,14 @@ export function useCommunityWorkspace({
   channelSettingsTargetId,
   onMemberBanned,
   onMemberChannelAccessRevoked,
+  onReportStatusUpdated,
 }: UseCommunityWorkspaceInput) {
   const [currentServerId, setCurrentServerId] = React.useState<string | null>(null);
   const [channels, setChannels] = React.useState<Channel[]>([]);
   const [channelsLoading, setChannelsLoading] = React.useState(false);
   const [channelsError, setChannelsError] = React.useState<string | null>(null);
   const [currentChannelId, setCurrentChannelId] = React.useState<string | null>(null);
+  const [reportStatusRefreshVersion, setReportStatusRefreshVersion] = React.useState(0);
   const [serverPermissions, setServerPermissions] = React.useState<ServerPermissions>(
     EMPTY_SERVER_PERMISSIONS
   );
@@ -181,6 +185,10 @@ export function useCommunityWorkspace({
       {
         onMemberBanned,
         onMemberChannelAccessRevoked,
+        onReportStatusUpdated: (payload) => {
+          setReportStatusRefreshVersion((current) => current + 1);
+          onReportStatusUpdated?.(payload); // CHECKPOINT 4 COMPLETE
+        },
       }
     );
 
@@ -188,7 +196,13 @@ export function useCommunityWorkspace({
       isMounted = false;
       void subscription.unsubscribe();
     };
-  }, [currentServerId, onMemberBanned, onMemberChannelAccessRevoked, resetChannelsWorkspace]);
+  }, [
+    currentServerId,
+    onMemberBanned,
+    onMemberChannelAccessRevoked,
+    onReportStatusUpdated,
+    resetChannelsWorkspace,
+  ]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -264,6 +278,7 @@ export function useCommunityWorkspace({
       channelSettingsTarget,
       currentRenderableChannel,
       currentChannelKind,
+      reportStatusRefreshVersion,
     },
     actions: {
       resetChannelsWorkspace,

@@ -120,8 +120,8 @@ export type ServerPermissions = {
   canManageMessages: boolean;
   canManageBans: boolean;
   canCreateReports: boolean;
+  canManageReports: boolean;
   canRefreshLinkPreviews: boolean;
-  canManageDeveloperAccess: boolean;
   canManageInvites: boolean;
 };
 
@@ -153,6 +153,11 @@ export type BanCommunityMemberResult = {
   communityId: string;
 };
 
+export type KickCommunityMemberResult = {
+  kickedUserId: string;
+  communityId: string;
+};
+
 export type MemberBannedBroadcastPayload = {
   bannedUserId: string;
   communityId: string;
@@ -180,9 +185,6 @@ export type ServerSettingsSnapshot = {
   description: string | null;
   allowPublicInvites: boolean;
   requireReportReason: boolean;
-  developerAccessEnabled: boolean;
-  developerAccessMode: DeveloperAccessMode;
-  developerAccessChannelIds: string[];
 };
 
 export type ServerSettingsUpdate = {
@@ -190,9 +192,6 @@ export type ServerSettingsUpdate = {
   description: string | null;
   allowPublicInvites: boolean;
   requireReportReason: boolean;
-  developerAccessEnabled: boolean;
-  developerAccessMode: DeveloperAccessMode;
-  developerAccessChannelIds: string[];
 };
 
 export type PermissionCatalogItem = {
@@ -304,7 +303,7 @@ export type ChannelGroupState = {
   collapsedGroupIds: string[];
 };
 
-export type MessageReportTarget = 'server_admins' | 'haven_developers' | 'both';
+export type MessageReportTarget = 'server_admins' | 'haven_staff' | 'both';
 
 export type MessageReportKind = 'content_abuse' | 'bug';
 
@@ -577,6 +576,92 @@ export type DirectMessage = {
 };
 
 export type DirectMessageReportKind = 'content_abuse' | 'bug';
+
+export type SupportReportStatus = Database['public']['Enums']['support_report_status'];
+export type SupportReportDestination = 'haven_staff' | 'server_admins' | 'both';
+export type SupportReportKind =
+  | 'message_report'
+  | 'user_report'
+  | 'escalated_report'
+  | 'unknown';
+
+export type SupportReportSnapshotMessage = {
+  id: string;
+  content: string;
+  authorUserId: string | null;
+  authorUsername: string | null;
+  avatarUrl: string | null;
+  createdAt: string;
+};
+
+export type SupportReportMessageSnapshot = {
+  reportedMessage: SupportReportSnapshotMessage;
+  contextBefore: SupportReportSnapshotMessage[];
+  contextAfter: SupportReportSnapshotMessage[];
+  capturedAt: string;
+};
+
+export type SupportReportProfileSnapshot = {
+  targetUserId: string;
+  targetUsername: string | null;
+  targetAvatarUrl: string | null;
+  capturedAt: string;
+};
+
+export type SupportReportSnapshot =
+  | SupportReportMessageSnapshot
+  | SupportReportProfileSnapshot;
+
+export type SupportReportInternalNote = {
+  id: string;
+  authorUserId: string;
+  authorDisplayName: string | null;
+  body: string;
+  createdAt: string;
+};
+
+export type ServerReportLinkedMessage = {
+  messageId: string;
+  channelId: string | null;
+  channelName: string | null;
+};
+
+export type ServerReportLinkedChannel = {
+  channelId: string;
+  channelName: string | null;
+};
+
+export type ServerReportSummary = {
+  reportId: string;
+  communityId: string;
+  serverName: string;
+  destination: SupportReportDestination;
+  status: SupportReportStatus;
+  title: string;
+  reportType: SupportReportKind;
+  createdAt: string;
+  updatedAt: string;
+  reporterUserId: string;
+  reporterUsername: string | null;
+  reporterAvatarUrl: string | null;
+  snapshot: SupportReportSnapshot | null;
+};
+
+export type ServerReportDetail = ServerReportSummary & {
+  notes: Record<string, unknown> | null;
+  linkedChannels: ServerReportLinkedChannel[];
+  linkedMessages: ServerReportLinkedMessage[];
+  internalNotes: SupportReportInternalNote[];
+  targetUserId: string | null;
+  targetDisplayName: string | null;
+};
+
+export type ReportStatusUpdatedBroadcastPayload = {
+  reportId: string;
+  status: SupportReportStatus;
+  communityId: string;
+  updatedBy: string;
+};
 
 export type DmMessageReportStatus =
   | 'open'

@@ -276,6 +276,18 @@ export function useVoiceSessionController({
       ),
     [peerDiagnostics]
   );
+  const playDebouncedVoicePresenceSound = React.useCallback(
+    (event: 'voice_presence_join' | 'voice_presence_leave') => {
+      const now = Date.now();
+      if (now - lastPresenceSoundAtRef.current < 900) return;
+      lastPresenceSoundAtRef.current = now;
+      void playVoicePresenceSound({
+        event,
+        audioSettings: notificationAudioSettingsRef.current,
+      });
+    },
+    []
+  );
 
   const persistVoiceSettingsPatch = React.useCallback(
     (patch: Partial<VoiceSettings>) => {
@@ -907,14 +919,7 @@ export function useVoiceSessionController({
       }
 
       if (nextSoundEvent) {
-        const now = Date.now();
-        if (now - lastPresenceSoundAtRef.current >= 900) {
-          lastPresenceSoundAtRef.current = now;
-          void playVoicePresenceSound({
-            event: nextSoundEvent,
-            audioSettings: notificationAudioSettingsRef.current,
-          });
-        }
+        playDebouncedVoicePresenceSound(nextSoundEvent);
       }
     }
 
@@ -925,7 +930,7 @@ export function useVoiceSessionController({
     reconcilePeerConnections(
       nextParticipants.map((participant) => participant.userId)
     );
-  }, [currentUserId, reconcilePeerConnections]);
+  }, [currentUserId, playDebouncedVoicePresenceSound, reconcilePeerConnections]);
 
   const trackPresenceState = React.useCallback(async () => {
     const channel = channelRef.current;
@@ -1051,6 +1056,7 @@ export function useVoiceSessionController({
   );
 
   const cleanupVoiceSession = React.useCallback(async () => {
+    const wasJoined = useVoiceStore.getState().joined;
     const channel = channelRef.current;
     channelRef.current = null;
     signalingSessionIdRef.current = null;
@@ -1094,7 +1100,18 @@ export function useVoiceSessionController({
       }
       await supabase.removeChannel(channel);
     }
-  }, [closePeerConnection, setStoredIsDeafened, setStoredIsMuted, setStoredJoined, setStoredParticipants, stopLocalInputMonitor]);
+    if (wasJoined) {
+      playDebouncedVoicePresenceSound('voice_presence_leave'); // CHECKPOINT 4 COMPLETE
+    }
+  }, [
+    closePeerConnection,
+    playDebouncedVoicePresenceSound,
+    setStoredIsDeafened,
+    setStoredIsMuted,
+    setStoredJoined,
+    setStoredParticipants,
+    stopLocalInputMonitor,
+  ]);
 
   const joinVoiceChannel = React.useCallback(
     async (targetChannel: VoiceControllerChannel | null = activeChannel) => {
@@ -1187,6 +1204,7 @@ export function useVoiceSessionController({
             if (status === 'SUBSCRIBED') {
               window.clearTimeout(timeoutId);
               setStoredJoined(true);
+              playDebouncedVoicePresenceSound('voice_presence_join'); // CHECKPOINT 4 COMPLETE
               await trackPresenceState();
               resolve();
             } else if (status === 'CHANNEL_ERROR') {
@@ -1218,6 +1236,7 @@ export function useVoiceSessionController({
       joining,
       onSessionError,
       onVoiceKick,
+      playDebouncedVoicePresenceSound,
       refreshAudioDevices,
       requestLocalAudioStream,
       selectedInputDeviceId,

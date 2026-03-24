@@ -546,6 +546,7 @@ describe("voice lifecycle regressions", () => {
 
   it("plays voice join and leave sounds when remote presence changes", async () => {
     const user = userEvent.setup();
+    const nowSpy = vi.spyOn(Date, "now");
 
     render(
       <VoiceControllerHarness
@@ -554,6 +555,7 @@ describe("voice lifecycle regressions", () => {
       />,
     );
 
+    nowSpy.mockReturnValue(1000);
     await user.click(screen.getByRole("button", { name: "Request Voice 1" }));
     await user.click(screen.getByRole("button", { name: "Confirm Voice Join" }));
 
@@ -568,8 +570,7 @@ describe("voice lifecycle regressions", () => {
     expect(activeChannel).toBeTruthy();
     voiceMocks.playVoicePresenceSound.mockClear();
 
-    const nowSpy = vi.spyOn(Date, "now");
-    nowSpy.mockReturnValue(1000);
+    nowSpy.mockReturnValue(2000);
     await act(async () => {
       activeChannel?.setPresenceState({});
       activeChannel?.emitPresence("sync");
@@ -577,6 +578,7 @@ describe("voice lifecycle regressions", () => {
 
     expect(voiceMocks.playVoicePresenceSound).not.toHaveBeenCalled();
 
+    nowSpy.mockReturnValue(3000);
     await act(async () => {
       activeChannel?.setPresenceState({
         "remote-1": [
@@ -601,7 +603,7 @@ describe("voice lifecycle regressions", () => {
     });
 
     voiceMocks.playVoicePresenceSound.mockClear();
-    nowSpy.mockReturnValue(2500);
+    nowSpy.mockReturnValue(4500);
     await act(async () => {
       activeChannel?.setPresenceState({});
       activeChannel?.emitPresence("leave");
@@ -613,6 +615,52 @@ describe("voice lifecycle regressions", () => {
         audioSettings: DEFAULT_NOTIFICATION_AUDIO_SETTINGS,
       });
     });
+
+    nowSpy.mockRestore();
+  });
+
+  it("plays voice join and leave sounds for the local user when connecting and disconnecting", async () => {
+    const user = userEvent.setup();
+    const nowSpy = vi.spyOn(Date, "now");
+
+    render(
+      <VoiceControllerHarness
+        currentServerId={null}
+        channels={VOICE_SERVER_CHANNELS}
+      />,
+    );
+
+    nowSpy.mockReturnValue(1000);
+    await user.click(screen.getByRole("button", { name: "Request Voice 1" }));
+    await user.click(screen.getByRole("button", { name: "Confirm Voice Join" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("voice-connected").textContent).toBe("true");
+    });
+
+    await waitFor(() => {
+      expect(voiceMocks.playVoicePresenceSound).toHaveBeenCalledWith({
+        event: "voice_presence_join",
+        audioSettings: DEFAULT_NOTIFICATION_AUDIO_SETTINGS,
+      });
+    });
+
+    voiceMocks.playVoicePresenceSound.mockClear();
+    nowSpy.mockReturnValue(2500);
+    await user.click(screen.getByRole("button", { name: /leave voice/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("voice-connected").textContent).toBe("false");
+    });
+
+    await waitFor(() => {
+      expect(voiceMocks.playVoicePresenceSound).toHaveBeenCalledWith({
+        event: "voice_presence_leave",
+        audioSettings: DEFAULT_NOTIFICATION_AUDIO_SETTINGS,
+      });
+    });
+
+    nowSpy.mockRestore();
   });
 
   it("switches channels on the same server by leaving first and advancing the active channel", async () => {

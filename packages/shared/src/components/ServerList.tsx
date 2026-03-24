@@ -31,7 +31,7 @@ interface ServerListProps {
   onOpenFriends?: () => void;
   friendRequestIncomingCount?: number;
   friendRequestHasPendingPulse?: boolean;
-  onOpenDmReportReview?: () => void;
+  onOpenServerModmail?: () => void;
   userDisplayName: string;
   userAvatarUrl: string | null;
   onOpenAccountSettings: () => void;
@@ -60,7 +60,7 @@ export function ServerList({
   onOpenFriends,
   friendRequestIncomingCount = 0,
   friendRequestHasPendingPulse = false,
-  onOpenDmReportReview,
+  onOpenServerModmail,
   userDisplayName,
   userAvatarUrl,
   onOpenAccountSettings,
@@ -336,19 +336,19 @@ export function ServerList({
             </Tooltip>
           )}
 
-          {onOpenDmReportReview && (
+          {onOpenServerModmail && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   type="button"
-                  onClick={onOpenDmReportReview}
+                  onClick={onOpenServerModmail}
                   className={`${squareButtonBaseClass} bg-[#18243a] hover:bg-[#9a5b20] text-[#f7c793] hover:text-white`}
                 >
                   <ShieldAlert className="size-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={8}>
-                DM report review (staff)
+                Server Modmail
               </TooltipContent>
             </Tooltip>
           )}

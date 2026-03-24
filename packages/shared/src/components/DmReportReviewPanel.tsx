@@ -590,7 +590,7 @@ export function DmReportReviewPanel({
                             <Textarea
                               value={internalNote}
                               onChange={(event) => setInternalNote(event.target.value)}
-                              placeholder="Private note for Haven staff"
+                              placeholder="Private note for Haven Moderation Staff"
                               className="min-h-[120px] resize-y bg-[#142033] border-[#304867] text-white placeholder:text-[#89a1c3]"
                               disabled={busy}
                             />

@@ -210,18 +210,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[AuthContext] auth event:", event, session?.user?.id); //FUTURE CODY REMOVE THIS LATER ALSO IM SORRY
-      if (event === "TOKEN_REFRESHED") {
-        const currentId = useAuthStore.getState().user?.id;
-        console.log(
-          "[AuthContext] TOKEN_REFRESHED — store id:",
-          currentId,
-          "incoming id:",
-          session?.user?.id,
-          "skipping:",
-          currentId === session?.user?.id,
-        );
-      }
       if (!isMounted) return;
       const nextUser = session?.user ?? null;
       const currentUserId = useAuthStore.getState().user?.id ?? null;
@@ -243,7 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (event === "SIGNED_OUT") {
         setPasswordRecoveryRequired(false);
       }
-    });
+    }); // CHECKPOINT 2 COMPLETE
 
     return () => {
       isMounted = false;

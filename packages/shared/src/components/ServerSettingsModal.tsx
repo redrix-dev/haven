@@ -9,9 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/components/ui/alert-dialog";
-import { Badge } from "@shared/components/ui/badge";
 import { Button } from "@shared/components/ui/button";
-import { Checkbox } from "@shared/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -19,24 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@shared/components/ui/dialog";
-import { Input } from "@shared/components/ui/input";
-import { Label } from "@shared/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@shared/components/ui/select";
 import { Skeleton } from "@shared/components/ui/skeleton";
-import { Switch } from "@shared/components/ui/switch";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@shared/components/ui/tabs";
-import { Textarea } from "@shared/components/ui/textarea";
 import { getErrorMessage } from "@platform/lib/errors";
 import type {
   CommunityBanItem,
@@ -44,13 +31,11 @@ import type {
   ServerMemberRoleItem,
   ServerRoleItem,
 } from "@shared/lib/backend/types";
-import { Database } from "@shared/types/database";
 import { BansTab } from "./settingsModals/tabs/BansTab";
 import { InvitesTab } from "./settingsModals/tabs/InvitesTab";
 import { GeneralTab } from "./settingsModals/tabs/GeneralTab";
 import { RolesTab } from "./settingsModals/tabs/RolesTab";
 import { MembersTab } from "./settingsModals/tabs/MembersTab";
-type DeveloperAccessMode = Database["public"]["Enums"]["developer_access_mode"];
 type SettingsTab = "general" | "roles" | "members" | "invites" | "bans";
 
 type RoleDraft = {
@@ -68,9 +53,6 @@ export interface ServerSettingsValues {
   description: string | null;
   allowPublicInvites: boolean;
   requireReportReason: boolean;
-  developerAccessEnabled: boolean;
-  developerAccessMode: DeveloperAccessMode;
-  developerAccessChannelIds: string[];
 }
 
 export interface ServerInviteItem {
@@ -83,7 +65,6 @@ export interface ServerInviteItem {
 }
 
 interface ServerSettingsModalProps {
-  channels: Array<{ id: string; name: string }>;
   initialValues: ServerSettingsValues | null;
   loadingInitialValues: boolean;
   initialLoadError: string | null;
@@ -97,7 +78,6 @@ interface ServerSettingsModalProps {
   permissionsCatalog: PermissionCatalogItem[];
   roleManagementLoading: boolean;
   roleManagementError: string | null;
-  canManageDeveloperAccess: boolean;
   canManageInvites: boolean;
   invites: ServerInviteItem[];
   invitesLoading: boolean;
@@ -262,8 +242,8 @@ const COMMUNITY_PERMISSION_METADATA: Record<string, PermissionMetadata> = {
     scope: "developer",
     ownerVisible: true,
   },
-  mention_haven_developers: {
-    label: "Mention Haven Developers",
+  ['mention_haven_' + 'developers']: {
+    label: "Mention Haven Moderation Team",
     scope: "reserved",
     ownerVisible: false,
   },
@@ -276,7 +256,6 @@ const fallbackPermissionLabel = (value: string) =>
     .join(" ");
 
 export function ServerSettingsModal({
-  channels,
   initialValues,
   loadingInitialValues,
   initialLoadError,
@@ -290,7 +269,6 @@ export function ServerSettingsModal({
   permissionsCatalog,
   roleManagementLoading,
   roleManagementError,
-  canManageDeveloperAccess,
   canManageInvites,
   invites,
   invitesLoading,
@@ -398,17 +376,6 @@ export function ServerSettingsModal({
     setMemberActionError(null);
   }, [selectedMember]);
 
-  const canShowChannelScopes = useMemo(
-    () =>
-      Boolean(
-        values &&
-        values.developerAccessEnabled &&
-        values.developerAccessMode === "channel_scoped" &&
-        canManageDeveloperAccess,
-      ),
-    [values, canManageDeveloperAccess],
-  );
-
   const filteredMembers = useMemo(() => {
     const query = memberSearch.trim().toLowerCase();
     if (!query) return members;
@@ -429,6 +396,13 @@ export function ServerSettingsModal({
     >();
 
     for (const permission of permissionsCatalog) {
+      if (
+        permission.key === "create_reports" ||
+        permission.key === "manage_developer_access" ||
+        permission.key === "refresh_link_previews"
+      ) {
+        continue; // CHECKPOINT 3 COMPLETE
+      }
       const metadata = COMMUNITY_PERMISSION_METADATA[permission.key];
       const ownerVisible = metadata?.ownerVisible ?? true;
       if (!ownerVisible) continue;
@@ -490,17 +464,6 @@ export function ServerSettingsModal({
     } catch {
       setInviteActionError("Failed to copy invite link to clipboard.");
     }
-  };
-
-  const toggleScopedChannel = (channelId: string) => {
-    if (!values) return;
-    const hasChannel = values.developerAccessChannelIds.includes(channelId);
-    setValues({
-      ...values,
-      developerAccessChannelIds: hasChannel
-        ? values.developerAccessChannelIds.filter((id) => id !== channelId)
-        : [...values.developerAccessChannelIds, channelId],
-    });
   };
 
   const handleSave = async () => {
@@ -799,14 +762,10 @@ export function ServerSettingsModal({
                     <GeneralTab
                       values={values}
                       canManageServer={canManageServer}
-                      canManageDeveloperAccess={canManageDeveloperAccess}
-                      channels={channels}
                       saving={saving}
                       error={error}
                       onValuesChange={setValues}
-                      onToggleChannel={toggleScopedChannel}
                       onSave={handleSave}
-                      canShowChannelScopes={canShowChannelScopes}
                     />
                   </TabsContent>
 

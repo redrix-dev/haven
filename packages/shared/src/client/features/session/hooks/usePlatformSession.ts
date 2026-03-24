@@ -16,14 +16,12 @@ export function usePlatformSession({
   const [profileAvatarUrl, setProfileAvatarUrl] = React.useState<string | null>(null);
   const [isPlatformStaff, setIsPlatformStaff] = React.useState(false);
   const [platformStaffPrefix, setPlatformStaffPrefix] = React.useState<string | null>(null);
-  const [canPostHavenDevMessage, setCanPostHavenDevMessage] = React.useState(false);
 
   const resetPlatformSession = React.useCallback(() => {
     setProfileUsername('');
     setProfileAvatarUrl(null);
     setIsPlatformStaff(false);
     setPlatformStaffPrefix(null);
-    setCanPostHavenDevMessage(false);
   }, []);
 
   const applyLocalProfileUpdate = React.useCallback((values: { username: string; avatarUrl: string | null }) => {
@@ -65,13 +63,11 @@ export function usePlatformSession({
         console.error('Error loading platform staff info:', staffResult.reason);
         setIsPlatformStaff(false);
         setPlatformStaffPrefix(null);
-        setCanPostHavenDevMessage(false);
       } else {
         const staff = staffResult.value;
         const activeStaff = Boolean(staff?.isActive);
         setIsPlatformStaff(activeStaff);
         setPlatformStaffPrefix(staff?.displayPrefix ?? null);
-        setCanPostHavenDevMessage(Boolean(staff?.isActive && staff?.canPostHavenDev));
       }
     };
 
@@ -88,7 +84,6 @@ export function usePlatformSession({
       profileAvatarUrl,
       isPlatformStaff,
       platformStaffPrefix,
-      canPostHavenDevMessage,
     },
     derived: {},
     actions: {

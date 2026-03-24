@@ -18,7 +18,7 @@ import { NotificationCenterModal } from "@shared/components/NotificationCenterMo
 import { FriendsModal } from "@shared/components/FriendsModal";
 import { DirectMessagesSidebar } from "@shared/components/DirectMessagesSidebar";
 import { DirectMessageArea } from "@shared/components/DirectMessageArea";
-import { DmReportReviewPanel } from "@shared/components/DmReportReviewPanel";
+import { ServerModmailPanel } from "@shared/components/ServerModmailPanel";
 import { PasswordRecoveryDialog } from "@shared/components/PasswordRecoveryDialog";
 import {
   AlertDialog,
@@ -88,7 +88,7 @@ export function ChatApp() {
     app.user?.id ?? null,
     app.servers,
   );
-  // TODO: bridge — remove when useServers writes directly to store (orchestration cleanup pass)
+  // Keep the shared server store aligned with orchestration-selected state and local ordering.
   const setStoredServers = useServersStore((state) => state.setServers);
   const setStoredCurrentServerId = useServersStore(
     (state) => state.setCurrentServerId,
@@ -212,9 +212,17 @@ export function ChatApp() {
       voiceController.state.participants,
     ],
   );
+  const managedReportServers = React.useMemo(
+    () =>
+      orderedServers
+        .filter((server) => app.managedReportServerIds.includes(server.id))
+        .map((server) => ({ id: server.id, name: server.name })),
+    [app.managedReportServerIds, orderedServers],
+  );
   const voicePopoutWindowOpen =
     canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
 
+  // CHECKPOINT 1 COMPLETE
   React.useEffect(() => {
     if (!hasSameServerIdOrder(app.servers, orderedServers)) {
       setStoredServers(orderedServers);
@@ -235,10 +243,6 @@ export function ChatApp() {
     if (!canOpenVoicePopout) return;
 
     return desktopClient.onVoicePopoutState((nextState) => {
-      console.log(
-        "[VoicePopoutApp] received state:",
-        JSON.stringify(nextState),
-      );
       setVoicePopoutState(nextState);
     });
   }, [canOpenVoicePopout]);
@@ -504,11 +508,11 @@ export function ChatApp() {
           friendRequestHasPendingPulse={
             app.socialCounts.incomingPendingRequestCount > 0
           }
-          onOpenDmReportReview={
-            app.dmReportReviewPanelEnabled
-              ? () => app.setDmReportReviewPanelOpen(true)
+          onOpenServerModmail={
+            app.serverModmailEnabled
+              ? () => app.setServerModmailOpen(true)
               : undefined
-          }
+          } // CHECKPOINT 6 COMPLETE
           userDisplayName={app.userDisplayName}
           userAvatarUrl={app.profileAvatarUrl}
           onOpenAccountSettings={() => app.setShowAccountModal(true)}
@@ -748,14 +752,15 @@ export function ChatApp() {
                 channelName={app.currentRenderableChannel.name}
                 channelKind={app.currentRenderableChannel.kind}
                 currentUserId={user.id}
-                blockedUserIds={app.blockedUserIds}
-                isElevatedViewer={app.isCurrentUserElevatedInCurrentServer}
-                canManageMessages={app.serverPermissions.canManageMessages}
-                canCreateReports={app.serverPermissions.canCreateReports}
-                canManageBans={app.serverPermissions.canManageBans}
-                canRefreshLinkPreviews={
-                  app.serverPermissions.canRefreshLinkPreviews
-                }
+                  blockedUserIds={app.blockedUserIds}
+                  isElevatedViewer={app.isCurrentUserElevatedInCurrentServer}
+                  canManageMessages={app.serverPermissions.canManageMessages}
+                  canCreateReports={app.serverPermissions.canCreateReports}
+                  canManageBans={app.serverPermissions.canManageBans}
+                  canManageMembers={app.serverPermissions.canManageMembers}
+                  canRefreshLinkPreviews={
+                    app.serverPermissions.canRefreshLinkPreviews
+                  }
                 showVoiceDiagnostics={app.isPlatformStaff}
                 onOpenChannelSettings={
                   canOpenChannelSettings
@@ -784,14 +789,16 @@ export function ChatApp() {
                   })
                 }
                 onBanUserFromServer={app.banUserFromServer}
+                onKickUserFromCurrentServer={async ({ targetUserId, username }) => {
+                  await app.kickUserFromServer({
+                    targetUserId,
+                    username,
+                    communityId: app.currentServer!.id,
+                  });
+                }}
                 onResolveBanEligibleServers={app.resolveBanEligibleServers}
                 onDirectMessageUser={app.directMessageUser}
                 onComposerHeightChange={app.setComposerHeight}
-                onSendHavenDeveloperMessage={
-                  app.canSendHavenDeveloperMessage
-                    ? app.sendHavenDeveloperMessage
-                    : undefined
-                }
               />
             ) : (
               <div className="flex-1 flex items-center justify-center">
@@ -894,12 +901,16 @@ export function ChatApp() {
         />
       )}
 
-      {app.dmReportReviewPanelEnabled && user && (
-        <DmReportReviewPanel
-          open={app.dmReportReviewPanelOpen}
-          onOpenChange={app.setDmReportReviewPanelOpen}
-          currentUserId={user.id}
+      {app.serverModmailEnabled && user && (
+        <ServerModmailPanel
+          open={app.serverModmailOpen}
+          onOpenChange={app.setServerModmailOpen}
           currentUserDisplayName={app.userDisplayName}
+          managedServers={managedReportServers}
+          serverPermissionsById={app.serverReportPermissionsById}
+          reportStatusRefreshVersion={app.reportStatusRefreshVersion}
+          onBanUserFromServer={app.banUserFromServer}
+          onKickUserFromServer={app.kickUserFromServer}
         />
       )}
 
@@ -997,10 +1008,6 @@ export function ChatApp() {
         app.currentServerId &&
         app.canOpenServerSettings && (
           <ServerSettingsModal
-            channels={app.channels.map((channel) => ({
-              id: channel.id,
-              name: channel.name,
-            }))}
             initialValues={app.serverSettingsInitialValues}
             loadingInitialValues={app.serverSettingsLoading}
             initialLoadError={app.serverSettingsLoadError}
@@ -1014,9 +1021,6 @@ export function ChatApp() {
             permissionsCatalog={app.serverPermissionCatalog}
             roleManagementLoading={app.serverRoleManagementLoading}
             roleManagementError={app.serverRoleManagementError}
-            canManageDeveloperAccess={
-              app.serverPermissions.canManageDeveloperAccess
-            }
             canManageInvites={app.serverPermissions.canManageInvites}
             invites={app.serverInvites}
             invitesLoading={app.serverInvitesLoading}
@@ -1074,6 +1078,7 @@ export function ChatApp() {
         isElevatedViewer={app.isCurrentUserElevatedInMembersModalServer}
         canReportProfiles={app.membersModalCanCreateReports}
         canBanProfiles={app.membersModalCanManageBans}
+        canKickProfiles={app.membersModalCanManageMembers}
         onResolveBanServers={app.resolveBanEligibleServers}
         onDirectMessage={app.directMessageUser}
         onReportUser={async (targetUserId, reason) => {
@@ -1086,6 +1091,14 @@ export function ChatApp() {
         }}
         onBanUser={async (targetUserId, communityId, reason) => {
           await app.banUserFromServer({ targetUserId, communityId, reason });
+        }}
+        onKickUser={async (targetUserId, username) => {
+          if (!app.membersModalCommunityId) return;
+          await app.kickUserFromServer({
+            targetUserId,
+            username,
+            communityId: app.membersModalCommunityId,
+          });
         }}
         onClose={app.closeMembersModal}
       />

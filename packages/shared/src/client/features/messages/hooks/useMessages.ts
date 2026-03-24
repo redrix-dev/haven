@@ -1800,13 +1800,8 @@ export function useMessages({
     const communityBackend = getCommunityDataBackend(currentServerId);
     let latestAuthorSyncId = 0;
 
-    const logReload = (event: string, details?: Record<string, unknown>) => {
+    const logReload = (_event: string, _details?: Record<string, unknown>) => {
       if (!debugChannelReloads) return;
-      console.debug(`[chat-reload] ${event}`, {
-        channelId: currentChannelId,
-        serverId: currentServerId,
-        ...details,
-      });
     };
 
     const updateAuthorProfilesForMessages = async (messageList: Message[]) => {

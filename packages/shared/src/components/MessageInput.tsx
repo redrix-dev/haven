@@ -12,14 +12,6 @@ interface MessageInputProps {
       mediaExpiresInHours?: number;
     }
   ) => Promise<void>;
-  onSendHavenDeveloperMessage?: (
-    content: string,
-    options?: {
-      replyToMessageId?: string;
-      mediaFile?: File;
-      mediaExpiresInHours?: number;
-    }
-  ) => Promise<void>;
   channelId: string;
   channelName: string;
   replyTarget?: {
@@ -33,7 +25,6 @@ interface MessageInputProps {
 
 export function MessageInput({
   onSendMessage,
-  onSendHavenDeveloperMessage,
   channelId,
   channelName,
   replyTarget = null,
@@ -42,8 +33,7 @@ export function MessageInput({
 }: MessageInputProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [input, setInput] = useState('');
-  const [isDeveloperMode, setIsDeveloperMode] = useState(false);
-  const [sendingMode, setSendingMode] = useState<'user' | 'haven_dev' | null>(null);
+  const [sending, setSending] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaExpiresInHours, setMediaExpiresInHours] = useState(24);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -96,58 +86,19 @@ export function MessageInput({
     };
   }, [onContainerHeightChange]);
 
-  const runCommand = (content: string) => {
-    const command = content.trim().toLowerCase();
-
-    if (command === '#dev' || command === '/dev') {
-      if (!onSendHavenDeveloperMessage) {
-        setSendError('You do not have permission to use Haven developer messaging here.');
-        return true;
-      }
-      setIsDeveloperMode(true);
-      setSendError(null);
-      setInput('');
-      return true;
-    }
-
-    if (command === '#devoff' || command === '/devoff') {
-      setIsDeveloperMode(false);
-      setSendError(null);
-      setInput('');
-      return true;
-    }
-
-    return false;
-  };
-
   const handleSubmit = async () => {
     const content = input.trim();
-    if ((!content && !mediaFile) || sendingMode) return;
+    if ((!content && !mediaFile) || sending) return;
 
-    if (content && !mediaFile && runCommand(content)) return;
-
-    const mode: 'user' | 'haven_dev' = isDeveloperMode ? 'haven_dev' : 'user';
-
-    setSendingMode(mode);
+    setSending(true);
     setSendError(null);
 
     try {
-      if (mode === 'haven_dev') {
-        if (!onSendHavenDeveloperMessage) {
-          throw new Error('Haven developer messaging is unavailable in this channel.');
-        }
-        await onSendHavenDeveloperMessage(content, {
-          replyToMessageId: replyTarget?.id,
-          mediaFile: mediaFile ?? undefined,
-          mediaExpiresInHours: mediaFile ? mediaExpiresInHours : undefined,
-        });
-      } else {
-        await onSendMessage(content, {
-          replyToMessageId: replyTarget?.id,
-          mediaFile: mediaFile ?? undefined,
-          mediaExpiresInHours: mediaFile ? mediaExpiresInHours : undefined,
-        });
-      }
+      await onSendMessage(content, {
+        replyToMessageId: replyTarget?.id,
+        mediaFile: mediaFile ?? undefined,
+        mediaExpiresInHours: mediaFile ? mediaExpiresInHours : undefined,
+      });
       setInput('');
       setMediaFile(null);
       setMediaExpiresInHours(24);
@@ -156,7 +107,7 @@ export function MessageInput({
       console.error('Failed to send message:', error);
       setSendError(getErrorMessage(error, 'Failed to send message.'));
     } finally {
-      setSendingMode(null);
+      setSending(false);
     }
   };
 
@@ -244,38 +195,19 @@ export function MessageInput({
               void handleSubmit();
             }
           }}
-          placeholder={
-            isDeveloperMode
-              ? `Haven Developer mode in #${channelName}`
-              : `Message #${channelName}`
-          }
+          placeholder={`Message #${channelName}`}
           className="bg-[#243754] border-none text-[#e6edf7] placeholder:text-[#8897b1]"
         />
         <Button
           type="button"
           onClick={() => void handleSubmit()}
-          disabled={(!input.trim() && !mediaFile) || sendingMode !== null}
-          className={
-            isDeveloperMode
-              ? 'bg-[#d6a24a] hover:bg-[#d89f2c] text-[#142033]'
-              : 'bg-[#3f79d8] hover:bg-[#325fae] text-white'
-          }
+          disabled={(!input.trim() && !mediaFile) || sending}
+          className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
         >
-          {sendingMode !== null
-            ? 'Sending...'
-            : isDeveloperMode
-              ? 'Send as Haven Dev'
-              : 'Send'}
+          {sending ? 'Sending...' : 'Send'}
         </Button>
       </div>
-      {onSendHavenDeveloperMessage && !isDeveloperMode && (
-        <p className="text-xs text-[#a9b8cf]">Type `#dev` to enable Haven developer mode.</p>
-      )}
-      {isDeveloperMode && (
-        <p className="text-xs text-[#d6a24a]">
-          Haven developer mode enabled. Type `#devoff` to return to normal messaging.
-        </p>
-      )}
+      {/* CHECKPOINT 2 COMPLETE */}
       {sendError && <p className="text-xs text-[#f87171]">{sendError}</p>}
     </div>
   );

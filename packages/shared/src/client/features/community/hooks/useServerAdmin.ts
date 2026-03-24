@@ -4,7 +4,6 @@ import type { ControlPlaneBackend } from '@shared/lib/backend/controlPlaneBacken
 import type {
   CommunityBanItem,
   CommunityMemberListItem,
-  DeveloperAccessMode,
   PermissionCatalogItem,
   ServerInvite,
   ServerMemberRoleItem,
@@ -19,7 +18,6 @@ type UseServerAdminInput = {
   controlPlaneBackend: ControlPlaneBackend;
   currentServerId: string | null;
   currentUserId: string | null;
-  canManageDeveloperAccess: boolean;
   canManageInvites: boolean;
   isServerSettingsModalOpen: boolean;
   setCurrentServerId: React.Dispatch<React.SetStateAction<string | null>>;
@@ -33,7 +31,6 @@ export function useServerAdmin({
   controlPlaneBackend,
   currentServerId,
   currentUserId,
-  canManageDeveloperAccess,
   canManageInvites,
   isServerSettingsModalOpen,
   setCurrentServerId,
@@ -48,6 +45,7 @@ export function useServerAdmin({
   const [membersModalLoading, setMembersModalLoading] = React.useState(false);
   const [membersModalError, setMembersModalError] = React.useState<string | null>(null);
   const [membersModalCanCreateReports, setMembersModalCanCreateReports] = React.useState(false);
+  const [membersModalCanManageMembers, setMembersModalCanManageMembers] = React.useState(false);
   const [membersModalCanManageBans, setMembersModalCanManageBans] = React.useState(false);
   const [communityBans, setCommunityBans] = React.useState<CommunityBanItem[]>([]);
   const [communityBansLoading, setCommunityBansLoading] = React.useState(false);
@@ -73,6 +71,7 @@ export function useServerAdmin({
     setMembersModalLoading(false);
     setMembersModalError(null);
     setMembersModalCanCreateReports(false);
+    setMembersModalCanManageMembers(false);
     setMembersModalCanManageBans(false);
   }, []);
 
@@ -82,6 +81,7 @@ export function useServerAdmin({
     setMembersModalMembers([]);
     setMembersModalError(null);
     setMembersModalCanCreateReports(false);
+    setMembersModalCanManageMembers(false);
     setMembersModalCanManageBans(false);
   }, []);
 
@@ -151,6 +151,7 @@ export function useServerAdmin({
       setMembersModalError(null);
       setMembersModalLoading(true);
       setMembersModalCanCreateReports(false);
+      setMembersModalCanManageMembers(false);
       setMembersModalCanManageBans(false);
 
       try {
@@ -161,6 +162,7 @@ export function useServerAdmin({
         ]);
         setMembersModalMembers(members);
         setMembersModalCanCreateReports(Boolean(permissions.canCreateReports));
+        setMembersModalCanManageMembers(Boolean(permissions.canManageMembers));
         setMembersModalCanManageBans(Boolean(permissions.canManageBans));
       } catch (error: unknown) {
         setMembersModalError(getErrorMessage(error, 'Failed to load community members.'));
@@ -268,9 +270,6 @@ export function useServerAdmin({
           description: snapshot.description,
           allowPublicInvites: snapshot.allowPublicInvites,
           requireReportReason: snapshot.requireReportReason,
-          developerAccessEnabled: snapshot.developerAccessEnabled,
-          developerAccessMode: snapshot.developerAccessMode as DeveloperAccessMode,
-          developerAccessChannelIds: snapshot.developerAccessChannelIds,
         });
       } finally {
         setServerSettingsLoading(false);
@@ -315,26 +314,19 @@ export function useServerAdmin({
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.updateServerSettings({
         communityId: currentServerId,
-        userId: currentUserId,
         values: {
           name: trimmedName,
           description: values.description,
           allowPublicInvites: values.allowPublicInvites,
           requireReportReason: values.requireReportReason,
-          developerAccessEnabled: values.developerAccessEnabled,
-          developerAccessMode: values.developerAccessMode,
-          developerAccessChannelIds: values.developerAccessChannelIds,
         },
-        canManageDeveloperAccess,
       });
 
       await refreshServers();
       await loadServerSettings();
     },
     [
-      canManageDeveloperAccess,
       currentServerId,
-      currentUserId,
       loadServerSettings,
       refreshServers,
     ]
@@ -579,6 +571,7 @@ export function useServerAdmin({
       membersModalLoading,
       membersModalError,
       membersModalCanCreateReports,
+      membersModalCanManageMembers,
       membersModalCanManageBans,
       communityBans,
       communityBansLoading,

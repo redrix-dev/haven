@@ -37,10 +37,12 @@ interface ServerMembersModalProps {
   isElevatedViewer: boolean;
   canReportProfiles: boolean;
   canBanProfiles: boolean;
+  canKickProfiles: boolean;
   onResolveBanServers: (targetUserId: string) => Promise<BanEligibleServer[]>;
   onDirectMessage: (targetUserId: string) => void;
   onReportUser: (targetUserId: string, reason: string) => Promise<void> | void;
   onBanUser: (targetUserId: string, communityId: string, reason: string) => Promise<void> | void;
+  onKickUser: (targetUserId: string, username: string) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -55,10 +57,12 @@ export function ServerMembersModal({
   isElevatedViewer,
   canReportProfiles,
   canBanProfiles,
+  canKickProfiles,
   onResolveBanServers,
   onDirectMessage,
   onReportUser,
   onBanUser,
+  onKickUser,
   onClose,
 }: ServerMembersModalProps) {
   const [search, setSearch] = React.useState('');
@@ -73,9 +77,14 @@ export function ServerMembersModal({
     communityId: string;
     username: string;
   } | null>(null);
+  const [kickDraft, setKickDraft] = React.useState<{
+    targetUserId: string;
+    username: string;
+  } | null>(null);
   const [banReason, setBanReason] = React.useState('');
   const [banSubmitting, setBanSubmitting] = React.useState(false);
   const [banConfirmOpen, setBanConfirmOpen] = React.useState(false);
+  const [kickSubmitting, setKickSubmitting] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -85,9 +94,11 @@ export function ServerMembersModal({
       setReportReason('');
       setReportSubmitting(false);
       setBanDraft(null);
+      setKickDraft(null);
       setBanReason('');
       setBanSubmitting(false);
       setBanConfirmOpen(false);
+      setKickSubmitting(false);
       setActionError(null);
     }
   }, [open]);
@@ -154,6 +165,7 @@ export function ServerMembersModal({
                         canDirectMessage={member.userId !== currentUserId}
                         canReport={canReportProfiles}
                         canBan={canBanProfiles}
+                        canKick={canKickProfiles}
                         onDirectMessage={onDirectMessage}
                         onReport={(targetUserId) => {
                           const targetMember = membersByUserId.get(targetUserId);
@@ -173,6 +185,15 @@ export function ServerMembersModal({
                           });
                           setBanReason('');
                           setBanConfirmOpen(false);
+                          setActionError(null);
+                        }}
+                        onKick={(targetUserId) => {
+                          const targetMember = membersByUserId.get(targetUserId);
+                          setKickDraft({
+                            targetUserId,
+                            username: targetMember?.displayName ?? targetUserId.substring(0, 12),
+                          });
+                          setKickSubmitting(false);
                           setActionError(null);
                         }}
                         resolveBanServers={onResolveBanServers}
@@ -397,6 +418,48 @@ export function ServerMembersModal({
               }}
             >
               {banSubmitting ? 'Banning...' : 'Ban User'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(kickDraft)}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) return;
+          setKickDraft(null);
+          setKickSubmitting(false);
+        }}
+      >
+        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Removal</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a9b8cf]">
+              Remove this user from the server now. They can rejoin later if they still have a valid invite.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={kickSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-500"
+              disabled={kickSubmitting || !kickDraft}
+              onClick={() => {
+                if (!kickDraft) return;
+                setKickSubmitting(true);
+                setActionError(null);
+                Promise.resolve(onKickUser(kickDraft.targetUserId, kickDraft.username))
+                  .then(() => {
+                    setKickDraft(null);
+                  })
+                  .catch((kickError: unknown) => {
+                    setActionError(getErrorMessage(kickError, 'Failed to remove user from the server.'));
+                  })
+                  .finally(() => {
+                    setKickSubmitting(false);
+                  });
+              }}
+            >
+              {kickSubmitting ? 'Removing...' : 'Remove from Server'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -18,9 +18,11 @@ export interface ProfileActionSurfaceProps {
   canDirectMessage?: boolean;
   canReport: boolean;
   canBan: boolean;
+  canKick?: boolean;
   onDirectMessage: (userId: string) => void;
   onReport: (userId: string) => void;
   onBan: (userId: string, communityId: string) => void;
+  onKick?: (userId: string) => void;
   resolveBanServers: (userId: string) => Promise<BanEligibleServer[]>;
   children: React.ReactNode;
 }
@@ -32,9 +34,11 @@ export function ProfileActionSurface({
   canDirectMessage = true,
   canReport,
   canBan,
+  canKick = false,
   onDirectMessage,
   onReport,
   onBan,
+  onKick,
   resolveBanServers,
   children,
 }: ProfileActionSurfaceProps) {
@@ -135,8 +139,21 @@ export function ProfileActionSurface({
       });
     }
 
+    if (canKick && onKick) {
+      next.push({
+        kind: 'item',
+        key: 'kick',
+        label: 'Kick from Server',
+        destructive: true,
+        onSelect: () => {
+          setOpen(false);
+          onKick(userId);
+        },
+      });
+    }
+
     return next;
-  }, [banServers, banServersLoading, canBan, canDirectMessage, canReport, onBan, onDirectMessage, onReport, userId]);
+  }, [banServers, banServersLoading, canBan, canDirectMessage, canKick, canReport, onBan, onDirectMessage, onKick, onReport, userId]);
 
   return (
     <DropdownMenu

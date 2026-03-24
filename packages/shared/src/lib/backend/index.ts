@@ -3,6 +3,7 @@ import { centralControlPlaneBackend, type ControlPlaneBackend } from './controlP
 import { centralDirectMessageBackend, type DirectMessageBackend } from './directMessageBackend';
 import { centralModerationBackend, type ModerationBackend } from './moderationBackend';
 import { centralNotificationBackend, type NotificationBackend } from './notificationBackend';
+import { centralServerModmailBackend, type ServerModmailBackend } from './serverModmailBackend';
 import { centralSocialBackend, type SocialBackend } from './socialBackend';
 
 export type BackendMode = 'central_supabase';
@@ -72,5 +73,13 @@ export const getModerationBackend = (): ModerationBackend => {
     case 'central_supabase':
     default:
       return centralModerationBackend;
+  }
+};
+
+export const getServerModmailBackend = (): ServerModmailBackend => {
+  switch (backendMode) {
+    case 'central_supabase':
+    default:
+      return centralServerModmailBackend;
   }
 };

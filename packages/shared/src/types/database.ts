@@ -1797,10 +1797,12 @@ export type Database = {
         Row: {
           community_id: string
           created_at: string
+          destination: string
           id: string
           include_last_n_messages: number | null
           notes: string | null
           reporter_user_id: string
+          snapshot: Json | null
           status: Database["public"]["Enums"]["support_report_status"]
           title: string
           updated_at: string
@@ -1808,10 +1810,12 @@ export type Database = {
         Insert: {
           community_id: string
           created_at?: string
+          destination?: string
           id?: string
           include_last_n_messages?: number | null
           notes?: string | null
           reporter_user_id: string
+          snapshot?: Json | null
           status?: Database["public"]["Enums"]["support_report_status"]
           title: string
           updated_at?: string
@@ -1819,10 +1823,12 @@ export type Database = {
         Update: {
           community_id?: string
           created_at?: string
+          destination?: string
           id?: string
           include_last_n_messages?: number | null
           notes?: string | null
           reporter_user_id?: string
+          snapshot?: Json | null
           status?: Database["public"]["Enums"]["support_report_status"]
           title?: string
           updated_at?: string
@@ -1871,6 +1877,19 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "community_bans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      kick_community_member: {
+        Args: { p_community_id: string; p_target_user_id: string }
+        Returns: {
+          community_id: string
+          kicked_user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "community_members"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2323,7 +2342,12 @@ export type Database = {
       link_embed_provider: "none" | "youtube" | "vimeo"
       link_preview_status: "pending" | "ready" | "unsupported" | "failed"
       message_author_type: "user" | "haven_dev" | "system"
-      support_report_status: "open" | "in_review" | "resolved" | "closed"
+      support_report_status:
+        | "pending"
+        | "under_review"
+        | "resolved"
+        | "dismissed"
+        | "escalated"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2469,7 +2493,13 @@ export const Constants = {
       link_embed_provider: ["none", "youtube", "vimeo"],
       link_preview_status: ["pending", "ready", "unsupported", "failed"],
       message_author_type: ["user", "haven_dev", "system"],
-      support_report_status: ["open", "in_review", "resolved", "closed"],
+      support_report_status: [
+        "pending",
+        "under_review",
+        "resolved",
+        "dismissed",
+        "escalated",
+      ],
     },
   },
 } as const

@@ -145,9 +145,10 @@ describe('NotificationCenterModal', () => {
     expect(screen.getByText(/no notifications yet/i)).toBeTruthy();
   });
 
-  it('renders dismiss all and notification settings actions without inline settings content', async () => {
+  it('renders notification settings and saves local voice presence sound changes', async () => {
     const user = userEvent.setup();
     const onDismissAll = vi.fn();
+    const onUpdateLocalAudioSettings = vi.fn();
     useNotificationsStore.getState().setNotifications([
       makeNotification({
         recipientId: 'recipient-mention-1',
@@ -181,16 +182,61 @@ describe('NotificationCenterModal', () => {
         onUpdatePreferences={() => {}}
         localAudioSettings={baseLocalAudioSettings}
         localAudioSaving={false}
-        onUpdateLocalAudioSettings={() => {}}
+        onUpdateLocalAudioSettings={onUpdateLocalAudioSettings}
       />
     );
 
     expect(screen.getByRole('button', { name: /dismiss all/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /notification settings/i })).toBeTruthy();
-    expect(screen.queryByText(/global notification preferences/i)).toBeNull();
+    expect(screen.queryByText(/local sound settings/i)).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /dismiss all/i }));
     expect(onDismissAll).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: /notification settings/i }));
+
+    expect(screen.getByText(/local sound settings/i)).toBeTruthy();
+    expect(screen.getByRole('switch', { name: /voice join\/leave sounds/i })).toBeTruthy();
+    expect(screen.getAllByRole('slider')).toHaveLength(2);
+
+    await user.click(screen.getByRole('switch', { name: /voice join\/leave sounds/i }));
+    expect(onUpdateLocalAudioSettings).toHaveBeenCalledWith({
+      ...baseLocalAudioSettings,
+      voicePresenceSoundEnabled: false,
+    });
+  });
+
+  it('hides the join and leave volume slider when voice presence sounds are disabled', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <NotificationCenterModal
+        open
+        onOpenChange={() => {}}
+        counts={{ unseenCount: 0, unreadCount: 0 }}
+        error={null}
+        refreshing={false}
+        onRefresh={() => {}}
+        onMarkAllSeen={() => {}}
+        onDismissAll={() => {}}
+        onMarkNotificationRead={() => {}}
+        onDismissNotification={() => {}}
+        preferences={basePreferences}
+        preferencesLoading={false}
+        preferencesSaving={false}
+        onUpdatePreferences={() => {}}
+        localAudioSettings={{
+          ...baseLocalAudioSettings,
+          voicePresenceSoundEnabled: false,
+        }}
+        localAudioSaving={false}
+        onUpdateLocalAudioSettings={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /notification settings/i }));
+
+    expect(screen.getAllByRole('slider')).toHaveLength(1);
   });
 
   it('renders friend request notification actions including dismiss', async () => {

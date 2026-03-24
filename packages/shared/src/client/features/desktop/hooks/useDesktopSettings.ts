@@ -28,35 +28,55 @@ const makeFallbackUpdaterStatus = (
   repository: 'redrix-dev/haven',
 });
 
-const readWebNotificationAudioSettings = (): NotificationAudioSettings | null => {
-  if (typeof window === 'undefined') return null;
+const readWebNotificationAudioSettings = (): {
+  settings: NotificationAudioSettings | null;
+  migrated: boolean;
+} => {
+  if (typeof window === 'undefined') return { settings: null, migrated: false };
 
   try {
     const raw = window.localStorage.getItem(WEB_NOTIFICATION_AUDIO_SETTINGS_STORAGE_KEY);
-    if (!raw) return null;
+    if (!raw) return { settings: null, migrated: false };
 
     const parsed = JSON.parse(raw) as Partial<NotificationAudioSettings>;
+    const defaults = DEFAULT_APP_SETTINGS.notifications;
     if (
       typeof parsed.masterSoundEnabled !== 'boolean' ||
       typeof parsed.playSoundsWhenFocused !== 'boolean' ||
-      typeof parsed.voicePresenceSoundEnabled !== 'boolean' ||
       typeof parsed.notificationSoundVolume !== 'number' ||
-      !Number.isFinite(parsed.notificationSoundVolume) ||
-      typeof parsed.voicePresenceSoundVolume !== 'number' ||
-      !Number.isFinite(parsed.voicePresenceSoundVolume)
+      !Number.isFinite(parsed.notificationSoundVolume)
     ) {
-      return null;
+      return { settings: null, migrated: false };
+    }
+
+    const hasVoicePresenceSoundEnabled =
+      typeof parsed.voicePresenceSoundEnabled === 'boolean';
+    const hasVoicePresenceSoundVolume =
+      typeof parsed.voicePresenceSoundVolume === 'number' &&
+      Number.isFinite(parsed.voicePresenceSoundVolume);
+    if (parsed.voicePresenceSoundEnabled != null && !hasVoicePresenceSoundEnabled) {
+      return { settings: null, migrated: false };
+    }
+    if (parsed.voicePresenceSoundVolume != null && !hasVoicePresenceSoundVolume) {
+      return { settings: null, migrated: false };
     }
 
     return {
-      masterSoundEnabled: parsed.masterSoundEnabled,
-      playSoundsWhenFocused: parsed.playSoundsWhenFocused,
-      notificationSoundVolume: Math.max(0, Math.min(100, Math.round(parsed.notificationSoundVolume))),
-      voicePresenceSoundEnabled: parsed.voicePresenceSoundEnabled,
-      voicePresenceSoundVolume: Math.max(0, Math.min(100, Math.round(parsed.voicePresenceSoundVolume))),
+      settings: {
+        masterSoundEnabled: parsed.masterSoundEnabled,
+        playSoundsWhenFocused: parsed.playSoundsWhenFocused,
+        notificationSoundVolume: Math.max(0, Math.min(100, Math.round(parsed.notificationSoundVolume))),
+        voicePresenceSoundEnabled: hasVoicePresenceSoundEnabled
+          ? (parsed.voicePresenceSoundEnabled as boolean)
+          : defaults.voicePresenceSoundEnabled,
+        voicePresenceSoundVolume: hasVoicePresenceSoundVolume
+          ? Math.max(0, Math.min(100, Math.round(parsed.voicePresenceSoundVolume as number)))
+          : defaults.voicePresenceSoundVolume,
+      },
+      migrated: !hasVoicePresenceSoundEnabled || !hasVoicePresenceSoundVolume,
     };
   } catch {
-    return null;
+    return { settings: null, migrated: false };
   }
 };
 
@@ -170,7 +190,13 @@ export function useDesktopSettings() {
     const loadDesktopSettings = async () => {
       if (!desktopClient.isAvailable()) {
         if (!isMounted) return;
-        const webNotificationAudioSettings = readWebNotificationAudioSettings();
+        const {
+          settings: webNotificationAudioSettings,
+          migrated: migratedNotificationAudioSettings,
+        } = readWebNotificationAudioSettings();
+        if (webNotificationAudioSettings && migratedNotificationAudioSettings) {
+          writeWebNotificationAudioSettings(webNotificationAudioSettings); // CHECKPOINT 3 COMPLETE
+        }
         const webVoiceSettings = readWebVoiceSettings();
         setAppSettings({
           ...DEFAULT_APP_SETTINGS,

@@ -30,6 +30,7 @@ import type {
   MessageAttachment,
   MessageLinkPreview,
   MessageReaction,
+  ReportStatusUpdatedBroadcastPayload,
   ChannelAccessRevokedResult,
   MemberBannedBroadcastPayload,
   MemberChannelAccessRevokedBroadcastPayload,
@@ -39,9 +40,13 @@ import type {
   ServerRoleManagementSnapshot,
   ServerSettingsSnapshot,
   ServerSettingsUpdate,
+  SupportReportMessageSnapshot,
+  SupportReportProfileSnapshot,
+  SupportReportSnapshotMessage,
   LinkPreviewSnapshot,
   LinkPreviewStatus,
   LinkPreviewEmbedProvider,
+  KickCommunityMemberResult,
 } from './types';
 
 type CommunityMemberWithProfile = Pick<
@@ -126,6 +131,16 @@ type BanCommunityMemberRpcRow = {
   community_id?: unknown;
 };
 
+type KickCommunityMemberRpcRow = {
+  kicked_user_id?: unknown;
+  community_id?: unknown;
+};
+
+type ReportProfileRow = Pick<
+  Database['public']['Tables']['profiles']['Row'],
+  'id' | 'username' | 'avatar_url'
+>;
+
 const activeCommunityChannelsById = new Map<string, RealtimeChannel>();
 
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
@@ -136,6 +151,15 @@ const asOptionalString = (value: unknown): string | null =>
 
 const asOptionalNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const isSupportReportStatus = (
+  value: unknown
+): value is ReportStatusUpdatedBroadcastPayload['status'] =>
+  value === 'pending' ||
+  value === 'under_review' ||
+  value === 'resolved' ||
+  value === 'dismissed' ||
+  value === 'escalated';
 
 const normalizeLinkPreviewSnapshot = (value: unknown): LinkPreviewSnapshot | null => {
   const obj = asObjectRecord(value);
@@ -186,6 +210,206 @@ const normalizeLinkPreviewSnapshot = (value: unknown): LinkPreviewSnapshot | nul
     canonicalUrl: asOptionalString(obj.canonicalUrl),
     thumbnail,
     embed,
+  };
+};
+
+const getReplyToMessageId = (message: Pick<Message, 'metadata'>): string | null => {
+  const metadata = asObjectRecord(message.metadata);
+  const replyToMessageId = metadata?.replyToMessageId;
+  return typeof replyToMessageId === 'string' && replyToMessageId.trim().length > 0
+    ? replyToMessageId
+    : null;
+};
+
+const compareMessagesByCreatedAt = (left: Pick<Message, 'created_at' | 'id'>, right: Pick<Message, 'created_at' | 'id'>): number => {
+  const createdAtComparison = left.created_at.localeCompare(right.created_at);
+  if (createdAtComparison !== 0) return createdAtComparison;
+  return left.id.localeCompare(right.id);
+};
+
+const toSupportReportSnapshotMessage = (
+  message: Pick<Message, 'id' | 'content' | 'author_user_id' | 'created_at'>,
+  profile: ReportProfileRow | null
+): SupportReportSnapshotMessage => ({
+  id: message.id,
+  content: message.content,
+  authorUserId: message.author_user_id,
+  authorUsername: profile?.username ?? null,
+  avatarUrl: profile?.avatar_url ?? null,
+  createdAt: message.created_at,
+});
+
+const listProfileSnapshotsByUserId = async (userIds: readonly (string | null | undefined)[]) => {
+  const uniqueUserIds = Array.from(
+    new Set(userIds.filter((userId): userId is string => typeof userId === 'string' && userId.length > 0))
+  );
+  if (uniqueUserIds.length === 0) {
+    return new Map<string, ReportProfileRow>();
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .in('id', uniqueUserIds);
+  if (error) throw error;
+
+  return new Map((data ?? []).map((row) => [row.id, row as ReportProfileRow]));
+};
+
+const fetchSupportReportProfileSnapshot = async (
+  targetUserId: string
+): Promise<SupportReportProfileSnapshot> => {
+  const profileByUserId = await listProfileSnapshotsByUserId([targetUserId]);
+  const profile = profileByUserId.get(targetUserId) ?? null;
+
+  return {
+    targetUserId,
+    targetUsername: profile?.username ?? null,
+    targetAvatarUrl: profile?.avatar_url ?? null,
+    capturedAt: new Date().toISOString(),
+  };
+};
+
+const fetchSupportReportMessageSnapshot = async (input: {
+  communityId: string;
+  channelId: string;
+  messageId: string;
+}): Promise<SupportReportMessageSnapshot | null> => {
+  const { data: reportedMessage, error: reportedMessageError } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('community_id', input.communityId)
+    .eq('channel_id', input.channelId)
+    .eq('id', input.messageId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (reportedMessageError) throw reportedMessageError;
+  if (!reportedMessage) return null;
+
+  const replyToMessageId = getReplyToMessageId(reportedMessage);
+  let orderedContextMessages: Message[] = [];
+
+  if (replyToMessageId) {
+    const { data: channelMessages, error: channelMessagesError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('community_id', input.communityId)
+      .eq('channel_id', input.channelId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true });
+    if (channelMessagesError) throw channelMessagesError;
+
+    const messages = (channelMessages ?? []) as Message[];
+    const messageById = new Map(messages.map((message) => [message.id, message]));
+    const childIdsByParentId = new Map<string, string[]>();
+
+    for (const message of messages) {
+      const parentId = getReplyToMessageId(message);
+      if (!parentId) continue;
+      const existingChildIds = childIdsByParentId.get(parentId) ?? [];
+      existingChildIds.push(message.id);
+      childIdsByParentId.set(parentId, existingChildIds);
+    }
+
+    let threadRootId = reportedMessage.id;
+    let currentMessage: Message | undefined = reportedMessage;
+    while (currentMessage) {
+      const parentId = getReplyToMessageId(currentMessage);
+      if (!parentId) break;
+      const parentMessage = messageById.get(parentId);
+      if (!parentMessage) break;
+      threadRootId = parentMessage.id;
+      currentMessage = parentMessage;
+    }
+
+    const threadMessageIds = new Set<string>();
+    const pendingIds = [threadRootId];
+    while (pendingIds.length > 0) {
+      const nextId = pendingIds.pop();
+      if (!nextId || threadMessageIds.has(nextId)) continue;
+      threadMessageIds.add(nextId);
+      const childIds = childIdsByParentId.get(nextId) ?? [];
+      for (const childId of childIds) {
+        pendingIds.push(childId);
+      }
+    }
+    threadMessageIds.add(reportedMessage.id);
+
+    orderedContextMessages = messages
+      .filter((message) => threadMessageIds.has(message.id))
+      .sort(compareMessagesByCreatedAt);
+  } else {
+    const beforeFilter =
+      `created_at.lt.${reportedMessage.created_at},` +
+      `and(created_at.eq.${reportedMessage.created_at},id.lt.${reportedMessage.id})`;
+    const afterFilter =
+      `created_at.gt.${reportedMessage.created_at},` +
+      `and(created_at.eq.${reportedMessage.created_at},id.gt.${reportedMessage.id})`;
+
+    const [
+      { data: contextBeforeRows, error: contextBeforeError },
+      { data: contextAfterRows, error: contextAfterError },
+    ] = await Promise.all([
+      supabase
+        .from('messages')
+        .select('*')
+        .eq('community_id', input.communityId)
+        .eq('channel_id', input.channelId)
+        .is('deleted_at', null)
+        .or(beforeFilter)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(5),
+      supabase
+        .from('messages')
+        .select('*')
+        .eq('community_id', input.communityId)
+        .eq('channel_id', input.channelId)
+        .is('deleted_at', null)
+        .or(afterFilter)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(5),
+    ]);
+    if (contextBeforeError) throw contextBeforeError;
+    if (contextAfterError) throw contextAfterError;
+
+    orderedContextMessages = [
+      ...((contextBeforeRows ?? []) as Message[]).slice().reverse(),
+      reportedMessage,
+      ...((contextAfterRows ?? []) as Message[]),
+    ];
+  }
+
+  const authorProfilesByUserId = await listProfileSnapshotsByUserId(
+    orderedContextMessages.map((message) => message.author_user_id)
+  );
+  const reportedMessageIndex = orderedContextMessages.findIndex((message) => message.id === reportedMessage.id);
+  const safeReportedMessageIndex = reportedMessageIndex >= 0 ? reportedMessageIndex : 0;
+
+  return {
+    reportedMessage: toSupportReportSnapshotMessage(
+      reportedMessage,
+      authorProfilesByUserId.get(reportedMessage.author_user_id ?? '') ?? null
+    ),
+    contextBefore: orderedContextMessages
+      .slice(0, safeReportedMessageIndex)
+      .map((message) =>
+        toSupportReportSnapshotMessage(
+          message,
+          authorProfilesByUserId.get(message.author_user_id ?? '') ?? null
+        )
+      ),
+    contextAfter: orderedContextMessages
+      .slice(safeReportedMessageIndex + 1)
+      .map((message) =>
+        toSupportReportSnapshotMessage(
+          message,
+          authorProfilesByUserId.get(message.author_user_id ?? '') ?? null
+        )
+      ),
+    capturedAt: new Date().toISOString(),
   };
 };
 
@@ -435,10 +659,6 @@ const mapMessageLinkPreviewRowsWithSignedUrls = async (
   });
 };
 
-// Incident toggle for channel-create debugging.
-// Keep disabled by default. Re-enable by setting `HAVEN_DEBUG_CHANNEL_CREATE=1`.
-// const ENABLE_CHANNEL_CREATE_DIAGNOSTICS = process.env.HAVEN_DEBUG_CHANNEL_CREATE === '1';
-
 export interface CommunityDataBackend {
   fetchServerPermissions(communityId: string): Promise<ServerPermissions>;
   listCommunityMembers(communityId: string): Promise<CommunityMemberListItem[]>;
@@ -454,6 +674,10 @@ export interface CommunityDataBackend {
     targetUserId: string;
     reason: string;
   }): Promise<BanCommunityMemberResult>;
+  kickCommunityMember(input: {
+    communityId: string;
+    targetUserId: string;
+  }): Promise<KickCommunityMemberResult>;
   unbanCommunityMember(input: {
     communityId: string;
     targetUserId: string;
@@ -469,11 +693,15 @@ export interface CommunityDataBackend {
       onMemberChannelAccessRevoked?: (
         payload: MemberChannelAccessRevokedBroadcastPayload
       ) => void;
+      onReportStatusUpdated?: (payload: ReportStatusUpdatedBroadcastPayload) => void;
     }
   ): RealtimeChannel;
   broadcastMemberBanned(input: MemberBannedBroadcastPayload): Promise<void>;
   broadcastMemberChannelAccessRevoked(
     input: MemberChannelAccessRevokedBroadcastPayload
+  ): Promise<void>;
+  broadcastReportStatusUpdated(
+    input: ReportStatusUpdatedBroadcastPayload
   ): Promise<void>;
   listChannelGroups(input: {
     communityId: string;
@@ -554,18 +782,12 @@ export interface CommunityDataBackend {
     deadLetters: number;
   }>;
   fetchAuthorProfiles(authorIds: string[]): Promise<Record<string, AuthorProfile>>;
-  isHavenDeveloperMessagingAllowed(input: {
-    communityId: string;
-    channelId: string;
-  }): Promise<boolean>;
   isElevatedInServer(communityId: string): Promise<boolean>;
   canSendInChannel(channelId: string): Promise<boolean>;
   fetchServerSettings(communityId: string): Promise<ServerSettingsSnapshot>;
   updateServerSettings(input: {
     communityId: string;
-    userId: string;
     values: ServerSettingsUpdate;
-    canManageDeveloperAccess: boolean;
   }): Promise<void>;
   fetchServerRoleManagement(communityId: string): Promise<ServerRoleManagementSnapshot>;
   createServerRole(input: {
@@ -650,16 +872,6 @@ export interface CommunityDataBackend {
     kind: MessageReportKind;
     comment: string;
   }): Promise<void>;
-  postHavenDeveloperMessage(input: {
-    communityId: string;
-    channelId: string;
-    content: string;
-    replyToMessageId?: string;
-    mediaUpload?: {
-      file: File;
-      expiresInHours?: number;
-    };
-  }): Promise<void>;
 }
 
 export const centralCommunityDataBackend: CommunityDataBackend = {
@@ -675,8 +887,8 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: canManageMessages },
       { data: canManageBans },
       { data: canCreateReports },
+      { data: canManageReports },
       { data: canRefreshLinkPreviews },
-      { data: canManageDeveloperAccess },
       { data: canManageInvites },
     ] = await Promise.all([
       supabase.rpc('is_community_owner', { p_community_id: communityId }),
@@ -718,11 +930,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       }),
       supabase.rpc('user_has_permission', {
         p_community_id: communityId,
-        p_permission_key: 'refresh_link_previews',
+        p_permission_key: 'manage_reports',
       }),
       supabase.rpc('user_has_permission', {
         p_community_id: communityId,
-        p_permission_key: 'manage_developer_access',
+        p_permission_key: 'refresh_link_previews',
       }),
       supabase.rpc('user_has_permission', {
         p_community_id: communityId,
@@ -745,8 +957,8 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       canManageMessages: owner || Boolean(canManageMessages),
       canManageBans: owner || Boolean(canManageBans),
       canCreateReports: owner || Boolean(canCreateReports),
+      canManageReports: owner || Boolean(canManageReports), // CHECKPOINT 1 COMPLETE
       canRefreshLinkPreviews: owner || Boolean(canRefreshLinkPreviews),
-      canManageDeveloperAccess: owner || Boolean(canManageDeveloperAccess),
       canManageInvites: owner || Boolean(canManageInvites),
     };
   },
@@ -787,6 +999,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       throw new Error('Report reason is required.');
     }
 
+    let snapshot: SupportReportProfileSnapshot | null = null;
+    try {
+      snapshot = await fetchSupportReportProfileSnapshot(targetUserId); // CHECKPOINT 4 COMPLETE
+    } catch (snapshotError) {
+      console.warn('Failed to capture support report profile snapshot:', snapshotError);
+    }
+
     const reportId = crypto.randomUUID();
     const reportTitle = 'User Report: Profile';
     const reportNotes = JSON.stringify({
@@ -798,9 +1017,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const { error } = await supabase.from('support_reports').insert({
       id: reportId,
       community_id: communityId,
+      destination: 'haven_staff',
       reporter_user_id: reporterUserId,
       title: reportTitle,
       notes: reportNotes,
+      snapshot,
       include_last_n_messages: null,
     });
     if (error) throw error;
@@ -868,6 +1089,29 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       bannedUserId,
       communityId: returnedCommunityId,
     };
+  },
+
+  async kickCommunityMember({ communityId, targetUserId }) {
+    const { data, error } = await supabase.rpc('kick_community_member', {
+      p_community_id: communityId,
+      p_target_user_id: targetUserId,
+    });
+    if (error) throw error;
+
+    const row = (Array.isArray(data) ? data[0] : data) as KickCommunityMemberRpcRow | null;
+    const kickedUserId =
+      row && typeof row.kicked_user_id === 'string' ? row.kicked_user_id : null;
+    const returnedCommunityId =
+      row && typeof row.community_id === 'string' ? row.community_id : null;
+
+    if (!kickedUserId || !returnedCommunityId) {
+      throw new Error('Kick RPC returned incomplete moderation context.');
+    }
+
+    return {
+      kickedUserId,
+      communityId: returnedCommunityId,
+    }; // CHECKPOINT 5 COMPLETE
   },
 
   async unbanCommunityMember({ communityId, targetUserId, reason }) {
@@ -1115,6 +1359,36 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           channelId,
           communityId: payloadCommunityId,
         }); // CHECKPOINT 3 COMPLETE
+      })
+      .on('broadcast', { event: 'report_status_updated' }, ({ payload }) => {
+        const payloadRecord = asObjectRecord(payload);
+        const reportId =
+          payloadRecord && typeof payloadRecord.reportId === 'string'
+            ? payloadRecord.reportId
+            : null;
+        const status = payloadRecord?.status;
+        const updatedBy =
+          payloadRecord && typeof payloadRecord.updatedBy === 'string'
+            ? payloadRecord.updatedBy
+            : null;
+        const payloadCommunityId =
+          payloadRecord && typeof payloadRecord.communityId === 'string'
+            ? payloadRecord.communityId
+            : null;
+        if (
+          !reportId ||
+          !updatedBy ||
+          payloadCommunityId !== communityId ||
+          !isSupportReportStatus(status)
+        ) {
+          return;
+        }
+        options?.onReportStatusUpdated?.({
+          reportId,
+          status,
+          communityId: payloadCommunityId,
+          updatedBy,
+        }); // CHECKPOINT 4 COMPLETE
       });
 
     channel.subscribe((status) => {
@@ -1178,6 +1452,31 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     if (sendStatus !== 'ok') {
       throw new Error('Failed to broadcast channel access revocation.');
+    }
+  },
+
+  async broadcastReportStatusUpdated({ reportId, status, communityId, updatedBy }) {
+    const broadcastChannel = activeCommunityChannelsById.get(communityId);
+    if (!broadcastChannel) {
+      console.warn(
+        `Skipping report_status_updated broadcast for ${communityId}: no active channels subscription.`
+      );
+      return;
+    }
+
+    const sendStatus = await broadcastChannel.send({
+      type: 'broadcast',
+      event: 'report_status_updated',
+      payload: {
+        reportId,
+        status,
+        communityId,
+        updatedBy,
+      } satisfies ReportStatusUpdatedBroadcastPayload,
+    });
+
+    if (sendStatus !== 'ok') {
+      throw new Error('Failed to broadcast report status update.');
     }
   },
 
@@ -1706,35 +2005,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return profileMap;
   },
 
-  async isHavenDeveloperMessagingAllowed({ communityId, channelId }) {
-    const { data: developerAccess, error: developerAccessError } = await supabase
-      .from('community_developer_access')
-      .select('enabled, mode')
-      .eq('community_id', communityId)
-      .maybeSingle();
-
-    if (developerAccessError || !developerAccess?.enabled) {
-      return false;
-    }
-
-    if (developerAccess.mode === 'report_only') {
-      return false;
-    }
-
-    if (developerAccess.mode === 'channel_scoped') {
-      const { data: allowedChannel } = await supabase
-        .from('community_developer_access_channels')
-        .select('channel_id')
-        .eq('community_id', communityId)
-        .eq('channel_id', channelId)
-        .maybeSingle();
-
-      return Boolean(allowedChannel);
-    }
-
-    return false;
-  },
-
   async isElevatedInServer(communityId) {
     const {
       data: { user },
@@ -1796,8 +2066,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const [
       { data: community, error: communityError },
       { data: communitySettings, error: communitySettingsError },
-      { data: developerAccess, error: developerAccessError },
-      { data: scopedChannels, error: scopedChannelsError },
     ] = await Promise.all([
       supabase
         .from('communities')
@@ -1806,41 +2074,23 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         .maybeSingle(),
       supabase
         .from('community_settings')
-        .select('allow_public_invites, require_report_reason, allow_haven_developer_access, developer_access_mode')
+        .select('allow_public_invites, require_report_reason')
         .eq('community_id', communityId)
         .maybeSingle(),
-      supabase
-        .from('community_developer_access')
-        .select('enabled, mode')
-        .eq('community_id', communityId)
-        .maybeSingle(),
-      supabase
-        .from('community_developer_access_channels')
-        .select('channel_id')
-        .eq('community_id', communityId),
     ]);
 
     if (communityError) throw communityError;
     if (communitySettingsError) throw communitySettingsError;
-    if (developerAccessError) throw developerAccessError;
-    if (scopedChannelsError) throw scopedChannelsError;
-
-    const defaultMode = 'report_only' as const;
 
     return {
       name: community?.name ?? '',
       description: community?.description ?? null,
       allowPublicInvites: communitySettings?.allow_public_invites ?? false,
       requireReportReason: communitySettings?.require_report_reason ?? true,
-      developerAccessEnabled:
-        developerAccess?.enabled ?? communitySettings?.allow_haven_developer_access ?? false,
-      developerAccessMode:
-        developerAccess?.mode ?? communitySettings?.developer_access_mode ?? defaultMode,
-      developerAccessChannelIds: (scopedChannels ?? []).map((row) => row.channel_id),
     };
   },
 
-  async updateServerSettings({ communityId, userId, values, canManageDeveloperAccess }) {
+  async updateServerSettings({ communityId, values }) {
     const { error: communityError } = await supabase
       .from('communities')
       .update({
@@ -1855,46 +2105,10 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .update({
         allow_public_invites: values.allowPublicInvites,
         require_report_reason: values.requireReportReason,
-        allow_haven_developer_access: values.developerAccessEnabled,
-        developer_access_mode: values.developerAccessMode,
       })
       .eq('community_id', communityId);
     if (communitySettingsError) throw communitySettingsError;
-
-    if (!canManageDeveloperAccess) return;
-
-    const { error: developerAccessError } = await supabase
-      .from('community_developer_access')
-      .update({
-        enabled: values.developerAccessEnabled,
-        mode: values.developerAccessMode,
-        granted_by_user_id: userId,
-        granted_at: values.developerAccessEnabled ? new Date().toISOString() : null,
-      })
-      .eq('community_id', communityId);
-    if (developerAccessError) throw developerAccessError;
-
-    const { error: clearScopedError } = await supabase
-      .from('community_developer_access_channels')
-      .delete()
-      .eq('community_id', communityId);
-    if (clearScopedError) throw clearScopedError;
-
-    if (
-      values.developerAccessEnabled &&
-      values.developerAccessMode === 'channel_scoped' &&
-      values.developerAccessChannelIds.length > 0
-    ) {
-      const scopedRows = values.developerAccessChannelIds.map((channelId) => ({
-        community_id: communityId,
-        channel_id: channelId,
-      }));
-
-      const { error: scopedInsertError } = await supabase
-        .from('community_developer_access_channels')
-        .insert(scopedRows);
-      if (scopedInsertError) throw scopedInsertError;
-    }
+    // CHECKPOINT 2 COMPLETE
   },
 
   async fetchServerRoleManagement(communityId) {
@@ -2116,34 +2330,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (authError) throw authError;
     if (!user?.id) throw new Error('Not authenticated.');
 
-    /*if (ENABLE_CHANNEL_CREATE_DIAGNOSTICS)*/ {
-      const [{ data: ownerCheck }, { data: canCreateChannels }, { data: canManageChannels }] =
-        await Promise.all([
-          supabase.rpc('is_community_owner', {
-            p_community_id: input.communityId,
-          }),
-          supabase.rpc('user_has_permission', {
-            p_community_id: input.communityId,
-            p_permission_key: 'create_channels',
-          }),
-          supabase.rpc('user_has_permission', {
-            p_community_id: input.communityId,
-            p_permission_key: 'manage_channels',
-          }),
-        ]);
-
-      console.info('[createChannel] diagnostics', {
-        authUserId: user.id,
-        communityId: input.communityId,
-        channelName: input.name,
-        channelKind: input.kind,
-        channelPosition: input.position,
-        isCommunityOwner: Boolean(ownerCheck),
-        canCreateChannels: Boolean(canCreateChannels),
-        canManageChannels: Boolean(canManageChannels),
-      });
-    }
-
     const insertPayload = {
       community_id: input.communityId,
       name: input.name,
@@ -2158,18 +2344,16 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .insert(insertPayload);
 
     if (error) {
-      /*if (ENABLE_CHANNEL_CREATE_DIAGNOSTICS)*/ {
-        console.error('[createChannel] insert failed', {
-          authUserId: user.id,
-          communityId: input.communityId,
-          channelName: input.name,
-          channelKind: input.kind,
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-        });
-      }
+      console.error('[createChannel] insert failed', {
+        authUserId: user.id,
+        communityId: input.communityId,
+        channelName: input.name,
+        channelKind: input.kind,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
       throw error;
     }
     const { data: fallbackChannel, error: fallbackError } = await supabase
@@ -2628,6 +2812,17 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       comment,
     });
 
+    let snapshot: SupportReportMessageSnapshot | null = null;
+    try {
+      snapshot = await fetchSupportReportMessageSnapshot({
+        communityId,
+        channelId,
+        messageId,
+      }); // CHECKPOINT 4 COMPLETE
+    } catch (snapshotError) {
+      console.warn('Failed to capture support report message snapshot:', snapshotError);
+    }
+
     const reportId = crypto.randomUUID();
 
     const { error: reportError } = await supabase
@@ -2635,9 +2830,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .insert({
         id: reportId,
         community_id: communityId,
+        destination: target, // CHECKPOINT 3 COMPLETE
         reporter_user_id: reporterUserId,
         title: reportTitle,
         notes: reportNotes,
+        snapshot,
         include_last_n_messages: null,
       });
 
@@ -2657,89 +2854,5 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (messageLinkError) throw messageLinkError;
   },
 
-  async postHavenDeveloperMessage({
-    communityId,
-    channelId,
-    content,
-    replyToMessageId,
-    mediaUpload,
-  }) {
-    const trimmedContent = content.trim();
-    const hasMediaUpload = Boolean(mediaUpload?.file);
-    if (!trimmedContent && !hasMediaUpload) {
-      throw new Error('Message content or media is required.');
-    }
-
-    const uploadedMedia = await uploadMessageMediaToObjectStore({
-      communityId,
-      channelId,
-      mediaUpload,
-    });
-
-    const nextMetadata = {
-      source: 'renderer_dev_mode',
-      ...(replyToMessageId && replyToMessageId.trim().length > 0
-        ? { replyToMessageId: replyToMessageId.trim() }
-        : {}),
-      ...(uploadedMedia ? { hasAttachment: true } : {}),
-    };
-
-    const { data: createdMessage, error } = await supabase.rpc('post_haven_dev_message', {
-      p_community_id: communityId,
-      p_channel_id: channelId,
-      p_content: trimmedContent || MEDIA_ONLY_CONTENT_PLACEHOLDER,
-      p_metadata: nextMetadata,
-    });
-    if (error) {
-      await removeUploadedMediaObject(uploadedMedia);
-      throw error;
-    }
-
-    if (!uploadedMedia) return;
-
-    const createdMessageId =
-      createdMessage && typeof createdMessage === 'object' && 'id' in createdMessage
-        ? (createdMessage as { id: string }).id
-        : null;
-
-    if (!createdMessageId) {
-      await removeUploadedMediaObject(uploadedMedia);
-      throw new Error('Failed to create Haven developer message.');
-    }
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError) {
-      await removeUploadedMediaObject(uploadedMedia);
-      throw authError;
-    }
-    if (!user?.id) {
-      await removeUploadedMediaObject(uploadedMedia);
-      throw new Error('Not authenticated.');
-    }
-
-    const { error: attachmentError } = await supabase
-      .from('message_attachments' as never)
-      .insert({
-        message_id: createdMessageId,
-        community_id: communityId,
-        channel_id: channelId,
-        owner_user_id: user.id,
-        bucket_name: uploadedMedia.bucketName,
-        object_path: uploadedMedia.objectPath,
-        original_filename: uploadedMedia.originalFilename,
-        mime_type: uploadedMedia.mimeType,
-        media_kind: uploadedMedia.mediaKind,
-        size_bytes: uploadedMedia.sizeBytes,
-        expires_at: uploadedMedia.expiresAt,
-      } as never);
-
-    if (!attachmentError) return;
-
-    await removeUploadedMediaObject(uploadedMedia);
-    await supabase.from('messages').delete().eq('id', createdMessageId);
-    throw attachmentError;
-  },
+  // CHECKPOINT 5 COMPLETE
 };

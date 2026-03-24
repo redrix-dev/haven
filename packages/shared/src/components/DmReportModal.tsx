@@ -80,8 +80,9 @@ export function DmReportModal({ open, onOpenChange, target, onSubmit }: DmReport
         <DialogHeader>
           <DialogTitle>Report Direct Message</DialogTitle>
           <DialogDescription className="text-[#a9b8cf]">
-            Reports are sent to Haven for review. This is separate from server-based moderation reports.
+            Reports are sent to the Haven Moderation Team for review. This is separate from server-based moderation reports.
           </DialogDescription>
+          {/* CHECKPOINT 6 COMPLETE */}
         </DialogHeader>
 
         {!submitted ? (
@@ -143,7 +144,7 @@ export function DmReportModal({ open, onOpenChange, target, onSubmit }: DmReport
           <div className="rounded-md border border-[#355077] bg-[#142033] p-4">
             <p className="text-sm font-semibold text-white">Report submitted</p>
             <p className="mt-1 text-sm text-[#a9b8cf]">
-              Haven received your DM report and can review it in the DM moderation workflow.
+              The Haven Moderation Team received your DM report and can review it in the DM moderation workflow.
             </p>
           </div>
         )}

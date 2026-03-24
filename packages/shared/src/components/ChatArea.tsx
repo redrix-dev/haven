@@ -25,6 +25,7 @@ interface ChatAreaProps {
   canManageMessages: boolean;
   canCreateReports: boolean;
   canManageBans: boolean;
+  canManageMembers: boolean;
   canRefreshLinkPreviews: boolean;
   showVoiceDiagnostics?: boolean;
   onOpenChannelSettings?: () => void;
@@ -55,17 +56,13 @@ interface ChatAreaProps {
     communityId: string;
     reason: string;
   }) => Promise<void>;
+  onKickUserFromCurrentServer: (input: {
+    targetUserId: string;
+    username: string;
+  }) => Promise<void>;
   onResolveBanEligibleServers: (targetUserId: string) => Promise<BanEligibleServer[]>;
   onDirectMessageUser: (targetUserId: string) => void;
   onComposerHeightChange?: (height: number) => void;
-  onSendHavenDeveloperMessage?: (
-    content: string,
-    options?: {
-      replyToMessageId?: string;
-      mediaFile?: File;
-      mediaExpiresInHours?: number;
-    }
-  ) => Promise<void>;
 }
 
 export function ChatArea({
@@ -78,6 +75,7 @@ export function ChatArea({
   canManageMessages,
   canCreateReports,
   canManageBans,
+  canManageMembers,
   canRefreshLinkPreviews,
   showVoiceDiagnostics = false,
   onOpenChannelSettings,
@@ -92,10 +90,10 @@ export function ChatArea({
   onSaveAttachment,
   onReportUserProfile,
   onBanUserFromServer,
+  onKickUserFromCurrentServer,
   onResolveBanEligibleServers,
   onDirectMessageUser,
   onComposerHeightChange,
-  onSendHavenDeveloperMessage,
 }: ChatAreaProps) {
   const isVoiceChannel = channelKind === 'voice';
   const messages = useMessagesStore((state) => state.messages);
@@ -221,10 +219,12 @@ export function ChatArea({
             canManageMessages={canManageMessages}
             canCreateReports={canCreateReports}
             canManageBans={canManageBans}
+            canManageMembers={canManageMembers}
             canRefreshLinkPreviews={canRefreshLinkPreviews}
             onSaveAttachment={onSaveAttachment}
             onReportUserProfile={onReportUserProfile}
             onBanUserFromServer={onBanUserFromServer}
+            onKickUserFromCurrentServer={onKickUserFromCurrentServer}
             onResolveBanEligibleServers={onResolveBanEligibleServers}
             onDirectMessageUser={onDirectMessageUser}
             onDeleteMessage={onDeleteMessage}
@@ -239,7 +239,6 @@ export function ChatArea({
           {/* Input */}
           <MessageInput
             onSendMessage={handleSendMessage}
-            onSendHavenDeveloperMessage={onSendHavenDeveloperMessage}
             channelId={channelId}
             channelName={channelName}
             replyTarget={replyTarget}

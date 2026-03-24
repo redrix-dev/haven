@@ -13,7 +13,6 @@ import { getPlatformInviteBaseUrl } from '@platform/urls';
 import { getErrorMessage } from '@platform/lib/errors';
 import { installPromptTrap } from '@shared/lib/contextMenu/debugTrace';
 import {
-  DM_REPORT_REVIEW_PANEL_FLAG,
   ENABLE_CHANNEL_RELOAD_DIAGNOSTICS,
   FRIENDS_SOCIAL_PANEL_FLAG,
   VOICE_HARDWARE_DEBUG_PANEL_FLAG,
@@ -44,6 +43,7 @@ import type {
   Message,
   MemberBannedBroadcastPayload,
   MemberChannelAccessRevokedBroadcastPayload,
+  ServerPermissions,
 } from '@shared/lib/backend/types';
 import type { ForceDisconnectVoiceReason } from '@client/features/voice/types';
 import { useServersStore } from '@shared/stores/serversStore';
@@ -143,8 +143,6 @@ export function useChatAppOrchestration() {
       profileUsername,
       profileAvatarUrl,
       isPlatformStaff,
-      platformStaffPrefix,
-      canPostHavenDevMessage,
     },
     actions: { resetPlatformSession, applyLocalProfileUpdate },
   } = usePlatformSession({
@@ -154,15 +152,16 @@ export function useChatAppOrchestration() {
   });
 
   const baseUserDisplayName = profileUsername || user?.email?.split('@')[0] || 'User';
-  const userDisplayName = isPlatformStaff
-    ? `${platformStaffPrefix ?? 'Haven'}-${baseUserDisplayName}`
-    : baseUserDisplayName;
+  const userDisplayName = baseUserDisplayName; // CHECKPOINT 1 COMPLETE
 
   // ── UI / workspace state ──────────────────────────────────────────────────
   const [workspaceMode, setWorkspaceMode] = useState<'community' | 'dm'>('community');
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   const [composerHeight, setComposerHeight] = useState<number | null>(null);
-  const [dmReportReviewPanelOpen, setDmReportReviewPanelOpen] = useState(false);
+  const [serverModmailOpen, setServerModmailOpen] = useState(false);
+  const [serverReportPermissionsById, setServerReportPermissionsById] = useState<
+    Record<string, ServerPermissions>
+  >({});
 
   // ── Modal state ───────────────────────────────────────────────────────────
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -201,7 +200,6 @@ export function useChatAppOrchestration() {
   const [messageLinkPreviews, setMessageLinkPreviews] = useState<MessageLinkPreview[]>([]);
   const [authorProfiles, setAuthorProfiles] = useState<Record<string, AuthorProfile>>({});
   const authorProfileCacheRef = useRef<Record<string, AuthorProfile>>({});
-  const [canSendHavenDeveloperMessage, setCanSendHavenDeveloperMessage] = useState(false);
 
   // ── Community workspace ───────────────────────────────────────────────────
   const {
@@ -219,6 +217,7 @@ export function useChatAppOrchestration() {
       channelSettingsTarget,
       currentRenderableChannel,
       currentChannelKind,
+      reportStatusRefreshVersion,
     },
     actions: {
       resetChannelsWorkspace,
@@ -242,14 +241,50 @@ export function useChatAppOrchestration() {
     serverPermissions.canManageRoles ||
     serverPermissions.canManageMembers ||
     serverPermissions.canManageBans ||
-    serverPermissions.canManageInvites ||
-    serverPermissions.canManageDeveloperAccess;
+    serverPermissions.canManageInvites;
   const canManageCurrentServer =
     serverPermissions.isOwner || serverPermissions.canManageServer;
 
   const dmWorkspaceIsActive = dmWorkspaceEnabled && workspaceMode === 'dm';
-  const dmReportReviewPanelEnabled =
-    isPlatformStaff && hasFeatureFlag(DM_REPORT_REVIEW_PANEL_FLAG);
+  const managedReportServerIds = servers
+    .filter((server) => serverReportPermissionsById[server.id]?.canManageReports)
+    .map((server) => server.id);
+  const serverModmailEnabled = managedReportServerIds.length > 0;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!user?.id || servers.length === 0) {
+      setServerReportPermissionsById({});
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    void (async () => {
+      const permissionResults = await Promise.allSettled(
+        servers.map(async (server) => {
+          const communityBackend = getCommunityDataBackend(server.id);
+          const permissions = await communityBackend.fetchServerPermissions(server.id);
+          return [server.id, permissions] as const;
+        })
+      );
+
+      if (!isMounted) return;
+
+      const nextPermissionsById: Record<string, ServerPermissions> = {};
+      for (const result of permissionResults) {
+        if (result.status !== 'fulfilled') continue;
+        const [serverId, permissions] = result.value;
+        nextPermissionsById[serverId] = permissions;
+      }
+      setServerReportPermissionsById(nextPermissionsById);
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [servers, user?.id]);
 
   // ── Voice ─────────────────────────────────────────────────────────────────
   const {
@@ -363,6 +398,7 @@ export function useChatAppOrchestration() {
       membersModalLoading,
       membersModalError,
       membersModalCanCreateReports,
+      membersModalCanManageMembers,
       membersModalCanManageBans,
       communityBans,
       communityBansLoading,
@@ -408,7 +444,6 @@ export function useChatAppOrchestration() {
     controlPlaneBackend,
     currentServerId,
     currentUserId: user?.id ?? null,
-    canManageDeveloperAccess: serverPermissions.canManageDeveloperAccess,
     canManageInvites: serverPermissions.canManageInvites,
     isServerSettingsModalOpen: showServerSettingsModal,
     setCurrentServerId,
@@ -1024,6 +1059,31 @@ export function useChatAppOrchestration() {
     ]
   );
 
+  const kickUserFromServer = useCallback(
+    async (input: { targetUserId: string; communityId: string; username: string }) => {
+      const communityBackend = getCommunityDataBackend(input.communityId);
+      await communityBackend.kickCommunityMember({
+        communityId: input.communityId,
+        targetUserId: input.targetUserId,
+      });
+      try {
+        await refreshMembersModalMembersIfOpen(input.communityId);
+      } catch (error) {
+        console.error('Failed to refresh members after kick:', error);
+      }
+      toast(`${input.username} has been removed from the server.`, {
+        id: `server-kick:${input.communityId}:${input.targetUserId}`,
+        action: {
+          label: 'Dismiss',
+          onClick: () => {
+            toast.dismiss(`server-kick:${input.communityId}:${input.targetUserId}`);
+          },
+        },
+      }); // CHECKPOINT 5 COMPLETE
+    },
+    [refreshMembersModalMembersIfOpen]
+  );
+
   const saveMemberChannelPermissions = useCallback(
     async (memberId: string, permissions: { canView: boolean | null; canSend: boolean | null; canManage: boolean | null }) => {
       const accessRevokedResult = await saveMemberChannelPermissionsRaw(memberId, permissions);
@@ -1039,26 +1099,6 @@ export function useChatAppOrchestration() {
       return controlPlaneBackend.listBanEligibleServersForUser(targetUserId);
     },
     [controlPlaneBackend]
-  );
-
-  const sendHavenDeveloperMessage = useCallback(
-    async (
-      content: string,
-      options?: { replyToMessageId?: string; mediaFile?: File; mediaExpiresInHours?: number }
-    ) => {
-      if (!currentChannelId || !currentServerId) return;
-      const communityBackend = getCommunityDataBackend(currentServerId);
-      await communityBackend.postHavenDeveloperMessage({
-        communityId: currentServerId,
-        channelId: currentChannelId,
-        content,
-        replyToMessageId: options?.replyToMessageId,
-        mediaUpload: options?.mediaFile
-          ? { file: options.mediaFile, expiresInHours: options.mediaExpiresInHours }
-          : undefined,
-      });
-    },
-    [currentServerId, currentChannelId]
   );
 
   const saveAccountSettings = useCallback(
@@ -1227,16 +1267,16 @@ export function useChatAppOrchestration() {
   }, [friendsSocialPanelEnabled, resetDirectMessages, resetSocialWorkspace]);
 
   useEffect(() => {
-    if (dmReportReviewPanelEnabled) return;
-    setDmReportReviewPanelOpen(false);
-  }, [dmReportReviewPanelEnabled]);
+    if (serverModmailEnabled) return;
+    setServerModmailOpen(false); // CHECKPOINT 6 COMPLETE
+  }, [serverModmailEnabled]);
 
   // Sign-out reset — clear all state when user logs out.
   useEffect(() => {
     if (user) return;
     resetPlatformSession();
     resetVoiceState();
-    setDmReportReviewPanelOpen(false);
+    setServerModmailOpen(false);
     setNotificationsPanelOpen(false);
     setShowVoiceSettingsModal(false);
     setUserVoiceHardwareTestOpen(false);
@@ -1324,35 +1364,6 @@ export function useChatAppOrchestration() {
     resetVoiceState,
   ]);
 
-  // Determine whether Haven Developer messaging is allowed in the current channel.
-  useEffect(() => {
-    let isMounted = true;
-    if (!user || !currentServerId || !currentChannelId || !canPostHavenDevMessage) {
-      setCanSendHavenDeveloperMessage(false);
-      return;
-    }
-    const selectedChannel = channels.find((ch) => ch.id === currentChannelId);
-    if (!selectedChannel || selectedChannel.kind !== 'text') {
-      setCanSendHavenDeveloperMessage(false);
-      return;
-    }
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    void (async () => {
-      try {
-        const allowed = await communityBackend.isHavenDeveloperMessagingAllowed({
-          communityId: currentServerId,
-          channelId: currentChannelId,
-        });
-        if (isMounted) setCanSendHavenDeveloperMessage(allowed);
-      } catch {
-        if (isMounted) setCanSendHavenDeveloperMessage(false);
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, [user, currentServerId, currentChannelId, canPostHavenDevMessage, channels]);
-
   // ── Background prefetch: warm caches for instant server switching ─────────
   useEffect(() => {
     if (servers.length === 0 || !user?.id) return;
@@ -1380,19 +1391,21 @@ export function useChatAppOrchestration() {
     // servers
     servers, serversStatus, serversError, isServersLoading, createServer,
     // session / profile
-    profileUsername, profileAvatarUrl, isPlatformStaff, platformStaffPrefix,
+    profileUsername, profileAvatarUrl, isPlatformStaff,
     userDisplayName, baseUserDisplayName, applyLocalProfileUpdate,
     // feature flags
     hasFeatureFlag, friendsSocialPanelEnabled, dmWorkspaceEnabled,
-    dmWorkspaceIsActive, dmReportReviewPanelEnabled, voiceHardwareDebugPanelEnabled,
+    dmWorkspaceIsActive, serverModmailEnabled, voiceHardwareDebugPanelEnabled,
     // community
     channels, channelsLoading, channelsError, currentChannelId, currentServerId,
-    serverPermissions, currentServer, currentChannel, channelSettingsTarget,
+    serverPermissions, serverReportPermissionsById, managedReportServerIds,
+    currentServer, currentChannel, channelSettingsTarget,
     currentRenderableChannel, currentChannelKind,
     setCurrentChannelId, setCurrentServerId,
     canOpenServerSettings, canManageCurrentServer,
     isCurrentUserElevatedInCurrentServer,
     isCurrentUserElevatedInMembersModalServer,
+    reportStatusRefreshVersion,
     // voice
     activeVoiceChannelId, voicePanelOpen, voiceHardwareDebugPanelOpen,
     voiceConnected, voiceParticipants, voiceSessionState,
@@ -1410,7 +1423,7 @@ export function useChatAppOrchestration() {
     // server admin
     showMembersModal, membersModalCommunityId, membersModalServerName,
     membersModalMembers, membersModalLoading, membersModalError,
-    membersModalCanCreateReports, membersModalCanManageBans,
+    membersModalCanCreateReports, membersModalCanManageMembers, membersModalCanManageBans,
     communityBans, communityBansLoading, communityBansError,
     serverInvites, serverInvitesLoading, serverInvitesError,
     serverRoles, serverMembers, serverPermissionCatalog,
@@ -1431,7 +1444,6 @@ export function useChatAppOrchestration() {
     authorProfiles, hasOlderMessages, isLoadingOlderMessages,
     requestOlderMessages, sendMessage, toggleMessageReaction,
     editMessage, deleteMessage, reportMessage, requestMessageLinkPreviewRefresh,
-    canSendHavenDeveloperMessage,
     // desktop settings
     appSettings, appSettingsLoading, updaterStatus, updaterStatusLoading,
     checkingForUpdates, notificationAudioSettingsSaving, notificationAudioSettingsError,
@@ -1463,7 +1475,7 @@ export function useChatAppOrchestration() {
     // ui state
     workspaceMode, setWorkspaceMode,
     composerHeight, setComposerHeight,
-    dmReportReviewPanelOpen, setDmReportReviewPanelOpen,
+    serverModmailOpen, setServerModmailOpen,
     // modals
     showCreateModal, setShowCreateModal,
     showCreateChannelModal, setShowCreateChannelModal,
@@ -1488,8 +1500,8 @@ export function useChatAppOrchestration() {
     handleRenameChannel, handleDeleteChannel,
     handleCreateChannelGroup, handleRenameChannelGroup, handleDeleteChannelGroup,
     // business actions
-    joinServerByInvite, saveAttachment, reportUserProfile, banUserFromServer,
-    resolveBanEligibleServers, sendHavenDeveloperMessage, saveAccountSettings,
+    joinServerByInvite, saveAttachment, reportUserProfile, banUserFromServer, kickUserFromServer,
+    resolveBanEligibleServers, saveAccountSettings,
     // cache helpers
     getDefaultChannelIdForServer,
     // misc
