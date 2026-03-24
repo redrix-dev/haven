@@ -33,6 +33,7 @@ import { useDirectMessages } from '@client/features/direct-messages/hooks/useDir
 import { useDirectMessageInteractions } from '@client/features/direct-messages/hooks/useDirectMessageInteractions';
 import { useVoice } from '@client/features/voice/hooks/useVoice';
 import { useFeatureFlags } from '@client/features/session/hooks/useFeatureFlags';
+import { useLiveProfiles } from '@client/features/session/hooks/useLiveProfiles';
 import { usePlatformSession } from '@client/features/session/hooks/usePlatformSession';
 import type {
   AuthorProfile,
@@ -153,6 +154,23 @@ export function useChatAppOrchestration() {
 
   const baseUserDisplayName = profileUsername || user?.email?.split('@')[0] || 'User';
   const userDisplayName = baseUserDisplayName; // CHECKPOINT 1 COMPLETE
+
+  const {
+    actions: { upsertProfile: upsertLiveProfile },
+  } = useLiveProfiles({
+    controlPlaneBackend,
+    userId: user?.id,
+  });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    upsertLiveProfile({
+      userId: user.id,
+      username: baseUserDisplayName,
+      avatarUrl: profileAvatarUrl,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [baseUserDisplayName, profileAvatarUrl, upsertLiveProfile, user?.id]);
 
   // ── UI / workspace state ──────────────────────────────────────────────────
   const [workspaceMode, setWorkspaceMode] = useState<'community' | 'dm'>('community');
@@ -1111,8 +1129,14 @@ export function useChatAppOrchestration() {
         avatarFile: values.avatarFile ?? null,
       });
       applyLocalProfileUpdate(updatedProfile);
+      upsertLiveProfile({
+        userId: user.id,
+        username: updatedProfile.username,
+        avatarUrl: updatedProfile.avatarUrl,
+        updatedAt: new Date().toISOString(),
+      });
     },
-    [user, controlPlaneBackend, applyLocalProfileUpdate]
+    [user, controlPlaneBackend, applyLocalProfileUpdate, upsertLiveProfile]
   ); // CHECKPOINT 4 COMPLETE
 
   // ── Deep links ────────────────────────────────────────────────────────────

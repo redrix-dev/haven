@@ -1,15 +1,24 @@
-import React from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
+import React from "react";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@shared/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from '@shared/components/ui/dropdown-menu';
-import { ActionMenuContent } from '@shared/components/menus/ActionMenuContent';
-import type { BanEligibleServer } from '@shared/lib/backend/types';
-import type { MenuActionNode } from '@shared/lib/contextMenu/types';
-import { resolveContextMenuIntent } from '@shared/lib/contextMenu';
-import { traceContextMenuEvent } from '@shared/lib/contextMenu/debugTrace';
+} from "@shared/components/ui/dropdown-menu";
+import { ActionMenuContent } from "@shared/components/menus/ActionMenuContent";
+import type { BanEligibleServer } from "@shared/lib/backend/types";
+import type { MenuActionNode } from "@shared/lib/contextMenu/types";
+import { resolveContextMenuIntent } from "@shared/lib/contextMenu";
+import { traceContextMenuEvent } from "@shared/lib/contextMenu/debugTrace";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
+import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 
 export interface ProfileActionSurfaceProps {
   userId: string;
@@ -42,6 +51,7 @@ export function ProfileActionSurface({
   resolveBanServers,
   children,
 }: ProfileActionSurfaceProps) {
+  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const [open, setOpen] = React.useState(false);
   const [banServers, setBanServers] = React.useState<BanEligibleServer[]>([]);
   const [banServersLoading, setBanServersLoading] = React.useState(false);
@@ -70,18 +80,25 @@ export function ProfileActionSurface({
     };
   }, [canBan, open, resolveBanServers, userId]);
 
-  const avatarInitial = username.trim().charAt(0).toUpperCase() || 'U';
+  const resolvedUsername =
+    resolveLiveUsername(liveProfiles, userId, username) ?? username;
+  const resolvedAvatarUrl = resolveLiveAvatarUrl(
+    liveProfiles,
+    userId,
+    avatarUrl,
+  );
+  const avatarInitial = resolvedUsername.trim().charAt(0).toUpperCase() || "U";
 
   const actions = React.useMemo<MenuActionNode[]>(() => {
     const next: MenuActionNode[] = [
       {
-        kind: 'separator',
-        key: 'header-separator',
+        kind: "separator",
+        key: "header-separator",
       },
       {
-        kind: 'item',
-        key: 'direct-message',
-        label: 'Direct Message',
+        kind: "item",
+        key: "direct-message",
+        label: "Direct Message",
         disabled: !canDirectMessage,
         onSelect: () => {
           setOpen(false);
@@ -89,9 +106,9 @@ export function ProfileActionSurface({
         },
       },
       {
-        kind: 'item',
-        key: 'report',
-        label: 'Report',
+        kind: "item",
+        key: "report",
+        label: "Report",
         disabled: !canReport,
         onSelect: () => {
           setOpen(false);
@@ -104,9 +121,9 @@ export function ProfileActionSurface({
       const banItems: MenuActionNode[] = banServersLoading
         ? [
             {
-              kind: 'item',
-              key: 'ban-loading',
-              label: 'Loading servers...',
+              kind: "item",
+              key: "ban-loading",
+              label: "Loading servers...",
               disabled: true,
               onSelect: () => undefined,
             },
@@ -114,15 +131,15 @@ export function ProfileActionSurface({
         : banServers.length === 0
           ? [
               {
-                kind: 'item',
-                key: 'ban-none',
-                label: 'No eligible servers',
+                kind: "item",
+                key: "ban-none",
+                label: "No eligible servers",
                 disabled: true,
                 onSelect: () => undefined,
               },
             ]
           : banServers.map((server) => ({
-              kind: 'item',
+              kind: "item",
               key: `ban-${server.communityId}`,
               label: server.communityName,
               onSelect: () => {
@@ -132,18 +149,18 @@ export function ProfileActionSurface({
             }));
 
       next.push({
-        kind: 'submenu',
-        key: 'ban',
-        label: 'Ban',
+        kind: "submenu",
+        key: "ban",
+        label: "Ban",
         items: banItems,
       });
     }
 
     if (canKick && onKick) {
       next.push({
-        kind: 'item',
-        key: 'kick',
-        label: 'Kick from Server',
+        kind: "item",
+        key: "kick",
+        label: "Kick from Server",
         destructive: true,
         onSelect: () => {
           setOpen(false);
@@ -153,14 +170,29 @@ export function ProfileActionSurface({
     }
 
     return next;
-  }, [banServers, banServersLoading, canBan, canDirectMessage, canKick, canReport, onBan, onDirectMessage, onKick, onReport, userId]);
+  }, [
+    banServers,
+    banServersLoading,
+    canBan,
+    canDirectMessage,
+    canKick,
+    canReport,
+    onBan,
+    onDirectMessage,
+    onKick,
+    onReport,
+    userId,
+  ]);
 
   return (
     <DropdownMenu
       open={open}
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
-        traceContextMenuEvent('profile', 'open-change', { userId, open: nextOpen });
+        traceContextMenuEvent("profile", "open-change", {
+          userId,
+          open: nextOpen,
+        });
       }}
     >
       <DropdownMenuTrigger asChild>
@@ -172,8 +204,11 @@ export function ProfileActionSurface({
           }}
           onContextMenu={(event) => {
             const intent = resolveContextMenuIntent(event.target);
-            traceContextMenuEvent('profile', 'contextmenu-trigger', { intent, userId });
-            if (intent === 'native_text') {
+            traceContextMenuEvent("profile", "contextmenu-trigger", {
+              intent,
+              userId,
+            });
+            if (intent === "native_text") {
               event.stopPropagation();
               return;
             }
@@ -183,7 +218,7 @@ export function ProfileActionSurface({
             setOpen(true);
           }}
           onKeyDown={(event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return;
+            if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
             event.stopPropagation();
             setOpen(true);
@@ -207,10 +242,14 @@ export function ProfileActionSurface({
       >
         <div className="flex items-center gap-2 rounded-md bg-[#111a2b] px-2 py-2">
           <Avatar size="sm">
-            {avatarUrl && <AvatarImage src={avatarUrl} alt={username} />}
+            {resolvedAvatarUrl && (
+              <AvatarImage src={resolvedAvatarUrl} alt={resolvedUsername} />
+            )}
             <AvatarFallback>{avatarInitial}</AvatarFallback>
           </Avatar>
-          <p className="truncate text-sm font-semibold text-white">{username}</p>
+          <p className="truncate text-sm font-semibold text-white">
+            {resolvedUsername}
+          </p>
         </div>
         <ActionMenuContent mode="dropdown" scope="profile" actions={actions} />
       </DropdownMenuContent>

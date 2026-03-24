@@ -77,6 +77,80 @@ select test_support.assert_true(
 );
 
 reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+select public.send_friend_request(test_support.fixture_username('non_member'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.profile_identities
+    where user_id = test_support.fixture_user_id('non_member')
+  ),
+  1,
+  'pending friend request senders should be able to read the target live profile identity'
+);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('non_member'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.profile_identities
+    where user_id = test_support.fixture_user_id('member_a')
+  ),
+  1,
+  'pending friend request recipients should be able to read the sender live profile identity'
+);
+
+select public.accept_friend_request(
+  (select fr.id
+   from public.friend_requests fr
+   where fr.sender_user_id = test_support.fixture_user_id('member_a')
+     and fr.recipient_user_id = test_support.fixture_user_id('non_member')
+     and fr.status = 'pending'
+   order by fr.created_at desc
+   limit 1)
+);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+select test_support.assert_true(
+  public.are_friends(test_support.fixture_user_id('member_a'), test_support.fixture_user_id('non_member')),
+  'member_a and non_member should become friends after the accept flow'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.profile_identities
+    where user_id = test_support.fixture_user_id('non_member')
+  ),
+  1,
+  'friends without a shared community should be able to read live profile identities'
+);
+
+select test_support.assert_not_null(
+  public.block_user(test_support.fixture_user_id('non_member')),
+  'member_a should be able to block non_member with the current block RPC'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.profile_identities
+    where user_id = test_support.fixture_user_id('non_member')
+  ),
+  1,
+  'blockers should retain access to blocked users in the live profile identity lane'
+);
+
+reset role;
 select test_support.clear_jwt_claims();
 select test_support.assert_eq_int(
   (
@@ -84,6 +158,16 @@ select test_support.assert_eq_int(
     from public.notification_recipients nr
     join public.notification_events ne on ne.id = nr.event_id
     where ne.kind = 'friend_request_accepted'
+      and ne.source_kind = 'friend_request'
+      and ne.source_id = (
+        select fr.id
+        from public.friend_requests fr
+        where fr.sender_user_id = test_support.fixture_user_id('member_a')
+          and fr.recipient_user_id = test_support.fixture_user_id('member_b')
+          and fr.status = 'accepted'
+        order by fr.responded_at desc nulls last, fr.created_at desc
+        limit 1
+      )
       and nr.recipient_user_id = test_support.fixture_user_id('member_a')
   ),
   1,

@@ -47,6 +47,29 @@ select test_support.assert_eq_int(
 select test_support.assert_eq_int(
   (
     select count(*)::bigint
+    from pg_class
+    where relnamespace = 'public'::regnamespace
+      and relname = 'profile_identities'
+  ),
+  1,
+  'profile_identities table should exist'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'profile_identities'
+  ),
+  1,
+  'profile_identities should be included in the realtime publication'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
     from pg_policies
     where schemaname = 'storage'
       and tablename = 'objects'
@@ -145,6 +168,42 @@ select test_support.assert_eq_int(
 reset role;
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+select test_support.assert_eq_text(
+  (
+    select username
+    from public.profile_identities
+    where user_id = auth.uid()
+  ),
+  test_support.fixture_username('member_a'),
+  'profile_identities should backfill existing profile rows'
+);
+
+update public.profiles
+set
+  username = 'member_a_identity_sync',
+  avatar_url = 'https://example.com/member-a-live-avatar.webp'
+where id = auth.uid();
+
+select test_support.assert_eq_text(
+  (
+    select username
+    from public.profile_identities
+    where user_id = auth.uid()
+  ),
+  'member_a_identity_sync',
+  'profile identity trigger should sync username updates'
+);
+
+select test_support.assert_eq_text(
+  (
+    select avatar_url
+    from public.profile_identities
+    where user_id = auth.uid()
+  ),
+  'https://example.com/member-a-live-avatar.webp',
+  'profile identity trigger should sync avatar updates'
+);
 
 insert into public.tos_acceptances (user_id, tos_version, ip_address)
 values (auth.uid(), '2026-03-24', null);

@@ -1,27 +1,36 @@
-import React from 'react';
-import { useNotificationsStore } from '@shared/stores/notificationsStore';
-import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
-import { Badge } from '@shared/components/ui/badge';
-import { Button } from '@shared/components/ui/button';
+import React from "react";
+import { useNotificationsStore } from "@shared/stores/notificationsStore";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@shared/components/ui/avatar";
+import { Badge } from "@shared/components/ui/badge";
+import { Button } from "@shared/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@shared/components/ui/dialog';
-import { ScrollArea } from '@shared/components/ui/scroll-area';
-import { Skeleton } from '@shared/components/ui/skeleton';
-import { Slider } from '@shared/components/ui/slider';
-import { Switch } from '@shared/components/ui/switch';
+} from "@shared/components/ui/dialog";
+import { ScrollArea } from "@shared/components/ui/scroll-area";
+import { Skeleton } from "@shared/components/ui/skeleton";
+import { Slider } from "@shared/components/ui/slider";
+import { Switch } from "@shared/components/ui/switch";
 import type {
   NotificationCounts,
   NotificationItem,
   NotificationPreferences,
   NotificationPreferenceUpdate,
-} from '@shared/lib/backend/types';
-import type { NotificationAudioSettings } from '@platform/desktop/types';
-import { Bell, BellDot, RefreshCcw } from 'lucide-react';
+} from "@shared/lib/backend/types";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
+import type { NotificationAudioSettings } from "@platform/desktop/types";
+import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { Bell, BellDot, RefreshCcw } from "lucide-react";
 
 type NotificationCenterModalProps = {
   open: boolean;
@@ -66,50 +75,56 @@ const formatTimestamp = (value: string) => {
 
 const getNotificationTitle = (notification: NotificationItem) => {
   switch (notification.kind) {
-    case 'friend_request_received':
-      return 'Friend request received';
-    case 'friend_request_accepted':
-      return 'Friend request accepted';
-    case 'dm_message':
-      return 'Direct message';
-    case 'channel_mention':
-      return 'Mention';
-    case 'system':
+    case "friend_request_received":
+      return "Friend request received";
+    case "friend_request_accepted":
+      return "Friend request accepted";
+    case "dm_message":
+      return "Direct message";
+    case "channel_mention":
+      return "Mention";
+    case "system":
     default:
-      return 'Notification';
+      return "Notification";
   }
 };
 
 const getNotificationSummary = (notification: NotificationItem) => {
   const titleFromPayload =
-    typeof notification.payload.title === 'string' ? notification.payload.title.trim() : '';
+    typeof notification.payload.title === "string"
+      ? notification.payload.title.trim()
+      : "";
   const messageFromPayload =
-    typeof notification.payload.message === 'string' ? notification.payload.message.trim() : '';
+    typeof notification.payload.message === "string"
+      ? notification.payload.message.trim()
+      : "";
 
   if (messageFromPayload) return messageFromPayload;
   if (titleFromPayload) return titleFromPayload;
 
   switch (notification.kind) {
-    case 'friend_request_received':
-      return 'A user sent you a friend request.';
-    case 'friend_request_accepted':
-      return 'A user accepted your friend request.';
-    case 'dm_message':
-      return 'You received a new direct message.';
-    case 'channel_mention':
-      return 'You were mentioned in a channel.';
-    case 'system':
+    case "friend_request_received":
+      return "A user sent you a friend request.";
+    case "friend_request_accepted":
+      return "A user accepted your friend request.";
+    case "dm_message":
+      return "You received a new direct message.";
+    case "channel_mention":
+      return "You were mentioned in a channel.";
+    case "system":
     default:
-      return 'A new notification was added to your inbox.';
+      return "A new notification was added to your inbox.";
   }
 };
 
 const rowIsUnread = (notification: NotificationItem) => !notification.readAt;
 
-const getFriendRequestIdFromNotification = (notification: NotificationItem): string | null => {
-  if (notification.kind !== 'friend_request_received') return null;
+const getFriendRequestIdFromNotification = (
+  notification: NotificationItem,
+): string | null => {
+  if (notification.kind !== "friend_request_received") return null;
   const raw = notification.payload.friendRequestId;
-  return typeof raw === 'string' && raw.trim().length > 0 ? raw : null;
+  return typeof raw === "string" && raw.trim().length > 0 ? raw : null;
 };
 
 export function NotificationCenterModal({
@@ -139,10 +154,15 @@ export function NotificationCenterModal({
 }: NotificationCenterModalProps) {
   const notifications = useNotificationsStore((state) => state.notifications);
   const loading = useNotificationsStore((state) => state.isLoading);
+  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const [showSettings, setShowSettings] = React.useState(false);
   // dm_message notifications are handled by the DM panel, not surfaced here
-  const visibleNotifications = notifications.filter((notification) => notification.kind !== 'dm_message');
-  const visibleUnreadCount = visibleNotifications.filter((notification) => notification.readAt == null).length;
+  const visibleNotifications = notifications.filter(
+    (notification) => notification.kind !== "dm_message",
+  );
+  const visibleUnreadCount = visibleNotifications.filter(
+    (notification) => notification.readAt == null,
+  ).length;
   // CHECKPOINT 2 COMPLETE
 
   // Retain these props until the dedicated notification settings surface is wired.
@@ -161,7 +181,7 @@ export function NotificationCenterModal({
         ...patch,
       });
     },
-    [localAudioSettings, onUpdateLocalAudioSettings]
+    [localAudioSettings, onUpdateLocalAudioSettings],
   );
 
   return (
@@ -179,14 +199,21 @@ export function NotificationCenterModal({
                   Notification Center
                 </DialogTitle>
                 <DialogDescription className="text-[#a9b8cf]">
-                  Centralized in-app notifications with unread state and inbox actions.
+                  Centralized in-app notifications with unread state and inbox
+                  actions.
                 </DialogDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="border-[#355077] text-[#d5e4ff]">
+                <Badge
+                  variant="outline"
+                  className="border-[#355077] text-[#d5e4ff]"
+                >
                   Unseen: {counts.unseenCount}
                 </Badge>
-                <Badge variant="outline" className="border-[#355077] text-[#d5e4ff]">
+                <Badge
+                  variant="outline"
+                  className="border-[#355077] text-[#d5e4ff]"
+                >
                   Unread: {visibleUnreadCount}
                 </Badge>
                 <Button
@@ -196,7 +223,9 @@ export function NotificationCenterModal({
                   disabled={refreshing}
                   className="border-[#304867] text-white"
                 >
-                  <RefreshCcw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCcw
+                    className={`size-4 ${refreshing ? "animate-spin" : ""}`}
+                  />
                   Refresh
                 </Button>
               </div>
@@ -208,7 +237,9 @@ export function NotificationCenterModal({
               <div className="border-b border-[#263a58] bg-[#13233c]/70 px-4 py-4">
                 {/* CHECKPOINT 1 COMPLETE */}
                 <div className="mb-4">
-                  <p className="text-sm font-semibold text-white">Local sound settings</p>
+                  <p className="text-sm font-semibold text-white">
+                    Local sound settings
+                  </p>
                   <p className="mt-1 text-xs text-[#a9b8cf]">
                     These controls only affect sounds played on this device.
                   </p>
@@ -217,16 +248,21 @@ export function NotificationCenterModal({
                 <div className="rounded-md border border-[#304867] bg-[#142033]">
                   <div className="flex items-center justify-between gap-3 border-b border-[#263a58] px-4 py-3">
                     <div>
-                      <p className="text-sm font-semibold text-white">Master sounds</p>
+                      <p className="text-sm font-semibold text-white">
+                        Master sounds
+                      </p>
                       <p className="text-xs text-[#a9b8cf]">
-                        Turn all Haven notification and voice presence sounds on or off.
+                        Turn all Haven notification and voice presence sounds on
+                        or off.
                       </p>
                     </div>
                     <Switch
                       aria-label="Master sounds"
                       checked={localAudioSettings.masterSoundEnabled}
                       onCheckedChange={(checked) => {
-                        updateLocalAudioSettings({ masterSoundEnabled: checked });
+                        updateLocalAudioSettings({
+                          masterSoundEnabled: checked,
+                        });
                       }}
                       disabled={localAudioSaving}
                     />
@@ -234,8 +270,12 @@ export function NotificationCenterModal({
 
                   <div className="border-b border-[#263a58] px-4 py-3">
                     <div className="mb-2 flex items-center justify-between gap-2 text-sm">
-                      <span className="font-semibold text-white">Notification volume</span>
-                      <span className="text-[#a9b8cf]">{localAudioSettings.notificationSoundVolume}%</span>
+                      <span className="font-semibold text-white">
+                        Notification volume
+                      </span>
+                      <span className="text-[#a9b8cf]">
+                        {localAudioSettings.notificationSoundVolume}%
+                      </span>
                     </div>
                     <Slider
                       aria-label="Notification volume"
@@ -245,8 +285,10 @@ export function NotificationCenterModal({
                       value={[localAudioSettings.notificationSoundVolume]}
                       onValueChange={(values) => {
                         const nextValue = values[0];
-                        if (typeof nextValue !== 'number') return;
-                        updateLocalAudioSettings({ notificationSoundVolume: nextValue });
+                        if (typeof nextValue !== "number") return;
+                        updateLocalAudioSettings({
+                          notificationSoundVolume: nextValue,
+                        });
                       }}
                       disabled={localAudioSaving}
                       className="w-full py-1"
@@ -255,16 +297,21 @@ export function NotificationCenterModal({
 
                   <div className="flex items-center justify-between gap-3 border-b border-[#263a58] px-4 py-3">
                     <div>
-                      <p className="text-sm font-semibold text-white">Play sounds while Haven is focused</p>
+                      <p className="text-sm font-semibold text-white">
+                        Play sounds while Haven is focused
+                      </p>
                       <p className="text-xs text-[#a9b8cf]">
-                        Turn this off if you only want sounds while Haven is in the background.
+                        Turn this off if you only want sounds while Haven is in
+                        the background.
                       </p>
                     </div>
                     <Switch
                       aria-label="Play sounds while Haven is focused"
                       checked={localAudioSettings.playSoundsWhenFocused}
                       onCheckedChange={(checked) => {
-                        updateLocalAudioSettings({ playSoundsWhenFocused: checked });
+                        updateLocalAudioSettings({
+                          playSoundsWhenFocused: checked,
+                        });
                       }}
                       disabled={localAudioSaving}
                     />
@@ -272,16 +319,21 @@ export function NotificationCenterModal({
 
                   <div className="flex items-center justify-between gap-3 px-4 py-3">
                     <div>
-                      <p className="text-sm font-semibold text-white">Voice join/leave sounds</p>
+                      <p className="text-sm font-semibold text-white">
+                        Voice join/leave sounds
+                      </p>
                       <p className="text-xs text-[#a9b8cf]">
-                        Play a sound when someone joins or leaves a voice channel you&apos;re in
+                        Play a sound when someone joins or leaves a voice
+                        channel you&apos;re in
                       </p>
                     </div>
                     <Switch
                       aria-label="Voice join/leave sounds"
                       checked={localAudioSettings.voicePresenceSoundEnabled}
                       onCheckedChange={(checked) => {
-                        updateLocalAudioSettings({ voicePresenceSoundEnabled: checked });
+                        updateLocalAudioSettings({
+                          voicePresenceSoundEnabled: checked,
+                        });
                       }}
                       disabled={localAudioSaving}
                     />
@@ -290,8 +342,12 @@ export function NotificationCenterModal({
                   {localAudioSettings.voicePresenceSoundEnabled && (
                     <div className="border-t border-[#263a58] px-4 py-3">
                       <div className="mb-2 flex items-center justify-between gap-2 text-sm">
-                        <span className="font-semibold text-white">Join/leave volume</span>
-                        <span className="text-[#a9b8cf]">{localAudioSettings.voicePresenceSoundVolume}%</span>
+                        <span className="font-semibold text-white">
+                          Join/leave volume
+                        </span>
+                        <span className="text-[#a9b8cf]">
+                          {localAudioSettings.voicePresenceSoundVolume}%
+                        </span>
                       </div>
                       <Slider
                         aria-label="Join/leave volume"
@@ -301,8 +357,10 @@ export function NotificationCenterModal({
                         value={[localAudioSettings.voicePresenceSoundVolume]}
                         onValueChange={(values) => {
                           const nextValue = values[0];
-                          if (typeof nextValue !== 'number') return;
-                          updateLocalAudioSettings({ voicePresenceSoundVolume: nextValue });
+                          if (typeof nextValue !== "number") return;
+                          updateLocalAudioSettings({
+                            voicePresenceSoundVolume: nextValue,
+                          });
                         }}
                         disabled={localAudioSaving}
                         className="w-full py-1"
@@ -314,7 +372,9 @@ export function NotificationCenterModal({
                 {(localAudioSaving || localAudioError) && (
                   <div className="mt-3 space-y-1">
                     {localAudioSaving && (
-                      <p className="text-xs text-[#a9b8cf]">Saving local sound settings...</p>
+                      <p className="text-xs text-[#a9b8cf]">
+                        Saving local sound settings...
+                      </p>
                     )}
                     {localAudioError && (
                       <p className="text-xs text-red-300">{localAudioError}</p>
@@ -383,33 +443,57 @@ export function NotificationCenterModal({
                     <p className="text-sm text-red-300">{error}</p>
                   ) : visibleNotifications.length === 0 ? (
                     <div className="rounded-md border border-dashed border-[#304867] bg-[#142033]/50 p-4">
-                      <p className="text-sm text-[#a9b8cf]">No notifications yet.</p>
+                      <p className="text-sm text-[#a9b8cf]">
+                        No notifications yet.
+                      </p>
                       <p className="mt-1 text-xs text-[#90a5c4]">
-                        Friend requests will appear here once the social graph phase ships.
+                        Friend requests will appear here once the social graph
+                        phase ships.
                       </p>
                     </div>
                   ) : (
                     visibleNotifications.map((notification) => {
                       const actorLabel =
-                        notification.actorUsername?.trim() || notification.actorUserId || 'System';
-                      const actorInitial = actorLabel.trim().charAt(0).toUpperCase() || 'N';
+                        resolveLiveUsername(
+                          liveProfiles,
+                          notification.actorUserId,
+                          notification.actorUsername,
+                        )?.trim() ||
+                        notification.actorUserId ||
+                        "System";
+                      const actorAvatarUrl = resolveLiveAvatarUrl(
+                        liveProfiles,
+                        notification.actorUserId,
+                        notification.actorAvatarUrl,
+                      );
+                      const actorInitial =
+                        actorLabel.trim().charAt(0).toUpperCase() || "N";
                       const unread = rowIsUnread(notification);
-                      const friendRequestId = getFriendRequestIdFromNotification(notification);
+                      const friendRequestId =
+                        getFriendRequestIdFromNotification(notification);
                       const isFriendRequestNotification =
-                        Boolean(friendRequestId) && notification.kind === 'friend_request_received';
+                        Boolean(friendRequestId) &&
+                        notification.kind === "friend_request_received";
                       const showInlineFriendRequestDismiss =
-                        isFriendRequestNotification && Boolean(onDismissFriendRequestNotification);
-                      const canOpenNotification = Boolean(onOpenNotificationItem);
+                        isFriendRequestNotification &&
+                        Boolean(onDismissFriendRequestNotification);
+                      const canOpenNotification = Boolean(
+                        onOpenNotificationItem,
+                      );
                       const handleOpenNotification = () => {
                         onOpenNotificationItem?.(notification);
                       };
-                      const handleNotificationKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+                      const handleNotificationKeyDown = (
+                        event: React.KeyboardEvent<HTMLDivElement>,
+                      ) => {
                         if (!canOpenNotification) return;
-                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        if (event.key !== "Enter" && event.key !== " ") return;
                         event.preventDefault();
                         handleOpenNotification();
                       };
-                      const stopRowOpenPropagation = (event: React.SyntheticEvent) => {
+                      const stopRowOpenPropagation = (
+                        event: React.SyntheticEvent,
+                      ) => {
                         event.stopPropagation();
                       };
 
@@ -418,13 +502,21 @@ export function NotificationCenterModal({
                           key={notification.recipientId}
                           className={`rounded-md border px-3 py-3 ${
                             unread
-                              ? 'border-[#4a78bd] bg-[#13233c]'
-                              : 'border-[#304867] bg-[#142033]'
-                          } ${canOpenNotification ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5b92e8]' : ''}`}
-                          role={canOpenNotification ? 'button' : undefined}
+                              ? "border-[#4a78bd] bg-[#13233c]"
+                              : "border-[#304867] bg-[#142033]"
+                          } ${canOpenNotification ? "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5b92e8]" : ""}`}
+                          role={canOpenNotification ? "button" : undefined}
                           tabIndex={canOpenNotification ? 0 : undefined}
-                          onClick={canOpenNotification ? handleOpenNotification : undefined}
-                          onKeyDown={canOpenNotification ? handleNotificationKeyDown : undefined}
+                          onClick={
+                            canOpenNotification
+                              ? handleOpenNotification
+                              : undefined
+                          }
+                          onKeyDown={
+                            canOpenNotification
+                              ? handleNotificationKeyDown
+                              : undefined
+                          }
                           aria-label={
                             canOpenNotification
                               ? `Open notification: ${getNotificationTitle(notification)}`
@@ -433,8 +525,11 @@ export function NotificationCenterModal({
                         >
                           <div className="flex items-start gap-3">
                             <Avatar className="size-9 rounded-xl border border-[#304867] bg-[#1b2a42]">
-                              {notification.actorAvatarUrl && (
-                                <AvatarImage src={notification.actorAvatarUrl} alt={actorLabel} />
+                              {actorAvatarUrl && (
+                                <AvatarImage
+                                  src={actorAvatarUrl}
+                                  alt={actorLabel}
+                                />
                               )}
                               <AvatarFallback className="rounded-xl bg-[#1b2a42] text-white text-xs">
                                 {actorInitial}
@@ -447,12 +542,18 @@ export function NotificationCenterModal({
                                   {getNotificationTitle(notification)}
                                 </p>
                                 {unread && (
-                                  <Badge variant="default" className="bg-[#3f79d8] text-white">
+                                  <Badge
+                                    variant="default"
+                                    className="bg-[#3f79d8] text-white"
+                                  >
                                     Unread
                                   </Badge>
                                 )}
                                 {!notification.seenAt && (
-                                  <Badge variant="outline" className="border-[#3b5f91] text-[#b7d1ff]">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-[#3b5f91] text-[#b7d1ff]"
+                                  >
                                     New
                                   </Badge>
                                 )}
@@ -460,7 +561,10 @@ export function NotificationCenterModal({
 
                               <p className="mt-1 text-xs text-[#c8d7ee]">
                                 {actorLabel}
-                                <span className="text-[#8ea4c7]"> · {formatTimestamp(notification.createdAt)}</span>
+                                <span className="text-[#8ea4c7]">
+                                  {" "}
+                                  · {formatTimestamp(notification.createdAt)}
+                                </span>
                               </p>
 
                               <p className="mt-1 text-sm text-[#a9b8cf] break-words">
@@ -469,7 +573,8 @@ export function NotificationCenterModal({
 
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 {friendRequestId &&
-                                  notification.kind === 'friend_request_received' &&
+                                  notification.kind ===
+                                    "friend_request_received" &&
                                   onAcceptFriendRequestNotification &&
                                   onDeclineFriendRequestNotification && (
                                     <>
@@ -479,7 +584,8 @@ export function NotificationCenterModal({
                                         onClick={(event) => {
                                           stopRowOpenPropagation(event);
                                           onAcceptFriendRequestNotification({
-                                            recipientId: notification.recipientId,
+                                            recipientId:
+                                              notification.recipientId,
                                             friendRequestId,
                                           });
                                         }}
@@ -493,7 +599,8 @@ export function NotificationCenterModal({
                                         onClick={(event) => {
                                           stopRowOpenPropagation(event);
                                           onDeclineFriendRequestNotification({
-                                            recipientId: notification.recipientId,
+                                            recipientId:
+                                              notification.recipientId,
                                             friendRequestId,
                                           });
                                         }}
@@ -509,7 +616,8 @@ export function NotificationCenterModal({
                                           onClick={(event) => {
                                             stopRowOpenPropagation(event);
                                             onDismissFriendRequestNotification({
-                                              recipientId: notification.recipientId,
+                                              recipientId:
+                                                notification.recipientId,
                                               friendRequestId,
                                             });
                                           }}
@@ -526,7 +634,9 @@ export function NotificationCenterModal({
                                     variant="secondary"
                                     onClick={(event) => {
                                       stopRowOpenPropagation(event);
-                                      onMarkNotificationRead(notification.recipientId);
+                                      onMarkNotificationRead(
+                                        notification.recipientId,
+                                      );
                                     }}
                                   >
                                     Mark read
@@ -540,14 +650,19 @@ export function NotificationCenterModal({
                                     className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
                                     onClick={(event) => {
                                       stopRowOpenPropagation(event);
-                                      onDismissNotification(notification.recipientId);
+                                      onDismissNotification(
+                                        notification.recipientId,
+                                      );
                                     }}
                                   >
                                     Dismiss
                                   </Button>
                                 )}
                                 {!notification.deliverSound && (
-                                  <Badge variant="outline" className="border-[#304867] text-[#9eb4d3]">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-[#304867] text-[#9eb4d3]"
+                                  >
                                     Sound off
                                   </Badge>
                                 )}
@@ -569,7 +684,9 @@ export function NotificationCenterModal({
                 onClick={() => setShowSettings((current) => !current)}
                 aria-expanded={showSettings}
               >
-                {showSettings ? 'Hide Notification Settings' : 'Notification Settings'}
+                {showSettings
+                  ? "Hide Notification Settings"
+                  : "Notification Settings"}
               </Button>
             </div>
           </div>

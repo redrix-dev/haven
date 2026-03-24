@@ -1,17 +1,26 @@
-import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@shared/components/ui/dialog';
-import { Input } from '@shared/components/ui/input';
-import { ScrollArea } from '@shared/components/ui/scroll-area';
-import { Badge } from '@shared/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
-import { Button } from '@shared/components/ui/button';
-import { Skeleton } from '@shared/components/ui/skeleton';
+import React from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@shared/components/ui/dialog";
+import { Input } from "@shared/components/ui/input";
+import { ScrollArea } from "@shared/components/ui/scroll-area";
+import { Badge } from "@shared/components/ui/badge";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@shared/components/ui/avatar";
+import { Button } from "@shared/components/ui/button";
+import { Skeleton } from "@shared/components/ui/skeleton";
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from '@shared/components/ui/hover-card';
-import { Textarea } from '@shared/components/ui/textarea';
+} from "@shared/components/ui/hover-card";
+import { Textarea } from "@shared/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,10 +30,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@shared/components/ui/alert-dialog';
-import type { BanEligibleServer, CommunityMemberListItem } from '@shared/lib/backend/types';
-import { ProfileContextMenu } from '@shared/components/ProfileContextMenu';
-import { getErrorMessage } from '@platform/lib/errors';
+} from "@shared/components/ui/alert-dialog";
+import type {
+  BanEligibleServer,
+  CommunityMemberListItem,
+} from "@shared/lib/backend/types";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
+import { ProfileContextMenu } from "@shared/components/ProfileContextMenu";
+import { getErrorMessage } from "@platform/lib/errors";
+import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 
 interface ServerMembersModalProps {
   open: boolean;
@@ -41,7 +58,11 @@ interface ServerMembersModalProps {
   onResolveBanServers: (targetUserId: string) => Promise<BanEligibleServer[]>;
   onDirectMessage: (targetUserId: string) => void;
   onReportUser: (targetUserId: string, reason: string) => Promise<void> | void;
-  onBanUser: (targetUserId: string, communityId: string, reason: string) => Promise<void> | void;
+  onBanUser: (
+    targetUserId: string,
+    communityId: string,
+    reason: string,
+  ) => Promise<void> | void;
   onKickUser: (targetUserId: string, username: string) => Promise<void> | void;
   onClose: () => void;
 }
@@ -65,12 +86,13 @@ export function ServerMembersModal({
   onKickUser,
   onClose,
 }: ServerMembersModalProps) {
-  const [search, setSearch] = React.useState('');
+  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const [search, setSearch] = React.useState("");
   const [reportDraft, setReportDraft] = React.useState<{
     targetUserId: string;
     username: string;
   } | null>(null);
-  const [reportReason, setReportReason] = React.useState('');
+  const [reportReason, setReportReason] = React.useState("");
   const [reportSubmitting, setReportSubmitting] = React.useState(false);
   const [banDraft, setBanDraft] = React.useState<{
     targetUserId: string;
@@ -81,7 +103,7 @@ export function ServerMembersModal({
     targetUserId: string;
     username: string;
   } | null>(null);
-  const [banReason, setBanReason] = React.useState('');
+  const [banReason, setBanReason] = React.useState("");
   const [banSubmitting, setBanSubmitting] = React.useState(false);
   const [banConfirmOpen, setBanConfirmOpen] = React.useState(false);
   const [kickSubmitting, setKickSubmitting] = React.useState(false);
@@ -89,13 +111,13 @@ export function ServerMembersModal({
 
   React.useEffect(() => {
     if (!open) {
-      setSearch('');
+      setSearch("");
       setReportDraft(null);
-      setReportReason('');
+      setReportReason("");
       setReportSubmitting(false);
       setBanDraft(null);
       setKickDraft(null);
-      setBanReason('');
+      setBanReason("");
       setBanSubmitting(false);
       setBanConfirmOpen(false);
       setKickSubmitting(false);
@@ -109,17 +131,30 @@ export function ServerMembersModal({
       ? members
       : members.filter((member) => !blockedUserIds.has(member.userId));
     if (!normalized) return visibleMembers;
-    return visibleMembers.filter((member) => member.displayName.toLowerCase().includes(normalized));
-  }, [blockedUserIds, isElevatedViewer, members, search]); // CHECKPOINT 8 COMPLETE
+    return visibleMembers.filter((member) => {
+      const liveUsername = resolveLiveUsername(
+        liveProfiles,
+        member.userId,
+        null,
+      )?.toLowerCase();
+      return (
+        member.displayName.toLowerCase().includes(normalized) ||
+        (typeof liveUsername === "string" && liveUsername.includes(normalized))
+      );
+    });
+  }, [blockedUserIds, isElevatedViewer, liveProfiles, members, search]); // CHECKPOINT 8 COMPLETE
 
   const membersByUserId = React.useMemo(
     () => new Map(members.map((member) => [member.userId, member])),
-    [members]
+    [members],
   );
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent size="lg" className="bg-[#18243a] border-[#304867] text-white">
+      <DialogContent
+        size="lg"
+        className="bg-[#18243a] border-[#304867] text-white"
+      >
         <DialogHeader>
           <DialogTitle>Members - {serverName}</DialogTitle>
         </DialogHeader>
@@ -135,7 +170,10 @@ export function ServerMembersModal({
           {loading ? (
             <div className="rounded-md border border-[#304867] bg-[#142033] p-2 space-y-1">
               {Array.from({ length: 5 }, (_, index) => (
-                <div key={index} className="flex items-center justify-between gap-2 rounded-md px-2 py-2">
+                <div
+                  key={index}
+                  className="flex items-center justify-between gap-2 rounded-md px-2 py-2"
+                >
                   <div className="min-w-0 flex items-center gap-2">
                     <Skeleton className="size-8 rounded-full bg-[#22334f]" />
                     <div className="min-w-0 space-y-2">
@@ -151,47 +189,70 @@ export function ServerMembersModal({
             <ScrollArea className="h-[420px] rounded-md border border-[#304867] bg-[#142033]">
               <div className="p-2 space-y-1">
                 {filteredMembers.length === 0 ? (
-                  <p className="px-2 py-3 text-sm text-[#a9b8cf]">No members found.</p>
+                  <p className="px-2 py-3 text-sm text-[#a9b8cf]">
+                    No members found.
+                  </p>
                 ) : (
                   filteredMembers.map((member) => {
-                    const avatarInitial = member.displayName.trim().charAt(0).toUpperCase() || 'U';
+                    const avatarInitial =
+                      member.displayName.trim().charAt(0).toUpperCase() || "U";
+                    const liveAvatarUrl = resolveLiveAvatarUrl(
+                      liveProfiles,
+                      member.userId,
+                      member.avatarUrl,
+                    );
+                    const liveUsername =
+                      resolveLiveUsername(
+                        liveProfiles,
+                        member.userId,
+                        member.displayName,
+                      ) ?? member.displayName;
 
                     return (
                       <ProfileContextMenu
                         key={member.memberId}
                         userId={member.userId}
-                        username={member.displayName}
-                        avatarUrl={member.avatarUrl}
+                        username={liveUsername}
+                        avatarUrl={liveAvatarUrl}
                         canDirectMessage={member.userId !== currentUserId}
                         canReport={canReportProfiles}
                         canBan={canBanProfiles}
                         canKick={canKickProfiles}
                         onDirectMessage={onDirectMessage}
                         onReport={(targetUserId) => {
-                          const targetMember = membersByUserId.get(targetUserId);
+                          const targetMember =
+                            membersByUserId.get(targetUserId);
                           setReportDraft({
                             targetUserId,
-                            username: targetMember?.displayName ?? targetUserId.substring(0, 12),
+                            username:
+                              targetMember?.displayName ??
+                              targetUserId.substring(0, 12),
                           });
-                          setReportReason('');
+                          setReportReason("");
                           setActionError(null);
                         }}
                         onBan={(targetUserId, communityId) => {
-                          const targetMember = membersByUserId.get(targetUserId);
+                          const targetMember =
+                            membersByUserId.get(targetUserId);
                           setBanDraft({
                             targetUserId,
                             communityId,
-                            username: targetMember?.displayName ?? targetUserId.substring(0, 12),
+                            username:
+                              targetMember?.displayName ??
+                              targetUserId.substring(0, 12),
                           });
-                          setBanReason('');
+                          setBanReason("");
                           setBanConfirmOpen(false);
                           setActionError(null);
                         }}
                         onKick={(targetUserId) => {
-                          const targetMember = membersByUserId.get(targetUserId);
+                          const targetMember =
+                            membersByUserId.get(targetUserId);
                           setKickDraft({
                             targetUserId,
-                            username: targetMember?.displayName ?? targetUserId.substring(0, 12),
+                            username:
+                              targetMember?.displayName ??
+                              targetUserId.substring(0, 12),
                           });
                           setKickSubmitting(false);
                           setActionError(null);
@@ -203,32 +264,55 @@ export function ServerMembersModal({
                             <div className="flex items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-[#1a2a43]">
                               <div className="min-w-0 flex items-center gap-2">
                                 <Avatar size="sm">
-                                  {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={member.displayName} />}
-                                  <AvatarFallback>{avatarInitial}</AvatarFallback>
+                                  {liveAvatarUrl && (
+                                    <AvatarImage
+                                      src={liveAvatarUrl}
+                                      alt={member.displayName}
+                                    />
+                                  )}
+                                  <AvatarFallback>
+                                    {avatarInitial}
+                                  </AvatarFallback>
                                 </Avatar>
                                 <div className="min-w-0">
-                                  <p className="truncate text-sm font-medium text-white">{member.displayName}</p>
-                                  <p className="truncate text-[11px] text-[#8ea4c7]">{member.userId}</p>
+                                  <p className="truncate text-sm font-medium text-white">
+                                    {member.displayName}
+                                  </p>
+                                  <p className="truncate text-[11px] text-[#8ea4c7]">
+                                    {member.userId}
+                                  </p>
                                 </div>
                               </div>
                               <div className="shrink-0">
-                                {member.isOwner && <Badge variant="outline">Owner</Badge>}
+                                {member.isOwner && (
+                                  <Badge variant="outline">Owner</Badge>
+                                )}
                               </div>
                             </div>
                           </HoverCardTrigger>
                           <HoverCardContent className="w-72 border-[#304867] bg-[#18243a] text-white">
                             <div className="space-y-2">
                               <div>
-                                <p className="text-sm font-semibold text-white">{member.displayName}</p>
-                                <p className="text-xs text-[#a9b8cf] break-all">{member.userId}</p>
+                                <p className="text-sm font-semibold text-white">
+                                  {member.displayName}
+                                </p>
+                                <p className="text-xs text-[#a9b8cf] break-all">
+                                  {member.userId}
+                                </p>
                               </div>
                               <div className="flex flex-wrap items-center gap-2 text-xs text-[#9fb2cf]">
                                 {member.isOwner && (
-                                  <Badge variant="outline" className="border-[#587aa8] text-[#d5e6ff]">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-[#587aa8] text-[#d5e6ff]"
+                                  >
                                     Owner
                                   </Badge>
                                 )}
-                                <span>Right-click or press Enter for profile actions.</span>
+                                <span>
+                                  Right-click or press Enter for profile
+                                  actions.
+                                </span>
                               </div>
                             </div>
                           </HoverCardContent>
@@ -248,7 +332,7 @@ export function ServerMembersModal({
         onOpenChange={(nextOpen) => {
           if (nextOpen) return;
           setReportDraft(null);
-          setReportReason('');
+          setReportReason("");
           setReportSubmitting(false);
         }}
       >
@@ -258,12 +342,14 @@ export function ServerMembersModal({
           </DialogHeader>
           <div className="space-y-2">
             <p className="text-sm text-[#c7d5ea]">
-              Target:{' '}
+              Target:{" "}
               <span className="font-semibold text-white">
-                {reportDraft?.username ?? 'Unknown user'}
+                {reportDraft?.username ?? "Unknown user"}
               </span>
             </p>
-            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">Reason (required)</label>
+            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              Reason (required)
+            </label>
             <Textarea
               value={reportReason}
               onChange={(event) => setReportReason(event.target.value)}
@@ -278,7 +364,7 @@ export function ServerMembersModal({
               variant="ghost"
               onClick={() => {
                 setReportDraft(null);
-                setReportReason('');
+                setReportReason("");
                 setReportSubmitting(false);
               }}
               disabled={reportSubmitting}
@@ -291,19 +377,26 @@ export function ServerMembersModal({
                 if (!reportDraft) return;
                 const normalizedReason = reportReason.trim();
                 if (!normalizedReason) {
-                  setActionError('Report reason is required.');
+                  setActionError("Report reason is required.");
                   return;
                 }
 
                 setReportSubmitting(true);
                 setActionError(null);
-                Promise.resolve(onReportUser(reportDraft.targetUserId, normalizedReason))
+                Promise.resolve(
+                  onReportUser(reportDraft.targetUserId, normalizedReason),
+                )
                   .then(() => {
                     setReportDraft(null);
-                    setReportReason('');
+                    setReportReason("");
                   })
                   .catch((reportError: unknown) => {
-                    setActionError(getErrorMessage(reportError, 'Failed to submit profile report.'));
+                    setActionError(
+                      getErrorMessage(
+                        reportError,
+                        "Failed to submit profile report.",
+                      ),
+                    );
                   })
                   .finally(() => {
                     setReportSubmitting(false);
@@ -312,7 +405,7 @@ export function ServerMembersModal({
               disabled={reportSubmitting}
               className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
             >
-              {reportSubmitting ? 'Submitting...' : 'Submit Report'}
+              {reportSubmitting ? "Submitting..." : "Submit Report"}
             </Button>
           </div>
         </DialogContent>
@@ -323,7 +416,7 @@ export function ServerMembersModal({
         onOpenChange={(nextOpen) => {
           if (nextOpen) return;
           setBanDraft(null);
-          setBanReason('');
+          setBanReason("");
           setBanSubmitting(false);
           setBanConfirmOpen(false);
         }}
@@ -334,12 +427,14 @@ export function ServerMembersModal({
           </DialogHeader>
           <div className="space-y-2">
             <p className="text-sm text-[#c7d5ea]">
-              Target:{' '}
+              Target:{" "}
               <span className="font-semibold text-white">
-                {banDraft?.username ?? 'Unknown user'}
+                {banDraft?.username ?? "Unknown user"}
               </span>
             </p>
-            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">Reason (required)</label>
+            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              Reason (required)
+            </label>
             <Textarea
               value={banReason}
               onChange={(event) => setBanReason(event.target.value)}
@@ -354,7 +449,7 @@ export function ServerMembersModal({
               variant="ghost"
               onClick={() => {
                 setBanDraft(null);
-                setBanReason('');
+                setBanReason("");
                 setBanSubmitting(false);
                 setBanConfirmOpen(false);
               }}
@@ -367,7 +462,7 @@ export function ServerMembersModal({
               variant="destructive"
               onClick={() => {
                 if (!banReason.trim()) {
-                  setActionError('Ban reason is required.');
+                  setActionError("Ban reason is required.");
                   return;
                 }
                 setBanConfirmOpen(true);
@@ -385,11 +480,14 @@ export function ServerMembersModal({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Ban</AlertDialogTitle>
             <AlertDialogDescription className="text-[#a9b8cf]">
-              This action is immediate. Confirm banning this user from the selected server.
+              This action is immediate. Confirm banning this user from the
+              selected server.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={banSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={banSubmitting}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-500"
               disabled={banSubmitting || !banDraft}
@@ -397,27 +495,35 @@ export function ServerMembersModal({
                 if (!banDraft) return;
                 const normalizedReason = banReason.trim();
                 if (!normalizedReason) {
-                  setActionError('Ban reason is required.');
+                  setActionError("Ban reason is required.");
                   return;
                 }
 
                 setBanSubmitting(true);
                 setActionError(null);
-                Promise.resolve(onBanUser(banDraft.targetUserId, banDraft.communityId, normalizedReason))
+                Promise.resolve(
+                  onBanUser(
+                    banDraft.targetUserId,
+                    banDraft.communityId,
+                    normalizedReason,
+                  ),
+                )
                   .then(() => {
                     setBanConfirmOpen(false);
                     setBanDraft(null);
-                    setBanReason('');
+                    setBanReason("");
                   })
                   .catch((banError: unknown) => {
-                    setActionError(getErrorMessage(banError, 'Failed to ban user.'));
+                    setActionError(
+                      getErrorMessage(banError, "Failed to ban user."),
+                    );
                   })
                   .finally(() => {
                     setBanSubmitting(false);
                   });
               }}
             >
-              {banSubmitting ? 'Banning...' : 'Ban User'}
+              {banSubmitting ? "Banning..." : "Ban User"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -435,11 +541,14 @@ export function ServerMembersModal({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Removal</AlertDialogTitle>
             <AlertDialogDescription className="text-[#a9b8cf]">
-              Remove this user from the server now. They can rejoin later if they still have a valid invite.
+              Remove this user from the server now. They can rejoin later if
+              they still have a valid invite.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={kickSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={kickSubmitting}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-500"
               disabled={kickSubmitting || !kickDraft}
@@ -447,19 +556,26 @@ export function ServerMembersModal({
                 if (!kickDraft) return;
                 setKickSubmitting(true);
                 setActionError(null);
-                Promise.resolve(onKickUser(kickDraft.targetUserId, kickDraft.username))
+                Promise.resolve(
+                  onKickUser(kickDraft.targetUserId, kickDraft.username),
+                )
                   .then(() => {
                     setKickDraft(null);
                   })
                   .catch((kickError: unknown) => {
-                    setActionError(getErrorMessage(kickError, 'Failed to remove user from the server.'));
+                    setActionError(
+                      getErrorMessage(
+                        kickError,
+                        "Failed to remove user from the server.",
+                      ),
+                    );
                   })
                   .finally(() => {
                     setKickSubmitting(false);
                   });
               }}
             >
-              {kickSubmitting ? 'Removing...' : 'Remove from Server'}
+              {kickSubmitting ? "Removing..." : "Remove from Server"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

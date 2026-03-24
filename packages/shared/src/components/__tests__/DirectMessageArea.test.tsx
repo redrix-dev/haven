@@ -1,17 +1,27 @@
 // @vitest-environment jsdom
-import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { DirectMessageArea } from '@shared/components/DirectMessageArea';
-import { useDmStore } from '@shared/stores/dmStore';
-import type { DirectMessage, DirectMessageConversationSummary } from '@shared/lib/backend/types';
+import React from "react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DirectMessageArea } from "@shared/components/DirectMessageArea";
+import { useDmStore } from "@shared/stores/dmStore";
+import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import type {
+  DirectMessage,
+  DirectMessageConversationSummary,
+} from "@shared/lib/backend/types";
 
 const conversation: DirectMessageConversationSummary = {
-  conversationId: 'conv-1',
-  kind: 'direct',
-  otherUserId: 'user-2',
-  otherUsername: 'FriendUser',
+  conversationId: "conv-1",
+  kind: "direct",
+  otherUserId: "user-2",
+  otherUsername: "FriendUser",
   otherAvatarUrl: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -25,7 +35,9 @@ const conversation: DirectMessageConversationSummary = {
   mutedUntil: null,
 };
 
-function renderArea(overrides?: Partial<React.ComponentProps<typeof DirectMessageArea>>) {
+function renderArea(
+  overrides?: Partial<React.ComponentProps<typeof DirectMessageArea>>,
+) {
   useDmStore.getState().setCurrentConversation(conversation);
   useDmStore.getState().setCurrentConversationId(conversation.conversationId);
   return render(
@@ -42,63 +54,71 @@ function renderArea(overrides?: Partial<React.ComponentProps<typeof DirectMessag
       onBlockUser={async () => {}}
       onReportMessage={async () => {}}
       {...overrides}
-    />
+    />,
   );
 }
 
-describe('DirectMessageArea', () => {
-  it('renders explicit blocked/unfriended style error hint', () => {
+describe("DirectMessageArea", () => {
+  beforeEach(() => {
+    useDmStore.getState().reset();
+    useLiveProfilesStore.getState().reset();
+  });
+
+  it("renders explicit blocked/unfriended style error hint", () => {
     renderArea({
-      error: 'Direct messages are not available for this user because they are not on your friends list.',
+      error:
+        "Direct messages are not available for this user because they are not on your friends list.",
     });
 
     expect(screen.getByText(/friends-only right now/i)).toBeTruthy();
   });
 
-  it('invokes block handler when confirmed', async () => {
+  it("invokes block handler when confirmed", async () => {
     const user = userEvent.setup();
     const onBlockUser = vi.fn().mockResolvedValue(undefined);
 
     renderArea({ onBlockUser });
 
-    await user.click(screen.getByRole('button', { name: /^block$/i }));
-    const confirmDialog = await screen.findByRole('alertdialog');
-    await user.click(within(confirmDialog).getByRole('button', { name: /^block$/i }));
+    await user.click(screen.getByRole("button", { name: /^block$/i }));
+    const confirmDialog = await screen.findByRole("alertdialog");
+    await user.click(
+      within(confirmDialog).getByRole("button", { name: /^block$/i }),
+    );
 
     expect(onBlockUser).toHaveBeenCalledWith({
-      userId: 'user-2',
-      username: 'FriendUser',
+      userId: "user-2",
+      username: "FriendUser",
     });
   });
 
-  it('renders image attachments and hides placeholder-only text', () => {
+  it("renders image attachments and hides placeholder-only text", () => {
     const messages: DirectMessage[] = [
       {
-        messageId: 'msg-1',
-        conversationId: 'conv-1',
-        authorUserId: 'user-2',
-        authorUsername: 'FriendUser',
+        messageId: "msg-1",
+        conversationId: "conv-1",
+        authorUserId: "user-2",
+        authorUsername: "FriendUser",
         authorAvatarUrl: null,
-        content: '\u200B',
+        content: "\u200B",
         metadata: {},
         createdAt: new Date().toISOString(),
         editedAt: null,
         deletedAt: null,
         attachments: [
           {
-            id: 'att-1',
-            messageId: 'msg-1',
-            conversationId: 'conv-1',
-            ownerUserId: 'user-2',
-            bucketName: 'dm-message-media',
-            objectPath: 'conv-1/test-image.png',
-            originalFilename: 'test-image.png',
-            mimeType: 'image/png',
-            mediaKind: 'image',
+            id: "att-1",
+            messageId: "msg-1",
+            conversationId: "conv-1",
+            ownerUserId: "user-2",
+            bucketName: "dm-message-media",
+            objectPath: "conv-1/test-image.png",
+            originalFilename: "test-image.png",
+            mimeType: "image/png",
+            mediaKind: "image",
             sizeBytes: 123,
             createdAt: new Date().toISOString(),
             expiresAt: new Date(Date.now() + 60_000).toISOString(),
-            signedUrl: 'https://example.com/test-image.png',
+            signedUrl: "https://example.com/test-image.png",
           },
         ],
       },
@@ -106,32 +126,64 @@ describe('DirectMessageArea', () => {
 
     renderArea({ messages });
 
-    expect(screen.queryByText('\u200B')).toBeNull();
-    expect(screen.getByAltText('test-image.png')).toBeTruthy();
+    expect(screen.queryByText("\u200B")).toBeNull();
+    expect(screen.getByAltText("test-image.png")).toBeTruthy();
   });
 
-  it('replaces the composer with an unavailable indicator when messaging is blocked', () => {
+  it("overlays live profile identities for the conversation header and message rows", () => {
+    useLiveProfilesStore.getState().upsertProfile({
+      userId: "user-2",
+      username: "Live Friend",
+      avatarUrl: "https://example.com/live-friend.png",
+      updatedAt: new Date().toISOString(),
+    });
+
+    const messages: DirectMessage[] = [
+      {
+        messageId: "msg-1",
+        conversationId: "conv-1",
+        authorUserId: "user-2",
+        authorUsername: "Stale Friend",
+        authorAvatarUrl: null,
+        content: "hello there",
+        metadata: {},
+        createdAt: new Date().toISOString(),
+        editedAt: null,
+        deletedAt: null,
+        attachments: [],
+      },
+    ];
+
+    renderArea({ messages });
+
+    expect(screen.getAllByText("Live Friend")).toHaveLength(2);
+    expect(screen.queryByText("Stale Friend")).toBeNull();
+  });
+
+  it("replaces the composer with an unavailable indicator when messaging is blocked", () => {
     renderArea({ messagingUnavailable: true });
 
-    expect(screen.getByText('Messaging is unavailable in this conversation.')).toBeTruthy();
-    expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.queryByRole('button', { name: /send/i })).toBeNull();
+    expect(
+      screen.getByText("Messaging is unavailable in this conversation."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /send/i })).toBeNull();
   });
 
-  it('applies markdown shortcuts through the shared DM toolbar path', async () => {
+  it("applies markdown shortcuts through the shared DM toolbar path", async () => {
     const user = userEvent.setup();
 
     renderArea();
 
-    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
-    await user.type(textarea, 'hello');
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    await user.type(textarea, "hello");
     textarea.focus();
     textarea.setSelectionRange(0, 5);
 
-    fireEvent.keyDown(textarea, { key: 'b', ctrlKey: true });
+    fireEvent.keyDown(textarea, { key: "b", ctrlKey: true });
 
     await waitFor(() => {
-      expect(textarea.value).toBe('**hello**');
+      expect(textarea.value).toBe("**hello**");
     });
   });
 });

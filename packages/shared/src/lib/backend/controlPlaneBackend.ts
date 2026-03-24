@@ -5,6 +5,7 @@ import type {
   BanEligibleServer,
   FeatureFlagsSnapshot,
   RedeemedInvite,
+  LiveProfileIdentity,
   ServerInvite,
   ServerSummary,
 } from './types';
@@ -55,6 +56,7 @@ const getProfileAvatarObjectPathFromUrl = (avatarUrl: string): string | null => 
 export interface ControlPlaneBackend {
   fetchUserProfile(userId: string): Promise<UserProfileInfo | null>;
   fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
+  subscribeToProfileIdentities(onChange: (payload?: unknown) => void): RealtimeChannel;
   listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
   uploadAvatar(file: File): Promise<string>;
   deleteAvatar(avatarUrl: string): Promise<void>;
@@ -95,6 +97,20 @@ type FeatureFlagRow = {
   enabled: boolean;
 };
 
+type ProfileIdentityRow = {
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  updated_at: string;
+};
+
+export const mapLiveProfileIdentity = (row: ProfileIdentityRow): LiveProfileIdentity => ({
+  userId: row.user_id,
+  username: row.username,
+  avatarUrl: row.avatar_url ?? null,
+  updatedAt: row.updated_at,
+});
+
 const mapInvite = (invite: InviteRecord): ServerInvite => ({
   id: invite.id,
   code: invite.code,
@@ -134,6 +150,21 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
       canPostHavenDev: Boolean(data.can_post_haven_dev),
       displayPrefix: data.display_prefix ?? null,
     };
+  },
+
+  subscribeToProfileIdentities(onChange) {
+    return supabase
+      .channel('profile_identities')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profile_identities',
+        },
+        (payload) => onChange(payload)
+      )
+      .subscribe();
   },
 
   async listMyFeatureFlags() {

@@ -109,6 +109,13 @@ export type AuthorProfile = {
   avatarUrl: string | null;
 };
 
+export type LiveProfileIdentity = {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  updatedAt: string;
+};
+
 export type ServerPermissions = {
   isOwner: boolean;
   canManageServer: boolean;

@@ -1,22 +1,26 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MoreHorizontal } from 'lucide-react';
-import { Button } from '@shared/components/ui/button';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
+import { Button } from "@shared/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '@shared/components/ui/collapsible';
-import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
+} from "@shared/components/ui/collapsible";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@shared/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from '@shared/components/ui/dropdown-menu';
+} from "@shared/components/ui/dropdown-menu";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
-} from '@shared/components/ui/context-menu';
+} from "@shared/components/ui/context-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@shared/components/ui/alert-dialog';
+} from "@shared/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -34,16 +38,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@shared/components/ui/dialog';
-import { Input } from '@shared/components/ui/input';
-import { Textarea } from '@shared/components/ui/textarea';
-import { ProfileContextMenu } from '@shared/components/ProfileContextMenu';
-import { ActionMenuContent } from '@shared/components/menus/ActionMenuContent';
-import { Database } from '@shared/types/database';
-import { resolveContextMenuIntent } from '@shared/lib/contextMenu';
-import { traceContextMenuEvent } from '@shared/lib/contextMenu/debugTrace';
-import { getErrorMessage } from '@platform/lib/errors';
-import type { MenuActionNode } from '@shared/lib/contextMenu/types';
+} from "@shared/components/ui/dialog";
+import { Input } from "@shared/components/ui/input";
+import { Textarea } from "@shared/components/ui/textarea";
+import { ProfileContextMenu } from "@shared/components/ProfileContextMenu";
+import { ActionMenuContent } from "@shared/components/menus/ActionMenuContent";
+import { Database } from "@shared/types/database";
+import { resolveContextMenuIntent } from "@shared/lib/contextMenu";
+import { traceContextMenuEvent } from "@shared/lib/contextMenu/debugTrace";
+import { getErrorMessage } from "@platform/lib/errors";
+import type { MenuActionNode } from "@shared/lib/contextMenu/types";
 import type {
   BanEligibleServer,
   MessageAttachment,
@@ -51,18 +55,25 @@ import type {
   MessageReaction,
   MessageReportKind,
   MessageReportTarget,
-} from '@shared/lib/backend/types';
-import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import { MarkdownText } from '@shared/lib/markdownRenderer';
+} from "@shared/lib/backend/types";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
+import { MarkdownText } from "@shared/lib/markdownRenderer";
 import {
   BANNED_REPLY_PLACEHOLDER_CONTENT,
   filterBlockedUserContent,
   isModerationRemovedReplyPlaceholder,
-} from '@client/features/messages/lib/banVisibility';
-import { useMessagesStore } from '@shared/stores/messagesStore';
+} from "@client/features/messages/lib/banVisibility";
+import { getLiveProfile } from "@shared/lib/liveProfiles";
+import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useMessagesStore } from "@shared/stores/messagesStore";
 
-type Message = Database['public']['Tables']['messages']['Row'];
-const QUICK_REACTION_EMOJI = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}'] as const;
+type Message = Database["public"]["Tables"]["messages"]["Row"];
+const QUICK_REACTION_EMOJI = [
+  "\u{1F44D}",
+  "\u2764\uFE0F",
+  "\u{1F602}",
+  "\u{1F389}",
+] as const;
 type AuthorProfile = {
   username: string;
   isPlatformStaff: boolean;
@@ -81,7 +92,10 @@ interface MessageListProps {
   canManageMembers: boolean;
   canRefreshLinkPreviews: boolean;
   onSaveAttachment: (attachment: MessageAttachment) => Promise<void>;
-  onReportUserProfile: (input: { targetUserId: string; reason: string }) => Promise<void>;
+  onReportUserProfile: (input: {
+    targetUserId: string;
+    reason: string;
+  }) => Promise<void>;
   onBanUserFromServer: (input: {
     targetUserId: string;
     communityId: string;
@@ -91,12 +105,18 @@ interface MessageListProps {
     targetUserId: string;
     username: string;
   }) => Promise<void>;
-  onResolveBanEligibleServers: (targetUserId: string) => Promise<BanEligibleServer[]>;
+  onResolveBanEligibleServers: (
+    targetUserId: string,
+  ) => Promise<BanEligibleServer[]>;
   onDirectMessageUser: (targetUserId: string) => void;
   onDeleteMessage: (messageId: string) => Promise<void>;
   onEditMessage: (messageId: string, content: string) => Promise<void>;
   onToggleMessageReaction: (messageId: string, emoji: string) => Promise<void>;
-  onReplyToMessage: (target: { id: string; authorLabel: string; preview: string }) => void;
+  onReplyToMessage: (target: {
+    id: string;
+    authorLabel: string;
+    preview: string;
+  }) => void;
   onReportMessage: (input: {
     messageId: string;
     target: MessageReportTarget;
@@ -109,20 +129,26 @@ interface MessageListProps {
 
 const getReplyToMessageId = (message: Message): string | null => {
   const metadata = message.metadata;
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata))
+    return null;
   const replyTo = (metadata as Record<string, unknown>).replyToMessageId;
-  return typeof replyTo === 'string' && replyTo.trim().length > 0 ? replyTo : null;
+  return typeof replyTo === "string" && replyTo.trim().length > 0
+    ? replyTo
+    : null;
 };
 
 const getAuthorLabel = (
   message: Message,
   authorProfile: AuthorProfile | undefined,
-  currentUserId: string
+  currentUserId: string,
 ): string => {
-  if (message.author_type === 'haven_dev') return 'Haven Moderation Team';
-  if (message.author_type === 'system') return 'System';
+  if (message.author_type === "haven_dev") return "Haven Moderation Team";
+  if (message.author_type === "system") return "System";
 
-  const username = authorProfile?.username ?? message.author_user_id?.substring(0, 12) ?? 'Unknown User';
+  const username =
+    authorProfile?.username ??
+    message.author_user_id?.substring(0, 12) ??
+    "Unknown User";
   if (message.author_user_id === currentUserId) return `${username} (You)`;
   return username; // CHECKPOINT 1 COMPLETE
 };
@@ -130,20 +156,24 @@ const getAuthorLabel = (
 const getAuthorColor = (
   message: Message,
   authorProfile: AuthorProfile | undefined,
-  currentUserId: string
+  currentUserId: string,
 ): string => {
-  const isStaffUserMessage = message.author_type === 'user' && Boolean(authorProfile?.isPlatformStaff);
-  const isOwnMessage = message.author_type === 'user' && message.author_user_id === currentUserId;
+  const isStaffUserMessage =
+    message.author_type === "user" && Boolean(authorProfile?.isPlatformStaff);
+  const isOwnMessage =
+    message.author_type === "user" && message.author_user_id === currentUserId;
 
-  if (message.author_type === 'haven_dev') return '#d6a24a';
-  if (isOwnMessage) return '#3f79d8';
-  if (isStaffUserMessage) return '#59b7ff';
-  return '#44b894';
+  if (message.author_type === "haven_dev") return "#d6a24a";
+  if (isOwnMessage) return "#3f79d8";
+  if (isStaffUserMessage) return "#59b7ff";
+  return "#44b894";
 };
 
 const URL_SEGMENT_PATTERN = /https?:\/\/[^\s<>"'`]+/gi;
 
-const trimTrailingUrlPunctuation = (value: string): { url: string; trailing: string } => {
+const trimTrailingUrlPunctuation = (
+  value: string,
+): { url: string; trailing: string } => {
   let end = value.length;
   while (end > 0 && /[.,!?;:]$/.test(value.slice(0, end))) {
     end -= 1;
@@ -162,12 +192,12 @@ const renderLinkifiedMessageText = (content: string): React.ReactNode[] => {
 
   for (const match of content.matchAll(URL_SEGMENT_PATTERN)) {
     const start = match.index ?? 0;
-    const raw = match[0] ?? '';
+    const raw = match[0] ?? "";
     if (start > lastIndex) {
       nodes.push(
         <React.Fragment key={`text-${matchIndex}-${lastIndex}`}>
           {content.slice(lastIndex, start)}
-        </React.Fragment>
+        </React.Fragment>,
       );
     }
 
@@ -182,16 +212,20 @@ const renderLinkifiedMessageText = (content: string): React.ReactNode[] => {
           className="text-[#8fc1ff] hover:text-[#b4d6ff] underline break-all"
         >
           {url}
-        </a>
+        </a>,
       );
     } else {
       nodes.push(
-        <React.Fragment key={`link-fallback-${matchIndex}-${start}`}>{raw}</React.Fragment>
+        <React.Fragment key={`link-fallback-${matchIndex}-${start}`}>
+          {raw}
+        </React.Fragment>,
       );
     }
     if (trailing) {
       nodes.push(
-        <React.Fragment key={`trail-${matchIndex}-${start}`}>{trailing}</React.Fragment>
+        <React.Fragment key={`trail-${matchIndex}-${start}`}>
+          {trailing}
+        </React.Fragment>,
       );
     }
 
@@ -200,7 +234,11 @@ const renderLinkifiedMessageText = (content: string): React.ReactNode[] => {
   }
 
   if (lastIndex < content.length) {
-    nodes.push(<React.Fragment key={`tail-${lastIndex}`}>{content.slice(lastIndex)}</React.Fragment>);
+    nodes.push(
+      <React.Fragment key={`tail-${lastIndex}`}>
+        {content.slice(lastIndex)}
+      </React.Fragment>,
+    );
   }
 
   return nodes.length > 0 ? nodes : [content];
@@ -215,16 +253,20 @@ const extractYoutubeVideoId = (rawUrl: string): string | null => {
   try {
     const url = new URL(rawUrl);
     const host = url.hostname.toLowerCase();
-    if (host === 'youtu.be') {
-      const candidate = url.pathname.split('/').filter(Boolean)[0] ?? '';
+    if (host === "youtu.be") {
+      const candidate = url.pathname.split("/").filter(Boolean)[0] ?? "";
       return /^[a-zA-Z0-9_-]{6,20}$/.test(candidate) ? candidate : null;
     }
 
-    if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
-      const fromQuery = url.searchParams.get('v');
-      if (fromQuery && /^[a-zA-Z0-9_-]{6,20}$/.test(fromQuery)) return fromQuery;
-      const parts = url.pathname.split('/').filter(Boolean);
-      if ((parts[0] === 'embed' || parts[0] === 'shorts') && /^[a-zA-Z0-9_-]{6,20}$/.test(parts[1] ?? '')) {
+    if (host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com")) {
+      const fromQuery = url.searchParams.get("v");
+      if (fromQuery && /^[a-zA-Z0-9_-]{6,20}$/.test(fromQuery))
+        return fromQuery;
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (
+        (parts[0] === "embed" || parts[0] === "shorts") &&
+        /^[a-zA-Z0-9_-]{6,20}$/.test(parts[1] ?? "")
+      ) {
         return parts[1] ?? null;
       }
     }
@@ -238,8 +280,8 @@ const extractYoutubeVideoId = (rawUrl: string): string | null => {
 const extractVimeoVideoId = (rawUrl: string): string | null => {
   try {
     const url = new URL(rawUrl);
-    if (!url.hostname.toLowerCase().endsWith('vimeo.com')) return null;
-    const parts = url.pathname.split('/').filter(Boolean);
+    if (!url.hostname.toLowerCase().endsWith("vimeo.com")) return null;
+    const parts = url.pathname.split("/").filter(Boolean);
     for (let index = parts.length - 1; index >= 0; index -= 1) {
       if (/^\d{6,15}$/.test(parts[index])) return parts[index];
     }
@@ -259,9 +301,12 @@ const getFallbackEmbedUrl = (preview: MessageLinkPreview): string | null => {
     preview.snapshot?.finalUrl,
     preview.snapshot?.sourceUrl,
     preview.sourceUrl,
-  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  ].filter(
+    (value): value is string =>
+      typeof value === "string" && value.trim().length > 0,
+  );
 
-  if (embed.provider === 'youtube') {
+  if (embed.provider === "youtube") {
     for (const rawUrl of candidateSourceUrls) {
       const videoId = extractYoutubeVideoId(rawUrl);
       if (videoId) return `https://www.youtube-nocookie.com/embed/${videoId}`;
@@ -269,7 +314,7 @@ const getFallbackEmbedUrl = (preview: MessageLinkPreview): string | null => {
     return null;
   }
 
-  if (embed.provider === 'vimeo') {
+  if (embed.provider === "vimeo") {
     for (const rawUrl of candidateSourceUrls) {
       const videoId = extractVimeoVideoId(rawUrl);
       if (videoId) return `https://player.vimeo.com/video/${videoId}`;
@@ -308,6 +353,7 @@ export function MessageList({
   const attachmentRecord = useMessagesStore((state) => state.attachments);
   const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
   const authorProfiles = useMessagesStore((state) => state.profiles);
+  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const hasOlderMessages = useMessagesStore((state) => state.hasMore);
   const isLoadingOlderMessages = useMessagesStore((state) => state.isLoading);
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);
@@ -317,22 +363,32 @@ export function MessageList({
   const olderLoadInFlightRef = useRef(false);
   const shouldScrollToBottomOnNextDataRef = useRef(true);
   const [firstItemIndex, setFirstItemIndex] = useState(1_000_000);
-  const [expandedReplyThreads, setExpandedReplyThreads] = useState<Record<string, boolean>>({});
+  const [expandedReplyThreads, setExpandedReplyThreads] = useState<
+    Record<string, boolean>
+  >({});
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editingContent, setEditingContent] = useState('');
+  const [editingContent, setEditingContent] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
-  const [actionBusyMessageId, setActionBusyMessageId] = useState<string | null>(null);
-  const [reactionBusyKeys, setReactionBusyKeys] = useState<Record<string, boolean>>({});
-  const [reportDialogMessageId, setReportDialogMessageId] = useState<string | null>(null);
-  const [reportTarget, setReportTarget] = useState<MessageReportTarget>('haven_staff');
-  const [reportKind, setReportKind] = useState<MessageReportKind>('content_abuse');
-  const [reportComment, setReportComment] = useState('');
+  const [actionBusyMessageId, setActionBusyMessageId] = useState<string | null>(
+    null,
+  );
+  const [reactionBusyKeys, setReactionBusyKeys] = useState<
+    Record<string, boolean>
+  >({});
+  const [reportDialogMessageId, setReportDialogMessageId] = useState<
+    string | null
+  >(null);
+  const [reportTarget, setReportTarget] =
+    useState<MessageReportTarget>("haven_staff");
+  const [reportKind, setReportKind] =
+    useState<MessageReportKind>("content_abuse");
+  const [reportComment, setReportComment] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [profileReportDraft, setProfileReportDraft] = useState<{
     targetUserId: string;
     username: string;
   } | null>(null);
-  const [profileReportReason, setProfileReportReason] = useState('');
+  const [profileReportReason, setProfileReportReason] = useState("");
   const [profileReportSubmitting, setProfileReportSubmitting] = useState(false);
   const [banDraft, setBanDraft] = useState<{
     targetUserId: string;
@@ -343,14 +399,23 @@ export function MessageList({
     targetUserId: string;
     username: string;
   } | null>(null);
-  const [banReason, setBanReason] = useState('');
+  const [banReason, setBanReason] = useState("");
   const [banSubmitting, setBanSubmitting] = useState(false);
   const [banConfirmOpen, setBanConfirmOpen] = useState(false);
   const [kickSubmitting, setKickSubmitting] = useState(false);
 
-  const messageReactions = useMemo(() => Object.values(reactionRecord), [reactionRecord]);
-  const messageAttachments = useMemo(() => Object.values(attachmentRecord), [attachmentRecord]);
-  const messageLinkPreviews = useMemo(() => Object.values(linkPreviewRecord), [linkPreviewRecord]);
+  const messageReactions = useMemo(
+    () => Object.values(reactionRecord),
+    [reactionRecord],
+  );
+  const messageAttachments = useMemo(
+    () => Object.values(attachmentRecord),
+    [attachmentRecord],
+  );
+  const messageLinkPreviews = useMemo(
+    () => Object.values(linkPreviewRecord),
+    [linkPreviewRecord],
+  );
 
   const visibleBundle = useMemo(
     () =>
@@ -362,9 +427,16 @@ export function MessageList({
           linkPreviews: messageLinkPreviews,
         },
         blockedUserIds,
-        isElevatedViewer
+        isElevatedViewer,
       ),
-    [blockedUserIds, isElevatedViewer, messageAttachments, messageLinkPreviews, messageReactions, messages]
+    [
+      blockedUserIds,
+      isElevatedViewer,
+      messageAttachments,
+      messageLinkPreviews,
+      messageReactions,
+      messages,
+    ],
   );
 
   const visibleMessages = visibleBundle.messages;
@@ -400,35 +472,52 @@ export function MessageList({
     return next;
   }, [messageById, visibleLinkPreviews]);
 
-  const getRenderableEmbedUrl = React.useCallback((preview: MessageLinkPreview): string | null => {
-    const embed = preview.snapshot?.embed;
-    if (!embed?.embedUrl) return null;
+  const getRenderableEmbedUrl = React.useCallback(
+    (preview: MessageLinkPreview): string | null => {
+      const embed = preview.snapshot?.embed;
+      if (!embed?.embedUrl) return null;
 
-    try {
-      const url = new URL(embed.embedUrl);
-      // Prefer the privacy-enhanced embed host. We validate the path below and fall back to a
-      // reconstructed embed URL if cached rows contain malformed values.
-      if (embed.provider === 'youtube' && url.hostname.toLowerCase() === 'www.youtube.com') {
-        url.hostname = 'www.youtube-nocookie.com';
+      try {
+        const url = new URL(embed.embedUrl);
+        // Prefer the privacy-enhanced embed host. We validate the path below and fall back to a
+        // reconstructed embed URL if cached rows contain malformed values.
+        if (
+          embed.provider === "youtube" &&
+          url.hostname.toLowerCase() === "www.youtube.com"
+        ) {
+          url.hostname = "www.youtube-nocookie.com";
+        }
+        if (
+          embed.provider === "youtube" &&
+          !url.pathname.startsWith("/embed/")
+        ) {
+          return getFallbackEmbedUrl(preview);
+        }
+        if (embed.provider === "vimeo" && !url.pathname.startsWith("/video/")) {
+          return getFallbackEmbedUrl(preview);
+        }
+        return url.toString();
+      } catch {
+        return getFallbackEmbedUrl(preview) ?? embed.embedUrl;
       }
-      if (embed.provider === 'youtube' && !url.pathname.startsWith('/embed/')) {
-        return getFallbackEmbedUrl(preview);
-      }
-      if (embed.provider === 'vimeo' && !url.pathname.startsWith('/video/')) {
-        return getFallbackEmbedUrl(preview);
-      }
-      return url.toString();
-    } catch {
-      return getFallbackEmbedUrl(preview) ?? embed.embedUrl;
-    }
-  }, []);
+    },
+    [],
+  );
 
   const reactionsByMessageId = useMemo(() => {
-    const next = new Map<string, Map<string, { count: number; reactedByCurrentUser: boolean }>>();
+    const next = new Map<
+      string,
+      Map<string, { count: number; reactedByCurrentUser: boolean }>
+    >();
     for (const reaction of visibleReactions) {
       if (!messageById.has(reaction.messageId)) continue;
-      const byEmoji = next.get(reaction.messageId) ?? new Map<string, { count: number; reactedByCurrentUser: boolean }>();
-      const current = byEmoji.get(reaction.emoji) ?? { count: 0, reactedByCurrentUser: false };
+      const byEmoji =
+        next.get(reaction.messageId) ??
+        new Map<string, { count: number; reactedByCurrentUser: boolean }>();
+      const current = byEmoji.get(reaction.emoji) ?? {
+        count: 0,
+        reactedByCurrentUser: false,
+      };
       current.count += 1;
       if (reaction.userId === currentUserId) {
         current.reactedByCurrentUser = true;
@@ -445,7 +534,9 @@ export function MessageList({
 
     for (const message of visibleMessages) {
       const parentId = getReplyToMessageId(message);
-      const parentExists = Boolean(parentId && parentId !== message.id && messageById.has(parentId));
+      const parentExists = Boolean(
+        parentId && parentId !== message.id && messageById.has(parentId),
+      );
 
       if (!parentExists || !parentId) {
         rootMessages.push(message);
@@ -459,7 +550,10 @@ export function MessageList({
 
     // Guard against malformed reply graphs that would otherwise render nothing.
     if (rootMessages.length === 0 && visibleMessages.length > 0) {
-      return { rootMessages: visibleMessages, repliesByParentId: new Map<string, Message[]>() };
+      return {
+        rootMessages: visibleMessages,
+        repliesByParentId: new Map<string, Message[]>(),
+      };
     }
 
     return { rootMessages, repliesByParentId };
@@ -494,17 +588,28 @@ export function MessageList({
   }, [channelId]);
 
   useEffect(() => {
-    const nextRootMessageIds = replyTree.rootMessages.map((message) => message.id);
+    const nextRootMessageIds = replyTree.rootMessages.map(
+      (message) => message.id,
+    );
     const previousRootMessageIds = previousRootMessageIdsRef.current;
 
-    if (previousRootMessageIds.length > 0 && nextRootMessageIds.length > previousRootMessageIds.length) {
-      const previousIsSuffix = previousRootMessageIds.every((messageId, index) => {
-        const nextIndex = nextRootMessageIds.length - previousRootMessageIds.length + index;
-        return nextRootMessageIds[nextIndex] === messageId;
-      });
+    if (
+      previousRootMessageIds.length > 0 &&
+      nextRootMessageIds.length > previousRootMessageIds.length
+    ) {
+      const previousIsSuffix = previousRootMessageIds.every(
+        (messageId, index) => {
+          const nextIndex =
+            nextRootMessageIds.length - previousRootMessageIds.length + index;
+          return nextRootMessageIds[nextIndex] === messageId;
+        },
+      );
 
       if (previousIsSuffix) {
-        setFirstItemIndex((prev) => prev - (nextRootMessageIds.length - previousRootMessageIds.length));
+        setFirstItemIndex(
+          (prev) =>
+            prev - (nextRootMessageIds.length - previousRootMessageIds.length),
+        );
       }
     }
 
@@ -514,7 +619,7 @@ export function MessageList({
   useEffect(() => {
     if (!editingMessageId || messageById.has(editingMessageId)) return;
     setEditingMessageId(null);
-    setEditingContent('');
+    setEditingContent("");
   }, [editingMessageId, messageById]);
 
   useEffect(() => {
@@ -523,7 +628,8 @@ export function MessageList({
   }, [actionBusyMessageId, messageById]);
 
   useEffect(() => {
-    if (!reportDialogMessageId || messageById.has(reportDialogMessageId)) return;
+    if (!reportDialogMessageId || messageById.has(reportDialogMessageId))
+      return;
     setReportDialogMessageId(null);
     setReportSubmitting(false);
   }, [messageById, reportDialogMessageId]);
@@ -531,16 +637,16 @@ export function MessageList({
   useEffect(() => {
     setExpandedReplyThreads({});
     setEditingMessageId(null);
-    setEditingContent('');
+    setEditingContent("");
     setActionBusyMessageId(null);
     setReactionBusyKeys({});
     setReportDialogMessageId(null);
     setReportSubmitting(false);
     setProfileReportDraft(null);
-    setProfileReportReason('');
+    setProfileReportReason("");
     setProfileReportSubmitting(false);
     setBanDraft(null);
-    setBanReason('');
+    setBanReason("");
     setBanSubmitting(false);
     setBanConfirmOpen(false);
     setActionError(null);
@@ -562,8 +668,9 @@ export function MessageList({
       const next: Record<string, boolean> = {};
 
       for (const [key, isBusy] of Object.entries(prev)) {
-        const separatorIndex = key.indexOf(':');
-        const messageId = separatorIndex > 0 ? key.slice(0, separatorIndex) : key;
+        const separatorIndex = key.indexOf(":");
+        const messageId =
+          separatorIndex > 0 ? key.slice(0, separatorIndex) : key;
         if (!messageById.has(messageId)) {
           changed = true;
           continue;
@@ -586,7 +693,7 @@ export function MessageList({
       try {
         await onToggleMessageReaction(messageId, emoji);
       } catch (error: unknown) {
-        setActionError(getErrorMessage(error, 'Failed to update reaction.'));
+        setActionError(getErrorMessage(error, "Failed to update reaction."));
       } finally {
         setReactionBusyKeys((prev) => {
           const { [reactionKey]: _removed, ...rest } = prev;
@@ -594,47 +701,70 @@ export function MessageList({
         });
       }
     },
-    [onToggleMessageReaction, reactionBusyKeys]
+    [onToggleMessageReaction, reactionBusyKeys],
+  );
+
+  const getResolvedAuthorProfile = React.useCallback(
+    (targetUserId: string | null | undefined): AuthorProfile | undefined => {
+      if (!targetUserId) return undefined;
+
+      const authorProfile = authorProfiles[targetUserId];
+      const liveProfile = getLiveProfile(liveProfiles, targetUserId);
+      if (!authorProfile && !liveProfile) return undefined;
+
+      return {
+        username:
+          liveProfile?.username ??
+          authorProfile?.username ??
+          targetUserId.substring(0, 12),
+        isPlatformStaff: authorProfile?.isPlatformStaff ?? false,
+        displayPrefix: authorProfile?.displayPrefix ?? null,
+        avatarUrl: liveProfile?.avatarUrl ?? authorProfile?.avatarUrl ?? null,
+      };
+    },
+    [authorProfiles, liveProfiles],
   );
 
   const reportProfile = React.useCallback(
     async (targetUserId: string) => {
       if (!canCreateReports) {
-        setActionError('You do not have permission to report profiles in this server.');
+        setActionError(
+          "You do not have permission to report profiles in this server.",
+        );
         return;
       }
-      const profile = authorProfiles[targetUserId];
+      const profile = getResolvedAuthorProfile(targetUserId);
       setProfileReportDraft({
         targetUserId,
         username: profile?.username ?? targetUserId.substring(0, 12),
       });
-      setProfileReportReason('');
+      setProfileReportReason("");
       setProfileReportSubmitting(false);
       setActionError(null);
     },
-    [authorProfiles, canCreateReports]
+    [canCreateReports, getResolvedAuthorProfile],
   );
 
   const openBanDialog = React.useCallback(
     (targetUserId: string, communityId: string) => {
-      const profile = authorProfiles[targetUserId];
+      const profile = getResolvedAuthorProfile(targetUserId);
       const username = profile?.username ?? targetUserId.substring(0, 12);
       setBanDraft({
         targetUserId,
         communityId,
         username,
       });
-      setBanReason('');
+      setBanReason("");
       setBanSubmitting(false);
       setBanConfirmOpen(false);
       setActionError(null);
     },
-    [authorProfiles]
+    [getResolvedAuthorProfile],
   );
 
   const openKickDialog = React.useCallback(
     (targetUserId: string) => {
-      const profile = authorProfiles[targetUserId];
+      const profile = getResolvedAuthorProfile(targetUserId);
       const username = profile?.username ?? targetUserId.substring(0, 12);
       setKickDraft({
         targetUserId,
@@ -643,11 +773,12 @@ export function MessageList({
       setKickSubmitting(false);
       setActionError(null);
     },
-    [authorProfiles]
+    [getResolvedAuthorProfile],
   );
 
   const renderMessageRow = (message: Message, depth = 0) => {
-    const isModerationPlaceholder = isModerationRemovedReplyPlaceholder(message);
+    const isModerationPlaceholder =
+      isModerationRemovedReplyPlaceholder(message);
     const isReply = depth > 0;
     const replyIndent = Math.min(depth, 4) * 20;
 
@@ -665,33 +796,42 @@ export function MessageList({
       );
     }
 
-    const authorProfile = message.author_user_id ? authorProfiles[message.author_user_id] : undefined;
-    const isStaffUserMessage = message.author_type === 'user' && Boolean(authorProfile?.isPlatformStaff);
-    const isOwnMessage = message.author_type === 'user' && message.author_user_id === currentUserId;
-    const canProfileMenu = message.author_type === 'user' && Boolean(message.author_user_id);
+    const authorProfile = getResolvedAuthorProfile(message.author_user_id);
+    const isStaffUserMessage =
+      message.author_type === "user" && Boolean(authorProfile?.isPlatformStaff);
+    const isOwnMessage =
+      message.author_type === "user" &&
+      message.author_user_id === currentUserId;
+    const canProfileMenu =
+      message.author_type === "user" && Boolean(message.author_user_id);
     const canDeleteMessage = isOwnMessage || canManageMessages;
     const canEditMessage = isOwnMessage;
     const authorLabel = getAuthorLabel(message, authorProfile, currentUserId);
     const authorColor = getAuthorColor(message, authorProfile, currentUserId);
     const isEditing = editingMessageId === message.id;
-    const messageReactionMap = reactionsByMessageId.get(message.id) ?? new Map();
+    const messageReactionMap =
+      reactionsByMessageId.get(message.id) ?? new Map();
     const reactionSummaries = Array.from(messageReactionMap.entries());
     const messageAttachmentRows = attachmentsByMessageId.get(message.id) ?? [];
-    const messageLinkPreviewRow = linkPreviewByMessageId.get(message.id) ?? null;
+    const messageLinkPreviewRow =
+      linkPreviewByMessageId.get(message.id) ?? null;
     const messageHasHttpUrl = messageContainsHttpUrl(message.content);
     const trimmedMessageContent = message.content.trim();
-    const isInvisibleMediaPlaceholder = /^[\u200B\u200C\u200D\uFEFF]+$/.test(message.content);
+    const isInvisibleMediaPlaceholder = /^[\u200B\u200C\u200D\uFEFF]+$/.test(
+      message.content,
+    );
     const hideMediaPlaceholder =
       messageAttachmentRows.length > 0 &&
-      (/^\[(media|image|file)\]$/i.test(trimmedMessageContent) || isInvisibleMediaPlaceholder);
+      (/^\[(media|image|file)\]$/i.test(trimmedMessageContent) ||
+        isInvisibleMediaPlaceholder);
 
     const messageActions: MenuActionNode[] = [];
 
     if (canEditMessage) {
       messageActions.push({
-        kind: 'item',
-        key: 'edit',
-        label: 'Edit',
+        kind: "item",
+        key: "edit",
+        label: "Edit",
         onSelect: () => {
           setActionError(null);
           setEditingMessageId(message.id);
@@ -702,9 +842,9 @@ export function MessageList({
 
     if (canDeleteMessage) {
       messageActions.push({
-        kind: 'item',
-        key: 'delete',
-        label: 'Delete',
+        kind: "item",
+        key: "delete",
+        label: "Delete",
         destructive: true,
         disabled: actionBusyMessageId === message.id,
         onSelect: () => {
@@ -712,23 +852,27 @@ export function MessageList({
           setActionBusyMessageId(message.id);
           void onDeleteMessage(message.id)
             .catch((error: unknown) => {
-              setActionError(getErrorMessage(error, 'Failed to delete message.'));
+              setActionError(
+                getErrorMessage(error, "Failed to delete message."),
+              );
             })
             .finally(() => {
-              setActionBusyMessageId((prev) => (prev === message.id ? null : prev));
+              setActionBusyMessageId((prev) =>
+                prev === message.id ? null : prev,
+              );
             });
         },
       });
     }
 
     if (messageActions.length > 0) {
-      messageActions.push({ kind: 'separator', key: 'separator-edit-delete' });
+      messageActions.push({ kind: "separator", key: "separator-edit-delete" });
     }
 
     messageActions.push({
-      kind: 'item',
-      key: 'reply',
-      label: 'Reply',
+      kind: "item",
+      key: "reply",
+      label: "Reply",
       onSelect: () =>
         onReplyToMessage({
           id: message.id,
@@ -737,18 +881,18 @@ export function MessageList({
         }),
     });
     messageActions.push({
-      kind: 'separator',
-      key: 'separator-reply',
+      kind: "separator",
+      key: "separator-reply",
     });
 
     messageActions.push({
-      kind: 'submenu',
-      key: 'react-submenu',
-      label: 'React',
+      kind: "submenu",
+      key: "react-submenu",
+      label: "React",
       items: QUICK_REACTION_EMOJI.map((emoji) => {
         const reactionKey = `${message.id}:${emoji}`;
         return {
-          kind: 'item',
+          kind: "item",
           key: `react-${reactionKey}`,
           label: emoji,
           disabled: Boolean(reactionBusyKeys[reactionKey]),
@@ -761,49 +905,59 @@ export function MessageList({
 
     if (canRefreshLinkPreviews && messageHasHttpUrl) {
       const previewRefreshLabel =
-        messageLinkPreviewRow?.status === 'ready'
-          ? 'Refresh link preview'
-          : messageLinkPreviewRow?.status === 'pending'
-            ? 'Link preview pending'
-            : 'Generate link preview';
+        messageLinkPreviewRow?.status === "ready"
+          ? "Refresh link preview"
+          : messageLinkPreviewRow?.status === "pending"
+            ? "Link preview pending"
+            : "Generate link preview";
 
-      messageActions.push({ kind: 'separator', key: 'separator-link-preview-refresh' });
       messageActions.push({
-        kind: 'item',
-        key: 'refresh-link-preview',
+        kind: "separator",
+        key: "separator-link-preview-refresh",
+      });
+      messageActions.push({
+        kind: "item",
+        key: "refresh-link-preview",
         label: previewRefreshLabel,
         disabled:
-          actionBusyMessageId === message.id || messageLinkPreviewRow?.status === 'pending',
+          actionBusyMessageId === message.id ||
+          messageLinkPreviewRow?.status === "pending",
         onSelect: () => {
           setActionError(null);
           setActionBusyMessageId(message.id);
           void onRequestMessageLinkPreviewRefresh(message.id)
             .catch((error: unknown) => {
-              setActionError(getErrorMessage(error, 'Failed to refresh link preview.'));
+              setActionError(
+                getErrorMessage(error, "Failed to refresh link preview."),
+              );
             })
             .finally(() => {
-              setActionBusyMessageId((prev) => (prev === message.id ? null : prev));
+              setActionBusyMessageId((prev) =>
+                prev === message.id ? null : prev,
+              );
             });
         },
       });
     }
 
     if (messageAttachmentRows.length > 0) {
-      messageActions.push({ kind: 'separator', key: 'separator-attachments' });
+      messageActions.push({ kind: "separator", key: "separator-attachments" });
       messageActions.push({
-        kind: 'submenu',
-        key: 'save-media-submenu',
-        label: 'Save media',
+        kind: "submenu",
+        key: "save-media-submenu",
+        label: "Save media",
         items: messageAttachmentRows.map((attachment) => {
           const attachmentLabel =
-            attachment.originalFilename ?? attachment.objectPath.split('/').pop() ?? 'media';
+            attachment.originalFilename ??
+            attachment.objectPath.split("/").pop() ??
+            "media";
           return {
-            kind: 'item',
+            kind: "item",
             key: `save-media-${attachment.id}`,
             label: attachmentLabel,
             onSelect: () => {
               void onSaveAttachment(attachment).catch((error: unknown) => {
-                setActionError(getErrorMessage(error, 'Failed to save media.'));
+                setActionError(getErrorMessage(error, "Failed to save media."));
               });
             },
           } satisfies MenuActionNode;
@@ -811,30 +965,35 @@ export function MessageList({
       });
     }
 
-    messageActions.push({ kind: 'separator', key: 'separator-report' });
+    messageActions.push({ kind: "separator", key: "separator-report" });
     messageActions.push({
-      kind: 'item',
-      key: 'report',
-      label: 'Report',
+      kind: "item",
+      key: "report",
+      label: "Report",
       disabled: !canCreateReports,
       onSelect: () => {
         setReportDialogMessageId(message.id);
-        setReportTarget('haven_staff');
-        setReportKind('content_abuse');
-        setReportComment('');
+        setReportTarget("haven_staff");
+        setReportKind("content_abuse");
+        setReportComment("");
         setActionError(null);
       },
     });
 
-    const authorAvatarInitial = authorLabel.trim().charAt(0).toUpperCase() || 'U';
+    const authorAvatarInitial =
+      authorLabel.trim().charAt(0).toUpperCase() || "U";
     const authorIdentity = (
-      <div className={`flex items-center gap-2 min-w-0 ${canProfileMenu ? 'cursor-pointer' : ''}`}>
+      <div
+        className={`flex items-center gap-2 min-w-0 ${canProfileMenu ? "cursor-pointer" : ""}`}
+      >
         <Avatar size="sm">
-          {authorProfile?.avatarUrl && <AvatarImage src={authorProfile.avatarUrl} alt={authorLabel} />}
+          {authorProfile?.avatarUrl && (
+            <AvatarImage src={authorProfile.avatarUrl} alt={authorLabel} />
+          )}
           <AvatarFallback>{authorAvatarInitial}</AvatarFallback>
         </Avatar>
         <span
-          className={`font-semibold text-[15px] truncate ${canProfileMenu ? 'hover:underline underline-offset-2' : ''}`}
+          className={`font-semibold text-[15px] truncate ${canProfileMenu ? "hover:underline underline-offset-2" : ""}`}
           style={{ color: authorColor }}
         >
           {authorLabel}
@@ -845,24 +1004,27 @@ export function MessageList({
     return (
       <ContextMenu
         onOpenChange={(nextOpen) => {
-          traceContextMenuEvent('message', 'open-change', { messageId: message.id, open: nextOpen });
+          traceContextMenuEvent("message", "open-change", {
+            messageId: message.id,
+            open: nextOpen,
+          });
         }}
       >
         <ContextMenuTrigger
           asChild
           onContextMenu={(event) => {
             const intent = resolveContextMenuIntent(event.target);
-            traceContextMenuEvent('message', 'contextmenu-trigger', {
+            traceContextMenuEvent("message", "contextmenu-trigger", {
               messageId: message.id,
               intent,
             });
 
-            if (intent === 'entity_profile') {
+            if (intent === "entity_profile") {
               event.preventDefault();
               return;
             }
 
-            if (intent === 'native_text') {
+            if (intent === "native_text") {
               event.stopPropagation();
             }
           }}
@@ -870,7 +1032,7 @@ export function MessageList({
           <div
             data-menu-scope="message"
             className={`group rounded-md border bg-[#16263d] border-[#2b4263] px-3 py-2 transition-colors hover:bg-[#1b2f4a] hover:border-[#3d5f8d] ${
-              isReply ? 'border-l-2 border-l-[#4c74a6]' : ''
+              isReply ? "border-l-2 border-l-[#4c74a6]" : ""
             }`}
             style={isReply ? { marginLeft: `${replyIndent}px` } : undefined}
           >
@@ -882,9 +1044,17 @@ export function MessageList({
                     username={authorLabel}
                     avatarUrl={authorProfile?.avatarUrl ?? null}
                     canDirectMessage={message.author_user_id !== currentUserId}
-                    canReport={canCreateReports && message.author_user_id !== currentUserId}
-                    canBan={canManageBans && message.author_user_id !== currentUserId}
-                    canKick={canManageMembers && message.author_user_id !== currentUserId}
+                    canReport={
+                      canCreateReports &&
+                      message.author_user_id !== currentUserId
+                    }
+                    canBan={
+                      canManageBans && message.author_user_id !== currentUserId
+                    }
+                    canKick={
+                      canManageMembers &&
+                      message.author_user_id !== currentUserId
+                    }
                     onDirectMessage={onDirectMessageUser}
                     onReport={(targetUserId) => {
                       void reportProfile(targetUserId);
@@ -909,8 +1079,8 @@ export function MessageList({
                 )}
                 <span className="text-xs text-[#8897b1] shrink-0">
                   {new Date(message.created_at).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
+                    hour: "2-digit",
+                    minute: "2-digit",
                   })}
                 </span>
               </div>
@@ -918,7 +1088,7 @@ export function MessageList({
               <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                 <DropdownMenu
                   onOpenChange={(nextOpen) => {
-                    traceContextMenuEvent('message', 'overflow-open-change', {
+                    traceContextMenuEvent("message", "overflow-open-change", {
                       messageId: message.id,
                       open: nextOpen,
                     });
@@ -934,8 +1104,15 @@ export function MessageList({
                       <MoreHorizontal className="size-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-[#18243a] border-[#304867] text-white">
-                    <ActionMenuContent mode="dropdown" scope="message" actions={messageActions} />
+                  <DropdownMenuContent
+                    align="end"
+                    className="bg-[#18243a] border-[#304867] text-white"
+                  >
+                    <ActionMenuContent
+                      mode="dropdown"
+                      scope="message"
+                      actions={messageActions}
+                    />
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -956,20 +1133,24 @@ export function MessageList({
                     onClick={() => {
                       const nextContent = editingContent.trim();
                       if (!nextContent) {
-                        setActionError('Message content is required.');
+                        setActionError("Message content is required.");
                         return;
                       }
                       setActionBusyMessageId(message.id);
                       void onEditMessage(message.id, nextContent)
                         .then(() => {
                           setEditingMessageId(null);
-                          setEditingContent('');
+                          setEditingContent("");
                         })
                         .catch((error: unknown) => {
-                          setActionError(getErrorMessage(error, 'Failed to edit message.'));
+                          setActionError(
+                            getErrorMessage(error, "Failed to edit message."),
+                          );
                         })
                         .finally(() => {
-                          setActionBusyMessageId((prev) => (prev === message.id ? null : prev));
+                          setActionBusyMessageId((prev) =>
+                            prev === message.id ? null : prev,
+                          );
                         });
                     }}
                     disabled={actionBusyMessageId === message.id}
@@ -983,7 +1164,7 @@ export function MessageList({
                     variant="ghost"
                     onClick={() => {
                       setEditingMessageId(null);
-                      setEditingContent('');
+                      setEditingContent("");
                     }}
                   >
                     Cancel
@@ -998,124 +1179,167 @@ export function MessageList({
                   </div>
                 )}
 
-                {messageLinkPreviewRow?.status === 'pending' && (
+                {messageLinkPreviewRow?.status === "pending" && (
                   <div className="rounded-md border border-[#304867] bg-[#142033] px-3 py-2">
-                    <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">Link preview</p>
-                    <p className="text-xs text-[#a9b8cf]">Fetching preview...</p>
+                    <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">
+                      Link preview
+                    </p>
+                    <p className="text-xs text-[#a9b8cf]">
+                      Fetching preview...
+                    </p>
                   </div>
                 )}
 
-                {messageLinkPreviewRow?.status === 'ready' && messageLinkPreviewRow.snapshot && (
-                  <div className="space-y-2">
-                    {messageLinkPreviewRow.snapshot.embed ? (
-                      (() => {
-                        const embedUrl = getRenderableEmbedUrl(messageLinkPreviewRow);
-                        if (!embedUrl) return null;
+                {messageLinkPreviewRow?.status === "ready" &&
+                  messageLinkPreviewRow.snapshot && (
+                    <div className="space-y-2">
+                      {messageLinkPreviewRow.snapshot.embed ? (
+                        (() => {
+                          const embedUrl = getRenderableEmbedUrl(
+                            messageLinkPreviewRow,
+                          );
+                          if (!embedUrl) return null;
 
-                        return (
-                          <div className="space-y-2">
-                            <div
-                              className="overflow-hidden rounded-md border border-[#304867] bg-[#0d1626]"
-                              style={{ maxWidth: '480px' }}
-                            >
+                          return (
+                            <div className="space-y-2">
                               <div
-                                className="bg-[#0d1626]"
-                                style={{
-                                  aspectRatio: String(messageLinkPreviewRow.snapshot.embed?.aspectRatio || 16 / 9),
-                                  maxWidth: '480px',
-                                  width: '100%',
-                                }}
+                                className="overflow-hidden rounded-md border border-[#304867] bg-[#0d1626]"
+                                style={{ maxWidth: "480px" }}
                               >
-                                <iframe
-                                src={embedUrl}
-                                title={messageLinkPreviewRow.snapshot.title ?? 'Embedded video'}
-                                className="h-full w-full max-h-64 max-w-lg aspect-video"
-                                loading="lazy"
-                                // YouTube returns error 153 when no referrer/client identity is provided.
-                                referrerPolicy="origin"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                              />
-                              </div>
-                              {(messageLinkPreviewRow.snapshot.title ||
-                                messageLinkPreviewRow.snapshot.siteName ||
-                                messageLinkPreviewRow.snapshot.description) && (
-                                <a
-                                  href={
-                                    messageLinkPreviewRow.snapshot.canonicalUrl ??
-                                    messageLinkPreviewRow.snapshot.sourceUrl
-                                  }
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  className="block border-t border-[#304867] bg-[#142033] px-3 py-2 hover:bg-[#182740] transition-colors"
+                                <div
+                                  className="bg-[#0d1626]"
+                                  style={{
+                                    aspectRatio: String(
+                                      messageLinkPreviewRow.snapshot.embed
+                                        ?.aspectRatio || 16 / 9,
+                                    ),
+                                    maxWidth: "480px",
+                                    width: "100%",
+                                  }}
                                 >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    {messageLinkPreviewRow.snapshot.siteName && (
-                                      <span className="shrink-0 rounded-sm bg-[#223754] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#a8c4ea]">
-                                        {messageLinkPreviewRow.snapshot.siteName}
+                                  <iframe
+                                    src={embedUrl}
+                                    title={
+                                      messageLinkPreviewRow.snapshot.title ??
+                                      "Embedded video"
+                                    }
+                                    className="h-full w-full max-h-64 max-w-lg aspect-video"
+                                    loading="lazy"
+                                    // YouTube returns error 153 when no referrer/client identity is provided.
+                                    referrerPolicy="origin"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                  />
+                                </div>
+                                {(messageLinkPreviewRow.snapshot.title ||
+                                  messageLinkPreviewRow.snapshot.siteName ||
+                                  messageLinkPreviewRow.snapshot
+                                    .description) && (
+                                  <a
+                                    href={
+                                      messageLinkPreviewRow.snapshot
+                                        .canonicalUrl ??
+                                      messageLinkPreviewRow.snapshot.sourceUrl
+                                    }
+                                    target="_blank"
+                                    rel="noreferrer noopener"
+                                    className="block border-t border-[#304867] bg-[#142033] px-3 py-2 hover:bg-[#182740] transition-colors"
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      {messageLinkPreviewRow.snapshot
+                                        .siteName && (
+                                        <span className="shrink-0 rounded-sm bg-[#223754] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#a8c4ea]">
+                                          {
+                                            messageLinkPreviewRow.snapshot
+                                              .siteName
+                                          }
+                                        </span>
+                                      )}
+                                      {messageLinkPreviewRow.snapshot.title && (
+                                        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white leading-tight">
+                                          {messageLinkPreviewRow.snapshot.title}
+                                        </p>
+                                      )}
+                                      <span className="shrink-0 text-[11px] text-[#8ea4c7]">
+                                        Open
                                       </span>
-                                    )}
-                                    {messageLinkPreviewRow.snapshot.title && (
-                                      <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white leading-tight">
-                                        {messageLinkPreviewRow.snapshot.title}
+                                    </div>
+                                    {messageLinkPreviewRow.snapshot
+                                      .description && (
+                                      <p className="mt-1 text-xs text-[#bfd0ea] leading-snug max-h-8 overflow-hidden">
+                                        {
+                                          messageLinkPreviewRow.snapshot
+                                            .description
+                                        }
                                       </p>
                                     )}
-                                    <span className="shrink-0 text-[11px] text-[#8ea4c7]">Open</span>
-                                  </div>
-                                  {messageLinkPreviewRow.snapshot.description && (
-                                    <p className="mt-1 text-xs text-[#bfd0ea] leading-snug max-h-8 overflow-hidden">
-                                      {messageLinkPreviewRow.snapshot.description}
-                                    </p>
-                                  )}
-                                </a>
-                              )}
+                                  </a>
+                                )}
+                              </div>
                             </div>
+                          );
+                        })()
+                      ) : (
+                        <a
+                          href={
+                            messageLinkPreviewRow.snapshot.canonicalUrl ??
+                            messageLinkPreviewRow.snapshot.sourceUrl
+                          }
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="block rounded-md border border-[#304867] bg-[#142033] hover:bg-[#1a2943] transition-colors overflow-hidden"
+                        >
+                          {messageLinkPreviewRow.snapshot.thumbnail
+                            ?.signedUrl && (
+                            <img
+                              src={
+                                messageLinkPreviewRow.snapshot.thumbnail
+                                  .signedUrl
+                              }
+                              alt={
+                                messageLinkPreviewRow.snapshot.title ??
+                                "Link preview"
+                              }
+                              className="w-full max-h-64 object-cover bg-[#0d1626]"
+                            />
+                          )}
+                          <div className="px-3 py-2 space-y-1">
+                            {messageLinkPreviewRow.snapshot.siteName && (
+                              <p className="text-[11px] uppercase tracking-wide text-[#8ea4c7]">
+                                {messageLinkPreviewRow.snapshot.siteName}
+                              </p>
+                            )}
+                            {messageLinkPreviewRow.snapshot.title && (
+                              <p className="text-sm font-semibold text-white leading-snug">
+                                {messageLinkPreviewRow.snapshot.title}
+                              </p>
+                            )}
+                            {messageLinkPreviewRow.snapshot.description && (
+                              <p className="text-xs text-[#bfd0ea] leading-snug">
+                                {messageLinkPreviewRow.snapshot.description}
+                              </p>
+                            )}
                           </div>
-                        );
-                      })()
-                    ) : (
-                      <a
-                        href={messageLinkPreviewRow.snapshot.canonicalUrl ?? messageLinkPreviewRow.snapshot.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="block rounded-md border border-[#304867] bg-[#142033] hover:bg-[#1a2943] transition-colors overflow-hidden"
-                      >
-                        {messageLinkPreviewRow.snapshot.thumbnail?.signedUrl && (
-                          <img
-                            src={messageLinkPreviewRow.snapshot.thumbnail.signedUrl}
-                            alt={messageLinkPreviewRow.snapshot.title ?? 'Link preview'}
-                            className="w-full max-h-64 object-cover bg-[#0d1626]"
-                          />
-                        )}
-                        <div className="px-3 py-2 space-y-1">
-                          {messageLinkPreviewRow.snapshot.siteName && (
-                            <p className="text-[11px] uppercase tracking-wide text-[#8ea4c7]">
-                              {messageLinkPreviewRow.snapshot.siteName}
-                            </p>
-                          )}
-                          {messageLinkPreviewRow.snapshot.title && (
-                            <p className="text-sm font-semibold text-white leading-snug">
-                              {messageLinkPreviewRow.snapshot.title}
-                            </p>
-                          )}
-                          {messageLinkPreviewRow.snapshot.description && (
-                            <p className="text-xs text-[#bfd0ea] leading-snug">
-                              {messageLinkPreviewRow.snapshot.description}
-                            </p>
-                          )}
-                        </div>
-                      </a>
-                    )}
-                  </div>
-                )}
+                        </a>
+                      )}
+                    </div>
+                  )}
 
                 {messageAttachmentRows.length > 0 && (
                   <div className="space-y-2">
                     {messageAttachmentRows.map((attachment) => {
-                      const attachmentLabel = attachment.originalFilename ?? attachment.objectPath.split('/').pop() ?? 'media';
-                      const expiresAtLabel = new Date(attachment.expiresAt).toLocaleString();
+                      const attachmentLabel =
+                        attachment.originalFilename ??
+                        attachment.objectPath.split("/").pop() ??
+                        "media";
+                      const expiresAtLabel = new Date(
+                        attachment.expiresAt,
+                      ).toLocaleString();
 
-                      if (attachment.mediaKind === 'image' && attachment.signedUrl) {
+                      if (
+                        attachment.mediaKind === "image" &&
+                        attachment.signedUrl
+                      ) {
                         return (
                           <div key={attachment.id} className="space-y-1">
                             <img
@@ -1130,7 +1354,10 @@ export function MessageList({
                         );
                       }
 
-                      if (attachment.mediaKind === 'video' && attachment.signedUrl) {
+                      if (
+                        attachment.mediaKind === "video" &&
+                        attachment.signedUrl
+                      ) {
                         return (
                           <div key={attachment.id} className="space-y-1">
                             <video
@@ -1157,9 +1384,13 @@ export function MessageList({
                               {attachmentLabel}
                             </a>
                           ) : (
-                            <span className="text-sm text-[#a9b8cf]">{attachmentLabel}</span>
+                            <span className="text-sm text-[#a9b8cf]">
+                              {attachmentLabel}
+                            </span>
                           )}
-                          <p className="text-[11px] text-[#8ea4c7]">Expires {expiresAtLabel}</p>
+                          <p className="text-[11px] text-[#8ea4c7]">
+                            Expires {expiresAtLabel}
+                          </p>
                         </div>
                       );
                     })}
@@ -1183,8 +1414,8 @@ export function MessageList({
                           }}
                           className={`h-6 rounded-full border px-2 text-xs ${
                             summary.reactedByCurrentUser
-                              ? 'border-[#3f79d8] bg-[#3f79d8]/20 text-[#dbe9ff]'
-                              : 'border-[#304867] bg-[#142033] text-[#b8c7dd] hover:text-white'
+                              ? "border-[#3f79d8] bg-[#3f79d8]/20 text-[#dbe9ff]"
+                              : "border-[#304867] bg-[#142033] text-[#b8c7dd] hover:text-white"
                           }`}
                         >
                           <span>{emoji}</span>
@@ -1199,18 +1430,28 @@ export function MessageList({
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="bg-[#18243a] border-[#304867] text-white">
-          <ActionMenuContent mode="context" scope="message" actions={messageActions} />
+          <ActionMenuContent
+            mode="context"
+            scope="message"
+            actions={messageActions}
+          />
         </ContextMenuContent>
       </ContextMenu>
     );
   };
 
-  const renderMessageTree = (message: Message, depth = 0, ancestorIds = new Set<string>()) => {
+  const renderMessageTree = (
+    message: Message,
+    depth = 0,
+    ancestorIds = new Set<string>(),
+  ) => {
     const replies = replyTree.repliesByParentId.get(message.id) ?? [];
     const repliesExpanded = Boolean(expandedReplyThreads[message.id]);
     const nextAncestorIds = new Set(ancestorIds);
     nextAncestorIds.add(message.id);
-    const renderableReplies = replies.filter((reply) => !nextAncestorIds.has(reply.id));
+    const renderableReplies = replies.filter(
+      (reply) => !nextAncestorIds.has(reply.id),
+    );
 
     return (
       <Collapsible
@@ -1241,7 +1482,9 @@ export function MessageList({
 
         {renderableReplies.length > 0 && (
           <CollapsibleContent className="space-y-2">
-            {renderableReplies.map((reply) => renderMessageTree(reply, depth + 1, nextAncestorIds))}
+            {renderableReplies.map((reply) =>
+              renderMessageTree(reply, depth + 1, nextAncestorIds),
+            )}
           </CollapsibleContent>
         )}
       </Collapsible>
@@ -1255,8 +1498,8 @@ export function MessageList({
       if (!virtuosoRef.current) return;
       virtuosoRef.current.scrollToIndex({
         index: replyTree.rootMessages.length - 1,
-        align: 'end',
-        behavior: 'auto',
+        align: "end",
+        behavior: "auto",
       });
       shouldScrollToBottomOnNextDataRef.current = false;
     });
@@ -1285,7 +1528,7 @@ export function MessageList({
           atBottomStateChange={(atBottom) => {
             isAtBottomRef.current = atBottom;
           }}
-          followOutput={(isAtBottom) => (isAtBottom ? 'smooth' : false)}
+          followOutput={(isAtBottom) => (isAtBottom ? "smooth" : false)}
           startReached={handleStartReached}
           increaseViewportBy={{ top: 400, bottom: 600 }}
           components={{
@@ -1295,8 +1538,8 @@ export function MessageList({
                   <div className="flex items-center justify-center">
                     <div className="rounded-full border border-[#304867] bg-[#142033] px-3 py-1 text-[11px] text-[#9fb4d5]">
                       {isLoadingOlderMessages
-                        ? 'Loading older messages...'
-                        : 'Scroll up to load older messages'}
+                        ? "Loading older messages..."
+                        : "Scroll up to load older messages"}
                     </div>
                   </div>
                 </div>
@@ -1316,7 +1559,7 @@ export function MessageList({
         onOpenChange={(open) => {
           if (open) return;
           setProfileReportDraft(null);
-          setProfileReportReason('');
+          setProfileReportReason("");
           setProfileReportSubmitting(false);
         }}
       >
@@ -1330,12 +1573,14 @@ export function MessageList({
 
           <div className="space-y-2">
             <p className="text-sm text-[#c7d5ea]">
-              Target:{' '}
+              Target:{" "}
               <span className="font-semibold text-white">
-                {profileReportDraft?.username ?? 'Unknown user'}
+                {profileReportDraft?.username ?? "Unknown user"}
               </span>
             </p>
-            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">Reason (required)</label>
+            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              Reason (required)
+            </label>
             <Textarea
               value={profileReportReason}
               onChange={(event) => setProfileReportReason(event.target.value)}
@@ -1351,7 +1596,7 @@ export function MessageList({
               variant="ghost"
               onClick={() => {
                 setProfileReportDraft(null);
-                setProfileReportReason('');
+                setProfileReportReason("");
                 setProfileReportSubmitting(false);
               }}
               disabled={profileReportSubmitting}
@@ -1365,7 +1610,7 @@ export function MessageList({
 
                 const normalizedReason = profileReportReason.trim();
                 if (!normalizedReason) {
-                  setActionError('Report reason is required.');
+                  setActionError("Report reason is required.");
                   return;
                 }
 
@@ -1377,10 +1622,15 @@ export function MessageList({
                 })
                   .then(() => {
                     setProfileReportDraft(null);
-                    setProfileReportReason('');
+                    setProfileReportReason("");
                   })
                   .catch((error: unknown) => {
-                    setActionError(getErrorMessage(error, 'Failed to submit profile report.'));
+                    setActionError(
+                      getErrorMessage(
+                        error,
+                        "Failed to submit profile report.",
+                      ),
+                    );
                   })
                   .finally(() => {
                     setProfileReportSubmitting(false);
@@ -1389,28 +1639,36 @@ export function MessageList({
               disabled={profileReportSubmitting}
               className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
             >
-              {profileReportSubmitting ? 'Submitting...' : 'Submit Report'}
+              {profileReportSubmitting ? "Submitting..." : "Submit Report"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(reportDialogMessageId)} onOpenChange={(open) => !open && setReportDialogMessageId(null)}>
+      <Dialog
+        open={Boolean(reportDialogMessageId)}
+        onOpenChange={(open) => !open && setReportDialogMessageId(null)}
+      >
         <DialogContent className="bg-[#18243a] border-[#304867] text-white">
           <DialogHeader>
             <DialogTitle>Report Message</DialogTitle>
             <DialogDescription className="text-[#a9b8cf]">
-              Route this report to server staff, the Haven Moderation Team, or both while preserving a snapshot of the current context.
+              Route this report to server staff, the Haven Moderation Team, or
+              both while preserving a snapshot of the current context.
             </DialogDescription>
             {/* CHECKPOINT 6 COMPLETE */}
           </DialogHeader>
 
           <div className="space-y-3">
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">Destination</label>
+              <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+                Destination
+              </label>
               <select
                 value={reportTarget}
-                onChange={(event) => setReportTarget(event.target.value as MessageReportTarget)}
+                onChange={(event) =>
+                  setReportTarget(event.target.value as MessageReportTarget)
+                }
                 className="w-full rounded-md border border-[#304867] bg-[#142033] px-3 py-2 text-sm text-white"
               >
                 <option value="haven_staff">Haven Moderation Team</option>
@@ -1421,10 +1679,14 @@ export function MessageList({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">Type</label>
+              <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+                Type
+              </label>
               <select
                 value={reportKind}
-                onChange={(event) => setReportKind(event.target.value as MessageReportKind)}
+                onChange={(event) =>
+                  setReportKind(event.target.value as MessageReportKind)
+                }
                 className="w-full rounded-md border border-[#304867] bg-[#142033] px-3 py-2 text-sm text-white"
               >
                 <option value="content_abuse">Report Content Abuse</option>
@@ -1433,7 +1695,9 @@ export function MessageList({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">Comment</label>
+              <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+                Comment
+              </label>
               <Textarea
                 value={reportComment}
                 onChange={(event) => setReportComment(event.target.value)}
@@ -1470,7 +1734,12 @@ export function MessageList({
                     setReportDialogMessageId(null);
                   })
                   .catch((error: unknown) => {
-                    setActionError(getErrorMessage(error, 'Failed to submit message report.'));
+                    setActionError(
+                      getErrorMessage(
+                        error,
+                        "Failed to submit message report.",
+                      ),
+                    );
                   })
                   .finally(() => {
                     setReportSubmitting(false);
@@ -1478,7 +1747,7 @@ export function MessageList({
               }}
               className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
             >
-              {reportSubmitting ? 'Submitting...' : 'Submit report'}
+              {reportSubmitting ? "Submitting..." : "Submit report"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1489,7 +1758,7 @@ export function MessageList({
         onOpenChange={(open) => {
           if (open) return;
           setBanDraft(null);
-          setBanReason('');
+          setBanReason("");
           setBanSubmitting(false);
           setBanConfirmOpen(false);
         }}
@@ -1498,17 +1767,20 @@ export function MessageList({
           <DialogHeader>
             <DialogTitle>Ban User</DialogTitle>
             <DialogDescription className="text-[#a9b8cf]">
-              Bans remove server access immediately and block rejoin until unbanned.
+              Bans remove server access immediately and block rejoin until
+              unbanned.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <p className="text-sm text-[#c7d5ea]">
-              Target:{' '}
+              Target:{" "}
               <span className="font-semibold text-white">
-                {banDraft?.username ?? 'Unknown user'}
+                {banDraft?.username ?? "Unknown user"}
               </span>
             </p>
-            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">Reason (required)</label>
+            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              Reason (required)
+            </label>
             <Textarea
               value={banReason}
               onChange={(event) => setBanReason(event.target.value)}
@@ -1523,7 +1795,7 @@ export function MessageList({
               variant="ghost"
               onClick={() => {
                 setBanDraft(null);
-                setBanReason('');
+                setBanReason("");
                 setBanSubmitting(false);
                 setBanConfirmOpen(false);
               }}
@@ -1536,7 +1808,7 @@ export function MessageList({
               variant="destructive"
               onClick={() => {
                 if (!banReason.trim()) {
-                  setActionError('Ban reason is required.');
+                  setActionError("Ban reason is required.");
                   return;
                 }
                 setBanConfirmOpen(true);
@@ -1554,11 +1826,14 @@ export function MessageList({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Ban</AlertDialogTitle>
             <AlertDialogDescription className="text-[#a9b8cf]">
-              This action is immediate. Confirm banning this user from the selected server.
+              This action is immediate. Confirm banning this user from the
+              selected server.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={banSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={banSubmitting}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-500"
               disabled={banSubmitting || !banDraft}
@@ -1566,7 +1841,7 @@ export function MessageList({
                 if (!banDraft) return;
                 const normalizedReason = banReason.trim();
                 if (!normalizedReason) {
-                  setActionError('Ban reason is required.');
+                  setActionError("Ban reason is required.");
                   return;
                 }
                 setBanSubmitting(true);
@@ -1579,17 +1854,19 @@ export function MessageList({
                   .then(() => {
                     setBanConfirmOpen(false);
                     setBanDraft(null);
-                    setBanReason('');
+                    setBanReason("");
                   })
                   .catch((error: unknown) => {
-                    setActionError(getErrorMessage(error, 'Failed to ban user.'));
+                    setActionError(
+                      getErrorMessage(error, "Failed to ban user."),
+                    );
                   })
                   .finally(() => {
                     setBanSubmitting(false);
                   });
               }}
             >
-              {banSubmitting ? 'Banning...' : 'Ban User'}
+              {banSubmitting ? "Banning..." : "Ban User"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1607,11 +1884,14 @@ export function MessageList({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Removal</AlertDialogTitle>
             <AlertDialogDescription className="text-[#a9b8cf]">
-              Remove this user from the server now. They can rejoin later if they still have a valid invite.
+              Remove this user from the server now. They can rejoin later if
+              they still have a valid invite.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={kickSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={kickSubmitting}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-500"
               disabled={kickSubmitting || !kickDraft}
@@ -1627,20 +1907,27 @@ export function MessageList({
                     setKickDraft(null);
                   })
                   .catch((error: unknown) => {
-                    setActionError(getErrorMessage(error, 'Failed to remove user from the server.'));
+                    setActionError(
+                      getErrorMessage(
+                        error,
+                        "Failed to remove user from the server.",
+                      ),
+                    );
                   })
                   .finally(() => {
                     setKickSubmitting(false);
                   });
               }}
             >
-              {kickSubmitting ? 'Removing...' : 'Remove from Server'}
+              {kickSubmitting ? "Removing..." : "Remove from Server"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {actionError && <p className="px-4 pb-2 text-xs text-red-400">{actionError}</p>}
+      {actionError && (
+        <p className="px-4 pb-2 text-xs text-red-400">{actionError}</p>
+      )}
     </>
   );
 }

@@ -1,33 +1,38 @@
-import React from 'react';
-import type { VoiceSettings } from '@platform/desktop/types';
+import React from "react";
+import type { VoiceSettings } from "@platform/desktop/types";
 import type {
   VoiceParticipant,
   VoicePeerDiagnostics,
-} from '@client/features/voice/types';
-import { Badge } from '@shared/components/ui/badge';
+} from "@client/features/voice/types";
+import { Badge } from "@shared/components/ui/badge";
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from '@shared/components/ui/avatar';
-import { Button } from '@shared/components/ui/button';
+} from "@shared/components/ui/avatar";
+import { Button } from "@shared/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@shared/components/ui/card';
-import { PushToTalkBindingField } from '@shared/components/PushToTalkBindingField';
-import { Slider } from '@shared/components/ui/slider';
+} from "@shared/components/ui/card";
+import { PushToTalkBindingField } from "@shared/components/PushToTalkBindingField";
+import { Slider } from "@shared/components/ui/slider";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@shared/components/ui/select';
-import { cn } from '@shared/lib/utils';
+} from "@shared/components/ui/select";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
+import { cn } from "@shared/lib/utils";
+import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import {
   ExternalLink,
   Headphones,
@@ -38,21 +43,17 @@ import {
   RefreshCcw,
   Volume2,
   VolumeX,
-} from 'lucide-react';
+} from "lucide-react";
 
 const REMOTE_VOLUME_OPTIONS = [0, 25, 50, 75, 100, 125, 150, 200] as const;
 
 const formatBytes = (value: number | null) =>
-  value == null ? 'n/a' : `${(value / 1024).toFixed(1)} KB`;
+  value == null ? "n/a" : `${(value / 1024).toFixed(1)} KB`;
 
 const getInitials = (displayName: string) => {
-  const parts = displayName
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
-  if (parts.length === 0) return '?';
-  return parts.map((part) => part.charAt(0).toUpperCase()).join('');
+  const parts = displayName.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  if (parts.length === 0) return "?";
+  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
 };
 
 type VoiceChannelPaneProps = {
@@ -69,7 +70,7 @@ type VoiceChannelPaneProps = {
   voiceSettingsError?: string | null;
   notice?: string | null;
   error?: string | null;
-  iceSource?: 'xirsys' | 'fallback' | null;
+  iceSource?: "xirsys" | "fallback" | null;
   inputDevices: MediaDeviceInfo[];
   outputDevices: MediaDeviceInfo[];
   selectedInputDeviceId: string;
@@ -150,6 +151,7 @@ export function VoiceChannelPane({
   getMemberVolume,
   onKickParticipant,
 }: VoiceChannelPaneProps) {
+  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const updateVoiceSettingsPatch = (patch: Partial<VoiceSettings>) => {
     onUpdateVoiceSettingsPatch?.(patch);
   };
@@ -160,7 +162,7 @@ export function VoiceChannelPane({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Headphones className="size-5" />
-            <span>{channelName ?? 'Voice Controls'}</span>
+            <span>{channelName ?? "Voice Controls"}</span>
           </CardTitle>
           <CardDescription className="text-[#a9b8cf]">
             Advanced voice routing, diagnostics, and local per-member volume
@@ -169,12 +171,12 @@ export function VoiceChannelPane({
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={joined ? 'default' : 'outline'}>
-              {joined ? 'Connected' : channelName ? 'Disconnected' : 'Idle'}
+            <Badge variant={joined ? "default" : "outline"}>
+              {joined ? "Connected" : channelName ? "Disconnected" : "Idle"}
             </Badge>
             {iceSource && (
-              <Badge variant={iceSource === 'xirsys' ? 'default' : 'outline'}>
-                ICE: {iceSource === 'xirsys' ? 'Xirsys' : 'STUN fallback'}
+              <Badge variant={iceSource === "xirsys" ? "default" : "outline"}>
+                ICE: {iceSource === "xirsys" ? "Xirsys" : "STUN fallback"}
               </Badge>
             )}
           </div>
@@ -197,7 +199,7 @@ export function VoiceChannelPane({
                 className="bg-[#3f79d8] text-white hover:bg-[#325fae]"
               >
                 <PhoneCall className="size-4" />
-                {joining ? 'Joining...' : 'Join Voice'}
+                {joining ? "Joining..." : "Join Voice"}
               </Button>
             ) : (
               <>
@@ -207,12 +209,16 @@ export function VoiceChannelPane({
                   onClick={onToggleMute}
                   className={`text-white ${
                     isMuted
-                      ? 'border-red-500/40 bg-red-500/15 hover:bg-red-500/20'
-                      : 'border-[#304867] bg-[#142033] hover:bg-[#22334f]'
+                      ? "border-red-500/40 bg-red-500/15 hover:bg-red-500/20"
+                      : "border-[#304867] bg-[#142033] hover:bg-[#22334f]"
                   }`}
                 >
-                  {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
-                  {isMuted ? 'Unmute' : 'Mute'}
+                  {isMuted ? (
+                    <MicOff className="size-4" />
+                  ) : (
+                    <Mic className="size-4" />
+                  )}
+                  {isMuted ? "Unmute" : "Mute"}
                 </Button>
                 <Button
                   type="button"
@@ -220,12 +226,12 @@ export function VoiceChannelPane({
                   onClick={onToggleDeafen}
                   className={`text-white ${
                     isDeafened
-                      ? 'border-red-500/40 bg-red-500/15 hover:bg-red-500/20'
-                      : 'border-[#304867] bg-[#142033] hover:bg-[#22334f]'
+                      ? "border-red-500/40 bg-red-500/15 hover:bg-red-500/20"
+                      : "border-[#304867] bg-[#142033] hover:bg-[#22334f]"
                   }`}
                 >
                   <VolumeX className="size-4" />
-                  {isDeafened ? 'Undeafen' : 'Deafen'}
+                  {isDeafened ? "Undeafen" : "Deafen"}
                 </Button>
                 <Button type="button" variant="outline" onClick={onRetryIce}>
                   <RefreshCcw className="size-4" />
@@ -241,12 +247,20 @@ export function VoiceChannelPane({
 
           <div className="flex flex-wrap gap-2">
             {onOpenVoiceHardwareTest && (
-              <Button type="button" variant="secondary" onClick={onOpenVoiceHardwareTest}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onOpenVoiceHardwareTest}
+              >
                 Open Voice Hardware Test
               </Button>
             )}
             {canOpenVoicePopout && onOpenVoicePopout && (
-              <Button type="button" variant="outline" onClick={onOpenVoicePopout}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onOpenVoicePopout}
+              >
                 <ExternalLink className="size-4" />
                 Open Voice Popout
               </Button>
@@ -268,19 +282,21 @@ export function VoiceChannelPane({
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">
-              Mode: {voiceSettings.transmissionMode.replace(/_/g, ' ')}
+              Mode: {voiceSettings.transmissionMode.replace(/_/g, " ")}
             </Badge>
-            {voiceSettings.transmissionMode === 'voice_activity' && (
-              <Badge variant={voiceActivityGateOpen ? 'default' : 'outline'}>
-                Gate {voiceActivityGateOpen ? 'Open' : 'Closed'}
+            {voiceSettings.transmissionMode === "voice_activity" && (
+              <Badge variant={voiceActivityGateOpen ? "default" : "outline"}>
+                Gate {voiceActivityGateOpen ? "Open" : "Closed"}
               </Badge>
             )}
-            {voiceSettings.transmissionMode === 'push_to_talk' && (
-              <Badge variant={pushToTalkPressed ? 'default' : 'outline'}>
-                PTT {pushToTalkPressed ? 'Held' : 'Idle'}
+            {voiceSettings.transmissionMode === "push_to_talk" && (
+              <Badge variant={pushToTalkPressed ? "default" : "outline"}>
+                PTT {pushToTalkPressed ? "Held" : "Idle"}
               </Badge>
             )}
-            <Badge variant="outline">Input {Math.round(localInputLevel * 100)}%</Badge>
+            <Badge variant="outline">
+              Input {Math.round(localInputLevel * 100)}%
+            </Badge>
           </div>
 
           <div className="space-y-2">
@@ -291,7 +307,7 @@ export function VoiceChannelPane({
               value={voiceSettings.transmissionMode}
               onValueChange={(value) =>
                 updateVoiceSettingsPatch({
-                  transmissionMode: value as VoiceSettings['transmissionMode'],
+                  transmissionMode: value as VoiceSettings["transmissionMode"],
                 })
               }
               disabled={voiceSettingsSaving}
@@ -307,7 +323,7 @@ export function VoiceChannelPane({
             </Select>
           </div>
 
-          {voiceSettings.transmissionMode === 'voice_activity' && (
+          {voiceSettings.transmissionMode === "voice_activity" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2 text-xs text-[#a9b8cf]">
                 <span>Gate threshold</span>
@@ -320,7 +336,7 @@ export function VoiceChannelPane({
                 value={[voiceSettings.voiceActivationThreshold]}
                 onValueChange={(values) => {
                   const nextValue = values[0];
-                  if (typeof nextValue !== 'number') return;
+                  if (typeof nextValue !== "number") return;
                   updateVoiceSettingsPatch({
                     voiceActivationThreshold: nextValue,
                   });
@@ -332,7 +348,7 @@ export function VoiceChannelPane({
             </div>
           )}
 
-          {voiceSettings.transmissionMode === 'push_to_talk' && (
+          {voiceSettings.transmissionMode === "push_to_talk" && (
             <PushToTalkBindingField
               value={voiceSettings.pushToTalkBinding}
               disabled={voiceSettingsSaving}
@@ -434,12 +450,15 @@ export function VoiceChannelPane({
           <CardContent className="space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-xs text-[#a9b8cf]">
               <span>Peers: {diagnosticsRows.length}</span>
-              <span>ICE source: {iceSource === 'xirsys' ? 'xirsys' : iceSource ?? 'unknown'}</span>
               <span>
-                Last refresh:{' '}
+                ICE source:{" "}
+                {iceSource === "xirsys" ? "xirsys" : (iceSource ?? "unknown")}
+              </span>
+              <span>
+                Last refresh:{" "}
                 {diagnosticsUpdatedAt
                   ? new Date(diagnosticsUpdatedAt).toLocaleTimeString()
-                  : 'never'}
+                  : "never"}
               </span>
             </div>
 
@@ -451,12 +470,14 @@ export function VoiceChannelPane({
                 disabled={!joined || diagnosticsLoading}
               >
                 <RefreshCcw className="size-4" />
-                {diagnosticsLoading ? 'Refreshing...' : 'Refresh Diagnostics'}
+                {diagnosticsLoading ? "Refreshing..." : "Refresh Diagnostics"}
               </Button>
             </div>
 
             {!joined ? (
-              <p className="text-sm text-[#a9b8cf]">Join voice to view diagnostics.</p>
+              <p className="text-sm text-[#a9b8cf]">
+                Join voice to view diagnostics.
+              </p>
             ) : diagnosticsRows.length === 0 ? (
               <p className="text-sm text-[#a9b8cf]">No peer connections yet.</p>
             ) : (
@@ -474,13 +495,21 @@ export function VoiceChannelPane({
                       <p>ICE connection: {diag.iceConnectionState}</p>
                       <p>Signaling: {diag.signalingState}</p>
                       <p>ICE gathering: {diag.iceGatheringState}</p>
-                      <p>Pair ID: {diag.selectedCandidatePairId ?? 'n/a'}</p>
-                      <p>Pair state: {diag.selectedCandidatePairState ?? 'n/a'}</p>
-                      <p>Local candidate: {diag.localCandidateType ?? 'n/a'}</p>
-                      <p>Remote candidate: {diag.remoteCandidateType ?? 'n/a'}</p>
+                      <p>Pair ID: {diag.selectedCandidatePairId ?? "n/a"}</p>
                       <p>
-                        Writable:{' '}
-                        {diag.writable == null ? 'n/a' : diag.writable ? 'yes' : 'no'}
+                        Pair state: {diag.selectedCandidatePairState ?? "n/a"}
+                      </p>
+                      <p>Local candidate: {diag.localCandidateType ?? "n/a"}</p>
+                      <p>
+                        Remote candidate: {diag.remoteCandidateType ?? "n/a"}
+                      </p>
+                      <p>
+                        Writable:{" "}
+                        {diag.writable == null
+                          ? "n/a"
+                          : diag.writable
+                            ? "yes"
+                            : "no"}
                       </p>
                       <p>Bytes sent: {formatBytes(diag.bytesSent)}</p>
                       <p>Bytes received: {formatBytes(diag.bytesReceived)}</p>
@@ -495,7 +524,9 @@ export function VoiceChannelPane({
 
       <Card className="border-[#263a58] bg-[#1c2a43] text-white">
         <CardHeader>
-          <CardTitle>Participants ({participants.length + (joined ? 1 : 0)})</CardTitle>
+          <CardTitle>
+            Participants ({participants.length + (joined ? 1 : 0)})
+          </CardTitle>
           <CardDescription className="text-[#a9b8cf]">
             Per-user volume is local to this client.
           </CardDescription>
@@ -507,18 +538,20 @@ export function VoiceChannelPane({
                 <Avatar
                   size="sm"
                   className={cn(
-                    'ring-2 ring-transparent transition-colors',
+                    "ring-2 ring-transparent transition-colors",
                     voiceActivityGateOpen &&
                       !isMuted &&
                       !isDeafened &&
-                      'ring-[#64f0a8]'
+                      "ring-[#64f0a8]",
                   )}
                 >
                   <AvatarImage
                     src={currentUserAvatarUrl ?? undefined}
                     alt={currentUserDisplayName}
                   />
-                  <AvatarFallback>{getInitials(currentUserDisplayName)}</AvatarFallback>
+                  <AvatarFallback>
+                    {getInitials(currentUserDisplayName)}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-white">
@@ -554,88 +587,111 @@ export function VoiceChannelPane({
                 </Button>
               </div>
 
-              {participants.map((participant) => (
-                <div
-                  key={participant.userId}
-                  className="flex items-center justify-between gap-3 rounded-md border border-[#304867] bg-[#142033] px-3 py-2"
-                >
-                  <div className="min-w-0 flex items-center gap-3">
-                    <Avatar
-                      size="sm"
-                      className={cn(
-                        'ring-2 ring-transparent transition-colors',
-                        participant.isSpeaking && 'ring-[#64f0a8]'
-                      )}
-                    >
-                      <AvatarImage
-                        src={participant.avatarUrl ?? undefined}
-                        alt={participant.displayName}
-                      />
-                      <AvatarFallback>
-                        {getInitials(participant.displayName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p
-                        className="truncate text-sm font-medium text-white"
-                        title={participant.displayName}
-                      >
-                        {participant.displayName}
-                      </p>
-                      <div className="mt-1 flex items-center gap-2">
-                        {participant.muted && <Badge variant="outline">Muted</Badge>}
-                        {participant.deafened && (
-                          <Badge variant="outline">Deafened</Badge>
+              {participants.map((participant) => {
+                const participantDisplayName =
+                  resolveLiveUsername(
+                    liveProfiles,
+                    participant.userId,
+                    participant.displayName,
+                  ) ?? participant.displayName;
+                const participantAvatarUrl = resolveLiveAvatarUrl(
+                  liveProfiles,
+                  participant.userId,
+                  participant.avatarUrl,
+                );
+
+                return (
+                  <div
+                    key={participant.userId}
+                    className="flex items-center justify-between gap-3 rounded-md border border-[#304867] bg-[#142033] px-3 py-2"
+                  >
+                    <div className="min-w-0 flex items-center gap-3">
+                      <Avatar
+                        size="sm"
+                        className={cn(
+                          "ring-2 ring-transparent transition-colors",
+                          participant.isSpeaking && "ring-[#64f0a8]",
                         )}
+                      >
+                        <AvatarImage
+                          src={participantAvatarUrl ?? undefined}
+                          alt={participantDisplayName}
+                        />
+                        <AvatarFallback>
+                          {getInitials(participantDisplayName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p
+                          className="truncate text-sm font-medium text-white"
+                          title={participantDisplayName}
+                        >
+                          {participantDisplayName}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                          {participant.muted && (
+                            <Badge variant="outline">Muted</Badge>
+                          )}
+                          {participant.deafened && (
+                            <Badge variant="outline">Deafened</Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex min-w-[220px] items-center gap-3">
-                    <Volume2 className="size-4 text-[#a9b8cf]" />
-                    <Slider
-                      min={REMOTE_VOLUME_OPTIONS[0]}
-                      max={REMOTE_VOLUME_OPTIONS[REMOTE_VOLUME_OPTIONS.length - 1]}
-                      step={25}
-                      value={[getMemberVolume(participant.userId)]}
-                      onValueChange={(values) => {
-                        const numericValue = values[0];
-                        if (typeof numericValue !== 'number') return;
-                        setMemberVolume(participant.userId, numericValue);
-                      }}
-                      disabled={isDeafened}
-                      className="w-full"
-                      aria-label={`Volume for ${participant.displayName}`}
-                    />
-                    <span className="w-10 shrink-0 text-right text-xs text-[#c8d7ee]">
-                      {getMemberVolume(participant.userId)}%
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => resetMemberVolume(participant.userId)}
-                      disabled={isDeafened}
-                      className="h-8 px-2 text-xs"
-                    >
-                      100%
-                    </Button>
-                    {canKickParticipants && onKickParticipant && (
+                    <div className="flex min-w-[220px] items-center gap-3">
+                      <Volume2 className="size-4 text-[#a9b8cf]" />
+                      <Slider
+                        min={REMOTE_VOLUME_OPTIONS[0]}
+                        max={
+                          REMOTE_VOLUME_OPTIONS[
+                            REMOTE_VOLUME_OPTIONS.length - 1
+                          ]
+                        }
+                        step={25}
+                        value={[getMemberVolume(participant.userId)]}
+                        onValueChange={(values) => {
+                          const numericValue = values[0];
+                          if (typeof numericValue !== "number") return;
+                          setMemberVolume(participant.userId, numericValue);
+                        }}
+                        disabled={isDeafened}
+                        className="w-full"
+                        aria-label={`Volume for ${participantDisplayName}`}
+                      />
+                      <span className="w-10 shrink-0 text-right text-xs text-[#c8d7ee]">
+                        {getMemberVolume(participant.userId)}%
+                      </span>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() =>
-                          onKickParticipant(participant.userId, participant.displayName)
-                        }
-                        className="h-8 border-red-500/40 bg-red-500/10 px-2 text-xs text-red-100 hover:bg-red-500/20"
+                        onClick={() => resetMemberVolume(participant.userId)}
+                        disabled={isDeafened}
+                        className="h-8 px-2 text-xs"
                       >
-                        Remove
+                        100%
                       </Button>
-                    )}
+                      {canKickParticipants && onKickParticipant && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            onKickParticipant(
+                              participant.userId,
+                              participantDisplayName,
+                            )
+                          }
+                          className="h-8 border-red-500/40 bg-red-500/10 px-2 text-xs text-red-100 hover:bg-red-500/20"
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
         </CardContent>

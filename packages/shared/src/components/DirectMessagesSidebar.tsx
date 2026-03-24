@@ -1,16 +1,25 @@
-import React from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
-import { Badge } from '@shared/components/ui/badge';
-import { Button } from '@shared/components/ui/button';
-import { ScrollArea } from '@shared/components/ui/scroll-area';
-import { Skeleton } from '@shared/components/ui/skeleton';
-import { DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT } from '@shared/lib/backend/directMessageUtils';
-import { useDmStore } from '@shared/stores/dmStore';
-import { MessageCircle, RefreshCcw, VolumeX } from 'lucide-react';
+import React from "react";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@shared/components/ui/avatar";
+import { Badge } from "@shared/components/ui/badge";
+import { Button } from "@shared/components/ui/button";
+import { ScrollArea } from "@shared/components/ui/scroll-area";
+import { Skeleton } from "@shared/components/ui/skeleton";
+import { DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT } from "@shared/lib/backend/directMessageUtils";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
+import { useDmStore } from "@shared/stores/dmStore";
+import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { MessageCircle, RefreshCcw, VolumeX } from "lucide-react";
 
 const DM_SIDEBAR_BASE_MIN_WIDTH = 280;
 const DM_SIDEBAR_MAX_WIDTH = 520;
-const DM_SIDEBAR_WIDTH_STORAGE_KEY = 'haven:dm-sidebar-width';
+const DM_SIDEBAR_WIDTH_STORAGE_KEY = "haven:dm-sidebar-width";
 
 type DirectMessagesSidebarProps = {
   currentUserDisplayName: string;
@@ -21,13 +30,14 @@ type DirectMessagesSidebarProps = {
 };
 
 const formatTimestamp = (value: string | null) => {
-  if (!value) return '';
+  if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return value;
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 };
 
-const getInitial = (value: string | null) => value?.trim().charAt(0).toUpperCase() || 'D';
+const getInitial = (value: string | null) =>
+  value?.trim().charAt(0).toUpperCase() || "D";
 
 export function DirectMessagesSidebar({
   currentUserDisplayName,
@@ -37,28 +47,43 @@ export function DirectMessagesSidebar({
   onRefresh,
 }: DirectMessagesSidebarProps) {
   const conversations = useDmStore((state) => state.conversations);
-  const selectedConversationId = useDmStore((state) => state.currentConversationId);
+  const selectedConversationId = useDmStore(
+    (state) => state.currentConversationId,
+  );
   const loading = useDmStore((state) => state.isLoading);
   const unreadCounts = useDmStore((state) => state.unreadCounts);
+  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const sidebarRef = React.useRef<HTMLDivElement | null>(null);
   const userTitleRef = React.useRef<HTMLParagraphElement | null>(null);
-  const [autoMinWidth, setAutoMinWidth] = React.useState(DM_SIDEBAR_BASE_MIN_WIDTH);
+  const [autoMinWidth, setAutoMinWidth] = React.useState(
+    DM_SIDEBAR_BASE_MIN_WIDTH,
+  );
   const [isResizing, setIsResizing] = React.useState(false);
   const [sidebarWidth, setSidebarWidth] = React.useState<number>(() => {
-    if (typeof window === 'undefined') return 320;
-    const stored = Number(window.localStorage.getItem(DM_SIDEBAR_WIDTH_STORAGE_KEY));
+    if (typeof window === "undefined") return 320;
+    const stored = Number(
+      window.localStorage.getItem(DM_SIDEBAR_WIDTH_STORAGE_KEY),
+    );
     if (!Number.isFinite(stored) || stored <= 0) return 320;
-    return Math.max(DM_SIDEBAR_BASE_MIN_WIDTH, Math.min(DM_SIDEBAR_MAX_WIDTH, stored));
+    return Math.max(
+      DM_SIDEBAR_BASE_MIN_WIDTH,
+      Math.min(DM_SIDEBAR_MAX_WIDTH, stored),
+    );
   });
 
   const computedMinWidth = React.useMemo(
-    () => Math.max(DM_SIDEBAR_BASE_MIN_WIDTH, Math.min(DM_SIDEBAR_MAX_WIDTH, autoMinWidth)),
-    [autoMinWidth]
+    () =>
+      Math.max(
+        DM_SIDEBAR_BASE_MIN_WIDTH,
+        Math.min(DM_SIDEBAR_MAX_WIDTH, autoMinWidth),
+      ),
+    [autoMinWidth],
   );
 
   const clampSidebarWidth = React.useCallback(
-    (value: number) => Math.max(computedMinWidth, Math.min(DM_SIDEBAR_MAX_WIDTH, value)),
-    [computedMinWidth]
+    (value: number) =>
+      Math.max(computedMinWidth, Math.min(DM_SIDEBAR_MAX_WIDTH, value)),
+    [computedMinWidth],
   );
 
   React.useLayoutEffect(() => {
@@ -70,7 +95,7 @@ export function DirectMessagesSidebar({
 
     measure();
 
-    if (typeof ResizeObserver === 'undefined' || !userTitleRef.current) return;
+    if (typeof ResizeObserver === "undefined" || !userTitleRef.current) return;
     const observer = new ResizeObserver(measure);
     observer.observe(userTitleRef.current);
     return () => observer.disconnect();
@@ -82,16 +107,22 @@ export function DirectMessagesSidebar({
   }, [computedMinWidth, sidebarWidth]);
 
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(DM_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      DM_SIDEBAR_WIDTH_STORAGE_KEY,
+      String(sidebarWidth),
+    );
   }, [sidebarWidth]);
 
-  const handleResizePointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setIsResizing(true);
-  }, []);
+  const handleResizePointerDown = React.useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setIsResizing(true);
+    },
+    [],
+  );
 
   const handleResizePointerMove = React.useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -99,7 +130,7 @@ export function DirectMessagesSidebar({
       const sidebarLeft = sidebarRef.current.getBoundingClientRect().left;
       setSidebarWidth(clampSidebarWidth(event.clientX - sidebarLeft));
     },
-    [clampSidebarWidth, isResizing]
+    [clampSidebarWidth, isResizing],
   );
 
   const stopResizing = React.useCallback(() => {
@@ -110,7 +141,7 @@ export function DirectMessagesSidebar({
     <div
       ref={sidebarRef}
       className={`relative shrink-0 border-r border-[#22334f] bg-[#162238] flex flex-col ${
-        isResizing ? 'select-none' : ''
+        isResizing ? "select-none" : ""
       }`}
       style={{
         width: `${sidebarWidth}px`,
@@ -121,8 +152,13 @@ export function DirectMessagesSidebar({
       <div className="h-16 px-4 border-b border-[#22334f] bg-[#142033] flex items-center">
         <div className="flex w-full items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">Direct Messages</p>
-            <p ref={userTitleRef} className="text-sm font-semibold text-white truncate">
+            <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">
+              Direct Messages
+            </p>
+            <p
+              ref={userTitleRef}
+              className="text-sm font-semibold text-white truncate"
+            >
               {currentUserDisplayName}
             </p>
           </div>
@@ -135,7 +171,9 @@ export function DirectMessagesSidebar({
             disabled={loading || refreshing}
             aria-label="Refresh direct messages"
           >
-            <RefreshCcw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCcw
+              className={`size-4 ${refreshing ? "animate-spin" : ""}`}
+            />
           </Button>
         </div>
       </div>
@@ -166,57 +204,79 @@ export function DirectMessagesSidebar({
             <div className="rounded-md border border-dashed border-[#304867] bg-[#142033]/60 p-4">
               <p className="text-sm text-[#a9b8cf]">No DM conversations yet.</p>
               <p className="mt-1 text-xs text-[#90a5c4]">
-                Add a friend, then click Message from the Friends panel to start one.
+                Add a friend, then click Message from the Friends panel to start
+                one.
               </p>
             </div>
           ) : (
             conversations.map((conversation) => {
-              const isSelected = conversation.conversationId === selectedConversationId;
-              const title = conversation.otherUsername ?? 'Direct Message';
+              const isSelected =
+                conversation.conversationId === selectedConversationId;
+              const title =
+                resolveLiveUsername(
+                  liveProfiles,
+                  conversation.otherUserId,
+                  conversation.otherUsername,
+                ) ?? "Direct Message";
+              const avatarUrl = resolveLiveAvatarUrl(
+                liveProfiles,
+                conversation.otherUserId,
+                conversation.otherAvatarUrl,
+              );
               const preview =
                 conversation.lastMessagePreview?.trim() ||
                 (conversation.lastMessageId
                   ? DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT
-                  : 'No messages yet. Start the conversation.');
+                  : "No messages yet. Start the conversation.");
               return (
                 <button
                   key={conversation.conversationId}
                   type="button"
-                  onClick={() => onSelectConversation(conversation.conversationId)}
+                  onClick={() =>
+                    onSelectConversation(conversation.conversationId)
+                  }
                   className={`w-full rounded-md border px-3 py-3 text-left transition-colors ${
                     isSelected
-                      ? 'border-[#4a78bd] bg-[#13233c]'
-                      : 'border-[#304867] bg-[#142033] hover:bg-[#192946]'
+                      ? "border-[#4a78bd] bg-[#13233c]"
+                      : "border-[#304867] bg-[#142033] hover:bg-[#192946]"
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="size-10 rounded-xl border border-[#304867] bg-[#1b2a42]">
-                      {conversation.otherAvatarUrl && (
-                        <AvatarImage src={conversation.otherAvatarUrl} alt={title} />
-                      )}
+                      {avatarUrl && <AvatarImage src={avatarUrl} alt={title} />}
                       <AvatarFallback className="rounded-xl bg-[#1b2a42] text-white text-xs">
-                        {getInitial(conversation.otherUsername)}
+                        {getInitial(title)}
                       </AvatarFallback>
                     </Avatar>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-white truncate">{title}</p>
+                        <p className="text-sm font-semibold text-white truncate">
+                          {title}
+                        </p>
                         {conversation.isMuted && (
                           <VolumeX className="size-3.5 text-[#95a5bf] shrink-0" />
                         )}
-                        {(unreadCounts[conversation.conversationId] ?? conversation.unreadCount) > 0 && (
-                          <Badge variant="default" className="bg-[#3f79d8] text-white ml-auto">
-                            {(unreadCounts[conversation.conversationId] ?? conversation.unreadCount) > 99
-                              ? '99+'
-                              : unreadCounts[conversation.conversationId] ?? conversation.unreadCount}
+                        {(unreadCounts[conversation.conversationId] ??
+                          conversation.unreadCount) > 0 && (
+                          <Badge
+                            variant="default"
+                            className="bg-[#3f79d8] text-white ml-auto"
+                          >
+                            {(unreadCounts[conversation.conversationId] ??
+                              conversation.unreadCount) > 99
+                              ? "99+"
+                              : (unreadCounts[conversation.conversationId] ??
+                                conversation.unreadCount)}
                           </Badge>
                         )}
                       </div>
 
                       <div className="mt-1 flex items-center gap-2">
                         <MessageCircle className="size-3 text-[#8ea4c7] shrink-0" />
-                        <p className="text-xs text-[#a9b8cf] truncate">{preview}</p>
+                        <p className="text-xs text-[#a9b8cf] truncate">
+                          {preview}
+                        </p>
                         {conversation.lastMessageCreatedAt && (
                           <span className="ml-auto shrink-0 text-[11px] text-[#8398ba]">
                             {formatTimestamp(conversation.lastMessageCreatedAt)}
@@ -237,7 +297,9 @@ export function DirectMessagesSidebar({
         aria-label="Resize Direct Messages Sidebar"
         aria-orientation="vertical"
         className={`absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize ${
-          isResizing ? 'bg-[#3f79d8]/40' : 'bg-transparent hover:bg-[#3f79d8]/20'
+          isResizing
+            ? "bg-[#3f79d8]/40"
+            : "bg-transparent hover:bg-[#3f79d8]/20"
         }`}
         onPointerDown={handleResizePointerDown}
         onPointerMove={handleResizePointerMove}
@@ -253,4 +315,3 @@ export function DirectMessagesSidebar({
     </div>
   );
 }
-
