@@ -207,6 +207,31 @@ const explainedScenarioCatalog = {
         },
       ],
     },
+    '13_recent_schema_alignment.sql': {
+      title: 'Recent Schema Alignment (Permissions / Avatars / ToS / Account Deletion)',
+      scenarios: [
+        {
+          actor: 'schema parity checks',
+          action: 'Verifies removed developer permission keys are gone and support report statuses match the current enum.',
+          expected: 'The test suite reflects the current prod-parity permission catalog and report lifecycle schema.',
+        },
+        {
+          actor: 'community_owner',
+          action: 'Creates a fresh community after the developer-permission cleanup migrations.',
+          expected: 'Default community bootstrap succeeds and no removed permission keys are assigned to the Admin role.',
+        },
+        {
+          actor: 'member_a / anon',
+          action: 'Uploads a profile avatar object to their own path and verifies public read plus foreign-path rejection.',
+          expected: 'Avatar storage policies allow only self-scoped writes while keeping the bucket publicly readable.',
+        },
+        {
+          actor: 'member_a / member_b / platform_staff_active',
+          action: 'Exercises ToS acceptance self-read, cross-user denial, staff visibility, and validates account-deletion FK delete rules.',
+          expected: 'ToS acceptance RLS matches the current policy model and account deletion blockers now use SET NULL.',
+        },
+      ],
+    },
   },
   backendFiles: {
     'packages/shared/src/lib/backend/__tests__/notificationBackend.contract.test.ts': {

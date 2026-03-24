@@ -382,7 +382,7 @@ select test_support.expect_exception(
     (select id from dm_ids where key = 'conversation'),
     'blocked send should fail'
   ),
-  'cannot send'
+  'blocked'
 );
 
 rollback;
