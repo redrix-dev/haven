@@ -600,8 +600,23 @@ export function ChatApp() {
                       "Unknown server"
                     }
                     channelName={app.activeVoiceChannel.name}
-                    participantCount={visibleActiveVoiceParticipantPreview.length}
+                    participantCount={
+                      visibleActiveVoiceParticipants.length +
+                      (voiceController.state.joined ? 1 : 0)
+                    }
                     participantPreview={visibleActiveVoiceParticipantPreview}
+                    memberControls={visibleActiveVoiceParticipants.map(
+                      (participant) => ({
+                        userId: participant.userId,
+                        displayName: participant.displayName,
+                        isMuted: participant.muted,
+                        isDeafened: participant.deafened,
+                        volume:
+                          voiceController.state.remoteVolumes[
+                            participant.userId
+                          ] ?? 100,
+                      }),
+                    )}
                     voiceConnected={voiceController.state.joined}
                     voicePanelOpen={app.voicePanelOpen}
                     joining={voiceController.state.joining}
@@ -641,6 +656,13 @@ export function ChatApp() {
                     }}
                     onSelectOutputDevice={
                       voiceController.actions.setOutputDevice
+                    }
+                    onSetMemberVolume={voiceController.actions.setMemberVolume}
+                    onResetMemberVolume={
+                      voiceController.actions.resetMemberVolume
+                    }
+                    onResetAllMemberVolumes={
+                      voiceController.actions.resetAllMemberVolumes
                     }
                     onOpenAdvancedOptions={() =>
                       app.setShowVoiceSettingsModal(true)

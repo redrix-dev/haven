@@ -192,6 +192,7 @@ export function useVoiceSessionController({
   const hasPresenceSyncedOnceRef = React.useRef(false);
   const lastPresenceSoundAtRef = React.useRef(0);
   const previousChannelKeyRef = React.useRef<string | null>(null);
+  const skipNextPresenceSyncRef = React.useRef(false);
   const activeChannelRef = React.useRef<VoiceControllerChannel | null>(
     activeChannel
   );
@@ -932,20 +933,59 @@ export function useVoiceSessionController({
     );
   }, [currentUserId, playDebouncedVoicePresenceSound, reconcilePeerConnections]);
 
+  const getLocalTransmissionState = React.useCallback(() => {
+    const {
+      joined: currentJoined,
+      isMuted: currentIsMuted,
+      isDeafened: currentIsDeafened,
+    } = useVoiceStore.getState();
+    const baseAllowsSend = !currentIsMuted && !currentIsDeafened;
+    const transmissionMode = voiceSettingsRef.current.transmissionMode;
+
+    let shouldSendAudio = baseAllowsSend;
+    if (baseAllowsSend) {
+      switch (transmissionMode) {
+        case 'push_to_talk':
+          shouldSendAudio =
+            Boolean(voiceSettingsRef.current.pushToTalkBinding) &&
+            pushToTalkPressed;
+          break;
+        case 'voice_activity':
+          shouldSendAudio = voiceActivityGateOpen;
+          break;
+        case 'open_mic':
+        default:
+          shouldSendAudio = true;
+          break;
+      }
+    }
+
+    const isSpeaking =
+      transmissionMode === 'push_to_talk'
+        ? baseAllowsSend && pushToTalkPressed
+        : baseAllowsSend && voiceActivityGateOpen;
+
+    return {
+      joined: currentJoined,
+      isMuted: currentIsMuted,
+      isDeafened: currentIsDeafened,
+      shouldSendAudio,
+      isSpeaking,
+    };
+  }, [pushToTalkPressed, voiceActivityGateOpen]);
+
   const trackPresenceState = React.useCallback(async () => {
     const channel = channelRef.current;
-    if (!channel || !joined || !currentUserId) return;
+    const transmissionState = getLocalTransmissionState();
+    if (!channel || !transmissionState.joined || !currentUserId) return;
 
     const payload: VoicePresencePayload = {
       user_id: currentUserId,
       display_name: currentUserDisplayName,
       avatar_url: currentUserAvatarUrl ?? null,
-      muted: isMuted,
-      deafened: isDeafened,
-      is_speaking:
-        voiceSettings.transmissionMode !== 'push_to_talk'
-          ? !isMuted && !isDeafened && voiceActivityGateOpen
-          : !isMuted && !isDeafened && pushToTalkPressed,
+      muted: transmissionState.isMuted,
+      deafened: transmissionState.isDeafened,
+      is_speaking: transmissionState.isSpeaking,
       joined_at: new Date().toISOString(),
     };
 
@@ -954,15 +994,10 @@ export function useVoiceSessionController({
       console.error('Failed to update voice presence:', trackStatus);
     }
   }, [
+    getLocalTransmissionState,
     currentUserAvatarUrl,
     currentUserDisplayName,
     currentUserId,
-    isDeafened,
-    isMuted,
-    joined,
-    pushToTalkPressed,
-    voiceActivityGateOpen,
-    voiceSettings.transmissionMode,
   ]);
 
   const requestLocalAudioStream = React.useCallback(async (deviceId: string) => {
@@ -982,31 +1017,11 @@ export function useVoiceSessionController({
     const localStream = localStreamRef.current;
     if (!localStream) return;
 
-    const baseAllowsSend = !isMuted && !isDeafened;
-    let modeAllowsSend = true;
-
-    if (baseAllowsSend) {
-      switch (voiceSettingsRef.current.transmissionMode) {
-        case 'push_to_talk':
-          modeAllowsSend =
-            Boolean(voiceSettingsRef.current.pushToTalkBinding) &&
-            pushToTalkPressed;
-          break;
-        case 'voice_activity':
-          modeAllowsSend = voiceActivityGateOpen;
-          break;
-        case 'open_mic':
-        default:
-          modeAllowsSend = true;
-          break;
-      }
-    }
-
-    const shouldSendAudio = baseAllowsSend && modeAllowsSend;
+    const { shouldSendAudio } = getLocalTransmissionState();
     localStream.getAudioTracks().forEach((track) => {
       track.enabled = shouldSendAudio;
     });
-  }, [isDeafened, isMuted, pushToTalkPressed, voiceActivityGateOpen]);
+  }, [getLocalTransmissionState]);
 
   const applyOutgoingTrackToPeers = React.useCallback(
     async (stream: MediaStream, renegotiate: boolean) => {
@@ -1015,12 +1030,10 @@ export function useVoiceSessionController({
         throw new Error('Selected input device has no audio track.');
       }
 
-      const shouldSendAudio = !isMuted && !isDeafened;
-      nextTrack.enabled = shouldSendAudio;
-
       const previousStream = localStreamRef.current;
       localStreamRef.current = stream;
       await startLocalInputMonitor(stream);
+      applyLocalTrackState();
 
       for (const [remoteUserId, peerConnection] of peersRef.current.entries()) {
         const audioSender = peerConnection
@@ -1052,7 +1065,7 @@ export function useVoiceSessionController({
         previousStream.getTracks().forEach((track) => track.stop());
       }
     },
-    [createAndSendOffer, isDeafened, isMuted, startLocalInputMonitor]
+    [applyLocalTrackState, createAndSendOffer, startLocalInputMonitor]
   );
 
   const cleanupVoiceSession = React.useCallback(async () => {
@@ -1088,6 +1101,7 @@ export function useVoiceSessionController({
     setLocalInputLevel(0);
     setVoiceActivityGateOpen(false);
     setPushToTalkPressed(false);
+    skipNextPresenceSyncRef.current = false;
     activePushToTalkCodeRef.current = null;
     previousRemoteParticipantIdsRef.current = new Set();
     hasPresenceSyncedOnceRef.current = false;
@@ -1160,12 +1174,7 @@ export function useVoiceSessionController({
 
       localStreamRef.current = localStream;
       await startLocalInputMonitor(localStream);
-      if (localStream) {
-        const shouldSendAudio = !isMuted && !isDeafened;
-        localStream.getAudioTracks().forEach((track) => {
-          track.enabled = shouldSendAudio;
-        });
-      }
+      applyLocalTrackState();
 
       await refreshAudioDevices();
 
@@ -1205,6 +1214,7 @@ export function useVoiceSessionController({
               window.clearTimeout(timeoutId);
               setStoredJoined(true);
               playDebouncedVoicePresenceSound('voice_presence_join'); // CHECKPOINT 4 COMPLETE
+              skipNextPresenceSyncRef.current = true;
               await trackPresenceState();
               resolve();
             } else if (status === 'CHANNEL_ERROR') {
@@ -1237,6 +1247,7 @@ export function useVoiceSessionController({
       onSessionError,
       onVoiceKick,
       playDebouncedVoicePresenceSound,
+      applyLocalTrackState,
       refreshAudioDevices,
       requestLocalAudioStream,
       selectedInputDeviceId,
@@ -1427,6 +1438,10 @@ export function useVoiceSessionController({
 
   React.useEffect(() => {
     applyLocalTrackState();
+    if (skipNextPresenceSyncRef.current) {
+      skipNextPresenceSyncRef.current = false;
+      return;
+    }
     void trackPresenceState();
   }, [
     applyLocalTrackState,

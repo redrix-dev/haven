@@ -390,6 +390,60 @@ function VoiceStoreHarness({
   );
 }
 
+type DirectVoiceControllerHarnessProps = {
+  initialTransmissionMode?: "voice_activity" | "push_to_talk" | "open_mic";
+};
+
+function DirectVoiceControllerHarness({
+  initialTransmissionMode = DEFAULT_VOICE_SETTINGS.transmissionMode,
+}: DirectVoiceControllerHarnessProps) {
+  const [voiceSettings, setVoiceSettings] = React.useState(() => ({
+    ...DEFAULT_VOICE_SETTINGS,
+    transmissionMode: initialTransmissionMode,
+  }));
+
+  const controller = useVoiceSessionController({
+    activeChannel: {
+      communityId: "server-voice",
+      channelId: "voice-1",
+      channelName: "Lobby",
+    },
+    currentUserId: "user-1",
+    currentUserDisplayName: "Test User",
+    currentUserAvatarUrl: null,
+    blockedUserIds: new Set(),
+    isElevatedInActiveServer: false,
+    voiceSettings,
+    notificationAudioSettings: DEFAULT_NOTIFICATION_AUDIO_SETTINGS,
+    onUpdateVoiceSettings: setVoiceSettings,
+    onSessionError: () => undefined,
+  });
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          void controller.actions.joinVoiceChannel();
+        }}
+      >
+        Join Voice Direct
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void controller.actions.switchInputDevice("mic-2");
+        }}
+      >
+        Switch Input Direct
+      </button>
+      <div data-testid="direct-voice-connected">
+        {String(controller.state.joined)}
+      </div>
+    </div>
+  );
+}
+
 describe("voice lifecycle regressions", () => {
   beforeEach(() => {
     voiceMocks.reset();
@@ -661,6 +715,62 @@ describe("voice lifecycle regressions", () => {
     });
 
     nowSpy.mockRestore();
+  });
+
+  it("applies the active transmission gate to a replacement microphone track", async () => {
+    const user = userEvent.setup();
+    const firstTrack = {
+      kind: "audio",
+      enabled: true,
+      stop: vi.fn(),
+    } as unknown as MediaStreamTrack;
+    const secondTrack = {
+      kind: "audio",
+      enabled: true,
+      stop: vi.fn(),
+    } as unknown as MediaStreamTrack;
+    const firstStream = {
+      getAudioTracks: () => [firstTrack],
+      getTracks: () => [firstTrack],
+    } as unknown as MediaStream;
+    const secondStream = {
+      getAudioTracks: () => [secondTrack],
+      getTracks: () => [secondTrack],
+    } as unknown as MediaStream;
+
+    vi.mocked(navigator.mediaDevices.getUserMedia)
+      .mockResolvedValueOnce(firstStream)
+      .mockResolvedValueOnce(secondStream);
+
+    render(
+      <DirectVoiceControllerHarness initialTransmissionMode="voice_activity" />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Join Voice Direct" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("direct-voice-connected").textContent).toBe(
+        "true",
+      );
+    });
+
+    await waitFor(() => {
+      expect(firstTrack.enabled).toBe(false);
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Switch Input Direct" }),
+    );
+
+    await waitFor(() => {
+      expect(vi.mocked(navigator.mediaDevices.getUserMedia)).toHaveBeenCalledTimes(
+        2,
+      );
+    });
+
+    await waitFor(() => {
+      expect(secondTrack.enabled).toBe(false);
+    });
   });
 
   it("switches channels on the same server by leaving first and advancing the active channel", async () => {

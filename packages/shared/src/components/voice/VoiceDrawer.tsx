@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@shared/components/ui/select";
+import { Slider } from "@shared/components/ui/slider";
 import type {
   VoicePopoutDeviceOption,
   VoiceSettings,
@@ -27,12 +28,23 @@ import {
   VolumeX,
 } from "lucide-react";
 
+const DEFAULT_MEMBER_VOLUME = 100;
+const MIN_MEMBER_VOLUME = 0;
+const MAX_MEMBER_VOLUME = 200;
+
 interface VoiceDrawerProps {
   surface?: "sidebar" | "popout";
   serverName: string;
   channelName: string;
   participantCount: number;
   participantPreview: Array<{ userId: string; displayName: string }>;
+  memberControls?: Array<{
+    userId: string;
+    displayName: string;
+    isMuted?: boolean;
+    isDeafened?: boolean;
+    volume: number;
+  }>;
   voiceConnected: boolean;
   voicePanelOpen: boolean;
   joining?: boolean;
@@ -56,6 +68,9 @@ interface VoiceDrawerProps {
   onSelectTransmissionMode: (mode: VoiceSettings["transmissionMode"]) => void;
   onSelectInputDevice: (deviceId: string) => void;
   onSelectOutputDevice: (deviceId: string) => void;
+  onSetMemberVolume?: (userId: string, volume: number) => void;
+  onResetMemberVolume?: (userId: string) => void;
+  onResetAllMemberVolumes?: () => void;
   onOpenAdvancedOptions: () => void;
   onOpenVoiceHardwareTest: () => void;
   onOpenVoicePopout?: () => void;
@@ -76,6 +91,7 @@ export function VoiceDrawer({
   channelName,
   participantCount,
   participantPreview,
+  memberControls = [],
   voiceConnected: voiceConnectedProp,
   voicePanelOpen,
   joining = false,
@@ -95,6 +111,9 @@ export function VoiceDrawer({
   onSelectTransmissionMode,
   onSelectInputDevice,
   onSelectOutputDevice,
+  onSetMemberVolume,
+  onResetMemberVolume,
+  onResetAllMemberVolumes,
   onOpenAdvancedOptions,
   onOpenVoiceHardwareTest,
   onOpenVoicePopout,
@@ -122,6 +141,10 @@ export function VoiceDrawer({
         ? "Connected"
         : "Standby";
   const isPopoutSurface = surface === "popout";
+  const canAdjustMemberVolumes =
+    voiceSessionState.joined &&
+    memberControls.length > 0 &&
+    Boolean(onSetMemberVolume);
 
   return (
     <div
@@ -174,7 +197,7 @@ export function VoiceDrawer({
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="w-[300px] border-[#304867] bg-[#111a2b] p-3 text-white"
+              className="w-[340px] max-w-[calc(100vw-1.5rem)] max-h-[70vh] overflow-y-auto border-[#304867] bg-[#111a2b] p-3 text-white"
             >
               <div className="space-y-3">
                 <div>
@@ -283,6 +306,106 @@ export function VoiceDrawer({
                     selected. Use Voice Settings for threshold and binding
                     changes.
                   </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                      Member Volume
+                    </p>
+                    {canAdjustMemberVolumes && onResetAllMemberVolumes && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={onResetAllMemberVolumes}
+                        disabled={voiceSessionState.isDeafened}
+                        className="h-7 px-2 text-[11px] text-[#c8d7ee] hover:bg-[#22334f] hover:text-white"
+                      >
+                        Reset all
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#90a5c4]">
+                    Per-user volume is local to this client.
+                  </p>
+
+                  {canAdjustMemberVolumes ? (
+                    <div className="space-y-2">
+                      {memberControls.map((member) => {
+                        const statusLabel = member.isDeafened
+                          ? "Deafened"
+                          : member.isMuted
+                            ? "Muted"
+                            : "Connected";
+                        return (
+                          <div
+                            key={member.userId}
+                            className="rounded-md border border-[#304867] bg-[#142033] px-2.5 py-2"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p
+                                  className="truncate text-xs font-medium text-white"
+                                  title={member.displayName}
+                                >
+                                  {member.displayName}
+                                </p>
+                                <p className="text-[10px] text-[#90a5c4]">
+                                  {statusLabel}
+                                </p>
+                              </div>
+                              <span className="shrink-0 text-[11px] font-medium text-[#d8e5f7]">
+                                {member.volume}%
+                              </span>
+                            </div>
+
+                            <div className="mt-2 flex items-center gap-2">
+                              <Slider
+                                min={MIN_MEMBER_VOLUME}
+                                max={MAX_MEMBER_VOLUME}
+                                step={25}
+                                value={[member.volume]}
+                                onValueChange={(values) => {
+                                  const nextVolume = values[0];
+                                  if (typeof nextVolume !== "number") return;
+                                  onSetMemberVolume?.(member.userId, nextVolume);
+                                }}
+                                disabled={voiceSessionState.isDeafened}
+                                className="w-full"
+                                aria-label={`Volume for ${member.displayName}`}
+                              />
+                              {onResetMemberVolume ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    onResetMemberVolume(member.userId)
+                                  }
+                                  disabled={
+                                    voiceSessionState.isDeafened ||
+                                    member.volume === DEFAULT_MEMBER_VOLUME
+                                  }
+                                  className="h-7 shrink-0 px-2 text-[11px] text-[#c8d7ee] hover:bg-[#22334f] hover:text-white"
+                                >
+                                  100%
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : voiceSessionState.joined ? (
+                    <p className="text-[11px] text-[#90a5c4]">
+                      No other participants are connected yet.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-[#90a5c4]">
+                      Join voice to adjust individual member volume.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-2 pt-1">

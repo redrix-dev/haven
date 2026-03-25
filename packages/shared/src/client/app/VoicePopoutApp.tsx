@@ -51,6 +51,13 @@ export function VoicePopoutApp() {
           userId: member.userId,
           displayName: member.displayName,
         }))}
+        memberControls={state.members.map((member) => ({
+          userId: member.userId,
+          displayName: member.displayName,
+          isMuted: member.isMuted,
+          isDeafened: member.isDeafened,
+          volume: member.volume,
+        }))}
         voiceConnected={state.connected}
         voicePanelOpen={quickSettingsOpen}
         joining={state.joining}
@@ -80,6 +87,21 @@ export function VoicePopoutApp() {
         onSelectOutputDevice={(deviceId) =>
           dispatch({ type: 'set_output_device', deviceId })
         }
+        onSetMemberVolume={(userId, volume) =>
+          dispatch({ type: 'set_member_volume', userId, volume })
+        }
+        onResetMemberVolume={(userId) =>
+          dispatch({ type: 'set_member_volume', userId, volume: 100 })
+        }
+        onResetAllMemberVolumes={() => {
+          for (const member of state.members) {
+            dispatch({
+              type: 'set_member_volume',
+              userId: member.userId,
+              volume: 100,
+            });
+          }
+        }}
         onOpenAdvancedOptions={() => dispatch({ type: 'open_voice_settings' })}
         onOpenVoiceHardwareTest={() =>
           dispatch({ type: 'open_voice_hardware_test' })

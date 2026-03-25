@@ -89,6 +89,19 @@ describe('VoicePopoutApp', () => {
     await user.click(screen.getByLabelText(/open voice quick settings/i));
 
     expect(screen.getByText('Voice Quick Settings')).toBeTruthy();
+    expect(screen.getByText('Member Volume')).toBeTruthy();
+
+    const memberVolumeSlider = screen.getByRole('slider', {
+      name: /volume for remote user/i,
+    });
+    memberVolumeSlider.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(popoutMocks.dispatchVoicePopoutControlAction).toHaveBeenCalledWith({
+      type: 'set_member_volume',
+      userId: 'user-2',
+      volume: 125,
+    });
 
     await user.click(screen.getByRole('button', { name: /open voice settings/i }));
     expect(popoutMocks.dispatchVoicePopoutControlAction).toHaveBeenCalledWith({
