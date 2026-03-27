@@ -126,6 +126,7 @@ export type ServerPermissions = {
   canManageChannelPermissions: boolean;
   canManageMessages: boolean;
   canManageBans: boolean;
+  canViewBanHidden: boolean;
   canCreateReports: boolean;
   canManageReports: boolean;
   canRefreshLinkPreviews: boolean;

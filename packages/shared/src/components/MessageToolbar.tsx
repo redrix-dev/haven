@@ -4,9 +4,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
+import { cn } from '@shared/lib/utils';
 
 type ShortcutEvent = Pick<
   React.KeyboardEvent<HTMLTextAreaElement>,
@@ -21,10 +23,17 @@ interface MessageToolbarProps {
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   value: string;
   onChange: (newValue: string) => void;
+  variant?: 'toolbar' | 'menu';
+  triggerClassName?: string;
+  triggerLabel?: React.ReactNode;
+  triggerTitle?: string;
+  menuAlign?: 'start' | 'center' | 'end';
 }
 
 const toolbarButtonClassName =
   'h-7 min-w-7 rounded-md px-2 text-xs font-semibold text-[#cfe0ff] hover:bg-[#22334f] hover:text-white';
+const menuItemClassName = 'cursor-pointer text-[#d8e5f7] focus:bg-[#22334f] focus:text-white';
+const menuShortcutClassName = 'text-[#8ea4c7]';
 
 const scheduleSelection = (
   inputRef: React.RefObject<HTMLTextAreaElement | null>,
@@ -40,7 +49,19 @@ const scheduleSelection = (
 };
 
 export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageToolbarProps>(
-  function MessageToolbar({ inputRef, value, onChange }, ref) {
+  function MessageToolbar(
+    {
+      inputRef,
+      value,
+      onChange,
+      variant = 'toolbar',
+      triggerClassName,
+      triggerLabel = '...',
+      triggerTitle = 'Formatting options',
+      menuAlign = 'end',
+    },
+    ref
+  ) {
     const commitChange = React.useCallback(
       (nextValue: string, selectionStart: number, selectionEnd: number) => {
         onChange(nextValue);
@@ -63,7 +84,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
 
     const applyWrappedFormat = React.useCallback(
       (open: string, close = open) => {
-        withSelection((input, start, end) => {
+        withSelection((_input, start, end) => {
           const selected = value.slice(start, end);
           const before = value.slice(0, start);
           const after = value.slice(end);
@@ -188,6 +209,106 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
       event.preventDefault();
     };
 
+    const renderMenuContent = () => (
+      <DropdownMenuContent
+        align={menuAlign}
+        className="w-56 border-[#304867] bg-[#18243a] text-white"
+      >
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => applyWrappedFormat('**')}
+        >
+          Bold
+          <DropdownMenuShortcut className={menuShortcutClassName}>Ctrl+B</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem className={menuItemClassName} onSelect={() => applyWrappedFormat('*')}>
+          Italic
+          <DropdownMenuShortcut className={menuShortcutClassName}>Ctrl+I</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem className={menuItemClassName} onSelect={() => applyWrappedFormat('__')}>
+          Underline
+          <DropdownMenuShortcut className={menuShortcutClassName}>Ctrl+U</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem className={menuItemClassName} onSelect={() => applyWrappedFormat('~~')}>
+          Strikethrough
+        </DropdownMenuItem>
+        <DropdownMenuItem className={menuItemClassName} onSelect={() => applyWrappedFormat('`')}>
+          Inline code
+        </DropdownMenuItem>
+        <DropdownMenuItem className={menuItemClassName} onSelect={insertCodeBlock}>
+          Code block
+        </DropdownMenuItem>
+        <DropdownMenuItem className={menuItemClassName} onSelect={insertLink}>
+          Link
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-[#304867]" />
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => prefixSelectedLines((line) => `> ${line}`)}
+        >
+          Blockquote
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => prefixSelectedLines((line) => `# ${line}`)}
+        >
+          Heading 1
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => prefixSelectedLines((line) => `## ${line}`)}
+        >
+          Heading 2
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => prefixSelectedLines((line) => `### ${line}`)}
+        >
+          Heading 3
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => prefixSelectedLines((line) => `- ${line}`)}
+        >
+          Bullet list
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => prefixSelectedLines((line, index) => `${index + 1}. ${line}`)}
+        >
+          Numbered list
+        </DropdownMenuItem>
+        <DropdownMenuItem className={menuItemClassName} onSelect={insertHorizontalRule}>
+          Horizontal rule
+          <DropdownMenuShortcut className={menuShortcutClassName}>---</DropdownMenuShortcut>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    );
+
+    if (variant === 'menu') {
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'h-9 min-w-9 rounded-xl px-2 text-sm font-semibold text-[#cfe0ff] hover:bg-[#22334f] hover:text-white',
+                triggerClassName
+              )}
+              title={triggerTitle}
+              aria-label={triggerTitle}
+              onMouseDown={preventToolbarFocusLoss}
+            >
+              {triggerLabel}
+            </Button>
+          </DropdownMenuTrigger>
+          {renderMenuContent()}
+        </DropdownMenu>
+      );
+    }
+
     return (
       <div className="flex flex-wrap items-center gap-1 rounded-md border border-[#304867] bg-[#111a2b] px-2 py-1">
         <Button
@@ -281,46 +402,18 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
               variant="ghost"
               size="xs"
               className={toolbarButtonClassName}
-              title="More formatting"
-              aria-label="More formatting"
+              title={triggerTitle}
+              aria-label={triggerTitle}
               onMouseDown={preventToolbarFocusLoss}
             >
-              •••
+              {triggerLabel}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="border-[#304867] bg-[#18243a] text-white"
-          >
-            <DropdownMenuItem onSelect={() => prefixSelectedLines((line) => `> ${line}`)}>
-              Blockquote
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => prefixSelectedLines((line) => `# ${line}`)}>
-              Heading 1
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => prefixSelectedLines((line) => `## ${line}`)}>
-              Heading 2
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => prefixSelectedLines((line) => `### ${line}`)}>
-              Heading 3
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => prefixSelectedLines((line) => `- ${line}`)}>
-              Bullet list
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => prefixSelectedLines((line, index) => `${index + 1}. ${line}`)}
-            >
-              Numbered list
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={insertHorizontalRule}>
-              Horizontal rule
-              <DropdownMenuShortcut>---</DropdownMenuShortcut>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+          {renderMenuContent()}
         </DropdownMenu>
       </div>
     );
   }
 );
 
-// CHECKPOINT 4 COMPLETE
+MessageToolbar.displayName = 'MessageToolbar';

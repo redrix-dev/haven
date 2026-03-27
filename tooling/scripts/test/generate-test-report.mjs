@@ -232,6 +232,31 @@ const explainedScenarioCatalog = {
         },
       ],
     },
+    '14_hidden_message_visibility.sql': {
+      title: 'Hidden Message Visibility (Ban Hide / RLS Cascade / Rejoin Restore)',
+      scenarios: [
+        {
+          actor: 'member_a -> community_owner',
+          action: 'Creates a channel message with child reaction/attachment/link-preview rows, then the owner bans member_a.',
+          expected: 'Ban RPC marks the author message hidden and removes the member without deleting the historical content.',
+        },
+        {
+          actor: 'member_b',
+          action: 'Queries the hidden message and its child rows after the ban.',
+          expected: 'Message, reactions, attachments, and link previews are all hidden by RLS because child-table visibility cascades through the parent message.',
+        },
+        {
+          actor: 'server_mod',
+          action: 'Receives an explicit role grant for can_view_ban_hidden and reads the hidden message thread.',
+          expected: 'Moderator can still view the hidden message and its child rows while regular members cannot.',
+        },
+        {
+          actor: 'community_owner + member_a',
+          action: 'Revokes the ban, then member_a rejoins through invite redemption.',
+          expected: 'The rejoin path restores is_hidden to false and the message thread becomes visible again to regular members.',
+        },
+      ],
+    },
   },
   backendFiles: {
     'packages/shared/src/lib/backend/__tests__/notificationBackend.contract.test.ts': {

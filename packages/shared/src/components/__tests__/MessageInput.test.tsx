@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MessageInput } from '@shared/components/MessageInput';
 
 describe('MessageInput', () => {
-  it('wraps the current selection with toolbar formatting and keeps textarea composition behavior', async () => {
+  it('wraps the current selection with formatting menu actions and keeps textarea composition behavior', async () => {
     const user = userEvent.setup();
     const onSendMessage = vi.fn().mockResolvedValue(undefined);
 
@@ -24,7 +24,8 @@ describe('MessageInput', () => {
     textarea.focus();
     textarea.setSelectionRange(0, 5);
 
-    await user.click(screen.getByRole('button', { name: /bold/i }));
+    await user.click(screen.getByRole('button', { name: /formatting options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /bold/i }));
 
     await waitFor(() => {
       expect(textarea.value).toBe('**hello**');

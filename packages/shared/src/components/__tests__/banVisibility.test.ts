@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   BANNED_REPLY_PLACEHOLDER_CONTENT,
-  applyBanVisibilityToMessageBundle,
   applyChannelAccessVisibilityToMessageBundle,
+  filterHiddenMessageContent,
   filterBlockedUserContent,
-  isBanRemovedReplyPlaceholder,
   isModerationRemovedReplyPlaceholder,
 } from '@client/features/messages/lib/banVisibility';
 import type {
@@ -21,7 +20,8 @@ const makeMessage = (
   authorUserId: string,
   content: string,
   metadata: Record<string, unknown> | null = null,
-  channelId = 'channel-1'
+  channelId = 'channel-1',
+  isHidden = false
 ) =>
   ({
     id,
@@ -34,6 +34,7 @@ const makeMessage = (
     created_at: nowIso,
     deleted_at: null,
     edited_at: null,
+    is_hidden: isHidden,
   }) as unknown as Message;
 
 const makeReaction = (id: string, messageId: string, userId: string): MessageReaction => ({
@@ -83,63 +84,7 @@ const makeLinkPreview = (id: string, messageId: string, channelId = 'channel-1')
   updatedAt: nowIso,
 });
 
-describe('applyBanVisibilityToMessageBundle', () => {
-  it('removes a banned thread owner and all replies in that thread', () => {
-    const root = makeMessage('root', 'banned-user', 'Root');
-    const reply = makeMessage('reply', 'user-2', 'Reply', { replyToMessageId: 'root' });
-    const unrelated = makeMessage('other', 'user-3', 'Other');
-
-    const filtered = applyBanVisibilityToMessageBundle(
-      {
-        messages: [root, reply, unrelated],
-        reactions: [makeReaction('reaction-1', 'reply', 'user-4')],
-        attachments: [makeAttachment('attachment-1', 'reply', 'user-2')],
-        linkPreviews: [makeLinkPreview('preview-1', 'reply')],
-      },
-      ['banned-user']
-    );
-
-    expect(filtered.messages.map((message) => message.id)).toEqual(['other']);
-    expect(filtered.reactions).toHaveLength(0);
-    expect(filtered.attachments).toHaveLength(0);
-    expect(filtered.linkPreviews).toHaveLength(0);
-  });
-
-  it('keeps thread structure by replacing a banned reply with a placeholder', () => {
-    const root = makeMessage('root', 'user-1', 'Root');
-    const bannedReply = makeMessage('reply', 'banned-user', 'Sensitive reply', {
-      replyToMessageId: 'root',
-    });
-    const descendant = makeMessage('descendant', 'user-2', 'Nested reply', {
-      replyToMessageId: 'reply',
-    });
-
-    const filtered = applyBanVisibilityToMessageBundle(
-      {
-        messages: [root, bannedReply, descendant],
-        reactions: [
-          makeReaction('reaction-1', 'reply', 'user-3'),
-          makeReaction('reaction-2', 'descendant', 'user-3'),
-        ],
-        attachments: [
-          makeAttachment('attachment-1', 'reply', 'banned-user'),
-          makeAttachment('attachment-2', 'descendant', 'user-2'),
-        ],
-        linkPreviews: [makeLinkPreview('preview-1', 'reply'), makeLinkPreview('preview-2', 'descendant')],
-      },
-      ['banned-user']
-    );
-
-    const placeholderReply = filtered.messages.find((message) => message.id === 'reply');
-
-    expect(filtered.messages.map((message) => message.id)).toEqual(['root', 'reply', 'descendant']);
-    expect(placeholderReply?.content).toBe(BANNED_REPLY_PLACEHOLDER_CONTENT);
-    expect(isBanRemovedReplyPlaceholder(placeholderReply as Message)).toBe(true);
-    expect(filtered.reactions.map((reaction) => reaction.id)).toEqual(['reaction-2']);
-    expect(filtered.attachments.map((attachment) => attachment.id)).toEqual(['attachment-2']);
-    expect(filtered.linkPreviews.map((preview) => preview.id)).toEqual(['preview-2']);
-  });
-
+describe('banVisibility', () => {
   it('filters channel access revocation content only in the targeted channel', () => {
     const revokedRoot = makeMessage('revoked-root', 'revoked-user', 'Hidden root');
     const revokedReply = makeMessage(
@@ -242,6 +187,68 @@ describe('applyBanVisibilityToMessageBundle', () => {
         linkPreviews: [makeLinkPreview('preview-1', 'blocked-root')],
       },
       new Set(['blocked-user']),
+      true
+    );
+
+    expect(filtered.messages).toHaveLength(1);
+    expect(filtered.reactions).toHaveLength(1);
+    expect(filtered.attachments).toHaveLength(1);
+    expect(filtered.linkPreviews).toHaveLength(1);
+  });
+
+  it('filters hidden messages and their child records when hidden messages are toggled off', () => {
+    const visibleMessage = makeMessage('visible-root', 'user-1', 'Visible root');
+    const hiddenMessage = makeMessage(
+      'hidden-root',
+      'user-2',
+      'Hidden root',
+      null,
+      'channel-1',
+      true
+    );
+
+    const filtered = filterHiddenMessageContent(
+      {
+        messages: [visibleMessage, hiddenMessage],
+        reactions: [
+          makeReaction('reaction-1', 'hidden-root', 'user-3'),
+          makeReaction('reaction-2', 'visible-root', 'user-4'),
+        ],
+        attachments: [
+          makeAttachment('attachment-1', 'hidden-root', 'user-2'),
+          makeAttachment('attachment-2', 'visible-root', 'user-1'),
+        ],
+        linkPreviews: [
+          makeLinkPreview('preview-1', 'hidden-root'),
+          makeLinkPreview('preview-2', 'visible-root'),
+        ],
+      },
+      false
+    );
+
+    expect(filtered.messages.map((message) => message.id)).toEqual(['visible-root']);
+    expect(filtered.reactions.map((reaction) => reaction.id)).toEqual(['reaction-2']);
+    expect(filtered.attachments.map((attachment) => attachment.id)).toEqual(['attachment-2']);
+    expect(filtered.linkPreviews.map((preview) => preview.id)).toEqual(['preview-2']);
+  });
+
+  it('keeps hidden messages visible when the session toggle is on', () => {
+    const hiddenMessage = makeMessage(
+      'hidden-root',
+      'user-2',
+      'Hidden root',
+      null,
+      'channel-1',
+      true
+    );
+
+    const filtered = filterHiddenMessageContent(
+      {
+        messages: [hiddenMessage],
+        reactions: [makeReaction('reaction-1', 'hidden-root', 'user-3')],
+        attachments: [makeAttachment('attachment-1', 'hidden-root', 'user-2')],
+        linkPreviews: [makeLinkPreview('preview-1', 'hidden-root')],
+      },
       true
     );
 

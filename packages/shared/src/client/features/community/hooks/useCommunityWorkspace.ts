@@ -20,6 +20,7 @@ const EMPTY_SERVER_PERMISSIONS: ServerPermissions = {
   canManageChannelPermissions: false,
   canManageMessages: false,
   canManageBans: false,
+  canViewBanHidden: false,
   canCreateReports: false,
   canManageReports: false,
   canRefreshLinkPreviews: false,

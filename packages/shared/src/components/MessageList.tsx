@@ -60,6 +60,7 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { MarkdownText } from "@shared/lib/markdownRenderer";
 import {
   BANNED_REPLY_PLACEHOLDER_CONTENT,
+  filterHiddenMessageContent,
   filterBlockedUserContent,
   isModerationRemovedReplyPlaceholder,
 } from "@client/features/messages/lib/banVisibility";
@@ -80,6 +81,16 @@ type AuthorProfile = {
   displayPrefix: string | null;
   avatarUrl: string | null;
 };
+
+const isAuthorProfileTombstone = (
+  authorProfile: AuthorProfile | undefined,
+): boolean =>
+  Boolean(
+    authorProfile &&
+      authorProfile.avatarUrl === null &&
+      (authorProfile.username === "Banned User" ||
+        authorProfile.username === "Unknown User"),
+  );
 
 interface MessageListProps {
   channelId: string;
@@ -125,6 +136,8 @@ interface MessageListProps {
   }) => Promise<void>;
   onRequestMessageLinkPreviewRefresh: (messageId: string) => Promise<void>;
   onRequestOlderMessages?: () => Promise<void>;
+  bottomInset?: number;
+  showHiddenMessages?: boolean;
 }
 
 const getReplyToMessageId = (message: Message): string | null => {
@@ -347,6 +360,8 @@ export function MessageList({
   onReportMessage,
   onRequestMessageLinkPreviewRefresh,
   onRequestOlderMessages,
+  bottomInset = 96,
+  showHiddenMessages = false,
 }: MessageListProps) {
   const messages = useMessagesStore((state) => state.messages);
   const reactionRecord = useMessagesStore((state) => state.reactions);
@@ -419,15 +434,18 @@ export function MessageList({
 
   const visibleBundle = useMemo(
     () =>
-      filterBlockedUserContent(
-        {
-          messages,
-          reactions: messageReactions,
-          attachments: messageAttachments,
-          linkPreviews: messageLinkPreviews,
-        },
-        blockedUserIds,
-        isElevatedViewer,
+      filterHiddenMessageContent(
+        filterBlockedUserContent(
+          {
+            messages,
+            reactions: messageReactions,
+            attachments: messageAttachments,
+            linkPreviews: messageLinkPreviews,
+          },
+          blockedUserIds,
+          isElevatedViewer,
+        ),
+        showHiddenMessages,
       ),
     [
       blockedUserIds,
@@ -436,6 +454,7 @@ export function MessageList({
       messageLinkPreviews,
       messageReactions,
       messages,
+      showHiddenMessages,
     ],
   );
 
@@ -711,15 +730,19 @@ export function MessageList({
       const authorProfile = authorProfiles[targetUserId];
       const liveProfile = getLiveProfile(liveProfiles, targetUserId);
       if (!authorProfile && !liveProfile) return undefined;
+      const preserveFetchedTombstone = isAuthorProfileTombstone(authorProfile);
 
       return {
         username:
-          liveProfile?.username ??
+          (preserveFetchedTombstone ? null : liveProfile?.username) ??
           authorProfile?.username ??
           targetUserId.substring(0, 12),
         isPlatformStaff: authorProfile?.isPlatformStaff ?? false,
         displayPrefix: authorProfile?.displayPrefix ?? null,
-        avatarUrl: liveProfile?.avatarUrl ?? authorProfile?.avatarUrl ?? null,
+        avatarUrl:
+          (preserveFetchedTombstone ? null : liveProfile?.avatarUrl) ??
+          authorProfile?.avatarUrl ??
+          null,
       };
     },
     [authorProfiles, liveProfiles],
@@ -799,11 +822,18 @@ export function MessageList({
     const authorProfile = getResolvedAuthorProfile(message.author_user_id);
     const isStaffUserMessage =
       message.author_type === "user" && Boolean(authorProfile?.isPlatformStaff);
+    const isHiddenMessage = message.is_hidden;
     const isOwnMessage =
       message.author_type === "user" &&
       message.author_user_id === currentUserId;
     const canProfileMenu =
       message.author_type === "user" && Boolean(message.author_user_id);
+    const kickDisabledReason =
+      canManageMembers &&
+      message.author_user_id !== currentUserId &&
+      (isHiddenMessage || authorProfile?.username === "Banned User")
+        ? "User is not a member"
+        : null;
     const canDeleteMessage = isOwnMessage || canManageMessages;
     const canEditMessage = isOwnMessage;
     const authorLabel = getAuthorLabel(message, authorProfile, currentUserId);
@@ -1031,7 +1061,11 @@ export function MessageList({
         >
           <div
             data-menu-scope="message"
-            className={`group rounded-md border bg-[#16263d] border-[#2b4263] px-3 py-2 transition-colors hover:bg-[#1b2f4a] hover:border-[#3d5f8d] ${
+            className={`group rounded-md border px-3 py-2 transition-colors backdrop-blur-sm ${
+              isHiddenMessage
+                ? "bg-red-500/10 border-red-400/25 hover:bg-red-500/15 hover:border-red-300/35"
+                : "bg-[#16263d] border-[#2b4263] hover:bg-[#1b2f4a] hover:border-[#3d5f8d]"
+            } ${
               isReply ? "border-l-2 border-l-[#4c74a6]" : ""
             }`}
             style={isReply ? { marginLeft: `${replyIndent}px` } : undefined}
@@ -1055,6 +1089,7 @@ export function MessageList({
                       canManageMembers &&
                       message.author_user_id !== currentUserId
                     }
+                    kickDisabledReason={kickDisabledReason}
                     onDirectMessage={onDirectMessageUser}
                     onReport={(targetUserId) => {
                       void reportProfile(targetUserId);
@@ -1075,6 +1110,11 @@ export function MessageList({
                 {isStaffUserMessage && (
                   <span className="px-1.5 py-0.5 rounded bg-[#59b7ff]/20 text-[#9cd6ff] text-[10px] font-semibold uppercase tracking-wide">
                     Staff
+                  </span>
+                )}
+                {isHiddenMessage && (
+                  <span className="rounded border border-red-300/20 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-100">
+                    Hidden - banned user
                   </span>
                 )}
                 <span className="text-xs text-[#8897b1] shrink-0">
@@ -1546,7 +1586,9 @@ export function MessageList({
               ) : (
                 <div className="h-4" />
               ),
-            Footer: () => <div className="h-4" />,
+            Footer: () => (
+              <div style={{ height: `${Math.max(16, bottomInset)}px` }} />
+            ),
           }}
           itemContent={(_index, message) => (
             <div className="px-4 pb-4">{renderMessageTree(message)}</div>

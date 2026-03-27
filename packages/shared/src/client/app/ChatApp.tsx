@@ -59,7 +59,9 @@ function filterBlockedUsersFromParticipantList<T extends { userId: string }>(
     return [...participants];
   }
 
-  return participants.filter((participant) => !blockedUserIds.has(participant.userId));
+  return participants.filter(
+    (participant) => !blockedUserIds.has(participant.userId),
+  );
 }
 
 function filterBlockedUsersFromParticipantRecord<T extends { userId: string }>(
@@ -74,7 +76,9 @@ function filterBlockedUsersFromParticipantRecord<T extends { userId: string }>(
   return Object.fromEntries(
     Object.entries(participantsByChannelId).map(([channelId, participants]) => [
       channelId,
-      participants.filter((participant) => !blockedUserIds.has(participant.userId)),
+      participants.filter(
+        (participant) => !blockedUserIds.has(participant.userId),
+      ),
     ]),
   ) as Record<string, T[]>;
 }
@@ -82,7 +86,10 @@ function filterBlockedUsersFromParticipantRecord<T extends { userId: string }>(
 export function ChatApp() {
   const app = useChatAppOrchestration();
   const totalDmUnreadCount = useDmStore((state) =>
-    Object.values(state.unreadCounts).reduce((total, count) => total + count, 0),
+    Object.values(state.unreadCounts).reduce(
+      (total, count) => total + count,
+      0,
+    ),
   );
   const { orderedServers, setOrder: setServerOrder } = useServerOrder(
     app.user?.id ?? null,
@@ -134,7 +141,8 @@ export function ChatApp() {
     [disconnectVoiceSession],
   );
   const handleVoiceKickReceived = React.useCallback(() => {
-    void app.forceDisconnectVoice("kicked")
+    void app
+      .forceDisconnectVoice("kicked")
       .then(() => {
         app.showVoiceDisconnectToast({ reason: "kicked" });
       })
@@ -175,7 +183,7 @@ export function ChatApp() {
     () =>
       Boolean(
         app.selectedDmConversation?.otherUserId &&
-          app.blockedUserIds.has(app.selectedDmConversation.otherUserId),
+        app.blockedUserIds.has(app.selectedDmConversation.otherUserId),
       ),
     [app.blockedUserIds, app.selectedDmConversation?.otherUserId],
   );
@@ -266,7 +274,8 @@ export function ChatApp() {
         isMuted: voiceMuted,
         isDeafened: voiceDeafened,
         transmissionMode: app.appSettings.voice.transmissionMode,
-        participantCount: visibleActiveVoiceParticipants.length + (voiceJoined ? 1 : 0),
+        participantCount:
+          visibleActiveVoiceParticipants.length + (voiceJoined ? 1 : 0),
         selectedInputDeviceId: voiceController.state.selectedInputDeviceId,
         selectedOutputDeviceId: voiceController.state.selectedOutputDeviceId,
         inputDevices: voiceController.state.inputDevices.map(
@@ -459,7 +468,9 @@ export function ChatApp() {
       action: {
         label: "Dismiss",
         onClick: () => {
-          toast.dismiss(`voice-kick:${app.activeVoiceChannelId}:${targetUserId}`);
+          toast.dismiss(
+            `voice-kick:${app.activeVoiceChannelId}:${targetUserId}`,
+          );
         },
       },
     });
@@ -577,7 +588,6 @@ export function ChatApp() {
             <Sidebar
               serverName={app.currentServer.name}
               userName={app.userDisplayName}
-              composerHeight={app.composerHeight}
               channels={app.channels.map((channel) => ({
                 id: channel.id,
                 name: channel.name,
@@ -774,15 +784,16 @@ export function ChatApp() {
                 channelName={app.currentRenderableChannel.name}
                 channelKind={app.currentRenderableChannel.kind}
                 currentUserId={user.id}
-                  blockedUserIds={app.blockedUserIds}
-                  isElevatedViewer={app.isCurrentUserElevatedInCurrentServer}
-                  canManageMessages={app.serverPermissions.canManageMessages}
-                  canCreateReports={app.serverPermissions.canCreateReports}
-                  canManageBans={app.serverPermissions.canManageBans}
-                  canManageMembers={app.serverPermissions.canManageMembers}
-                  canRefreshLinkPreviews={
-                    app.serverPermissions.canRefreshLinkPreviews
-                  }
+                blockedUserIds={app.blockedUserIds}
+                isElevatedViewer={app.isCurrentUserElevatedInCurrentServer}
+                canManageMessages={app.serverPermissions.canManageMessages}
+                canCreateReports={app.serverPermissions.canCreateReports}
+                canManageBans={app.serverPermissions.canManageBans}
+                canManageMembers={app.serverPermissions.canManageMembers}
+                canViewBanHidden={app.serverPermissions.canViewBanHidden}
+                canRefreshLinkPreviews={
+                  app.serverPermissions.canRefreshLinkPreviews
+                }
                 showVoiceDiagnostics={app.isPlatformStaff}
                 onOpenChannelSettings={
                   canOpenChannelSettings
@@ -811,7 +822,10 @@ export function ChatApp() {
                   })
                 }
                 onBanUserFromServer={app.banUserFromServer}
-                onKickUserFromCurrentServer={async ({ targetUserId, username }) => {
+                onKickUserFromCurrentServer={async ({
+                  targetUserId,
+                  username,
+                }) => {
                   await app.kickUserFromServer({
                     targetUserId,
                     username,
@@ -820,7 +834,6 @@ export function ChatApp() {
                 }}
                 onResolveBanEligibleServers={app.resolveBanEligibleServers}
                 onDirectMessageUser={app.directMessageUser}
-                onComposerHeightChange={app.setComposerHeight}
               />
             ) : (
               <div className="flex-1 flex items-center justify-center">

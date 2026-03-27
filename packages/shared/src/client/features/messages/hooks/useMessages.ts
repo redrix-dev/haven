@@ -3,7 +3,6 @@ import { getCommunityDataBackend } from '@shared/lib/backend';
 import { MESSAGE_PAGE_SIZE } from '@client/app/constants';
 import type { ChannelMessageBundleCacheEntry } from '@client/app/types';
 import {
-  applyBanVisibilityToMessageBundle,
   applyChannelAccessVisibilityToMessageBundle,
   filterBlockedUserContent,
 } from '@client/features/messages/lib/banVisibility';
@@ -163,8 +162,6 @@ export function useMessages({
   const currentReactionListRef = React.useRef<MessageReaction[]>([]);
   const currentAttachmentListRef = React.useRef<MessageAttachment[]>([]);
   const currentLinkPreviewListRef = React.useRef<MessageLinkPreview[]>([]);
-  const bannedUserIdsByServerRef = React.useRef<Record<string, string[]>>({});
-  const loadedBannedUserIdsByServerRef = React.useRef<Record<string, boolean>>({});
   const revokedUserIdsByChannelRef = React.useRef<Record<string, string[]>>({});
   const loadedRevokedUserIdsByChannelRef = React.useRef<Record<string, boolean>>({});
   const cleanupIntervalRef = useRef<number | null>(null);
@@ -234,13 +231,6 @@ export function useMessages({
     [getChannelBundleCacheKey]
   );
 
-  const getCachedBannedUserIds = React.useCallback((communityId: string): string[] | null => {
-    if (!communityId) return null;
-    return Object.prototype.hasOwnProperty.call(bannedUserIdsByServerRef.current, communityId)
-      ? bannedUserIdsByServerRef.current[communityId] ?? []
-      : null;
-  }, []);
-
   const getCachedChannelRevokedUserIds = React.useCallback(
     (communityId: string, channelId: string): string[] | null => {
       if (!communityId || !channelId) return null;
@@ -250,19 +240,6 @@ export function useMessages({
         : null;
     },
     [getChannelRevocationCacheKey]
-  );
-
-  const cacheBannedUserIds = React.useCallback(
-    (communityId: string, bannedUserIds: string[], options?: { loaded?: boolean }) => {
-      if (!communityId) return [] as string[];
-      const nextBannedUserIds = Array.from(new Set(bannedUserIds.filter(Boolean)));
-      bannedUserIdsByServerRef.current[communityId] = nextBannedUserIds;
-      if (options?.loaded === true) {
-        loadedBannedUserIdsByServerRef.current[communityId] = true;
-      }
-      return nextBannedUserIds;
-    },
-    []
   );
 
   const cacheChannelRevokedUserIds = React.useCallback(
@@ -284,28 +261,6 @@ export function useMessages({
     [getChannelRevocationCacheKey]
   );
 
-  const ensureBannedUserIdsLoaded = React.useCallback(
-    async (communityId: string) => {
-      if (!communityId) return [] as string[];
-      const cachedBannedUserIds = getCachedBannedUserIds(communityId);
-      if (cachedBannedUserIds && loadedBannedUserIdsByServerRef.current[communityId] === true) {
-        return cachedBannedUserIds;
-      }
-
-      const communityBackend = getCommunityDataBackend(communityId);
-      const bans = await communityBackend.listCommunityBans(communityId);
-      // CHECKPOINT 6 COMPLETE
-      return cacheBannedUserIds(
-        communityId,
-        bans
-          .map((ban) => ban.bannedUserId)
-          .filter((bannedUserId): bannedUserId is string => Boolean(bannedUserId)),
-        { loaded: true }
-      );
-    },
-    [cacheBannedUserIds, getCachedBannedUserIds]
-  );
-
   const ensureChannelRevokedUserIdsLoaded = React.useCallback(
     async (communityId: string, channelId: string) => {
       if (!communityId || !channelId) return [] as string[];
@@ -325,29 +280,6 @@ export function useMessages({
     [cacheChannelRevokedUserIds, getCachedChannelRevokedUserIds, getChannelRevocationCacheKey]
   );
 
-  const ensureMessageVisibilityContextLoaded = React.useCallback(
-    async (communityId: string, channelId: string) => {
-      const [bannedUserIds, revokedUserIds] = await Promise.all([
-        ensureBannedUserIdsLoaded(communityId),
-        ensureChannelRevokedUserIdsLoaded(communityId, channelId),
-      ]); // CHECKPOINT 4 COMPLETE
-      return { bannedUserIds, revokedUserIds };
-    },
-    [ensureBannedUserIdsLoaded, ensureChannelRevokedUserIdsLoaded]
-  );
-
-  const addBannedUserIdToCache = React.useCallback(
-    (communityId: string, bannedUserId: string) => {
-      if (!communityId || !bannedUserId) return [] as string[];
-      const existingBannedUserIds = getCachedBannedUserIds(communityId) ?? [];
-      if (existingBannedUserIds.includes(bannedUserId)) {
-        return existingBannedUserIds;
-      }
-      return cacheBannedUserIds(communityId, [...existingBannedUserIds, bannedUserId]);
-    },
-    [cacheBannedUserIds, getCachedBannedUserIds]
-  );
-
   const addChannelRevokedUserIdToCache = React.useCallback(
     (communityId: string, channelId: string, revokedUserId: string) => {
       if (!communityId || !channelId || !revokedUserId) return [] as string[];
@@ -363,7 +295,7 @@ export function useMessages({
     [cacheChannelRevokedUserIds, getCachedChannelRevokedUserIds]
   );
 
-  const applyMessageVisibility = React.useCallback(
+  const applyChannelAccessVisibility = React.useCallback(
     (input: {
       communityId: string;
       channelId: string;
@@ -371,28 +303,22 @@ export function useMessages({
       reactions: MessageReaction[];
       attachments: MessageAttachment[];
       linkPreviews: MessageLinkPreview[];
-      bannedUserIds?: string[];
       revokedUserIds?: string[];
-      blockedUserIds?: ReadonlySet<string>;
-      isElevatedInServer?: boolean;
-    }) => {
-      const serverFilteredBundle = applyBanVisibilityToMessageBundle(
+    }) =>
+      applyChannelAccessVisibilityToMessageBundle(
         {
           messages: input.messages,
           reactions: input.reactions,
           attachments: input.attachments,
           linkPreviews: input.linkPreviews,
         },
-        input.bannedUserIds ?? getCachedBannedUserIds(input.communityId) ?? []
-      );
-
-      return applyChannelAccessVisibilityToMessageBundle(serverFilteredBundle, {
-        channelId: input.channelId,
-        revokedUserIds:
-          input.revokedUserIds ?? getCachedChannelRevokedUserIds(input.communityId, input.channelId) ?? [],
-      });
-    },
-    [getCachedBannedUserIds, getCachedChannelRevokedUserIds]
+        {
+          channelId: input.channelId,
+          revokedUserIds:
+            input.revokedUserIds ?? getCachedChannelRevokedUserIds(input.communityId, input.channelId) ?? [],
+        }
+      ),
+    [getCachedChannelRevokedUserIds]
   );
 
   const applyBlockVisibility = React.useCallback(
@@ -425,14 +351,14 @@ export function useMessages({
       linkPreviews: MessageLinkPreview[];
     }) => {
       if (!currentServerId || !currentChannelId) return bundle;
-      const moderationFilteredBundle = applyMessageVisibility({
+      const moderationFilteredBundle = applyChannelAccessVisibility({
         communityId: currentServerId,
         channelId: currentChannelId,
         ...bundle,
       });
       return applyBlockVisibility(moderationFilteredBundle);
     },
-    [applyBlockVisibility, applyMessageVisibility, currentChannelId, currentServerId]
+    [applyBlockVisibility, applyChannelAccessVisibility, currentChannelId, currentServerId]
   );
 
   const purgeMessageBundleCacheForServer = React.useCallback(
@@ -478,18 +404,14 @@ export function useMessages({
                 communityBackend.listMessageLinkPreviewsForMessages({ communityId: serverId, channelId, messageIds }),
               ])
             : [[] as MessageReaction[], [] as MessageAttachment[], [] as MessageLinkPreview[]];
-        const { bannedUserIds, revokedUserIds } = await ensureMessageVisibilityContextLoaded(
-          serverId,
-          channelId
-        );
-        const moderationFilteredBundle = applyMessageVisibility({
+        const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(serverId, channelId);
+        const moderationFilteredBundle = applyChannelAccessVisibility({
           communityId: serverId,
           channelId,
           messages,
           reactions,
           attachments,
           linkPreviews,
-          bannedUserIds,
           revokedUserIds,
         });
         const filteredBundle = applyBlockVisibility({
@@ -512,9 +434,9 @@ export function useMessages({
     },
     [
       applyBlockVisibility,
-      applyMessageVisibility,
+      applyChannelAccessVisibility,
       ensureIsElevatedInServer,
-      ensureMessageVisibilityContextLoaded,
+      ensureChannelRevokedUserIdsLoaded,
       getChannelBundleCacheKey,
     ]
   );
@@ -906,18 +828,14 @@ export function useMessages({
       const targetCount = Math.max(currentMessageCount, MESSAGE_PAGE_SIZE);
       const { messageList, hasMore } = await fetchLatestMessageWindow(targetCount);
       const { reactionList, attachmentList, linkPreviewList } = await fetchRelatedForMessages(messageList);
-      const { bannedUserIds, revokedUserIds } = await ensureMessageVisibilityContextLoaded(
-        currentServerId,
-        currentChannelId
-      );
-      const moderationFilteredBundle = applyMessageVisibility({
+      const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(currentServerId, currentChannelId);
+      const moderationFilteredBundle = applyChannelAccessVisibility({
         communityId: currentServerId,
         channelId: currentChannelId,
         messages: messageList,
         reactions: reactionList,
         attachments: attachmentList,
         linkPreviews: linkPreviewList,
-        bannedUserIds,
         revokedUserIds,
       });
       const filteredBundle = applyBlockVisibility({
@@ -938,11 +856,11 @@ export function useMessages({
     [
       applyBlockVisibility,
       createNextMessageLoadId,
-      applyMessageVisibility,
+      applyChannelAccessVisibility,
       currentChannelId,
       currentServerId,
       ensureIsElevatedInServer,
-      ensureMessageVisibilityContextLoaded,
+      ensureChannelRevokedUserIdsLoaded,
       fetchLatestMessageWindow,
       fetchRelatedForMessages,
     ]
@@ -977,18 +895,14 @@ export function useMessages({
       const prependMessages = page.messages.filter((message) => !existingIds.has(message.id));
       const nextMessageList = [...prependMessages, ...currentMessageList];
       const { reactionList, attachmentList, linkPreviewList } = await fetchRelatedForMessages(nextMessageList);
-      const { bannedUserIds, revokedUserIds } = await ensureMessageVisibilityContextLoaded(
-        currentServerId,
-        currentChannelId
-      );
-      const moderationFilteredBundle = applyMessageVisibility({
+      const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(currentServerId, currentChannelId);
+      const moderationFilteredBundle = applyChannelAccessVisibility({
         communityId: currentServerId,
         channelId: currentChannelId,
         messages: nextMessageList,
         reactions: reactionList,
         attachments: attachmentList,
         linkPreviews: linkPreviewList,
-        bannedUserIds,
         revokedUserIds,
       });
       const filteredBundle = applyBlockVisibility({
@@ -1011,11 +925,11 @@ export function useMessages({
     },
     [
       applyBlockVisibility,
-      applyMessageVisibility,
+      applyChannelAccessVisibility,
       currentChannelId,
       currentServerId,
       ensureIsElevatedInServer,
-      ensureMessageVisibilityContextLoaded,
+      ensureChannelRevokedUserIdsLoaded,
       fetchMessagesPageBeforeCursor,
       fetchRelatedForMessages,
       tryBeginOlderMessagesLoad,
@@ -1352,82 +1266,6 @@ export function useMessages({
     [applyCurrentChannelVisibility, fetchMessageAttachmentsForMessageIds, fetchMessageLinkPreviewsForMessageIds]
   );
 
-  const applyBannedUserContentVisibility = React.useCallback(
-    (input: { communityId: string; bannedUserId: string }) => {
-      if (!input.communityId || !input.bannedUserId) return;
-
-      const bannedUserIds = addBannedUserIdToCache(input.communityId, input.bannedUserId);
-
-      for (const [cacheKey, cachedBundle] of Object.entries(messageBundleByChannelCacheRef.current)) {
-        if (!cacheKey.startsWith(`${input.communityId}:`)) continue;
-        const channelId = cacheKey.slice(`${input.communityId}:`.length);
-        const moderationFilteredBundle = applyMessageVisibility({
-          communityId: input.communityId,
-          channelId,
-          messages: cachedBundle.messages,
-          reactions: cachedBundle.reactions,
-          attachments: cachedBundle.attachments,
-          linkPreviews: cachedBundle.linkPreviews,
-          bannedUserIds,
-        });
-        const filteredBundle = applyBlockVisibility(moderationFilteredBundle);
-        messageBundleByChannelCacheRef.current[cacheKey] = {
-          ...cachedBundle,
-          messages: filteredBundle.messages,
-          reactions: filteredBundle.reactions,
-          attachments: filteredBundle.attachments,
-          linkPreviews: filteredBundle.linkPreviews,
-        };
-      }
-
-      if (currentServerId !== input.communityId) return;
-      if (!currentChannelId) return;
-
-      const moderationFilteredBundle = applyMessageVisibility({
-        communityId: input.communityId,
-        channelId: currentChannelId,
-        messages: currentMessageListRef.current,
-        reactions: currentReactionListRef.current,
-        attachments: currentAttachmentListRef.current,
-        linkPreviews: currentLinkPreviewListRef.current,
-        bannedUserIds,
-      });
-      const filteredBundle = applyBlockVisibility(moderationFilteredBundle);
-
-      currentMessageListRef.current = filteredBundle.messages;
-      currentReactionListRef.current = filteredBundle.reactions;
-      currentAttachmentListRef.current = filteredBundle.attachments;
-      currentLinkPreviewListRef.current = filteredBundle.linkPreviews;
-      syncLoadedMessageWindow(filteredBundle.messages, currentHasOlderMessagesRef.current);
-      const remainingAuthorIds = new Set(
-        filteredBundle.messages
-          .map((message) => message.author_user_id)
-          .filter((authorUserId): authorUserId is string => Boolean(authorUserId))
-      );
-      const nextProfiles = Object.fromEntries(
-        Object.entries(useMessagesStore.getState().profiles).filter(([authorUserId]) =>
-          remainingAuthorIds.has(authorUserId)
-        )
-      );
-
-      useMessagesStore.getState().setMessages(filteredBundle.messages);
-      useMessagesStore.getState().setReactions(filteredBundle.reactions);
-      useMessagesStore.getState().setAttachments(filteredBundle.attachments);
-      useMessagesStore.getState().setLinkPreviews(filteredBundle.linkPreviews);
-      useMessagesStore.getState().setProfiles(nextProfiles);
-      markMessagesFresh();
-    },
-    [
-      addBannedUserIdToCache,
-      applyBlockVisibility,
-      applyMessageVisibility,
-      currentChannelId,
-      currentServerId,
-      markMessagesFresh,
-      syncLoadedMessageWindow,
-    ]
-  );
-
   const applyChannelAccessRevokedContentVisibility = React.useCallback(
     (input: { communityId: string; channelId: string; revokedUserId: string }) => {
       if (!input.communityId || !input.channelId || !input.revokedUserId) return;
@@ -1440,7 +1278,7 @@ export function useMessages({
       const cacheKey = getChannelBundleCacheKey(input.communityId, input.channelId);
       const cachedBundle = messageBundleByChannelCacheRef.current[cacheKey];
       if (cachedBundle) {
-        const moderationFilteredBundle = applyMessageVisibility({
+        const moderationFilteredBundle = applyChannelAccessVisibility({
           communityId: input.communityId,
           channelId: input.channelId,
           messages: cachedBundle.messages,
@@ -1461,7 +1299,7 @@ export function useMessages({
 
       if (currentServerId !== input.communityId || currentChannelId !== input.channelId) return;
 
-      const moderationFilteredBundle = applyMessageVisibility({
+      const moderationFilteredBundle = applyChannelAccessVisibility({
         communityId: input.communityId,
         channelId: input.channelId,
         messages: currentMessageListRef.current,
@@ -1498,7 +1336,7 @@ export function useMessages({
     [
       addChannelRevokedUserIdToCache,
       applyBlockVisibility,
-      applyMessageVisibility,
+      applyChannelAccessVisibility,
       currentChannelId,
       currentServerId,
       getChannelBundleCacheKey,
@@ -1821,7 +1659,10 @@ export function useMessages({
 
       const missingAuthorIds = authorIds.filter((authorId) => !authorProfileCacheRef.current[authorId]);
       if (missingAuthorIds.length > 0) {
-        const fetchedProfiles = await communityBackend.fetchAuthorProfiles(missingAuthorIds);
+        const fetchedProfiles = await communityBackend.fetchAuthorProfiles(
+          currentServerId,
+          missingAuthorIds
+        );
         authorProfileCacheRef.current = {
           ...authorProfileCacheRef.current,
           ...fetchedProfiles,
@@ -2166,7 +2007,6 @@ export function useMessages({
       prefetchChannelMessages,
       purgeMessageBundleCacheForServer,
       purgeMessageBundleCacheForChannel,
-      applyBannedUserContentVisibility,
       applyChannelAccessRevokedContentVisibility,
     },
   };

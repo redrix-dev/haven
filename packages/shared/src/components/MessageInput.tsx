@@ -1,11 +1,18 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Button } from '@shared/components/ui/button';
-import { Textarea } from '@shared/components/ui/textarea';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { Button } from "@shared/components/ui/button";
+import { Textarea } from "@shared/components/ui/textarea";
 import {
   MessageToolbar,
   type MessageToolbarHandle,
-} from '@shared/components/MessageToolbar';
-import { getErrorMessage } from '@platform/lib/errors';
+} from "@shared/components/MessageToolbar";
+import { getErrorMessage } from "@platform/lib/errors";
+import { Plus } from "lucide-react";
 
 interface MessageInputProps {
   onSendMessage: (
@@ -14,7 +21,7 @@ interface MessageInputProps {
       replyToMessageId?: string;
       mediaFile?: File;
       mediaExpiresInHours?: number;
-    }
+    },
   ) => Promise<void>;
   channelId: string;
   channelName: string;
@@ -38,7 +45,8 @@ export function MessageInput({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const toolbarRef = useRef<MessageToolbarHandle | null>(null);
-  const [input, setInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaExpiresInHours, setMediaExpiresInHours] = useState(24);
@@ -47,10 +55,10 @@ export function MessageInput({
   const syncInputHeight = useCallback(() => {
     const node = inputRef.current;
     if (!node) return;
-    node.style.height = 'auto';
+    node.style.height = "auto";
     const nextHeight = Math.min(node.scrollHeight, 200);
     node.style.height = `${nextHeight}px`;
-    node.style.overflowY = node.scrollHeight > 200 ? 'auto' : 'hidden';
+    node.style.overflowY = node.scrollHeight > 200 ? "auto" : "hidden";
   }, []);
 
   useEffect(() => {
@@ -70,6 +78,10 @@ export function MessageInput({
   }, [sendError]);
 
   useLayoutEffect(() => {
+    syncInputHeight();
+  }, [input, syncInputHeight]);
+
+  useLayoutEffect(() => {
     if (!onContainerHeightChange || !containerRef.current) return;
 
     const node = containerRef.current;
@@ -84,7 +96,7 @@ export function MessageInput({
 
     emitHeight();
 
-    if (typeof ResizeObserver === 'undefined') {
+    if (typeof ResizeObserver === "undefined") {
       return () => {
         onContainerHeightChange(0);
       };
@@ -101,9 +113,17 @@ export function MessageInput({
     };
   }, [onContainerHeightChange]);
 
-  useLayoutEffect(() => {
-    syncInputHeight();
-  }, [input, syncInputHeight]);
+  const handleAttachFileChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const nextFile = event.target.files?.[0] ?? null;
+      event.currentTarget.value = "";
+      if (!nextFile) return;
+      setMediaFile(nextFile);
+      setSendError(null);
+      inputRef.current?.focus();
+    },
+    [],
+  );
 
   const handleSubmit = async () => {
     const content = input.trim();
@@ -118,36 +138,46 @@ export function MessageInput({
         mediaFile: mediaFile ?? undefined,
         mediaExpiresInHours: mediaFile ? mediaExpiresInHours : undefined,
       });
-      setInput('');
+      setInput("");
       setMediaFile(null);
       setMediaExpiresInHours(24);
       onClearReplyTarget?.();
     } catch (error: unknown) {
-      console.error('Failed to send message:', error);
-      setSendError(getErrorMessage(error, 'Failed to send message.'));
+      console.error("Failed to send message:", error);
+      setSendError(getErrorMessage(error, "Failed to send message."));
     } finally {
       setSending(false);
     }
   };
 
-  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleInputKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
     if (toolbarRef.current?.handleKeyboardShortcut(event)) return;
-    if (event.key !== 'Enter' || event.shiftKey) return;
+    if (event.key !== "Enter" || event.shiftKey) return;
     event.preventDefault();
     void handleSubmit();
   };
 
   return (
-    <div
-      ref={containerRef}
-      data-message-input-root="true"
-      className="shrink-0 border-t border-[#263a58] bg-[#0f1728] px-4 py-3 space-y-2 shadow-[0_-8px_18px_rgba(3,9,20,0.35)]"
-    >
+    <div ref={containerRef} className="relative shrink-0 space-y-2 px-4 pb-1 pt-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*,application/pdf"
+        className="hidden"
+        onChange={handleAttachFileChange}
+      />
+
       {replyTarget && (
-        <div className="rounded-md border border-[#304867] bg-[#142033] px-3 py-2 flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 rounded-md border border-[#304867] bg-[#142033] px-3 py-2">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Replying to {replyTarget.authorLabel}</p>
-            <p className="text-xs text-[#d2dcef] truncate">{replyTarget.preview}</p>
+            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              Replying to {replyTarget.authorLabel}
+            </p>
+            <p className="truncate text-xs text-[#d2dcef]">
+              {replyTarget.preview}
+            </p>
           </div>
           <Button
             type="button"
@@ -160,18 +190,23 @@ export function MessageInput({
           </Button>
         </div>
       )}
+
       {mediaFile && (
-        <div className="rounded-md border border-[#304867] bg-[#142033] px-3 py-2 flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-[#304867] bg-[#142033] px-3 py-2">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Media attached</p>
-            <p className="text-xs text-[#d2dcef] truncate">{mediaFile.name}</p>
+            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              Media attached
+            </p>
+            <p className="truncate text-xs text-[#d2dcef]">{mediaFile.name}</p>
           </div>
           <div className="flex items-center gap-2">
             <label className="text-xs text-[#a9b8cf]">
               Expires
               <select
                 value={mediaExpiresInHours}
-                onChange={(event) => setMediaExpiresInHours(Number(event.target.value))}
+                onChange={(event) =>
+                  setMediaExpiresInHours(Number(event.target.value))
+                }
                 className="ml-2 rounded border border-[#304867] bg-[#18243a] px-2 py-1 text-xs text-white"
               >
                 <option value={1}>1h</option>
@@ -192,52 +227,50 @@ export function MessageInput({
           </div>
         </div>
       )}
-      <MessageToolbar inputRef={inputRef} value={input} onChange={setInput} ref={toolbarRef} />
-      <div className="flex items-end gap-2">
-        <label className="shrink-0">
-          <input
-            type="file"
-            accept="image/*,video/*,application/pdf"
-            className="hidden"
-            onChange={(event) => {
-              const nextFile = event.target.files?.[0] ?? null;
-              if (!nextFile) return;
-              setMediaFile(nextFile);
-              setSendError(null);
-              event.currentTarget.value = '';
-            }}
-          />
-          <span
-            className="inline-flex h-9 items-center rounded-md border border-[#304867] px-3 text-xs text-[#d2dcef] hover:bg-[#22334f] cursor-pointer"
-          >
-            Attach
-          </span>
-        </label>
-        <div className="min-w-0 flex-1">
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={handleInputKeyDown}
-            rows={1}
-            placeholder={`Message #${channelName}`}
-            className="min-h-[36px] max-h-[200px] resize-none bg-[#243754] border-none text-[#e6edf7] placeholder:text-[#8897b1] leading-5 shadow-none focus-visible:ring-0"
-          />
-          <p className="mt-1 text-[11px] text-[#8ea4c7]">Enter sends; Shift+Enter for newline</p>
-        </div>
+
+      <div className="relative rounded-[7.5px] border border-[#304867] bg-[#142033] shadow-[0_10px_24px_rgba(3,9,20,0.22)] transition-colors focus-within:border-[#3f79d8]">
         <Button
           type="button"
-          onClick={() => void handleSubmit()}
-          disabled={(!input.trim() && !mediaFile) || sending}
-          className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute bottom-2.5 left-2.5 z-10 rounded-xl text-[#d2dcef] hover:bg-[#22334f] hover:text-white"
+          title="Add file"
+          aria-label="Add file"
+          onClick={() => fileInputRef.current?.click()}
         >
-          {sending ? 'Sending...' : 'Send'}
+          <Plus className="size-4" />
         </Button>
+
+        <MessageToolbar
+          ref={toolbarRef}
+          inputRef={inputRef}
+          value={input}
+          onChange={setInput}
+          variant="menu"
+          triggerLabel=". . ."
+          triggerTitle="Formatting options"
+          triggerClassName="absolute bottom-2.5 right-2.5 z-10 rounded-xl px-2 text-xs font-semibold tracking-[0.2em] text-[#d2dcef] hover:bg-[#22334f] hover:text-white"
+          menuAlign="end"
+        />
+
+        <Textarea
+          ref={inputRef}
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleInputKeyDown}
+          rows={1}
+          placeholder={`Message #${channelName}`}
+          className="min-h-[52px] max-h-[200px] resize-none border-none bg-transparent px-0 py-0 pb-[14px] pl-14 pr-16 pt-[14px] leading-6 text-[#e6edf7] placeholder:text-[#8897b1] shadow-none focus-visible:ring-0"
+        />
       </div>
+
       {/* CHECKPOINT 3 COMPLETE */}
       {/* CHECKPOINT 5 COMPLETE */}
       {sendError && <p className="text-xs text-[#f87171]">{sendError}</p>}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-[#111a2b]"
+      />
     </div>
   );
 }
-
