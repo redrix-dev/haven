@@ -1429,6 +1429,7 @@ export function useChatAppOrchestration() {
   // Sign-out reset — clear all state when user logs out.
   useEffect(() => {
     if (user) return;
+    setCurrentServerId(null);
     resetPlatformSession();
     resetVoiceState();
     setServerModmailOpen(false);

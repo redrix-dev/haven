@@ -87,9 +87,9 @@ const isAuthorProfileTombstone = (
 ): boolean =>
   Boolean(
     authorProfile &&
-      authorProfile.avatarUrl === null &&
-      (authorProfile.username === "Banned User" ||
-        authorProfile.username === "Unknown User"),
+    authorProfile.avatarUrl === null &&
+    (authorProfile.username === "Banned User" ||
+      authorProfile.username === "Unknown User"),
   );
 
 interface MessageListProps {
@@ -1065,9 +1065,7 @@ export function MessageList({
               isHiddenMessage
                 ? "bg-red-500/10 border-red-400/25 hover:bg-red-500/15 hover:border-red-300/35"
                 : "bg-[#16263d] border-[#2b4263] hover:bg-[#1b2f4a] hover:border-[#3d5f8d]"
-            } ${
-              isReply ? "border-l-2 border-l-[#4c74a6]" : ""
-            }`}
+            } ${isReply ? "border-l-2 border-l-[#4c74a6]" : ""}`}
             style={isReply ? { marginLeft: `${replyIndent}px` } : undefined}
           >
             <div className="flex items-start justify-between gap-2 mb-1">
@@ -1511,7 +1509,7 @@ export function MessageList({
           <div className="ml-1">
             <CollapsibleTrigger
               type="button"
-              className="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-[#8ea4c7] transition-colors hover:bg-[#22334f] hover:text-white focus-visible:ring-2 focus-visible:ring-[#5b92e8] focus-visible:outline-none"
+              className="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-[#8ea4c7] gpu-layer transition-colors hover:bg-[#22334f] hover:text-white focus-visible:ring-2 focus-visible:ring-[#5b92e8] focus-visible:outline-none"
             >
               {repliesExpanded
                 ? `Hide replies (${renderableReplies.length})`
@@ -1532,6 +1530,11 @@ export function MessageList({
   };
 
   useEffect(() => {
+    console.log("scroll effect fired", {
+      messageCount: replyTree.rootMessages.length,
+      shouldScroll: shouldScrollToBottomOnNextDataRef.current,
+      hasVirtuoso: !!virtuosoRef.current,
+    });
     if (replyTree.rootMessages.length === 0) return;
     if (!shouldScrollToBottomOnNextDataRef.current) return;
     void Promise.resolve().then(() => {
@@ -1568,7 +1571,10 @@ export function MessageList({
           atBottomStateChange={(atBottom) => {
             isAtBottomRef.current = atBottom;
           }}
-          followOutput={(isAtBottom) => (isAtBottom ? "smooth" : false)}
+          followOutput={(isAtBottom) => {
+            if (shouldScrollToBottomOnNextDataRef.current) return "auto";
+            return isAtBottom ? "smooth" : false;
+          }}
           startReached={handleStartReached}
           increaseViewportBy={{ top: 400, bottom: 600 }}
           components={{

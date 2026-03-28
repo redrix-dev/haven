@@ -855,67 +855,67 @@ export function ChatApp() {
           </div>
         )}
       </div>
-
-      <NotificationCenterModal
-        open={app.notificationsPanelOpen}
-        onOpenChange={app.setNotificationsPanelOpen}
-        counts={app.notificationCounts}
-        error={app.notificationsError}
-        refreshing={app.notificationsRefreshing}
-        onRefresh={() => void app.refreshNotificationsManually()}
-        onMarkAllSeen={() => void app.markAllNotificationsSeen()}
-        onDismissAll={() => void app.dismissAllNotifications()}
-        onMarkNotificationRead={(recipientId) =>
-          void app.markNotificationRead(recipientId)
-        }
-        onDismissNotification={(recipientId) =>
-          void app.dismissNotification(recipientId)
-        }
-        onOpenNotificationItem={(notification) =>
-          void app.openNotificationItem(notification)
-        }
-        onAcceptFriendRequestNotification={({
-          recipientId,
-          friendRequestId,
-        }) => {
-          void app.acceptFriendRequestFromNotification({
+      {app.notificationsPanelOpen && (
+        <NotificationCenterModal
+          open={app.notificationsPanelOpen}
+          onOpenChange={app.setNotificationsPanelOpen}
+          counts={app.notificationCounts}
+          error={app.notificationsError}
+          refreshing={app.notificationsRefreshing}
+          onRefresh={() => void app.refreshNotificationsManually()}
+          onMarkAllSeen={() => void app.markAllNotificationsSeen()}
+          onDismissAll={() => void app.dismissAllNotifications()}
+          onMarkNotificationRead={(recipientId) =>
+            void app.markNotificationRead(recipientId)
+          }
+          onDismissNotification={(recipientId) =>
+            void app.dismissNotification(recipientId)
+          }
+          onOpenNotificationItem={(notification) =>
+            void app.openNotificationItem(notification)
+          }
+          onAcceptFriendRequestNotification={({
             recipientId,
             friendRequestId,
-          });
-        }}
-        onDeclineFriendRequestNotification={({
-          recipientId,
-          friendRequestId,
-        }) => {
-          void app.declineFriendRequestFromNotification({
+          }) => {
+            void app.acceptFriendRequestFromNotification({
+              recipientId,
+              friendRequestId,
+            });
+          }}
+          onDeclineFriendRequestNotification={({
             recipientId,
             friendRequestId,
-          });
-        }}
-        onDismissFriendRequestNotification={({
-          recipientId,
-          friendRequestId,
-        }) => {
-          void app.dismissFriendRequestNotification({
+          }) => {
+            void app.declineFriendRequestFromNotification({
+              recipientId,
+              friendRequestId,
+            });
+          }}
+          onDismissFriendRequestNotification={({
             recipientId,
             friendRequestId,
-          });
-        }}
-        preferences={app.notificationPreferences}
-        preferencesLoading={app.notificationPreferencesLoading}
-        preferencesSaving={app.notificationPreferencesSaving}
-        preferencesError={app.notificationPreferencesError}
-        onUpdatePreferences={(next) =>
-          void app.saveNotificationPreferences(next)
-        }
-        localAudioSettings={app.appSettings.notifications}
-        localAudioSaving={app.notificationAudioSettingsSaving}
-        localAudioError={app.notificationAudioSettingsError}
-        onUpdateLocalAudioSettings={(next) =>
-          void app.setNotificationAudioSettings(next)
-        }
-      />
-
+          }) => {
+            void app.dismissFriendRequestNotification({
+              recipientId,
+              friendRequestId,
+            });
+          }}
+          preferences={app.notificationPreferences}
+          preferencesLoading={app.notificationPreferencesLoading}
+          preferencesSaving={app.notificationPreferencesSaving}
+          preferencesError={app.notificationPreferencesError}
+          onUpdatePreferences={(next) =>
+            void app.saveNotificationPreferences(next)
+          }
+          localAudioSettings={app.appSettings.notifications}
+          localAudioSaving={app.notificationAudioSettingsSaving}
+          localAudioError={app.notificationAudioSettingsError}
+          onUpdateLocalAudioSettings={(next) =>
+            void app.setNotificationAudioSettings(next)
+          }
+        />
+      )}
       {app.friendsSocialPanelEnabled && user && (
         <FriendsModal
           open={app.friendsPanelOpen}
@@ -1104,96 +1104,101 @@ export function ChatApp() {
             onSaveMemberPermissions={app.saveMemberChannelPermissions}
           />
         )}
-
-      <ServerMembersModal
-        open={app.showMembersModal}
-        currentUserId={user?.id ?? null}
-        serverName={app.membersModalServerName}
-        loading={app.membersModalLoading}
-        error={app.membersModalError}
-        members={app.membersModalMembers}
-        blockedUserIds={app.blockedUserIds}
-        isElevatedViewer={app.isCurrentUserElevatedInMembersModalServer}
-        canReportProfiles={app.membersModalCanCreateReports}
-        canBanProfiles={app.membersModalCanManageBans}
-        canKickProfiles={app.membersModalCanManageMembers}
-        onResolveBanServers={app.resolveBanEligibleServers}
-        onDirectMessage={app.directMessageUser}
-        onReportUser={async (targetUserId, reason) => {
-          if (!app.membersModalCommunityId) return;
-          await app.reportUserProfile({
-            targetUserId,
-            reason,
-            communityId: app.membersModalCommunityId,
-          });
-        }}
-        onBanUser={async (targetUserId, communityId, reason) => {
-          await app.banUserFromServer({ targetUserId, communityId, reason });
-        }}
-        onKickUser={async (targetUserId, username) => {
-          if (!app.membersModalCommunityId) return;
-          await app.kickUserFromServer({
-            targetUserId,
-            username,
-            communityId: app.membersModalCommunityId,
-          });
-        }}
-        onClose={app.closeMembersModal}
-      />
-
-      <QuickRenameDialog
-        open={Boolean(app.renameServerDraft)}
-        title="Rename Community"
-        initialValue={app.renameServerDraft?.currentName ?? ""}
-        confirmLabel="Rename"
-        onClose={() => app.setRenameServerDraft(null)}
-        onConfirm={async (value) => {
-          if (!app.renameServerDraft) return;
-          await app.renameServer(app.renameServerDraft.serverId, value);
-          app.setRenameServerDraft(null);
-        }}
-      />
-
-      <QuickRenameDialog
-        open={Boolean(app.renameChannelDraft)}
-        title="Rename Channel"
-        initialValue={app.renameChannelDraft?.currentName ?? ""}
-        confirmLabel="Rename"
-        onClose={() => app.setRenameChannelDraft(null)}
-        onConfirm={async (value) => {
-          if (!app.renameChannelDraft) return;
-          await app.renameChannel(app.renameChannelDraft.channelId, value);
-          app.setRenameChannelDraft(null);
-        }}
-      />
-
-      <QuickRenameDialog
-        open={Boolean(app.renameGroupDraft)}
-        title="Rename Channel Group"
-        initialValue={app.renameGroupDraft?.currentName ?? ""}
-        confirmLabel="Rename"
-        onClose={() => app.setRenameGroupDraft(null)}
-        onConfirm={async (value) => {
-          if (!app.renameGroupDraft) return;
-          await app.renameChannelGroup(app.renameGroupDraft.groupId, value);
-          app.setRenameGroupDraft(null);
-        }}
-      />
-
-      <QuickRenameDialog
-        open={Boolean(app.createGroupDraft)}
-        title="Create Channel Group"
-        initialValue=""
-        confirmLabel="Create"
-        onClose={() => app.setCreateGroupDraft(null)}
-        onConfirm={async (value) => {
-          await app.createChannelGroup(
-            value,
-            app.createGroupDraft?.channelId ?? null,
-          );
-          app.setCreateGroupDraft(null);
-        }}
-      />
+      {app.showMembersModal && (
+        <ServerMembersModal
+          open={app.showMembersModal}
+          currentUserId={user?.id ?? null}
+          serverName={app.membersModalServerName}
+          loading={app.membersModalLoading}
+          error={app.membersModalError}
+          members={app.membersModalMembers}
+          blockedUserIds={app.blockedUserIds}
+          isElevatedViewer={app.isCurrentUserElevatedInMembersModalServer}
+          canReportProfiles={app.membersModalCanCreateReports}
+          canBanProfiles={app.membersModalCanManageBans}
+          canKickProfiles={app.membersModalCanManageMembers}
+          onResolveBanServers={app.resolveBanEligibleServers}
+          onDirectMessage={app.directMessageUser}
+          onReportUser={async (targetUserId, reason) => {
+            if (!app.membersModalCommunityId) return;
+            await app.reportUserProfile({
+              targetUserId,
+              reason,
+              communityId: app.membersModalCommunityId,
+            });
+          }}
+          onBanUser={async (targetUserId, communityId, reason) => {
+            await app.banUserFromServer({ targetUserId, communityId, reason });
+          }}
+          onKickUser={async (targetUserId, username) => {
+            if (!app.membersModalCommunityId) return;
+            await app.kickUserFromServer({
+              targetUserId,
+              username,
+              communityId: app.membersModalCommunityId,
+            });
+          }}
+          onClose={app.closeMembersModal}
+        />
+      )}
+      {Boolean(app.renameServerDraft) && (
+        <QuickRenameDialog
+          open={Boolean(app.renameServerDraft)}
+          title="Rename Community"
+          initialValue={app.renameServerDraft?.currentName ?? ""}
+          confirmLabel="Rename"
+          onClose={() => app.setRenameServerDraft(null)}
+          onConfirm={async (value) => {
+            if (!app.renameServerDraft) return;
+            await app.renameServer(app.renameServerDraft.serverId, value);
+            app.setRenameServerDraft(null);
+          }}
+        />
+      )}
+      {Boolean(app.renameChannelDraft) && (
+        <QuickRenameDialog
+          open={Boolean(app.renameChannelDraft)}
+          title="Rename Channel"
+          initialValue={app.renameChannelDraft?.currentName ?? ""}
+          confirmLabel="Rename"
+          onClose={() => app.setRenameChannelDraft(null)}
+          onConfirm={async (value) => {
+            if (!app.renameChannelDraft) return;
+            await app.renameChannel(app.renameChannelDraft.channelId, value);
+            app.setRenameChannelDraft(null);
+          }}
+        />
+      )}
+      {Boolean(app.renameGroupDraft) && (
+        <QuickRenameDialog
+          open={Boolean(app.renameGroupDraft)}
+          title="Rename Channel Group"
+          initialValue={app.renameGroupDraft?.currentName ?? ""}
+          confirmLabel="Rename"
+          onClose={() => app.setRenameGroupDraft(null)}
+          onConfirm={async (value) => {
+            if (!app.renameGroupDraft) return;
+            await app.renameChannelGroup(app.renameGroupDraft.groupId, value);
+            app.setRenameGroupDraft(null);
+          }}
+        />
+      )}
+      {Boolean(app.createGroupDraft) && (
+        <QuickRenameDialog
+          open={Boolean(app.createGroupDraft)}
+          title="Create Channel Group"
+          initialValue=""
+          confirmLabel="Create"
+          onClose={() => app.setCreateGroupDraft(null)}
+          onConfirm={async (value) => {
+            await app.createChannelGroup(
+              value,
+              app.createGroupDraft?.channelId ?? null,
+            );
+            app.setCreateGroupDraft(null);
+          }}
+        />
+      )}
 
       {app.showAccountModal && (
         <AccountSettingsModal
@@ -1215,55 +1220,56 @@ export function ChatApp() {
           onDeleteAccount={app.deleteAccount}
         />
       )}
-
-      <VoiceSettingsModal
-        open={app.showVoiceSettingsModal}
-        onOpenChange={app.setShowVoiceSettingsModal}
-        settings={app.appSettings.voice}
-        saving={app.voiceSettingsSaving}
-        error={app.voiceSettingsError}
-        activeChannelName={app.activeVoiceChannel?.name ?? null}
-        currentUserDisplayName={app.userDisplayName}
-        currentUserAvatarUrl={app.profileAvatarUrl}
-        voiceSessionState={{
-          ...voiceController.state,
-          participants: visibleActiveVoiceParticipants,
-        }}
-        voiceSessionActions={voiceController.actions}
-        showDiagnostics={app.isPlatformStaff}
-        canOpenVoicePopout={canOpenVoicePopout}
-        canKickParticipants={canKickVoiceParticipants}
-        onDisconnect={() => {
-          void app.disconnectVoiceSession();
-        }}
-        onOpenVoicePopout={handleOpenVoicePopout}
-        onOpenVoiceHardwareTest={() => app.setUserVoiceHardwareTestOpen(true)}
-        onKickParticipant={(targetUserId, displayName) => {
-          void handleKickVoiceParticipant(targetUserId, displayName).catch(
-            (error: unknown) => {
-              toast.error(
-                getErrorMessage(
-                  error,
-                  "Failed to remove member from the voice channel.",
-                ),
-                {
-                  id: "voice-kick-error",
-                },
-              );
-            },
-          );
-        }}
-      />
-
-      <VoiceHardwareDebugPanel
-        open={app.userVoiceHardwareTestOpen}
-        onOpenChange={app.setUserVoiceHardwareTestOpen}
-        hotkeyLabel={null}
-        title="Voice Hardware Test"
-        description="Test microphone capture and speaker playback locally before joining a voice channel."
-        showDebugWorkflow={false}
-      />
-
+      {app.showVoiceSettingsModal && (
+        <VoiceSettingsModal
+          open={app.showVoiceSettingsModal}
+          onOpenChange={app.setShowVoiceSettingsModal}
+          settings={app.appSettings.voice}
+          saving={app.voiceSettingsSaving}
+          error={app.voiceSettingsError}
+          activeChannelName={app.activeVoiceChannel?.name ?? null}
+          currentUserDisplayName={app.userDisplayName}
+          currentUserAvatarUrl={app.profileAvatarUrl}
+          voiceSessionState={{
+            ...voiceController.state,
+            participants: visibleActiveVoiceParticipants,
+          }}
+          voiceSessionActions={voiceController.actions}
+          showDiagnostics={app.isPlatformStaff}
+          canOpenVoicePopout={canOpenVoicePopout}
+          canKickParticipants={canKickVoiceParticipants}
+          onDisconnect={() => {
+            void app.disconnectVoiceSession();
+          }}
+          onOpenVoicePopout={handleOpenVoicePopout}
+          onOpenVoiceHardwareTest={() => app.setUserVoiceHardwareTestOpen(true)}
+          onKickParticipant={(targetUserId, displayName) => {
+            void handleKickVoiceParticipant(targetUserId, displayName).catch(
+              (error: unknown) => {
+                toast.error(
+                  getErrorMessage(
+                    error,
+                    "Failed to remove member from the voice channel.",
+                  ),
+                  {
+                    id: "voice-kick-error",
+                  },
+                );
+              },
+            );
+          }}
+        />
+      )}
+      {app.userVoiceHardwareTestOpen && (
+        <VoiceHardwareDebugPanel
+          open={app.userVoiceHardwareTestOpen}
+          onOpenChange={app.setUserVoiceHardwareTestOpen}
+          hotkeyLabel={null}
+          title="Voice Hardware Test"
+          description="Test microphone capture and speaker playback locally before joining a voice channel."
+          showDebugWorkflow={false}
+        />
+      )}
       {Object.keys(voiceController.state.remoteStreams).map((userId) => (
         <audio
           key={userId}

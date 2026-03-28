@@ -221,7 +221,9 @@
     --border-angle: 360deg;
   }
 }
-
+.gpu-layer {
+  transform: translateZ(0);
+}
 .rainbow-border {
   border: none;
   background:
