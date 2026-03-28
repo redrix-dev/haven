@@ -2009,6 +2009,17 @@ export function useMessages({
     }) => {
       if (!isMounted || !isCurrentMessageLoad(inputBundle.loadId)) return;
 
+      let authorCount = 0;
+      let fetchedAuthorCount = 0;
+      try {
+        ({ authorCount, fetchedAuthorCount } =
+          await updateAuthorProfilesForMessages(inputBundle.messageList));
+      } catch {
+        // Profile fetch failed — still render messages with fallback labels
+      }
+
+      if (!isMounted || !isCurrentMessageLoad(inputBundle.loadId)) return;
+
       messageBundleController.applyLoadedBundle({
         messageList: inputBundle.messageList,
         reactionList: inputBundle.reactionList,
@@ -2016,10 +2027,6 @@ export function useMessages({
         linkPreviewList: inputBundle.linkPreviewList,
         hasOlder: inputBundle.hasOlder,
       });
-
-      const { authorCount, fetchedAuthorCount } =
-        await updateAuthorProfilesForMessages(inputBundle.messageList);
-      if (!isMounted || !isCurrentMessageLoad(inputBundle.loadId)) return;
 
       logReload("load:success", {
         reason: inputBundle.reason,
