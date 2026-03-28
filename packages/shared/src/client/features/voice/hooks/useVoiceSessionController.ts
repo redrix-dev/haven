@@ -1,26 +1,26 @@
-import React from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@shared/lib/supabase';
-import { fetchIceConfig } from '@shared/lib/voice/ice';
-import { matchesVoicePushToTalkBinding } from '@shared/lib/voice/pushToTalk';
-import { useVoiceMemberVolumes } from '@client/features/voice/hooks/useVoiceMemberVolumes';
-import { isEditableKeyboardTarget } from '@client/app/utils';
-import { playVoicePresenceSound } from '@shared/lib/notifications/sound';
-import { getErrorMessage } from '@platform/lib/errors';
-import { useVoiceStore } from '@shared/stores/voiceStore';
+import React from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "@shared/lib/supabase";
+import { fetchIceConfig } from "@shared/lib/voice/ice";
+import { matchesVoicePushToTalkBinding } from "@shared/lib/voice/pushToTalk";
+import { useVoiceMemberVolumes } from "@client/features/voice/hooks/useVoiceMemberVolumes";
+import { isEditableKeyboardTarget } from "@client/app/utils";
+import { playVoicePresenceSound } from "@shared/lib/notifications/sound";
+import { getErrorMessage } from "@platform/lib/errors";
+import { useVoiceStore } from "@shared/stores/voiceStore";
 import type {
   NotificationAudioSettings,
   VoiceSettings,
-} from '@platform/desktop/types';
+} from "@platform/desktop/types";
 import type {
   VoiceControllerChannel,
   VoiceParticipant,
   VoicePeerDiagnostics,
   VoiceSessionControllerActions,
   VoiceSessionControllerState,
-} from '@client/features/voice/types';
+} from "@client/features/voice/types";
 
-type VoiceSignalEvent = 'offer' | 'answer' | 'ice';
+type VoiceSignalEvent = "offer" | "answer" | "ice";
 
 type VoiceSignalPayload = {
   type: VoiceSignalEvent;
@@ -67,7 +67,7 @@ type UseVoiceSessionControllerInput = {
       displayName: string;
       avatarUrl?: string | null;
       isSpeaking?: boolean;
-    }>
+    }>,
   ) => void;
   onConnectionChange?: (connected: boolean) => void;
   onSessionStateChange?: (state: {
@@ -76,14 +76,12 @@ type UseVoiceSessionControllerInput = {
     isDeafened: boolean;
   }) => void;
   onControlActionsReady?: (
-    actions:
-      | {
-          join: () => void;
-          leave: () => void;
-          toggleMute: () => void;
-          toggleDeafen: () => void;
-        }
-      | null
+    actions: {
+      join: () => void;
+      leave: () => void;
+      toggleMute: () => void;
+      toggleDeafen: () => void;
+    } | null,
   ) => void;
   onSessionError?: (message: string) => void;
   onVoiceKick?: (payload: VoiceKickPayload) => void;
@@ -91,15 +89,15 @@ type UseVoiceSessionControllerInput = {
 
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   {
-    urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'],
+    urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"],
   },
 ];
 
 const VOICE_ACTIVITY_GATE_RELEASE_MS = 220;
 
-const isAudioInput = (device: MediaDeviceInfo) => device.kind === 'audioinput';
+const isAudioInput = (device: MediaDeviceInfo) => device.kind === "audioinput";
 const isAudioOutput = (device: MediaDeviceInfo) =>
-  device.kind === 'audiooutput';
+  device.kind === "audiooutput";
 const hasSelectableDeviceId = (device: MediaDeviceInfo) =>
   device.deviceId.trim().length > 0;
 
@@ -126,7 +124,9 @@ export function useVoiceSessionController({
 } {
   const joined = useVoiceStore((state) => state.joined);
   const [joining, setJoining] = React.useState(false);
-  const [participants, setParticipants] = React.useState<VoiceParticipant[]>([]);
+  const [participants, setParticipants] = React.useState<VoiceParticipant[]>(
+    [],
+  );
   const [remoteStreams, setRemoteStreams] = React.useState<
     Record<string, MediaStream>
   >({});
@@ -135,17 +135,17 @@ export function useVoiceSessionController({
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [iceSource, setIceSource] = React.useState<
-    'xirsys' | 'fallback' | null
+    "xirsys" | "fallback" | null
   >(null);
   const [inputDevices, setInputDevices] = React.useState<MediaDeviceInfo[]>([]);
   const [outputDevices, setOutputDevices] = React.useState<MediaDeviceInfo[]>(
-    []
+    [],
   );
   const [selectedInputDeviceId, setSelectedInputDeviceId] = React.useState(
-    voiceSettings.preferredInputDeviceId || 'default'
+    voiceSettings.preferredInputDeviceId || "default",
   );
   const [selectedOutputDeviceId, setSelectedOutputDeviceId] = React.useState(
-    voiceSettings.preferredOutputDeviceId || 'default'
+    voiceSettings.preferredOutputDeviceId || "default",
   );
   const [switchingInput, setSwitchingInput] = React.useState(false);
   const [supportsOutputSelection, setSupportsOutputSelection] =
@@ -165,21 +165,22 @@ export function useVoiceSessionController({
   const channelRef = React.useRef<RealtimeChannel | null>(null);
   const localStreamRef = React.useRef<MediaStream | null>(null);
   const peersRef = React.useRef<Map<string, RTCPeerConnection>>(new Map());
-  const pendingIceCandidatesRef = React.useRef<Map<string, RTCIceCandidateInit[]>>(
-    new Map()
-  );
-  const audioElementRefs = React.useRef<Record<string, HTMLAudioElement | null>>(
-    {}
-  );
+  const pendingIceCandidatesRef = React.useRef<
+    Map<string, RTCIceCandidateInit[]>
+  >(new Map());
+  const audioElementRefs = React.useRef<
+    Record<string, HTMLAudioElement | null>
+  >({});
   const iceServersRef = React.useRef<RTCIceServer[]>(FALLBACK_ICE_SERVERS);
   const signalingSessionIdRef = React.useRef<string | null>(null);
   const localInputMonitorAudioContextRef = React.useRef<AudioContext | null>(
-    null
+    null,
   );
   const localInputMonitorSourceNodeRef =
     React.useRef<MediaStreamAudioSourceNode | null>(null);
-  const localInputMonitorAnalyserNodeRef =
-    React.useRef<AnalyserNode | null>(null);
+  const localInputMonitorAnalyserNodeRef = React.useRef<AnalyserNode | null>(
+    null,
+  );
   const localInputMonitorTimeDomainRef =
     React.useRef<Uint8Array<ArrayBuffer> | null>(null);
   const localInputMonitorRafIdRef = React.useRef<number | null>(null);
@@ -194,13 +195,13 @@ export function useVoiceSessionController({
   const previousChannelKeyRef = React.useRef<string | null>(null);
   const skipNextPresenceSyncRef = React.useRef(false);
   const activeChannelRef = React.useRef<VoiceControllerChannel | null>(
-    activeChannel
+    activeChannel,
   );
   const joinVoiceChannelActionRef = React.useRef<(() => Promise<void>) | null>(
-    null
+    null,
   );
   const leaveVoiceChannelActionRef = React.useRef<(() => Promise<void>) | null>(
-    null
+    null,
   );
   const toggleMuteActionRef = React.useRef<(() => void) | null>(null);
   const toggleDeafenActionRef = React.useRef<(() => void) | null>(null);
@@ -209,55 +210,58 @@ export function useVoiceSessionController({
     (value: React.SetStateAction<boolean>) => {
       const previousValue = useVoiceStore.getState().joined;
       const nextValue =
-        typeof value === 'function'
+        typeof value === "function"
           ? (value as (previousState: boolean) => boolean)(previousValue)
           : value;
       useVoiceStore.getState().setJoined(nextValue);
     },
-    []
+    [],
   );
 
   const setStoredIsMuted = React.useCallback(
     (value: React.SetStateAction<boolean>) => {
       const previousValue = useVoiceStore.getState().isMuted;
       const nextValue =
-        typeof value === 'function'
+        typeof value === "function"
           ? (value as (previousState: boolean) => boolean)(previousValue)
           : value;
       useVoiceStore.getState().setIsMuted(nextValue);
     },
-    []
+    [],
   );
 
   const setStoredIsDeafened = React.useCallback(
     (value: React.SetStateAction<boolean>) => {
       const previousValue = useVoiceStore.getState().isDeafened;
       const nextValue =
-        typeof value === 'function'
+        typeof value === "function"
           ? (value as (previousState: boolean) => boolean)(previousValue)
           : value;
       useVoiceStore.getState().setIsDeafened(nextValue);
     },
-    []
+    [],
   );
 
-  const setStoredParticipants = React.useCallback((nextParticipants: VoiceParticipant[]) => {
-    useVoiceStore.getState().setParticipants(
-      nextParticipants.map((participant) => ({
-        userId: participant.userId,
-        displayName: participant.displayName,
-        avatarUrl: participant.avatarUrl ?? null,
-        isSpeaking: participant.isSpeaking ?? false,
-      }))
-    );
-  }, []);
+  const setStoredParticipants = React.useCallback(
+    (nextParticipants: VoiceParticipant[]) => {
+      useVoiceStore.getState().setParticipants(
+        nextParticipants.map((participant) => ({
+          userId: participant.userId,
+          displayName: participant.displayName,
+          avatarUrl: participant.avatarUrl ?? null,
+          isSpeaking: participant.isSpeaking ?? false,
+        })),
+      );
+    },
+    [],
+  );
 
   const activeChannelKey = activeChannel
     ? `${activeChannel.communityId}:${activeChannel.channelId}`
     : null;
   const remoteParticipantIds = React.useMemo(
     () => participants.map((participant) => participant.userId),
-    [participants]
+    [participants],
   );
   const {
     remoteVolumes,
@@ -266,19 +270,19 @@ export function useVoiceSessionController({
     resetAllMemberVolumes,
     getMemberVolume,
   } = useVoiceMemberVolumes(
-    activeChannel?.communityId ?? 'voice',
-    activeChannel?.channelId ?? 'inactive',
-    remoteParticipantIds
+    activeChannel?.communityId ?? "voice",
+    activeChannel?.channelId ?? "inactive",
+    remoteParticipantIds,
   );
   const diagnosticsRows = React.useMemo(
     () =>
       Object.values(peerDiagnostics).sort((left, right) =>
-        left.displayName.localeCompare(right.displayName)
+        left.displayName.localeCompare(right.displayName),
       ),
-    [peerDiagnostics]
+    [peerDiagnostics],
   );
   const playDebouncedVoicePresenceSound = React.useCallback(
-    (event: 'voice_presence_join' | 'voice_presence_leave') => {
+    (event: "voice_presence_join" | "voice_presence_leave") => {
       const now = Date.now();
       if (now - lastPresenceSoundAtRef.current < 900) return;
       lastPresenceSoundAtRef.current = now;
@@ -287,7 +291,7 @@ export function useVoiceSessionController({
         audioSettings: notificationAudioSettingsRef.current,
       });
     },
-    []
+    [],
   );
 
   const persistVoiceSettingsPatch = React.useCallback(
@@ -298,7 +302,7 @@ export function useVoiceSessionController({
         ...patch,
       });
     },
-    [onUpdateVoiceSettings, voiceSettings]
+    [onUpdateVoiceSettings, voiceSettings],
   );
 
   const applySinkId = React.useCallback(
@@ -311,13 +315,13 @@ export function useVoiceSessionController({
 
       try {
         await mediaElementWithSink.setSinkId(
-          selectedOutputDeviceId || 'default'
+          selectedOutputDeviceId || "default",
         );
       } catch (sinkError) {
-        console.error('Failed to set output device:', sinkError);
+        console.error("Failed to set output device:", sinkError);
       }
     },
-    [selectedOutputDeviceId, supportsOutputSelection]
+    [selectedOutputDeviceId, supportsOutputSelection],
   );
 
   const refreshAudioDevices = React.useCallback(async () => {
@@ -326,10 +330,10 @@ export function useVoiceSessionController({
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const audioInputs = devices.filter(
-        (device) => isAudioInput(device) && hasSelectableDeviceId(device)
+        (device) => isAudioInput(device) && hasSelectableDeviceId(device),
       );
       const audioOutputs = devices.filter(
-        (device) => isAudioOutput(device) && hasSelectableDeviceId(device)
+        (device) => isAudioOutput(device) && hasSelectableDeviceId(device),
       );
       setInputDevices(audioInputs);
       setOutputDevices(audioOutputs);
@@ -341,24 +345,26 @@ export function useVoiceSessionController({
         setSelectedInputDeviceId(audioInputs[0].deviceId);
       } else if (
         audioInputs.length === 0 &&
-        selectedInputDeviceId !== 'default'
+        selectedInputDeviceId !== "default"
       ) {
-        setSelectedInputDeviceId('default');
+        setSelectedInputDeviceId("default");
       }
 
       if (
         audioOutputs.length > 0 &&
-        !audioOutputs.some((device) => device.deviceId === selectedOutputDeviceId)
+        !audioOutputs.some(
+          (device) => device.deviceId === selectedOutputDeviceId,
+        )
       ) {
         setSelectedOutputDeviceId(audioOutputs[0].deviceId);
       } else if (
         audioOutputs.length === 0 &&
-        selectedOutputDeviceId !== 'default'
+        selectedOutputDeviceId !== "default"
       ) {
-        setSelectedOutputDeviceId('default');
+        setSelectedOutputDeviceId("default");
       }
     } catch (deviceError) {
-      console.error('Failed to enumerate audio devices:', deviceError);
+      console.error("Failed to enumerate audio devices:", deviceError);
     }
   }, [selectedInputDeviceId, selectedOutputDeviceId]);
 
@@ -380,8 +386,8 @@ export function useVoiceSessionController({
         await localInputMonitorAudioContextRef.current.close();
       } catch (monitorError) {
         console.warn(
-          'Failed to close local input monitor audio context:',
-          monitorError
+          "Failed to close local input monitor audio context:",
+          monitorError,
         );
       }
       localInputMonitorAudioContextRef.current = null;
@@ -419,7 +425,7 @@ export function useVoiceSessionController({
         localInputMonitorSourceNodeRef.current = source;
         localInputMonitorAnalyserNodeRef.current = analyser;
         localInputMonitorTimeDomainRef.current = new Uint8Array(
-          analyser.fftSize
+          analyser.fftSize,
         ) as Uint8Array<ArrayBuffer>;
         localInputMonitorActiveRef.current = true;
 
@@ -447,7 +453,10 @@ export function useVoiceSessionController({
           const normalizedLevel = Math.min(1, rms * 3);
           const threshold = Math.max(
             0,
-            Math.min(1, voiceSettingsRef.current.voiceActivationThreshold / 100)
+            Math.min(
+              1,
+              voiceSettingsRef.current.voiceActivationThreshold / 100,
+            ),
           );
 
           if (normalizedLevel >= threshold) {
@@ -462,25 +471,26 @@ export function useVoiceSessionController({
           setLocalInputLevel((previousLevel) =>
             Math.abs(previousLevel - normalizedLevel) > 0.01
               ? normalizedLevel
-              : previousLevel
+              : previousLevel,
           );
           setVoiceActivityGateOpen((previousGateOpen) =>
-            previousGateOpen === gateOpen ? previousGateOpen : gateOpen
+            previousGateOpen === gateOpen ? previousGateOpen : gateOpen,
           );
 
-          localInputMonitorRafIdRef.current = window.requestAnimationFrame(frame);
+          localInputMonitorRafIdRef.current =
+            window.requestAnimationFrame(frame);
         };
 
         localInputMonitorRafIdRef.current = window.requestAnimationFrame(frame);
       } catch (monitorError) {
         console.warn(
-          'Failed to start local input monitor for voice activity gating:',
-          monitorError
+          "Failed to start local input monitor for voice activity gating:",
+          monitorError,
         );
         void stopLocalInputMonitor();
       }
     },
-    [stopLocalInputMonitor]
+    [stopLocalInputMonitor],
   );
 
   const closePeerConnection = React.useCallback((remoteUserId: string) => {
@@ -516,31 +526,32 @@ export function useVoiceSessionController({
 
   const flushPendingIceCandidates = React.useCallback(
     async (remoteUserId: string, peerConnection: RTCPeerConnection) => {
-      const pendingCandidates = pendingIceCandidatesRef.current.get(remoteUserId);
+      const pendingCandidates =
+        pendingIceCandidatesRef.current.get(remoteUserId);
       if (!pendingCandidates || pendingCandidates.length === 0) return;
 
       for (const candidate of pendingCandidates) {
         try {
           await peerConnection.addIceCandidate(candidate);
         } catch (iceError) {
-          console.error('Failed to apply buffered ICE candidate:', iceError);
+          console.error("Failed to apply buffered ICE candidate:", iceError);
         }
       }
 
       pendingIceCandidatesRef.current.delete(remoteUserId);
     },
-    []
+    [],
   );
 
   const sendSignal = React.useCallback(
-    async (payload: Omit<VoiceSignalPayload, 'from' | 'senderSessionId'>) => {
+    async (payload: Omit<VoiceSignalPayload, "from" | "senderSessionId">) => {
       const channel = channelRef.current;
       const sessionId = signalingSessionIdRef.current;
       if (!channel || !sessionId || !currentUserId) return;
 
       const sendStatus = await channel.send({
-        type: 'broadcast',
-        event: 'webrtc-signal',
+        type: "broadcast",
+        event: "webrtc-signal",
         payload: {
           ...payload,
           from: currentUserId,
@@ -548,11 +559,11 @@ export function useVoiceSessionController({
         },
       });
 
-      if (sendStatus !== 'ok') {
-        console.error('Failed to send WebRTC signal:', sendStatus);
+      if (sendStatus !== "ok") {
+        console.error("Failed to send WebRTC signal:", sendStatus);
       }
     },
-    [currentUserId]
+    [currentUserId],
   );
 
   const refreshVoiceDiagnostics = React.useCallback(async () => {
@@ -588,15 +599,15 @@ export function useVoiceSessionController({
 
               if (
                 !selectedCandidatePairId &&
-                statsRecord.type === 'transport' &&
-                typeof statsRecord.selectedCandidatePairId === 'string'
+                statsRecord.type === "transport" &&
+                typeof statsRecord.selectedCandidatePairId === "string"
               ) {
                 selectedCandidatePairId = statsRecord.selectedCandidatePairId;
               }
 
               if (
                 !selectedCandidatePairId &&
-                statsRecord.type === 'candidate-pair' &&
+                statsRecord.type === "candidate-pair" &&
                 statsRecord.selected === true
               ) {
                 selectedCandidatePairId = statsRecord.id;
@@ -607,49 +618,49 @@ export function useVoiceSessionController({
               const selectedPair = statsById.get(selectedCandidatePairId);
               if (selectedPair) {
                 selectedCandidatePairState =
-                  typeof selectedPair.state === 'string'
+                  typeof selectedPair.state === "string"
                     ? selectedPair.state
                     : null;
                 writable =
-                  typeof selectedPair.writable === 'boolean'
+                  typeof selectedPair.writable === "boolean"
                     ? selectedPair.writable
                     : null;
                 bytesSent =
-                  typeof selectedPair.bytesSent === 'number'
+                  typeof selectedPair.bytesSent === "number"
                     ? selectedPair.bytesSent
                     : null;
                 bytesReceived =
-                  typeof selectedPair.bytesReceived === 'number'
+                  typeof selectedPair.bytesReceived === "number"
                     ? selectedPair.bytesReceived
                     : null;
 
                 const localCandidate =
-                  typeof selectedPair.localCandidateId === 'string'
+                  typeof selectedPair.localCandidateId === "string"
                     ? statsById.get(selectedPair.localCandidateId)
                     : null;
                 const remoteCandidate =
-                  typeof selectedPair.remoteCandidateId === 'string'
+                  typeof selectedPair.remoteCandidateId === "string"
                     ? statsById.get(selectedPair.remoteCandidateId)
                     : null;
 
                 localCandidateType =
                   localCandidate &&
-                  typeof localCandidate.candidateType === 'string'
+                  typeof localCandidate.candidateType === "string"
                     ? localCandidate.candidateType
                     : null;
                 remoteCandidateType =
                   remoteCandidate &&
-                  typeof remoteCandidate.candidateType === 'string'
+                  typeof remoteCandidate.candidateType === "string"
                     ? remoteCandidate.candidateType
                     : null;
               }
             }
           } catch (statsError) {
-            console.error('Failed to collect WebRTC stats:', statsError);
+            console.error("Failed to collect WebRTC stats:", statsError);
           }
 
           const participant = participants.find(
-            (entry) => entry.userId === remoteUserId
+            (entry) => entry.userId === remoteUserId,
           );
 
           return {
@@ -667,14 +678,17 @@ export function useVoiceSessionController({
             bytesSent,
             bytesReceived,
           } satisfies VoicePeerDiagnostics;
-        })
+        }),
       );
 
       setPeerDiagnostics(
-        rows.reduce<Record<string, VoicePeerDiagnostics>>((accumulator, row) => {
-          accumulator[row.userId] = row;
-          return accumulator;
-        }, {})
+        rows.reduce<Record<string, VoicePeerDiagnostics>>(
+          (accumulator, row) => {
+            accumulator[row.userId] = row;
+            return accumulator;
+          },
+          {},
+        ),
       );
       setDiagnosticsUpdatedAt(new Date().toISOString());
     } finally {
@@ -701,7 +715,7 @@ export function useVoiceSessionController({
           peerConnection.addTrack(track, localStream);
         });
       } else {
-        peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+        peerConnection.addTransceiver("audio", { direction: "recvonly" });
       }
 
       peerConnection.ontrack = (event) => {
@@ -720,7 +734,7 @@ export function useVoiceSessionController({
         if (!event.candidate) return;
 
         void sendSignal({
-          type: 'ice',
+          type: "ice",
           to: remoteUserId,
           candidate: event.candidate.toJSON(),
         });
@@ -728,8 +742,8 @@ export function useVoiceSessionController({
 
       peerConnection.onconnectionstatechange = () => {
         if (
-          peerConnection.connectionState === 'failed' ||
-          peerConnection.connectionState === 'closed'
+          peerConnection.connectionState === "failed" ||
+          peerConnection.connectionState === "closed"
         ) {
           closePeerConnection(remoteUserId);
         } else if (showDiagnostics) {
@@ -755,23 +769,23 @@ export function useVoiceSessionController({
       peersRef.current.set(remoteUserId, peerConnection);
       return peerConnection;
     },
-    [closePeerConnection, refreshVoiceDiagnostics, sendSignal, showDiagnostics]
+    [closePeerConnection, refreshVoiceDiagnostics, sendSignal, showDiagnostics],
   );
 
   const createAndSendOffer = React.useCallback(
     async (remoteUserId: string) => {
       const peerConnection = ensurePeerConnection(remoteUserId);
-      if (peerConnection.signalingState !== 'stable') return;
+      if (peerConnection.signalingState !== "stable") return;
 
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
       await sendSignal({
-        type: 'offer',
+        type: "offer",
         to: remoteUserId,
         sdp: offer,
       });
     },
-    [ensurePeerConnection, sendSignal]
+    [ensurePeerConnection, sendSignal],
   );
 
   const handleSignal = React.useCallback(
@@ -792,10 +806,10 @@ export function useVoiceSessionController({
       const peerConnection = ensurePeerConnection(remoteUserId);
 
       try {
-        if (payload.type === 'offer' && payload.sdp) {
-          if (peerConnection.signalingState !== 'stable') {
+        if (payload.type === "offer" && payload.sdp) {
+          if (peerConnection.signalingState !== "stable") {
             await peerConnection
-              .setLocalDescription({ type: 'rollback' })
+              .setLocalDescription({ type: "rollback" })
               .catch(() => undefined);
           }
 
@@ -805,7 +819,7 @@ export function useVoiceSessionController({
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
           await sendSignal({
-            type: 'answer',
+            type: "answer",
             to: remoteUserId,
             sdp: answer,
             targetSessionId: payload.senderSessionId,
@@ -813,13 +827,13 @@ export function useVoiceSessionController({
           return;
         }
 
-        if (payload.type === 'answer' && payload.sdp) {
+        if (payload.type === "answer" && payload.sdp) {
           await peerConnection.setRemoteDescription(payload.sdp);
           await flushPendingIceCandidates(remoteUserId, peerConnection);
           return;
         }
 
-        if (payload.type === 'ice' && payload.candidate) {
+        if (payload.type === "ice" && payload.candidate) {
           if (peerConnection.remoteDescription) {
             await peerConnection.addIceCandidate(payload.candidate);
           } else {
@@ -828,12 +842,12 @@ export function useVoiceSessionController({
             pendingCandidates.push(payload.candidate);
             pendingIceCandidatesRef.current.set(
               remoteUserId,
-              pendingCandidates
+              pendingCandidates,
             );
           }
         }
       } catch (signalError) {
-        console.error('Failed to handle WebRTC signal:', signalError);
+        console.error("Failed to handle WebRTC signal:", signalError);
       }
     },
     [
@@ -841,7 +855,7 @@ export function useVoiceSessionController({
       ensurePeerConnection,
       flushPendingIceCandidates,
       sendSignal,
-    ]
+    ],
   );
 
   const reconcilePeerConnections = React.useCallback(
@@ -855,13 +869,18 @@ export function useVoiceSessionController({
       for (const remoteUserId of remoteUserIds) {
         if (!peersRef.current.has(remoteUserId)) {
           ensurePeerConnection(remoteUserId);
-          if ((currentUserId ?? '').localeCompare(remoteUserId) < 0) {
+          if ((currentUserId ?? "").localeCompare(remoteUserId) < 0) {
             void createAndSendOffer(remoteUserId);
           }
         }
       }
     },
-    [closePeerConnection, createAndSendOffer, currentUserId, ensurePeerConnection]
+    [
+      closePeerConnection,
+      createAndSendOffer,
+      currentUserId,
+      ensurePeerConnection,
+    ],
   );
 
   const syncParticipantsFromPresence = React.useCallback(() => {
@@ -892,20 +911,22 @@ export function useVoiceSessionController({
     }
 
     nextParticipants.sort((left, right) =>
-      left.displayName.localeCompare(right.displayName)
+      left.displayName.localeCompare(right.displayName),
     );
 
     const nextParticipantIds = new Set(
-      nextParticipants.map((participant) => participant.userId)
+      nextParticipants.map((participant) => participant.userId),
     );
     if (hasPresenceSyncedOnceRef.current) {
       const previousIds = previousRemoteParticipantIdsRef.current;
-      let nextSoundEvent: 'voice_presence_join' | 'voice_presence_leave' | null =
-        null;
+      let nextSoundEvent:
+        | "voice_presence_join"
+        | "voice_presence_leave"
+        | null = null;
 
       for (const participantId of nextParticipantIds) {
         if (!previousIds.has(participantId)) {
-          nextSoundEvent = 'voice_presence_join';
+          nextSoundEvent = "voice_presence_join";
           break;
         }
       }
@@ -913,7 +934,7 @@ export function useVoiceSessionController({
       if (!nextSoundEvent) {
         for (const participantId of previousIds) {
           if (!nextParticipantIds.has(participantId)) {
-            nextSoundEvent = 'voice_presence_leave';
+            nextSoundEvent = "voice_presence_leave";
             break;
           }
         }
@@ -929,9 +950,13 @@ export function useVoiceSessionController({
 
     setParticipants(nextParticipants);
     reconcilePeerConnections(
-      nextParticipants.map((participant) => participant.userId)
+      nextParticipants.map((participant) => participant.userId),
     );
-  }, [currentUserId, playDebouncedVoicePresenceSound, reconcilePeerConnections]);
+  }, [
+    currentUserId,
+    playDebouncedVoicePresenceSound,
+    reconcilePeerConnections,
+  ]);
 
   const getLocalTransmissionState = React.useCallback(() => {
     const {
@@ -945,15 +970,15 @@ export function useVoiceSessionController({
     let shouldSendAudio = baseAllowsSend;
     if (baseAllowsSend) {
       switch (transmissionMode) {
-        case 'push_to_talk':
+        case "push_to_talk":
           shouldSendAudio =
             Boolean(voiceSettingsRef.current.pushToTalkBinding) &&
             pushToTalkPressed;
           break;
-        case 'voice_activity':
+        case "voice_activity":
           shouldSendAudio = voiceActivityGateOpen;
           break;
-        case 'open_mic':
+        case "open_mic":
         default:
           shouldSendAudio = true;
           break;
@@ -961,7 +986,7 @@ export function useVoiceSessionController({
     }
 
     const isSpeaking =
-      transmissionMode === 'push_to_talk'
+      transmissionMode === "push_to_talk"
         ? baseAllowsSend && pushToTalkPressed
         : baseAllowsSend && voiceActivityGateOpen;
 
@@ -990,8 +1015,8 @@ export function useVoiceSessionController({
     };
 
     const trackStatus = await channel.track(payload);
-    if (trackStatus !== 'ok') {
-      console.error('Failed to update voice presence:', trackStatus);
+    if (trackStatus !== "ok") {
+      console.error("Failed to update voice presence:", trackStatus);
     }
   }, [
     getLocalTransmissionState,
@@ -1000,18 +1025,21 @@ export function useVoiceSessionController({
     currentUserId,
   ]);
 
-  const requestLocalAudioStream = React.useCallback(async (deviceId: string) => {
-    const constraints: MediaTrackConstraints = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: false,
-    };
-    if (deviceId && deviceId !== 'default') {
-      constraints.deviceId = { exact: deviceId };
-    }
+  const requestLocalAudioStream = React.useCallback(
+    async (deviceId: string) => {
+      const constraints: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: false,
+      };
+      if (deviceId && deviceId !== "default") {
+        constraints.deviceId = { exact: deviceId };
+      }
 
-    return navigator.mediaDevices.getUserMedia({ audio: constraints });
-  }, []);
+      return navigator.mediaDevices.getUserMedia({ audio: constraints });
+    },
+    [],
+  );
 
   const applyLocalTrackState = React.useCallback(() => {
     const localStream = localStreamRef.current;
@@ -1027,7 +1055,7 @@ export function useVoiceSessionController({
     async (stream: MediaStream, renegotiate: boolean) => {
       const nextTrack = stream.getAudioTracks()[0];
       if (!nextTrack) {
-        throw new Error('Selected input device has no audio track.');
+        throw new Error("Selected input device has no audio track.");
       }
 
       const previousStream = localStreamRef.current;
@@ -1038,7 +1066,7 @@ export function useVoiceSessionController({
       for (const [remoteUserId, peerConnection] of peersRef.current.entries()) {
         const audioSender = peerConnection
           .getSenders()
-          .find((sender) => !sender.track || sender.track.kind === 'audio');
+          .find((sender) => !sender.track || sender.track.kind === "audio");
 
         if (audioSender) {
           const audioTransceiver = peerConnection
@@ -1046,17 +1074,17 @@ export function useVoiceSessionController({
             .find((transceiver) => transceiver.sender === audioSender);
           if (
             audioTransceiver &&
-            (audioTransceiver.direction === 'recvonly' ||
-              audioTransceiver.direction === 'inactive')
+            (audioTransceiver.direction === "recvonly" ||
+              audioTransceiver.direction === "inactive")
           ) {
-            audioTransceiver.direction = 'sendrecv';
+            audioTransceiver.direction = "sendrecv";
           }
           await audioSender.replaceTrack(nextTrack);
         } else {
           peerConnection.addTrack(nextTrack, stream);
         }
 
-        if (renegotiate && peerConnection.signalingState === 'stable') {
+        if (renegotiate && peerConnection.signalingState === "stable") {
           await createAndSendOffer(remoteUserId);
         }
       }
@@ -1065,7 +1093,7 @@ export function useVoiceSessionController({
         previousStream.getTracks().forEach((track) => track.stop());
       }
     },
-    [applyLocalTrackState, createAndSendOffer, startLocalInputMonitor]
+    [applyLocalTrackState, createAndSendOffer, startLocalInputMonitor],
   );
 
   const cleanupVoiceSession = React.useCallback(async () => {
@@ -1106,6 +1134,9 @@ export function useVoiceSessionController({
     previousRemoteParticipantIdsRef.current = new Set();
     hasPresenceSyncedOnceRef.current = false;
 
+    if (wasJoined) {
+      playDebouncedVoicePresenceSound("voice_presence_leave"); // CHECKPOINT 4 COMPLETE
+    }
     if (channel) {
       try {
         await channel.untrack();
@@ -1113,9 +1144,6 @@ export function useVoiceSessionController({
         // no-op
       }
       await supabase.removeChannel(channel);
-    }
-    if (wasJoined) {
-      playDebouncedVoicePresenceSound('voice_presence_leave'); // CHECKPOINT 4 COMPLETE
     }
   }, [
     closePeerConnection,
@@ -1164,11 +1192,11 @@ export function useVoiceSessionController({
         localStream = await requestLocalAudioStream(selectedInputDeviceId);
       } catch (mediaError) {
         console.error(
-          'Microphone permission failed during voice join:',
-          mediaError
+          "Microphone permission failed during voice join:",
+          mediaError,
         );
         setNotice(
-          'Microphone access unavailable. Joined with microphone disabled.'
+          "Microphone access unavailable. Joined with microphone disabled.",
         );
       }
 
@@ -1184,17 +1212,17 @@ export function useVoiceSessionController({
           config: {
             presence: { key: currentUserId },
           },
-        }
+        },
       );
 
       voiceChannel
-        .on('presence', { event: 'sync' }, syncParticipantsFromPresence)
-        .on('presence', { event: 'join' }, syncParticipantsFromPresence)
-        .on('presence', { event: 'leave' }, syncParticipantsFromPresence)
-        .on('broadcast', { event: 'webrtc-signal' }, ({ payload }) => {
+        .on("presence", { event: "sync" }, syncParticipantsFromPresence)
+        .on("presence", { event: "join" }, syncParticipantsFromPresence)
+        .on("presence", { event: "leave" }, syncParticipantsFromPresence)
+        .on("broadcast", { event: "webrtc-signal" }, ({ payload }) => {
           void handleSignal(payload as VoiceSignalPayload);
         })
-        .on('broadcast', { event: 'voice_kick' }, ({ payload }) => {
+        .on("broadcast", { event: "voice_kick" }, ({ payload }) => {
           const kickPayload = payload as VoiceKickPayload;
           if (kickPayload.targetUserId !== currentUserId) return;
           if (kickPayload.channelId !== targetChannel.channelId) return;
@@ -1206,29 +1234,32 @@ export function useVoiceSessionController({
       try {
         await new Promise<void>((resolve, reject) => {
           const timeoutId = window.setTimeout(() => {
-            reject(new Error('Timed out connecting to voice.'));
+            reject(new Error("Timed out connecting to voice."));
           }, 12000);
 
           voiceChannel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
+            if (status === "SUBSCRIBED") {
               window.clearTimeout(timeoutId);
               setStoredJoined(true);
-              playDebouncedVoicePresenceSound('voice_presence_join'); // CHECKPOINT 4 COMPLETE
+              playDebouncedVoicePresenceSound("voice_presence_join"); // CHECKPOINT 4 COMPLETE
               skipNextPresenceSyncRef.current = true;
               await trackPresenceState();
               resolve();
-            } else if (status === 'CHANNEL_ERROR') {
+            } else if (status === "CHANNEL_ERROR") {
               window.clearTimeout(timeoutId);
-              reject(new Error('Voice channel connection failed.'));
-            } else if (status === 'TIMED_OUT') {
+              reject(new Error("Voice channel connection failed."));
+            } else if (status === "TIMED_OUT") {
               window.clearTimeout(timeoutId);
-              reject(new Error('Voice channel connection timed out.'));
+              reject(new Error("Voice channel connection timed out."));
             }
           });
         });
       } catch (joinError: unknown) {
-        const message = getErrorMessage(joinError, 'Failed to join voice channel.');
-        console.error('Failed to join voice channel:', joinError);
+        const message = getErrorMessage(
+          joinError,
+          "Failed to join voice channel.",
+        );
+        console.error("Failed to join voice channel:", joinError);
         await cleanupVoiceSession();
         onSessionError?.(message);
       } finally {
@@ -1257,7 +1288,7 @@ export function useVoiceSessionController({
       startLocalInputMonitor,
       syncParticipantsFromPresence,
       trackPresenceState,
-    ]
+    ],
   );
 
   const switchInputDevice = React.useCallback(
@@ -1272,8 +1303,10 @@ export function useVoiceSessionController({
         const newStream = await requestLocalAudioStream(deviceId);
         await applyOutgoingTrackToPeers(newStream, false);
       } catch (switchError: unknown) {
-        console.error('Failed to switch input device:', switchError);
-        setError(getErrorMessage(switchError, 'Failed to switch input device.'));
+        console.error("Failed to switch input device:", switchError);
+        setError(
+          getErrorMessage(switchError, "Failed to switch input device."),
+        );
       } finally {
         setSwitchingInput(false);
       }
@@ -1283,7 +1316,7 @@ export function useVoiceSessionController({
       joined,
       persistVoiceSettingsPatch,
       requestLocalAudioStream,
-    ]
+    ],
   );
 
   const setOutputDevice = React.useCallback(
@@ -1291,15 +1324,15 @@ export function useVoiceSessionController({
       setSelectedOutputDeviceId(deviceId);
       persistVoiceSettingsPatch({ preferredOutputDeviceId: deviceId });
     },
-    [persistVoiceSettingsPatch]
+    [persistVoiceSettingsPatch],
   );
 
   const retryIce = React.useCallback(async () => {
     for (const [remoteUserId, peerConnection] of peersRef.current.entries()) {
-      if (typeof peerConnection.restartIce === 'function') {
+      if (typeof peerConnection.restartIce === "function") {
         peerConnection.restartIce();
       }
-      if (peerConnection.signalingState === 'stable') {
+      if (peerConnection.signalingState === "stable") {
         await createAndSendOffer(remoteUserId);
       }
     }
@@ -1328,16 +1361,16 @@ export function useVoiceSessionController({
       const channel = channelRef.current;
       const currentChannel = activeChannelRef.current;
       if (!channel || !currentChannel || !currentUserId) {
-        throw new Error('Not connected to a voice channel.');
+        throw new Error("Not connected to a voice channel.");
       }
       if (currentChannel.channelId !== channelId) {
-        throw new Error('Voice channel mismatch.');
+        throw new Error("Voice channel mismatch.");
       }
 
       // CHECKPOINT 4 COMPLETE
       const sendStatus = await channel.send({
-        type: 'broadcast',
-        event: 'voice_kick',
+        type: "broadcast",
+        event: "voice_kick",
         payload: {
           targetUserId,
           channelId,
@@ -1345,11 +1378,11 @@ export function useVoiceSessionController({
         } satisfies VoiceKickPayload,
       });
 
-      if (sendStatus !== 'ok') {
-        throw new Error('Failed to remove member from the voice channel.');
+      if (sendStatus !== "ok") {
+        throw new Error("Failed to remove member from the voice channel.");
       }
     },
-    [currentUserId]
+    [currentUserId],
   );
 
   const applyAudioElementPlaybackState = React.useCallback(
@@ -1358,9 +1391,11 @@ export function useVoiceSessionController({
       const isBlockedParticipant =
         !isElevatedInActiveServer && blockedUserIds.has(userId);
       element.muted = isDeafened || isBlockedParticipant;
-      element.volume = isBlockedParticipant ? 0 : (remoteVolumes[userId] ?? 100) / 100;
+      element.volume = isBlockedParticipant
+        ? 0
+        : (remoteVolumes[userId] ?? 100) / 100;
     },
-    [blockedUserIds, isDeafened, isElevatedInActiveServer, remoteVolumes]
+    [blockedUserIds, isDeafened, isElevatedInActiveServer, remoteVolumes],
   );
 
   const bindAudioElement = React.useCallback(
@@ -1375,13 +1410,13 @@ export function useVoiceSessionController({
 
       if (nextRemoteStream) {
         void element.play().catch((playError) => {
-          const errorName = playError instanceof Error ? playError.name : '';
-          if (errorName === 'AbortError') return;
-          console.error('Failed to start remote audio playback:', playError);
+          const errorName = playError instanceof Error ? playError.name : "";
+          if (errorName === "AbortError") return;
+          console.error("Failed to start remote audio playback:", playError);
         });
       }
     },
-    [applyAudioElementPlaybackState, applySinkId, remoteStreams]
+    [applyAudioElementPlaybackState, applySinkId, remoteStreams],
   );
 
   React.useEffect(() => {
@@ -1404,8 +1439,8 @@ export function useVoiceSessionController({
 
   React.useEffect(() => {
     setSupportsOutputSelection(
-      typeof HTMLMediaElement !== 'undefined' &&
-        'setSinkId' in HTMLMediaElement.prototype
+      typeof HTMLMediaElement !== "undefined" &&
+        "setSinkId" in HTMLMediaElement.prototype,
     );
     void refreshAudioDevices();
 
@@ -1416,23 +1451,23 @@ export function useVoiceSessionController({
       void refreshAudioDevices();
     };
 
-    mediaDevices.addEventListener('devicechange', handleDeviceChange);
+    mediaDevices.addEventListener("devicechange", handleDeviceChange);
     return () => {
-      mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+      mediaDevices.removeEventListener("devicechange", handleDeviceChange);
     };
   }, [refreshAudioDevices]);
 
   React.useEffect(() => {
-    const nextInputId = voiceSettings.preferredInputDeviceId || 'default';
+    const nextInputId = voiceSettings.preferredInputDeviceId || "default";
     setSelectedInputDeviceId((previousInputId) =>
-      previousInputId === nextInputId ? previousInputId : nextInputId
+      previousInputId === nextInputId ? previousInputId : nextInputId,
     );
   }, [voiceSettings.preferredInputDeviceId]);
 
   React.useEffect(() => {
-    const nextOutputId = voiceSettings.preferredOutputDeviceId || 'default';
+    const nextOutputId = voiceSettings.preferredOutputDeviceId || "default";
     setSelectedOutputDeviceId((previousOutputId) =>
-      previousOutputId === nextOutputId ? previousOutputId : nextOutputId
+      previousOutputId === nextOutputId ? previousOutputId : nextOutputId,
     );
   }, [voiceSettings.preferredOutputDeviceId]);
 
@@ -1463,7 +1498,7 @@ export function useVoiceSessionController({
   }, [startLocalInputMonitor, voiceSettings.voiceActivationThreshold]);
 
   React.useEffect(() => {
-    if (voiceSettings.transmissionMode !== 'push_to_talk') {
+    if (voiceSettings.transmissionMode !== "push_to_talk") {
       activePushToTalkCodeRef.current = null;
       setPushToTalkPressed(false);
       return;
@@ -1498,22 +1533,22 @@ export function useVoiceSessionController({
       setPushToTalkPressed(false);
     };
 
-    window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('keyup', handleKeyUp, true);
-    window.addEventListener('blur', clearPressed);
-    document.addEventListener('visibilitychange', clearPressed);
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
+    window.addEventListener("blur", clearPressed);
+    document.addEventListener("visibilitychange", clearPressed);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('keyup', handleKeyUp, true);
-      window.removeEventListener('blur', clearPressed);
-      document.removeEventListener('visibilitychange', clearPressed);
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
+      window.removeEventListener("blur", clearPressed);
+      document.removeEventListener("visibilitychange", clearPressed);
       clearPressed();
     };
   }, [voiceSettings.pushToTalkBinding, voiceSettings.transmissionMode]);
 
   React.useEffect(() => {
     for (const [remoteUserId, audioElement] of Object.entries(
-      audioElementRefs.current
+      audioElementRefs.current,
     )) {
       if (!audioElement) continue;
       audioElement.muted = isDeafened;
@@ -1558,7 +1593,7 @@ export function useVoiceSessionController({
         displayName: participant.displayName,
         avatarUrl: participant.avatarUrl ?? null,
         isSpeaking: participant.isSpeaking ?? false,
-      }))
+      })),
     );
   }, [joined, onParticipantsChange, participants]);
 
@@ -1600,11 +1635,7 @@ export function useVoiceSessionController({
     return () => {
       cancelled = true;
     };
-  }, [
-    activeChannelKey,
-    cleanupVoiceSession,
-    currentUserId,
-  ]);
+  }, [activeChannelKey, cleanupVoiceSession, currentUserId]);
 
   React.useEffect(() => {
     return () => {

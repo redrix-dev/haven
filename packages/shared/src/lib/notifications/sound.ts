@@ -119,10 +119,23 @@ const playSoundEvent = async ({
     Math.min(100, Math.round(soundConfig.getVolume(audioSettings))),
   );
   if (volume === 0) return { played: false, reasonCode: "sound_pref_disabled" };
+
   try {
-    const audio = new Audio(soundConfig.url);
-    audio.volume = volume / 100;
-    await audio.play();
+    const audioContext = new AudioContext();
+    const response = await fetch(soundConfig.url);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const source = audioContext.createBufferSource();
+    const gainNode = audioContext.createGain();
+
+    gainNode.gain.value = volume / 100;
+    source.buffer = audioBuffer;
+    source.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    source.start(0);
+
+    source.onended = () => audioContext.close();
+
     lastPlayedAt = now;
     return { played: true, reasonCode: "sent" };
   } catch (error) {
