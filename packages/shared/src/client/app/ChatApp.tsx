@@ -593,6 +593,9 @@ export function ChatApp() {
                 name: channel.name,
                 kind: channel.kind,
               }))}
+              userStatus={app.userStatus}
+              rainbowMode={app.rainbowMode}
+              onStatusChange={app.setUserStatus}
               channelGroups={app.sidebarChannelGroups}
               ungroupedChannelIds={app.channelGroupState.ungroupedChannelIds}
               currentChannelId={app.currentChannelId}

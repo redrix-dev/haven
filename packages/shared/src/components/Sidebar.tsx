@@ -14,6 +14,7 @@ import {
 import { ActionMenuContent } from "@shared/components/menus/ActionMenuContent";
 import {
   ChevronDown,
+  ChevronDownIcon,
   ChevronRight,
   Hash,
   Headphones,
@@ -24,7 +25,13 @@ import { Database } from "@shared/types/database";
 import { resolveContextMenuIntent } from "@shared/lib/contextMenu";
 import { traceContextMenuEvent } from "@shared/lib/contextMenu/debugTrace";
 import type { MenuActionNode } from "@shared/lib/contextMenu/types";
-
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@shared/components/ui/dropdown-menu";
 const SIDEBAR_BASE_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 640;
 const SIDEBAR_WIDTH_STORAGE_KEY = "haven:sidebar-width";
@@ -47,6 +54,9 @@ type SidebarChannelGroup = {
 interface SidebarProps {
   serverName: string;
   userName: string;
+  userStatus: "online" | "away" | "dnd";
+  rainbowMode: boolean;
+  onStatusChange: (status: "online" | "away" | "dnd") => void;
   channels: SidebarChannel[];
   channelGroups?: SidebarChannelGroup[];
   ungroupedChannelIds?: string[];
@@ -74,10 +84,17 @@ interface SidebarProps {
   onOpenServerSettings?: () => void;
   footerStatusActions?: React.ReactNode;
 }
-
+function getStatusColor(status: "online" | "away" | "dnd"): string {
+  if (status === "online") return "#44b894";
+  if (status === "away") return "#f0a832";
+  return "#f04747";
+}
 export function Sidebar({
   serverName,
   userName,
+  userStatus,
+  rainbowMode,
+  onStatusChange,
   channels,
   channelGroups = [],
   ungroupedChannelIds = [],
@@ -619,17 +636,47 @@ export function Sidebar({
       >
         {voiceStatusPanel}
         <div className={voiceStatusPanel ? "px-2 pb-2 pt-1" : "p-2"}>
-          <div className="rounded-md border border-[#304867] bg-[#142033] px-2.5 py-2.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8ea4c7]">
-                  Status
-                </p>
-                <p className="mt-1 truncate text-sm font-semibold leading-5 text-white">
-                  {userName}
-                </p>
-                <p className="text-[11px] leading-4 text-[#44b894]">Online</p>
-              </div>
+          <div
+            className={`rounded-md bg-[#142033] px-2.5 py-2.5 ${rainbowMode ? "rainbow-border" : "border border-[#304867] status-breathe"}`}
+          >
+            <div className="flex items-center justify-between">
+              <p className="truncate text-sm font-semibold leading-5 text-white">
+                {userName}
+              </p>
+              <DropdownMenu>
+                <DropdownMenuTrigger className=" flex items-center gap-1 cursor-pointer">
+                  <span
+                    style={{ color: getStatusColor(userStatus) }}
+                    className="text-sm leading-4"
+                  >
+                    {userStatus === "online"
+                      ? "Online"
+                      : userStatus === "away"
+                        ? "Away"
+                        : "Do Not Disturb"}
+                  </span>
+                  <ChevronDownIcon className="size-3 text-[#8ea4c7]" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuRadioGroup
+                    value={userStatus}
+                    onValueChange={(value) =>
+                      onStatusChange(value as "online" | "away" | "dnd")
+                    }
+                  >
+                    <DropdownMenuRadioItem value="online">
+                      Online
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="away">
+                      Away
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="dnd">
+                      Do Not Disturb
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               {footerStatusActions ? (
                 <div className="flex items-center gap-1">
                   {footerStatusActions}

@@ -213,3 +213,48 @@
     border-radius: 9999px;
   }
 }
+@keyframes rainbow-border {
+  0% {
+    --border-angle: 0deg;
+  }
+  100% {
+    --border-angle: 360deg;
+  }
+}
+
+.rainbow-border {
+  border: none;
+  background:
+    linear-gradient(#142033, #142033) padding-box,
+    conic-gradient(
+        from var(--border-angle),
+        #ff0000,
+        #ff8800,
+        #ffff00,
+        #00ff00,
+        #0088ff,
+        #8800ff,
+        #ff0000
+      )
+      border-box;
+  border: 2px solid transparent;
+  animation: rainbow-border 2s linear infinite;
+}
+@property --border-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+@keyframes status-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0px transparent;
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(63, 121, 216, 0.3);
+  }
+}
+
+.status-breathe {
+  animation: status-breathe 4s ease-in-out infinite;
+}

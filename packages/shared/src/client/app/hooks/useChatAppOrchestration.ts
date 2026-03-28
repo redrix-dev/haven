@@ -48,6 +48,7 @@ import type {
 } from "@shared/lib/backend/types";
 import type { ForceDisconnectVoiceReason } from "@client/features/voice/types";
 import { useServersStore } from "@shared/stores/serversStore";
+import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { toast } from "sonner";
 
 // Pure utility — no hook deps, stable across renders.
@@ -166,6 +167,10 @@ export function useChatAppOrchestration() {
     userId: user?.id,
     userEmail: user?.email,
   });
+
+  const { status: userStatus, setStatus: setUserStatus } = useUserStatusStore();
+  const { rainbowMode: rainbowMode, setRainbowMode: setRainbowMode } =
+    useUserStatusStore();
 
   const baseUserDisplayName =
     profileUsername || user?.email?.split("@")[0] || "User";
@@ -830,7 +835,7 @@ export function useChatAppOrchestration() {
     },
   } = useDesktopSettings();
 
-  // â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Notifications ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
   const {
     state: {
       notificationItems,
@@ -862,7 +867,7 @@ export function useChatAppOrchestration() {
     autoMarkSeenOnPanelOpen: false,
   });
 
-  // â”€â”€ Social / Friends â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Social / Friends ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
   // ── Direct messages ───────────────────────────────────────────────────────
   const {
     state: {
@@ -1563,6 +1568,10 @@ export function useChatAppOrchestration() {
     userDisplayName,
     baseUserDisplayName,
     applyLocalProfileUpdate,
+    userStatus,
+    setUserStatus,
+    rainbowMode,
+    setRainbowMode,
     // feature flags
     hasFeatureFlag,
     friendsSocialPanelEnabled,
