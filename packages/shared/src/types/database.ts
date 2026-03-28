@@ -1520,6 +1520,7 @@ export type Database = {
           deleted_at: string | null
           edited_at: string | null
           id: string
+          is_hidden: boolean
           metadata: Json
         }
         Insert: {
@@ -1532,6 +1533,7 @@ export type Database = {
           deleted_at?: string | null
           edited_at?: string | null
           id?: string
+          is_hidden?: boolean
           metadata?: Json
         }
         Update: {
@@ -1544,6 +1546,7 @@ export type Database = {
           deleted_at?: string | null
           edited_at?: string | null
           id?: string
+          is_hidden?: boolean
           metadata?: Json
         }
         Relationships: [
@@ -2071,6 +2074,14 @@ export type Database = {
         }[]
       }
       extract_first_http_url: { Args: { p_content: string }; Returns: string }
+      get_message_author_profiles: {
+        Args: { p_author_user_ids: string[]; p_community_id: string }
+        Returns: {
+          avatar_url: string | null
+          id: string
+          username: string
+        }[]
+      }
       get_dm_message_report_detail: {
         Args: { p_report_id: string }
         Returns: {

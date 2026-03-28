@@ -28,6 +28,7 @@ export interface ProfileActionSurfaceProps {
   canReport: boolean;
   canBan: boolean;
   canKick?: boolean;
+  kickDisabledReason?: string | null;
   onDirectMessage: (userId: string) => void;
   onReport: (userId: string) => void;
   onBan: (userId: string, communityId: string) => void;
@@ -44,6 +45,7 @@ export function ProfileActionSurface({
   canReport,
   canBan,
   canKick = false,
+  kickDisabledReason = null,
   onDirectMessage,
   onReport,
   onBan,
@@ -55,6 +57,9 @@ export function ProfileActionSurface({
   const [open, setOpen] = React.useState(false);
   const [banServers, setBanServers] = React.useState<BanEligibleServer[]>([]);
   const [banServersLoading, setBanServersLoading] = React.useState(false);
+  const preserveFallbackIdentity =
+    avatarUrl === null &&
+    (username === "Banned User" || username === "Unknown User");
 
   React.useEffect(() => {
     if (!open || !canBan) return;
@@ -80,13 +85,12 @@ export function ProfileActionSurface({
     };
   }, [canBan, open, resolveBanServers, userId]);
 
-  const resolvedUsername =
-    resolveLiveUsername(liveProfiles, userId, username) ?? username;
-  const resolvedAvatarUrl = resolveLiveAvatarUrl(
-    liveProfiles,
-    userId,
-    avatarUrl,
-  );
+  const resolvedUsername = preserveFallbackIdentity
+    ? username
+    : resolveLiveUsername(liveProfiles, userId, username) ?? username;
+  const resolvedAvatarUrl = preserveFallbackIdentity
+    ? avatarUrl
+    : resolveLiveAvatarUrl(liveProfiles, userId, avatarUrl);
   const avatarInitial = resolvedUsername.trim().charAt(0).toUpperCase() || "U";
 
   const actions = React.useMemo<MenuActionNode[]>(() => {
@@ -156,12 +160,15 @@ export function ProfileActionSurface({
       });
     }
 
-    if (canKick && onKick) {
+    if ((canKick || kickDisabledReason) && onKick) {
       next.push({
         kind: "item",
         key: "kick",
-        label: "Kick from Server",
+        label: kickDisabledReason
+          ? `Kick from Server - ${kickDisabledReason}`
+          : "Kick from Server",
         destructive: true,
+        disabled: !canKick || Boolean(kickDisabledReason),
         onSelect: () => {
           setOpen(false);
           onKick(userId);
@@ -177,6 +184,7 @@ export function ProfileActionSurface({
     canDirectMessage,
     canKick,
     canReport,
+    kickDisabledReason,
     onBan,
     onDirectMessage,
     onKick,

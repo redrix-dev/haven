@@ -24,4 +24,5 @@ services/supabase/tests/sql/10_web_push_dispatch_wakeups_shadow.sql
 services/supabase/tests/sql/11_web_push_queue_health_diagnostics.sql
 services/supabase/tests/sql/12_channel_overwrite_permission_split.sql
 services/supabase/tests/sql/13_recent_schema_alignment.sql
+services/supabase/tests/sql/14_hidden_message_visibility.sql
 

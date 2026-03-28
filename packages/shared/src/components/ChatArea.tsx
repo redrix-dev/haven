@@ -1,19 +1,19 @@
-import React from 'react';
-import { MessageList } from './MessageList';
-import { MessageInput } from './MessageInput';
-import { Database } from '@shared/types/database';
-import { Button } from '@shared/components/ui/button';
-import { Headphones } from 'lucide-react';
-import { useMessagesStore } from '@shared/stores/messagesStore';
+import React from "react";
+import { MessageList } from "./MessageList";
+import { MessageInput } from "./MessageInput";
+import { Database } from "@shared/types/database";
+import { Button } from "@shared/components/ui/button";
+import { Switch } from "@shared/components/ui/switch";
+import { Headphones } from "lucide-react";
+import { useMessagesStore } from "@shared/stores/messagesStore";
 import type {
   BanEligibleServer,
   MessageAttachment,
   MessageReportKind,
   MessageReportTarget,
-} from '@shared/lib/backend/types';
+} from "@shared/lib/backend/types";
 
-type Message = Database['public']['Tables']['messages']['Row'];
-type ChannelKind = Database['public']['Enums']['channel_kind'];
+type ChannelKind = Database["public"]["Enums"]["channel_kind"];
 
 interface ChatAreaProps {
   channelId: string;
@@ -26,6 +26,7 @@ interface ChatAreaProps {
   canCreateReports: boolean;
   canManageBans: boolean;
   canManageMembers: boolean;
+  canViewBanHidden: boolean;
   canRefreshLinkPreviews: boolean;
   showVoiceDiagnostics?: boolean;
   onOpenChannelSettings?: () => void;
@@ -36,7 +37,7 @@ interface ChatAreaProps {
       replyToMessageId?: string;
       mediaFile?: File;
       mediaExpiresInHours?: number;
-    }
+    },
   ) => Promise<void>;
   onEditMessage: (messageId: string, content: string) => Promise<void>;
   onDeleteMessage: (messageId: string) => Promise<void>;
@@ -50,7 +51,10 @@ interface ChatAreaProps {
   onRequestMessageLinkPreviewRefresh: (messageId: string) => Promise<void>;
   onRequestOlderMessages?: () => Promise<void>;
   onSaveAttachment: (attachment: MessageAttachment) => Promise<void>;
-  onReportUserProfile: (input: { targetUserId: string; reason: string }) => Promise<void>;
+  onReportUserProfile: (input: {
+    targetUserId: string;
+    reason: string;
+  }) => Promise<void>;
   onBanUserFromServer: (input: {
     targetUserId: string;
     communityId: string;
@@ -60,9 +64,10 @@ interface ChatAreaProps {
     targetUserId: string;
     username: string;
   }) => Promise<void>;
-  onResolveBanEligibleServers: (targetUserId: string) => Promise<BanEligibleServer[]>;
+  onResolveBanEligibleServers: (
+    targetUserId: string,
+  ) => Promise<BanEligibleServer[]>;
   onDirectMessageUser: (targetUserId: string) => void;
-  onComposerHeightChange?: (height: number) => void;
 }
 
 export function ChatArea({
@@ -76,6 +81,7 @@ export function ChatArea({
   canCreateReports,
   canManageBans,
   canManageMembers,
+  canViewBanHidden,
   canRefreshLinkPreviews,
   showVoiceDiagnostics = false,
   onOpenChannelSettings,
@@ -93,15 +99,18 @@ export function ChatArea({
   onKickUserFromCurrentServer,
   onResolveBanEligibleServers,
   onDirectMessageUser,
-  onComposerHeightChange,
 }: ChatAreaProps) {
-  const isVoiceChannel = channelKind === 'voice';
+  const isVoiceChannel = channelKind === "voice";
   const messages = useMessagesStore((state) => state.messages);
+  const [composerHeight, setComposerHeight] = React.useState(96);
+  const hiddenMessagesToggleId = React.useId();
   const [replyTarget, setReplyTarget] = React.useState<{
     id: string;
     authorLabel: string;
     preview: string;
   } | null>(null);
+  const [showHiddenMessages, setShowHiddenMessages] = React.useState(false);
+  const shouldShowHiddenMessages = canViewBanHidden && showHiddenMessages;
 
   React.useEffect(() => {
     setReplyTarget(null);
@@ -109,22 +118,25 @@ export function ChatArea({
 
   React.useEffect(() => {
     if (!replyTarget) return;
-    const replyTargetStillExists = messages.some((message) => message.id === replyTarget.id);
-    if (!replyTargetStillExists) {
+    const replyTargetMessage = messages.find(
+      (message) => message.id === replyTarget.id,
+    );
+    if (
+      !replyTargetMessage ||
+      (replyTargetMessage.is_hidden && !shouldShowHiddenMessages)
+    ) {
       setReplyTarget(null);
     }
-  }, [messages, replyTarget]);
-
-  React.useEffect(() => {
-    if (!onComposerHeightChange) return;
-    if (!isVoiceChannel) return;
-    onComposerHeightChange(0);
-  }, [isVoiceChannel, onComposerHeightChange]);
+  }, [messages, replyTarget, shouldShowHiddenMessages]);
 
   const handleSendMessage = React.useCallback(
     async (
       content: string,
-      options?: { replyToMessageId?: string; mediaFile?: File; mediaExpiresInHours?: number }
+      options?: {
+        replyToMessageId?: string;
+        mediaFile?: File;
+        mediaExpiresInHours?: number;
+      },
     ) => {
       const replyToMessageId = options?.replyToMessageId?.trim();
       if (!replyToMessageId) {
@@ -135,7 +147,9 @@ export function ChatArea({
         return;
       }
 
-      const replyTargetStillExists = messages.some((message) => message.id === replyToMessageId);
+      const replyTargetStillExists = messages.some(
+        (message) => message.id === replyToMessageId,
+      );
       await onSendMessage(
         content,
         replyTargetStillExists
@@ -147,14 +161,14 @@ export function ChatArea({
           : {
               mediaFile: options?.mediaFile,
               mediaExpiresInHours: options?.mediaExpiresInHours,
-            }
+            },
       );
 
       if (!replyTargetStillExists) {
         setReplyTarget(null);
       }
     },
-    [messages, onSendMessage]
+    [messages, onSendMessage],
   );
 
   return (
@@ -171,23 +185,44 @@ export function ChatArea({
             `# ${channelName}`
           )}
         </span>
-        {onOpenChannelSettings && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onOpenChannelSettings}
-            className="text-[#a9b8cf] hover:text-white hover:bg-[#304867]"
-          >
-            Channel Settings
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {!isVoiceChannel && canViewBanHidden && (
+            <label
+              htmlFor={hiddenMessagesToggleId}
+              className="inline-flex items-center gap-2 rounded-md border border-[#304867] bg-[#142033]/90 px-2.5 py-1"
+            >
+              <span className="text-xs font-medium text-[#d7e3f5]">
+                Show hidden messages
+              </span>
+              <Switch
+                id={hiddenMessagesToggleId}
+                size="sm"
+                checked={showHiddenMessages}
+                onCheckedChange={setShowHiddenMessages}
+                className="data-[state=checked]:bg-red-500/70 data-[state=unchecked]:bg-[#233753]"
+              />
+            </label>
+          )}
+          {onOpenChannelSettings && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onOpenChannelSettings}
+              className="text-[#a9b8cf] hover:text-white hover:bg-[#304867]"
+            >
+              Channel Settings
+            </Button>
+          )}
+        </div>
       </div>
 
       {isVoiceChannel ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
           <Headphones className="size-7 text-[#8ea4c7]" />
-          <p className="text-white font-semibold">Voice channel selected: {channelName}</p>
+          <p className="text-white font-semibold">
+            Voice channel selected: {channelName}
+          </p>
           <p className="text-sm text-[#a9b8cf] max-w-xl">
             Voice stays connected while you browse text channels. Use the footer
             controls for quick actions, or open Voice Settings for devices,
@@ -210,44 +245,51 @@ export function ChatArea({
         </div>
       ) : (
         <>
-          {/* Messages */}
-          <MessageList
-            channelId={channelId}
-            currentUserId={currentUserId}
-            blockedUserIds={blockedUserIds}
-            isElevatedViewer={isElevatedViewer}
-            canManageMessages={canManageMessages}
-            canCreateReports={canCreateReports}
-            canManageBans={canManageBans}
-            canManageMembers={canManageMembers}
-            canRefreshLinkPreviews={canRefreshLinkPreviews}
-            onSaveAttachment={onSaveAttachment}
-            onReportUserProfile={onReportUserProfile}
-            onBanUserFromServer={onBanUserFromServer}
-            onKickUserFromCurrentServer={onKickUserFromCurrentServer}
-            onResolveBanEligibleServers={onResolveBanEligibleServers}
-            onDirectMessageUser={onDirectMessageUser}
-            onDeleteMessage={onDeleteMessage}
-            onEditMessage={onEditMessage}
-            onToggleMessageReaction={onToggleMessageReaction}
-            onReplyToMessage={setReplyTarget}
-            onReportMessage={onReportMessage}
-            onRequestMessageLinkPreviewRefresh={onRequestMessageLinkPreviewRefresh}
-            onRequestOlderMessages={onRequestOlderMessages}
-          />
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {/* Messages */}
+            <MessageList
+              channelId={channelId}
+              currentUserId={currentUserId}
+              blockedUserIds={blockedUserIds}
+              isElevatedViewer={isElevatedViewer}
+              canManageMessages={canManageMessages}
+              canCreateReports={canCreateReports}
+              canManageBans={canManageBans}
+              canManageMembers={canManageMembers}
+              canRefreshLinkPreviews={canRefreshLinkPreviews}
+              onSaveAttachment={onSaveAttachment}
+              onReportUserProfile={onReportUserProfile}
+              onBanUserFromServer={onBanUserFromServer}
+              onKickUserFromCurrentServer={onKickUserFromCurrentServer}
+              onResolveBanEligibleServers={onResolveBanEligibleServers}
+              onDirectMessageUser={onDirectMessageUser}
+              onDeleteMessage={onDeleteMessage}
+              onEditMessage={onEditMessage}
+              onToggleMessageReaction={onToggleMessageReaction}
+              onReplyToMessage={setReplyTarget}
+              onReportMessage={onReportMessage}
+              onRequestMessageLinkPreviewRefresh={
+                onRequestMessageLinkPreviewRefresh
+              }
+              onRequestOlderMessages={onRequestOlderMessages}
+              bottomInset={composerHeight + 16}
+              showHiddenMessages={shouldShowHiddenMessages}
+            />
 
-          {/* Input */}
-          <MessageInput
-            onSendMessage={handleSendMessage}
-            channelId={channelId}
-            channelName={channelName}
-            replyTarget={replyTarget}
-            onClearReplyTarget={() => setReplyTarget(null)}
-            onContainerHeightChange={onComposerHeightChange}
-          />
+            {/* Input */}
+            <div className="absolute inset-x-0 bottom-0 z-10">
+              <MessageInput
+                onSendMessage={handleSendMessage}
+                channelId={channelId}
+                channelName={channelName}
+                replyTarget={replyTarget}
+                onClearReplyTarget={() => setReplyTarget(null)}
+                onContainerHeightChange={setComposerHeight}
+              />
+            </div>
+          </div>
         </>
       )}
     </div>
   );
 }
-

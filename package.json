@@ -12,7 +12,7 @@
   "scripts": {
     "tunnel:mac": "cloudflared tunnel --config /Users/codymagnuson/.cloudflared/haven.yml run",
     "tunnel:windows": "cloudflared tunnel --config C:\\Users\\Churro\\.cloudflared\\haven.yml run",
-    "start": "electron-forge start",
+    "start": "electron-forge start -- --remote-debugging-port=9222",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",

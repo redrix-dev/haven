@@ -163,14 +163,6 @@ const applyRemovedAuthorVisibilityToMessageBundle = (
   };
 };
 
-export const applyBanVisibilityToMessageBundle = (
-  bundle: BanVisibilityBundle,
-  bannedUserIds: string[]
-): BanVisibilityBundle =>
-  applyRemovedAuthorVisibilityToMessageBundle(bundle, bannedUserIds, {
-    reason: 'ban',
-  });
-
 export const applyChannelAccessVisibilityToMessageBundle = (
   bundle: BanVisibilityBundle,
   input: ChannelAccessVisibilityInput
@@ -234,4 +226,29 @@ export const filterBlockedUserContent = (
       visibleMessageIds.has(preview.messageId)
     ),
   }; // CHECKPOINT 5 COMPLETE
+};
+
+export const filterHiddenMessageContent = (
+  bundle: BanVisibilityBundle,
+  showHiddenMessages: boolean
+): BanVisibilityBundle => {
+  if (showHiddenMessages) {
+    return bundle;
+  }
+
+  const visibleMessages = bundle.messages.filter((message) => !message.is_hidden);
+  const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
+
+  return {
+    messages: visibleMessages,
+    reactions: bundle.reactions.filter((reaction) =>
+      visibleMessageIds.has(reaction.messageId)
+    ),
+    attachments: bundle.attachments.filter((attachment) =>
+      visibleMessageIds.has(attachment.messageId)
+    ),
+    linkPreviews: bundle.linkPreviews.filter((preview) =>
+      visibleMessageIds.has(preview.messageId)
+    ),
+  };
 };

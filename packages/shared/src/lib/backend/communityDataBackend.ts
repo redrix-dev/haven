@@ -136,6 +136,12 @@ type KickCommunityMemberRpcRow = {
   community_id?: unknown;
 };
 
+type MessageAuthorProfileRpcRow = {
+  id?: unknown;
+  username?: unknown;
+  avatar_url?: unknown;
+};
+
 type ReportProfileRow = Pick<
   Database['public']['Tables']['profiles']['Row'],
   'id' | 'username' | 'avatar_url'
@@ -781,7 +787,10 @@ export interface CommunityDataBackend {
     retryableFailures: number;
     deadLetters: number;
   }>;
-  fetchAuthorProfiles(authorIds: string[]): Promise<Record<string, AuthorProfile>>;
+  fetchAuthorProfiles(
+    communityId: string,
+    authorIds: string[]
+  ): Promise<Record<string, AuthorProfile>>;
   isElevatedInServer(communityId: string): Promise<boolean>;
   canSendInChannel(channelId: string): Promise<boolean>;
   fetchServerSettings(communityId: string): Promise<ServerSettingsSnapshot>;
@@ -886,6 +895,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: canManageChannelPermissions },
       { data: canManageMessages },
       { data: canManageBans },
+      { data: canViewBanHidden },
       { data: canCreateReports },
       { data: canManageReports },
       { data: canRefreshLinkPreviews },
@@ -926,6 +936,10 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       }),
       supabase.rpc('user_has_permission', {
         p_community_id: communityId,
+        p_permission_key: 'can_view_ban_hidden',
+      }),
+      supabase.rpc('user_has_permission', {
+        p_community_id: communityId,
         p_permission_key: 'create_reports',
       }),
       supabase.rpc('user_has_permission', {
@@ -956,6 +970,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       canManageChannelPermissions: manageChannelPermissions,
       canManageMessages: owner || Boolean(canManageMessages),
       canManageBans: owner || Boolean(canManageBans),
+      canViewBanHidden: owner || Boolean(canViewBanHidden),
       canCreateReports: owner || Boolean(canCreateReports),
       canManageReports: owner || Boolean(canManageReports), // CHECKPOINT 1 COMPLETE
       canRefreshLinkPreviews: owner || Boolean(canRefreshLinkPreviews),
@@ -1952,44 +1967,71 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     });
   },
 
-  async fetchAuthorProfiles(authorIds) {
+  async fetchAuthorProfiles(communityId, authorIds) {
     if (authorIds.length === 0) return {};
-
-    const [{ data: profiles, error: profilesError }, { data: activeStaffRows, error: staffError }] =
-      await Promise.all([
-        supabase.from('profiles').select('id, username, avatar_url').in('id', authorIds),
-        supabase
-          .from('platform_staff')
-          .select('user_id, display_prefix')
-          .in('user_id', authorIds)
-          .eq('is_active', true),
-      ]);
-
-    if (profilesError) throw profilesError;
-    if (staffError) throw staffError;
 
     const profileMap: Record<string, AuthorProfile> = {};
     for (const authorId of authorIds) {
       profileMap[authorId] = {
-        username: authorId.substring(0, 12),
+        username: 'Unknown User',
         isPlatformStaff: false,
         displayPrefix: null,
         avatarUrl: null,
       };
     }
 
-    for (const profile of profiles ?? []) {
-      profileMap[profile.id] = {
-        username: profile.username,
+    const { data: profileRows, error: profileRowsError } = await supabase.rpc(
+      'get_message_author_profiles',
+      {
+        p_author_user_ids: authorIds,
+        p_community_id: communityId,
+      }
+    );
+    if (profileRowsError) throw profileRowsError;
+
+    const tombstonedUserIds = new Set<string>();
+    for (const row of (profileRows ?? []) as MessageAuthorProfileRpcRow[]) {
+      const profileId = typeof row.id === 'string' ? row.id : null;
+      if (!profileId) continue;
+
+      const username =
+        typeof row.username === 'string' && row.username.trim().length > 0
+          ? row.username
+          : 'Unknown User';
+      const avatarUrl =
+        typeof row.avatar_url === 'string' && row.avatar_url.trim().length > 0
+          ? row.avatar_url
+          : null;
+      const isTombstone =
+        username === 'Banned User' || (username === 'Unknown User' && avatarUrl === null);
+
+      if (isTombstone) {
+        tombstonedUserIds.add(profileId);
+      }
+
+      profileMap[profileId] = {
+        username,
         isPlatformStaff: false,
         displayPrefix: null,
-        avatarUrl: profile.avatar_url ?? null,
+        avatarUrl,
       };
     }
 
+    const staffCandidateIds = authorIds.filter((authorId) => !tombstonedUserIds.has(authorId));
+    if (staffCandidateIds.length === 0) {
+      return profileMap;
+    }
+
+    const { data: activeStaffRows, error: staffError } = await supabase
+      .from('platform_staff')
+      .select('user_id, display_prefix')
+      .in('user_id', staffCandidateIds)
+      .eq('is_active', true);
+    if (staffError) throw staffError;
+
     for (const staffRow of activeStaffRows ?? []) {
       const existing = profileMap[staffRow.user_id] ?? {
-        username: staffRow.user_id.substring(0, 12),
+        username: 'Unknown User',
         isPlatformStaff: false,
         displayPrefix: null,
         avatarUrl: null,

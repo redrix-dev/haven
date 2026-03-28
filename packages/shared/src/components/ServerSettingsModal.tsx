@@ -132,6 +132,7 @@ type PermissionScope =
 
 type PermissionMetadata = {
   label: string;
+  description?: string;
   scope: PermissionScope;
   ownerVisible: boolean;
 };
@@ -234,6 +235,12 @@ const COMMUNITY_PERMISSION_METADATA: Record<string, PermissionMetadata> = {
   },
   manage_bans: {
     label: "Manage Bans",
+    scope: "moderation",
+    ownerVisible: true,
+  },
+  can_view_ban_hidden: {
+    label: "View Hidden Messages",
+    description: "Can see messages hidden by bans.",
     scope: "moderation",
     ownerVisible: true,
   },
@@ -412,7 +419,7 @@ export function ServerSettingsModal({
       group.push({
         key: permission.key,
         label: metadata?.label ?? fallbackPermissionLabel(permission.key),
-        description: permission.description,
+        description: metadata?.description ?? permission.description,
       });
       grouped.set(scope, group);
     }

@@ -27,11 +27,17 @@ This repo now separates documentation by audience:
 | `manage_messages` | `canManageMessages` | Message moderation actions | `messages_delete_self_or_moderator` and related checks |
 | `manage_invites` | `canManageInvites` | Invite creation/revocation | Invite RLS policies and RPC checks |
 | `manage_bans` | `canManageBans` | Ban management surfaces | Ban policies and moderation RPC checks |
+| `can_view_ban_hidden` | none yet (DB/RLS-only) | No dedicated UI yet; used for elevated hidden-message review | `messages_select_visible_channel` plus child-table select policies that cascade through visible `messages` rows |
 | `manage_developer_access` | `canManageDeveloperAccess` | Developer access settings | Developer access policies/RPC checks |
 
 ## Reserved Permissions
 - `mention_haven_developers`: reserved/internal and hidden from owner-facing role permission editing.
 - Channel overwrite `can_manage`: schema-compatible but hidden from owner-facing channel overwrite UI.
+
+## Ban-Hidden Messages
+- Hidden-by-ban message visibility is now enforced in the database, not by a client-side scrubber.
+- `public.messages.is_hidden` is flipped by the ban/unban-plus-rejoin moderation flow.
+- Only viewers who satisfy `messages` RLS, including `can_view_ban_hidden` when needed, can see the message row or its reactions, attachments, and link previews.
 
 ## Adding A Permission Lever Checklist
 1. Add the key to `permissions_catalog` migration flow.

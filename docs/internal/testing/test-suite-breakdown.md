@@ -68,7 +68,11 @@ This aggregates:
 - `services/supabase/tests/fixtures/*`
   - seeded shared test data / cleanup setup
 - `services/supabase/tests/sql/*`
-  - domain suites (`01` core, `02` notifications, `03` social, `04` DMs, `05` moderation, `06` mentions)
+  - domain suites (`01` core, `02` notifications, `03` social, `04` DMs, `05` moderation, `06` mentions, `12` channel overwrite split, `13` schema alignment, `14` hidden message visibility)
+
+### Hidden message coverage
+- `services/supabase/tests/sql/14_hidden_message_visibility.sql`
+- Verifies that banning hides `messages` rows for regular members, preserves visibility for roles with `can_view_ban_hidden`, cascades hidden state to reactions/attachments/link previews through child-table RLS, and restores visibility after unban plus invite-based rejoin.
 
 ## What `npm run test:backend` actually does
 

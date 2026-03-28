@@ -7,6 +7,7 @@ The database is the enforcement agent. The app UI reads and writes permission st
 - Server-level checks: `public.user_has_permission(community_id, permission_key)`
 - Channel visibility: `public.can_view_channel(channel_id)`
 - Channel posting/speaking gate: `public.can_send_in_channel(channel_id)`
+- Hidden moderated message visibility: `public.messages.is_hidden` plus `public.user_has_permission(community_id, 'can_view_ban_hidden')`
 - Table-level enforcement: RLS policies on `roles`, `role_permissions`, `member_roles`, `channels`, `messages`, and overwrite tables.
 - Regression coverage: SQL RLS suites in `services/supabase/tests/sql/*`
 
@@ -54,6 +55,7 @@ Current SQL RLS coverage includes:
 - member/default-role channel access
 - overwrite-restricted channel visibility/send behavior
 - moderator message moderation behavior
+- ban-hidden message visibility and child-table cascade behavior
 - permission helper checks (`user_has_permission`, channel helpers)
 
 Runbook:
@@ -66,6 +68,15 @@ When adding new server capabilities:
 3. Surface capability in `fetchServerPermissions`.
 4. Gate UI visibility with server permission flags.
 5. Keep actual access control in DB/RLS.
+
+## Ban-Hidden Message Flow
+- `can_view_ban_hidden` is a cataloged community permission. Existing communities backfill it onto the owner role, and new communities inherit it automatically through the default owner-role seed path.
+- `ban_community_member` now records the ban, removes the active `community_members` row, and sets `messages.is_hidden = true` for the target author within that community.
+- `messages_select_visible_channel` is the primary read gate: regular viewers need `NOT is_hidden`, while elevated viewers can still read hidden rows through `can_view_ban_hidden`.
+- `message_reactions`, `message_attachments`, and `message_link_previews` no longer enforce visibility independently by channel. Their select policies now cascade through the parent `messages` row, so hidden-message RLS automatically hides child rows too.
+- `unban_community_member` revokes the active ban record, but hidden messages stay hidden until membership is restored.
+- `redeem_community_invite` restores membership and flips `is_hidden` back to `false` only when no active `community_bans` row remains.
+- The previous client-side ban scrubber has been removed; hidden-message enforcement now lives in database state and RLS.
 
 ## Files to Know
 - `packages/shared/src/lib/backend/communityDataBackend.ts`
