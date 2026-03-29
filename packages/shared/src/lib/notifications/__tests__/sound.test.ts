@@ -6,18 +6,35 @@ import type { NotificationAudioSettings } from "@platform/desktop/types";
 const baseAudioSettings: NotificationAudioSettings = {
   masterSoundEnabled: true,
   notificationSoundVolume: 70,
-  voicePresenceSoundEnabled: true,
   voicePresenceSoundVolume: 55,
+  voicePresenceSoundEnabled: true,
   playSoundsWhenFocused: true,
 };
 
 type MockAudioInstance = {
   src: string;
-  volume: number;
-  play: ReturnType<typeof vi.fn>;
+};
+
+type MockAudioContextInstance = {
+  close: ReturnType<typeof vi.fn>;
+  createBufferSource: ReturnType<typeof vi.fn>;
+  createGain: ReturnType<typeof vi.fn>;
+  decodeAudioData: ReturnType<typeof vi.fn>;
+  destination: object;
+  gainNode: {
+    connect: ReturnType<typeof vi.fn>;
+    gain: { value: number };
+  };
+  source: {
+    buffer: unknown;
+    connect: ReturnType<typeof vi.fn>;
+    onended: (() => void) | null;
+    start: ReturnType<typeof vi.fn>;
+  };
 };
 
 let audioInstances: MockAudioInstance[] = [];
+let audioContexts: MockAudioContextInstance[] = [];
 
 const loadSoundModule = async () => {
   vi.resetModules();
@@ -27,23 +44,53 @@ const loadSoundModule = async () => {
 describe("notification sound helpers", () => {
   beforeEach(() => {
     audioInstances = [];
+    audioContexts = [];
 
-    const audioConstructor = vi.fn(function (
-      this: MockAudioInstance,
-      src: string,
-    ) {
-      const instance: MockAudioInstance = {
-        src,
-        volume: 1,
-        play: vi.fn().mockResolvedValue(undefined),
+    const mockArrayBuffer = new ArrayBuffer(8);
+    const mockAudioBuffer = { kind: "decoded-buffer" };
+
+    const AudioContextMock = vi.fn(function MockAudioContext() {
+      const mockSource = {
+        buffer: null as unknown,
+        connect: vi.fn(),
+        start: vi.fn(),
+        onended: null as (() => void) | null,
       };
-      audioInstances.push(instance);
-      return instance as unknown as MockAudioInstance;
+
+      const mockGainNode = {
+        gain: { value: 1 },
+        connect: vi.fn(),
+      };
+
+      const mockAudioContext = {
+        decodeAudioData: vi.fn().mockResolvedValue(mockAudioBuffer),
+        createBufferSource: vi.fn().mockReturnValue(mockSource),
+        createGain: vi.fn().mockReturnValue(mockGainNode),
+        destination: {},
+        close: vi.fn(),
+        gainNode: mockGainNode,
+        source: mockSource,
+      } satisfies MockAudioContextInstance;
+
+      audioContexts.push(mockAudioContext);
+      return mockAudioContext;
     });
 
-    Object.defineProperty(globalThis, "Audio", {
+    Object.defineProperty(globalThis, "AudioContext", {
       configurable: true,
-      value: audioConstructor,
+      value: AudioContextMock,
+    });
+
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: vi.fn((url: string) => {
+        audioInstances.push({
+          src: url,
+        });
+        return Promise.resolve({
+          arrayBuffer: () => Promise.resolve(mockArrayBuffer),
+        });
+      }),
     });
 
     Object.defineProperty(document, "hasFocus", {
@@ -69,36 +116,48 @@ describe("notification sound helpers", () => {
       audioSettings: baseAudioSettings,
     });
 
-    expect(result).toEqual({
-      played: true,
-      reasonCode: "sent",
-    });
-    expect((globalThis.Audio as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
+    expect(result).toEqual({ played: true, reasonCode: "sent" });
+    expect(audioInstances[0]?.src).toBe(
       RUNTIME_AUDIO_URLS.notifications.default,
     );
-    expect(audioInstances[0]?.volume).toBe(0.7);
-    expect(audioInstances[0]?.play).toHaveBeenCalledTimes(1);
+    expect(audioContexts).toHaveLength(1);
+    expect(audioContexts[0]?.gainNode.gain.value).toBe(0.7);
+    expect(audioContexts[0]?.source.buffer).toEqual({ kind: "decoded-buffer" });
+    expect(audioContexts[0]?.source.connect).toHaveBeenCalledWith(
+      audioContexts[0]?.gainNode,
+    );
+    expect(audioContexts[0]?.gainNode.connect).toHaveBeenCalledWith(
+      audioContexts[0]?.destination,
+    );
+    expect(audioContexts[0]?.source.start).toHaveBeenCalledWith(0);
+    audioContexts[0]?.source.onended?.();
+    expect(audioContexts[0]?.close).toHaveBeenCalledTimes(1);
   });
 
   it("plays the configured voice join and leave assets", async () => {
     const { playVoicePresenceSound } = await loadSoundModule();
 
     vi.setSystemTime(new Date("2026-03-17T12:00:00.000Z"));
-    await playVoicePresenceSound({
+    const joinResult = await playVoicePresenceSound({
       event: "voice_presence_join",
       audioSettings: baseAudioSettings,
     });
 
     vi.setSystemTime(new Date("2026-03-17T12:00:01.000Z"));
-    await playVoicePresenceSound({
+    const leaveResult = await playVoicePresenceSound({
       event: "voice_presence_leave",
       audioSettings: baseAudioSettings,
     });
 
+    expect(joinResult).toEqual({ played: true, reasonCode: "sent" });
+    expect(leaveResult).toEqual({ played: true, reasonCode: "sent" });
     expect(audioInstances[0]?.src).toBe(RUNTIME_AUDIO_URLS.voicePresence.join);
-    expect(audioInstances[0]?.volume).toBe(0.55);
     expect(audioInstances[1]?.src).toBe(RUNTIME_AUDIO_URLS.voicePresence.leave);
-    expect(audioInstances[1]?.volume).toBe(0.55);
+    expect(audioContexts).toHaveLength(2);
+    expect(audioContexts[0]?.gainNode.gain.value).toBe(0.55);
+    expect(audioContexts[1]?.gainNode.gain.value).toBe(0.55);
+    expect(audioContexts[0]?.source.start).toHaveBeenCalledWith(0);
+    expect(audioContexts[1]?.source.start).toHaveBeenCalledWith(0);
   });
 
   it("respects local sound preference gates for notification and voice sounds", async () => {
@@ -109,19 +168,13 @@ describe("notification sound helpers", () => {
     const notificationResult = await playNotificationSound({
       kind: "dm_message",
       deliverSound: true,
-      audioSettings: {
-        ...baseAudioSettings,
-        masterSoundEnabled: false,
-      },
+      audioSettings: { ...baseAudioSettings, masterSoundEnabled: false },
     });
 
     vi.setSystemTime(new Date("2026-03-17T12:00:01.000Z"));
     const voiceResult = await playVoicePresenceSound({
       event: "voice_presence_join",
-      audioSettings: {
-        ...baseAudioSettings,
-        playSoundsWhenFocused: false,
-      },
+      audioSettings: { ...baseAudioSettings, playSoundsWhenFocused: false },
     });
 
     expect(notificationResult).toEqual({
@@ -133,5 +186,6 @@ describe("notification sound helpers", () => {
       reasonCode: "sound_pref_disabled",
     });
     expect(audioInstances).toHaveLength(0);
+    expect(audioContexts).toHaveLength(0);
   });
 });
