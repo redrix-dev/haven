@@ -7,10 +7,14 @@ const createVoicePopoutWindowManager = ({
   desktopIpcKeys = null,
   BrowserWindowClass = null,
 }) => {
-  const ipcKeys = desktopIpcKeys ?? require('@platform/ipc/keys').DESKTOP_IPC_KEYS;
-  const WindowConstructor = BrowserWindowClass ?? require('electron').BrowserWindow;
+  const ipcKeys =
+    desktopIpcKeys ?? require("@platform/ipc/keys").DESKTOP_IPC_KEYS;
+  const WindowConstructor =
+    BrowserWindowClass ?? require("electron").BrowserWindow;
   if (!rendererEntryUrl) {
-    throw new Error('Renderer entry URL must be provided before creating the voice popout window.');
+    throw new Error(
+      "Renderer entry URL must be provided before creating the voice popout window.",
+    );
   }
 
   let voicePopoutWindow = null;
@@ -23,10 +27,10 @@ const createVoicePopoutWindowManager = ({
     joining: false,
     isMuted: false,
     isDeafened: false,
-    transmissionMode: 'voice_activity',
+    transmissionMode: "voice_activity",
     participantCount: 0,
-    selectedInputDeviceId: 'default',
-    selectedOutputDeviceId: 'default',
+    selectedInputDeviceId: "default",
+    selectedOutputDeviceId: "default",
     inputDevices: [],
     outputDevices: [],
     supportsOutputSelection: false,
@@ -69,7 +73,7 @@ const createVoicePopoutWindowManager = ({
       height: 640,
       minWidth: 360,
       minHeight: 500,
-      title: 'Haven Voice Popout',
+      title: "Haven Voice Popout",
       frame: true,
       resizable: true,
       webPreferences: {
@@ -79,16 +83,16 @@ const createVoicePopoutWindowManager = ({
       },
     });
 
-    window.webContents.once('did-finish-load', () => {
+    window.webContents.once("did-finish-load", () => {
       broadcastState();
     });
     window.loadURL(`${rendererEntryUrl}?view=voice-popout`);
 
-    if (!app.isPackaged) {
-      window.webContents.openDevTools({ mode: 'detach' });
-    }
+    //if (!app.isPackaged) {
+    window.webContents.openDevTools({ mode: "detach" });
+    //}
 
-    window.on('closed', () => {
+    window.on("closed", () => {
       voicePopoutWindow = null;
       broadcastState();
       onClosed?.();

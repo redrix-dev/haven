@@ -1,5 +1,5 @@
-const { BrowserWindow, Menu } = require('electron');
-const { registerNativeContextMenu } = require('./register-native-context-menu');
+const { BrowserWindow, Menu, shell } = require("electron");
+const { registerNativeContextMenu } = require("./register-native-context-menu");
 
 const createMainWindow = ({
   app,
@@ -14,14 +14,16 @@ const createMainWindow = ({
   registerNativeContextMenuFn = registerNativeContextMenu,
 }) => {
   if (!rendererEntryUrl) {
-    throw new Error('Renderer entry URL must be provided before creating the main window.');
+    throw new Error(
+      "Renderer entry URL must be provided before creating the main window.",
+    );
   }
 
-  const isMac = process.platform === 'darwin';
+  const isMac = process.platform === "darwin";
   const platformWindowOptions = isMac
     ? {
         frame: true,
-        titleBarStyle: 'hiddenInset',
+        titleBarStyle: "hiddenInset",
       }
     : {
         frame: false,
@@ -32,7 +34,7 @@ const createMainWindow = ({
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    backgroundColor: '#0d1626',
+    backgroundColor: "#0d1626",
     ...platformWindowOptions,
     webPreferences: {
       nodeIntegration: false,
@@ -42,54 +44,67 @@ const createMainWindow = ({
   });
 
   if (shouldDebugWindowFocus) {
-    window.on('focus', () => {
-      debugWindowFocus('focus', { minimized: window.isMinimized(), visible: window.isVisible() });
+    window.on("focus", () => {
+      debugWindowFocus("focus", {
+        minimized: window.isMinimized(),
+        visible: window.isVisible(),
+      });
     });
-    window.on('blur', () => {
-      debugWindowFocus('blur', { visible: window.isVisible() });
+    window.on("blur", () => {
+      debugWindowFocus("blur", { visible: window.isVisible() });
     });
-    window.on('show', () => {
-      debugWindowFocus('show');
+    window.on("show", () => {
+      debugWindowFocus("show");
     });
-    window.on('hide', () => {
-      debugWindowFocus('hide');
+    window.on("hide", () => {
+      debugWindowFocus("hide");
     });
-    window.webContents.on('did-start-loading', () => {
-      debugWindowFocus('did-start-loading', { url: window.webContents.getURL() });
+    window.webContents.on("did-start-loading", () => {
+      debugWindowFocus("did-start-loading", {
+        url: window.webContents.getURL(),
+      });
     });
-    window.webContents.on('did-finish-load', () => {
-      debugWindowFocus('did-finish-load', { url: window.webContents.getURL() });
+    window.webContents.on("did-finish-load", () => {
+      debugWindowFocus("did-finish-load", { url: window.webContents.getURL() });
     });
   }
 
   window.setMenuBarVisibility(false);
   MenuRef.setApplicationMenu(null);
 
-  if (!app.isPackaged) {
-    window.webContents.on('before-input-event', (_event, input) => {
-      if (input.type !== 'keyDown' || input.key !== 'F12') return;
-      window.webContents.toggleDevTools();
-    });
-  }
+  //if (!app.isPackaged) {
+  //  window.webContents.on("before-input-event", (_event, input) => {
+  //   if (input.type !== "keyDown" || input.key !== "F12") return;
+  window.webContents.toggleDevTools();
+  // });
+  //}
 
   window.loadURL(rendererEntryUrl);
 
-  if (!app.isPackaged) {
-    // Open the DevTools only in development.
-    window.webContents.openDevTools();
-  }
+  //if (!app.isPackaged) {
+  // Open the DevTools only in development.
+  window.webContents.openDevTools();
+  //}
 
   registerNativeContextMenuFn({
     window,
     debugContextMenu,
   });
 
-  window.on('closed', () => {
+  window.on("closed", () => {
     onClosed?.(window);
   });
 
-  // CHECKPOINT 1 COMPLETE
-  // CHECKPOINT 5 COMPLETE
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  window.webContents.on("will-navigate", (event, url) => {
+    event.preventDefault();
+    shell.openExternal(url);
+  });
+
   return window;
 };
 
