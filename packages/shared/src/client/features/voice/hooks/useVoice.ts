@@ -1,15 +1,21 @@
-import React from 'react';
-import { supabase } from '@shared/lib/supabase';
-import type { Channel } from '@shared/lib/backend/types';
-import type { VoicePresenceStateRow, VoiceSidebarParticipant } from '@client/app/types';
-import { areVoiceParticipantListsEqual, isEditableKeyboardTarget } from '@client/app/utils';
-import type { ForceDisconnectVoiceReason } from '@client/features/voice/types';
-import { useVoiceStore } from '@shared/stores/voiceStore';
+import React from "react";
+import { supabase } from "@shared/lib/supabase";
+import type { Channel } from "@shared/lib/backend/types";
+import type {
+  VoicePresenceStateRow,
+  VoiceSidebarParticipant,
+} from "@client/app/types";
+import {
+  areVoiceParticipantListsEqual,
+  isEditableKeyboardTarget,
+} from "@client/app/utils";
+import type { ForceDisconnectVoiceReason } from "@client/features/voice/types";
+import { useVoiceStore } from "@shared/stores/voiceStore";
 import {
   createInitialVoiceSessionStoreState,
   reduceVoiceSessionStoreState,
   type VoiceChannelReference,
-} from '@client/features/voice/store/voiceSessionStore';
+} from "@client/features/voice/store/voiceSessionStore";
 
 type VoiceControlActions = {
   join: () => void;
@@ -18,13 +24,11 @@ type VoiceControlActions = {
   toggleDeafen: () => void;
 };
 
-type VoiceJoinPrompt =
-  | {
-      channelId: string;
-      channel: VoiceChannelReference;
-      mode: 'join' | 'switch';
-    }
-  | null;
+type VoiceJoinPrompt = {
+  channelId: string;
+  channel: VoiceChannelReference;
+  mode: "join" | "switch";
+} | null;
 
 type VoiceSessionState = {
   joined: boolean;
@@ -38,7 +42,7 @@ type UseVoiceInput = {
   currentUserDisplayName: string;
   currentUserAvatarUrl: string | null;
   currentChannelId: string | null;
-  setCurrentChannelId: React.Dispatch<React.SetStateAction<string | null>>;
+  setCurrentChannelId: (id: string | null) => void;
   voiceHardwareDebugPanelEnabled: boolean;
   channels: Channel[];
 };
@@ -59,52 +63,67 @@ export function useVoice({
   voiceHardwareDebugPanelEnabled,
   channels,
 }: UseVoiceInput) {
-  const [voiceSessionStoreState, dispatchVoiceSessionStoreEvent] = React.useReducer(
-    reduceVoiceSessionStoreState,
-    undefined,
-    createInitialVoiceSessionStoreState
-  );
+  const [voiceSessionStoreState, dispatchVoiceSessionStoreEvent] =
+    React.useReducer(
+      reduceVoiceSessionStoreState,
+      undefined,
+      createInitialVoiceSessionStoreState,
+    );
   const activeVoiceChannel = voiceSessionStoreState.activeChannel;
   const activeVoiceChannelId = activeVoiceChannel?.id ?? null;
   const [voicePanelOpen, setVoicePanelOpen] = React.useState(false);
-  const [voiceHardwareDebugPanelOpen, setVoiceHardwareDebugPanelOpen] = React.useState(false);
+  const [voiceHardwareDebugPanelOpen, setVoiceHardwareDebugPanelOpen] =
+    React.useState(false);
   const voiceConnected = useVoiceStore((state) => state.voiceConnected);
   const voiceParticipants = useVoiceStore((state) => state.participants);
   const storedVoiceSessionState = useVoiceStore((state) => state.sessionState);
-  const [voicePresenceByChannelId, setVoicePresenceByChannelId] = React.useState<
-    Record<string, VoiceSidebarParticipant[]>
-  >({});
-  const [voiceControlActions, setVoiceControlActions] = React.useState<VoiceControlActions | null>(null);
-  const [voiceJoinPrompt, setVoiceJoinPrompt] = React.useState<VoiceJoinPrompt>(null);
-  const defaultVoiceSessionState = React.useMemo(createDefaultVoiceSessionState, []);
+  const [voicePresenceByChannelId, setVoicePresenceByChannelId] =
+    React.useState<Record<string, VoiceSidebarParticipant[]>>({});
+  const [voiceControlActions, setVoiceControlActions] =
+    React.useState<VoiceControlActions | null>(null);
+  const [voiceJoinPrompt, setVoiceJoinPrompt] =
+    React.useState<VoiceJoinPrompt>(null);
+  const defaultVoiceSessionState = React.useMemo(
+    createDefaultVoiceSessionState,
+    [],
+  );
   const voiceSessionState = storedVoiceSessionState ?? defaultVoiceSessionState;
 
   const setStoredVoiceConnected = React.useCallback((connected: boolean) => {
     useVoiceStore.getState().setVoiceConnected(connected);
   }, []);
 
-  const setStoredVoiceParticipants = React.useCallback((participants: VoiceSidebarParticipant[]) => {
-    useVoiceStore.getState().setParticipants(participants);
-  }, []);
+  const setStoredVoiceParticipants = React.useCallback(
+    (participants: VoiceSidebarParticipant[]) => {
+      useVoiceStore.getState().setParticipants(participants);
+    },
+    [],
+  );
 
-  const setStoredVoiceSessionState = React.useCallback((nextState: VoiceSessionState) => {
-    const store = useVoiceStore.getState();
-    store.setSessionState(nextState);
-    store.setJoined(nextState.joined);
-    store.setIsMuted(nextState.isMuted);
-    store.setIsDeafened(nextState.isDeafened);
-  }, []);
+  const setStoredVoiceSessionState = React.useCallback(
+    (nextState: VoiceSessionState) => {
+      const store = useVoiceStore.getState();
+      store.setSessionState(nextState);
+      store.setJoined(nextState.joined);
+      store.setIsMuted(nextState.isMuted);
+      store.setIsDeafened(nextState.isDeafened);
+    },
+    [],
+  );
 
-  const setStoredCurrentChannelId = React.useCallback((channelId: string | null) => {
-    useVoiceStore.getState().setCurrentChannelId(channelId);
-  }, []);
+  const setStoredCurrentChannelId = React.useCallback(
+    (channelId: string | null) => {
+      useVoiceStore.getState().setCurrentChannelId(channelId);
+    },
+    [],
+  );
 
   const resetStoredVoiceState = React.useCallback(() => {
     useVoiceStore.getState().reset();
   }, []);
 
   const resetVoiceState = React.useCallback(() => {
-    dispatchVoiceSessionStoreEvent({ type: 'COMPLETE_DISCONNECT' });
+    dispatchVoiceSessionStoreEvent({ type: "COMPLETE_DISCONNECT" });
     setVoicePanelOpen(false);
     resetStoredVoiceState();
     setVoicePresenceByChannelId({});
@@ -116,23 +135,23 @@ export function useVoice({
     if (!activeVoiceChannel) return;
 
     const expectedTopic = `voice:presence:${activeVoiceChannel.community_id}:${activeVoiceChannel.id}`;
-    const channels = supabase
-      .getChannels()
-      .filter((channel) => {
-        const topic = channel.topic ?? '';
-        return (
-          topic === expectedTopic ||
-          topic === `realtime:${expectedTopic}` ||
-          topic.endsWith(expectedTopic)
-        );
-      });
-    await Promise.all(channels.map((channel) => supabase.removeChannel(channel)));
+    const channels = supabase.getChannels().filter((channel) => {
+      const topic = channel.topic ?? "";
+      return (
+        topic === expectedTopic ||
+        topic === `realtime:${expectedTopic}` ||
+        topic.endsWith(expectedTopic)
+      );
+    });
+    await Promise.all(
+      channels.map((channel) => supabase.removeChannel(channel)),
+    );
   }, [activeVoiceChannel]);
 
   const requestVoiceChannelJoin = React.useCallback(
     (channelId: string) => {
       const targetChannel = channels.find(
-        (channel) => channel.id === channelId && channel.kind === 'voice'
+        (channel) => channel.id === channelId && channel.kind === "voice",
       );
       if (!targetChannel) return;
       const targetVoiceChannel: VoiceChannelReference = {
@@ -145,7 +164,7 @@ export function useVoice({
         setVoiceJoinPrompt({
           channelId: targetChannel.id,
           channel: targetVoiceChannel,
-          mode: 'join',
+          mode: "join",
         });
         return;
       }
@@ -157,25 +176,40 @@ export function useVoice({
       setVoiceJoinPrompt({
         channelId: targetChannel.id,
         channel: targetVoiceChannel,
-        mode: 'switch',
+        mode: "switch",
       });
     },
-    [activeVoiceChannelId, channels]
+    [activeVoiceChannelId, channels],
   );
 
   const confirmVoiceChannelJoin = React.useCallback(async () => {
     if (!voiceJoinPrompt) return;
 
-    if (voiceJoinPrompt.mode === 'switch' && activeVoiceChannelId && voiceControlActions) {
-      dispatchVoiceSessionStoreEvent({ type: 'START_SWITCH', channel: voiceJoinPrompt.channel });
+    if (
+      voiceJoinPrompt.mode === "switch" &&
+      activeVoiceChannelId &&
+      voiceControlActions
+    ) {
+      dispatchVoiceSessionStoreEvent({
+        type: "START_SWITCH",
+        channel: voiceJoinPrompt.channel,
+      });
       await voiceControlActions.leave();
       await cleanupStaleVoicePresenceChannels();
-      dispatchVoiceSessionStoreEvent({ type: 'COMPLETE_DISCONNECT' });
+      dispatchVoiceSessionStoreEvent({ type: "COMPLETE_DISCONNECT" });
     }
 
-    dispatchVoiceSessionStoreEvent({ type: 'START_CONNECT', channel: voiceJoinPrompt.channel });
+    dispatchVoiceSessionStoreEvent({
+      type: "START_CONNECT",
+      channel: voiceJoinPrompt.channel,
+    });
     setVoiceJoinPrompt(null);
-  }, [activeVoiceChannelId, cleanupStaleVoicePresenceChannels, voiceControlActions, voiceJoinPrompt]);
+  }, [
+    activeVoiceChannelId,
+    cleanupStaleVoicePresenceChannels,
+    voiceControlActions,
+    voiceJoinPrompt,
+  ]);
 
   const cancelVoiceChannelJoinPrompt = React.useCallback(() => {
     setVoiceJoinPrompt(null);
@@ -183,17 +217,21 @@ export function useVoice({
 
   const disconnectVoiceSession = React.useCallback(
     async (options?: { triggerPaneLeave?: boolean }) => {
-      dispatchVoiceSessionStoreEvent({ type: 'START_DISCONNECT' });
+      dispatchVoiceSessionStoreEvent({ type: "START_DISCONNECT" });
       if (options?.triggerPaneLeave !== false) {
         await voiceControlActions?.leave();
       }
       await cleanupStaleVoicePresenceChannels();
-      dispatchVoiceSessionStoreEvent({ type: 'COMPLETE_DISCONNECT' });
+      dispatchVoiceSessionStoreEvent({ type: "COMPLETE_DISCONNECT" });
       resetStoredVoiceState();
       setVoiceControlActions(null);
       setVoicePanelOpen(false);
     },
-    [cleanupStaleVoicePresenceChannels, resetStoredVoiceState, voiceControlActions]
+    [
+      cleanupStaleVoicePresenceChannels,
+      resetStoredVoiceState,
+      voiceControlActions,
+    ],
   );
 
   const forceDisconnectVoice = React.useCallback(
@@ -202,20 +240,22 @@ export function useVoice({
       // CHECKPOINT 1 COMPLETE
       await disconnectVoiceSession();
     },
-    [disconnectVoiceSession]
+    [disconnectVoiceSession],
   );
 
-
-  const handleVoiceConnectionChange = React.useCallback((connected: boolean) => {
-    setStoredVoiceConnected(connected);
-    if (connected) {
-      dispatchVoiceSessionStoreEvent({ type: 'CONNECTED' });
-      return;
-    }
-    if (!activeVoiceChannelId) {
-      dispatchVoiceSessionStoreEvent({ type: 'COMPLETE_DISCONNECT' });
-    }
-  }, [activeVoiceChannelId, setStoredVoiceConnected]);
+  const handleVoiceConnectionChange = React.useCallback(
+    (connected: boolean) => {
+      setStoredVoiceConnected(connected);
+      if (connected) {
+        dispatchVoiceSessionStoreEvent({ type: "CONNECTED" });
+        return;
+      }
+      if (!activeVoiceChannelId) {
+        dispatchVoiceSessionStoreEvent({ type: "COMPLETE_DISCONNECT" });
+      }
+    },
+    [activeVoiceChannelId, setStoredVoiceConnected],
+  );
 
   React.useEffect(() => {
     setStoredCurrentChannelId(activeVoiceChannelId);
@@ -231,17 +271,18 @@ export function useVoice({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return;
-      if (!(event.ctrlKey || event.metaKey) || !event.altKey || !event.shiftKey) return;
-      if (event.key.toLowerCase() !== 'v') return;
+      if (!(event.ctrlKey || event.metaKey) || !event.altKey || !event.shiftKey)
+        return;
+      if (event.key.toLowerCase() !== "v") return;
       if (isEditableKeyboardTarget(event.target)) return;
 
       event.preventDefault();
       setVoiceHardwareDebugPanelOpen((prev) => !prev);
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [currentUserId, voiceHardwareDebugPanelEnabled]);
 
@@ -252,13 +293,13 @@ export function useVoice({
     }
 
     const voiceChannelIds = channels
-      .filter((channel) => channel.kind === 'voice')
+      .filter((channel) => channel.kind === "voice")
       .map((channel) => channel.id)
       .filter((channelId) => channelId !== activeVoiceChannelId);
 
     setVoicePresenceByChannelId((prev) => {
       const nextEntries = Object.entries(prev).filter(([channelId]) =>
-        voiceChannelIds.includes(channelId)
+        voiceChannelIds.includes(channelId),
       );
       if (nextEntries.length === Object.keys(prev).length) return prev;
       return Object.fromEntries(nextEntries);
@@ -271,7 +312,9 @@ export function useVoice({
     let disposed = false;
 
     const subscriptionChannels = voiceChannelIds.map((voiceChannelId) => {
-      const subscriptionChannel = supabase.channel(`voice:presence:${currentServerId}:${voiceChannelId}`);
+      const subscriptionChannel = supabase.channel(
+        `voice:presence:${currentServerId}:${voiceChannelId}`,
+      );
 
       const syncPresenceState = () => {
         if (disposed) return;
@@ -282,15 +325,20 @@ export function useVoice({
         >;
         const participantsByUserId = new Map<string, VoiceSidebarParticipant>();
 
-        for (const [presenceKey, presenceRows] of Object.entries(presenceState)) {
+        for (const [presenceKey, presenceRows] of Object.entries(
+          presenceState,
+        )) {
           const latestPresence = presenceRows[presenceRows.length - 1];
           if (!latestPresence) continue;
 
           const userId = latestPresence.user_id ?? presenceKey;
           if (!userId) continue;
 
-          const trimmedDisplayName = latestPresence.display_name?.trim() ?? '';
-          const displayName = trimmedDisplayName.length > 0 ? trimmedDisplayName : userId.slice(0, 12);
+          const trimmedDisplayName = latestPresence.display_name?.trim() ?? "";
+          const displayName =
+            trimmedDisplayName.length > 0
+              ? trimmedDisplayName
+              : userId.slice(0, 12);
 
           if (!participantsByUserId.has(userId)) {
             participantsByUserId.set(userId, {
@@ -302,13 +350,18 @@ export function useVoice({
           }
         }
 
-        const nextParticipants = Array.from(participantsByUserId.values()).sort((left, right) =>
-          left.displayName.localeCompare(right.displayName)
+        const nextParticipants = Array.from(participantsByUserId.values()).sort(
+          (left, right) => left.displayName.localeCompare(right.displayName),
         );
 
         setVoicePresenceByChannelId((prev) => {
           const previousParticipants = prev[voiceChannelId] ?? [];
-          if (areVoiceParticipantListsEqual(previousParticipants, nextParticipants)) {
+          if (
+            areVoiceParticipantListsEqual(
+              previousParticipants,
+              nextParticipants,
+            )
+          ) {
             return prev;
           }
           return {
@@ -319,16 +372,16 @@ export function useVoice({
       };
 
       subscriptionChannel
-        .on('presence', { event: 'sync' }, syncPresenceState)
-        .on('presence', { event: 'join' }, syncPresenceState)
-        .on('presence', { event: 'leave' }, syncPresenceState);
+        .on("presence", { event: "sync" }, syncPresenceState)
+        .on("presence", { event: "join" }, syncPresenceState)
+        .on("presence", { event: "leave" }, syncPresenceState);
 
       subscriptionChannel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
+        if (status === "SUBSCRIBED") {
           syncPresenceState();
           return;
         }
-        if (status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT') {
+        if (status !== "CHANNEL_ERROR" && status !== "TIMED_OUT") {
           return;
         }
 
@@ -359,10 +412,14 @@ export function useVoice({
   React.useEffect(() => {
     if (!currentChannelId) return;
 
-    const selectedChannel = channels.find((channel) => channel.id === currentChannelId);
-    if (!selectedChannel || selectedChannel.kind !== 'voice') return;
+    const selectedChannel = channels.find(
+      (channel) => channel.id === currentChannelId,
+    );
+    if (!selectedChannel || selectedChannel.kind !== "voice") return;
 
-    const firstTextChannel = channels.find((channel) => channel.kind === 'text');
+    const firstTextChannel = channels.find(
+      (channel) => channel.kind === "text",
+    );
     if (firstTextChannel) {
       setCurrentChannelId(firstTextChannel.id);
     }
@@ -384,8 +441,9 @@ export function useVoice({
           ...voiceParticipants,
         ].filter(
           (participant, participantIndex, participantList) =>
-            participantList.findIndex((candidate) => candidate.userId === participant.userId) ===
-            participantIndex
+            participantList.findIndex(
+              (candidate) => candidate.userId === participant.userId,
+            ) === participantIndex,
         )
       : [];
 
@@ -398,7 +456,8 @@ export function useVoice({
       : {}),
   };
 
-  const activeVoiceParticipantCount = voiceParticipants.length + (voiceConnected ? 1 : 0);
+  const activeVoiceParticipantCount =
+    voiceParticipants.length + (voiceConnected ? 1 : 0);
 
   return {
     state: {

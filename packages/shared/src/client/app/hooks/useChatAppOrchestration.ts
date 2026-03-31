@@ -254,15 +254,18 @@ export function useChatAppOrchestration() {
   const authorProfileCacheRef = useRef<Record<string, AuthorProfile>>({});
 
   // ── Community workspace ───────────────────────────────────────────────────
+  const currentServerId = useNavigationStore((state) => state.currentServerId);
+  const setCurrentServerId = useNavigationStore(
+    (state) => state.setCurrentServerId,
+  );
+  const currentChannelId = useNavigationStore(
+    (state) => state.currentChannelId,
+  );
+  const setCurrentChannelId = useNavigationStore(
+    (state) => state.setCurrentChannelId,
+  );
   const {
-    state: {
-      channels,
-      channelsLoading,
-      channelsError,
-      currentChannelId,
-      currentServerId,
-      serverPermissions,
-    },
+    state: { channels, channelsLoading, channelsError, serverPermissions },
     derived: {
       currentServer,
       currentChannel,
@@ -274,8 +277,6 @@ export function useChatAppOrchestration() {
     actions: {
       resetChannelsWorkspace,
       setChannels,
-      setCurrentChannelId,
-      setCurrentServerId,
       resetServerPermissions,
       prefetchServersChannels,
       getDefaultChannelIdForServer,
@@ -506,11 +507,9 @@ export function useChatAppOrchestration() {
     currentUserId: user?.id ?? null,
     canManageInvites: serverPermissions.canManageInvites,
     isServerSettingsModalOpen: showServerSettingsModal,
-    setCurrentServerId,
     setShowServerSettingsModal,
     refreshServers,
     onActiveServerRemoved: () => {
-      setCurrentServerId(null);
       setShowServerSettingsModal(false);
       setShowChannelSettingsModal(false);
       setChannelSettingsTargetId(null);

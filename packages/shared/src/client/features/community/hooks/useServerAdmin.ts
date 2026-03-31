@@ -1,6 +1,6 @@
-import React from 'react';
-import { getCommunityDataBackend } from '@shared/lib/backend';
-import type { ControlPlaneBackend } from '@shared/lib/backend/controlPlaneBackend';
+import React from "react";
+import { getCommunityDataBackend } from "@shared/lib/backend";
+import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend";
 import type {
   CommunityBanItem,
   CommunityMemberListItem,
@@ -10,9 +10,9 @@ import type {
   ServerRoleItem,
   ServerSettingsUpdate,
   ServerSummary,
-} from '@shared/lib/backend/types';
-import { getErrorMessage } from '@platform/lib/errors';
-
+} from "@shared/lib/backend/types";
+import { getErrorMessage } from "@platform/lib/errors";
+import { useNavigationStore } from "@shared/stores/navigationStore";
 type UseServerAdminInput = {
   servers: ServerSummary[];
   controlPlaneBackend: ControlPlaneBackend;
@@ -20,7 +20,6 @@ type UseServerAdminInput = {
   currentUserId: string | null;
   canManageInvites: boolean;
   isServerSettingsModalOpen: boolean;
-  setCurrentServerId: React.Dispatch<React.SetStateAction<string | null>>;
   setShowServerSettingsModal: React.Dispatch<React.SetStateAction<boolean>>;
   refreshServers: () => Promise<void>;
   onActiveServerRemoved: () => void;
@@ -33,40 +32,64 @@ export function useServerAdmin({
   currentUserId,
   canManageInvites,
   isServerSettingsModalOpen,
-  setCurrentServerId,
   setShowServerSettingsModal,
   refreshServers,
   onActiveServerRemoved,
 }: UseServerAdminInput) {
   const [showMembersModal, setShowMembersModal] = React.useState(false);
-  const [membersModalCommunityId, setMembersModalCommunityId] = React.useState<string | null>(null);
-  const [membersModalServerName, setMembersModalServerName] = React.useState('');
-  const [membersModalMembers, setMembersModalMembers] = React.useState<CommunityMemberListItem[]>([]);
+  const [membersModalCommunityId, setMembersModalCommunityId] = React.useState<
+    string | null
+  >(null);
+  const [membersModalServerName, setMembersModalServerName] =
+    React.useState("");
+  const [membersModalMembers, setMembersModalMembers] = React.useState<
+    CommunityMemberListItem[]
+  >([]);
   const [membersModalLoading, setMembersModalLoading] = React.useState(false);
-  const [membersModalError, setMembersModalError] = React.useState<string | null>(null);
-  const [membersModalCanCreateReports, setMembersModalCanCreateReports] = React.useState(false);
-  const [membersModalCanManageMembers, setMembersModalCanManageMembers] = React.useState(false);
-  const [membersModalCanManageBans, setMembersModalCanManageBans] = React.useState(false);
-  const [communityBans, setCommunityBans] = React.useState<CommunityBanItem[]>([]);
+  const [membersModalError, setMembersModalError] = React.useState<
+    string | null
+  >(null);
+  const [membersModalCanCreateReports, setMembersModalCanCreateReports] =
+    React.useState(false);
+  const [membersModalCanManageMembers, setMembersModalCanManageMembers] =
+    React.useState(false);
+  const [membersModalCanManageBans, setMembersModalCanManageBans] =
+    React.useState(false);
+  const [communityBans, setCommunityBans] = React.useState<CommunityBanItem[]>(
+    [],
+  );
   const [communityBansLoading, setCommunityBansLoading] = React.useState(false);
-  const [communityBansError, setCommunityBansError] = React.useState<string | null>(null);
+  const [communityBansError, setCommunityBansError] = React.useState<
+    string | null
+  >(null);
   const [serverInvites, setServerInvites] = React.useState<ServerInvite[]>([]);
   const [serverInvitesLoading, setServerInvitesLoading] = React.useState(false);
-  const [serverInvitesError, setServerInvitesError] = React.useState<string | null>(null);
+  const [serverInvitesError, setServerInvitesError] = React.useState<
+    string | null
+  >(null);
   const [serverRoles, setServerRoles] = React.useState<ServerRoleItem[]>([]);
-  const [serverMembers, setServerMembers] = React.useState<ServerMemberRoleItem[]>([]);
-  const [serverPermissionCatalog, setServerPermissionCatalog] = React.useState<PermissionCatalogItem[]>([]);
-  const [serverRoleManagementLoading, setServerRoleManagementLoading] = React.useState(false);
-  const [serverRoleManagementError, setServerRoleManagementError] = React.useState<string | null>(null);
+  const [serverMembers, setServerMembers] = React.useState<
+    ServerMemberRoleItem[]
+  >([]);
+  const [serverPermissionCatalog, setServerPermissionCatalog] = React.useState<
+    PermissionCatalogItem[]
+  >([]);
+  const [serverRoleManagementLoading, setServerRoleManagementLoading] =
+    React.useState(false);
+  const [serverRoleManagementError, setServerRoleManagementError] =
+    React.useState<string | null>(null);
   const [serverSettingsInitialValues, setServerSettingsInitialValues] =
     React.useState<ServerSettingsUpdate | null>(null);
-  const [serverSettingsLoading, setServerSettingsLoading] = React.useState(false);
-  const [serverSettingsLoadError, setServerSettingsLoadError] = React.useState<string | null>(null);
+  const [serverSettingsLoading, setServerSettingsLoading] =
+    React.useState(false);
+  const [serverSettingsLoadError, setServerSettingsLoadError] = React.useState<
+    string | null
+  >(null);
 
   const resetMembersModal = React.useCallback(() => {
     setShowMembersModal(false);
     setMembersModalCommunityId(null);
-    setMembersModalServerName('');
+    setMembersModalServerName("");
     setMembersModalMembers([]);
     setMembersModalLoading(false);
     setMembersModalError(null);
@@ -127,18 +150,21 @@ export function useServerAdmin({
     setServerSettingsLoadError(null);
   }, []);
 
-  const refreshMembersModalMembers = React.useCallback(async (communityId: string) => {
-    const communityBackend = getCommunityDataBackend(communityId);
-    const members = await communityBackend.listCommunityMembers(communityId);
-    setMembersModalMembers(members);
-  }, []);
+  const refreshMembersModalMembers = React.useCallback(
+    async (communityId: string) => {
+      const communityBackend = getCommunityDataBackend(communityId);
+      const members = await communityBackend.listCommunityMembers(communityId);
+      setMembersModalMembers(members);
+    },
+    [],
+  );
 
   const refreshMembersModalMembersIfOpen = React.useCallback(
     async (communityId: string) => {
       if (!showMembersModal || membersModalCommunityId !== communityId) return;
       await refreshMembersModalMembers(communityId);
     },
-    [membersModalCommunityId, refreshMembersModalMembers, showMembersModal]
+    [membersModalCommunityId, refreshMembersModalMembers, showMembersModal],
   );
 
   const openServerMembersModal = React.useCallback(
@@ -146,7 +172,7 @@ export function useServerAdmin({
       const server = servers.find((candidate) => candidate.id === communityId);
       setShowMembersModal(true);
       setMembersModalCommunityId(communityId);
-      setMembersModalServerName(server?.name ?? 'Community');
+      setMembersModalServerName(server?.name ?? "Community");
       setMembersModalMembers([]);
       setMembersModalError(null);
       setMembersModalLoading(true);
@@ -165,12 +191,14 @@ export function useServerAdmin({
         setMembersModalCanManageMembers(Boolean(permissions.canManageMembers));
         setMembersModalCanManageBans(Boolean(permissions.canManageBans));
       } catch (error: unknown) {
-        setMembersModalError(getErrorMessage(error, 'Failed to load community members.'));
+        setMembersModalError(
+          getErrorMessage(error, "Failed to load community members."),
+        );
       } finally {
         setMembersModalLoading(false);
       }
     },
-    [servers]
+    [servers],
   );
 
   const loadCommunityBans = React.useCallback(
@@ -189,13 +217,13 @@ export function useServerAdmin({
         setCommunityBans(bans);
       } catch (error: unknown) {
         setCommunityBans([]);
-        setCommunityBansError(getErrorMessage(error, 'Failed to load bans.'));
+        setCommunityBansError(getErrorMessage(error, "Failed to load bans."));
         throw error;
       } finally {
         setCommunityBansLoading(false);
       }
     },
-    [currentServerId]
+    [currentServerId],
   );
 
   const loadServerInvites = React.useCallback(
@@ -209,7 +237,8 @@ export function useServerAdmin({
       setServerInvitesLoading(true);
       setServerInvitesError(null);
       try {
-        const invites = await controlPlaneBackend.listActiveCommunityInvites(communityId);
+        const invites =
+          await controlPlaneBackend.listActiveCommunityInvites(communityId);
         setServerInvites(
           invites.map((invite) => ({
             id: invite.id,
@@ -218,13 +247,13 @@ export function useServerAdmin({
             maxUses: invite.maxUses,
             expiresAt: invite.expiresAt,
             isActive: invite.isActive,
-          }))
+          })),
         );
       } finally {
         setServerInvitesLoading(false);
       }
     },
-    [controlPlaneBackend, currentServerId]
+    [controlPlaneBackend, currentServerId],
   );
 
   const loadServerRoleManagement = React.useCallback(
@@ -241,7 +270,8 @@ export function useServerAdmin({
 
       try {
         const communityBackend = getCommunityDataBackend(communityId);
-        const snapshot = await communityBackend.fetchServerRoleManagement(communityId);
+        const snapshot =
+          await communityBackend.fetchServerRoleManagement(communityId);
         setServerRoles(snapshot.roles);
         setServerMembers(snapshot.members);
         setServerPermissionCatalog(snapshot.permissionsCatalog);
@@ -249,7 +279,7 @@ export function useServerAdmin({
         setServerRoleManagementLoading(false);
       }
     },
-    [currentServerId]
+    [currentServerId],
   );
 
   const loadServerSettings = React.useCallback(
@@ -264,7 +294,8 @@ export function useServerAdmin({
 
       try {
         const communityBackend = getCommunityDataBackend(communityId);
-        const snapshot = await communityBackend.fetchServerSettings(communityId);
+        const snapshot =
+          await communityBackend.fetchServerSettings(communityId);
         setServerSettingsInitialValues({
           name: snapshot.name,
           description: snapshot.description,
@@ -275,12 +306,15 @@ export function useServerAdmin({
         setServerSettingsLoading(false);
       }
     },
-    [currentServerId]
+    [currentServerId],
   );
 
   const createServerInvite = React.useCallback(
-    async (values: { maxUses: number | null; expiresInHours: number | null }): Promise<ServerInvite> => {
-      if (!currentServerId) throw new Error('No community selected.');
+    async (values: {
+      maxUses: number | null;
+      expiresInHours: number | null;
+    }): Promise<ServerInvite> => {
+      if (!currentServerId) throw new Error("No community selected.");
 
       const invite = await controlPlaneBackend.createCommunityInvite({
         communityId: currentServerId,
@@ -299,16 +333,17 @@ export function useServerAdmin({
         isActive: invite.isActive,
       };
     },
-    [controlPlaneBackend, currentServerId, loadServerInvites]
+    [controlPlaneBackend, currentServerId, loadServerInvites],
   );
 
   const saveServerSettings = React.useCallback(
     async (values: ServerSettingsUpdate) => {
-      if (!currentServerId || !currentUserId) throw new Error('Not authenticated');
+      if (!currentServerId || !currentUserId)
+        throw new Error("Not authenticated");
 
       const trimmedName = values.name.trim();
       if (!trimmedName) {
-        throw new Error('Community name is required.');
+        throw new Error("Community name is required.");
       }
 
       const communityBackend = getCommunityDataBackend(currentServerId);
@@ -325,13 +360,11 @@ export function useServerAdmin({
       await refreshServers();
       await loadServerSettings();
     },
-    [
-      currentServerId,
-      loadServerSettings,
-      refreshServers,
-    ]
+    [currentServerId, loadServerSettings, refreshServers],
   );
-
+  const setCurrentServerId = useNavigationStore(
+    (state) => state.setCurrentServerId,
+  );
   const openServerSettingsModal = React.useCallback(
     async (communityIdOverride?: string) => {
       const targetCommunityId = communityIdOverride ?? currentServerId;
@@ -350,16 +383,20 @@ export function useServerAdmin({
       try {
         await loadServerSettings(targetCommunityId);
       } catch (error: unknown) {
-        console.error('Failed to load community settings:', error);
-        setServerSettingsLoadError(getErrorMessage(error, 'Failed to load community settings.'));
+        console.error("Failed to load community settings:", error);
+        setServerSettingsLoadError(
+          getErrorMessage(error, "Failed to load community settings."),
+        );
       }
 
       if (canManageInvites) {
         try {
           await loadServerInvites(targetCommunityId);
         } catch (error: unknown) {
-          console.error('Failed to load community invites:', error);
-          setServerInvitesError(getErrorMessage(error, 'Failed to load community invites.'));
+          console.error("Failed to load community invites:", error);
+          setServerInvitesError(
+            getErrorMessage(error, "Failed to load community invites."),
+          );
         }
       } else {
         resetServerInvites();
@@ -368,16 +405,16 @@ export function useServerAdmin({
       try {
         await loadServerRoleManagement(targetCommunityId);
       } catch (error: unknown) {
-        console.error('Failed to load community role management:', error);
+        console.error("Failed to load community role management:", error);
         setServerRoleManagementError(
-          getErrorMessage(error, 'Failed to load community roles and members.')
+          getErrorMessage(error, "Failed to load community roles and members."),
         );
       }
 
       try {
         await loadCommunityBans(targetCommunityId);
       } catch (error: unknown) {
-        console.error('Failed to load community bans:', error);
+        console.error("Failed to load community bans:", error);
       }
     },
     [
@@ -394,22 +431,25 @@ export function useServerAdmin({
       resetServerSettingsState,
       setCurrentServerId,
       setShowServerSettingsModal,
-    ]
+    ],
   );
 
   const revokeServerInvite = React.useCallback(
     async (inviteId: string): Promise<void> => {
-      if (!currentServerId) throw new Error('No community selected.');
+      if (!currentServerId) throw new Error("No community selected.");
 
-      await controlPlaneBackend.revokeCommunityInvite(currentServerId, inviteId);
+      await controlPlaneBackend.revokeCommunityInvite(
+        currentServerId,
+        inviteId,
+      );
       await loadServerInvites();
     },
-    [controlPlaneBackend, currentServerId, loadServerInvites]
+    [controlPlaneBackend, currentServerId, loadServerInvites],
   );
 
   const unbanUserFromCurrentServer = React.useCallback(
     async (input: { targetUserId: string; reason?: string | null }) => {
-      if (!currentServerId) throw new Error('No community selected.');
+      if (!currentServerId) throw new Error("No community selected.");
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.unbanCommunityMember({
@@ -421,12 +461,12 @@ export function useServerAdmin({
       await loadCommunityBans(currentServerId);
       await refreshMembersModalMembersIfOpen(currentServerId);
     },
-    [currentServerId, loadCommunityBans, refreshMembersModalMembersIfOpen]
+    [currentServerId, loadCommunityBans, refreshMembersModalMembersIfOpen],
   );
 
   const createServerRole = React.useCallback(
     async (input: { name: string; color: string; position: number }) => {
-      if (!currentServerId) throw new Error('No community selected.');
+      if (!currentServerId) throw new Error("No community selected.");
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.createServerRole({
@@ -438,12 +478,17 @@ export function useServerAdmin({
 
       await loadServerRoleManagement();
     },
-    [currentServerId, loadServerRoleManagement]
+    [currentServerId, loadServerRoleManagement],
   );
 
   const updateServerRole = React.useCallback(
-    async (input: { roleId: string; name: string; color: string; position: number }) => {
-      if (!currentServerId) throw new Error('No community selected.');
+    async (input: {
+      roleId: string;
+      name: string;
+      color: string;
+      position: number;
+    }) => {
+      if (!currentServerId) throw new Error("No community selected.");
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.updateServerRole({
@@ -456,12 +501,12 @@ export function useServerAdmin({
 
       await loadServerRoleManagement();
     },
-    [currentServerId, loadServerRoleManagement]
+    [currentServerId, loadServerRoleManagement],
   );
 
   const deleteServerRole = React.useCallback(
     async (roleId: string) => {
-      if (!currentServerId) throw new Error('No community selected.');
+      if (!currentServerId) throw new Error("No community selected.");
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.deleteServerRole({
@@ -471,12 +516,12 @@ export function useServerAdmin({
 
       await loadServerRoleManagement();
     },
-    [currentServerId, loadServerRoleManagement]
+    [currentServerId, loadServerRoleManagement],
   );
 
   const saveServerRolePermissions = React.useCallback(
     async (roleId: string, permissionKeys: string[]) => {
-      if (!currentServerId) throw new Error('No community selected.');
+      if (!currentServerId) throw new Error("No community selected.");
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.saveServerRolePermissions({
@@ -486,12 +531,13 @@ export function useServerAdmin({
 
       await loadServerRoleManagement();
     },
-    [currentServerId, loadServerRoleManagement]
+    [currentServerId, loadServerRoleManagement],
   );
 
   const saveServerMemberRoles = React.useCallback(
     async (memberId: string, roleIds: string[]) => {
-      if (!currentServerId || !currentUserId) throw new Error('Not authenticated');
+      if (!currentServerId || !currentUserId)
+        throw new Error("Not authenticated");
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.saveServerMemberRoles({
@@ -503,7 +549,7 @@ export function useServerAdmin({
 
       await loadServerRoleManagement();
     },
-    [currentServerId, currentUserId, loadServerRoleManagement]
+    [currentServerId, currentUserId, loadServerRoleManagement],
   );
 
   const leaveServer = React.useCallback(
@@ -521,7 +567,7 @@ export function useServerAdmin({
       currentServerId,
       onActiveServerRemoved,
       refreshServers,
-    ]
+    ],
   );
 
   const deleteServer = React.useCallback(
@@ -539,7 +585,7 @@ export function useServerAdmin({
       currentServerId,
       onActiveServerRemoved,
       refreshServers,
-    ]
+    ],
   );
 
   const renameServer = React.useCallback(
@@ -559,7 +605,7 @@ export function useServerAdmin({
       isServerSettingsModalOpen,
       loadServerSettings,
       refreshServers,
-    ]
+    ],
   );
 
   return {

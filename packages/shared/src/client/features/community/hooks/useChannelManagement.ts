@@ -1,5 +1,5 @@
-import React from 'react';
-import { getCommunityDataBackend } from '@shared/lib/backend';
+import React from "react";
+import { getCommunityDataBackend } from "@shared/lib/backend";
 import type {
   Channel,
   ChannelAccessRevokedResult,
@@ -8,8 +8,8 @@ import type {
   ChannelMemberPermissionItem,
   ChannelPermissionState,
   ChannelRolePermissionItem,
-} from '@shared/lib/backend/types';
-import { getErrorMessage } from '@platform/lib/errors';
+} from "@shared/lib/backend/types";
+import { getErrorMessage } from "@platform/lib/errors";
 
 type UseChannelManagementInput = {
   currentServerId: string | null;
@@ -18,8 +18,10 @@ type UseChannelManagementInput = {
   channelSettingsTargetId: string | null;
   channels: Channel[];
   setChannels: React.Dispatch<React.SetStateAction<Channel[]>>;
-  setCurrentChannelId: React.Dispatch<React.SetStateAction<string | null>>;
-  setChannelSettingsTargetId: React.Dispatch<React.SetStateAction<string | null>>;
+  setCurrentChannelId: (id: string | null) => void;
+  setChannelSettingsTargetId: React.Dispatch<
+    React.SetStateAction<string | null>
+  >;
   setShowChannelSettingsModal: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
@@ -34,19 +36,17 @@ export function useChannelManagement({
   setChannelSettingsTargetId,
   setShowChannelSettingsModal,
 }: UseChannelManagementInput) {
-  const [channelRolePermissions, setChannelRolePermissions] = React.useState<ChannelRolePermissionItem[]>(
-    []
-  );
-  const [channelMemberPermissions, setChannelMemberPermissions] = React.useState<
-    ChannelMemberPermissionItem[]
+  const [channelRolePermissions, setChannelRolePermissions] = React.useState<
+    ChannelRolePermissionItem[]
   >([]);
-  const [channelPermissionMemberOptions, setChannelPermissionMemberOptions] = React.useState<
-    ChannelMemberOption[]
-  >([]);
-  const [channelPermissionsLoading, setChannelPermissionsLoading] = React.useState(false);
-  const [channelPermissionsLoadError, setChannelPermissionsLoadError] = React.useState<string | null>(
-    null
-  );
+  const [channelMemberPermissions, setChannelMemberPermissions] =
+    React.useState<ChannelMemberPermissionItem[]>([]);
+  const [channelPermissionMemberOptions, setChannelPermissionMemberOptions] =
+    React.useState<ChannelMemberOption[]>([]);
+  const [channelPermissionsLoading, setChannelPermissionsLoading] =
+    React.useState(false);
+  const [channelPermissionsLoadError, setChannelPermissionsLoadError] =
+    React.useState<string | null>(null);
 
   const resetChannelPermissionsState = React.useCallback(() => {
     setChannelRolePermissions([]);
@@ -57,11 +57,18 @@ export function useChannelManagement({
   }, []);
 
   const createChannel = React.useCallback(
-    async (values: { name: string; topic: string | null; kind: ChannelKind }) => {
-      if (!currentUserId || !currentServerId) throw new Error('Not authenticated');
+    async (values: {
+      name: string;
+      topic: string | null;
+      kind: ChannelKind;
+    }) => {
+      if (!currentUserId || !currentServerId)
+        throw new Error("Not authenticated");
 
       const nextPosition =
-        channels.length === 0 ? 0 : Math.max(...channels.map((channel) => channel.position)) + 1;
+        channels.length === 0
+          ? 0
+          : Math.max(...channels.map((channel) => channel.position)) + 1;
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       const channel = await communityBackend.createChannel({
@@ -73,18 +80,26 @@ export function useChannelManagement({
       });
 
       setChannels((prev) => {
-        if (prev.some((existingChannel) => existingChannel.id === channel.id)) return prev;
+        if (prev.some((existingChannel) => existingChannel.id === channel.id))
+          return prev;
         return [...prev, channel].sort((a, b) => a.position - b.position);
       });
       setCurrentChannelId(channel.id);
     },
-    [channels, currentServerId, currentUserId, setChannels, setCurrentChannelId]
+    [
+      channels,
+      currentServerId,
+      currentUserId,
+      setChannels,
+      setCurrentChannelId,
+    ],
   );
 
   const saveChannelSettings = React.useCallback(
     async (values: { name: string; topic: string | null }) => {
       const channelIdToUpdate = channelSettingsTargetId ?? currentChannelId;
-      if (!currentServerId || !channelIdToUpdate) throw new Error('No channel selected.');
+      if (!currentServerId || !channelIdToUpdate)
+        throw new Error("No channel selected.");
 
       const communityBackend = getCommunityDataBackend(currentServerId);
       await communityBackend.updateChannel({
@@ -98,22 +113,24 @@ export function useChannelManagement({
         prev.map((channel) =>
           channel.id === channelIdToUpdate
             ? { ...channel, name: values.name, topic: values.topic }
-            : channel
-        )
+            : channel,
+        ),
       );
     },
-    [channelSettingsTargetId, currentChannelId, currentServerId, setChannels]
+    [channelSettingsTargetId, currentChannelId, currentServerId, setChannels],
   );
 
   const renameChannel = React.useCallback(
     async (channelId: string, name: string) => {
-      if (!currentServerId) throw new Error('No server selected.');
-      const channelRow = channels.find((candidate) => candidate.id === channelId);
-      if (!channelRow) throw new Error('Channel not found.');
+      if (!currentServerId) throw new Error("No server selected.");
+      const channelRow = channels.find(
+        (candidate) => candidate.id === channelId,
+      );
+      if (!channelRow) throw new Error("Channel not found.");
 
       const normalizedName = name.trim();
       if (!normalizedName) {
-        throw new Error('Channel name is required.');
+        throw new Error("Channel name is required.");
       }
 
       const communityBackend = getCommunityDataBackend(currentServerId);
@@ -125,17 +142,21 @@ export function useChannelManagement({
       });
 
       setChannels((prev) =>
-        prev.map((channel) => (channel.id === channelId ? { ...channel, name: normalizedName } : channel))
+        prev.map((channel) =>
+          channel.id === channelId
+            ? { ...channel, name: normalizedName }
+            : channel,
+        ),
       );
     },
-    [channels, currentServerId, setChannels]
+    [channels, currentServerId, setChannels],
   );
 
   const deleteChannel = React.useCallback(
     async (channelId: string) => {
-      if (!currentServerId) throw new Error('No server selected.');
+      if (!currentServerId) throw new Error("No server selected.");
       if (channels.length <= 1) {
-        throw new Error('At least one channel must exist in a server.');
+        throw new Error("At least one channel must exist in a server.");
       }
 
       const communityBackend = getCommunityDataBackend(currentServerId);
@@ -146,21 +167,28 @@ export function useChannelManagement({
 
       setChannels((prev) => {
         const next = prev.filter((channel) => channel.id !== channelId);
-        setCurrentChannelId((prevCurrentId) => {
-          if (prevCurrentId !== channelId) return prevCurrentId;
-          return next.length > 0 ? next[0].id : null;
-        });
+        if (currentChannelId === channelId) {
+          setCurrentChannelId(next.length > 0 ? next[0].id : null);
+        }
         return next;
       });
 
-      setChannelSettingsTargetId((prevTargetId) => (prevTargetId === channelId ? null : prevTargetId));
+      setChannelSettingsTargetId((prevTargetId) =>
+        prevTargetId === channelId ? null : prevTargetId,
+      );
     },
-    [channels.length, currentServerId, setChannelSettingsTargetId, setChannels, setCurrentChannelId]
+    [
+      channels.length,
+      currentServerId,
+      setChannelSettingsTargetId,
+      setChannels,
+      setCurrentChannelId,
+    ],
   );
 
   const deleteCurrentChannel = React.useCallback(async () => {
     const targetChannelId = channelSettingsTargetId ?? currentChannelId;
-    if (!targetChannelId) throw new Error('No channel selected.');
+    if (!targetChannelId) throw new Error("No channel selected.");
     await deleteChannel(targetChannelId);
     setShowChannelSettingsModal(false);
   }, [
@@ -196,7 +224,7 @@ export function useChannelManagement({
         setChannelPermissionsLoading(false);
       }
     },
-    [channelSettingsTargetId, currentChannelId, currentServerId, currentUserId]
+    [channelSettingsTargetId, currentChannelId, currentServerId, currentUserId],
   );
 
   const openChannelSettingsModal = React.useCallback(
@@ -209,8 +237,10 @@ export function useChannelManagement({
       try {
         await loadChannelPermissions(targetChannelId);
       } catch (error: unknown) {
-        console.error('Failed to load channel permissions:', error);
-        setChannelPermissionsLoadError(getErrorMessage(error, 'Failed to load channel permissions.'));
+        console.error("Failed to load channel permissions:", error);
+        setChannelPermissionsLoadError(
+          getErrorMessage(error, "Failed to load channel permissions."),
+        );
       }
     },
     [
@@ -218,17 +248,22 @@ export function useChannelManagement({
       loadChannelPermissions,
       setChannelSettingsTargetId,
       setShowChannelSettingsModal,
-    ]
+    ],
   );
 
   const saveRoleChannelPermissions = React.useCallback(
     async (roleId: string, permissions: ChannelPermissionState) => {
       const targetChannelId = channelSettingsTargetId ?? currentChannelId;
-      if (!currentServerId || !targetChannelId) throw new Error('No channel selected.');
+      if (!currentServerId || !targetChannelId)
+        throw new Error("No channel selected.");
 
-      const roleRow = channelRolePermissions.find((row) => row.roleId === roleId);
+      const roleRow = channelRolePermissions.find(
+        (row) => row.roleId === roleId,
+      );
       if (roleRow && !roleRow.editable) {
-        throw new Error('You can only edit overwrites for roles below your highest role.');
+        throw new Error(
+          "You can only edit overwrites for roles below your highest role.",
+        );
       }
 
       const communityBackend = getCommunityDataBackend(currentServerId);
@@ -248,25 +283,35 @@ export function useChannelManagement({
                 canSend: permissions.canSend,
                 canManage: permissions.canManage,
               }
-            : row
-        )
+            : row,
+        ),
       );
     },
-    [channelRolePermissions, channelSettingsTargetId, currentChannelId, currentServerId]
+    [
+      channelRolePermissions,
+      channelSettingsTargetId,
+      currentChannelId,
+      currentServerId,
+    ],
   );
 
   const saveMemberChannelPermissions = React.useCallback(
-    async (memberId: string, permissions: ChannelPermissionState): Promise<ChannelAccessRevokedResult | null> => {
+    async (
+      memberId: string,
+      permissions: ChannelPermissionState,
+    ): Promise<ChannelAccessRevokedResult | null> => {
       const targetChannelId = channelSettingsTargetId ?? currentChannelId;
-      if (!currentServerId || !targetChannelId) throw new Error('No channel selected.');
+      if (!currentServerId || !targetChannelId)
+        throw new Error("No channel selected.");
 
       const communityBackend = getCommunityDataBackend(currentServerId);
-      const accessRevokedResult = await communityBackend.saveMemberChannelPermissions({
-        communityId: currentServerId,
-        channelId: targetChannelId,
-        memberId,
-        permissions,
-      });
+      const accessRevokedResult =
+        await communityBackend.saveMemberChannelPermissions({
+          communityId: currentServerId,
+          channelId: targetChannelId,
+          memberId,
+          permissions,
+        });
 
       setChannelMemberPermissions((prev) =>
         prev.map((row) =>
@@ -277,13 +322,13 @@ export function useChannelManagement({
                 canSend: permissions.canSend,
                 canManage: permissions.canManage,
               }
-            : row
-        )
+            : row,
+        ),
       );
 
       return accessRevokedResult;
     },
-    [channelSettingsTargetId, currentChannelId, currentServerId]
+    [channelSettingsTargetId, currentChannelId, currentServerId],
   );
 
   return {
