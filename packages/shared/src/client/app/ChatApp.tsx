@@ -207,9 +207,9 @@ export function ChatApp() {
     onUpdateVoiceSettings: (next) => {
       void app.setVoiceSettings(next);
     },
-    onParticipantsChange: app.setVoiceParticipants,
-    onConnectionChange: app.setVoiceConnected,
-    onSessionStateChange: app.setVoiceSessionState,
+    onParticipantsChange: useVoiceStore.getState().setParticipants,
+    onConnectionChange: useVoiceStore.getState().setVoiceConnected,
+    onSessionStateChange: useVoiceStore.getState().setSessionState,
     onControlActionsReady: app.setVoiceControlActions,
     onSessionError: handleVoiceSessionError,
     onVoiceKick: handleVoiceKickReceived,
