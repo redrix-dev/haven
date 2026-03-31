@@ -72,19 +72,19 @@ const createMainWindow = ({
   window.setMenuBarVisibility(false);
   MenuRef.setApplicationMenu(null);
 
-  //if (!app.isPackaged) {
-  //  window.webContents.on("before-input-event", (_event, input) => {
-  //   if (input.type !== "keyDown" || input.key !== "F12") return;
-  window.webContents.toggleDevTools();
-  // });
-  //}
+  if (!app.isPackaged) {
+    window.webContents.on("before-input-event", (_event, input) => {
+      if (input.type !== "keyDown" || input.key !== "F12") return;
+      window.webContents.toggleDevTools();
+    });
+  }
 
   window.loadURL(rendererEntryUrl);
 
-  //if (!app.isPackaged) {
-  // Open the DevTools only in development.
-  window.webContents.openDevTools();
-  //}
+  if (!app.isPackaged) {
+    // Open the DevTools only in development.
+    window.webContents.openDevTools();
+  }
 
   registerNativeContextMenuFn({
     window,

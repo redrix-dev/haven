@@ -88,9 +88,9 @@ const createVoicePopoutWindowManager = ({
     });
     window.loadURL(`${rendererEntryUrl}?view=voice-popout`);
 
-    //if (!app.isPackaged) {
-    window.webContents.openDevTools({ mode: "detach" });
-    //}
+    if (!app.isPackaged) {
+      window.webContents.openDevTools({ mode: "detach" });
+    }
 
     window.on("closed", () => {
       voicePopoutWindow = null;

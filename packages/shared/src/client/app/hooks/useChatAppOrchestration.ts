@@ -143,10 +143,6 @@ export function useChatAppOrchestration() {
   });
   const isServersLoading = serversStatus === "loading";
 
-  const serverPermissions = usePermissionsStore((state) =>
-    state.getPermissions(currentServerId ?? ""),
-  );
-
   // ── Feature flags ─────────────────────────────────────────────────────────
   const {
     state: { featureFlagsLoaded },
@@ -262,6 +258,9 @@ export function useChatAppOrchestration() {
   const currentServerId = useNavigationStore((state) => state.currentServerId);
   const setCurrentServerId = useNavigationStore(
     (state) => state.setCurrentServerId,
+  );
+  const serverPermissions = usePermissionsStore((state) =>
+    state.getPermissions(currentServerId ?? ""),
   );
   const currentChannelId = useNavigationStore(
     (state) => state.currentChannelId,
