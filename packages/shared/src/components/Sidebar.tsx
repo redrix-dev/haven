@@ -32,10 +32,11 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@shared/components/ui/dropdown-menu";
+import { useNavigationStore } from "@shared/stores/navigationStore";
 const SIDEBAR_BASE_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 640;
 const SIDEBAR_WIDTH_STORAGE_KEY = "haven:sidebar-width";
-
+const currentChannelId = useNavigationStore((state) => state.currentChannelId);
 type ChannelKind = Database["public"]["Enums"]["channel_kind"];
 
 type SidebarChannel = {
@@ -60,7 +61,6 @@ interface SidebarProps {
   channels: SidebarChannel[];
   channelGroups?: SidebarChannelGroup[];
   ungroupedChannelIds?: string[];
-  currentChannelId: string | null;
   onChannelClick: (channelId: string) => void;
   onVoiceChannelClick?: (channelId: string) => void;
   activeVoiceChannelId?: string | null;
@@ -98,7 +98,6 @@ export function Sidebar({
   channels,
   channelGroups = [],
   ungroupedChannelIds = [],
-  currentChannelId,
   onChannelClick,
   onVoiceChannelClick,
   activeVoiceChannelId = null,

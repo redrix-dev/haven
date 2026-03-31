@@ -599,7 +599,6 @@ export function ChatApp() {
               onStatusChange={app.setUserStatus}
               channelGroups={app.sidebarChannelGroups}
               ungroupedChannelIds={app.channelGroupState.ungroupedChannelIds}
-              currentChannelId={app.currentChannelId}
               onChannelClick={app.setCurrentChannelId}
               onVoiceChannelClick={app.requestVoiceChannelJoin}
               activeVoiceChannelId={app.activeVoiceChannelId}
