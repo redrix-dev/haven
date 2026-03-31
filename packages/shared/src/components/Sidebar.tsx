@@ -36,7 +36,6 @@ import { useNavigationStore } from "@shared/stores/navigationStore";
 const SIDEBAR_BASE_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 640;
 const SIDEBAR_WIDTH_STORAGE_KEY = "haven:sidebar-width";
-const currentChannelId = useNavigationStore((state) => state.currentChannelId);
 type ChannelKind = Database["public"]["Enums"]["channel_kind"];
 
 type SidebarChannel = {
@@ -118,9 +117,11 @@ export function Sidebar({
   onOpenServerSettings,
   footerStatusActions,
 }: SidebarProps) {
+  const currentChannelId = useNavigationStore(
+    (state) => state.currentChannelId,
+  );
   const sidebarRef = React.useRef<HTMLDivElement | null>(null);
   const serverNameRef = React.useRef<HTMLSpanElement | null>(null);
-
   const [autoMinWidth, setAutoMinWidth] = React.useState(
     SIDEBAR_BASE_MIN_WIDTH,
   );

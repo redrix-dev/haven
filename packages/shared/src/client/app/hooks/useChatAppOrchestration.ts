@@ -195,8 +195,9 @@ export function useChatAppOrchestration() {
   }, [baseUserDisplayName, profileAvatarUrl, upsertLiveProfile, user?.id]);
 
   // ── UI / workspace state ──────────────────────────────────────────────────
-  const [workspaceMode, setWorkspaceMode] = useState<"community" | "dm">(
-    "community",
+  const workspaceMode = useNavigationStore((state) => state.workspaceMode);
+  const setWorkspaceMode = useNavigationStore(
+    (state) => state.setWorkspaceMode,
   );
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   const [serverModmailOpen, setServerModmailOpen] = useState(false);
@@ -1263,7 +1264,6 @@ export function useChatAppOrchestration() {
     friendsSocialPanelEnabled,
     joinServerByInvite,
     openDirectMessageConversation,
-    setWorkspaceMode,
     setNotificationsPanelOpen,
     setFriendsPanelOpen,
     setFriendsPanelRequestedTab,

@@ -1,24 +1,25 @@
-import React, { useEffect, useRef } from 'react';
-import { asRecord, getRecordString } from '@platform/lib/records';
+import React, { useEffect, useRef } from "react";
+import { asRecord, getRecordString } from "@platform/lib/records";
 import {
   WEB_DEEP_LINK_DEDUPE_WINDOW_MS,
   parseWebAppDeepLinkUrl,
   getMergedUrlParams,
   normalizeDeepLinkPathname,
   WebAppDeepLinkTarget,
-} from '@shared/lib/deepLinks';
-import { desktopClient } from '@platform/desktop/client';
-import { getErrorMessage } from '@platform/lib/errors';
-import { toast } from 'sonner';
-import type { FriendsPanelTab } from '@client/app/types';
-
+} from "@shared/lib/deepLinks";
+import { desktopClient } from "@platform/desktop/client";
+import { getErrorMessage } from "@platform/lib/errors";
+import { toast } from "sonner";
+import type { FriendsPanelTab } from "@client/app/types";
+import { useNavigationStore } from "@shared/stores/navigationStore";
 interface UseDeepLinksOptions {
   user: { id: string } | null;
   featureFlagsLoaded: boolean;
   friendsSocialPanelEnabled: boolean;
-  joinServerByInvite: (code: string) => Promise<{ joined: boolean; communityName: string }>;
+  joinServerByInvite: (
+    code: string,
+  ) => Promise<{ joined: boolean; communityName: string }>;
   openDirectMessageConversation: (conversationId: string) => Promise<void>;
-  setWorkspaceMode: (mode: 'community' | 'dm') => void;
   setNotificationsPanelOpen: (open: boolean) => void;
   setFriendsPanelOpen: (open: boolean) => void;
   setFriendsPanelRequestedTab: (tab: FriendsPanelTab | null) => void;
@@ -33,7 +34,6 @@ export function useDeepLinks({
   friendsSocialPanelEnabled,
   joinServerByInvite,
   openDirectMessageConversation,
-  setWorkspaceMode,
   setNotificationsPanelOpen,
   setFriendsPanelOpen,
   setFriendsPanelRequestedTab,
@@ -41,6 +41,9 @@ export function useDeepLinks({
   setCurrentServerId,
   setCurrentChannelId,
 }: UseDeepLinksOptions) {
+  const setWorkspaceMode = useNavigationStore(
+    (state) => state.setWorkspaceMode,
+  );
   const processedWebDeepLinkKeysRef = useRef<Map<string, number>>(new Map());
   const pendingWebDeepLinkRef = useRef<{
     target: WebAppDeepLinkTarget;
@@ -49,27 +52,27 @@ export function useDeepLinks({
   } | null>(null);
 
   const clearBrowserDeepLinkUrl = React.useCallback(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     try {
       const parsed = new URL(window.location.href);
-      if (normalizeDeepLinkPathname(parsed.pathname) === '/') {
+      if (normalizeDeepLinkPathname(parsed.pathname) === "/") {
         const params = getMergedUrlParams(parsed);
         const hasDeepLinkParams =
-          params.has('target') ||
-          params.has('open') ||
-          params.has('kind') ||
-          params.has('notificationKind') ||
-          params.has('conversationId') ||
-          params.has('friendRequestId') ||
-          params.has('communityId') ||
-          params.has('channelId') ||
-          params.has('invite') ||
-          params.has('code');
+          params.has("target") ||
+          params.has("open") ||
+          params.has("kind") ||
+          params.has("notificationKind") ||
+          params.has("conversationId") ||
+          params.has("friendRequestId") ||
+          params.has("communityId") ||
+          params.has("channelId") ||
+          params.has("invite") ||
+          params.has("code");
         if (!hasDeepLinkParams) return;
       }
-      window.history.replaceState({}, document.title, '/');
+      window.history.replaceState({}, document.title, "/");
     } catch (historyError) {
-      console.warn('Failed to clear web deep-link URL:', historyError);
+      console.warn("Failed to clear web deep-link URL:", historyError);
     }
   }, []);
 
@@ -79,10 +82,13 @@ export function useDeepLinks({
       options?: {
         clearBrowserUrlAfterOpen?: boolean;
         dedupeKey?: string | null;
-      }
+      },
     ): Promise<boolean> => {
       const now = Date.now();
-      for (const [key, timestamp] of processedWebDeepLinkKeysRef.current.entries()) {
+      for (const [
+        key,
+        timestamp,
+      ] of processedWebDeepLinkKeysRef.current.entries()) {
         if (now - timestamp > WEB_DEEP_LINK_DEDUPE_WINDOW_MS) {
           processedWebDeepLinkKeysRef.current.delete(key);
         }
@@ -90,8 +96,12 @@ export function useDeepLinks({
 
       const dedupeKey = options?.dedupeKey ?? null;
       if (dedupeKey) {
-        const lastProcessedAt = processedWebDeepLinkKeysRef.current.get(dedupeKey);
-        if (typeof lastProcessedAt === 'number' && now - lastProcessedAt <= WEB_DEEP_LINK_DEDUPE_WINDOW_MS) {
+        const lastProcessedAt =
+          processedWebDeepLinkKeysRef.current.get(dedupeKey);
+        if (
+          typeof lastProcessedAt === "number" &&
+          now - lastProcessedAt <= WEB_DEEP_LINK_DEDUPE_WINDOW_MS
+        ) {
           return false;
         }
       }
@@ -106,9 +116,9 @@ export function useDeepLinks({
       }
 
       const requiresFeatureFlags =
-        target.kind === 'dm_message' ||
-        target.kind === 'friend_request_received' ||
-        target.kind === 'friend_request_accepted';
+        target.kind === "dm_message" ||
+        target.kind === "friend_request_received" ||
+        target.kind === "friend_request_accepted";
 
       if (!featureFlagsLoaded && requiresFeatureFlags) {
         pendingWebDeepLinkRef.current = {
@@ -121,44 +131,44 @@ export function useDeepLinks({
 
       try {
         switch (target.kind) {
-          case 'invite': {
+          case "invite": {
             const result = await joinServerByInvite(target.inviteCode);
             toast.success(
               result.joined
                 ? `Joined ${result.communityName}`
                 : `Opened ${result.communityName}`,
-              { id: 'web-deep-link-invite' }
+              { id: "web-deep-link-invite" },
             );
             break;
           }
-          case 'dm_message': {
-            setWorkspaceMode('dm');
+          case "dm_message": {
+            setWorkspaceMode("dm");
             await openDirectMessageConversation(target.conversationId);
             setNotificationsPanelOpen(false);
             break;
           }
-          case 'friend_request_received': {
+          case "friend_request_received": {
             if (!friendsSocialPanelEnabled) {
-              throw new Error('Friends are not enabled for your account.');
+              throw new Error("Friends are not enabled for your account.");
             }
-            setFriendsPanelRequestedTab('requests');
+            setFriendsPanelRequestedTab("requests");
             setFriendsPanelHighlightedRequestId(target.friendRequestId);
             setFriendsPanelOpen(true);
             setNotificationsPanelOpen(false);
             break;
           }
-          case 'friend_request_accepted': {
+          case "friend_request_accepted": {
             if (!friendsSocialPanelEnabled) {
-              throw new Error('Friends are not enabled for your account.');
+              throw new Error("Friends are not enabled for your account.");
             }
-            setFriendsPanelRequestedTab('friends');
+            setFriendsPanelRequestedTab("friends");
             setFriendsPanelHighlightedRequestId(null);
             setFriendsPanelOpen(true);
             setNotificationsPanelOpen(false);
             break;
           }
-          case 'channel_mention': {
-            setWorkspaceMode('community');
+          case "channel_mention": {
+            setWorkspaceMode("community");
             setCurrentServerId(target.communityId);
             setCurrentChannelId(target.channelId);
             setNotificationsPanelOpen(false);
@@ -176,8 +186,8 @@ export function useDeepLinks({
         }
         return true;
       } catch (error) {
-        toast.error(getErrorMessage(error, 'Failed to open link.'), {
-          id: 'web-deep-link-open-error',
+        toast.error(getErrorMessage(error, "Failed to open link."), {
+          id: "web-deep-link-open-error",
         });
         return false;
       }
@@ -196,13 +206,13 @@ export function useDeepLinks({
       setNotificationsPanelOpen,
       setWorkspaceMode,
       user,
-    ]
+    ],
   );
 
   // Handle deep link in the initial page URL for the browser client.
   useEffect(() => {
     if (desktopClient.isAvailable()) return;
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     const currentUrl = window.location.href;
     const target = parseWebAppDeepLinkUrl(currentUrl);
