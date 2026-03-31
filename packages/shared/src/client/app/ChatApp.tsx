@@ -96,11 +96,23 @@ export function ChatApp() {
     app.user?.id ?? null,
     app.servers,
   );
-  // Keep the shared server store aligned with orchestration-selected state and local ordering.
+  //STATE STORES
+  const currentServer = useNavigationStore((state) => state.currentServer);
   const setStoredServers = useServersStore((state) => state.setServers);
+  const currentServerId = useNavigationStore((state) => state.currentServerId);
+  const setCurrentChannelId = useNavigationStore(
+    (state) => state.setCurrentChannelId,
+  );
   const voiceJoined = useVoiceStore((state) => state.joined);
   const voiceMuted = useVoiceStore((state) => state.isMuted);
   const voiceDeafened = useVoiceStore((state) => state.isDeafened);
+  const setWorkspaceMode = useNavigationStore(
+    (state) => state.setWorkspaceMode,
+  );
+  const setCurrentServerId = useNavigationStore(
+    (state) => state.setCurrentServerId,
+  );
+  // STATE STORES END
   const canOpenVoicePopout = desktopClient.isAvailable();
   const [voicePopoutState, setVoicePopoutState] =
     React.useState<VoicePopoutState | null>(null);
@@ -230,13 +242,7 @@ export function ChatApp() {
     if (!hasSameServerIdOrder(app.servers, orderedServers)) {
       setStoredServers(orderedServers);
     }
-  }, [
-    app.currentServer,
-    app.currentServerId,
-    app.servers,
-    orderedServers,
-    setStoredServers,
-  ]);
+  }, [app.servers, orderedServers, setStoredServers]);
 
   React.useEffect(() => {
     if (!canOpenVoicePopout) return;
@@ -257,7 +263,7 @@ export function ChatApp() {
     void desktopClient
       .syncVoicePopoutState({
         isOpen: voicePopoutWindowOpen,
-        serverName: activeVoiceServer?.name ?? app.currentServer?.name ?? null,
+        serverName: activeVoiceServer?.name ?? currentServer?.name ?? null,
         channelName: app.activeVoiceChannel?.name ?? null,
         connected: voiceJoined,
         joined: voiceJoined,
@@ -304,7 +310,7 @@ export function ChatApp() {
     app.appSettings.voice.transmissionMode,
     canOpenVoicePopout,
     activeVoiceServer?.name,
-    app.currentServer?.name,
+    currentServer?.name,
     voiceDeafened,
     voiceJoined,
     voiceMuted,
@@ -392,11 +398,11 @@ export function ChatApp() {
       return;
     }
 
-    app.setWorkspaceMode("community");
-    app.setCurrentServerId(activeVoiceServer.id);
+    setWorkspaceMode("community");
+    setCurrentServerId(activeVoiceServer.id);
 
     const isKnownMissingVoiceChannelInCurrentServer =
-      activeVoiceServer.id === app.currentServerId &&
+      activeVoiceServer.id === currentServerId &&
       !app.channels.some(
         (channel) =>
           channel.id === app.activeVoiceChannel?.id && channel.kind === "voice",
@@ -407,7 +413,7 @@ export function ChatApp() {
       return;
     }
 
-    app.setCurrentChannelId(app.activeVoiceChannel.id);
+    setCurrentChannelId(app.activeVoiceChannel.id);
   };
 
   if (app.authStatus === "initializing") {
@@ -482,8 +488,8 @@ export function ChatApp() {
           canManageCurrentServer={app.canManageCurrentServer}
           canOpenCurrentServerSettings={app.canOpenServerSettings}
           onServerClick={(serverId) => {
-            app.setWorkspaceMode("community");
-            app.setCurrentServerId(serverId);
+            setWorkspaceMode("community");
+            setCurrentServerId(serverId);
           }}
           onCreateServer={() => app.setShowCreateModal(true)}
           onJoinServer={() => app.setShowJoinServerModal(true)}
@@ -574,10 +580,10 @@ export function ChatApp() {
           <div className="flex-1 flex items-center justify-center">
             <p className="text-[#a9b8cf]">Loading servers...</p>
           </div>
-        ) : app.currentServer ? (
+        ) : currentServer ? (
           <>
             <Sidebar
-              serverName={app.currentServer.name}
+              serverName={currentServer.name}
               userName={app.userDisplayName}
               channels={app.channels.map((channel) => ({
                 id: channel.id,
@@ -589,7 +595,7 @@ export function ChatApp() {
               onStatusChange={app.setUserStatus}
               channelGroups={app.sidebarChannelGroups}
               ungroupedChannelIds={app.channelGroupState.ungroupedChannelIds}
-              onChannelClick={app.setCurrentChannelId}
+              onChannelClick={setCurrentChannelId}
               onVoiceChannelClick={app.requestVoiceChannelJoin}
               activeVoiceChannelId={app.activeVoiceChannelId}
               voiceChannelParticipants={visibleVoiceChannelParticipants}
@@ -599,7 +605,7 @@ export function ChatApp() {
                     surface="sidebar"
                     serverName={
                       activeVoiceServer?.name ??
-                      app.currentServer?.name ??
+                      currentServer?.name ??
                       "Unknown server"
                     }
                     channelName={app.activeVoiceChannel.name}
@@ -811,7 +817,7 @@ export function ChatApp() {
                   app.reportUserProfile({
                     targetUserId,
                     reason,
-                    communityId: app.currentServer!.id,
+                    communityId: currentServer!.id,
                   })
                 }
                 onBanUserFromServer={app.banUserFromServer}
@@ -822,7 +828,7 @@ export function ChatApp() {
                   await app.kickUserFromServer({
                     targetUserId,
                     username,
-                    communityId: app.currentServer!.id,
+                    communityId: currentServer!.id,
                   });
                 }}
                 onResolveBanEligibleServers={app.resolveBanEligibleServers}
@@ -1017,7 +1023,7 @@ export function ChatApp() {
       )}
 
       {app.showCreateChannelModal &&
-        app.currentServerId &&
+        currentServerId &&
         app.serverPermissions.canCreateChannels && (
           <CreateChannelModal
             onClose={() => app.setShowCreateChannelModal(false)}
@@ -1033,7 +1039,7 @@ export function ChatApp() {
       )}
 
       {app.showServerSettingsModal &&
-        app.currentServerId &&
+        currentServerId &&
         app.canOpenServerSettings && (
           <ServerSettingsModal
             initialValues={app.serverSettingsInitialValues}
