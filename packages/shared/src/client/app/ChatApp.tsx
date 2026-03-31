@@ -41,6 +41,7 @@ import { useServerOrder } from "@client/features/community/hooks/useServerOrder"
 import { useDmStore } from "@shared/stores/dmStore";
 import { useServersStore } from "@shared/stores/serversStore";
 import { useVoiceStore } from "@shared/stores/voiceStore";
+import { useNavigationStore } from "@shared/stores/navigationStore";
 
 function hasSameServerIdOrder(
   left: ReadonlyArray<{ id: string }>,
@@ -97,10 +98,10 @@ export function ChatApp() {
   );
   // Keep the shared server store aligned with orchestration-selected state and local ordering.
   const setStoredServers = useServersStore((state) => state.setServers);
-  const setStoredCurrentServerId = useServersStore(
+  const setStoredCurrentServerId = useNavigationStore(
     (state) => state.setCurrentServerId,
   );
-  const setStoredCurrentServer = useServersStore(
+  const setStoredCurrentServer = useNavigationStore(
     (state) => state.setCurrentServer,
   );
   const voiceJoined = useVoiceStore((state) => state.joined);

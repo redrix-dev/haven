@@ -1044,7 +1044,7 @@ const MessageRow = React.memo(function MessageRow({
                               messageLinkPreviewRow.snapshot.title ??
                               "Link preview"
                             }
-                            className="w-full max-h-64 object-cover bg-[#0d1626]"
+                            className="w-full h-48 object-contain bg-[#0d1626]"
                           />
                         )}
                         <div className="px-3 py-2 space-y-1">

@@ -1,19 +1,35 @@
-import React, { useState } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
-import { Button } from '@shared/components/ui/button';
-import { ScrollArea } from '@shared/components/ui/scroll-area';
-import { Bell, LogIn, MessageCircle, Plus, ShieldAlert, Users } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
+import React, { useState } from "react";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@shared/components/ui/avatar";
+import { Button } from "@shared/components/ui/button";
+import { ScrollArea } from "@shared/components/ui/scroll-area";
+import {
+  Bell,
+  LogIn,
+  MessageCircle,
+  Plus,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@shared/components/ui/tooltip";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
-} from '@shared/components/ui/context-menu';
-import { ActionMenuContent } from '@shared/components/menus/ActionMenuContent';
-import { resolveContextMenuIntent } from '@shared/lib/contextMenu';
-import { traceContextMenuEvent } from '@shared/lib/contextMenu/debugTrace';
-import { useServersStore } from '@shared/stores/serversStore';
-import type { MenuActionNode } from '@shared/lib/contextMenu/types';
+} from "@shared/components/ui/context-menu";
+import { ActionMenuContent } from "@shared/components/menus/ActionMenuContent";
+import { resolveContextMenuIntent } from "@shared/lib/contextMenu";
+import { traceContextMenuEvent } from "@shared/lib/contextMenu/debugTrace";
+import { useServersStore } from "@shared/stores/serversStore";
+import type { MenuActionNode } from "@shared/lib/contextMenu/types";
+import { useNavigationStore } from "@shared/stores/navigationStore";
 
 interface ServerListProps {
   currentServerIsOwner: boolean;
@@ -72,14 +88,14 @@ export function ServerList({
   onReorder,
 }: ServerListProps) {
   const servers = useServersStore((state) => state.servers);
-  const currentServerId = useServersStore((state) => state.currentServerId);
-  const avatarInitial = userDisplayName.trim().charAt(0).toUpperCase() || 'U';
+  const currentServerId = useNavigationStore((state) => state.currentServerId);
+  const avatarInitial = userDisplayName.trim().charAt(0).toUpperCase() || "U";
 
   // Drag-to-reorder state
   const [dragFromIdx, setDragFromIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const squareButtonBaseClass =
-    'size-12 p-0 rounded-2xl flex items-center justify-center overflow-hidden transition-colors';
+    "size-12 p-0 rounded-2xl flex items-center justify-center overflow-hidden transition-colors";
 
   return (
     <div className="w-[72px] bg-[#142033] overflow-hidden">
@@ -88,53 +104,62 @@ export function ServerList({
           <div className="flex w-full flex-col items-center gap-2">
             {servers.map((server, serverIdx) => {
               const isCurrentServer = currentServerId === server.id;
-              const canRename = isCurrentServer && canManageCurrentServer && Boolean(onRenameServer);
-              const canDelete = isCurrentServer && currentServerIsOwner && Boolean(onDeleteServer);
+              const canRename =
+                isCurrentServer &&
+                canManageCurrentServer &&
+                Boolean(onRenameServer);
+              const canDelete =
+                isCurrentServer &&
+                currentServerIsOwner &&
+                Boolean(onDeleteServer);
               const canOpenSettings =
                 isCurrentServer &&
                 canOpenCurrentServerSettings &&
                 Boolean(onOpenServerSettingsForServer);
-              const canLeave = Boolean(onLeaveServer) && !(isCurrentServer && currentServerIsOwner);
+              const canLeave =
+                Boolean(onLeaveServer) &&
+                !(isCurrentServer && currentServerIsOwner);
               const isDragging = dragFromIdx === serverIdx;
-              const isDragTarget = dragOverIdx === serverIdx && dragFromIdx !== serverIdx;
+              const isDragTarget =
+                dragOverIdx === serverIdx && dragFromIdx !== serverIdx;
               const serverActions: MenuActionNode[] = [
                 {
-                  kind: 'item',
+                  kind: "item",
                   key: `view-members-${server.id}`,
-                  label: 'View Members',
+                  label: "View Members",
                   disabled: !onViewServerMembers,
                   onSelect: () => onViewServerMembers?.(server.id),
                 },
                 {
-                  kind: 'item',
+                  kind: "item",
                   key: `leave-server-${server.id}`,
-                  label: 'Leave Server',
+                  label: "Leave Server",
                   disabled: !canLeave,
                   onSelect: () => onLeaveServer?.(server.id),
                 },
                 {
-                  kind: 'separator',
+                  kind: "separator",
                   key: `server-separator-${server.id}`,
                 },
                 {
-                  kind: 'item',
+                  kind: "item",
                   key: `delete-server-${server.id}`,
-                  label: 'Delete Server',
+                  label: "Delete Server",
                   destructive: true,
                   disabled: !canDelete,
                   onSelect: () => onDeleteServer?.(server.id),
                 },
                 {
-                  kind: 'item',
+                  kind: "item",
                   key: `rename-server-${server.id}`,
-                  label: 'Rename Server',
+                  label: "Rename Server",
                   disabled: !canRename,
                   onSelect: () => onRenameServer?.(server.id),
                 },
                 {
-                  kind: 'item',
+                  kind: "item",
                   key: `open-server-settings-${server.id}`,
-                  label: 'Open Server Settings',
+                  label: "Open Server Settings",
                   disabled: !canOpenSettings,
                   onSelect: () => onOpenServerSettingsForServer?.(server.id),
                 },
@@ -145,16 +170,20 @@ export function ServerList({
                   key={server.id}
                   draggable={Boolean(onReorder)}
                   onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.effectAllowed = "move";
                     setDragFromIdx(serverIdx);
                   }}
                   onDragOver={(e) => {
                     e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
+                    e.dataTransfer.dropEffect = "move";
                     if (dragOverIdx !== serverIdx) setDragOverIdx(serverIdx);
                   }}
                   onDrop={() => {
-                    if (dragFromIdx !== null && dragFromIdx !== serverIdx && onReorder) {
+                    if (
+                      dragFromIdx !== null &&
+                      dragFromIdx !== serverIdx &&
+                      onReorder
+                    ) {
                       const ids = servers.map((s) => s.id);
                       const [moved] = ids.splice(dragFromIdx, 1);
                       ids.splice(serverIdx, 0, moved);
@@ -167,11 +196,11 @@ export function ServerList({
                     setDragFromIdx(null);
                     setDragOverIdx(null);
                   }}
-                  className={`transition-opacity ${isDragging ? 'opacity-40' : ''} ${isDragTarget ? 'ring-2 ring-[#3f79d8] rounded-2xl' : ''}`}
+                  className={`transition-opacity ${isDragging ? "opacity-40" : ""} ${isDragTarget ? "ring-2 ring-[#3f79d8] rounded-2xl" : ""}`}
                 >
                   <ContextMenu
                     onOpenChange={(nextOpen) => {
-                      traceContextMenuEvent('server', 'open-change', {
+                      traceContextMenuEvent("server", "open-change", {
                         serverId: server.id,
                         open: nextOpen,
                       });
@@ -182,12 +211,18 @@ export function ServerList({
                         <ContextMenuTrigger
                           asChild
                           onContextMenuCapture={(event) => {
-                            const intent = resolveContextMenuIntent(event.target);
-                            traceContextMenuEvent('server', 'contextmenu-trigger', {
-                              serverId: server.id,
-                              intent,
-                            });
-                            if (intent === 'native_text') {
+                            const intent = resolveContextMenuIntent(
+                              event.target,
+                            );
+                            traceContextMenuEvent(
+                              "server",
+                              "contextmenu-trigger",
+                              {
+                                serverId: server.id,
+                                intent,
+                              },
+                            );
+                            if (intent === "native_text") {
                               event.stopPropagation();
                             }
                           }}
@@ -198,8 +233,8 @@ export function ServerList({
                             onClick={() => onServerClick(server.id)}
                             className={`${squareButtonBaseClass} font-semibold text-white leading-none ${
                               isCurrentServer
-                                ? 'bg-[#3f79d8] hover:bg-[#3f79d8]'
-                                : 'bg-[#18243a] hover:bg-[#3f79d8]'
+                                ? "bg-[#3f79d8] hover:bg-[#3f79d8]"
+                                : "bg-[#18243a] hover:bg-[#3f79d8]"
                             }`}
                           >
                             <span className="text-base leading-none">
@@ -213,7 +248,11 @@ export function ServerList({
                       </TooltipContent>
                     </Tooltip>
                     <ContextMenuContent className="bg-[#18243a] border-[#304867] text-white">
-                      <ActionMenuContent mode="context" scope="server" actions={serverActions} />
+                      <ActionMenuContent
+                        mode="context"
+                        scope="server"
+                        actions={serverActions}
+                      />
                     </ContextMenuContent>
                   </ContextMenu>
                 </div>
@@ -264,7 +303,9 @@ export function ServerList({
                   <Bell className="size-5" />
                   {notificationUnseenCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d95c5c] text-white text-[10px] leading-[18px] font-semibold">
-                      {notificationUnseenCount > 99 ? '99+' : notificationUnseenCount}
+                      {notificationUnseenCount > 99
+                        ? "99+"
+                        : notificationUnseenCount}
                     </span>
                   )}
                   {notificationHasUnseenPulse && (
@@ -292,7 +333,9 @@ export function ServerList({
                   <Users className="size-5" />
                   {friendRequestIncomingCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d95c5c] text-white text-[10px] leading-[18px] font-semibold">
-                      {friendRequestIncomingCount > 99 ? '99+' : friendRequestIncomingCount}
+                      {friendRequestIncomingCount > 99
+                        ? "99+"
+                        : friendRequestIncomingCount}
                     </span>
                   )}
                   {friendRequestHasPendingPulse && (
@@ -317,14 +360,16 @@ export function ServerList({
                   onClick={onOpenDirectMessages}
                   className={`${squareButtonBaseClass} relative overflow-visible ${
                     directMessagesActive
-                      ? 'bg-[#3f79d8] hover:bg-[#3f79d8] text-white'
-                      : 'bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white'
+                      ? "bg-[#3f79d8] hover:bg-[#3f79d8] text-white"
+                      : "bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white"
                   }`}
                 >
                   <MessageCircle className="size-5" />
                   {directMessageUnreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d95c5c] text-white text-[10px] leading-[18px] font-semibold">
-                      {directMessageUnreadCount > 99 ? '99+' : directMessageUnreadCount}
+                      {directMessageUnreadCount > 99
+                        ? "99+"
+                        : directMessageUnreadCount}
                     </span>
                   )}
                   {/* CHECKPOINT 3 COMPLETE */}
@@ -360,8 +405,13 @@ export function ServerList({
                 onClick={onOpenAccountSettings}
                 className={`${squareButtonBaseClass} bg-[#18243a] hover:bg-[#304867]`}
               >
-                <Avatar className="w-full h-full rounded-2xl border border-[#304867] bg-[#18243a]" size="lg">
-                  {userAvatarUrl && <AvatarImage src={userAvatarUrl} alt="Account" />}
+                <Avatar
+                  className="w-full h-full rounded-2xl border border-[#304867] bg-[#18243a]"
+                  size="lg"
+                >
+                  {userAvatarUrl && (
+                    <AvatarImage src={userAvatarUrl} alt="Account" />
+                  )}
                   <AvatarFallback className="rounded-2xl bg-[#18243a] text-white font-semibold">
                     {avatarInitial}
                   </AvatarFallback>

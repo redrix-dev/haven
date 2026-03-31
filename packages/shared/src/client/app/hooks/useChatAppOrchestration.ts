@@ -50,6 +50,7 @@ import type { ForceDisconnectVoiceReason } from "@client/features/voice/types";
 import { useServersStore } from "@shared/stores/serversStore";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { toast } from "sonner";
+import { useNavigationStore } from "@shared/stores/navigationStore";
 
 // Pure utility — no hook deps, stable across renders.
 const normalizeInviteCode = (value: string): string => {
@@ -587,8 +588,8 @@ export function useChatAppOrchestration() {
       if (!serverId) return;
 
       // CHECKPOINT 2 COMPLETE
-      useServersStore.getState().setCurrentServerId(null);
-      useServersStore.getState().setCurrentServer(null);
+      useNavigationStore.getState().setCurrentServerId(null);
+      useNavigationStore.getState().setCurrentServer(null);
       resetMessageState();
       resetChannelGroups();
       resetChannelsWorkspace();
