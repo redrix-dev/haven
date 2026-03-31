@@ -5,28 +5,11 @@ import type {
   MemberBannedBroadcastPayload,
   MemberChannelAccessRevokedBroadcastPayload,
   ReportStatusUpdatedBroadcastPayload,
-  ServerPermissions,
   ServerSummary,
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useNavigationStore } from "@shared/stores/navigationStore";
-
-const EMPTY_SERVER_PERMISSIONS: ServerPermissions = {
-  isOwner: false,
-  canManageServer: false,
-  canManageRoles: false,
-  canManageMembers: false,
-  canCreateChannels: false,
-  canManageChannelStructure: false,
-  canManageChannelPermissions: false,
-  canManageMessages: false,
-  canManageBans: false,
-  canViewBanHidden: false,
-  canCreateReports: false,
-  canManageReports: false,
-  canRefreshLinkPreviews: false,
-  canManageInvites: false,
-};
+import { usePermissionsStore } from "@shared/stores/permissionsStore";
 
 type UseCommunityWorkspaceInput = {
   servers: ServerSummary[];
@@ -59,13 +42,13 @@ export function useCommunityWorkspace({
   const setCurrentChannelId = useNavigationStore(
     (state) => state.setCurrentChannelId,
   );
+
   const [channels, setChannels] = React.useState<Channel[]>([]);
   const [channelsLoading, setChannelsLoading] = React.useState(false);
   const [channelsError, setChannelsError] = React.useState<string | null>(null);
   const [reportStatusRefreshVersion, setReportStatusRefreshVersion] =
     React.useState(0);
-  const [serverPermissions, setServerPermissions] =
-    React.useState<ServerPermissions>(EMPTY_SERVER_PERMISSIONS);
+
   const channelsByServerCacheRef = React.useRef<Record<string, Channel[]>>({});
   const lastSelectedChannelIdByServerRef = React.useRef<
     Record<string, string | null>
@@ -76,11 +59,7 @@ export function useCommunityWorkspace({
     setChannelsLoading(false);
     setChannelsError(null);
     setCurrentChannelId(null);
-  }, []);
-
-  const resetServerPermissions = React.useCallback(() => {
-    setServerPermissions(EMPTY_SERVER_PERMISSIONS);
-  }, []);
+  }, [setCurrentChannelId]);
 
   const prefetchServersChannels = React.useCallback(
     async (serverIds: string[]) => {
@@ -123,12 +102,14 @@ export function useCommunityWorkspace({
     [],
   );
 
+  // Auto-select first server if none selected
   React.useEffect(() => {
     if (servers.length > 0 && !currentServerId) {
       setCurrentServerId(servers[0].id);
     }
-  }, [servers, currentServerId]);
+  }, [servers, currentServerId, setCurrentServerId]);
 
+  // Remember last selected channel per server
   React.useEffect(() => {
     if (!currentServerId) return;
     if (!currentChannelId) return;
@@ -136,6 +117,7 @@ export function useCommunityWorkspace({
       currentChannelId;
   }, [currentServerId, currentChannelId]);
 
+  // Load channels when server changes
   React.useEffect(() => {
     let isMounted = true;
 
@@ -233,7 +215,7 @@ export function useCommunityWorkspace({
         onMemberChannelAccessRevoked,
         onReportStatusUpdated: (payload) => {
           setReportStatusRefreshVersion((current) => current + 1);
-          onReportStatusUpdated?.(payload); // CHECKPOINT 4 COMPLETE
+          onReportStatusUpdated?.(payload);
         },
       },
     );
@@ -250,11 +232,14 @@ export function useCommunityWorkspace({
     resetChannelsWorkspace,
   ]);
 
+  // Load permissions when server or user changes
   React.useEffect(() => {
     let isMounted = true;
 
     if (!currentUserId || !currentServerId) {
-      resetServerPermissions();
+      if (currentServerId) {
+        usePermissionsStore.getState().clearPermissions(currentServerId);
+      }
       return () => {
         isMounted = false;
       };
@@ -263,15 +248,17 @@ export function useCommunityWorkspace({
     const loadPermissions = async () => {
       try {
         const communityBackend = getCommunityDataBackend(currentServerId);
-        const permissions =
+        const fetchedPermissions =
           await communityBackend.fetchServerPermissions(currentServerId);
 
         if (!isMounted) return;
-        setServerPermissions(permissions);
+        usePermissionsStore
+          .getState()
+          .setPermissions(currentServerId, fetchedPermissions);
       } catch (error) {
         console.error("Error loading server permissions:", error);
         if (!isMounted) return;
-        resetServerPermissions();
+        usePermissionsStore.getState().clearPermissions(currentServerId);
       }
     };
 
@@ -280,21 +267,25 @@ export function useCommunityWorkspace({
     return () => {
       isMounted = false;
     };
-  }, [currentServerId, currentUserId, resetServerPermissions]);
+  }, [currentServerId, currentUserId]);
 
+  // Derived values
   const currentServer = React.useMemo(
     () => servers.find((server) => server.id === currentServerId) ?? null,
     [servers, currentServerId],
   );
+
   const currentChannel = React.useMemo(
     () => channels.find((channel) => channel.id === currentChannelId) ?? null,
     [channels, currentChannelId],
   );
+
   const currentChannelBelongsToCurrentServer = Boolean(
     currentChannel &&
     currentServerId &&
     currentChannel.community_id === currentServerId,
   );
+
   const channelSettingsTarget = React.useMemo(
     () =>
       channels.find(
@@ -303,6 +294,7 @@ export function useCommunityWorkspace({
       ) ?? null,
     [channels, channelSettingsTargetId, currentChannelId],
   );
+
   const currentRenderableChannel = React.useMemo(
     () =>
       currentChannel &&
@@ -321,6 +313,7 @@ export function useCommunityWorkspace({
       currentServerId,
     ],
   );
+
   const currentChannelKind = currentChannel?.kind ?? null;
 
   return {
@@ -328,7 +321,6 @@ export function useCommunityWorkspace({
       channels,
       channelsLoading,
       channelsError,
-      serverPermissions,
     },
     derived: {
       currentServer,
@@ -342,7 +334,6 @@ export function useCommunityWorkspace({
     actions: {
       resetChannelsWorkspace,
       setChannels,
-      resetServerPermissions,
       prefetchServersChannels,
       getDefaultChannelIdForServer,
     },

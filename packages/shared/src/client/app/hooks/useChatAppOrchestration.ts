@@ -51,7 +51,7 @@ import { useServersStore } from "@shared/stores/serversStore";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { toast } from "sonner";
 import { useNavigationStore } from "@shared/stores/navigationStore";
-
+import { usePermissionsStore } from "@shared/stores/permissionsStore";
 // Pure utility — no hook deps, stable across renders.
 const normalizeInviteCode = (value: string): string => {
   const trimmed = value.trim();
@@ -142,6 +142,10 @@ export function useChatAppOrchestration() {
     onActiveServerAccessLost: handleActiveServerAccessLost,
   });
   const isServersLoading = serversStatus === "loading";
+
+  const serverPermissions = usePermissionsStore((state) =>
+    state.getPermissions(currentServerId ?? ""),
+  );
 
   // ── Feature flags ─────────────────────────────────────────────────────────
   const {
@@ -266,7 +270,7 @@ export function useChatAppOrchestration() {
     (state) => state.setCurrentChannelId,
   );
   const {
-    state: { channels, channelsLoading, channelsError, serverPermissions },
+    state: { channels, channelsLoading, channelsError },
     derived: {
       currentServer,
       currentChannel,
@@ -278,7 +282,6 @@ export function useChatAppOrchestration() {
     actions: {
       resetChannelsWorkspace,
       setChannels,
-      resetServerPermissions,
       prefetchServersChannels,
       getDefaultChannelIdForServer,
     },
@@ -593,7 +596,7 @@ export function useChatAppOrchestration() {
       resetMessageState();
       resetChannelGroups();
       resetChannelsWorkspace();
-      resetServerPermissions();
+      usePermissionsStore.getState().clearPermissions(serverId);
       purgeMessageBundleCacheForServer(serverId);
       setCurrentServerId(null);
       setWorkspaceMode("community");
@@ -603,8 +606,8 @@ export function useChatAppOrchestration() {
       resetChannelGroups,
       resetChannelsWorkspace,
       resetMessageState,
-      resetServerPermissions,
       setCurrentServerId,
+      setWorkspaceMode,
     ],
   );
 
@@ -1446,7 +1449,7 @@ export function useChatAppOrchestration() {
     resetSocialWorkspace();
     resetDirectMessages();
     resetChannelsWorkspace();
-    resetServerPermissions();
+    usePermissionsStore.getState().reset();
     resetServerSettingsState();
     setShowCreateChannelModal(false);
     setShowJoinServerModal(false);
@@ -1476,7 +1479,6 @@ export function useChatAppOrchestration() {
     resetNotifications,
     resetPlatformSession,
     resetServerInvites,
-    resetServerPermissions,
     resetServerRoleManagement,
     resetServerSettingsState,
     resetVoiceState,
@@ -1584,7 +1586,6 @@ export function useChatAppOrchestration() {
     channels,
     channelsLoading,
     channelsError,
-    serverPermissions,
     serverReportPermissionsById,
     managedReportServerIds,
     currentChannel,

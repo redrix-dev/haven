@@ -42,7 +42,7 @@ import { useDmStore } from "@shared/stores/dmStore";
 import { useServersStore } from "@shared/stores/serversStore";
 import { useVoiceStore } from "@shared/stores/voiceStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
-
+import { usePermissionsStore } from "@shared/stores/permissionsStore";
 function hasSameServerIdOrder(
   left: ReadonlyArray<{ id: string }>,
   right: ReadonlyArray<{ id: string }>,
@@ -111,6 +111,9 @@ export function ChatApp() {
   );
   const setCurrentServerId = useNavigationStore(
     (state) => state.setCurrentServerId,
+  );
+  const serverPermissions = usePermissionsStore((state) =>
+    state.getPermissions(currentServerId ?? ""),
   );
   // STATE STORES END
   const canOpenVoicePopout = desktopClient.isAvailable();
@@ -440,14 +443,13 @@ export function ChatApp() {
 
   const { user } = app;
   const canKickVoiceParticipants =
-    app.serverPermissions.isOwner ||
-    app.serverPermissions.canManageServer ||
-    app.serverPermissions.canManageMembers ||
-    app.serverPermissions.canManageBans;
-  const canManageChannelStructure =
-    app.serverPermissions.canManageChannelStructure;
+    serverPermissions.isOwner ||
+    serverPermissions.canManageServer ||
+    serverPermissions.canManageMembers ||
+    serverPermissions.canManageBans;
+  const canManageChannelStructure = serverPermissions.canManageChannelStructure;
   const canManageChannelPermissions =
-    app.serverPermissions.canManageChannelPermissions;
+    serverPermissions.canManageChannelPermissions;
   const canOpenChannelSettings =
     canManageChannelStructure || canManageChannelPermissions;
 
@@ -484,7 +486,7 @@ export function ChatApp() {
       <div className="flex h-screen overflow-hidden bg-[#111a2b] text-[#e6edf7]">
         <ServerList
           onReorder={setServerOrder}
-          currentServerIsOwner={app.serverPermissions.isOwner}
+          currentServerIsOwner={serverPermissions.isOwner}
           canManageCurrentServer={app.canManageCurrentServer}
           canOpenCurrentServerSettings={app.canOpenServerSettings}
           onServerClick={(serverId) => {
@@ -686,7 +688,7 @@ export function ChatApp() {
               }
               footerStatusActions={null}
               onCreateChannel={
-                app.serverPermissions.canCreateChannels
+                serverPermissions.canCreateChannels
                   ? () => app.setShowCreateChannelModal(true)
                   : undefined
               }
@@ -785,13 +787,13 @@ export function ChatApp() {
                 currentUserId={user.id}
                 blockedUserIds={app.blockedUserIds}
                 isElevatedViewer={app.isCurrentUserElevatedInCurrentServer}
-                canManageMessages={app.serverPermissions.canManageMessages}
-                canCreateReports={app.serverPermissions.canCreateReports}
-                canManageBans={app.serverPermissions.canManageBans}
-                canManageMembers={app.serverPermissions.canManageMembers}
-                canViewBanHidden={app.serverPermissions.canViewBanHidden}
+                canManageMessages={serverPermissions.canManageMessages}
+                canCreateReports={serverPermissions.canCreateReports}
+                canManageBans={serverPermissions.canManageBans}
+                canManageMembers={serverPermissions.canManageMembers}
+                canViewBanHidden={serverPermissions.canViewBanHidden}
                 canRefreshLinkPreviews={
-                  app.serverPermissions.canRefreshLinkPreviews
+                  serverPermissions.canRefreshLinkPreviews
                 }
                 showVoiceDiagnostics={app.isPlatformStaff}
                 onOpenChannelSettings={
@@ -1024,7 +1026,7 @@ export function ChatApp() {
 
       {app.showCreateChannelModal &&
         currentServerId &&
-        app.serverPermissions.canCreateChannels && (
+        serverPermissions.canCreateChannels && (
           <CreateChannelModal
             onClose={() => app.setShowCreateChannelModal(false)}
             onCreate={app.createChannel}
@@ -1045,17 +1047,17 @@ export function ChatApp() {
             initialValues={app.serverSettingsInitialValues}
             loadingInitialValues={app.serverSettingsLoading}
             initialLoadError={app.serverSettingsLoadError}
-            canManageServer={app.serverPermissions.canManageServer}
-            canManageRoles={app.serverPermissions.canManageRoles}
-            canManageMembers={app.serverPermissions.canManageMembers}
-            canManageBans={app.serverPermissions.canManageBans}
-            isOwner={app.serverPermissions.isOwner}
+            canManageServer={serverPermissions.canManageServer}
+            canManageRoles={serverPermissions.canManageRoles}
+            canManageMembers={serverPermissions.canManageMembers}
+            canManageBans={serverPermissions.canManageBans}
+            isOwner={serverPermissions.isOwner}
             roles={app.serverRoles}
             members={app.serverMembers}
             permissionsCatalog={app.serverPermissionCatalog}
             roleManagementLoading={app.serverRoleManagementLoading}
             roleManagementError={app.serverRoleManagementError}
-            canManageInvites={app.serverPermissions.canManageInvites}
+            canManageInvites={serverPermissions.canManageInvites}
             invites={app.serverInvites}
             invitesLoading={app.serverInvitesLoading}
             invitesError={app.serverInvitesError}
