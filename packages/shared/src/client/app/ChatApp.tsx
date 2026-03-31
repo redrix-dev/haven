@@ -98,12 +98,6 @@ export function ChatApp() {
   );
   // Keep the shared server store aligned with orchestration-selected state and local ordering.
   const setStoredServers = useServersStore((state) => state.setServers);
-  const setStoredCurrentServerId = useNavigationStore(
-    (state) => state.setCurrentServerId,
-  );
-  const setStoredCurrentServer = useNavigationStore(
-    (state) => state.setCurrentServer,
-  );
   const voiceJoined = useVoiceStore((state) => state.joined);
   const voiceMuted = useVoiceStore((state) => state.isMuted);
   const voiceDeafened = useVoiceStore((state) => state.isDeafened);
@@ -236,15 +230,11 @@ export function ChatApp() {
     if (!hasSameServerIdOrder(app.servers, orderedServers)) {
       setStoredServers(orderedServers);
     }
-    setStoredCurrentServerId(app.currentServerId);
-    setStoredCurrentServer(app.currentServer);
   }, [
     app.currentServer,
     app.currentServerId,
     app.servers,
     orderedServers,
-    setStoredCurrentServer,
-    setStoredCurrentServerId,
     setStoredServers,
   ]);
 
