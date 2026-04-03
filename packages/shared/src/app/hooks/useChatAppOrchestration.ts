@@ -52,6 +52,8 @@ import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { toast } from "sonner";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
+import { useNotificationsStore } from "@shared/stores/notificationsStore";
+
 // Pure utility — no hook deps, stable across renders.
 const normalizeInviteCode = (value: string): string => {
   const trimmed = value.trim();
@@ -168,7 +170,8 @@ export function useChatAppOrchestration() {
     userId: user?.id,
     userEmail: user?.email,
   });
-
+  const notificationsPanelOpen = useNotificationsStore((state) => state.isPanelOpen);
+  const setNotificationsPanelOpen = useNotificationsStore((state) => state.setIsPanelOpen);
   const { status: userStatus, setStatus: setUserStatus } = useUserStatusStore();
   const { rainbowMode: rainbowMode, setRainbowMode: setRainbowMode } =
     useUserStatusStore();
@@ -199,7 +202,6 @@ export function useChatAppOrchestration() {
   const setWorkspaceMode = useNavigationStore(
     (state) => state.setWorkspaceMode,
   );
-  const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   const [serverModmailOpen, setServerModmailOpen] = useState(false);
   const [serverReportPermissionsById, setServerReportPermissionsById] =
     useState<Record<string, ServerPermissions>>({});
@@ -865,7 +867,6 @@ export function useChatAppOrchestration() {
   } = useNotifications({
     notificationBackend,
     userId: user?.id,
-    notificationsPanelOpen,
     audioSettings: appSettings.notifications,
     autoMarkSeenOnPanelOpen: false,
   });
@@ -1705,8 +1706,6 @@ export function useChatAppOrchestration() {
     setVoiceSettings,
     checkForUpdatesNow,
     // notifications
-    notificationsPanelOpen,
-    setNotificationsPanelOpen,
     notificationItems,
     notificationCounts,
     notificationsLoading,

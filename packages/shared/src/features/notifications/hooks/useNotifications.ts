@@ -27,7 +27,6 @@ type UseNotificationsInput = {
     | 'subscribeToNotificationInbox'
   >;
   userId: string | null | undefined;
-  notificationsPanelOpen: boolean;
   audioSettings: NotificationAudioSettings;
   autoMarkSeenOnPanelOpen?: boolean;
 };
@@ -35,10 +34,10 @@ type UseNotificationsInput = {
 export function useNotifications({
   notificationBackend,
   userId,
-  notificationsPanelOpen,
   audioSettings,
   autoMarkSeenOnPanelOpen = false,
 }: UseNotificationsInput) {
+  const notificationsPanelOpen = useNotificationsStore((state) => state.isPanelOpen);
   const notificationItems = useNotificationsStore((state) => state.notifications);
   const [notificationCounts, setNotificationCounts] = React.useState<NotificationCounts>(
     DEFAULT_NOTIFICATION_COUNTS

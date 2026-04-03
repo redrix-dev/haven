@@ -43,6 +43,7 @@ import { useServersStore } from "@shared/stores/serversStore";
 import { useVoiceStore } from "@shared/stores/voiceStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
+import { useNotificationsStore } from "@shared/stores";
 function hasSameServerIdOrder(
   left: ReadonlyArray<{ id: string }>,
   right: ReadonlyArray<{ id: string }>,
@@ -114,6 +115,12 @@ export function ChatApp() {
   );
   const serverPermissions = usePermissionsStore((state) =>
     state.getPermissions(currentServerId ?? ""),
+  );
+  const notificationsPanelOpen = useNotificationsStore((state) =>
+    state.isPanelOpen,
+  );
+  const setNotificationsPanelOpen = useNotificationsStore(
+    (state) => state.setIsPanelOpen, 
   );
   // STATE STORES END
   const canOpenVoicePopout = desktopClient.isAvailable();
@@ -495,7 +502,7 @@ export function ChatApp() {
           }}
           onCreateServer={() => app.setShowCreateModal(true)}
           onJoinServer={() => app.setShowJoinServerModal(true)}
-          onOpenNotifications={() => app.setNotificationsPanelOpen(true)}
+          onOpenNotifications={() => setNotificationsPanelOpen(true)}
           notificationUnseenCount={app.notificationCounts.unseenCount}
           notificationHasUnseenPulse={app.notificationCounts.unseenCount > 0}
           onOpenDirectMessages={
@@ -853,10 +860,10 @@ export function ChatApp() {
           </div>
         )}
       </div>
-      {app.notificationsPanelOpen && (
+      {notificationsPanelOpen && (
         <NotificationCenterModal
-          open={app.notificationsPanelOpen}
-          onOpenChange={app.setNotificationsPanelOpen}
+          open={notificationsPanelOpen}
+          onOpenChange={setNotificationsPanelOpen}
           counts={app.notificationCounts}
           error={app.notificationsError}
           refreshing={app.notificationsRefreshing}
