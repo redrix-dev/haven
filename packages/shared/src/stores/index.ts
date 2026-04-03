@@ -26,3 +26,6 @@ export { useUserStatusStore } from "./userStatusStore";
 export type { UserStatusStoreState } from "./userStatusStore";
 
 export { useLiveProfilesStore } from "./liveProfilesStore";
+
+export { useUiStore } from "./uiStore";
+export type { UiStoreState } from "./uiStore";

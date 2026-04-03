@@ -13,14 +13,14 @@ import type {
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useNavigationStore } from "@shared/stores/navigationStore";
+import { useUiStore } from "@shared/stores";
+
 type UseServerAdminInput = {
   servers: ServerSummary[];
   controlPlaneBackend: ControlPlaneBackend;
   currentServerId: string | null;
   currentUserId: string | null;
   canManageInvites: boolean;
-  isServerSettingsModalOpen: boolean;
-  setShowServerSettingsModal: React.Dispatch<React.SetStateAction<boolean>>;
   refreshServers: () => Promise<void>;
   onActiveServerRemoved: () => void;
 };
@@ -31,11 +31,11 @@ export function useServerAdmin({
   currentServerId,
   currentUserId,
   canManageInvites,
-  isServerSettingsModalOpen,
-  setShowServerSettingsModal,
   refreshServers,
   onActiveServerRemoved,
 }: UseServerAdminInput) {
+  const showServerSettingsModal = useUiStore((state) => state.showServerSettingsModal);
+  const setShowServerSettingsModal = useUiStore((state) => state.setShowServerSettingsModal);
   const [showMembersModal, setShowMembersModal] = React.useState(false);
   const [membersModalCommunityId, setMembersModalCommunityId] = React.useState<
     string | null
@@ -595,14 +595,14 @@ export function useServerAdmin({
         name,
       });
       await refreshServers();
-      if (currentServerId === communityId && isServerSettingsModalOpen) {
+      if (currentServerId === communityId && showServerSettingsModal) {
         await loadServerSettings(communityId);
       }
     },
     [
       controlPlaneBackend,
       currentServerId,
-      isServerSettingsModalOpen,
+      showServerSettingsModal,
       loadServerSettings,
       refreshServers,
     ],

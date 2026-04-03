@@ -511,8 +511,6 @@ export function useChatAppOrchestration() {
     currentServerId,
     currentUserId: user?.id ?? null,
     canManageInvites: serverPermissions.canManageInvites,
-    isServerSettingsModalOpen: showServerSettingsModal,
-    setShowServerSettingsModal,
     refreshServers,
     onActiveServerRemoved: () => {
       setShowServerSettingsModal(false);
@@ -550,7 +548,6 @@ export function useChatAppOrchestration() {
     setChannels,
     setCurrentChannelId,
     setChannelSettingsTargetId,
-    setShowChannelSettingsModal,
   });
 
   // ── Messages ──────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import type {
   ChannelRolePermissionItem,
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
-
+import { useUiStore } from "@shared/stores/uiStore";
 type UseChannelManagementInput = {
   currentServerId: string | null;
   currentUserId: string | null;
@@ -22,7 +22,6 @@ type UseChannelManagementInput = {
   setChannelSettingsTargetId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
-  setShowChannelSettingsModal: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 export function useChannelManagement({
@@ -34,8 +33,8 @@ export function useChannelManagement({
   setChannels,
   setCurrentChannelId,
   setChannelSettingsTargetId,
-  setShowChannelSettingsModal,
 }: UseChannelManagementInput) {
+  const setShowChannelSettingsModal = useUiStore((state) => state.setShowChannelSettingsModal);
   const [channelRolePermissions, setChannelRolePermissions] = React.useState<
     ChannelRolePermissionItem[]
   >([]);
