@@ -289,7 +289,6 @@ export function useChatAppOrchestration() {
   } = useCommunityWorkspace({
     servers,
     currentUserId: user?.id ?? null,
-    channelSettingsTargetId,
     onMemberBanned: handleMemberBanned,
     onMemberChannelAccessRevoked: handleMemberChannelAccessRevoked,
   });
@@ -546,7 +545,6 @@ export function useChatAppOrchestration() {
     channelSettingsTargetId,
     channels,
     setChannels,
-    setCurrentChannelId,
     setChannelSettingsTargetId,
   });
 

@@ -10,11 +10,11 @@ import type {
 import { getErrorMessage } from "@platform/lib/errors";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
+import { useUiStore } from "@shared/stores";
 
 type UseCommunityWorkspaceInput = {
   servers: ServerSummary[];
   currentUserId: string | null;
-  channelSettingsTargetId: string | null;
   onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
   onMemberChannelAccessRevoked?: (
     payload: MemberChannelAccessRevokedBroadcastPayload,
@@ -27,11 +27,13 @@ type UseCommunityWorkspaceInput = {
 export function useCommunityWorkspace({
   servers,
   currentUserId,
-  channelSettingsTargetId,
   onMemberBanned,
   onMemberChannelAccessRevoked,
   onReportStatusUpdated,
 }: UseCommunityWorkspaceInput) {
+  const channelSettingsTargetId = useUiStore(
+    (state) => state.channelSettingsTargetId,
+  )
   const currentServerId = useNavigationStore((state) => state.currentServerId);
   const setCurrentServerId = useNavigationStore(
     (state) => state.setCurrentServerId,

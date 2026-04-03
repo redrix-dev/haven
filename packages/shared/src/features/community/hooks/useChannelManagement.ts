@@ -11,6 +11,7 @@ import type {
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useUiStore } from "@shared/stores/uiStore";
+import { useNavigationStore } from "@shared/stores";
 type UseChannelManagementInput = {
   currentServerId: string | null;
   currentUserId: string | null;
@@ -18,7 +19,6 @@ type UseChannelManagementInput = {
   channelSettingsTargetId: string | null;
   channels: Channel[];
   setChannels: React.Dispatch<React.SetStateAction<Channel[]>>;
-  setCurrentChannelId: (id: string | null) => void;
   setChannelSettingsTargetId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -28,12 +28,14 @@ export function useChannelManagement({
   currentServerId,
   currentUserId,
   currentChannelId,
-  channelSettingsTargetId,
   channels,
   setChannels,
-  setCurrentChannelId,
-  setChannelSettingsTargetId,
 }: UseChannelManagementInput) {
+  const setCurrentChannelId = useNavigationStore(
+    (state) => state.setCurrentChannelId,
+  )
+  const channelSettingsTargetId = useUiStore((state) => state.channelSettingsTargetId);
+  const setChannelSettingsTargetId = useUiStore((state) => state.setChannelSettingsTargetId);
   const setShowChannelSettingsModal = useUiStore((state) => state.setShowChannelSettingsModal);
   const [channelRolePermissions, setChannelRolePermissions] = React.useState<
     ChannelRolePermissionItem[]
@@ -171,10 +173,8 @@ export function useChannelManagement({
         }
         return next;
       });
-
-      setChannelSettingsTargetId((prevTargetId) =>
-        prevTargetId === channelId ? null : prevTargetId,
-      );
+      const current = useUiStore.getState().channelSettingsTargetId;
+      setChannelSettingsTargetId(current === channelId ? null : current);
     },
     [
       channels.length,
