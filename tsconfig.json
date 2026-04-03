@@ -19,7 +19,7 @@
       "@electron/*": ["./apps/electron/src/*"],
       "@web/*": ["./apps/web/src/*"],
       "@shared/*": ["./packages/shared/src/*"],
-      "@client/*": ["./packages/shared/src/client/*"],
+      "@client/app/*": ["./packages/shared/src/app/*"],
       "@platform/*": ["./packages/shared/src/platform/*"],
       "@test-support/*": ["./tooling/test-support/*"]
     }

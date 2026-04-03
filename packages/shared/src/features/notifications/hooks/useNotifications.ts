@@ -1,0 +1,369 @@
+import React from 'react';
+import { useNotificationsStore } from '@shared/stores/notificationsStore';
+import { playNotificationSound } from '@shared/lib/notifications/sound';
+import type { NotificationBackend } from '@shared/lib/backend/notificationBackend';
+import { recordLocalNotificationDeliveryTrace } from '@shared/lib/notifications/devTrace';
+import type {
+  NotificationCounts,
+  NotificationItem,
+  NotificationPreferenceUpdate,
+  NotificationPreferences,
+} from '@shared/lib/backend/types';
+import type { NotificationAudioSettings } from '@platform/desktop/types';
+import { getErrorMessage } from '@platform/lib/errors';
+import { DEFAULT_NOTIFICATION_COUNTS } from '@shared/app/constants';
+
+type UseNotificationsInput = {
+  notificationBackend: Pick<
+    NotificationBackend,
+    | 'listNotifications'
+    | 'listSoundNotifications'
+    | 'getNotificationCounts'
+    | 'markNotificationsRead'
+    | 'markAllNotificationsSeen'
+    | 'dismissNotifications'
+    | 'getNotificationPreferences'
+    | 'updateNotificationPreferences'
+    | 'subscribeToNotificationInbox'
+  >;
+  userId: string | null | undefined;
+  notificationsPanelOpen: boolean;
+  audioSettings: NotificationAudioSettings;
+  autoMarkSeenOnPanelOpen?: boolean;
+};
+
+export function useNotifications({
+  notificationBackend,
+  userId,
+  notificationsPanelOpen,
+  audioSettings,
+  autoMarkSeenOnPanelOpen = false,
+}: UseNotificationsInput) {
+  const notificationItems = useNotificationsStore((state) => state.notifications);
+  const [notificationCounts, setNotificationCounts] = React.useState<NotificationCounts>(
+    DEFAULT_NOTIFICATION_COUNTS
+  );
+  const notificationsLoading = useNotificationsStore((state) => state.isLoading);
+  const [notificationsRefreshing, setNotificationsRefreshing] = React.useState(false);
+  const [notificationsError, setNotificationsError] = React.useState<string | null>(null);
+  const [notificationPreferences, setNotificationPreferences] =
+    React.useState<NotificationPreferences | null>(null);
+  const [notificationPreferencesLoading, setNotificationPreferencesLoading] = React.useState(false);
+  const [notificationPreferencesSaving, setNotificationPreferencesSaving] = React.useState(false);
+  const [notificationPreferencesError, setNotificationPreferencesError] = React.useState<string | null>(
+    null
+  );
+
+  const knownSoundNotificationRecipientIdsRef = React.useRef<Set<string>>(new Set());
+  const notificationsBootstrappedRef = React.useRef(false);
+  const notificationAudioSettingsRef = React.useRef<NotificationAudioSettings>(audioSettings);
+
+  const setStoredNotifications = React.useCallback((notifications: NotificationItem[]) => {
+    useNotificationsStore.getState().setNotifications(notifications);
+  }, []);
+
+  const setStoredUnreadCount = React.useCallback((unreadCount: number) => {
+    useNotificationsStore.getState().setUnreadCount(unreadCount);
+  }, []);
+
+  const setStoredIsLoading = React.useCallback((isLoading: boolean) => {
+    useNotificationsStore.getState().setIsLoading(isLoading);
+  }, []);
+
+  const resetStoredNotifications = React.useCallback(() => {
+    useNotificationsStore.getState().reset();
+  }, []);
+
+  React.useEffect(() => {
+    notificationAudioSettingsRef.current = audioSettings;
+  }, [audioSettings]);
+
+  const refreshNotificationInbox = React.useCallback(
+    async (options?: { playSoundsForNew?: boolean }) => {
+      if (!userId) return;
+
+      const playSoundsForNew = Boolean(options?.playSoundsForNew);
+      const [items, soundItems, counts] = await Promise.all([
+        notificationBackend.listNotifications({ limit: 50 }),
+        notificationBackend.listSoundNotifications({ limit: 50 }),
+        notificationBackend.getNotificationCounts(),
+      ]);
+
+      const nextKnownSoundIds = new Set(soundItems.map((item) => item.recipientId));
+      const previousKnownSoundIds = knownSoundNotificationRecipientIdsRef.current;
+      const canPlaySounds = notificationsBootstrappedRef.current && playSoundsForNew;
+
+      setStoredNotifications(items);
+      setNotificationCounts(counts);
+      setStoredUnreadCount(counts.unreadCount);
+      knownSoundNotificationRecipientIdsRef.current = nextKnownSoundIds;
+
+      if (canPlaySounds) {
+        for (const item of soundItems) {
+          if (previousKnownSoundIds.has(item.recipientId)) continue;
+          if (item.dismissedAt) continue;
+          void playNotificationSound({
+            kind: item.kind,
+            deliverSound: item.deliverSound,
+            audioSettings: notificationAudioSettingsRef.current,
+            suppressWhenUnfocused: false,
+          }).then((result) => {
+            recordLocalNotificationDeliveryTrace({
+              notificationRecipientId: item.recipientId,
+              eventId: item.eventId,
+              transport: 'in_app',
+              stage: 'client_route',
+              decision: result.played ? 'send' : 'skip',
+              reasonCode: result.reasonCode,
+              details: {
+                kind: item.kind,
+                allowInAppSound: result.played,
+              },
+            });
+          });
+        }
+      }
+
+      notificationsBootstrappedRef.current = true;
+    },
+    [notificationBackend, setStoredNotifications, setStoredUnreadCount, userId]
+  );
+
+  const refreshNotificationPreferences = React.useCallback(async () => {
+    if (!userId) return;
+    const preferences = await notificationBackend.getNotificationPreferences();
+    setNotificationPreferences(preferences);
+  }, [notificationBackend, userId]);
+
+  const resetNotifications = React.useCallback(() => {
+    resetStoredNotifications();
+    setNotificationCounts(DEFAULT_NOTIFICATION_COUNTS);
+    setNotificationsRefreshing(false);
+    setNotificationsError(null);
+    setNotificationPreferences(null);
+    setNotificationPreferencesLoading(false);
+    setNotificationPreferencesSaving(false);
+    setNotificationPreferencesError(null);
+    knownSoundNotificationRecipientIdsRef.current = new Set();
+    notificationsBootstrappedRef.current = false;
+  }, [resetStoredNotifications]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    if (!userId) {
+      resetNotifications();
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setStoredIsLoading(true);
+    setNotificationsError(null);
+    notificationsBootstrappedRef.current = false;
+    knownSoundNotificationRecipientIdsRef.current = new Set();
+
+    const loadInbox = async () => {
+      try {
+        await refreshNotificationInbox({ playSoundsForNew: false });
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to load notification inbox:', error);
+        setNotificationsError(getErrorMessage(error, 'Failed to load notifications.'));
+      } finally {
+        if (!isMounted) return;
+        setStoredIsLoading(false);
+      }
+    };
+
+    void loadInbox();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshNotificationInbox, resetNotifications, setStoredIsLoading, userId]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    if (!userId) {
+      setNotificationPreferences(null);
+      setNotificationPreferencesLoading(false);
+      setNotificationPreferencesSaving(false);
+      setNotificationPreferencesError(null);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setNotificationPreferencesLoading(true);
+    setNotificationPreferencesError(null);
+
+    const loadPreferences = async () => {
+      try {
+        const preferences = await notificationBackend.getNotificationPreferences();
+        if (!isMounted) return;
+        setNotificationPreferences(preferences);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to load notification preferences:', error);
+        setNotificationPreferencesError(
+          getErrorMessage(error, 'Failed to load notification preferences.')
+        );
+      } finally {
+        if (!isMounted) return;
+        setNotificationPreferencesLoading(false);
+      }
+    };
+
+    void loadPreferences();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [notificationBackend, userId]);
+
+  React.useEffect(() => {
+    if (!userId) return;
+
+    const subscription = notificationBackend.subscribeToNotificationInbox(userId, () => {
+      setNotificationsRefreshing(true);
+      void refreshNotificationInbox({ playSoundsForNew: true })
+        .catch((error) => {
+          console.error('Failed to refresh notifications after realtime update:', error);
+          setNotificationsError(getErrorMessage(error, 'Failed to refresh notifications.'));
+        })
+        .finally(() => {
+          setNotificationsRefreshing(false);
+        });
+    });
+
+    return () => {
+      void subscription.unsubscribe();
+    };
+  }, [notificationBackend, refreshNotificationInbox, userId]);
+
+  React.useEffect(() => {
+    if (!autoMarkSeenOnPanelOpen) return;
+    if (!notificationsPanelOpen || !userId) return;
+    if (notificationCounts.unseenCount <= 0) return;
+
+    void notificationBackend
+      .markAllNotificationsSeen()
+      .then(() => refreshNotificationInbox({ playSoundsForNew: false }))
+      .catch((error) => {
+        console.error('Failed to mark notifications seen:', error);
+      });
+  }, [
+    autoMarkSeenOnPanelOpen,
+    notificationBackend,
+    notificationCounts.unseenCount,
+    notificationsPanelOpen,
+    refreshNotificationInbox,
+    userId,
+  ]);
+
+  const saveNotificationPreferences = React.useCallback(
+    async (values: NotificationPreferenceUpdate) => {
+      setNotificationPreferencesSaving(true);
+      setNotificationPreferencesError(null);
+      try {
+        const nextPreferences = await notificationBackend.updateNotificationPreferences(values);
+        setNotificationPreferences(nextPreferences);
+        await refreshNotificationInbox({ playSoundsForNew: false });
+      } catch (error) {
+        setNotificationPreferencesError(
+          getErrorMessage(error, 'Failed to update notification preferences.')
+        );
+      } finally {
+        setNotificationPreferencesSaving(false);
+      }
+    },
+    [notificationBackend, refreshNotificationInbox]
+  );
+
+  const refreshNotificationsManually = React.useCallback(async () => {
+    setNotificationsRefreshing(true);
+    setNotificationsError(null);
+    try {
+      await refreshNotificationInbox({ playSoundsForNew: false });
+      await refreshNotificationPreferences();
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to refresh notifications.'));
+    } finally {
+      setNotificationsRefreshing(false);
+    }
+  }, [refreshNotificationInbox, refreshNotificationPreferences]);
+
+  const markAllNotificationsSeen = React.useCallback(async () => {
+    try {
+      await notificationBackend.markAllNotificationsSeen();
+      await refreshNotificationInbox({ playSoundsForNew: false });
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to mark notifications seen.'));
+    }
+  }, [notificationBackend, refreshNotificationInbox]);
+
+  const markNotificationRead = React.useCallback(
+    async (recipientId: string) => {
+      try {
+        await notificationBackend.markNotificationsRead([recipientId]);
+        await refreshNotificationInbox({ playSoundsForNew: false });
+      } catch (error) {
+        setNotificationsError(getErrorMessage(error, 'Failed to mark notification read.'));
+      }
+    },
+    [notificationBackend, refreshNotificationInbox]
+  );
+
+  const dismissNotification = React.useCallback(
+    async (recipientId: string) => {
+      try {
+        await notificationBackend.dismissNotifications([recipientId]);
+        await refreshNotificationInbox({ playSoundsForNew: false });
+      } catch (error) {
+        setNotificationsError(getErrorMessage(error, 'Failed to dismiss notification.'));
+      }
+    },
+    [notificationBackend, refreshNotificationInbox]
+  );
+
+  const dismissAllNotifications = React.useCallback(async () => {
+    const recipientIds = notificationItems.map((notification) => notification.recipientId);
+    if (recipientIds.length === 0) return;
+
+    try {
+      await notificationBackend.dismissNotifications(recipientIds);
+      await refreshNotificationInbox({ playSoundsForNew: false });
+    } catch (error) {
+      setNotificationsError(getErrorMessage(error, 'Failed to dismiss all notifications.'));
+    }
+  }, [notificationBackend, notificationItems, refreshNotificationInbox]);
+
+  return {
+    state: {
+      notificationItems,
+      notificationCounts,
+      notificationsLoading,
+      notificationsRefreshing,
+      notificationsError,
+      notificationPreferences,
+      notificationPreferencesLoading,
+      notificationPreferencesSaving,
+      notificationPreferencesError,
+    },
+    derived: {},
+    actions: {
+      resetNotifications,
+      refreshNotificationInbox,
+      refreshNotificationPreferences,
+      saveNotificationPreferences,
+      refreshNotificationsManually,
+      markAllNotificationsSeen,
+      markNotificationRead,
+      dismissNotification,
+      dismissAllNotifications,
+      setNotificationsError,
+    },
+  };
+}

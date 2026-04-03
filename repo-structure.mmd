@@ -1,0 +1,141 @@
+%% Paste into https://mermaid.live
+%% Curated architecture map for the repo as it stands now.
+%% Representative files are listed for readability; very repetitive leaves are grouped.
+
+flowchart TB
+  classDef root fill:#0f172a,stroke:#020617,color:#f8fafc,stroke-width:2px;
+  classDef app fill:#dbeafe,stroke:#2563eb,color:#0f172a,stroke-width:1.5px;
+  classDef feature fill:#dcfce7,stroke:#16a34a,color:#052e16,stroke-width:1.5px;
+  classDef infra fill:#fef3c7,stroke:#d97706,color:#451a03,stroke-width:1.5px;
+  classDef service fill:#fce7f3,stroke:#db2777,color:#500724,stroke-width:1.5px;
+  classDef tool fill:#ede9fe,stroke:#7c3aed,color:#2e1065,stroke-width:1.5px;
+  classDef note fill:#f8fafc,stroke:#94a3b8,color:#334155,stroke-dasharray: 5 5;
+
+  repo["haven/"]:::root
+  legend["Curated map: representative files are named; large repetitive sets are summarized."]:::note
+
+  subgraph apps["apps/"]
+    direction LR
+    apps_root["apps/"]:::root
+    subgraph electron["electron/"]
+      direction TB
+      electron_main["src/main/<br/>index.js<br/>app/start-main-runtime.js<br/>app/create-main-window.js<br/>app/create-voice-popout-window.js<br/>app/register-*.js<br/>ipc/register-desktop-ipc-handlers.js<br/>__tests__/*"]:::app
+      electron_preload["src/preload/<br/>index.js<br/>desktop-bridge.js"]:::app
+      electron_renderer["src/renderer/<br/>index.tsx<br/>index.html"]:::app
+      electron_assets["assets/<br/>icon.ico<br/>icon.png<br/>audio/*"]:::infra
+    end
+    subgraph web["web/"]
+      direction TB
+      web_src["src/<br/>index.tsx<br/>index.html<br/>index.template.html"]:::app
+      web_public["public/<br/>icon-192.png<br/>icon-512.png"]:::infra
+    end
+  end
+
+  subgraph shared["packages/shared/src/"]
+    direction TB
+    shared_root["packages/shared/src/"]:::root
+    shared_app_entry["app/<br/>AppRoot.tsx<br/>ChatApp.tsx<br/>VoicePopoutApp.tsx"]:::app
+    shared_app_hooks["app/hooks/<br/>useChatAppOrchestration.ts<br/>useDeepLinks.ts<br/>useDesktopSettings.ts<br/>useFeatureFlags.ts"]:::app
+    shared_app_shell["app/components/<br/>TitleBar.tsx<br/>ServerList.tsx<br/>Sidebar.tsx<br/>MessageToolbar.tsx<br/>ProfileContextMenu.tsx<br/>menus/*<br/>settings/SettingsPrimitives.tsx"]:::app
+    shared_app_ui["app/ui/<br/>MarkdownText.tsx<br/>alert-dialog.tsx<br/>button.tsx<br/>dialog.tsx<br/>dropdown-menu.tsx<br/>tabs.tsx<br/>tooltip.tsx<br/>... other UI primitives"]:::app
+
+    subgraph features["features/"]
+      direction LR
+      feature_auth["auth/<br/>components:<br/>LoginScreen.tsx<br/>PasswordRecoveryDialog.tsx"]:::feature
+      feature_community["community/<br/>hooks:<br/>useServers.ts<br/>useCommunityWorkspace.ts<br/>useChannelManagement.ts<br/>useChannelGroups.ts<br/>useServerAdmin.ts<br/>useServerOrder.ts<br/>components:<br/>CreateServerModal.tsx<br/>CreateChannelModal.tsx<br/>JoinServerModal.tsx<br/>ServerSettingsModal.tsx<br/>ChannelSettingsModal.tsx<br/>ServerMembersModal.tsx<br/>QuickRenameDialog.tsx<br/>settingsModals/tabs/*"]:::feature
+      feature_dm["direct-messages/<br/>hooks:<br/>useDirectMessages.ts<br/>useDirectMessageInteractions.ts<br/>components:<br/>DirectMessagesSidebar.tsx<br/>DirectMessageArea.tsx<br/>DmReportModal.tsx<br/>__tests__/*"]:::feature
+      feature_messaging["messaging/<br/>hooks:<br/>useMessages.ts<br/>components:<br/>ChatArea.tsx<br/>MessageList.tsx<br/>MessageInput.tsx<br/>lib/banVisibility.ts<br/>__tests__/*"]:::feature
+      feature_moderation["moderation/<br/>components:<br/>DmReportReviewPanel.tsx<br/>ServerModmailPanel.tsx"]:::feature
+      feature_notifications["notifications/<br/>hooks:<br/>useNotifications.ts<br/>useNotificationInteractions.ts<br/>components:<br/>NotificationCenterModal.tsx<br/>__tests__/*"]:::feature
+      feature_profile["profile/<br/>hooks:<br/>usePlatformSession.ts<br/>useLiveProfiles.ts<br/>components:<br/>AccountSettingsModal.tsx"]:::feature
+      feature_social["social/<br/>hooks:<br/>useSocialWorkspace.ts<br/>components:<br/>FriendsModal.tsx"]:::feature
+      feature_voice["voice/<br/>types.ts<br/>hooks:<br/>useVoice.ts<br/>useVoiceMemberVolumes.ts<br/>useVoiceSessionController.ts<br/>components:<br/>VoicePanel.tsx<br/>VoiceChannelPane.tsx<br/>VoiceDrawer.tsx<br/>VoiceDrawerShell.tsx<br/>VoiceSettingsModal.tsx<br/>VoiceHardwareDebugPanel.tsx<br/>PushToTalkBindingField.tsx<br/>store/voiceSessionStore.ts<br/>__tests__/*"]:::feature
+    end
+
+    shared_stores["stores/<br/>authStore.ts<br/>serversStore.ts<br/>messagesStore.ts<br/>voiceStore.ts<br/>dmStore.ts<br/>notificationsStore.ts<br/>navigationStore.ts<br/>permissionsStore.ts<br/>userStatusStore.ts<br/>liveProfilesStore.ts"]:::infra
+    shared_platform["platform/<br/>desktop/client.ts<br/>desktop/types.ts<br/>ipc/keys.js<br/>ipc/validators.js<br/>lib/env.ts<br/>lib/errors.ts<br/>lib/logger.ts<br/>lib/records.ts<br/>lib/result.ts<br/>assets/runtimeAudio.ts<br/>urls.ts"]:::infra
+    shared_lib["lib/<br/>backend/* adapters + contract tests<br/>notifications/sound.ts<br/>notifications/routePolicy.ts<br/>notifications/devTrace.ts<br/>voice/ice.ts<br/>voice/pushToTalk.ts<br/>contextMenu/debugTrace.ts<br/>contextMenu/types.ts<br/>deepLinks.ts<br/>liveProfiles.ts<br/>supabase.ts<br/>utils.ts"]:::infra
+    shared_contexts["contexts/<br/>AuthContext.tsx"]:::infra
+    shared_config["config/<br/>appAssets.ts<br/>appAssets.json"]:::infra
+    shared_assets["assets/audio/<br/>voice/*<br/>notifications/*"]:::infra
+    shared_types["types + styles + testing/<br/>database.ts<br/>assets.d.ts<br/>globals.css<br/>vitest-globals.d.ts"]:::infra
+  end
+
+  subgraph tooling["tooling/"]
+    direction TB
+    tooling_root["tooling/"]:::root
+    tooling_config["config/<br/>app-assets.cjs"]:::tool
+    tooling_assets["scripts/assets/<br/>generate-app-assets.mjs"]:::tool
+    tooling_tests["scripts/test/<br/>run-vitest-with-local-env.mjs<br/>run-db-suite.mjs<br/>run-supabase-sql-suite.mjs<br/>run-notification-dispatch-smoke.mjs<br/>bootstrap-local-auth-users.mjs<br/>resolve-supabase-local-env.mjs<br/>generate-test-report.mjs<br/>generate-test-signoff.mjs"]:::tool
+    tooling_support["test-support/<br/>setup/env.ts<br/>setup/jsdom.ts<br/>setup/supabaseLocal.ts<br/>fixtures/users.ts"]:::tool
+  end
+
+  subgraph services["services/supabase/"]
+    direction TB
+    services_root["services/supabase/"]:::root
+    supabase_functions["functions/<br/>_shared/*<br/>link-preview-backfill/index.ts<br/>link-preview-worker/index.ts<br/>message-media-maintenance/index.ts<br/>report-alert/index.ts<br/>voice-ice/index.ts<br/>web-push-worker/index.ts"]:::service
+    supabase_migrations["migrations/<br/>20260217...20260327 *.sql<br/>schema + permissions + messaging + DM + notifications + web push + moderation"]:::service
+    supabase_tests["tests/<br/>sql/*.sql<br/>fixtures/*.sql<br/>_helpers/*.sql<br/>run_order.txt<br/>README.md"]:::service
+    supabase_config["config.toml"]:::service
+  end
+
+  repo --> apps_root
+  repo --> shared_root
+  repo --> tooling_root
+  repo --> services_root
+  repo -.-> legend
+
+  web_src --> shared_app_entry
+  electron_renderer --> shared_app_entry
+  electron_preload --> shared_platform
+  electron_main --> electron_preload
+  electron_main --> shared_platform
+  electron_main --> shared_config
+
+  shared_app_entry --> shared_app_hooks
+  shared_app_entry --> shared_app_shell
+  shared_app_entry --> shared_app_ui
+
+  shared_app_entry --> feature_auth
+  shared_app_entry --> feature_community
+  shared_app_entry --> feature_dm
+  shared_app_entry --> feature_messaging
+  shared_app_entry --> feature_moderation
+  shared_app_entry --> feature_notifications
+  shared_app_entry --> feature_profile
+  shared_app_entry --> feature_social
+  shared_app_entry --> feature_voice
+
+  shared_app_hooks --> shared_stores
+  shared_app_hooks --> shared_platform
+  shared_app_hooks --> shared_lib
+  shared_app_shell --> shared_app_ui
+
+  feature_auth --> shared_stores
+  feature_community --> shared_stores
+  feature_community --> shared_lib
+  feature_dm --> shared_stores
+  feature_dm --> shared_lib
+  feature_messaging --> shared_stores
+  feature_messaging --> shared_lib
+  feature_moderation --> shared_stores
+  feature_moderation --> shared_lib
+  feature_notifications --> shared_stores
+  feature_notifications --> shared_lib
+  feature_profile --> shared_stores
+  feature_profile --> shared_lib
+  feature_social --> shared_stores
+  feature_social --> shared_lib
+  feature_voice --> shared_stores
+  feature_voice --> shared_platform
+  feature_voice --> shared_lib
+
+  tooling_config --> shared_config
+  tooling_assets --> shared_config
+  tooling_tests --> tooling_support
+  tooling_tests --> supabase_tests
+
+  supabase_tests --> supabase_migrations
+  supabase_functions --> supabase_config
+  shared_lib -. runtime / RPC boundary .-> supabase_functions
+  shared_assets --> shared_config

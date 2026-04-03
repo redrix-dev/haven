@@ -1,8 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { TooltipProvider } from '@shared/components/ui/tooltip';
+import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
-import { AppRoot } from '@client/app/AppRoot';
+import { AppRoot } from '@shared/app/AppRoot';
 import '@shared/styles/globals.css';
 
 document.documentElement.classList.add('haven-web-shell');
