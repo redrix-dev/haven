@@ -11,7 +11,7 @@ const mode = process.argv[2] ?? 'full';
 const commandSets = {
   full: [
     { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
-    { id: 'typecheck', label: 'TypeScript', command: 'npx', args: ['tsc', '--noEmit', '--project', 'tsconfig.json'] },
+    { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
     { id: 'unit', label: 'Unit / Component Tests', command: 'npm', args: ['run', 'test:unit'] },
     { id: 'db', label: 'DB / RLS Suite', command: 'npm', args: ['run', 'test:db'] },
     { id: 'backend', label: 'Backend Contract Tests', command: 'npm', args: ['run', 'test:backend'] },

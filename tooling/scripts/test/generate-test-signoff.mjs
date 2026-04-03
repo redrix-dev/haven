@@ -9,7 +9,7 @@ const repoRoot = path.resolve(__dirname, '../../..');
 const commandSets = {
   release: [
     { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
-    { id: 'typecheck', label: 'TypeScript', command: 'npx', args: ['tsc', '--noEmit', '--project', 'tsconfig.json'] },
+    { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
     { id: 'unit', label: 'Unit / Component Tests', command: 'npm', args: ['run', 'test:unit'] },
     { id: 'db', label: 'DB / RLS Suite', command: 'npm', args: ['run', 'test:db'] },
     { id: 'backend', label: 'Backend Contract Tests', command: 'npm', args: ['run', 'test:backend'] },
@@ -23,12 +23,12 @@ const commandSets = {
   ],
   quick: [
     { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
-    { id: 'typecheck', label: 'TypeScript', command: 'npx', args: ['tsc', '--noEmit', '--project', 'tsconfig.json'] },
+    { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
     { id: 'unit', label: 'Unit / Component Tests', command: 'npm', args: ['run', 'test:unit'] },
   ],
   web: [
     { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
-    { id: 'typecheck', label: 'TypeScript', command: 'npx', args: ['tsc', '--noEmit', '--project', 'tsconfig.json'] },
+    { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
     { id: 'build_web', label: 'Web Build', command: 'npm', args: ['run', 'build:web'] },
     {
       id: 'notif_smoke',

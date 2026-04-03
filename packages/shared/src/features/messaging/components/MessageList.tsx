@@ -67,6 +67,7 @@ import {
 import { getLiveProfile } from "@shared/lib/liveProfiles";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useMessagesStore } from "@shared/stores/messagesStore";
+import { useSocialStore } from "@shared/stores/socialStore";
 
 type Message = Database["public"]["Tables"]["messages"]["Row"];
 const QUICK_REACTION_EMOJI = [
@@ -95,7 +96,6 @@ const isAuthorProfileTombstone = (
 interface MessageListProps {
   channelId: string;
   currentUserId: string;
-  blockedUserIds: ReadonlySet<string>;
   isElevatedViewer: boolean;
   canManageMessages: boolean;
   canCreateReports: boolean;
@@ -1371,7 +1371,6 @@ const MessageVirtuosoItem = React.memo(function MessageVirtuosoItem({
 export function MessageList({
   channelId,
   currentUserId,
-  blockedUserIds,
   isElevatedViewer,
   canManageMessages,
   canCreateReports,
@@ -1400,6 +1399,7 @@ export function MessageList({
   const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
   const authorProfiles = useMessagesStore((state) => state.profiles);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
   const hasOlderMessages = useMessagesStore((state) => state.hasMore);
   const isLoadingOlderMessages = useMessagesStore((state) => state.isLoading);
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);

@@ -8,6 +8,7 @@ import { isEditableKeyboardTarget } from "@shared/app/utils";
 import { playVoicePresenceSound } from "@shared/lib/notifications/sound";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useVoiceStore } from "@shared/stores/voiceStore";
+import { useSocialStore } from "@shared/stores/socialStore";
 import type {
   NotificationAudioSettings,
   VoiceSettings,
@@ -55,7 +56,6 @@ type UseVoiceSessionControllerInput = {
   currentUserId: string | null | undefined;
   currentUserDisplayName: string;
   currentUserAvatarUrl?: string | null;
-  blockedUserIds: ReadonlySet<string>;
   isElevatedInActiveServer: boolean;
   voiceSettings: VoiceSettings;
   notificationAudioSettings: NotificationAudioSettings;
@@ -106,7 +106,6 @@ export function useVoiceSessionController({
   currentUserId,
   currentUserDisplayName,
   currentUserAvatarUrl,
-  blockedUserIds,
   isElevatedInActiveServer,
   voiceSettings,
   notificationAudioSettings,
@@ -122,6 +121,7 @@ export function useVoiceSessionController({
   state: VoiceSessionControllerState;
   actions: VoiceSessionControllerActions;
 } {
+  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
   const joined = useVoiceStore((state) => state.joined);
   const [joining, setJoining] = React.useState(false);
   const [participants, setParticipants] = React.useState<VoiceParticipant[]>(

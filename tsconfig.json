@@ -1,29 +1,7 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020", "DOM"],
-    "jsx": "react",
-    "moduleResolution": "node",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "types": ["vitest/globals", "node"],
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true,
-    "allowJs": true,
-    "outDir": "./dist",
-    "baseUrl": ".",
-    "paths": {
-      "@electron/*": ["./apps/electron/src/*"],
-      "@web/*": ["./apps/web/src/*"],
-      "@shared/*": ["./packages/shared/src/*"],
-      "@client/app/*": ["./packages/shared/src/app/*"],
-      "@platform/*": ["./packages/shared/src/platform/*"],
-      "@test-support/*": ["./tooling/test-support/*"]
-    }
-  },
-  "include": ["apps/**/*", "packages/**/*", "tooling/**/*"],
-  "exclude": ["node_modules"]
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.web.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
 }

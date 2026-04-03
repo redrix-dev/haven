@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "jsx": "react",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["vitest/globals", "node"],
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true,
+    "outDir": "./dist",
+    "paths": {
+      "@electron/*": ["./apps/electron/src/*"],
+      "@web/*": ["./apps/web/src/*"],
+      "@shared/*": ["./packages/shared/src/*"],
+      "@client/app/*": ["./packages/shared/src/app/*"],
+      "@platform/*": ["./packages/shared/src/platform/*"],
+      "@test-support/*": ["./tooling/test-support/*"]
+    }
+  }
+}

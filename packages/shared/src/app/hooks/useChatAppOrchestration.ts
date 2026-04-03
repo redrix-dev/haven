@@ -395,7 +395,6 @@ export function useChatAppOrchestration() {
       friendsPanelRequestedTab,
       friendsPanelHighlightedRequestId,
       socialCounts,
-      blockedUserIds,
     },
     actions: {
       setFriendsPanelOpen,
@@ -569,7 +568,6 @@ export function useChatAppOrchestration() {
     currentServerId,
     currentChannelId,
     currentUserId: user?.id ?? null,
-    blockedUserIds,
     isCurrentUserElevatedInServer: isCurrentUserElevatedInCurrentServer,
     ensureIsElevatedInServer,
     debugChannelReloads,
@@ -1728,7 +1726,6 @@ export function useChatAppOrchestration() {
     friendsPanelHighlightedRequestId,
     setFriendsPanelHighlightedRequestId,
     socialCounts,
-    blockedUserIds,
     directMessageUser,
     blockDirectMessageUser,
     openDirectMessagesWorkspace,

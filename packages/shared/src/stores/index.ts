@@ -27,5 +27,8 @@ export type { UserStatusStoreState } from "./userStatusStore";
 
 export { useLiveProfilesStore } from "./liveProfilesStore";
 
+export { useSocialStore } from "./socialStore";
+export type { SocialStoreState } from "./socialStore";
+
 export { useUiStore } from "./uiStore";
 export type { UiStoreState } from "./uiStore";

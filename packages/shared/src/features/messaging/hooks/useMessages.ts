@@ -7,6 +7,7 @@ import {
   filterBlockedUserContent,
 } from "@shared/features/messaging/lib/banVisibility";
 import { useMessagesStore } from "@shared/stores/messagesStore";
+import { useSocialStore } from "@shared/stores/socialStore";
 import type {
   AuthorProfile,
   Channel,
@@ -139,7 +140,6 @@ type UseMessagesInput = {
   currentServerId: string | null;
   currentChannelId: string | null;
   currentUserId: string | null;
-  blockedUserIds: ReadonlySet<string>;
   isCurrentUserElevatedInServer: boolean;
   ensureIsElevatedInServer: (communityId: string) => Promise<boolean>;
   debugChannelReloads: boolean;
@@ -163,13 +163,13 @@ export function useMessages({
   currentServerId,
   currentChannelId,
   currentUserId,
-  blockedUserIds,
   isCurrentUserElevatedInServer,
   ensureIsElevatedInServer,
   debugChannelReloads,
   channels,
   authorProfileCacheRef,
 }: UseMessagesInput) {
+  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
   const requestOlderMessagesRef = React.useRef<(() => Promise<void>) | null>(
     null,
   );

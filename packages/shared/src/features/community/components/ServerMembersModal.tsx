@@ -42,6 +42,7 @@ import {
 import { ProfileContextMenu } from "@shared/app/components/ProfileContextMenu";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useSocialStore } from "@shared/stores/socialStore";
 
 interface ServerMembersModalProps {
   open: boolean;
@@ -50,7 +51,6 @@ interface ServerMembersModalProps {
   loading: boolean;
   error: string | null;
   members: CommunityMemberListItem[];
-  blockedUserIds: ReadonlySet<string>;
   isElevatedViewer: boolean;
   canReportProfiles: boolean;
   canBanProfiles: boolean;
@@ -74,7 +74,6 @@ export function ServerMembersModal({
   loading,
   error,
   members,
-  blockedUserIds,
   isElevatedViewer,
   canReportProfiles,
   canBanProfiles,
@@ -87,6 +86,7 @@ export function ServerMembersModal({
   onClose,
 }: ServerMembersModalProps) {
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
   const [search, setSearch] = React.useState("");
   const [reportDraft, setReportDraft] = React.useState<{
     targetUserId: string;

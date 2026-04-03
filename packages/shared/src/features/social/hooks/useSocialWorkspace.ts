@@ -3,6 +3,7 @@ import type { SocialBackend } from '@shared/lib/backend/socialBackend';
 import type { SocialCounts } from '@shared/lib/backend/types';
 import type { FriendsPanelTab } from '@shared/app/types';
 import { DEFAULT_SOCIAL_COUNTS } from '@shared/app/constants';
+import { useSocialStore } from '@shared/stores/socialStore';
 
 type UseSocialWorkspaceInput = {
   socialBackend: Pick<
@@ -37,14 +38,6 @@ const getRealtimeNewRow = (payload: unknown): Record<string, unknown> | null =>
 const getRealtimeOldRow = (payload: unknown): Record<string, unknown> | null =>
   asRecord(asRecord(payload)?.old);
 
-const addUniqueUserId = (existingUserIds: string[], userId: string): string[] => {
-  if (!userId || existingUserIds.includes(userId)) return existingUserIds;
-  return [...existingUserIds, userId];
-};
-
-const removeUserId = (existingUserIds: string[], userId: string): string[] =>
-  existingUserIds.filter((existingUserId) => existingUserId !== userId);
-
 export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocialWorkspaceInput) {
   const [friendsPanelOpen, setFriendsPanelOpen] = React.useState(false);
   const [friendsPanelRequestedTab, setFriendsPanelRequestedTab] = React.useState<FriendsPanelTab | null>(
@@ -53,22 +46,41 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
   const [friendsPanelHighlightedRequestId, setFriendsPanelHighlightedRequestId] =
     React.useState<string | null>(null);
   const [socialCounts, setSocialCounts] = React.useState<SocialCounts>(DEFAULT_SOCIAL_COUNTS);
-  const [myBlockedUserIds, setMyBlockedUserIds] = React.useState<string[]>([]);
-  const [usersBlockingMeIds, setUsersBlockingMeIds] = React.useState<string[]>([]);
 
-  const blockedUserIds = React.useMemo(
-    () => new Set([...myBlockedUserIds, ...usersBlockingMeIds]),
-    [myBlockedUserIds, usersBlockingMeIds]
+  const setStoredBlockLists = React.useCallback(
+    (input: { myBlockedUserIds: string[]; usersBlockingMeIds: string[] }) => {
+      useSocialStore.getState().setBlockLists(input);
+    },
+    []
   );
+
+  const addStoredMyBlockedUserId = React.useCallback((blockedUserId: string) => {
+    useSocialStore.getState().addMyBlockedUserId(blockedUserId);
+  }, []);
+
+  const removeStoredMyBlockedUserId = React.useCallback((blockedUserId: string) => {
+    useSocialStore.getState().removeMyBlockedUserId(blockedUserId);
+  }, []);
+
+  const addStoredUserBlockingMeId = React.useCallback((blockerUserId: string) => {
+    useSocialStore.getState().addUserBlockingMeId(blockerUserId);
+  }, []);
+
+  const removeStoredUserBlockingMeId = React.useCallback((blockerUserId: string) => {
+    useSocialStore.getState().removeUserBlockingMeId(blockerUserId);
+  }, []);
+
+  const resetStoredBlockLists = React.useCallback(() => {
+    useSocialStore.getState().reset();
+  }, []);
 
   const resetSocialWorkspace = React.useCallback(() => {
     setFriendsPanelOpen(false);
     setFriendsPanelRequestedTab(null);
     setFriendsPanelHighlightedRequestId(null);
     setSocialCounts(DEFAULT_SOCIAL_COUNTS);
-    setMyBlockedUserIds([]);
-    setUsersBlockingMeIds([]);
-  }, []);
+    resetStoredBlockLists();
+  }, [resetStoredBlockLists]);
 
   const refreshSocialCounts = React.useCallback(async () => {
     if (!userId || !enabled) {
@@ -82,8 +94,7 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
 
   const refreshBlockLists = React.useCallback(async () => {
     if (!userId || !enabled) {
-      setMyBlockedUserIds([]);
-      setUsersBlockingMeIds([]);
+      resetStoredBlockLists();
       return;
     }
 
@@ -91,17 +102,18 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
       socialBackend.listMyBlocks(),
       socialBackend.listUsersBlockingMe(),
     ]);
-    setMyBlockedUserIds(nextMyBlockedUserIds);
-    setUsersBlockingMeIds(nextUsersBlockingMeIds);
-  }, [enabled, socialBackend, userId]);
+    setStoredBlockLists({
+      myBlockedUserIds: nextMyBlockedUserIds,
+      usersBlockingMeIds: nextUsersBlockingMeIds,
+    });
+  }, [enabled, resetStoredBlockLists, setStoredBlockLists, socialBackend, userId]);
 
   React.useEffect(() => {
     let isMounted = true;
 
     if (!userId || !enabled) {
       setSocialCounts(DEFAULT_SOCIAL_COUNTS);
-      setMyBlockedUserIds([]);
-      setUsersBlockingMeIds([]);
+      resetStoredBlockLists();
       return () => {
         isMounted = false;
       };
@@ -115,7 +127,7 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
     return () => {
       isMounted = false;
     };
-  }, [enabled, refreshBlockLists, refreshSocialCounts, userId]);
+  }, [enabled, refreshBlockLists, refreshSocialCounts, resetStoredBlockLists, userId]);
 
   React.useEffect(() => {
     if (!userId || !enabled) return;
@@ -134,19 +146,19 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
 
         if (eventType === 'INSERT') {
           if (blockerUserId === userId && blockedUserId) {
-            setMyBlockedUserIds((existingUserIds) => addUniqueUserId(existingUserIds, blockedUserId));
+            addStoredMyBlockedUserId(blockedUserId);
           }
           if (blockedUserId === userId && blockerUserId) {
-            setUsersBlockingMeIds((existingUserIds) => addUniqueUserId(existingUserIds, blockerUserId));
+            addStoredUserBlockingMeId(blockerUserId);
           }
         }
 
         if (eventType === 'DELETE') {
           if (blockerUserId === userId && blockedUserId) {
-            setMyBlockedUserIds((existingUserIds) => removeUserId(existingUserIds, blockedUserId));
+            removeStoredMyBlockedUserId(blockedUserId);
           }
           if (blockedUserId === userId && blockerUserId) {
-            setUsersBlockingMeIds((existingUserIds) => removeUserId(existingUserIds, blockerUserId));
+            removeStoredUserBlockingMeId(blockerUserId);
           }
         } // CHECKPOINT 3 COMPLETE
       }
@@ -159,7 +171,16 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
     return () => {
       void subscription.unsubscribe();
     };
-  }, [enabled, refreshSocialCounts, socialBackend, userId]);
+  }, [
+    addStoredMyBlockedUserId,
+    addStoredUserBlockingMeId,
+    enabled,
+    refreshSocialCounts,
+    removeStoredMyBlockedUserId,
+    removeStoredUserBlockingMeId,
+    socialBackend,
+    userId,
+  ]);
 
   return {
     state: {
@@ -167,7 +188,6 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
       friendsPanelRequestedTab,
       friendsPanelHighlightedRequestId,
       socialCounts,
-      blockedUserIds,
     },
     derived: {},
     actions: {

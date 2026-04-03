@@ -43,7 +43,7 @@ import { useServersStore } from "@shared/stores/serversStore";
 import { useVoiceStore } from "@shared/stores/voiceStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useNotificationsStore } from "@shared/stores";
+import { useNotificationsStore, useSocialStore } from "@shared/stores";
 function hasSameServerIdOrder(
   left: ReadonlyArray<{ id: string }>,
   right: ReadonlyArray<{ id: string }>,
@@ -119,6 +119,7 @@ export function ChatApp() {
   const setNotificationsPanelOpen = useNotificationsStore(
     (state) => state.setIsPanelOpen, 
   );
+  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
   // STATE STORES END
   const { orderedServers, setOrder: setServerOrder } = useServerOrder(
     app.user?.id ?? null,
@@ -173,11 +174,11 @@ export function ChatApp() {
     () =>
       filterBlockedUsersFromParticipantRecord(
         app.voiceChannelParticipants,
-        app.blockedUserIds,
+        blockedUserIds,
         app.isCurrentUserElevatedInCurrentServer,
       ),
     [
-      app.blockedUserIds,
+      blockedUserIds,
       app.isCurrentUserElevatedInCurrentServer,
       app.voiceChannelParticipants,
     ],
@@ -187,13 +188,13 @@ export function ChatApp() {
       app.activeVoiceChannel
         ? filterBlockedUsersFromParticipantList(
             app.voiceChannelParticipants[app.activeVoiceChannel.id] ?? [],
-            app.blockedUserIds,
+            blockedUserIds,
             app.isCurrentUserElevatedInActiveVoiceServer,
           )
         : [],
     [
       app.activeVoiceChannel,
-      app.blockedUserIds,
+      blockedUserIds,
       app.isCurrentUserElevatedInActiveVoiceServer,
       app.voiceChannelParticipants,
     ],
@@ -202,16 +203,15 @@ export function ChatApp() {
     () =>
       Boolean(
         app.selectedDmConversation?.otherUserId &&
-        app.blockedUserIds.has(app.selectedDmConversation.otherUserId),
+        blockedUserIds.has(app.selectedDmConversation.otherUserId),
       ),
-    [app.blockedUserIds, app.selectedDmConversation?.otherUserId],
+    [blockedUserIds, app.selectedDmConversation?.otherUserId],
   );
   const voiceController = useVoiceSessionController({
     activeChannel: activeVoiceControllerChannel,
     currentUserId: app.user?.id,
     currentUserDisplayName: app.userDisplayName,
     currentUserAvatarUrl: app.profileAvatarUrl,
-    blockedUserIds: app.blockedUserIds,
     isElevatedInActiveServer: app.isCurrentUserElevatedInActiveVoiceServer,
     voiceSettings: app.appSettings.voice,
     notificationAudioSettings: app.appSettings.notifications,
@@ -230,11 +230,11 @@ export function ChatApp() {
     () =>
       filterBlockedUsersFromParticipantList(
         voiceController.state.participants,
-        app.blockedUserIds,
+        blockedUserIds,
         app.isCurrentUserElevatedInActiveVoiceServer,
       ),
     [
-      app.blockedUserIds,
+      blockedUserIds,
       app.isCurrentUserElevatedInActiveVoiceServer,
       voiceController.state.participants,
     ],
@@ -794,7 +794,6 @@ export function ChatApp() {
                 channelName={app.currentRenderableChannel.name}
                 channelKind={app.currentRenderableChannel.kind}
                 currentUserId={user.id}
-                blockedUserIds={app.blockedUserIds}
                 isElevatedViewer={app.isCurrentUserElevatedInCurrentServer}
                 canManageMessages={serverPermissions.canManageMessages}
                 canCreateReports={serverPermissions.canCreateReports}
@@ -1119,7 +1118,6 @@ export function ChatApp() {
           loading={app.membersModalLoading}
           error={app.membersModalError}
           members={app.membersModalMembers}
-          blockedUserIds={app.blockedUserIds}
           isElevatedViewer={app.isCurrentUserElevatedInMembersModalServer}
           canReportProfiles={app.membersModalCanCreateReports}
           canBanProfiles={app.membersModalCanManageBans}

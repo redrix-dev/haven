@@ -20,7 +20,6 @@ interface ChatAreaProps {
   channelName: string;
   channelKind: ChannelKind;
   currentUserId: string;
-  blockedUserIds: ReadonlySet<string>;
   isElevatedViewer: boolean;
   canManageMessages: boolean;
   canCreateReports: boolean;
@@ -75,7 +74,6 @@ export function ChatArea({
   channelName,
   channelKind,
   currentUserId,
-  blockedUserIds,
   isElevatedViewer,
   canManageMessages,
   canCreateReports,
@@ -250,7 +248,6 @@ export function ChatArea({
             <MessageList
               channelId={channelId}
               currentUserId={currentUserId}
-              blockedUserIds={blockedUserIds}
               isElevatedViewer={isElevatedViewer}
               canManageMessages={canManageMessages}
               canCreateReports={canCreateReports}
