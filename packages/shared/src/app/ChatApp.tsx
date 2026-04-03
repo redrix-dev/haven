@@ -93,11 +93,8 @@ export function ChatApp() {
       0,
     ),
   );
-  const { orderedServers, setOrder: setServerOrder } = useServerOrder(
-    app.user?.id ?? null,
-    app.servers,
-  );
   //STATE STORES
+  const servers = useServersStore((state) => state.servers);
   const currentServer = useNavigationStore((state) => state.currentServer);
   const setStoredServers = useServersStore((state) => state.setServers);
   const currentServerId = useNavigationStore((state) => state.currentServerId);
@@ -123,6 +120,11 @@ export function ChatApp() {
     (state) => state.setIsPanelOpen, 
   );
   // STATE STORES END
+  const { orderedServers, setOrder: setServerOrder } = useServerOrder(
+    app.user?.id ?? null,
+    servers,
+  );
+  
   const canOpenVoicePopout = desktopClient.isAvailable();
   const [voicePopoutState, setVoicePopoutState] =
     React.useState<VoicePopoutState | null>(null);
@@ -131,7 +133,7 @@ export function ChatApp() {
   const setShowVoiceSettingsModal = app.setShowVoiceSettingsModal;
   const setUserVoiceHardwareTestOpen = app.setUserVoiceHardwareTestOpen;
   const activeVoiceServer = app.activeVoiceChannel
-    ? (app.servers.find(
+    ? (servers.find(
         (server) => server.id === app.activeVoiceChannel?.community_id,
       ) ?? null)
     : null;
@@ -249,10 +251,10 @@ export function ChatApp() {
 
   // CHECKPOINT 1 COMPLETE
   React.useEffect(() => {
-    if (!hasSameServerIdOrder(app.servers, orderedServers)) {
+    if (!hasSameServerIdOrder(servers, orderedServers)) {
       setStoredServers(orderedServers);
     }
-  }, [app.servers, orderedServers, setStoredServers]);
+  }, [servers, orderedServers, setStoredServers]);
 
   React.useEffect(() => {
     if (!canOpenVoicePopout) return;
