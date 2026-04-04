@@ -136,6 +136,20 @@ type KickCommunityMemberRpcRow = {
   community_id?: unknown;
 };
 
+type ListCommunityBansRpcRow = {
+  id?: unknown;
+  community_id?: unknown;
+  banned_user_id?: unknown;
+  banned_by_user_id?: unknown;
+  reason?: unknown;
+  banned_at?: unknown;
+  revoked_at?: unknown;
+  revoked_by_user_id?: unknown;
+  revoked_reason?: unknown;
+  username?: unknown;
+  avatar_url?: unknown;
+};
+
 type MessageAuthorProfileRpcRow = {
   id?: unknown;
   username?: unknown;
@@ -1043,37 +1057,36 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listCommunityBans(communityId) {
-    const { data, error } = await supabase
-      .from('community_bans')
-      .select(
-        'id, community_id, banned_user_id, banned_by_user_id, reason, banned_at, revoked_at, revoked_by_user_id, revoked_reason, profiles:banned_user_id(username, avatar_url)'
-      )
-      .eq('community_id', communityId)
-      .is('revoked_at', null)
-      .order('banned_at', { ascending: false });
+    const { data, error } = await supabase.rpc('list_community_bans', {
+      p_community_id: communityId,
+    });
     if (error) throw error;
 
-    return (data ?? []).map((row) => {
-      const profileRaw = (row as { profiles?: unknown }).profiles;
-      const profile = Array.isArray(profileRaw) ? profileRaw[0] : profileRaw;
-      const profileRecord =
-        profile && typeof profile === 'object'
-          ? (profile as { username?: string | null; avatar_url?: string | null })
-          : null;
+    return ((data ?? []) as ListCommunityBansRpcRow[]).flatMap((row) => {
+      const id = asOptionalString(row.id);
+      const returnedCommunityId = asOptionalString(row.community_id);
+      const bannedUserId = asOptionalString(row.banned_user_id);
+      const bannedAt = asOptionalString(row.banned_at);
 
-      return {
-        id: row.id,
-        communityId: row.community_id,
-        bannedUserId: row.banned_user_id,
-        bannedByUserId: row.banned_by_user_id,
-        reason: row.reason,
-        bannedAt: row.banned_at,
-        revokedAt: row.revoked_at,
-        revokedByUserId: row.revoked_by_user_id,
-        revokedReason: row.revoked_reason,
-        username: profileRecord?.username ?? row.banned_user_id.substring(0, 12),
-        avatarUrl: profileRecord?.avatar_url ?? null,
-      } satisfies CommunityBanItem;
+      if (!id || !returnedCommunityId || !bannedUserId || !bannedAt) {
+        return [];
+      }
+
+      return [
+        {
+          id,
+          communityId: returnedCommunityId,
+          bannedUserId,
+          bannedByUserId: asOptionalString(row.banned_by_user_id),
+          reason: asOptionalString(row.reason) ?? '',
+          bannedAt,
+          revokedAt: asOptionalString(row.revoked_at),
+          revokedByUserId: asOptionalString(row.revoked_by_user_id),
+          revokedReason: asOptionalString(row.revoked_reason),
+          username: asOptionalString(row.username) ?? bannedUserId.substring(0, 12),
+          avatarUrl: asOptionalString(row.avatar_url),
+        } satisfies CommunityBanItem,
+      ];
     });
   },
 

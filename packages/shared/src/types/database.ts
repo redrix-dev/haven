@@ -2139,6 +2139,22 @@ export type Database = {
           community_name: string
         }[]
       }
+      list_community_bans: {
+        Args: { p_community_id: string }
+        Returns: {
+          avatar_url: string | null
+          banned_at: string
+          banned_by_user_id: string | null
+          banned_user_id: string
+          community_id: string
+          id: string
+          reason: string
+          revoked_at: string | null
+          revoked_by_user_id: string | null
+          revoked_reason: string | null
+          username: string | null
+        }[]
+      }
       list_dm_message_context: {
         Args: { p_after?: number; p_before?: number; p_message_id: string }
         Returns: {

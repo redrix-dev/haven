@@ -146,7 +146,7 @@ export type CommunityBanItem = {
   id: string;
   communityId: string;
   bannedUserId: string;
-  bannedByUserId: string;
+  bannedByUserId: string | null;
   reason: string;
   bannedAt: string;
   revokedAt: string | null;
