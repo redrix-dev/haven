@@ -166,8 +166,6 @@ const registerDesktopIpcHandlers = ({
       voicePopoutWindowManager?.sendControlAction(action);
     }
   );
-
-  // CHECKPOINT 2 COMPLETE
 };
 
 module.exports = {

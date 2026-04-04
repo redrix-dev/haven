@@ -408,7 +408,7 @@ export function ServerSettingsModal({
         permission.key === "manage_developer_access" ||
         permission.key === "refresh_link_previews"
       ) {
-        continue; // CHECKPOINT 3 COMPLETE
+        continue;
       }
       const metadata = COMMUNITY_PERMISSION_METADATA[permission.key];
       const ownerVisible = metadata?.ownerVisible ?? true;

@@ -59,4 +59,4 @@ drop type public.support_report_status_old;
 
 commit;
 
--- CHECKPOINT 2 COMPLETE
+

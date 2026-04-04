@@ -72,4 +72,4 @@ $$;
 revoke all on function public.delete_own_account() from public;
 grant execute on function public.delete_own_account() to authenticated;
 
--- CHECKPOINT 5 COMPLETE
+

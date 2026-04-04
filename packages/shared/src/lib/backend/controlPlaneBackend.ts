@@ -250,7 +250,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
       username,
       avatarUrl: nextAvatarUrl,
     };
-  }, // CHECKPOINT 2 COMPLETE
+  },
 
   async listUserCommunities(userId) {
     const { data, error } = await supabase

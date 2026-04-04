@@ -179,7 +179,7 @@ export function useChatAppOrchestration() {
 
   const baseUserDisplayName =
     profileUsername || user?.email?.split("@")[0] || "User";
-  const userDisplayName = baseUserDisplayName; // CHECKPOINT 1 COMPLETE
+  const userDisplayName = baseUserDisplayName;
 
   const {
     actions: { upsertProfile: upsertLiveProfile },
@@ -532,8 +532,6 @@ export function useChatAppOrchestration() {
   const handleServerAccessLossReset = useCallback(
     (serverId: string) => {
       if (!serverId) return;
-
-      // CHECKPOINT 2 COMPLETE
       useNavigationStore.getState().setCurrentServerId(null);
       useNavigationStore.getState().setCurrentServer(null);
       useNavigationStore.getState().setCurrentChannelId(null);
@@ -564,8 +562,6 @@ export function useChatAppOrchestration() {
       const losesChannelAccess =
         Boolean(input.channelId) && activeChannel.id === input.channelId;
       if (!losesServerAccess && !losesChannelAccess) return false;
-
-      // CHECKPOINT 2 COMPLETE
       await forceDisconnectVoice("access_lost");
       return true;
     },
@@ -596,7 +592,6 @@ export function useChatAppOrchestration() {
       }
 
       const toastId = `voice-disconnect:${input.reason}:${input.accessScope ?? "generic"}`;
-      // CHECKPOINT 3 COMPLETE
       toast(message, {
         id: toastId,
         action: {
@@ -642,7 +637,6 @@ export function useChatAppOrchestration() {
       handleServerAccessLossReset(serverId);
 
       const toastId = `server-access-lost:${serverId}`;
-      // CHECKPOINT 3 COMPLETE
       toast(`You have been removed from ${lostServerName}.`, {
         id: toastId,
         action: {
@@ -697,7 +691,7 @@ export function useChatAppOrchestration() {
             communityId: currentServerId,
             channelId,
             revokedUserId: user.id,
-          }); // CHECKPOINT 3 COMPLETE
+          });
         } catch (error) {
           console.error(
             "Failed to broadcast channel access revocation:",
@@ -705,7 +699,6 @@ export function useChatAppOrchestration() {
           );
         }
       }
-      // CHECKPOINT 4 COMPLETE
       purgeMessageBundleCacheForChannel(currentServerId, channelId);
       resetMessageState();
       setCurrentChannelId(nextChannelId);
@@ -1081,7 +1074,7 @@ export function useChatAppOrchestration() {
         reason: input.reason,
       });
       try {
-        await communityBackend.broadcastMemberBanned(banResult); // CHECKPOINT 4 COMPLETE
+        await communityBackend.broadcastMemberBanned(banResult);
       } catch (error) {
         console.error("Failed to broadcast member ban:", error);
       }
@@ -1133,7 +1126,7 @@ export function useChatAppOrchestration() {
               );
             },
           },
-        }); // CHECKPOINT 5 COMPLETE
+        });
       } catch (error: unknown) {
         toast.error(
           getErrorMessage(error, "Failed to remove user from the server."),
@@ -1161,7 +1154,7 @@ export function useChatAppOrchestration() {
         permissions,
       );
       if (!accessRevokedResult) return;
-      applyChannelAccessRevokedContentVisibility(accessRevokedResult); // CHECKPOINT 2 COMPLETE
+      applyChannelAccessRevokedContentVisibility(accessRevokedResult);
     },
     [
       applyChannelAccessRevokedContentVisibility,
@@ -1199,7 +1192,7 @@ export function useChatAppOrchestration() {
       });
     },
     [user, controlPlaneBackend, applyLocalProfileUpdate, upsertLiveProfile],
-  ); // CHECKPOINT 4 COMPLETE
+  );
 
   // ── Deep links ────────────────────────────────────────────────────────────
   useDeepLinks({

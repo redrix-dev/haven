@@ -85,7 +85,7 @@ export function useChannelGroups({
 
       lastAccessLostChannelIdRef.current = channelIdToValidate;
       const channelName = channelNameByIdRef.current[channelIdToValidate] ?? channelIdToValidate;
-      onActiveChannelAccessLost?.(channelIdToValidate, channelName); // CHECKPOINT 4 COMPLETE
+      onActiveChannelAccessLost?.(channelIdToValidate, channelName);
     },
     [onActiveChannelAccessLost]
   );

@@ -19,4 +19,4 @@ for each row
 when (old.is_system and new.name is distinct from old.name)
 execute function public.prevent_system_role_name_changes();
 
--- CHECKPOINT 2 COMPLETE
+

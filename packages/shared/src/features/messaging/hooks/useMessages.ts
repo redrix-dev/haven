@@ -1566,7 +1566,7 @@ export function useMessages({
       useMessagesStore.getState().setAttachments(filteredBundle.attachments);
       useMessagesStore.getState().setLinkPreviews(filteredBundle.linkPreviews);
       useMessagesStore.getState().setProfiles(nextProfiles);
-      markMessagesFresh(); // CHECKPOINT 2 COMPLETE
+      markMessagesFresh();
     },
     [
       addChannelRevokedUserIdToCache,

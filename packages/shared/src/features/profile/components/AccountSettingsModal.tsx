@@ -734,5 +734,5 @@ export function AccountSettingsModal({
       </AlertDialog>
     </>
   );
-} // CHECKPOINT 3 COMPLETE
-// CHECKPOINT 6 COMPLETE
+}
+

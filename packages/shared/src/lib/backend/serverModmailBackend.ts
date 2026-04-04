@@ -546,6 +546,6 @@ export const centralServerModmailBackend: ServerModmailBackend = {
     }
 
     await centralServerModmailBackend.updateReportStatus(reportId, 'escalated');
-    return escalatedReportId; // CHECKPOINT 3 COMPLETE
+    return escalatedReportId;
   },
 };

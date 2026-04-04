@@ -29,4 +29,4 @@ alter table public.support_reports
   add constraint support_reports_destination_check
   check (destination in ('haven_staff', 'server_admins', 'both'));
 
--- CHECKPOINT 1 COMPLETE
+

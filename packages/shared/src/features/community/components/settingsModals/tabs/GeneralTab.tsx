@@ -128,7 +128,6 @@ export function GeneralTab({
           </Button>
         </div>
       </div>
-      {/* CHECKPOINT 2 COMPLETE */}
     </div>
   );
 }

@@ -81,4 +81,4 @@ $$;
 revoke all on function public.kick_community_member(uuid, uuid) from public;
 grant execute on function public.kick_community_member(uuid, uuid) to authenticated;
 
--- CHECKPOINT 5 COMPLETE
+

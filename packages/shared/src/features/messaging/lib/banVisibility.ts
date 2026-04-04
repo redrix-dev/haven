@@ -102,7 +102,6 @@ const applyRemovedAuthorVisibilityToMessageBundle = (
     const parentId = getReplyToMessageId(message);
     const isThreadOwner = !parentId || parentId === message.id;
     if (isThreadOwner) {
-      // CHECKPOINT 5 COMPLETE
       pendingThreadRootIds.push(message.id);
     }
   }
@@ -127,7 +126,6 @@ const applyRemovedAuthorVisibilityToMessageBundle = (
       message.author_user_id &&
       removedAuthorUserIdSet.has(message.author_user_id)
     ) {
-      // CHECKPOINT 5 COMPLETE
       placeholderMessageIds.add(message.id);
       moderatedMessages.push(createRemovedReplyPlaceholder(message, options.reason));
       continue;
@@ -225,7 +223,7 @@ export const filterBlockedUserContent = (
     linkPreviews: bundle.linkPreviews.filter((preview) =>
       visibleMessageIds.has(preview.messageId)
     ),
-  }; // CHECKPOINT 5 COMPLETE
+  };
 };
 
 export const filterHiddenMessageContent = (

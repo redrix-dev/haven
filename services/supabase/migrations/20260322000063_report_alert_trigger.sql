@@ -147,4 +147,4 @@ create trigger trg_dm_message_reports_report_alert
 after insert on public.dm_message_reports
 for each row execute function public.trigger_dm_message_report_alert();
 
--- CHECKPOINT 2 COMPLETE
+

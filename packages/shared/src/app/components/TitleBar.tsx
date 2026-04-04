@@ -118,5 +118,3 @@ export function TitleBar() {
     </div>
   );
 }
-
-// CHECKPOINT 3 COMPLETE

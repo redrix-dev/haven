@@ -113,7 +113,6 @@ begin
   where cm.community_id = p_community_id
     and cm.user_id = p_target_user_id;
 
-  -- CHECKPOINT 2 COMPLETE
   return query
   select v_ban.banned_user_id, v_ban.community_id;
 end;

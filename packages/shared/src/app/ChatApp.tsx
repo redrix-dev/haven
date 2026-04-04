@@ -219,7 +219,6 @@ export function ChatApp() {
   const voicePopoutWindowOpen =
     canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
 
-  // CHECKPOINT 1 COMPLETE
   React.useEffect(() => {
     if (!hasSameServerIdOrder(servers, orderedServers)) {
       setStoredServers(orderedServers);
@@ -499,7 +498,7 @@ export function ChatApp() {
             app.serverModmailEnabled
               ? () => useUiStore.getState().setServerModmailOpen(true)
               : undefined
-          } // CHECKPOINT 6 COMPLETE
+          }
           userDisplayName={app.userDisplayName}
           userAvatarUrl={app.profileAvatarUrl}
           onOpenAccountSettings={() =>

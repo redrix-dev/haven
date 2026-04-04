@@ -65,4 +65,4 @@ create trigger trg_record_signup_tos_acceptance
 after insert on auth.users
 for each row execute function public.record_signup_tos_acceptance();
 
--- CHECKPOINT 5 COMPLETE
+

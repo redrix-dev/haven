@@ -18,4 +18,3 @@ ALTER TABLE public.notification_recipients REPLICA IDENTITY FULL;
 -- dm_messages: filtered by conversation_id on DELETE, not a PK column
 ALTER TABLE public.dm_messages REPLICA IDENTITY FULL;
 
--- CHECKPOINT 1 COMPLETE

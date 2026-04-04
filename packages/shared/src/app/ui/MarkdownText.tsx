@@ -224,5 +224,3 @@ export const MarkdownText = React.memo(function MarkdownText({
     </span>
   );
 });
-
-// CHECKPOINT 2 COMPLETE

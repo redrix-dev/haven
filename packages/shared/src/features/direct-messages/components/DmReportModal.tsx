@@ -82,7 +82,6 @@ export function DmReportModal({ open, onOpenChange, target, onSubmit }: DmReport
           <DialogDescription className="text-[#a9b8cf]">
             Reports are sent to the Haven Moderation Team for review. This is separate from server-based moderation reports.
           </DialogDescription>
-          {/* CHECKPOINT 6 COMPLETE */}
         </DialogHeader>
 
         {!submitted ? (

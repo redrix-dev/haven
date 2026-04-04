@@ -234,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (event === "SIGNED_OUT") {
         setPasswordRecoveryRequired(false);
       }
-    }); // CHECKPOINT 2 COMPLETE
+    });
 
     return () => {
       isMounted = false;
@@ -343,7 +343,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           tos_accepted_at: new Date().toISOString(),
         },
       },
-    }); // CHECKPOINT 5 COMPLETE
+    });
 
     if (error) return { error };
 

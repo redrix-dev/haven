@@ -877,7 +877,6 @@ export function ServerModmailPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {/* CHECKPOINT 5 COMPLETE */}
     </Dialog>
   );
 }

@@ -372,7 +372,6 @@ export function ServerList({
                         : directMessageUnreadCount}
                     </span>
                   )}
-                  {/* CHECKPOINT 3 COMPLETE */}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={8}>

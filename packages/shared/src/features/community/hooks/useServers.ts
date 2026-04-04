@@ -73,7 +73,7 @@ export function useServers({ onActiveServerAccessLost }: UseServersInput = {}) {
       if (lastAccessLostServerIdRef.current === currentServerId) return;
 
       lastAccessLostServerIdRef.current = currentServerId;
-      onActiveServerAccessLost?.(currentServerId); // CHECKPOINT 1 COMPLETE
+      onActiveServerAccessLost?.(currentServerId);
     },
     [onActiveServerAccessLost],
   );

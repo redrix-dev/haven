@@ -263,9 +263,6 @@ export function MessageInput({
           className="min-h-[52px] max-h-[200px] resize-none border-none bg-transparent px-0 py-0 pb-[14px] pl-14 pr-16 pt-[14px] leading-6 text-[#e6edf7] placeholder:text-[#8897b1] shadow-none focus-visible:ring-0"
         />
       </div>
-
-      {/* CHECKPOINT 3 COMPLETE */}
-      {/* CHECKPOINT 5 COMPLETE */}
       {sendError && <p className="text-xs text-[#f87171]">{sendError}</p>}
       <div
         aria-hidden="true"

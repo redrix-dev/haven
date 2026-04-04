@@ -12,4 +12,4 @@ where key = 'refresh_link_previews';
 
 commit;
 
--- CHECKPOINT 4 COMPLETE
+

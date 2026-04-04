@@ -334,7 +334,6 @@ export function LoginScreen() {
             ? 'Already have an account? Sign in'
             : "Don't have an account? Sign up"}
         </Button>
-        {/* CHECKPOINT 5 COMPLETE */}
         </CardContent>
       </Card>
 

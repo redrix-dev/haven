@@ -27,5 +27,3 @@ export function AppRoot() {
     </AuthProvider>
   );
 }
-
-// CHECKPOINT 4 COMPLETE

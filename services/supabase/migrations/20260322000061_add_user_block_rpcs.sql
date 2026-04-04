@@ -511,4 +511,4 @@ $$;
 revoke all on function public.send_dm_message(uuid, text, jsonb, jsonb) from public;
 grant execute on function public.send_dm_message(uuid, text, jsonb, jsonb) to authenticated;
 
--- CHECKPOINT 1 COMPLETE
+

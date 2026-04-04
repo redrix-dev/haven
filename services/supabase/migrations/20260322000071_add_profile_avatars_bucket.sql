@@ -46,4 +46,4 @@ using (
   and split_part(name, '/', 1) = auth.uid()::text
 );
 
--- CHECKPOINT 1 COMPLETE
+

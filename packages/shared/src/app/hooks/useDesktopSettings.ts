@@ -195,7 +195,7 @@ export function useDesktopSettings() {
           migrated: migratedNotificationAudioSettings,
         } = readWebNotificationAudioSettings();
         if (webNotificationAudioSettings && migratedNotificationAudioSettings) {
-          writeWebNotificationAudioSettings(webNotificationAudioSettings); // CHECKPOINT 3 COMPLETE
+          writeWebNotificationAudioSettings(webNotificationAudioSettings);
         }
         const webVoiceSettings = readWebVoiceSettings();
         setAppSettings({

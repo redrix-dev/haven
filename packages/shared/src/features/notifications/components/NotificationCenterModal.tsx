@@ -163,8 +163,6 @@ export function NotificationCenterModal({
   const visibleUnreadCount = visibleNotifications.filter(
     (notification) => notification.readAt == null,
   ).length;
-  // CHECKPOINT 2 COMPLETE
-
   // Retain these props until the dedicated notification settings surface is wired.
   void [
     preferences,
@@ -235,7 +233,6 @@ export function NotificationCenterModal({
           <div className="flex min-h-0 flex-1 flex-col">
             {showSettings && (
               <div className="border-b border-[#263a58] bg-[#13233c]/70 px-4 py-4">
-                {/* CHECKPOINT 1 COMPLETE */}
                 <div className="mb-4">
                   <p className="text-sm font-semibold text-white">
                     Local sound settings
@@ -447,8 +444,7 @@ export function NotificationCenterModal({
                         No notifications yet.
                       </p>
                       <p className="mt-1 text-xs text-[#90a5c4]">
-                        Friend requests will appear here once the social graph
-                        phase ships.
+                        Friend requests will appear here.
                       </p>
                     </div>
                   ) : (

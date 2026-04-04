@@ -22,4 +22,4 @@ alter table public.channel_groups
   references public.profiles(id)
   on delete set null;
 
--- CHECKPOINT COMPLETE
+
