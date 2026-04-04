@@ -3,6 +3,10 @@ begin;
 select test_support.note('suite 15: community bans list returns usernames after membership removal');
 select test_support.cleanup_fixture_domain_state();
 
+update public.profiles
+set avatar_url = 'https://example.com/member-a-bans-avatar.webp'
+where id = test_support.fixture_user_id('member_a');
+
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('community_owner'));
 
@@ -38,14 +42,15 @@ select test_support.assert_eq_text(
   'community members should still receive the banned username through list_community_bans'
 );
 
-select test_support.assert_not_null(
+select test_support.assert_eq_text(
   (
     select avatar_url
     from public.list_community_bans(test_support.fixture_community_id())
     where banned_user_id = test_support.fixture_user_id('member_a')
     limit 1
   ),
-  'list_community_bans should still surface the banned user avatar when present'
+  'https://example.com/member-a-bans-avatar.webp',
+  'list_community_bans should preserve the banned user avatar when one exists'
 );
 
 reset role;

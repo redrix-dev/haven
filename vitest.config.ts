@@ -1,5 +1,22 @@
 import path from 'node:path';
 import { defineConfig } from 'vitest/config';
+import VitestMarkdownReporter from './tooling/test-support/reporters/vitestMarkdownReporter';
+
+const markdownOutputFile =
+  process.env.VITEST_MARKDOWN === '1' || process.env.VITEST_MARKDOWN_OUTPUT_FILE
+    ? process.env.VITEST_MARKDOWN_OUTPUT_FILE || './test-results.md'
+    : null;
+
+const conditionalReporters = markdownOutputFile
+  ? [
+      'default',
+      new VitestMarkdownReporter({
+        append: process.env.VITEST_MARKDOWN_APPEND === '1',
+        outputFile: markdownOutputFile,
+        runLabel: process.env.VITEST_MARKDOWN_RUN_LABEL?.trim() || null,
+      }),
+    ]
+  : undefined;
 
 export default defineConfig({
   resolve: {
@@ -24,6 +41,7 @@ export default defineConfig({
       'packages/**/*.test.tsx',
     ],
     exclude: ['node_modules/**', 'out/**', '.webpack/**'],
+    ...(conditionalReporters ? { reporters: conditionalReporters } : {}),
   },
 });
 

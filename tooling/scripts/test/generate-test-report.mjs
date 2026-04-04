@@ -2,6 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  getVitestMarkdownOutputPath,
+  getVitestReporterEnv,
+  sanitizeCapturedText,
+} from './report-output-utils.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
@@ -369,7 +374,7 @@ function runCapture(command, args, options = {}) {
     return {
       ok: true,
       status: 0,
-      stdout: stdout ?? '',
+      stdout: sanitizeCapturedText(stdout ?? ''),
       stderr: '',
       startedAt,
       endedAt: new Date(),
@@ -382,15 +387,19 @@ function runCapture(command, args, options = {}) {
     return {
       ok: false,
       status: typeof error.status === 'number' ? error.status : 1,
-      stdout: typeof error.stdout === 'string' ? error.stdout : (error.stdout?.toString?.() ?? ''),
-      stderr: typeof error.stderr === 'string' ? error.stderr : (error.stderr?.toString?.() ?? ''),
+      stdout: sanitizeCapturedText(
+        typeof error.stdout === 'string' ? error.stdout : (error.stdout?.toString?.() ?? '')
+      ),
+      stderr: sanitizeCapturedText(
+        typeof error.stderr === 'string' ? error.stderr : (error.stderr?.toString?.() ?? '')
+      ),
       startedAt,
       endedAt: new Date(),
       durationMs: Date.now() - startedMs,
       command,
       args,
       shell: invocation.shell,
-      errorMessage: error?.message ?? String(error),
+      errorMessage: sanitizeCapturedText(error?.message ?? String(error)),
     };
   }
 }
@@ -430,7 +439,7 @@ function formatDuration(ms) {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
-function writeLogFiles(runDir, index, step, result) {
+function writeLogFiles(runDir, index, step, result, markdownPath = null) {
   const baseName = `${String(index).padStart(2, '0')}-${step.id}`;
   const combinedPath = path.join(runDir, `${baseName}.log`);
   const stdoutPath = path.join(runDir, `${baseName}.stdout.log`);
@@ -454,9 +463,21 @@ function writeLogFiles(runDir, index, step, result) {
 
   return {
     combined: path.relative(repoRoot, combinedPath).replace(/\\/g, '/'),
+    markdown:
+      markdownPath && fs.existsSync(markdownPath)
+        ? path.relative(repoRoot, markdownPath).replace(/\\/g, '/')
+        : null,
     stdout: path.relative(repoRoot, stdoutPath).replace(/\\/g, '/'),
     stderr: path.relative(repoRoot, stderrPath).replace(/\\/g, '/'),
   };
+}
+
+function summarizeMarkdown(text, maxLines = 80) {
+  const trimmed = (text ?? '').trim();
+  if (!trimmed) return '_No markdown summary captured._';
+  const lines = trimmed.split(/\r?\n/);
+  if (lines.length <= maxLines) return trimmed;
+  return `${lines.slice(0, maxLines).join('\n')}\n\n_... ${lines.length - maxLines} more lines in the linked markdown artifact._`;
 }
 
 function extractSqlSuiteBasenames(text) {
@@ -607,6 +628,9 @@ function buildReport({ runId, modeName, startedAt, endedAt, envInfo, gitInfo, no
 
   for (const { step, result, logs } of results) {
     const combinedText = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+    const markdownText = logs.markdown
+      ? fs.readFileSync(path.join(repoRoot, logs.markdown), 'utf8')
+      : null;
     lines.push('');
     lines.push(`## ${step.label}`);
     lines.push('');
@@ -615,13 +639,16 @@ function buildReport({ runId, modeName, startedAt, endedAt, envInfo, gitInfo, no
     lines.push(`- Started: ${result.startedAt.toISOString()}`);
     lines.push(`- Finished: ${result.endedAt.toISOString()}`);
     lines.push(`- Logs: \`${logs.combined}\`, \`${logs.stdout}\`, \`${logs.stderr}\``);
+    if (logs.markdown) {
+      lines.push(`- Vitest Markdown: \`${logs.markdown}\``);
+    }
     if (!result.ok && result.errorMessage) {
       lines.push(`- Error: \`${result.errorMessage.replace(/\r?\n/g, ' ')}\``);
     }
     lines.push('');
-    lines.push('### Output Excerpt');
+    lines.push(markdownText ? '### Markdown Summary' : '### Output Excerpt');
     lines.push('');
-    lines.push(summarizeOutput(combinedText));
+    lines.push(markdownText ? summarizeMarkdown(markdownText) : summarizeOutput(combinedText));
   }
 
   lines.push('');
@@ -662,8 +689,11 @@ function main() {
 
   for (const [index, step] of steps.entries()) {
     console.log(`[test-report] Running: ${step.command} ${step.args.join(' ')}`);
-    const result = runCapture(step.command, step.args);
-    const logs = writeLogFiles(runDir, index + 1, step, result);
+    const markdownPath = getVitestMarkdownOutputPath(runDir, index + 1, step);
+    const result = runCapture(step.command, step.args, {
+      env: getVitestReporterEnv(markdownPath, step.label),
+    });
+    const logs = writeLogFiles(runDir, index + 1, step, result, markdownPath);
     results.push({ step, result, logs });
     if (!result.ok) {
       failed = true;

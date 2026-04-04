@@ -2,6 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  getVitestMarkdownOutputPath,
+  getVitestReporterEnv,
+  sanitizeCapturedText,
+} from './report-output-utils.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
@@ -166,26 +171,46 @@ function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+function resolveCommandInvocation(command, args) {
+  if (process.platform !== 'win32') {
+    return { command, args, shell: false };
+  }
+
+  if (command === 'npm' || command === 'npx') {
+    return { command: 'cmd', args: ['/c', `${command}.cmd`, ...args], shell: false };
+  }
+
+  return { command, args, shell: false };
+}
+
 function safeCapture(command, args) {
-  const result = spawnSync(command, args, {
+  const invocation = resolveCommandInvocation(command, args);
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: repoRoot,
     encoding: 'utf8',
-    shell: process.platform === 'win32',
+    shell: invocation.shell,
+    windowsHide: true,
   });
   if (result.error) {
-    return { ok: false, text: result.error.message };
+    return { ok: false, text: sanitizeCapturedText(result.error.message) };
   }
-  const text = `${result.stdout || ''}${result.stderr || ''}`.trim();
+  const text = sanitizeCapturedText(`${result.stdout || ''}${result.stderr || ''}`).trim();
   return { ok: result.status === 0, text: text || '' };
 }
 
-function runCapture(command, args) {
+function runCapture(command, args, options = {}) {
+  const invocation = resolveCommandInvocation(command, args);
   const startedAt = new Date();
   const startedMs = Date.now();
-  const result = spawnSync(command, args, {
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: repoRoot,
     encoding: 'utf8',
-    shell: process.platform === 'win32',
+    shell: invocation.shell,
+    env: {
+      ...process.env,
+      ...options.env,
+    },
+    windowsHide: true,
   });
   const endedAt = new Date();
   const durationMs = Date.now() - startedMs;
@@ -193,21 +218,17 @@ function runCapture(command, args) {
     ok: result.status === 0,
     status: result.status ?? 1,
     signal: result.signal ?? null,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
-    errorMessage: result.error ? String(result.error.message || result.error) : null,
+    stdout: sanitizeCapturedText(result.stdout ?? ''),
+    stderr: sanitizeCapturedText(result.stderr ?? ''),
+    errorMessage: result.error ? sanitizeCapturedText(String(result.error.message || result.error)) : null,
     startedAt,
     endedAt,
     durationMs,
   };
 }
 
-function sanitizeFileSegment(value) {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, '-');
-}
-
-function writeStepLogs(runDir, index, step, result) {
-  const stepPrefix = `${String(index).padStart(2, '0')}-${sanitizeFileSegment(step.id)}`;
+function writeStepLogs(runDir, index, step, result, markdownPath = null) {
+  const stepPrefix = `${String(index).padStart(2, '0')}-${step.id}`;
   const stdoutPath = path.join(runDir, `${stepPrefix}.stdout.log`);
   const stderrPath = path.join(runDir, `${stepPrefix}.stderr.log`);
   const combinedPath = path.join(runDir, `${stepPrefix}.combined.log`);
@@ -218,6 +239,10 @@ function writeStepLogs(runDir, index, step, result) {
     stdout: path.relative(repoRoot, stdoutPath).replace(/\\/g, '/'),
     stderr: path.relative(repoRoot, stderrPath).replace(/\\/g, '/'),
     combined: path.relative(repoRoot, combinedPath).replace(/\\/g, '/'),
+    markdown:
+      markdownPath && fs.existsSync(markdownPath)
+        ? path.relative(repoRoot, markdownPath).replace(/\\/g, '/')
+        : null,
   };
 }
 
@@ -264,6 +289,16 @@ function buildMarkdownSignoff(data) {
     );
   }
   lines.push('');
+
+  const vitestArtifacts = data.results.filter((result) => result.logs.markdown);
+  if (vitestArtifacts.length > 0) {
+    lines.push('## Vitest Markdown Artifacts');
+    lines.push('');
+    for (const result of vitestArtifacts) {
+      lines.push(`- ${result.label}: \`${result.logs.markdown}\``);
+    }
+    lines.push('');
+  }
 
   lines.push('## Signature');
   lines.push('');
@@ -340,8 +375,11 @@ function main() {
 
   for (const [index, step] of commandSets[args.mode].entries()) {
     console.log(`[test-signoff] Running: ${step.command} ${step.args.join(' ')}`);
-    const result = runCapture(step.command, step.args);
-    const logs = writeStepLogs(runDir, index + 1, step, result);
+    const markdownPath = getVitestMarkdownOutputPath(runDir, index + 1, step);
+    const result = runCapture(step.command, step.args, {
+      env: getVitestReporterEnv(markdownPath, step.label),
+    });
+    const logs = writeStepLogs(runDir, index + 1, step, result, markdownPath);
     results.push({
       id: step.id,
       label: step.label,
