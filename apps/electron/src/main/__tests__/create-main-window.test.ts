@@ -7,7 +7,11 @@ class FakeBrowserWindow {
     openDevTools: ReturnType<typeof vi.fn>;
     toggleDevTools: ReturnType<typeof vi.fn>;
     getURL: ReturnType<typeof vi.fn>;
+    setWindowOpenHandler: ReturnType<typeof vi.fn>;
   };
+  windowOpenHandler:
+    | ((details: { url: string }) => { action: string })
+    | undefined;
 
   private readonly listeners = new Map<string, () => void>();
   loadURL = vi.fn();
@@ -20,6 +24,9 @@ class FakeBrowserWindow {
       openDevTools: vi.fn(),
       toggleDevTools: vi.fn(),
       getURL: vi.fn(() => 'http://127.0.0.1:3000/main_window'),
+      setWindowOpenHandler: vi.fn((handler) => {
+        this.windowOpenHandler = handler;
+      }),
     };
   }
 
@@ -67,6 +74,7 @@ describe('createMainWindow', () => {
     expect(window.options).toMatchObject({
       backgroundColor: '#0d1626',
     });
+    expect(window.webContents.setWindowOpenHandler).toHaveBeenCalledTimes(1);
     expect(registerNativeContextMenuFn).toHaveBeenCalledWith({
       window,
       debugContextMenu,

@@ -77,6 +77,7 @@ module.exports = {
               name: "main_window",
               preload: {
                 js: "./apps/electron/src/preload/index.js",
+                config: "./webpack.preload.config.js",
               },
             },
           ],

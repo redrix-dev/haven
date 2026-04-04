@@ -167,8 +167,12 @@ export function useChatAppOrchestration() {
     userId: user?.id,
     userEmail: user?.email,
   });
-  const notificationsPanelOpen = useNotificationsStore((state) => state.isPanelOpen);
-  const setNotificationsPanelOpen = useNotificationsStore((state) => state.setIsPanelOpen);
+  const notificationsPanelOpen = useNotificationsStore(
+    (state) => state.isPanelOpen,
+  );
+  const setNotificationsPanelOpen = useNotificationsStore(
+    (state) => state.setIsPanelOpen,
+  );
   const { status: userStatus, setStatus: setUserStatus } = useUserStatusStore();
   const { rainbowMode: rainbowMode, setRainbowMode: setRainbowMode } =
     useUserStatusStore();
@@ -532,12 +536,13 @@ export function useChatAppOrchestration() {
       // CHECKPOINT 2 COMPLETE
       useNavigationStore.getState().setCurrentServerId(null);
       useNavigationStore.getState().setCurrentServer(null);
+      useNavigationStore.getState().setCurrentChannelId(null);
+      useNavigationStore.getState().setWorkspaceMode("community");
       resetMessageState();
       resetChannelGroups();
       resetChannelsWorkspace();
       usePermissionsStore.getState().clearPermissions(serverId);
       purgeMessageBundleCacheForServer(serverId);
-      setCurrentServerId(null);
       setWorkspaceMode("community");
     },
     [
@@ -545,8 +550,6 @@ export function useChatAppOrchestration() {
       resetChannelGroups,
       resetChannelsWorkspace,
       resetMessageState,
-      setCurrentServerId,
-      setWorkspaceMode,
     ],
   );
 
@@ -1368,7 +1371,7 @@ export function useChatAppOrchestration() {
   // Sign-out reset — clear all state when user logs out.
   useEffect(() => {
     if (user) return;
-    setCurrentServerId(null);
+    useNavigationStore.getState().clearNavigation();
     resetPlatformSession();
     resetVoiceState();
     setNotificationsPanelOpen(false);

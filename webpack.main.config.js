@@ -1,4 +1,5 @@
-const path = require('path');
+const { createWebpackRules } = require('./webpack.rules');
+const { sharedResolve } = require('./webpack.shared.config');
 
 module.exports = {
   /**
@@ -9,17 +10,7 @@ module.exports = {
   devtool: 'source-map',
   // Put your normal webpack config below here
   module: {
-    rules: require('./webpack.rules'),
+    rules: createWebpackRules('tsconfig.node.json'),
   },
-  resolve: {
-    extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
-    alias: {
-      '@electron': path.resolve(__dirname, 'apps/electron/src'),
-      '@web': path.resolve(__dirname, 'apps/web/src'),
-      '@shared': path.resolve(__dirname, 'packages/shared/src'),
-      '@client': path.resolve(__dirname, 'packages/shared/src/client'),
-      '@platform': path.resolve(__dirname, 'packages/shared/src/platform'),
-      '@test-support': path.resolve(__dirname, 'tooling/test-support'),
-    },
-  },
+  resolve: sharedResolve,
 };
