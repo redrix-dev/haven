@@ -144,18 +144,6 @@ type UseMessagesInput = {
   ensureIsElevatedInServer: (communityId: string) => Promise<boolean>;
   debugChannelReloads: boolean;
   channels: Channel[];
-  // Retained for compatibility with the current orchestration call site.
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  setMessageReactions: React.Dispatch<React.SetStateAction<MessageReaction[]>>;
-  setMessageAttachments: React.Dispatch<
-    React.SetStateAction<MessageAttachment[]>
-  >;
-  setMessageLinkPreviews: React.Dispatch<
-    React.SetStateAction<MessageLinkPreview[]>
-  >;
-  setAuthorProfiles: React.Dispatch<
-    React.SetStateAction<Record<string, AuthorProfile>>
-  >;
   authorProfileCacheRef: React.MutableRefObject<Record<string, AuthorProfile>>;
 };
 

@@ -16,12 +16,8 @@ type UseChannelManagementInput = {
   currentServerId: string | null;
   currentUserId: string | null;
   currentChannelId: string | null;
-  channelSettingsTargetId: string | null;
   channels: Channel[];
   setChannels: React.Dispatch<React.SetStateAction<Channel[]>>;
-  setChannelSettingsTargetId: React.Dispatch<
-    React.SetStateAction<string | null>
-  >;
 };
 
 export function useChannelManagement({

@@ -17,8 +17,7 @@ import {
   FRIENDS_SOCIAL_PANEL_FLAG,
   VOICE_HARDWARE_DEBUG_PANEL_FLAG,
 } from "@shared/app/constants";
-import type { PendingUiConfirmation, FriendsPanelTab } from "@shared/app/types";
-import { getPendingUiConfirmationCopy } from "@shared/app/ui-confirmations";
+import type { FriendsPanelTab } from "@shared/app/types";
 import { useDesktopSettings } from "@shared/app/hooks/useDesktopSettings";
 import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommunityWorkspace";
 import { useServerAdmin } from "@shared/features/community/hooks/useServerAdmin";
@@ -39,9 +38,6 @@ import type {
   AuthorProfile,
   BanEligibleServer,
   MessageAttachment,
-  MessageLinkPreview,
-  MessageReaction,
-  Message,
   MemberBannedBroadcastPayload,
   MemberChannelAccessRevokedBroadcastPayload,
   ServerPermissions,
@@ -53,6 +49,7 @@ import { toast } from "sonner";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useNotificationsStore } from "@shared/stores/notificationsStore";
+import { useUiStore } from "@shared/stores/uiStore";
 
 // Pure utility — no hook deps, stable across renders.
 const normalizeInviteCode = (value: string): string => {
@@ -202,58 +199,13 @@ export function useChatAppOrchestration() {
   const setWorkspaceMode = useNavigationStore(
     (state) => state.setWorkspaceMode,
   );
-  const [serverModmailOpen, setServerModmailOpen] = useState(false);
   const [serverReportPermissionsById, setServerReportPermissionsById] =
     useState<Record<string, ServerPermissions>>({});
 
-  // ── Modal state ───────────────────────────────────────────────────────────
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
-  const [showJoinServerModal, setShowJoinServerModal] = useState(false);
-  const [showServerSettingsModal, setShowServerSettingsModal] = useState(false);
-  const [showChannelSettingsModal, setShowChannelSettingsModal] =
-    useState(false);
-  const [channelSettingsTargetId, setChannelSettingsTargetId] = useState<
-    string | null
-  >(null);
-  const [showAccountModal, setShowAccountModal] = useState(false);
-  const [showVoiceSettingsModal, setShowVoiceSettingsModal] = useState(false);
-  const [userVoiceHardwareTestOpen, setUserVoiceHardwareTestOpen] =
-    useState(false);
-
-  // ── Draft / confirmation state ────────────────────────────────────────────
-  const [renameServerDraft, setRenameServerDraft] = useState<{
-    serverId: string;
-    currentName: string;
-  } | null>(null);
-  const [renameChannelDraft, setRenameChannelDraft] = useState<{
-    channelId: string;
-    currentName: string;
-  } | null>(null);
-  const [renameGroupDraft, setRenameGroupDraft] = useState<{
-    groupId: string;
-    currentName: string;
-  } | null>(null);
-  const [createGroupDraft, setCreateGroupDraft] = useState<{
-    channelId: string | null;
-  } | null>(null);
-  const [pendingUiConfirmation, setPendingUiConfirmation] =
-    useState<PendingUiConfirmation | null>(null);
-
-  // ── Message / author profile state ────────────────────────────────────────
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [messageReactions, setMessageReactions] = useState<MessageReaction[]>(
-    [],
+  const showServerSettingsModal = useUiStore(
+    (state) => state.showServerSettingsModal,
   );
-  const [messageAttachments, setMessageAttachments] = useState<
-    MessageAttachment[]
-  >([]);
-  const [messageLinkPreviews, setMessageLinkPreviews] = useState<
-    MessageLinkPreview[]
-  >([]);
-  const [authorProfiles, setAuthorProfiles] = useState<
-    Record<string, AuthorProfile>
-  >({});
+
   const authorProfileCacheRef = useRef<Record<string, AuthorProfile>>({});
 
   // ── Community workspace ───────────────────────────────────────────────────
@@ -511,9 +463,10 @@ export function useChatAppOrchestration() {
     canManageInvites: serverPermissions.canManageInvites,
     refreshServers,
     onActiveServerRemoved: () => {
-      setShowServerSettingsModal(false);
-      setShowChannelSettingsModal(false);
-      setChannelSettingsTargetId(null);
+      const ui = useUiStore.getState();
+      ui.setShowServerSettingsModal(false);
+      ui.setShowChannelSettingsModal(false);
+      ui.setChannelSettingsTargetId(null);
     },
   });
 
@@ -541,15 +494,12 @@ export function useChatAppOrchestration() {
     currentServerId,
     currentUserId: user?.id ?? null,
     currentChannelId,
-    channelSettingsTargetId,
     channels,
     setChannels,
-    setChannelSettingsTargetId,
   });
 
   // ── Messages ──────────────────────────────────────────────────────────────
   const {
-    state: { hasOlderMessages, isLoadingOlderMessages },
     actions: {
       resetMessageState,
       requestOlderMessages,
@@ -572,11 +522,6 @@ export function useChatAppOrchestration() {
     ensureIsElevatedInServer,
     debugChannelReloads,
     channels,
-    setMessages,
-    setMessageReactions,
-    setMessageAttachments,
-    setMessageLinkPreviews,
-    setAuthorProfiles,
     authorProfileCacheRef,
   });
 
@@ -1272,7 +1217,7 @@ export function useChatAppOrchestration() {
   const handleLeaveServer = useCallback(
     (communityId: string) => {
       const server = servers.find((s) => s.id === communityId);
-      setPendingUiConfirmation({
+      useUiStore.getState().setPendingUiConfirmation({
         kind: "leave-server",
         communityId,
         serverName: server?.name ?? "this server",
@@ -1284,7 +1229,7 @@ export function useChatAppOrchestration() {
   const handleDeleteServer = useCallback(
     (communityId: string) => {
       const server = servers.find((s) => s.id === communityId);
-      setPendingUiConfirmation({
+      useUiStore.getState().setPendingUiConfirmation({
         kind: "delete-server",
         communityId,
         serverName: server?.name ?? "this server",
@@ -1297,7 +1242,10 @@ export function useChatAppOrchestration() {
     (communityId: string) => {
       const server = servers.find((s) => s.id === communityId);
       if (!server) return;
-      setRenameServerDraft({ serverId: communityId, currentName: server.name });
+      useUiStore.getState().setRenameServerDraft({
+        serverId: communityId,
+        currentName: server.name,
+      });
     },
     [servers],
   );
@@ -1306,7 +1254,10 @@ export function useChatAppOrchestration() {
     (channelId: string) => {
       const channel = channels.find((c) => c.id === channelId);
       if (!channel) return;
-      setRenameChannelDraft({ channelId, currentName: channel.name });
+      useUiStore.getState().setRenameChannelDraft({
+        channelId,
+        currentName: channel.name,
+      });
     },
     [channels],
   );
@@ -1315,7 +1266,7 @@ export function useChatAppOrchestration() {
     (channelId: string) => {
       const channel = channels.find((c) => c.id === channelId);
       if (!channel) return;
-      setPendingUiConfirmation({
+      useUiStore.getState().setPendingUiConfirmation({
         kind: "delete-channel",
         channelId,
         channelName: channel.name,
@@ -1325,14 +1276,19 @@ export function useChatAppOrchestration() {
   );
 
   const handleCreateChannelGroup = useCallback((channelId?: string) => {
-    setCreateGroupDraft({ channelId: channelId ?? null });
+    useUiStore.getState().setCreateGroupDraft({
+      channelId: channelId ?? null,
+    });
   }, []);
 
   const handleRenameChannelGroup = useCallback(
     (groupId: string) => {
       const group = channelGroupState.groups.find((g) => g.id === groupId);
       if (!group) return;
-      setRenameGroupDraft({ groupId, currentName: group.name });
+      useUiStore.getState().setRenameGroupDraft({
+        groupId,
+        currentName: group.name,
+      });
     },
     [channelGroupState.groups],
   );
@@ -1341,7 +1297,7 @@ export function useChatAppOrchestration() {
     (groupId: string) => {
       const group = channelGroupState.groups.find((g) => g.id === groupId);
       if (!group) return;
-      setPendingUiConfirmation({
+      useUiStore.getState().setPendingUiConfirmation({
         kind: "delete-channel-group",
         groupId,
         groupName: group.name,
@@ -1351,9 +1307,10 @@ export function useChatAppOrchestration() {
   );
 
   const confirmPendingUiAction = useCallback(() => {
-    if (!pendingUiConfirmation) return;
-    const action = pendingUiConfirmation;
-    setPendingUiConfirmation(null);
+    const ui = useUiStore.getState();
+    const action = ui.pendingUiConfirmation;
+    if (!action) return;
+    ui.setPendingUiConfirmation(null);
     switch (action.kind) {
       case "leave-server":
         void leaveServer(action.communityId).catch((error: unknown) => {
@@ -1389,21 +1346,7 @@ export function useChatAppOrchestration() {
       default:
         return;
     }
-  }, [
-    pendingUiConfirmation,
-    leaveServer,
-    deleteServer,
-    deleteChannel,
-    deleteChannelGroup,
-  ]);
-
-  // ── Pending UI confirmation copy (derived, stable) ────────────────────────
-  const {
-    title: pendingUiConfirmationTitle,
-    description: pendingUiConfirmationDescription,
-    confirmLabel: pendingUiConfirmationConfirmLabel,
-    isDestructive: pendingUiConfirmationIsDestructive,
-  } = getPendingUiConfirmationCopy(pendingUiConfirmation);
+  }, [leaveServer, deleteServer, deleteChannel, deleteChannelGroup]);
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1419,7 +1362,7 @@ export function useChatAppOrchestration() {
 
   useEffect(() => {
     if (serverModmailEnabled) return;
-    setServerModmailOpen(false); // CHECKPOINT 6 COMPLETE
+    useUiStore.getState().setServerModmailOpen(false);
   }, [serverModmailEnabled]);
 
   // Sign-out reset — clear all state when user logs out.
@@ -1428,14 +1371,11 @@ export function useChatAppOrchestration() {
     setCurrentServerId(null);
     resetPlatformSession();
     resetVoiceState();
-    setServerModmailOpen(false);
     setNotificationsPanelOpen(false);
-    setShowVoiceSettingsModal(false);
-    setUserVoiceHardwareTestOpen(false);
+    useUiStore.getState().reset();
     setFriendsPanelOpen(false);
     setWorkspaceMode("community");
     resetMessageState();
-    setAuthorProfiles({});
     authorProfileCacheRef.current = {};
     resetFeatureFlags();
     resetNotifications();
@@ -1444,21 +1384,11 @@ export function useChatAppOrchestration() {
     resetChannelsWorkspace();
     usePermissionsStore.getState().reset();
     resetServerSettingsState();
-    setShowCreateChannelModal(false);
-    setShowJoinServerModal(false);
-    setShowServerSettingsModal(false);
-    setShowChannelSettingsModal(false);
-    setChannelSettingsTargetId(null);
-    setShowAccountModal(false);
     resetServerInvites();
     resetServerRoleManagement();
     resetChannelPermissionsState();
     resetChannelGroups();
     resetMembersModal();
-    setRenameServerDraft(null);
-    setRenameChannelDraft(null);
-    setRenameGroupDraft(null);
-    setCreateGroupDraft(null);
     resetCommunityBans();
   }, [
     resetChannelGroups,
@@ -1483,25 +1413,21 @@ export function useChatAppOrchestration() {
     if (currentServerId) return;
     resetChannelsWorkspace();
     resetVoiceState();
-    setMessages([]);
-    setMessageReactions([]);
-    setMessageAttachments([]);
-    setMessageLinkPreviews([]);
-    setAuthorProfiles({});
-    setShowCreateChannelModal(false);
-    setShowJoinServerModal(false);
-    setShowServerSettingsModal(false);
-    setShowChannelSettingsModal(false);
-    setChannelSettingsTargetId(null);
+    resetMessageState();
+    useUiStore.getState().setShowCreateChannelModal(false);
+    useUiStore.getState().setShowJoinServerModal(false);
+    useUiStore.getState().setShowServerSettingsModal(false);
+    useUiStore.getState().setShowChannelSettingsModal(false);
+    useUiStore.getState().setChannelSettingsTargetId(null);
     resetServerSettingsState();
     resetServerInvites();
     resetServerRoleManagement();
     resetChannelPermissionsState();
     resetChannelGroups();
     resetMembersModal();
-    setRenameChannelDraft(null);
-    setRenameGroupDraft(null);
-    setCreateGroupDraft(null);
+    useUiStore.getState().setRenameChannelDraft(null);
+    useUiStore.getState().setRenameGroupDraft(null);
+    useUiStore.getState().setCreateGroupDraft(null);
     resetCommunityBans();
   }, [
     currentServerId,
@@ -1512,6 +1438,8 @@ export function useChatAppOrchestration() {
     resetMembersModal,
     resetServerInvites,
     resetServerRoleManagement,
+    resetServerSettingsState,
+    resetMessageState,
     resetVoiceState,
   ]);
 
@@ -1670,13 +1598,6 @@ export function useChatAppOrchestration() {
     openChannelSettingsModal,
     saveRoleChannelPermissions,
     saveMemberChannelPermissions,
-    messages,
-    messageReactions,
-    messageAttachments,
-    messageLinkPreviews,
-    authorProfiles,
-    hasOlderMessages,
-    isLoadingOlderMessages,
     requestOlderMessages,
     sendMessage,
     toggleMessageReaction,
@@ -1749,43 +1670,6 @@ export function useChatAppOrchestration() {
     reportDirectMessage,
     openDirectMessageConversation,
     setSelectedDmConversationId,
-    // ui state
-    serverModmailOpen,
-    setServerModmailOpen,
-    // modals
-    showCreateModal,
-    setShowCreateModal,
-    showCreateChannelModal,
-    setShowCreateChannelModal,
-    showJoinServerModal,
-    setShowJoinServerModal,
-    showServerSettingsModal,
-    setShowServerSettingsModal,
-    showChannelSettingsModal,
-    setShowChannelSettingsModal,
-    showAccountModal,
-    setShowAccountModal,
-    showVoiceSettingsModal,
-    setShowVoiceSettingsModal,
-    userVoiceHardwareTestOpen,
-    setUserVoiceHardwareTestOpen,
-    // drafts / confirmations
-    channelSettingsTargetId,
-    setChannelSettingsTargetId,
-    renameServerDraft,
-    setRenameServerDraft,
-    renameChannelDraft,
-    setRenameChannelDraft,
-    renameGroupDraft,
-    setRenameGroupDraft,
-    createGroupDraft,
-    setCreateGroupDraft,
-    pendingUiConfirmation,
-    setPendingUiConfirmation,
-    pendingUiConfirmationTitle,
-    pendingUiConfirmationDescription,
-    pendingUiConfirmationConfirmLabel,
-    pendingUiConfirmationIsDestructive,
     confirmPendingUiAction,
     // handle functions
     handleLeaveServer,
