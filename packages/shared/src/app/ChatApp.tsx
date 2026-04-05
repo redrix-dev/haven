@@ -4,24 +4,21 @@ import { ServerList } from "@shared/app/components/ServerList";
 import { Sidebar } from "@shared/app/components/Sidebar";
 import { ChatArea } from "@shared/features/messaging/components/ChatArea";
 import { VoiceDrawer } from "@shared/features/voice/components/VoiceDrawer";
-import { DirectMessagesSidebar } from "@shared/features/direct-messages/components/DirectMessagesSidebar";
-import { DirectMessageArea } from "@shared/features/direct-messages/components/DirectMessageArea";
-import { desktopClient } from "@platform/desktop/client";
-import { getErrorMessage } from "@platform/lib/errors";
-import { useChatAppOrchestration } from "@shared/app/hooks/useChatAppOrchestration";
-import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
-import type { VoicePopoutState } from "@platform/desktop/types";
 import { toast } from "sonner";
 import { useServerOrder } from "@shared/features/community/hooks/useServerOrder";
 import { ChatAppModals } from "@shared/app/components/ChatAppModals";
+import { ChatAppDmWorkspace } from "@shared/app/chat-app/ChatAppDmWorkspace";
+import { useChatAppVoiceIntegration } from "@shared/app/chat-app/useChatAppVoiceIntegration";
 import { useDmStore } from "@shared/stores/dmStore";
 import { useServersStore } from "@shared/stores/serversStore";
-import { useVoiceStore } from "@shared/stores/voiceStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useNotificationsStore } from "@shared/stores/notificationsStore";
 import { useSocialStore } from "@shared/stores";
 import { useUiStore } from "@shared/stores/uiStore";
+import { useChatAppOrchestration } from "@shared/app/hooks/useChatAppOrchestration";
+import { getErrorMessage } from "@platform/lib/errors";
+
 function hasSameServerIdOrder(
   left: ReadonlyArray<{ id: string }>,
   right: ReadonlyArray<{ id: string }>,
@@ -30,48 +27,15 @@ function hasSameServerIdOrder(
   return left.every((server, index) => server.id === right[index]?.id);
 }
 
-function filterBlockedUsersFromParticipantList<T extends { userId: string }>(
-  participants: ReadonlyArray<T>,
-  blockedUserIds: ReadonlySet<string>,
-  isElevatedViewer: boolean,
-) {
-  if (isElevatedViewer || blockedUserIds.size === 0) {
-    return [...participants];
-  }
-
-  return participants.filter(
-    (participant) => !blockedUserIds.has(participant.userId),
-  );
-}
-
-function filterBlockedUsersFromParticipantRecord<T extends { userId: string }>(
-  participantsByChannelId: Record<string, T[]>,
-  blockedUserIds: ReadonlySet<string>,
-  isElevatedViewer: boolean,
-) {
-  if (isElevatedViewer || blockedUserIds.size === 0) {
-    return participantsByChannelId;
-  }
-
-  return Object.fromEntries(
-    Object.entries(participantsByChannelId).map(([channelId, participants]) => [
-      channelId,
-      participants.filter(
-        (participant) => !blockedUserIds.has(participant.userId),
-      ),
-    ]),
-  ) as Record<string, T[]>;
-}
-
 export function ChatApp() {
   const app = useChatAppOrchestration();
+  const voice = useChatAppVoiceIntegration(app);
   const totalDmUnreadCount = useDmStore((state) =>
     Object.values(state.unreadCounts).reduce(
       (total, count) => total + count,
       0,
     ),
   );
-  //STATE STORES
   const servers = useServersStore((state) => state.servers);
   const currentServer = useNavigationStore((state) => state.currentServer);
   const setStoredServers = useServersStore((state) => state.setServers);
@@ -79,9 +43,6 @@ export function ChatApp() {
   const setCurrentChannelId = useNavigationStore(
     (state) => state.setCurrentChannelId,
   );
-  const voiceJoined = useVoiceStore((state) => state.joined);
-  const voiceMuted = useVoiceStore((state) => state.isMuted);
-  const voiceDeafened = useVoiceStore((state) => state.isDeafened);
   const setWorkspaceMode = useNavigationStore(
     (state) => state.setWorkspaceMode,
   );
@@ -92,122 +53,17 @@ export function ChatApp() {
     state.getPermissions(currentServerId ?? ""),
   );
   const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
-  // STATE STORES END
   const { orderedServers, setOrder: setServerOrder } = useServerOrder(
     app.user?.id ?? null,
     servers,
-  );
-  
-  const canOpenVoicePopout = desktopClient.isAvailable();
-  const [voicePopoutState, setVoicePopoutState] =
-    React.useState<VoicePopoutState | null>(null);
-  const setVoicePanelOpen = app.setVoicePanelOpen;
-  const disconnectVoiceSession = app.disconnectVoiceSession;
-  const activeVoiceServer = app.activeVoiceChannel
-    ? (servers.find(
-        (server) => server.id === app.activeVoiceChannel?.community_id,
-      ) ?? null)
-    : null;
-  const activeVoiceControllerChannel = React.useMemo(
-    () =>
-      app.activeVoiceChannel
-        ? {
-            communityId: app.activeVoiceChannel.community_id,
-            channelId: app.activeVoiceChannel.id,
-            channelName: app.activeVoiceChannel.name,
-          }
-        : null,
-    [app.activeVoiceChannel],
-  );
-  const handleVoiceSessionError = React.useCallback(
-    (message: string) => {
-      toast.error(message);
-      void disconnectVoiceSession({ triggerPaneLeave: false }).catch(
-        (error: unknown) => {
-          console.error("Failed to reset voice session after error:", error);
-        },
-      );
-    },
-    [disconnectVoiceSession],
-  );
-  const handleVoiceKickReceived = React.useCallback(() => {
-    void app
-      .forceDisconnectVoice("kicked")
-      .then(() => {
-        app.showVoiceDisconnectToast({ reason: "kicked" });
-      })
-      .catch((error: unknown) => {
-        console.error("Failed to force disconnect voice after kick:", error);
-      });
-  }, [app]);
-  const visibleVoiceChannelParticipants = React.useMemo(
-    () =>
-      filterBlockedUsersFromParticipantRecord(
-        app.voiceChannelParticipants,
-        blockedUserIds,
-        app.isCurrentUserElevatedInCurrentServer,
-      ),
-    [
-      blockedUserIds,
-      app.isCurrentUserElevatedInCurrentServer,
-      app.voiceChannelParticipants,
-    ],
-  );
-  const visibleActiveVoiceParticipantPreview = React.useMemo(
-    () =>
-      app.activeVoiceChannel
-        ? filterBlockedUsersFromParticipantList(
-            app.voiceChannelParticipants[app.activeVoiceChannel.id] ?? [],
-            blockedUserIds,
-            app.isCurrentUserElevatedInActiveVoiceServer,
-          )
-        : [],
-    [
-      app.activeVoiceChannel,
-      blockedUserIds,
-      app.isCurrentUserElevatedInActiveVoiceServer,
-      app.voiceChannelParticipants,
-    ],
   );
   const isSelectedDmConversationBlocked = React.useMemo(
     () =>
       Boolean(
         app.selectedDmConversation?.otherUserId &&
-        blockedUserIds.has(app.selectedDmConversation.otherUserId),
+          blockedUserIds.has(app.selectedDmConversation.otherUserId),
       ),
     [blockedUserIds, app.selectedDmConversation?.otherUserId],
-  );
-  const voiceController = useVoiceSessionController({
-    activeChannel: activeVoiceControllerChannel,
-    currentUserId: app.user?.id,
-    currentUserDisplayName: app.userDisplayName,
-    currentUserAvatarUrl: app.profileAvatarUrl,
-    isElevatedInActiveServer: app.isCurrentUserElevatedInActiveVoiceServer,
-    voiceSettings: app.appSettings.voice,
-    notificationAudioSettings: app.appSettings.notifications,
-    showDiagnostics: app.isPlatformStaff,
-    onUpdateVoiceSettings: (next) => {
-      void app.setVoiceSettings(next);
-    },
-    onParticipantsChange: useVoiceStore.getState().setParticipants,
-    onConnectionChange: useVoiceStore.getState().setVoiceConnected,
-    onSessionStateChange: useVoiceStore.getState().setSessionState,
-    onControlActionsReady: app.setVoiceControlActions,
-    onSessionError: handleVoiceSessionError,
-    onVoiceKick: handleVoiceKickReceived,
-  });
-  const visibleActiveVoiceParticipants = React.useMemo(
-    () =>
-      filterBlockedUsersFromParticipantList(
-        voiceController.state.participants,
-        blockedUserIds,
-        app.isCurrentUserElevatedInActiveVoiceServer,
-      ),
-    [
-      blockedUserIds,
-      app.isCurrentUserElevatedInActiveVoiceServer,
-      voiceController.state.participants,
-    ],
   );
   const managedReportServers = React.useMemo(
     () =>
@@ -216,184 +72,12 @@ export function ChatApp() {
         .map((server) => ({ id: server.id, name: server.name })),
     [app.managedReportServerIds, orderedServers],
   );
-  const voicePopoutWindowOpen =
-    canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
 
   React.useEffect(() => {
     if (!hasSameServerIdOrder(servers, orderedServers)) {
       setStoredServers(orderedServers);
     }
   }, [servers, orderedServers, setStoredServers]);
-
-  React.useEffect(() => {
-    if (!canOpenVoicePopout) return;
-
-    return desktopClient.onVoicePopoutState((nextState) => {
-      setVoicePopoutState(nextState);
-    });
-  }, [canOpenVoicePopout]);
-
-  React.useEffect(() => {
-    if (!voicePopoutWindowOpen) return;
-    setVoicePanelOpen(false);
-  }, [setVoicePanelOpen, voicePopoutWindowOpen]);
-
-  React.useEffect(() => {
-    if (!canOpenVoicePopout) return;
-
-    void desktopClient
-      .syncVoicePopoutState({
-        isOpen: voicePopoutWindowOpen,
-        serverName: activeVoiceServer?.name ?? currentServer?.name ?? null,
-        channelName: app.activeVoiceChannel?.name ?? null,
-        connected: voiceJoined,
-        joined: voiceJoined,
-        joining: voiceController.state.joining,
-        isMuted: voiceMuted,
-        isDeafened: voiceDeafened,
-        transmissionMode: app.appSettings.voice.transmissionMode,
-        participantCount:
-          visibleActiveVoiceParticipants.length + (voiceJoined ? 1 : 0),
-        selectedInputDeviceId: voiceController.state.selectedInputDeviceId,
-        selectedOutputDeviceId: voiceController.state.selectedOutputDeviceId,
-        inputDevices: voiceController.state.inputDevices.map(
-          (device, index) => ({
-            deviceId: device.deviceId,
-            label: device.label || `Microphone ${index + 1}`,
-          }),
-        ),
-        outputDevices: voiceController.state.outputDevices.map(
-          (device, index) => ({
-            deviceId: device.deviceId,
-            label: device.label || `Speaker ${index + 1}`,
-          }),
-        ),
-        supportsOutputSelection: voiceController.state.supportsOutputSelection,
-        members: visibleActiveVoiceParticipants.map((participant) => {
-          const controllerParticipant = voiceController.state.participants.find(
-            (entry) => entry.userId === participant.userId,
-          );
-          return {
-            userId: participant.userId,
-            displayName: participant.displayName,
-            isMuted: controllerParticipant?.muted ?? false,
-            isDeafened: controllerParticipant?.deafened ?? false,
-            volume:
-              voiceController.state.remoteVolumes[participant.userId] ?? 100,
-          };
-        }),
-      })
-      .catch((error: unknown) => {
-        console.error("Failed to sync voice popout state:", error);
-      });
-  }, [
-    app.activeVoiceChannel,
-    app.appSettings.voice.transmissionMode,
-    canOpenVoicePopout,
-    activeVoiceServer?.name,
-    currentServer?.name,
-    voiceDeafened,
-    voiceJoined,
-    voiceMuted,
-    visibleActiveVoiceParticipants,
-    voicePopoutWindowOpen,
-    voiceController.state.joining,
-    voiceController.state.inputDevices,
-    voiceController.state.outputDevices,
-    voiceController.state.participants,
-    voiceController.state.remoteVolumes,
-    voiceController.state.selectedInputDeviceId,
-    voiceController.state.selectedOutputDeviceId,
-    voiceController.state.supportsOutputSelection,
-  ]);
-
-  React.useEffect(() => {
-    if (!canOpenVoicePopout) return;
-
-    return desktopClient.onVoicePopoutControlAction((action) => {
-      switch (action.type) {
-        case "toggle_mute":
-          voiceController.actions.toggleMute();
-          return;
-        case "toggle_deafen":
-          voiceController.actions.toggleDeafen();
-          return;
-        case "join_voice":
-          void voiceController.actions.joinVoiceChannel();
-          return;
-        case "leave_voice":
-          void disconnectVoiceSession();
-          return;
-        case "set_transmission_mode":
-          voiceController.actions.updateVoiceSettingsPatch({
-            transmissionMode: action.mode,
-          });
-          return;
-        case "set_input_device":
-          void voiceController.actions.switchInputDevice(action.deviceId);
-          return;
-        case "set_output_device":
-          voiceController.actions.setOutputDevice(action.deviceId);
-          return;
-        case "set_member_volume":
-          voiceController.actions.setMemberVolume(action.userId, action.volume);
-          return;
-        case "open_voice_settings":
-          useUiStore.getState().setShowVoiceSettingsModal(true);
-          return;
-        case "open_voice_hardware_test":
-          useUiStore.getState().setUserVoiceHardwareTestOpen(true);
-          return;
-        default:
-          return;
-      }
-    });
-  }, [
-    canOpenVoicePopout,
-    disconnectVoiceSession,
-    voiceController.actions.setMemberVolume,
-    voiceController.actions.setOutputDevice,
-    voiceController.actions.switchInputDevice,
-    voiceController.actions.joinVoiceChannel,
-    voiceController.actions.toggleDeafen,
-    voiceController.actions.toggleMute,
-    voiceController.actions.updateVoiceSettingsPatch,
-  ]);
-
-  const handleOpenVoicePopout = React.useCallback(() => {
-    if (!canOpenVoicePopout) return;
-    setVoicePanelOpen(false);
-
-    void desktopClient.openVoicePopout().catch((error: unknown) => {
-      toast.error(getErrorMessage(error, "Failed to open voice popout."));
-    });
-  }, [canOpenVoicePopout, setVoicePanelOpen]);
-
-  const handleVoiceHeaderChannelNavigate = () => {
-    if (!app.activeVoiceChannel) return;
-
-    if (!activeVoiceServer) {
-      toast.error("This voice channel is no longer available.");
-      return;
-    }
-
-    setWorkspaceMode("community");
-    setCurrentServerId(activeVoiceServer.id);
-
-    const isKnownMissingVoiceChannelInCurrentServer =
-      activeVoiceServer.id === currentServerId &&
-      !app.channels.some(
-        (channel) =>
-          channel.id === app.activeVoiceChannel?.id && channel.kind === "voice",
-      );
-
-    if (isKnownMissingVoiceChannelInCurrentServer) {
-      toast.message("Voice channel unavailable. Opened a safe default view.");
-      return;
-    }
-
-    setCurrentChannelId(app.activeVoiceChannel.id);
-  };
 
   if (app.authStatus === "initializing") {
     return (
@@ -418,38 +102,11 @@ export function ChatApp() {
   }
 
   const { user } = app;
-  const canKickVoiceParticipants =
-    serverPermissions.isOwner ||
-    serverPermissions.canManageServer ||
-    serverPermissions.canManageMembers ||
-    serverPermissions.canManageBans;
   const canManageChannelStructure = serverPermissions.canManageChannelStructure;
   const canManageChannelPermissions =
     serverPermissions.canManageChannelPermissions;
   const canOpenChannelSettings =
     canManageChannelStructure || canManageChannelPermissions;
-
-  const handleKickVoiceParticipant = async (
-    targetUserId: string,
-    displayName: string,
-  ) => {
-    if (!canKickVoiceParticipants || !app.activeVoiceChannelId) return;
-    await voiceController.actions.kickFromVoice(
-      targetUserId,
-      app.activeVoiceChannelId,
-    );
-    toast(`${displayName} has been removed from the voice channel.`, {
-      id: `voice-kick:${app.activeVoiceChannelId}:${targetUserId}`,
-      action: {
-        label: "Dismiss",
-        onClick: () => {
-          toast.dismiss(
-            `voice-kick:${app.activeVoiceChannelId}:${targetUserId}`,
-          );
-        },
-      },
-    });
-  };
 
   return (
     <>
@@ -516,46 +173,11 @@ export function ChatApp() {
         />
 
         {app.showDmWorkspace ? (
-          <>
-            <DirectMessagesSidebar
-              currentUserDisplayName={app.userDisplayName}
-              refreshing={app.dmConversationsRefreshing}
-              error={app.dmConversationsError}
-              onSelectConversation={(conversationId) => {
-                void app
-                  .openDirectMessageConversation(conversationId)
-                  .catch((error: unknown) => {
-                    toast.error(
-                      getErrorMessage(error, "Failed to open direct message."),
-                    );
-                  });
-              }}
-              onRefresh={() => {
-                void app.refreshDmConversations({ suppressLoadingState: true });
-              }}
-            />
-            <DirectMessageArea
-              currentUserId={user.id}
-              currentUserDisplayName={app.userDisplayName}
-              messages={app.dmMessages}
-              loading={app.dmMessagesLoading}
-              sending={app.dmMessageSendPending}
-              refreshing={app.dmMessagesRefreshing}
-              error={app.dmMessagesError}
-              messagingUnavailable={isSelectedDmConversationBlocked}
-              onRefresh={() => {
-                if (!app.selectedDmConversationId) return;
-                void app.refreshDmMessages(app.selectedDmConversationId, {
-                  suppressLoadingState: true,
-                  markRead: true,
-                });
-              }}
-              onSendMessage={app.sendDirectMessage}
-              onToggleMute={app.toggleSelectedDmConversationMuted}
-              onBlockUser={app.blockDirectMessageUser}
-              onReportMessage={app.reportDirectMessage}
-            />
-          </>
+          <ChatAppDmWorkspace
+            app={app}
+            user={user}
+            isSelectedDmConversationBlocked={isSelectedDmConversationBlocked}
+          />
         ) : app.isServersLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <p className="text-[#a9b8cf]">Loading servers...</p>
@@ -578,80 +200,82 @@ export function ChatApp() {
               onChannelClick={setCurrentChannelId}
               onVoiceChannelClick={app.requestVoiceChannelJoin}
               activeVoiceChannelId={app.activeVoiceChannelId}
-              voiceChannelParticipants={visibleVoiceChannelParticipants}
+              voiceChannelParticipants={voice.visibleVoiceChannelParticipants}
               voiceStatusPanel={
-                app.activeVoiceChannel && !voicePopoutWindowOpen ? (
+                app.activeVoiceChannel && !voice.voicePopoutWindowOpen ? (
                   <VoiceDrawer
                     surface="sidebar"
                     serverName={
-                      activeVoiceServer?.name ??
+                      voice.activeVoiceServer?.name ??
                       currentServer?.name ??
                       "Unknown server"
                     }
                     channelName={app.activeVoiceChannel.name}
                     participantCount={
-                      visibleActiveVoiceParticipants.length +
-                      (voiceController.state.joined ? 1 : 0)
+                      voice.visibleActiveVoiceParticipants.length +
+                      (voice.voiceController.state.joined ? 1 : 0)
                     }
-                    participantPreview={visibleActiveVoiceParticipantPreview}
-                    memberControls={visibleActiveVoiceParticipants.map(
+                    participantPreview={voice.visibleActiveVoiceParticipantPreview}
+                    memberControls={voice.visibleActiveVoiceParticipants.map(
                       (participant) => ({
                         userId: participant.userId,
                         displayName: participant.displayName,
                         isMuted: participant.muted,
                         isDeafened: participant.deafened,
                         volume:
-                          voiceController.state.remoteVolumes[
+                          voice.voiceController.state.remoteVolumes[
                             participant.userId
                           ] ?? 100,
                       }),
                     )}
-                    voiceConnected={voiceController.state.joined}
+                    voiceConnected={voice.voiceController.state.joined}
                     voicePanelOpen={app.voicePanelOpen}
-                    joining={voiceController.state.joining}
+                    joining={voice.voiceController.state.joining}
                     voiceSessionState={{
-                      joined: voiceController.state.joined,
-                      isMuted: voiceController.state.isMuted,
-                      isDeafened: voiceController.state.isDeafened,
+                      joined: voice.voiceController.state.joined,
+                      isMuted: voice.voiceController.state.isMuted,
+                      isDeafened: voice.voiceController.state.isDeafened,
                     }}
                     transmissionMode={app.appSettings.voice.transmissionMode}
-                    inputDevices={voiceController.state.inputDevices}
-                    outputDevices={voiceController.state.outputDevices}
+                    inputDevices={voice.voiceController.state.inputDevices}
+                    outputDevices={voice.voiceController.state.outputDevices}
                     selectedInputDeviceId={
-                      voiceController.state.selectedInputDeviceId
+                      voice.voiceController.state.selectedInputDeviceId
                     }
                     selectedOutputDeviceId={
-                      voiceController.state.selectedOutputDeviceId
+                      voice.voiceController.state.selectedOutputDeviceId
                     }
                     supportsOutputSelection={
-                      voiceController.state.supportsOutputSelection
+                      voice.voiceController.state.supportsOutputSelection
                     }
                     onOpenChange={app.setVoicePanelOpen}
                     onJoin={() => {
-                      void voiceController.actions.joinVoiceChannel();
+                      void voice.voiceController.actions.joinVoiceChannel();
                     }}
-                    onToggleMute={voiceController.actions.toggleMute}
-                    onToggleDeafen={voiceController.actions.toggleDeafen}
+                    onToggleMute={voice.voiceController.actions.toggleMute}
+                    onToggleDeafen={voice.voiceController.actions.toggleDeafen}
                     onDisconnect={() => {
                       void app.disconnectVoiceSession();
                     }}
                     onSelectTransmissionMode={(mode) => {
-                      voiceController.actions.updateVoiceSettingsPatch({
+                      voice.voiceController.actions.updateVoiceSettingsPatch({
                         transmissionMode: mode,
                       });
                     }}
                     onSelectInputDevice={(deviceId) => {
-                      void voiceController.actions.switchInputDevice(deviceId);
+                      void voice.voiceController.actions.switchInputDevice(
+                        deviceId,
+                      );
                     }}
                     onSelectOutputDevice={
-                      voiceController.actions.setOutputDevice
+                      voice.voiceController.actions.setOutputDevice
                     }
-                    onSetMemberVolume={voiceController.actions.setMemberVolume}
+                    onSetMemberVolume={voice.voiceController.actions.setMemberVolume}
                     onResetMemberVolume={
-                      voiceController.actions.resetMemberVolume
+                      voice.voiceController.actions.resetMemberVolume
                     }
                     onResetAllMemberVolumes={
-                      voiceController.actions.resetAllMemberVolumes
+                      voice.voiceController.actions.resetAllMemberVolumes
                     }
                     onOpenAdvancedOptions={() =>
                       useUiStore.getState().setShowVoiceSettingsModal(true)
@@ -659,8 +283,8 @@ export function ChatApp() {
                     onOpenVoiceHardwareTest={() =>
                       useUiStore.getState().setUserVoiceHardwareTestOpen(true)
                     }
-                    canOpenVoicePopout={canOpenVoicePopout}
-                    onOpenVoicePopout={handleOpenVoicePopout}
+                    canOpenVoicePopout={voice.canOpenVoicePopout}
+                    onOpenVoicePopout={voice.handleOpenVoicePopout}
                   />
                 ) : null
               }
@@ -837,21 +461,21 @@ export function ChatApp() {
         app={app}
         user={user}
         managedReportServers={managedReportServers}
-        voiceSession={voiceController}
-        visibleActiveVoiceParticipants={visibleActiveVoiceParticipants}
-        canOpenVoicePopout={canOpenVoicePopout}
-        canKickVoiceParticipants={canKickVoiceParticipants}
-        handleOpenVoicePopout={handleOpenVoicePopout}
-        handleKickVoiceParticipant={handleKickVoiceParticipant}
+        voiceSession={voice.voiceController}
+        visibleActiveVoiceParticipants={voice.visibleActiveVoiceParticipants}
+        canOpenVoicePopout={voice.canOpenVoicePopout}
+        canKickVoiceParticipants={voice.canKickVoiceParticipants}
+        handleOpenVoicePopout={voice.handleOpenVoicePopout}
+        handleKickVoiceParticipant={voice.handleKickVoiceParticipant}
       />
-      {Object.keys(voiceController.state.remoteStreams).map((userId) => (
+      {Object.keys(voice.voiceController.state.remoteStreams).map((userId) => (
         <audio
           key={userId}
           autoPlay
           playsInline
           className="hidden"
           ref={(element) => {
-            voiceController.actions.bindAudioElement(userId, element);
+            voice.voiceController.actions.bindAudioElement(userId, element);
           }}
         />
       ))}

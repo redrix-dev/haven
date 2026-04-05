@@ -24,6 +24,7 @@
     "test:db:rls": "node tooling/scripts/test/run-supabase-sql-suite.mjs",
     "test:db:quick": "node tooling/scripts/test/run-supabase-sql-suite.mjs --skip-fixtures",
     "test:db": "node tooling/scripts/test/run-db-suite.mjs",
+    "check:migrations-parity": "node tooling/scripts/test/check-supabase-migrations-parity.mjs",
     "test:notifications:smoke": "node tooling/scripts/test/run-notification-dispatch-smoke.mjs",
     "test:signoff": "node tooling/scripts/test/generate-test-signoff.mjs",
     "test:signoff:release": "node tooling/scripts/test/generate-test-signoff.mjs --mode release",

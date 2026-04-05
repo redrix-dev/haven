@@ -18,6 +18,10 @@ This directory contains the SQL-first RLS and RPC regression suite for Haven.
 - `fixtures/` — baseline deterministic fixture data shared by SQL + backend tests
 - `sql/` — domain suites (core permissions, notifications, social, DMs, moderation, mentions)
 
+## Migrations (canonical vs mirror)
+- **Canonical (commit here):** `services/supabase/migrations/` — used by the Supabase CLI with `--workdir services` (see `tooling/scripts/test/resolve-supabase-local-env.mjs`).
+- **Repo-root mirror:** `supabase/migrations/` may exist as a duplicate tree; it must stay **byte-identical** to the canonical folder. `npm run check:migrations-parity` verifies this; `npm run test:db` runs that check first.
+
 ## Notes
 - Tests use `SET LOCAL ROLE ...` + `request.jwt.claim.*` settings to exercise RLS.
 - Most suites run inside `BEGIN; ... ROLLBACK;` so data changes do not persist.

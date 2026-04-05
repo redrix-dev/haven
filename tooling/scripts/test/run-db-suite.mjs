@@ -96,6 +96,7 @@ async function waitForAuthAdminReady(timeoutMs = 60000) {
 }
 
 async function main() {
+  run('node', ['tooling/scripts/test/check-supabase-migrations-parity.mjs']);
   const cli = getSupabaseCliCommand();
   ensureSupabaseRunning(cli);
   let resetHadNonZero = false;

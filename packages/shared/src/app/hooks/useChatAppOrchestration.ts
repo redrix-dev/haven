@@ -1690,3 +1690,5 @@ export function useChatAppOrchestration() {
     getPlatformInviteBaseUrl,
   };
 }
+
+export type ChatAppOrchestrationApi = ReturnType<typeof useChatAppOrchestration>;
