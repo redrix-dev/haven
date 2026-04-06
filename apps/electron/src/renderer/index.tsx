@@ -2,8 +2,11 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
+import { registerElectronAppHost } from './registerElectronAppHost';
 import { AppRoot } from '@shared/app/AppRoot';
 import '@shared/styles/globals.css';
+
+registerElectronAppHost();
 
 const root = createRoot(document.body);
 

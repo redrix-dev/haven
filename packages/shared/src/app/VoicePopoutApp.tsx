@@ -1,7 +1,7 @@
 import React from 'react';
 import { VoiceDrawer as VoiceQuickControlsDrawer } from '@shared/features/voice/components/VoiceDrawer';
-import { desktopClient } from '@platform/desktop/client';
-import type { VoicePopoutControlAction, VoicePopoutState } from '@platform/desktop/types';
+import type { VoicePopoutControlAction, VoicePopoutState } from '@shared/platform/desktop/types';
+import { getAppHost } from '@shared/platform/appHost';
 
 const EMPTY_STATE: VoicePopoutState = {
   isOpen: false,
@@ -27,17 +27,19 @@ export function VoicePopoutApp() {
   const [quickSettingsOpen, setQuickSettingsOpen] = React.useState(false);
 
   React.useEffect(() => {
-    if (!desktopClient.isAvailable()) return;
-    const unsubscribe = desktopClient.onVoicePopoutState((nextState) => {
+    const bridge = getAppHost().voicePopout;
+    if (!bridge) return;
+    const unsubscribe = bridge.onVoicePopoutState((nextState) => {
       setState(nextState);
     });
-    void desktopClient.requestVoicePopoutStateSync();
+    void bridge.requestVoicePopoutStateSync();
     return unsubscribe;
   }, []);
 
   const dispatch = React.useCallback((action: VoicePopoutControlAction) => {
-    if (!desktopClient.isAvailable()) return;
-    void desktopClient.dispatchVoicePopoutControlAction(action);
+    const bridge = getAppHost().voicePopout;
+    if (!bridge) return;
+    void bridge.dispatchVoicePopoutControlAction(action);
   }, []);
 
   return (

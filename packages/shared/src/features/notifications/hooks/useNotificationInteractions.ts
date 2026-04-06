@@ -8,7 +8,6 @@ import { getNotificationPayloadString } from '@shared/app/utils';
 type UseNotificationInteractionsInput = {
   notificationBackend: Pick<NotificationBackend, 'markNotificationsRead' | 'dismissNotifications'>;
   socialBackend: Pick<SocialBackend, 'acceptFriendRequest' | 'declineFriendRequest'>;
-  friendsSocialPanelEnabled: boolean;
   refreshNotificationInbox: (options?: { playSoundsForNew?: boolean }) => Promise<void>;
   refreshSocialCounts: () => Promise<void>;
   setNotificationsError: React.Dispatch<React.SetStateAction<string | null>>;
@@ -20,7 +19,6 @@ type UseNotificationInteractionsInput = {
 export function useNotificationInteractions({
   notificationBackend,
   socialBackend,
-  friendsSocialPanelEnabled,
   refreshNotificationInbox,
   refreshSocialCounts,
   setNotificationsError,
@@ -41,9 +39,6 @@ export function useNotificationInteractions({
             break;
           }
           case 'friend_request_received': {
-            if (!friendsSocialPanelEnabled) {
-              throw new Error('Friends are not enabled for your account.');
-            }
             onOpenFriendsPanel({
               tab: 'requests',
               highlightedRequestId: getNotificationPayloadString(notification, 'friendRequestId'),
@@ -51,9 +46,6 @@ export function useNotificationInteractions({
             break;
           }
           case 'friend_request_accepted': {
-            if (!friendsSocialPanelEnabled) {
-              throw new Error('Friends are not enabled for your account.');
-            }
             onOpenFriendsPanel({
               tab: 'friends',
               highlightedRequestId: null,
@@ -82,7 +74,6 @@ export function useNotificationInteractions({
       }
     },
     [
-      friendsSocialPanelEnabled,
       notificationBackend,
       onOpenChannelMention,
       onOpenDmConversation,

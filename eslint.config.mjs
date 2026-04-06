@@ -16,7 +16,7 @@ const rendererBoundaryRestrictions = [
   {
     group: ['@platform/ipc/*', '**/platform/ipc/*'],
     message:
-      'Renderer/features must not import shared/ipc. Use @platform/desktop/client for desktop capabilities.',
+      'Renderer/features must not import shared/ipc. Use getAppHost() from @shared/platform/appHost (registered in the Electron renderer) for desktop capabilities.',
   },
   {
     group: ['@electron/main/*', '**/apps/electron/src/main/*'],
@@ -63,12 +63,14 @@ export default [
         {
           object: 'window',
           property: 'desktop',
-          message: 'Use @platform/desktop/client instead of window.desktop directly.',
+          message:
+            'Use getAppHost() from @shared/platform/appHost in app code; only packages/shared/src/platform/desktop/client.ts may read window.desktop.',
         },
         {
           object: 'window',
           property: 'havenDesktop',
-          message: 'Use @platform/desktop/client instead of legacy window.havenDesktop access.',
+          message:
+            'Use getAppHost() from @shared/platform/appHost instead of legacy window.havenDesktop access.',
         },
       ],
     },
@@ -77,6 +79,36 @@ export default [
     files: ['packages/shared/src/platform/desktop/client.ts'],
     rules: {
       'no-restricted-properties': 'off',
+    },
+  },
+  {
+    files: [
+      'packages/shared/src/app/hooks/useChatAppOrchestration.ts',
+      'packages/shared/src/app/components/ChatAppModals.tsx',
+    ],
+    rules: {
+      'max-lines': [
+        'warn',
+        { max: 550, skipBlankLines: true, skipComments: true },
+      ],
+    },
+  },
+  {
+    files: ['packages/shared/src/**/*.{ts,tsx}'],
+    ignores: ['packages/shared/src/platform/desktop/client.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@platform/desktop/client',
+              message:
+                'Import getAppHost from @shared/platform/appHost instead. Electron registers the real bridge in apps/electron/src/renderer/registerElectronAppHost.ts.',
+            },
+          ],
+        },
+      ],
     },
   },
   {

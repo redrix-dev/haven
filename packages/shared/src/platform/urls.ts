@@ -1,4 +1,4 @@
-import { desktopClient } from '@platform/desktop/client';
+import { getAppHost } from '@shared/platform/appHost';
 
 const DESKTOP_AUTH_CONFIRM_REDIRECT_URL = 'haven://auth/confirm';
 const DESKTOP_INVITE_BASE_URL = 'haven://invite/';
@@ -17,7 +17,7 @@ const getBrowserOrigin = (): string | null => {
 };
 
 export const getPlatformAuthConfirmRedirectUrl = (): string => {
-  if (desktopClient.isAvailable()) return DESKTOP_AUTH_CONFIRM_REDIRECT_URL;
+  if (getAppHost().isDesktopApp()) return DESKTOP_AUTH_CONFIRM_REDIRECT_URL;
 
   const origin = getBrowserOrigin();
   if (!origin) return DESKTOP_AUTH_CONFIRM_REDIRECT_URL;
@@ -26,7 +26,7 @@ export const getPlatformAuthConfirmRedirectUrl = (): string => {
 };
 
 export const getPlatformInviteBaseUrl = (): string => {
-  if (desktopClient.isAvailable()) return DESKTOP_INVITE_BASE_URL;
+  if (getAppHost().isDesktopApp()) return DESKTOP_INVITE_BASE_URL;
 
   const origin = getBrowserOrigin();
   if (!origin) return DESKTOP_INVITE_BASE_URL;
@@ -38,12 +38,6 @@ export const getPlatformInviteInputPlaceholder = (): string =>
   `ABC12345 or ${getPlatformInviteBaseUrl()}ABC12345`;
 
 export const openPlatformExternalUrl = async (url: string): Promise<void> => {
-  if (desktopClient.isAvailable()) {
-    await desktopClient.openExternalUrl(url);
-    return;
-  }
-
-  if (typeof window === 'undefined') return;
-  window.open(url, '_blank', 'noopener,noreferrer');
+  await getAppHost().openExternalUrl(url);
 };
 

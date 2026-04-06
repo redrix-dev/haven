@@ -7,15 +7,13 @@ import {
   normalizeDeepLinkPathname,
   WebAppDeepLinkTarget,
 } from "@shared/lib/deepLinks";
-import { desktopClient } from "@platform/desktop/client";
+import { getAppHost } from "@shared/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
 import { toast } from "sonner";
 import type { FriendsPanelTab } from "@shared/app/types";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 interface UseDeepLinksOptions {
   user: { id: string } | null;
-  featureFlagsLoaded: boolean;
-  friendsSocialPanelEnabled: boolean;
   joinServerByInvite: (
     code: string,
   ) => Promise<{ joined: boolean; communityName: string }>;
@@ -30,8 +28,6 @@ interface UseDeepLinksOptions {
 
 export function useDeepLinks({
   user,
-  featureFlagsLoaded,
-  friendsSocialPanelEnabled,
   joinServerByInvite,
   openDirectMessageConversation,
   setNotificationsPanelOpen,
@@ -115,20 +111,6 @@ export function useDeepLinks({
         return false;
       }
 
-      const requiresFeatureFlags =
-        target.kind === "dm_message" ||
-        target.kind === "friend_request_received" ||
-        target.kind === "friend_request_accepted";
-
-      if (!featureFlagsLoaded && requiresFeatureFlags) {
-        pendingWebDeepLinkRef.current = {
-          target,
-          clearBrowserUrlAfterOpen: Boolean(options?.clearBrowserUrlAfterOpen),
-          dedupeKey,
-        };
-        return false;
-      }
-
       try {
         switch (target.kind) {
           case "invite": {
@@ -148,9 +130,6 @@ export function useDeepLinks({
             break;
           }
           case "friend_request_received": {
-            if (!friendsSocialPanelEnabled) {
-              throw new Error("Friends are not enabled for your account.");
-            }
             setFriendsPanelRequestedTab("requests");
             setFriendsPanelHighlightedRequestId(target.friendRequestId);
             setFriendsPanelOpen(true);
@@ -158,9 +137,6 @@ export function useDeepLinks({
             break;
           }
           case "friend_request_accepted": {
-            if (!friendsSocialPanelEnabled) {
-              throw new Error("Friends are not enabled for your account.");
-            }
             setFriendsPanelRequestedTab("friends");
             setFriendsPanelHighlightedRequestId(null);
             setFriendsPanelOpen(true);
@@ -194,8 +170,6 @@ export function useDeepLinks({
     },
     [
       clearBrowserDeepLinkUrl,
-      featureFlagsLoaded,
-      friendsSocialPanelEnabled,
       joinServerByInvite,
       openDirectMessageConversation,
       setCurrentChannelId,
@@ -211,7 +185,7 @@ export function useDeepLinks({
 
   // Handle deep link in the initial page URL for the browser client.
   useEffect(() => {
-    if (desktopClient.isAvailable()) return;
+    if (getAppHost().isDesktopApp()) return;
     if (typeof window === "undefined") return;
 
     const currentUrl = window.location.href;
@@ -224,9 +198,9 @@ export function useDeepLinks({
     });
   }, [openWebDeepLinkTarget]);
 
-  // Flush any deep link that was queued before auth or feature flags were ready
+  // Flush any deep link that was queued before auth.
   useEffect(() => {
-    if (!user || !featureFlagsLoaded) return;
+    if (!user) return;
     const pending = pendingWebDeepLinkRef.current;
     if (!pending) return;
 
@@ -235,7 +209,7 @@ export function useDeepLinks({
       clearBrowserUrlAfterOpen: pending.clearBrowserUrlAfterOpen,
       dedupeKey: pending.dedupeKey,
     });
-  }, [featureFlagsLoaded, openWebDeepLinkTarget, user]);
+  }, [openWebDeepLinkTarget, user]);
 
   return { openWebDeepLinkTarget, clearBrowserDeepLinkUrl };
 }

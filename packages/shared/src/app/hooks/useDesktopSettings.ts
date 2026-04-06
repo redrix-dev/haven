@@ -1,5 +1,5 @@
 import React from 'react';
-import { desktopClient } from '@platform/desktop/client';
+import { getAppHost } from '@shared/platform/appHost';
 import type {
   AppSettings,
   NotificationAudioSettings,
@@ -188,7 +188,8 @@ export function useDesktopSettings() {
     let isMounted = true;
 
     const loadDesktopSettings = async () => {
-      if (!desktopClient.isAvailable()) {
+      const settingsBridge = getAppHost().desktopSettings;
+      if (!getAppHost().isDesktopApp() || !settingsBridge) {
         if (!isMounted) return;
         const {
           settings: webNotificationAudioSettings,
@@ -211,8 +212,8 @@ export function useDesktopSettings() {
       }
 
       const [settingsResult, updaterResult] = await Promise.allSettled([
-        desktopClient.getAppSettings(),
-        desktopClient.getUpdaterStatus(),
+        settingsBridge.getAppSettings(),
+        settingsBridge.getUpdaterStatus(),
       ]);
 
       if (!isMounted) return;
@@ -246,13 +247,14 @@ export function useDesktopSettings() {
   }, []);
 
   const setAutoUpdateEnabled = React.useCallback(async (enabled: boolean) => {
-    if (!desktopClient.isAvailable()) {
+    const settingsBridge = getAppHost().desktopSettings;
+    if (!getAppHost().isDesktopApp() || !settingsBridge) {
       setAppSettings((current) => ({ ...current, autoUpdateEnabled: false }));
       setUpdaterStatus(makeFallbackUpdaterStatus('unsupported_platform', 'Desktop bridge unavailable.'));
       return;
     }
 
-    const result = await desktopClient.setAutoUpdateEnabled(enabled);
+    const result = await settingsBridge.setAutoUpdateEnabled(enabled);
     setAppSettings(result.settings);
     setUpdaterStatus(result.updaterStatus);
   }, []);
@@ -261,7 +263,8 @@ export function useDesktopSettings() {
     setNotificationAudioSettingsSaving(true);
     setNotificationAudioSettingsError(null);
     try {
-      if (!desktopClient.isAvailable()) {
+      const settingsBridge = getAppHost().desktopSettings;
+      if (!getAppHost().isDesktopApp() || !settingsBridge) {
         writeWebNotificationAudioSettings(values);
         setAppSettings((current) => ({
           ...current,
@@ -272,7 +275,7 @@ export function useDesktopSettings() {
         return;
       }
 
-      const result = await desktopClient.setNotificationAudioSettings(values);
+      const result = await settingsBridge.setNotificationAudioSettings(values);
       setAppSettings(result.settings);
     } catch (error) {
       setNotificationAudioSettingsError(
@@ -287,7 +290,8 @@ export function useDesktopSettings() {
     setVoiceSettingsSaving(true);
     setVoiceSettingsError(null);
     try {
-      if (!desktopClient.isAvailable()) {
+      const settingsBridge = getAppHost().desktopSettings;
+      if (!getAppHost().isDesktopApp() || !settingsBridge) {
         writeWebVoiceSettings(values);
         setAppSettings((current) => ({
           ...current,
@@ -298,7 +302,7 @@ export function useDesktopSettings() {
         return;
       }
 
-      const result = await desktopClient.setVoiceSettings(values);
+      const result = await settingsBridge.setVoiceSettings(values);
       setAppSettings(result.settings);
     } catch (error) {
       setVoiceSettingsError(getErrorMessage(error, 'Failed to update voice settings.'));
@@ -310,12 +314,13 @@ export function useDesktopSettings() {
   const checkForUpdatesNow = React.useCallback(async () => {
     setCheckingForUpdates(true);
     try {
-      if (!desktopClient.isAvailable()) {
+      const settingsBridge = getAppHost().desktopSettings;
+      if (!getAppHost().isDesktopApp() || !settingsBridge) {
         setUpdaterStatus(makeFallbackUpdaterStatus('unsupported_platform', 'Desktop bridge unavailable.'));
         return;
       }
 
-      const status = await desktopClient.checkForUpdates();
+      const status = await settingsBridge.checkForUpdates();
       setUpdaterStatus(status);
     } finally {
       setCheckingForUpdates(false);

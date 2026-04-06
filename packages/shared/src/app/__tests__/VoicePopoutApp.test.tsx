@@ -4,14 +4,15 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VoicePopoutApp } from '@shared/app/VoicePopoutApp';
-import type { VoicePopoutControlAction, VoicePopoutState } from '@platform/desktop/types';
+import type { VoicePopoutControlAction, VoicePopoutState } from '@shared/platform/desktop/types';
+import type { AppHost } from '@shared/platform/appHost';
 
-const popoutMocks = vi.hoisted(() => {
+const { popoutMocks, makeTestAppHost } = vi.hoisted(() => {
   const listeners: Array<(state: VoicePopoutState) => void> = [];
   const dispatchVoicePopoutControlAction = vi.fn();
   const requestVoicePopoutStateSync = vi.fn();
 
-  return {
+  const popoutMocks = {
     listeners,
     dispatchVoicePopoutControlAction,
     requestVoicePopoutStateSync,
@@ -21,29 +22,45 @@ const popoutMocks = vi.hoisted(() => {
       requestVoicePopoutStateSync.mockClear();
     },
   };
+
+  function makeTestAppHost(): AppHost {
+    return {
+      isDesktopApp: () => true,
+      openExternalUrl: async () => {},
+      saveFileFromUrl: async () => ({ saved: false, filePath: null }),
+      voicePopout: {
+        onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => {
+          popoutMocks.listeners.push(listener);
+          return () => {
+            const index = popoutMocks.listeners.indexOf(listener);
+            if (index >= 0) {
+              popoutMocks.listeners.splice(index, 1);
+            }
+          };
+        },
+        syncVoicePopoutState: async () => {},
+        onVoicePopoutControlAction: () => () => {},
+        openVoicePopout: async () => {},
+        requestVoicePopoutStateSync: () => popoutMocks.requestVoicePopoutStateSync(),
+        dispatchVoicePopoutControlAction: (action: VoicePopoutControlAction) =>
+          popoutMocks.dispatchVoicePopoutControlAction(action),
+      },
+    };
+  }
+
+  return { popoutMocks, makeTestAppHost };
 });
 
-vi.mock('@platform/desktop/client', () => ({
-  desktopClient: {
-    isAvailable: () => true,
-    requestVoicePopoutStateSync: () => popoutMocks.requestVoicePopoutStateSync(),
-    dispatchVoicePopoutControlAction: (action: VoicePopoutControlAction) =>
-      popoutMocks.dispatchVoicePopoutControlAction(action),
-    onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => {
-      popoutMocks.listeners.push(listener);
-      return () => {
-        const index = popoutMocks.listeners.indexOf(listener);
-        if (index >= 0) {
-          popoutMocks.listeners.splice(index, 1);
-        }
-      };
-    },
-  },
+vi.mock('@shared/platform/appHost', () => ({
+  getAppHost: vi.fn(() => makeTestAppHost()),
 }));
+
+import { getAppHost } from '@shared/platform/appHost';
 
 describe('VoicePopoutApp', () => {
   beforeEach(() => {
     popoutMocks.reset();
+    vi.mocked(getAppHost).mockReturnValue(makeTestAppHost());
   });
 
   it('renders synced call state immediately and reuses the quick settings popover', async () => {

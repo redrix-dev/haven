@@ -8,13 +8,9 @@ import {
   getNotificationBackend,
   getSocialBackend,
 } from "@shared/lib/backend";
-import { desktopClient } from "@platform/desktop/client";
 import { getPlatformInviteBaseUrl } from "@platform/urls";
-import { getErrorMessage } from "@platform/lib/errors";
-import { installPromptTrap } from "@shared/lib/contextMenu/debugTrace";
 import {
   ENABLE_CHANNEL_RELOAD_DIAGNOSTICS,
-  FRIENDS_SOCIAL_PANEL_FLAG,
   VOICE_HARDWARE_DEBUG_PANEL_FLAG,
 } from "@shared/app/constants";
 import type { FriendsPanelTab } from "@shared/app/types";
@@ -36,33 +32,21 @@ import { useLiveProfiles } from "@shared/features/profile/hooks/useLiveProfiles"
 import { usePlatformSession } from "@shared/features/profile/hooks/usePlatformSession";
 import type {
   AuthorProfile,
-  BanEligibleServer,
-  MessageAttachment,
   MemberBannedBroadcastPayload,
   MemberChannelAccessRevokedBroadcastPayload,
-  ServerPermissions,
 } from "@shared/lib/backend/types";
-import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
 import { useServersStore } from "@shared/stores/serversStore";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
-import { toast } from "sonner";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useNotificationsStore } from "@shared/stores/notificationsStore";
 import { useUiStore } from "@shared/stores/uiStore";
-
-// Pure utility — no hook deps, stable across renders.
-const normalizeInviteCode = (value: string): string => {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  const maybeFromPath = trimmed.split("?")[0].replace(/\/+$/, "");
-  if (maybeFromPath.includes("/")) {
-    const pathSegments = maybeFromPath.split("/").filter(Boolean);
-    const lastSegment = pathSegments[pathSegments.length - 1];
-    if (lastSegment) return lastSegment.toUpperCase();
-  }
-  return maybeFromPath.toUpperCase();
-};
+import { usePermissionsReportSlice } from "@shared/app/chat-app/controllers/usePermissionsReportSlice";
+import { useChatAppAccessAndBroadcastOrchestration } from "@shared/app/chat-app/controllers/useChatAppAccessAndBroadcastOrchestration";
+import { useChatAppElevationEffects } from "@shared/app/chat-app/controllers/useChatAppElevationEffects";
+import { useChatAppBusinessActions } from "@shared/app/chat-app/controllers/useChatAppBusinessActions";
+import { useChatAppConfirmationHandlers } from "@shared/app/chat-app/controllers/useChatAppConfirmationHandlers";
+import { useChatAppLifecycleEffects } from "@shared/app/chat-app/controllers/useChatAppLifecycleEffects";
 
 export function useChatAppOrchestration() {
   const activeServerAccessLostHandlerRef = useRef<(serverId: string) => void>(
@@ -142,9 +126,11 @@ export function useChatAppOrchestration() {
   });
   const isServersLoading = serversStatus === "loading";
 
+  const { managedReportServerIds, serverModmailEnabled } =
+    usePermissionsReportSlice(user?.id, servers);
+
   // ── Feature flags ─────────────────────────────────────────────────────────
   const {
-    state: { featureFlagsLoaded },
     derived: { hasFeatureFlag },
     actions: { resetFeatureFlags },
   } = useFeatureFlags({ controlPlaneBackend, userId: user?.id });
@@ -155,9 +141,6 @@ export function useChatAppOrchestration() {
   const voiceHardwareDebugPanelEnabled = hasFeatureFlag(
     VOICE_HARDWARE_DEBUG_PANEL_FLAG,
   );
-  const friendsSocialPanelEnabled = hasFeatureFlag(FRIENDS_SOCIAL_PANEL_FLAG);
-  const dmWorkspaceEnabled = friendsSocialPanelEnabled;
-
   // ── Platform session ──────────────────────────────────────────────────────
   const {
     state: { profileUsername, profileAvatarUrl, isPlatformStaff },
@@ -203,9 +186,6 @@ export function useChatAppOrchestration() {
   const setWorkspaceMode = useNavigationStore(
     (state) => state.setWorkspaceMode,
   );
-  const [serverReportPermissionsById, setServerReportPermissionsById] =
-    useState<Record<string, ServerPermissions>>({});
-
   const showServerSettingsModal = useUiStore(
     (state) => state.showServerSettingsModal,
   );
@@ -258,50 +238,7 @@ export function useChatAppOrchestration() {
   const canManageCurrentServer =
     serverPermissions.isOwner || serverPermissions.canManageServer;
 
-  const dmWorkspaceIsActive = dmWorkspaceEnabled && workspaceMode === "dm";
-  const managedReportServerIds = servers
-    .filter(
-      (server) => serverReportPermissionsById[server.id]?.canManageReports,
-    )
-    .map((server) => server.id);
-  const serverModmailEnabled = managedReportServerIds.length > 0;
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!user?.id || servers.length === 0) {
-      setServerReportPermissionsById({});
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    void (async () => {
-      const permissionResults = await Promise.allSettled(
-        servers.map(async (server) => {
-          const communityBackend = getCommunityDataBackend(server.id);
-          const permissions = await communityBackend.fetchServerPermissions(
-            server.id,
-          );
-          return [server.id, permissions] as const;
-        }),
-      );
-
-      if (!isMounted) return;
-
-      const nextPermissionsById: Record<string, ServerPermissions> = {};
-      for (const result of permissionResults) {
-        if (result.status !== "fulfilled") continue;
-        const [serverId, permissions] = result.value;
-        nextPermissionsById[serverId] = permissions;
-      }
-      setServerReportPermissionsById(nextPermissionsById);
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [servers, user?.id]);
+  const dmWorkspaceIsActive = workspaceMode === "dm";
 
   // ── Voice ─────────────────────────────────────────────────────────────────
   const {
@@ -362,7 +299,7 @@ export function useChatAppOrchestration() {
   } = useSocialWorkspace({
     socialBackend,
     userId: user?.id,
-    enabled: friendsSocialPanelEnabled,
+    enabled: true,
   });
 
   const ensureIsElevatedInServer = useCallback(
@@ -529,229 +466,29 @@ export function useChatAppOrchestration() {
     authorProfileCacheRef,
   });
 
-  const handleServerAccessLossReset = useCallback(
-    (serverId: string) => {
-      if (!serverId) return;
-      useNavigationStore.getState().setCurrentServerId(null);
-      useNavigationStore.getState().setCurrentServer(null);
-      useNavigationStore.getState().setCurrentChannelId(null);
-      useNavigationStore.getState().setWorkspaceMode("community");
-      resetMessageState();
-      resetChannelGroups();
-      resetChannelsWorkspace();
-      usePermissionsStore.getState().clearPermissions(serverId);
-      purgeMessageBundleCacheForServer(serverId);
-      setWorkspaceMode("community");
-    },
-    [
-      purgeMessageBundleCacheForServer,
-      resetChannelGroups,
-      resetChannelsWorkspace,
-      resetMessageState,
-    ],
-  );
-
-  const disconnectVoiceForAccessLoss = useCallback(
-    async (input: { serverId?: string; channelId?: string }) => {
-      const activeChannel = activeVoiceChannel;
-      if (!activeChannel) return;
-
-      const losesServerAccess =
-        Boolean(input.serverId) &&
-        activeChannel.community_id === input.serverId;
-      const losesChannelAccess =
-        Boolean(input.channelId) && activeChannel.id === input.channelId;
-      if (!losesServerAccess && !losesChannelAccess) return false;
-      await forceDisconnectVoice("access_lost");
-      return true;
-    },
-    [activeVoiceChannel, forceDisconnectVoice],
-  );
-
-  const showVoiceDisconnectToast = useCallback(
-    (input: {
-      reason: ForceDisconnectVoiceReason;
-      accessScope?: "server" | "channel";
-    }) => {
-      let message = "You have been disconnected from voice.";
-      switch (input.reason) {
-        case "access_lost":
-          message =
-            input.accessScope === "channel"
-              ? "You have been disconnected from voice. You no longer have access to this channel."
-              : "You have been disconnected from voice. You no longer have access to this server.";
-          break;
-        case "kicked":
-          message = "You have been removed from this voice channel.";
-          break;
-        case "ban":
-          message = "You have been disconnected from voice.";
-          break;
-        default:
-          break;
-      }
-
-      const toastId = `voice-disconnect:${input.reason}:${input.accessScope ?? "generic"}`;
-      toast(message, {
-        id: toastId,
-        action: {
-          label: "Dismiss",
-          onClick: () => {
-            toast.dismiss(toastId);
-          },
-        },
-      });
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const nextServerNameById = { ...serverNameByIdRef.current };
-    for (const server of servers) {
-      nextServerNameById[server.id] = server.name;
-    }
-    if (currentServer) {
-      nextServerNameById[currentServer.id] = currentServer.name;
-    }
-    serverNameByIdRef.current = nextServerNameById;
-  }, [currentServer, servers]);
-
-  const handleServerAccessLostCascade = useCallback(
-    async (serverId: string) => {
-      if (!serverId) return;
-
-      const lostServerName =
-        (currentServerId === serverId ? currentServer?.name : null) ??
-        serverNameByIdRef.current[serverId] ??
-        "Unknown server";
-
-      const disconnectedFromVoice = await disconnectVoiceForAccessLoss({
-        serverId,
-      });
-      if (disconnectedFromVoice) {
-        showVoiceDisconnectToast({
-          reason: "access_lost",
-          accessScope: "server",
-        });
-      }
-      handleServerAccessLossReset(serverId);
-
-      const toastId = `server-access-lost:${serverId}`;
-      toast(`You have been removed from ${lostServerName}.`, {
-        id: toastId,
-        action: {
-          label: "Dismiss",
-          onClick: () => {
-            toast.dismiss(toastId);
-          },
-        },
-      });
-    },
-    [
+  const { showVoiceDisconnectToast } =
+    useChatAppAccessAndBroadcastOrchestration({
+      servers,
       currentServer,
       currentServerId,
-      disconnectVoiceForAccessLoss,
-      handleServerAccessLossReset,
-      showVoiceDisconnectToast,
-    ],
-  );
-
-  activeServerAccessLostHandlerRef.current = handleServerAccessLostCascade;
-
-  const handleChannelAccessLostCascade = useCallback(
-    async (channelId: string, channelName: string) => {
-      if (!channelId || !currentServerId) return;
-
-      const communityBackend = getCommunityDataBackend(currentServerId);
-      const nextChannelId =
-        channels.find(
-          (channel) =>
-            channel.community_id === currentServerId &&
-            channel.kind === "text" &&
-            channel.id !== channelId,
-        )?.id ?? null;
-
-      const disconnectedFromVoice = await disconnectVoiceForAccessLoss({
-        channelId,
-      });
-      if (disconnectedFromVoice) {
-        showVoiceDisconnectToast({
-          reason: "access_lost",
-          accessScope: "channel",
-        });
-      }
-      if (user?.id) {
-        applyChannelAccessRevokedContentVisibility({
-          communityId: currentServerId,
-          channelId,
-          revokedUserId: user.id,
-        });
-        try {
-          await communityBackend.broadcastMemberChannelAccessRevoked({
-            communityId: currentServerId,
-            channelId,
-            revokedUserId: user.id,
-          });
-        } catch (error) {
-          console.error(
-            "Failed to broadcast channel access revocation:",
-            error,
-          );
-        }
-      }
-      purgeMessageBundleCacheForChannel(currentServerId, channelId);
-      resetMessageState();
-      setCurrentChannelId(nextChannelId);
-
-      const toastId = `channel-access-lost:${currentServerId}:${channelId}`;
-      toast(`Your access to #${channelName} has been revoked.`, {
-        id: toastId,
-        action: {
-          label: "Dismiss",
-          onClick: () => {
-            toast.dismiss(toastId);
-          },
-        },
-      });
-    },
-    [
       channels,
-      currentServerId,
-      disconnectVoiceForAccessLoss,
-      applyChannelAccessRevokedContentVisibility,
-      purgeMessageBundleCacheForChannel,
-      resetMessageState,
+      userId: user?.id,
+      setWorkspaceMode,
       setCurrentChannelId,
-      showVoiceDisconnectToast,
-      user?.id,
-    ],
-  );
-
-  activeChannelAccessLostHandlerRef.current = handleChannelAccessLostCascade;
-
-  const handleMemberBannedBroadcast = useCallback(
-    (payload: MemberBannedBroadcastPayload) => {
-      if (!payload.communityId || !payload.bannedUserId) return;
-      if (payload.bannedUserId === user?.id) return;
-      // Hidden-message visibility now flows from server-side RLS on subsequent reads.
-    },
-    [user?.id],
-  );
-
-  memberBannedHandlerRef.current = handleMemberBannedBroadcast;
-
-  const handleMemberChannelAccessRevokedBroadcast = useCallback(
-    (payload: MemberChannelAccessRevokedBroadcastPayload) => {
-      if (!payload.communityId || !payload.channelId || !payload.revokedUserId)
-        return;
-      if (payload.revokedUserId === user?.id) return;
-      applyChannelAccessRevokedContentVisibility(payload);
-    },
-    [applyChannelAccessRevokedContentVisibility, user?.id],
-  );
-
-  memberChannelAccessRevokedHandlerRef.current =
-    handleMemberChannelAccessRevokedBroadcast;
+      resetMessageState,
+      resetChannelGroups,
+      resetChannelsWorkspace,
+      purgeMessageBundleCacheForServer,
+      purgeMessageBundleCacheForChannel,
+      applyChannelAccessRevokedContentVisibility,
+      activeVoiceChannel,
+      forceDisconnectVoice,
+      serverNameByIdRef,
+      activeServerAccessLostHandlerRef,
+      activeChannelAccessLostHandlerRef,
+      memberBannedHandlerRef,
+      memberChannelAccessRevokedHandlerRef,
+    });
 
   // ── Desktop settings ──────────────────────────────────────────────────────
   const {
@@ -835,7 +572,7 @@ export function useChatAppOrchestration() {
   } = useDirectMessages({
     directMessageBackend,
     userId: user?.id,
-    enabled: dmWorkspaceEnabled,
+    enabled: true,
     isActive: dmWorkspaceIsActive,
   });
 
@@ -854,8 +591,6 @@ export function useChatAppOrchestration() {
       blockDirectMessageUser,
     },
   } = useDirectMessageInteractions({
-    dmWorkspaceEnabled,
-    friendsSocialPanelEnabled,
     currentUserId: user?.id,
     setDmConversationsError,
     refreshDmConversations,
@@ -881,97 +616,17 @@ export function useChatAppOrchestration() {
   });
 
   // ── Notification interactions ─────────────────────────────────────────────
-  useEffect(() => {
-    elevatedServerAccessByIdRef.current.clear();
-    setIsCurrentUserElevatedInCurrentServer(false);
-    setIsCurrentUserElevatedInActiveVoiceServer(false);
-    setIsCurrentUserElevatedInMembersModalServer(false);
-  }, [currentServerId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!currentServerId || !user?.id) {
-      setIsCurrentUserElevatedInCurrentServer(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void ensureIsElevatedInServer(currentServerId)
-      .then((isElevated) => {
-        if (!cancelled) {
-          setIsCurrentUserElevatedInCurrentServer(isElevated);
-        }
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error(
-          "Failed to resolve elevated current server status:",
-          error,
-        );
-        setIsCurrentUserElevatedInCurrentServer(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentServerId, ensureIsElevatedInServer, user?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const activeVoiceCommunityId = activeVoiceChannel?.community_id ?? null;
-    if (!activeVoiceCommunityId || !user?.id) {
-      setIsCurrentUserElevatedInActiveVoiceServer(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void ensureIsElevatedInServer(activeVoiceCommunityId)
-      .then((isElevated) => {
-        if (!cancelled) {
-          setIsCurrentUserElevatedInActiveVoiceServer(isElevated);
-        }
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error("Failed to resolve elevated voice server status:", error);
-        setIsCurrentUserElevatedInActiveVoiceServer(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeVoiceChannel?.community_id, ensureIsElevatedInServer, user?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!membersModalCommunityId || !user?.id) {
-      setIsCurrentUserElevatedInMembersModalServer(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void ensureIsElevatedInServer(membersModalCommunityId)
-      .then((isElevated) => {
-        if (!cancelled) {
-          setIsCurrentUserElevatedInMembersModalServer(isElevated);
-        }
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error(
-          "Failed to resolve elevated members modal status:",
-          error,
-        );
-        setIsCurrentUserElevatedInMembersModalServer(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [ensureIsElevatedInServer, membersModalCommunityId, user?.id]);
+  useChatAppElevationEffects({
+    currentServerId,
+    userId: user?.id,
+    activeVoiceCommunityId: activeVoiceChannel?.community_id ?? null,
+    membersModalCommunityId,
+    ensureIsElevatedInServer,
+    elevatedCacheRef: elevatedServerAccessByIdRef,
+    setIsCurrentUserElevatedInCurrentServer,
+    setIsCurrentUserElevatedInActiveVoiceServer,
+    setIsCurrentUserElevatedInMembersModalServer,
+  });
 
   const {
     actions: {
@@ -983,7 +638,6 @@ export function useChatAppOrchestration() {
   } = useNotificationInteractions({
     notificationBackend,
     socialBackend,
-    friendsSocialPanelEnabled,
     refreshNotificationInbox,
     refreshSocialCounts,
     setNotificationsError,
@@ -1006,199 +660,33 @@ export function useChatAppOrchestration() {
     },
   });
 
-  // ── Business functions ────────────────────────────────────────────────────
-  const joinServerByInvite = useCallback(
-    async (
-      inviteInput: string,
-    ): Promise<{ communityName: string; joined: boolean }> => {
-      const code = normalizeInviteCode(inviteInput);
-      if (!code) throw new Error("Invite code is required.");
-      const redeemedInvite =
-        await controlPlaneBackend.redeemCommunityInvite(code);
-      await refreshServers();
-      setCurrentServerId(redeemedInvite.communityId);
-      return {
-        communityName: redeemedInvite.communityName,
-        joined: redeemedInvite.joined,
-      };
-    },
-    [controlPlaneBackend, refreshServers, setCurrentServerId],
-  );
-
-  const saveAttachment = useCallback(async (attachment: MessageAttachment) => {
-    if (!attachment.signedUrl) throw new Error("Media link is not available.");
-    if (!desktopClient.isAvailable()) {
-      window.open(attachment.signedUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-    const suggestedName =
-      attachment.originalFilename ??
-      attachment.objectPath.split("/").pop() ??
-      "media";
-    await desktopClient.saveFileFromUrl({
-      url: attachment.signedUrl,
-      suggestedName,
-    });
-  }, []);
-
-  const reportUserProfile = useCallback(
-    async (input: {
-      targetUserId: string;
-      reason: string;
-      communityId?: string;
-    }) => {
-      if (!user) throw new Error("Not authenticated.");
-      const targetCommunityId = input.communityId ?? currentServerId;
-      if (!targetCommunityId) throw new Error("No server selected.");
-      const communityBackend = getCommunityDataBackend(targetCommunityId);
-      await communityBackend.reportUserProfile({
-        communityId: targetCommunityId,
-        targetUserId: input.targetUserId,
-        reporterUserId: user.id,
-        reason: input.reason,
-      });
-    },
-    [user, currentServerId],
-  );
-
-  const banUserFromServer = useCallback(
-    async (input: {
-      targetUserId: string;
-      communityId: string;
-      reason: string;
-    }) => {
-      const communityBackend = getCommunityDataBackend(input.communityId);
-      const banResult = await communityBackend.banCommunityMember({
-        communityId: input.communityId,
-        targetUserId: input.targetUserId,
-        reason: input.reason,
-      });
-      try {
-        await communityBackend.broadcastMemberBanned(banResult);
-      } catch (error) {
-        console.error("Failed to broadcast member ban:", error);
-      }
-      try {
-        await refreshMembersModalMembersIfOpen(input.communityId);
-      } catch (error) {
-        console.error("Failed to refresh members after ban:", error);
-      }
-      if (showServerSettingsModal && currentServerId === input.communityId) {
-        try {
-          await loadCommunityBans(input.communityId);
-        } catch (error) {
-          console.error("Failed to refresh bans after ban:", error);
-        }
-      }
-    },
-    [
-      refreshMembersModalMembersIfOpen,
-      loadCommunityBans,
-      showServerSettingsModal,
-      currentServerId,
-    ],
-  );
-
-  const kickUserFromServer = useCallback(
-    async (input: {
-      targetUserId: string;
-      communityId: string;
-      username: string;
-    }) => {
-      try {
-        const communityBackend = getCommunityDataBackend(input.communityId);
-        await communityBackend.kickCommunityMember({
-          communityId: input.communityId,
-          targetUserId: input.targetUserId,
-        });
-        try {
-          await refreshMembersModalMembersIfOpen(input.communityId);
-        } catch (error) {
-          console.error("Failed to refresh members after kick:", error);
-        }
-        toast(`${input.username} has been removed from the server.`, {
-          id: `server-kick:${input.communityId}:${input.targetUserId}`,
-          action: {
-            label: "Dismiss",
-            onClick: () => {
-              toast.dismiss(
-                `server-kick:${input.communityId}:${input.targetUserId}`,
-              );
-            },
-          },
-        });
-      } catch (error: unknown) {
-        toast.error(
-          getErrorMessage(error, "Failed to remove user from the server."),
-          {
-            id: `server-kick-error:${input.communityId}:${input.targetUserId}`,
-          },
-        );
-        throw error;
-      }
-    },
-    [refreshMembersModalMembersIfOpen],
-  );
-
-  const saveMemberChannelPermissions = useCallback(
-    async (
-      memberId: string,
-      permissions: {
-        canView: boolean | null;
-        canSend: boolean | null;
-        canManage: boolean | null;
-      },
-    ) => {
-      const accessRevokedResult = await saveMemberChannelPermissionsRaw(
-        memberId,
-        permissions,
-      );
-      if (!accessRevokedResult) return;
-      applyChannelAccessRevokedContentVisibility(accessRevokedResult);
-    },
-    [
-      applyChannelAccessRevokedContentVisibility,
-      saveMemberChannelPermissionsRaw,
-    ],
-  );
-
-  const resolveBanEligibleServers = useCallback(
-    async (targetUserId: string): Promise<BanEligibleServer[]> => {
-      if (!targetUserId) return [];
-      return controlPlaneBackend.listBanEligibleServersForUser(targetUserId);
-    },
-    [controlPlaneBackend],
-  );
-
-  const saveAccountSettings = useCallback(
-    async (values: {
-      username: string;
-      avatarUrl: string | null;
-      avatarFile?: File | null;
-    }) => {
-      if (!user) throw new Error("Not authenticated");
-      const updatedProfile = await controlPlaneBackend.updateUserProfile({
-        userId: user.id,
-        username: values.username,
-        avatarUrl: values.avatarUrl,
-        avatarFile: values.avatarFile ?? null,
-      });
-      applyLocalProfileUpdate(updatedProfile);
-      upsertLiveProfile({
-        userId: user.id,
-        username: updatedProfile.username,
-        avatarUrl: updatedProfile.avatarUrl,
-        updatedAt: new Date().toISOString(),
-      });
-    },
-    [user, controlPlaneBackend, applyLocalProfileUpdate, upsertLiveProfile],
-  );
+  const {
+    joinServerByInvite,
+    saveAttachment,
+    reportUserProfile,
+    banUserFromServer,
+    kickUserFromServer,
+    saveMemberChannelPermissions,
+    resolveBanEligibleServers,
+    saveAccountSettings,
+  } = useChatAppBusinessActions({
+    user,
+    currentServerId,
+    showServerSettingsModal,
+    controlPlaneBackend,
+    refreshServers,
+    setCurrentServerId,
+    refreshMembersModalMembersIfOpen,
+    loadCommunityBans,
+    saveMemberChannelPermissionsRaw,
+    applyChannelAccessRevokedContentVisibility,
+    applyLocalProfileUpdate,
+    upsertLiveProfile,
+  });
 
   // ── Deep links ────────────────────────────────────────────────────────────
   useDeepLinks({
     user,
-    featureFlagsLoaded,
-    friendsSocialPanelEnabled,
     joinServerByInvite,
     openDirectMessageConversation,
     setNotificationsPanelOpen,
@@ -1209,261 +697,56 @@ export function useChatAppOrchestration() {
     setCurrentChannelId,
   });
 
-  // ── Handle functions (UI event → business action) ─────────────────────────
-  const handleLeaveServer = useCallback(
-    (communityId: string) => {
-      const server = servers.find((s) => s.id === communityId);
-      useUiStore.getState().setPendingUiConfirmation({
-        kind: "leave-server",
-        communityId,
-        serverName: server?.name ?? "this server",
-      });
-    },
-    [servers],
-  );
-
-  const handleDeleteServer = useCallback(
-    (communityId: string) => {
-      const server = servers.find((s) => s.id === communityId);
-      useUiStore.getState().setPendingUiConfirmation({
-        kind: "delete-server",
-        communityId,
-        serverName: server?.name ?? "this server",
-      });
-    },
-    [servers],
-  );
-
-  const handleRenameServer = useCallback(
-    (communityId: string) => {
-      const server = servers.find((s) => s.id === communityId);
-      if (!server) return;
-      useUiStore.getState().setRenameServerDraft({
-        serverId: communityId,
-        currentName: server.name,
-      });
-    },
-    [servers],
-  );
-
-  const handleRenameChannel = useCallback(
-    (channelId: string) => {
-      const channel = channels.find((c) => c.id === channelId);
-      if (!channel) return;
-      useUiStore.getState().setRenameChannelDraft({
-        channelId,
-        currentName: channel.name,
-      });
-    },
-    [channels],
-  );
-
-  const handleDeleteChannel = useCallback(
-    (channelId: string) => {
-      const channel = channels.find((c) => c.id === channelId);
-      if (!channel) return;
-      useUiStore.getState().setPendingUiConfirmation({
-        kind: "delete-channel",
-        channelId,
-        channelName: channel.name,
-      });
-    },
-    [channels],
-  );
-
-  const handleCreateChannelGroup = useCallback((channelId?: string) => {
-    useUiStore.getState().setCreateGroupDraft({
-      channelId: channelId ?? null,
-    });
-  }, []);
-
-  const handleRenameChannelGroup = useCallback(
-    (groupId: string) => {
-      const group = channelGroupState.groups.find((g) => g.id === groupId);
-      if (!group) return;
-      useUiStore.getState().setRenameGroupDraft({
-        groupId,
-        currentName: group.name,
-      });
-    },
-    [channelGroupState.groups],
-  );
-
-  const handleDeleteChannelGroup = useCallback(
-    (groupId: string) => {
-      const group = channelGroupState.groups.find((g) => g.id === groupId);
-      if (!group) return;
-      useUiStore.getState().setPendingUiConfirmation({
-        kind: "delete-channel-group",
-        groupId,
-        groupName: group.name,
-      });
-    },
-    [channelGroupState.groups],
-  );
-
-  const confirmPendingUiAction = useCallback(() => {
-    const ui = useUiStore.getState();
-    const action = ui.pendingUiConfirmation;
-    if (!action) return;
-    ui.setPendingUiConfirmation(null);
-    switch (action.kind) {
-      case "leave-server":
-        void leaveServer(action.communityId).catch((error: unknown) => {
-          toast.error(getErrorMessage(error, "Failed to leave server."), {
-            id: "leave-server-error",
-          });
-        });
-        return;
-      case "delete-server":
-        void deleteServer(action.communityId).catch((error: unknown) => {
-          toast.error(getErrorMessage(error, "Failed to delete server."), {
-            id: "delete-server-error",
-          });
-        });
-        return;
-      case "delete-channel":
-        void deleteChannel(action.channelId).catch((error: unknown) => {
-          toast.error(getErrorMessage(error, "Failed to delete channel."), {
-            id: "delete-channel-error",
-          });
-        });
-        return;
-      case "delete-channel-group":
-        void deleteChannelGroup(action.groupId).catch((error: unknown) => {
-          toast.error(
-            getErrorMessage(error, "Failed to delete channel group."),
-            {
-              id: "delete-channel-group-error",
-            },
-          );
-        });
-        return;
-      default:
-        return;
-    }
-  }, [leaveServer, deleteServer, deleteChannel, deleteChannelGroup]);
-
-  // ── Effects ───────────────────────────────────────────────────────────────
-  useEffect(() => {
-    installPromptTrap();
-  }, []);
-
-  useEffect(() => {
-    if (friendsSocialPanelEnabled) return;
-    resetSocialWorkspace();
-    setWorkspaceMode("community");
-    resetDirectMessages();
-  }, [friendsSocialPanelEnabled, resetDirectMessages, resetSocialWorkspace]);
-
-  useEffect(() => {
-    if (serverModmailEnabled) return;
-    useUiStore.getState().setServerModmailOpen(false);
-  }, [serverModmailEnabled]);
-
-  // Sign-out reset — clear all state when user logs out.
-  useEffect(() => {
-    if (user) return;
-    useNavigationStore.getState().clearNavigation();
-    resetPlatformSession();
-    resetVoiceState();
-    setNotificationsPanelOpen(false);
-    useUiStore.getState().reset();
-    setFriendsPanelOpen(false);
-    setWorkspaceMode("community");
-    resetMessageState();
-    authorProfileCacheRef.current = {};
-    resetFeatureFlags();
-    resetNotifications();
-    resetSocialWorkspace();
-    resetDirectMessages();
-    resetChannelsWorkspace();
-    usePermissionsStore.getState().reset();
-    resetServerSettingsState();
-    resetServerInvites();
-    resetServerRoleManagement();
-    resetChannelPermissionsState();
-    resetChannelGroups();
-    resetMembersModal();
-    resetCommunityBans();
-  }, [
-    resetChannelGroups,
-    resetChannelsWorkspace,
-    resetChannelPermissionsState,
-    resetCommunityBans,
-    resetDirectMessages,
-    resetFeatureFlags,
-    resetMembersModal,
-    resetMessageState,
-    resetNotifications,
-    resetPlatformSession,
-    resetServerInvites,
-    resetServerRoleManagement,
-    resetServerSettingsState,
-    resetVoiceState,
-    user,
-  ]);
-
-  // Reset server-scoped UI when no server is selected.
-  useEffect(() => {
-    if (currentServerId) return;
-    resetChannelsWorkspace();
-    resetVoiceState();
-    resetMessageState();
-    useUiStore.getState().setShowCreateChannelModal(false);
-    useUiStore.getState().setShowJoinServerModal(false);
-    useUiStore.getState().setShowServerSettingsModal(false);
-    useUiStore.getState().setShowChannelSettingsModal(false);
-    useUiStore.getState().setChannelSettingsTargetId(null);
-    resetServerSettingsState();
-    resetServerInvites();
-    resetServerRoleManagement();
-    resetChannelPermissionsState();
-    resetChannelGroups();
-    resetMembersModal();
-    useUiStore.getState().setRenameChannelDraft(null);
-    useUiStore.getState().setRenameGroupDraft(null);
-    useUiStore.getState().setCreateGroupDraft(null);
-    resetCommunityBans();
-  }, [
-    currentServerId,
-    resetChannelGroups,
-    resetChannelPermissionsState,
-    resetChannelsWorkspace,
-    resetCommunityBans,
-    resetMembersModal,
-    resetServerInvites,
-    resetServerRoleManagement,
-    resetServerSettingsState,
-    resetMessageState,
-    resetVoiceState,
-  ]);
-
-  // ── Background prefetch: warm caches for instant server switching ─────────
-  useEffect(() => {
-    if (servers.length === 0 || !user?.id) return;
-    const serverIds = servers.map((s) => s.id);
-    void (async () => {
-      await prefetchServersChannels(serverIds);
-      // After channel lists are warm, prefetch default channel messages for non-active servers
-      await Promise.allSettled(
-        serverIds
-          .filter((id) => id !== currentServerId)
-          .map((id) => {
-            const defaultChannelId = getDefaultChannelIdForServer(id);
-            if (!defaultChannelId) return Promise.resolve();
-            return prefetchChannelMessages(id, defaultChannelId);
-          }),
-      );
-    })();
-  }, [
+  const {
+    handleLeaveServer,
+    handleDeleteServer,
+    handleRenameServer,
+    handleRenameChannel,
+    handleDeleteChannel,
+    handleCreateChannelGroup,
+    handleRenameChannelGroup,
+    handleDeleteChannelGroup,
+    confirmPendingUiAction,
+  } = useChatAppConfirmationHandlers({
     servers,
-    user?.id,
+    channels,
+    channelGroupStateGroups: channelGroupState.groups,
+    leaveServer,
+    deleteServer,
+    deleteChannel,
+    deleteChannelGroup,
+  });
+
+  useChatAppLifecycleEffects({
+    user,
+    serverModmailEnabled,
     currentServerId,
+    userId: user?.id,
+    currentServerIdForPrefetch: currentServerId,
+    servers,
+    setNotificationsPanelOpen,
+    setFriendsPanelOpen,
+    setWorkspaceMode,
+    resetPlatformSession,
+    resetVoiceState,
+    resetMessageState,
+    authorProfileCacheRef,
+    resetFeatureFlags,
+    resetNotifications,
+    resetSocialWorkspace,
+    resetDirectMessages,
+    resetChannelsWorkspace,
+    resetServerSettingsState,
+    resetServerInvites,
+    resetServerRoleManagement,
+    resetChannelPermissionsState,
+    resetChannelGroups,
+    resetMembersModal,
+    resetCommunityBans,
     prefetchServersChannels,
     getDefaultChannelIdForServer,
     prefetchChannelMessages,
-  ]);
+  });
 
   // ── Return ────────────────────────────────────────────────────────────────
   return {
@@ -1494,8 +777,6 @@ export function useChatAppOrchestration() {
     setRainbowMode,
     // feature flags
     hasFeatureFlag,
-    friendsSocialPanelEnabled,
-    dmWorkspaceEnabled,
     dmWorkspaceIsActive,
     serverModmailEnabled,
     voiceHardwareDebugPanelEnabled,
@@ -1503,7 +784,6 @@ export function useChatAppOrchestration() {
     channels,
     channelsLoading,
     channelsError,
-    serverReportPermissionsById,
     managedReportServerIds,
     currentChannel,
     channelSettingsTarget,

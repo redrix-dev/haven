@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { desktopClient } from "@platform/desktop/client";
-import type { VoicePopoutState } from "@platform/desktop/types";
+import type { VoicePopoutState } from "@shared/platform/desktop/types";
+import { getAppHost } from "@shared/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
 import type { ChatAppOrchestrationApi } from "@shared/app/hooks/useChatAppOrchestration";
 import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
@@ -33,7 +33,9 @@ export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
     serverPermissions.canManageMembers ||
     serverPermissions.canManageBans;
 
-  const canOpenVoicePopout = desktopClient.isAvailable();
+  const voicePopoutBridge = getAppHost().voicePopout;
+  const canOpenVoicePopout =
+    getAppHost().isDesktopApp() && Boolean(voicePopoutBridge);
   const [voicePopoutState, setVoicePopoutState] =
     useState<VoicePopoutState | null>(null);
   const setVoicePanelOpen = app.setVoicePanelOpen;
@@ -140,12 +142,12 @@ export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
     canOpenVoicePopout && Boolean(voicePopoutState?.isOpen);
 
   useEffect(() => {
-    if (!canOpenVoicePopout) return;
+    if (!canOpenVoicePopout || !voicePopoutBridge) return;
 
-    return desktopClient.onVoicePopoutState((nextState) => {
+    return voicePopoutBridge.onVoicePopoutState((nextState) => {
       setVoicePopoutState(nextState);
     });
-  }, [canOpenVoicePopout]);
+  }, [canOpenVoicePopout, voicePopoutBridge]);
 
   useEffect(() => {
     if (!voicePopoutWindowOpen) return;
@@ -153,9 +155,9 @@ export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
   }, [setVoicePanelOpen, voicePopoutWindowOpen]);
 
   useEffect(() => {
-    if (!canOpenVoicePopout) return;
+    if (!canOpenVoicePopout || !voicePopoutBridge) return;
 
-    void desktopClient
+    void voicePopoutBridge
       .syncVoicePopoutState({
         isOpen: voicePopoutWindowOpen,
         serverName: activeVoiceServer?.name ?? currentServer?.name ?? null,
@@ -219,12 +221,13 @@ export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
     voiceController.state.selectedInputDeviceId,
     voiceController.state.selectedOutputDeviceId,
     voiceController.state.supportsOutputSelection,
+    voicePopoutBridge,
   ]);
 
   useEffect(() => {
-    if (!canOpenVoicePopout) return;
+    if (!canOpenVoicePopout || !voicePopoutBridge) return;
 
-    return desktopClient.onVoicePopoutControlAction((action) => {
+    return voicePopoutBridge.onVoicePopoutControlAction((action) => {
       switch (action.type) {
         case "toggle_mute":
           voiceController.actions.toggleMute();
@@ -272,16 +275,17 @@ export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
     voiceController.actions.toggleDeafen,
     voiceController.actions.toggleMute,
     voiceController.actions.updateVoiceSettingsPatch,
+    voicePopoutBridge,
   ]);
 
   const handleOpenVoicePopout = useCallback(() => {
-    if (!canOpenVoicePopout) return;
+    if (!canOpenVoicePopout || !voicePopoutBridge) return;
     setVoicePanelOpen(false);
 
-    void desktopClient.openVoicePopout().catch((error: unknown) => {
+    void voicePopoutBridge.openVoicePopout().catch((error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to open voice popout."));
     });
-  }, [canOpenVoicePopout, setVoicePanelOpen]);
+  }, [canOpenVoicePopout, setVoicePanelOpen, voicePopoutBridge]);
 
   const handleKickVoiceParticipant = useCallback(
     async (targetUserId: string, displayName: string) => {

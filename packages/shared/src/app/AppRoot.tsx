@@ -3,12 +3,12 @@ import { AuthProvider } from '@shared/contexts/AuthContext';
 import { TitleBar } from '@shared/app/components/TitleBar';
 import { ChatApp } from '@shared/app/ChatApp';
 import { VoicePopoutApp } from '@shared/app/VoicePopoutApp';
-import { desktopClient } from '@platform/desktop/client';
+import { getAppHost } from '@shared/platform/appHost';
 
 export function AppRoot() {
   const params = new URLSearchParams(window.location.search);
   const view = params.get('view');
-  const showDesktopTitleBar = desktopClient.isAvailable();
+  const showDesktopTitleBar = getAppHost().isDesktopApp();
 
   if (view === 'voice-popout') {
     return <VoicePopoutApp />;

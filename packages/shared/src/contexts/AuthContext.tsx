@@ -7,7 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { supabase } from "@shared/lib/supabase";
-import { desktopClient } from "@platform/desktop/client";
+import { getAppHost } from "@shared/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useAuthStore } from "@shared/stores/authStore";
@@ -243,7 +243,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!desktopClient.isAvailable()) return;
+    const authBridge = getAppHost().desktopAuth;
+    if (!getAppHost().isDesktopApp() || !authBridge) return;
 
     let disposed = false;
     let unsubscribe = () => {};
@@ -254,7 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     try {
-      unsubscribe = desktopClient.onProtocolUrl(handleProtocolUrl);
+      unsubscribe = authBridge.onProtocolUrl(handleProtocolUrl);
     } catch (eventError) {
       console.error("Failed to subscribe to protocol URL events:", eventError);
     }
@@ -262,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const drainPendingProtocolUrls = async () => {
       try {
         while (!disposed) {
-          const url = await desktopClient.consumeNextProtocolUrl();
+          const url = await authBridge.consumeNextProtocolUrl();
           if (!url) break;
           if (disposed) break;
           await consumeAuthConfirmUrl(url);
@@ -286,7 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [consumeAuthConfirmUrl]);
 
   useEffect(() => {
-    if (desktopClient.isAvailable()) return;
+    if (getAppHost().isDesktopApp() && getAppHost().desktopAuth) return;
     if (typeof window === "undefined") return;
 
     let disposed = false;

@@ -4,8 +4,6 @@ import type { SocialBackend } from '@shared/lib/backend/socialBackend';
 import { getErrorMessage } from '@platform/lib/errors';
 
 type UseDirectMessageInteractionsInput = {
-  dmWorkspaceEnabled: boolean;
-  friendsSocialPanelEnabled: boolean;
   currentUserId: string | null | undefined;
   setDmConversationsError: React.Dispatch<React.SetStateAction<string | null>>;
   refreshDmConversations: (options?: { suppressLoadingState?: boolean }) => Promise<void>;
@@ -19,8 +17,6 @@ type UseDirectMessageInteractionsInput = {
 };
 
 export function useDirectMessageInteractions({
-  dmWorkspaceEnabled,
-  friendsSocialPanelEnabled,
   currentUserId,
   setDmConversationsError,
   refreshDmConversations,
@@ -33,13 +29,6 @@ export function useDirectMessageInteractions({
   onOpenFriendsAddPanel,
 }: UseDirectMessageInteractionsInput) {
   const openDirectMessagesWorkspace = React.useCallback(() => {
-    if (!dmWorkspaceEnabled) {
-      const message = 'Direct messages are not enabled for your account.';
-      setDmConversationsError(message);
-      toast.error(message, { id: 'dm-workspace-disabled' });
-      return;
-    }
-
     onOpenDmWorkspace();
     setDmConversationsError(null);
 
@@ -49,23 +38,11 @@ export function useDirectMessageInteractions({
       setDmConversationsError(message);
       toast.error(message, { id: 'dm-workspace-open-error' });
     });
-  }, [
-    dmWorkspaceEnabled,
-    onOpenDmWorkspace,
-    refreshDmConversations,
-    setDmConversationsError,
-  ]);
+  }, [onOpenDmWorkspace, refreshDmConversations, setDmConversationsError]);
 
   const directMessageUser = React.useCallback(
     (targetUserId: string) => {
       setDmConversationsError(null);
-
-      if (!dmWorkspaceEnabled) {
-        const message = 'Direct messages are coming soon.';
-        setDmConversationsError(message);
-        toast.error(message, { id: 'dm-open-disabled' });
-        return;
-      }
 
       if (!targetUserId) {
         const message = 'Invalid DM target.';
@@ -98,12 +75,10 @@ export function useDirectMessageInteractions({
         if (errorCode === 'P0001' && message.includes('friends list')) {
           toast.error(message, {
             id: 'dm-open-friends-only',
-            action: friendsSocialPanelEnabled
-              ? {
-                  label: 'Open Friends',
-                  onClick: onOpenFriendsAddPanel,
-                }
-              : undefined,
+            action: {
+              label: 'Open Friends',
+              onClick: onOpenFriendsAddPanel,
+            },
           });
           return;
         }
@@ -113,8 +88,6 @@ export function useDirectMessageInteractions({
     },
     [
       currentUserId,
-      dmWorkspaceEnabled,
-      friendsSocialPanelEnabled,
       onEnterDmWorkspace,
       onOpenFriendsAddPanel,
       openDirectMessageWithUser,

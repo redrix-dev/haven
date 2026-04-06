@@ -5,18 +5,19 @@ import { DirectMessageArea } from "@shared/features/direct-messages/components/D
 import { DirectMessagesSidebar } from "@shared/features/direct-messages/components/DirectMessagesSidebar";
 import { getErrorMessage } from "@platform/lib/errors";
 import type { ChatAppOrchestrationApi } from "@shared/app/hooks/useChatAppOrchestration";
+import { useSocialStore } from "@shared/stores";
 
 type ChatAppDmWorkspaceProps = {
   app: ChatAppOrchestrationApi;
   user: User;
-  isSelectedDmConversationBlocked: boolean;
 };
 
-export function ChatAppDmWorkspace({
-  app,
-  user,
-  isSelectedDmConversationBlocked,
-}: ChatAppDmWorkspaceProps) {
+export function ChatAppDmWorkspace({ app, user }: ChatAppDmWorkspaceProps) {
+  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
+  const isSelectedDmConversationBlocked = Boolean(
+    app.selectedDmConversation?.otherUserId &&
+      blockedUserIds.has(app.selectedDmConversation.otherUserId),
+  );
   return (
     <>
       <DirectMessagesSidebar

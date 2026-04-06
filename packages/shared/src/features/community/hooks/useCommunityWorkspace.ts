@@ -1,5 +1,6 @@
 import React from "react";
 import { getCommunityDataBackend } from "@shared/lib/backend";
+import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import type {
   Channel,
   MemberBannedBroadcastPayload,
@@ -236,39 +237,14 @@ export function useCommunityWorkspace({
 
   // Load permissions when server or user changes
   React.useEffect(() => {
-    let isMounted = true;
-
     if (!currentUserId || !currentServerId) {
       if (currentServerId) {
         usePermissionsStore.getState().clearPermissions(currentServerId);
       }
-      return () => {
-        isMounted = false;
-      };
+      return;
     }
 
-    const loadPermissions = async () => {
-      try {
-        const communityBackend = getCommunityDataBackend(currentServerId);
-        const fetchedPermissions =
-          await communityBackend.fetchServerPermissions(currentServerId);
-
-        if (!isMounted) return;
-        usePermissionsStore
-          .getState()
-          .setPermissions(currentServerId, fetchedPermissions);
-      } catch (error) {
-        console.error("Error loading server permissions:", error);
-        if (!isMounted) return;
-        usePermissionsStore.getState().clearPermissions(currentServerId);
-      }
-    };
-
-    void loadPermissions();
-
-    return () => {
-      isMounted = false;
-    };
+    void hydrateCommunityPermissions(currentServerId);
   }, [currentServerId, currentUserId]);
 
   // Derived values

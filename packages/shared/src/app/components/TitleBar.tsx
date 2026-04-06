@@ -1,5 +1,5 @@
 import React from 'react';
-import { desktopClient } from '@platform/desktop/client';
+import { getAppHost } from '@shared/platform/appHost';
 
 const WINDOW_CONTROL_BUTTON_CLASS =
   'no-drag flex h-8 w-10 items-center justify-center text-[#9fb2d1] transition-colors hover:bg-[#1a2a3f] hover:text-white';
@@ -60,25 +60,25 @@ const HavenOwlIcon = () => (
 );
 
 export function TitleBar() {
-  const isDesktop = desktopClient.isAvailable();
+  const host = getAppHost();
+  const isDesktop = host.isDesktopApp();
   const isMac = window.navigator.platform.includes('Mac');
-  const showWindowControls = isDesktop && !isMac;
+  const showWindowControls = isDesktop && !isMac && Boolean(host.windowChrome);
 
-  if (!isDesktop) return null;
+  if (!isDesktop || !host.windowChrome) return null;
+
+  const { minimizeWindow, maximizeWindow, closeWindow } = host.windowChrome;
 
   const handleMinimize = () => {
-    if (!desktopClient.isAvailable()) return;
-    void desktopClient.minimizeWindow();
+    void minimizeWindow();
   };
 
   const handleMaximizeToggle = () => {
-    if (!desktopClient.isAvailable()) return;
-    void desktopClient.maximizeWindow();
+    void maximizeWindow();
   };
 
   const handleClose = () => {
-    if (!desktopClient.isAvailable()) return;
-    void desktopClient.closeWindow();
+    void closeWindow();
   };
 
   return (
