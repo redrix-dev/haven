@@ -1,12 +1,11 @@
-import { useEffect, type MutableRefObject } from "react";
+import { useEffect } from "react";
+import { usePermissionsStore } from "@shared/stores/permissionsStore";
 
 type UseChatAppElevationEffectsInput = {
   currentServerId: string | null;
   userId: string | undefined;
   activeVoiceCommunityId: string | null;
   membersModalCommunityId: string | null;
-  ensureIsElevatedInServer: (communityId: string) => Promise<boolean>;
-  elevatedCacheRef: MutableRefObject<Map<string, boolean>>;
   setIsCurrentUserElevatedInCurrentServer: (value: boolean) => void;
   setIsCurrentUserElevatedInActiveVoiceServer: (value: boolean) => void;
   setIsCurrentUserElevatedInMembersModalServer: (value: boolean) => void;
@@ -17,20 +16,25 @@ export function useChatAppElevationEffects({
   userId,
   activeVoiceCommunityId,
   membersModalCommunityId,
-  ensureIsElevatedInServer,
-  elevatedCacheRef,
   setIsCurrentUserElevatedInCurrentServer,
   setIsCurrentUserElevatedInActiveVoiceServer,
   setIsCurrentUserElevatedInMembersModalServer,
 }: UseChatAppElevationEffectsInput) {
+  const ensureElevatedInServer = usePermissionsStore(
+    (s) => s.ensureElevatedInServer,
+  );
+  const invalidateAllElevated = usePermissionsStore(
+    (s) => s.invalidateAllElevated,
+  );
+
   useEffect(() => {
-    elevatedCacheRef.current.clear();
+    invalidateAllElevated();
     setIsCurrentUserElevatedInCurrentServer(false);
     setIsCurrentUserElevatedInActiveVoiceServer(false);
     setIsCurrentUserElevatedInMembersModalServer(false);
   }, [
     currentServerId,
-    elevatedCacheRef,
+    invalidateAllElevated,
     setIsCurrentUserElevatedInActiveVoiceServer,
     setIsCurrentUserElevatedInCurrentServer,
     setIsCurrentUserElevatedInMembersModalServer,
@@ -45,7 +49,7 @@ export function useChatAppElevationEffects({
       };
     }
 
-    void ensureIsElevatedInServer(currentServerId)
+    void ensureElevatedInServer(currentServerId, userId)
       .then((isElevated) => {
         if (!cancelled) {
           setIsCurrentUserElevatedInCurrentServer(isElevated);
@@ -65,7 +69,7 @@ export function useChatAppElevationEffects({
     };
   }, [
     currentServerId,
-    ensureIsElevatedInServer,
+    ensureElevatedInServer,
     setIsCurrentUserElevatedInCurrentServer,
     userId,
   ]);
@@ -79,7 +83,7 @@ export function useChatAppElevationEffects({
       };
     }
 
-    void ensureIsElevatedInServer(activeVoiceCommunityId)
+    void ensureElevatedInServer(activeVoiceCommunityId, userId)
       .then((isElevated) => {
         if (!cancelled) {
           setIsCurrentUserElevatedInActiveVoiceServer(isElevated);
@@ -96,7 +100,7 @@ export function useChatAppElevationEffects({
     };
   }, [
     activeVoiceCommunityId,
-    ensureIsElevatedInServer,
+    ensureElevatedInServer,
     setIsCurrentUserElevatedInActiveVoiceServer,
     userId,
   ]);
@@ -110,7 +114,7 @@ export function useChatAppElevationEffects({
       };
     }
 
-    void ensureIsElevatedInServer(membersModalCommunityId)
+    void ensureElevatedInServer(membersModalCommunityId, userId)
       .then((isElevated) => {
         if (!cancelled) {
           setIsCurrentUserElevatedInMembersModalServer(isElevated);
@@ -129,7 +133,7 @@ export function useChatAppElevationEffects({
       cancelled = true;
     };
   }, [
-    ensureIsElevatedInServer,
+    ensureElevatedInServer,
     membersModalCommunityId,
     setIsCurrentUserElevatedInMembersModalServer,
     userId,

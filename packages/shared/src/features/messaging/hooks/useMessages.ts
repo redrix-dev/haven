@@ -20,6 +20,7 @@ import type {
 } from "@shared/lib/backend/types";
 import { asRecord } from "@platform/lib/records";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
+import { usePermissionsStore } from "@shared/stores/permissionsStore";
 
 const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000;
 
@@ -141,10 +142,8 @@ type UseMessagesInput = {
   currentChannelId: string | null;
   currentUserId: string | null;
   isCurrentUserElevatedInServer: boolean;
-  ensureIsElevatedInServer: (communityId: string) => Promise<boolean>;
   debugChannelReloads: boolean;
   channels: Channel[];
-  authorProfileCacheRef: React.MutableRefObject<Record<string, AuthorProfile>>;
 };
 
 export function useMessages({
@@ -152,15 +151,14 @@ export function useMessages({
   currentChannelId,
   currentUserId,
   isCurrentUserElevatedInServer,
-  ensureIsElevatedInServer,
   debugChannelReloads,
   channels,
-  authorProfileCacheRef,
 }: UseMessagesInput) {
   const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
   const requestOlderMessagesRef = React.useRef<(() => Promise<void>) | null>(
     null,
   );
+  const authorProfileCacheRef = React.useRef<Record<string, AuthorProfile>>({});
   const messageBundleByChannelCacheRef = React.useRef<
     Record<string, ChannelMessageBundleCacheEntry>
   >({});
@@ -504,7 +502,10 @@ export function useMessages({
         });
         const filteredBundle = applyBlockVisibility({
           ...moderationFilteredBundle,
-          isElevatedInServer: await ensureIsElevatedInServer(serverId),
+          isElevatedInServer:
+            await usePermissionsStore
+              .getState()
+              .ensureElevatedInServer(serverId, currentUserId),
         });
         // Only write if not already populated — avoid clobbering an active channel load
         if (!messageBundleByChannelCacheRef.current[cacheKey]) {
@@ -523,7 +524,7 @@ export function useMessages({
     [
       applyBlockVisibility,
       applyChannelAccessVisibility,
-      ensureIsElevatedInServer,
+      currentUserId,
       ensureChannelRevokedUserIdsLoaded,
       getChannelBundleCacheKey,
     ],
@@ -598,6 +599,10 @@ export function useMessages({
     },
     [setStoredIsLoading],
   );
+
+  const clearAuthorProfileCache = React.useCallback(() => {
+    authorProfileCacheRef.current = {};
+  }, []);
 
   const resetMessageState = React.useCallback(() => {
     resetStoredMessages();
@@ -977,7 +982,10 @@ export function useMessages({
       });
       const filteredBundle = applyBlockVisibility({
         ...moderationFilteredBundle,
-        isElevatedInServer: await ensureIsElevatedInServer(currentServerId),
+        isElevatedInServer:
+          await usePermissionsStore
+            .getState()
+            .ensureElevatedInServer(currentServerId, currentUserId),
       });
 
       return {
@@ -996,7 +1004,7 @@ export function useMessages({
       applyChannelAccessVisibility,
       currentChannelId,
       currentServerId,
-      ensureIsElevatedInServer,
+      currentUserId,
       ensureChannelRevokedUserIdsLoaded,
       fetchLatestMessageWindow,
       fetchRelatedForMessages,
@@ -1055,7 +1063,10 @@ export function useMessages({
       });
       const filteredBundle = applyBlockVisibility({
         ...moderationFilteredBundle,
-        isElevatedInServer: await ensureIsElevatedInServer(currentServerId),
+        isElevatedInServer:
+          await usePermissionsStore
+            .getState()
+            .ensureElevatedInServer(currentServerId, currentUserId),
       });
 
       return {
@@ -1076,7 +1087,7 @@ export function useMessages({
       applyChannelAccessVisibility,
       currentChannelId,
       currentServerId,
-      ensureIsElevatedInServer,
+      currentUserId,
       ensureChannelRevokedUserIdsLoaded,
       fetchMessagesPageBeforeCursor,
       fetchRelatedForMessages,
@@ -2282,7 +2293,6 @@ export function useMessages({
     channels,
     resetMessageState,
     setStoredProfiles,
-    authorProfileCacheRef,
     isCurrentMessageLoad,
     syncLoadedMessageWindow,
     loadLatestMessagesWithRelated,
@@ -2310,6 +2320,7 @@ export function useMessages({
     derived: {},
     actions: {
       resetMessageState,
+      clearAuthorProfileCache,
       requestOlderMessages,
       sendMessage,
       toggleMessageReaction,

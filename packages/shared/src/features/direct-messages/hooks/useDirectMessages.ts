@@ -460,6 +460,14 @@ export function useDirectMessages({
     [directMessageBackend]
   );
 
+  const selectedDmConversation = React.useMemo(
+    () =>
+      selectedDmConversationId
+        ? (dmConversations.find((c) => c.conversationId === selectedDmConversationId) ?? null)
+        : null,
+    [dmConversations, selectedDmConversationId],
+  );
+
   return {
     state: {
       dmConversations,
@@ -473,7 +481,11 @@ export function useDirectMessages({
       dmMessagesError,
       dmMessageSendPending,
     },
-    derived: {},
+    derived: {
+      /** Same as `isActive` input: DM workspace is visible. */
+      showDmWorkspace: isActive,
+      selectedDmConversation,
+    },
     actions: {
       resetDirectMessages,
       clearSelectedDmConversation,

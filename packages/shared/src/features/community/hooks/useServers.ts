@@ -5,6 +5,7 @@ import { useAuthStore } from "@shared/stores/authStore";
 import { useServersStore } from "@shared/stores/serversStore";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { useNavigationStore } from "@shared/stores/navigationStore";
+import { stableOnActiveServerAccessLost } from "@shared/app/chat-app/realtime/communityAccessBroadcastBridge";
 
 const controlPlaneBackend = getControlPlaneBackend();
 
@@ -14,7 +15,9 @@ type UseServersInput = {
   onActiveServerAccessLost?: (serverId: string) => void;
 };
 
-export function useServers({ onActiveServerAccessLost }: UseServersInput = {}) {
+export function useServers({
+  onActiveServerAccessLost = stableOnActiveServerAccessLost,
+}: UseServersInput = {}) {
   const user = useAuthStore((state) => state.user);
   const [status, setStatus] = useState<ServersStatus>("idle");
   const [error, setError] = useState<string | null>(null);

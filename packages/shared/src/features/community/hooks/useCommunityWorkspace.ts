@@ -12,6 +12,10 @@ import { getErrorMessage } from "@platform/lib/errors";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useUiStore } from "@shared/stores";
+import {
+  stableOnMemberBanned,
+  stableOnMemberChannelAccessRevoked,
+} from "@shared/app/chat-app/realtime/communityAccessBroadcastBridge";
 
 type UseCommunityWorkspaceInput = {
   servers: ServerSummary[];
@@ -28,8 +32,8 @@ type UseCommunityWorkspaceInput = {
 export function useCommunityWorkspace({
   servers,
   currentUserId,
-  onMemberBanned,
-  onMemberChannelAccessRevoked,
+  onMemberBanned = stableOnMemberBanned,
+  onMemberChannelAccessRevoked = stableOnMemberChannelAccessRevoked,
   onReportStatusUpdated,
 }: UseCommunityWorkspaceInput) {
   const channelSettingsTargetId = useUiStore(

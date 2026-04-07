@@ -1,8 +1,7 @@
 import { useCallback, useEffect, type MutableRefObject } from "react";
 import { toast } from "sonner";
-import {
-  getCommunityDataBackend,
-} from "@shared/lib/backend";
+import { getCommunityDataBackend } from "@shared/lib/backend";
+import { registerCommunityAccessBroadcastHandlers } from "@shared/app/chat-app/realtime/communityAccessBroadcastBridge";
 import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import type {
   Channel,
@@ -42,16 +41,6 @@ type UseChatAppAccessAndBroadcastOrchestrationInput = {
   activeVoiceChannel: VoiceChannelLike;
   forceDisconnectVoice: (reason: ForceDisconnectVoiceReason) => Promise<void>;
   serverNameByIdRef: MutableRefObject<Record<string, string>>;
-  activeServerAccessLostHandlerRef: MutableRefObject<(serverId: string) => void>;
-  activeChannelAccessLostHandlerRef: MutableRefObject<
-    (channelId: string, channelName: string) => void
-  >;
-  memberBannedHandlerRef: MutableRefObject<
-    (payload: MemberBannedBroadcastPayload) => void
-  >;
-  memberChannelAccessRevokedHandlerRef: MutableRefObject<
-    (payload: MemberChannelAccessRevokedBroadcastPayload) => void
-  >;
 };
 
 export function useChatAppAccessAndBroadcastOrchestration({
@@ -71,10 +60,6 @@ export function useChatAppAccessAndBroadcastOrchestration({
   activeVoiceChannel,
   forceDisconnectVoice,
   serverNameByIdRef,
-  activeServerAccessLostHandlerRef,
-  activeChannelAccessLostHandlerRef,
-  memberBannedHandlerRef,
-  memberChannelAccessRevokedHandlerRef,
 }: UseChatAppAccessAndBroadcastOrchestrationInput) {
   const handleServerAccessLossReset = useCallback(
     (serverId: string) => {
@@ -205,8 +190,6 @@ export function useChatAppAccessAndBroadcastOrchestration({
     ],
   );
 
-  activeServerAccessLostHandlerRef.current = handleServerAccessLostCascade;
-
   const handleChannelAccessLostCascade = useCallback(
     async (channelId: string, channelName: string) => {
       if (!channelId || !currentServerId) return;
@@ -276,8 +259,6 @@ export function useChatAppAccessAndBroadcastOrchestration({
     ],
   );
 
-  activeChannelAccessLostHandlerRef.current = handleChannelAccessLostCascade;
-
   const handleMemberBannedBroadcast = useCallback(
     (payload: MemberBannedBroadcastPayload) => {
       if (!payload.communityId || !payload.bannedUserId) return;
@@ -286,8 +267,6 @@ export function useChatAppAccessAndBroadcastOrchestration({
     },
     [userId],
   );
-
-  memberBannedHandlerRef.current = handleMemberBannedBroadcast;
 
   const handleMemberChannelAccessRevokedBroadcast = useCallback(
     (payload: MemberChannelAccessRevokedBroadcastPayload) => {
@@ -300,8 +279,19 @@ export function useChatAppAccessAndBroadcastOrchestration({
     [applyChannelAccessRevokedContentVisibility, userId],
   );
 
-  memberChannelAccessRevokedHandlerRef.current =
-    handleMemberChannelAccessRevokedBroadcast;
+  useEffect(() => {
+    registerCommunityAccessBroadcastHandlers({
+      onActiveServerAccessLost: handleServerAccessLostCascade,
+      onActiveChannelAccessLost: handleChannelAccessLostCascade,
+      onMemberBanned: handleMemberBannedBroadcast,
+      onMemberChannelAccessRevoked: handleMemberChannelAccessRevokedBroadcast,
+    });
+  }, [
+    handleChannelAccessLostCascade,
+    handleMemberBannedBroadcast,
+    handleMemberChannelAccessRevokedBroadcast,
+    handleServerAccessLostCascade,
+  ]);
 
   return {
     showVoiceDisconnectToast,

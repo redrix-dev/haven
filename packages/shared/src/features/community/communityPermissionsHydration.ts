@@ -15,7 +15,9 @@ export function hydrateCommunityPermissions(serverId: string): Promise<void> {
     try {
       const backend = getCommunityDataBackend(serverId);
       const permissions = await backend.fetchServerPermissions(serverId);
-      usePermissionsStore.getState().setPermissions(serverId, permissions);
+      const permissionsStore = usePermissionsStore.getState();
+      permissionsStore.setPermissions(serverId, permissions);
+      permissionsStore.invalidateElevatedForServer(serverId);
     } catch (error) {
       console.error("Error loading server permissions:", error);
       usePermissionsStore.getState().clearPermissions(serverId);

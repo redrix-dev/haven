@@ -1,9 +1,8 @@
-import { useEffect, type MutableRefObject } from "react";
+import { useEffect } from "react";
 import { installPromptTrap } from "@shared/lib/contextMenu/debugTrace";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useUiStore } from "@shared/stores/uiStore";
-import type { AuthorProfile } from "@shared/lib/backend/types";
 
 type UseChatAppLifecycleEffectsInput = {
   user: unknown | null;
@@ -18,7 +17,7 @@ type UseChatAppLifecycleEffectsInput = {
   resetPlatformSession: () => void;
   resetVoiceState: () => void;
   resetMessageState: () => void;
-  authorProfileCacheRef: MutableRefObject<Record<string, AuthorProfile>>;
+  clearAuthorProfileCache: () => void;
   resetFeatureFlags: () => void;
   resetNotifications: () => void;
   resetSocialWorkspace: () => void;
@@ -55,7 +54,7 @@ export function useChatAppLifecycleEffects({
   resetPlatformSession,
   resetVoiceState,
   resetMessageState,
-  authorProfileCacheRef,
+  clearAuthorProfileCache,
   resetFeatureFlags,
   resetNotifications,
   resetSocialWorkspace,
@@ -91,7 +90,7 @@ export function useChatAppLifecycleEffects({
     setFriendsPanelOpen(false);
     setWorkspaceMode("community");
     resetMessageState();
-    authorProfileCacheRef.current = {};
+    clearAuthorProfileCache();
     resetFeatureFlags();
     resetNotifications();
     resetSocialWorkspace();
@@ -106,7 +105,7 @@ export function useChatAppLifecycleEffects({
     resetMembersModal();
     resetCommunityBans();
   }, [
-    authorProfileCacheRef,
+    clearAuthorProfileCache,
     resetChannelGroups,
     resetChannelsWorkspace,
     resetChannelPermissionsState,

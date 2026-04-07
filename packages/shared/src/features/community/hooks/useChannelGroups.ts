@@ -2,6 +2,7 @@ import React from 'react';
 import { getCommunityDataBackend } from '@shared/lib/backend';
 import { supabase } from '@shared/lib/supabase';
 import type { Channel, ChannelGroupState } from '@shared/lib/backend/types';
+import { stableOnActiveChannelAccessLost } from '@shared/app/chat-app/realtime/communityAccessBroadcastBridge';
 
 type UseChannelGroupsInput = {
   currentServerId: string | null;
@@ -22,7 +23,7 @@ export function useChannelGroups({
   currentUserId,
   currentChannelId,
   channels,
-  onActiveChannelAccessLost,
+  onActiveChannelAccessLost = stableOnActiveChannelAccessLost,
 }: UseChannelGroupsInput) {
   const [channelGroupState, setChannelGroupState] = React.useState<ChannelGroupState>(
     createEmptyChannelGroupState()
@@ -301,11 +302,24 @@ export function useChannelGroups({
     [currentServerId, refreshChannelGroupsState]
   );
 
+  const sidebarChannelGroups = React.useMemo(
+    () =>
+      channelGroupState.groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        channelIds: group.channelIds,
+        isCollapsed: channelGroupState.collapsedGroupIds.includes(group.id),
+      })),
+    [channelGroupState.collapsedGroupIds, channelGroupState.groups],
+  );
+
   return {
     state: {
       channelGroupState,
     },
-    derived: {},
+    derived: {
+      sidebarChannelGroups,
+    },
     actions: {
       resetChannelGroups,
       setChannelGroupState,

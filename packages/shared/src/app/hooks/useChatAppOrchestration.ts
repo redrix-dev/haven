@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@shared/contexts/AuthContext";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import {
-  getCommunityDataBackend,
   getControlPlaneBackend,
   getDirectMessageBackend,
   getNotificationBackend,
@@ -19,6 +18,7 @@ import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommu
 import { useServerAdmin } from "@shared/features/community/hooks/useServerAdmin";
 import { useChannelManagement } from "@shared/features/community/hooks/useChannelManagement";
 import { useChannelGroups } from "@shared/features/community/hooks/useChannelGroups";
+import { useCurrentServerPermissionUi } from "@shared/features/community/hooks/useCurrentServerPermissionUi";
 import { useMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useNotifications } from "@shared/features/notifications/hooks/useNotifications";
 import { useNotificationInteractions } from "@shared/features/notifications/hooks/useNotificationInteractions";
@@ -30,15 +30,9 @@ import { useVoice } from "@shared/features/voice/hooks/useVoice";
 import { useFeatureFlags } from "@shared/app/hooks/useFeatureFlags";
 import { useLiveProfiles } from "@shared/features/profile/hooks/useLiveProfiles";
 import { usePlatformSession } from "@shared/features/profile/hooks/usePlatformSession";
-import type {
-  AuthorProfile,
-  MemberBannedBroadcastPayload,
-  MemberChannelAccessRevokedBroadcastPayload,
-} from "@shared/lib/backend/types";
 import { useServersStore } from "@shared/stores/serversStore";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useNotificationsStore } from "@shared/stores/notificationsStore";
 import { useUiStore } from "@shared/stores/uiStore";
 import { usePermissionsReportSlice } from "@shared/app/chat-app/controllers/usePermissionsReportSlice";
@@ -49,20 +43,7 @@ import { useChatAppConfirmationHandlers } from "@shared/app/chat-app/controllers
 import { useChatAppLifecycleEffects } from "@shared/app/chat-app/controllers/useChatAppLifecycleEffects";
 
 export function useChatAppOrchestration() {
-  const activeServerAccessLostHandlerRef = useRef<(serverId: string) => void>(
-    () => {},
-  );
-  const activeChannelAccessLostHandlerRef = useRef<
-    (channelId: string, channelName: string) => void
-  >(() => {});
-  const memberBannedHandlerRef = useRef<
-    (payload: MemberBannedBroadcastPayload) => void
-  >(() => {});
-  const memberChannelAccessRevokedHandlerRef = useRef<
-    (payload: MemberChannelAccessRevokedBroadcastPayload) => void
-  >(() => {});
   const serverNameByIdRef = useRef<Record<string, string>>({});
-  const elevatedServerAccessByIdRef = useRef<Map<string, boolean>>(new Map());
   const [
     isCurrentUserElevatedInCurrentServer,
     setIsCurrentUserElevatedInCurrentServer,
@@ -75,28 +56,6 @@ export function useChatAppOrchestration() {
     isCurrentUserElevatedInMembersModalServer,
     setIsCurrentUserElevatedInMembersModalServer,
   ] = useState(false);
-  const handleActiveServerAccessLost = useCallback((serverId: string) => {
-    activeServerAccessLostHandlerRef.current(serverId);
-  }, []);
-  const handleActiveChannelAccessLost = useCallback(
-    (channelId: string, channelName: string) => {
-      activeChannelAccessLostHandlerRef.current(channelId, channelName);
-    },
-    [],
-  );
-  const handleMemberBanned = useCallback(
-    (payload: MemberBannedBroadcastPayload) => {
-      memberBannedHandlerRef.current(payload);
-    },
-    [],
-  );
-  const handleMemberChannelAccessRevoked = useCallback(
-    (payload: MemberChannelAccessRevokedBroadcastPayload) => {
-      memberChannelAccessRevokedHandlerRef.current(payload);
-    },
-    [],
-  );
-
   // ── Backend singletons ────────────────────────────────────────────────────
   const controlPlaneBackend = getControlPlaneBackend();
   const directMessageBackend = getDirectMessageBackend();
@@ -121,9 +80,7 @@ export function useChatAppOrchestration() {
     error: serversError,
     createServer,
     refreshServers,
-  } = useServers({
-    onActiveServerAccessLost: handleActiveServerAccessLost,
-  });
+  } = useServers();
   const isServersLoading = serversStatus === "loading";
 
   const { managedReportServerIds, serverModmailEnabled } =
@@ -190,16 +147,16 @@ export function useChatAppOrchestration() {
     (state) => state.showServerSettingsModal,
   );
 
-  const authorProfileCacheRef = useRef<Record<string, AuthorProfile>>({});
-
   // ── Community workspace ───────────────────────────────────────────────────
   const currentServerId = useNavigationStore((state) => state.currentServerId);
   const setCurrentServerId = useNavigationStore(
     (state) => state.setCurrentServerId,
   );
-  const serverPermissions = usePermissionsStore((state) =>
-    state.getPermissions(currentServerId ?? ""),
-  );
+  const {
+    serverPermissions,
+    canOpenServerSettings,
+    canManageCurrentServer,
+  } = useCurrentServerPermissionUi(currentServerId);
   const currentChannelId = useNavigationStore(
     (state) => state.currentChannelId,
   );
@@ -225,18 +182,7 @@ export function useChatAppOrchestration() {
   } = useCommunityWorkspace({
     servers,
     currentUserId: user?.id ?? null,
-    onMemberBanned: handleMemberBanned,
-    onMemberChannelAccessRevoked: handleMemberChannelAccessRevoked,
   });
-
-  const canOpenServerSettings =
-    serverPermissions.canManageServer ||
-    serverPermissions.canManageRoles ||
-    serverPermissions.canManageMembers ||
-    serverPermissions.canManageBans ||
-    serverPermissions.canManageInvites;
-  const canManageCurrentServer =
-    serverPermissions.isOwner || serverPermissions.canManageServer;
 
   const dmWorkspaceIsActive = workspaceMode === "dm";
 
@@ -302,25 +248,10 @@ export function useChatAppOrchestration() {
     enabled: true,
   });
 
-  const ensureIsElevatedInServer = useCallback(
-    async (communityId: string): Promise<boolean> => {
-      if (!communityId || !user?.id) return false;
-      const cachedValue = elevatedServerAccessByIdRef.current.get(communityId);
-      if (typeof cachedValue === "boolean") {
-        return cachedValue;
-      }
-
-      const communityBackend = getCommunityDataBackend(communityId);
-      const nextValue = await communityBackend.isElevatedInServer(communityId);
-      elevatedServerAccessByIdRef.current.set(communityId, nextValue);
-      return nextValue;
-    },
-    [user?.id],
-  );
-
   // ── Channel groups ────────────────────────────────────────────────────────
   const {
     state: { channelGroupState },
+    derived: { sidebarChannelGroups },
     actions: {
       resetChannelGroups,
       createChannelGroup,
@@ -335,15 +266,7 @@ export function useChatAppOrchestration() {
     currentUserId: user?.id ?? null,
     currentChannelId,
     channels,
-    onActiveChannelAccessLost: handleActiveChannelAccessLost,
   });
-
-  const sidebarChannelGroups = channelGroupState.groups.map((group) => ({
-    id: group.id,
-    name: group.name,
-    channelIds: group.channelIds,
-    isCollapsed: channelGroupState.collapsedGroupIds.includes(group.id),
-  }));
 
   // ── Server admin ──────────────────────────────────────────────────────────
   const {
@@ -443,6 +366,7 @@ export function useChatAppOrchestration() {
   const {
     actions: {
       resetMessageState,
+      clearAuthorProfileCache,
       requestOlderMessages,
       sendMessage,
       toggleMessageReaction,
@@ -460,10 +384,8 @@ export function useChatAppOrchestration() {
     currentChannelId,
     currentUserId: user?.id ?? null,
     isCurrentUserElevatedInServer: isCurrentUserElevatedInCurrentServer,
-    ensureIsElevatedInServer,
     debugChannelReloads,
     channels,
-    authorProfileCacheRef,
   });
 
   const { showVoiceDisconnectToast } =
@@ -484,10 +406,6 @@ export function useChatAppOrchestration() {
       activeVoiceChannel,
       forceDisconnectVoice,
       serverNameByIdRef,
-      activeServerAccessLostHandlerRef,
-      activeChannelAccessLostHandlerRef,
-      memberBannedHandlerRef,
-      memberChannelAccessRevokedHandlerRef,
     });
 
   // ── Desktop settings ──────────────────────────────────────────────────────
@@ -557,6 +475,7 @@ export function useChatAppOrchestration() {
       dmMessagesError,
       dmMessageSendPending,
     },
+    derived: { showDmWorkspace, selectedDmConversation },
     actions: {
       resetDirectMessages,
       refreshDmConversations,
@@ -575,13 +494,6 @@ export function useChatAppOrchestration() {
     enabled: true,
     isActive: dmWorkspaceIsActive,
   });
-
-  const showDmWorkspace = dmWorkspaceIsActive;
-  const selectedDmConversation = selectedDmConversationId
-    ? (dmConversations.find(
-        (c) => c.conversationId === selectedDmConversationId,
-      ) ?? null)
-    : null;
 
   // ── DM interactions ───────────────────────────────────────────────────────
   const {
@@ -621,8 +533,6 @@ export function useChatAppOrchestration() {
     userId: user?.id,
     activeVoiceCommunityId: activeVoiceChannel?.community_id ?? null,
     membersModalCommunityId,
-    ensureIsElevatedInServer,
-    elevatedCacheRef: elevatedServerAccessByIdRef,
     setIsCurrentUserElevatedInCurrentServer,
     setIsCurrentUserElevatedInActiveVoiceServer,
     setIsCurrentUserElevatedInMembersModalServer,
@@ -730,7 +640,7 @@ export function useChatAppOrchestration() {
     resetPlatformSession,
     resetVoiceState,
     resetMessageState,
-    authorProfileCacheRef,
+    clearAuthorProfileCache,
     resetFeatureFlags,
     resetNotifications,
     resetSocialWorkspace,
