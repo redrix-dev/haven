@@ -98,6 +98,8 @@ export function useChatAppOrchestration() {
   const voiceHardwareDebugPanelEnabled = hasFeatureFlag(
     VOICE_HARDWARE_DEBUG_PANEL_FLAG,
   );
+  const richComposerEnabled =
+    hasFeatureFlag("rich_markdown_composer") || hasFeatureFlag("rich_composer");
   // ── Platform session ──────────────────────────────────────────────────────
   const {
     state: { profileUsername, profileAvatarUrl, isPlatformStaff },
@@ -690,6 +692,7 @@ export function useChatAppOrchestration() {
     dmWorkspaceIsActive,
     serverModmailEnabled,
     voiceHardwareDebugPanelEnabled,
+    richComposerEnabled,
     // community
     channels,
     channelsLoading,

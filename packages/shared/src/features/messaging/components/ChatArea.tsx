@@ -67,6 +67,7 @@ interface ChatAreaProps {
     targetUserId: string,
   ) => Promise<BanEligibleServer[]>;
   onDirectMessageUser: (targetUserId: string) => void;
+  enableRichComposer?: boolean;
 }
 
 export function ChatArea({
@@ -97,6 +98,7 @@ export function ChatArea({
   onKickUserFromCurrentServer,
   onResolveBanEligibleServers,
   onDirectMessageUser,
+  enableRichComposer = false,
 }: ChatAreaProps) {
   const isVoiceChannel = channelKind === "voice";
   const messages = useMessagesStore((state) => state.messages);
@@ -282,6 +284,7 @@ export function ChatArea({
                 replyTarget={replyTarget}
                 onClearReplyTarget={() => setReplyTarget(null)}
                 onContainerHeightChange={setComposerHeight}
+                enableRichComposer={enableRichComposer}
               />
             </div>
           </div>

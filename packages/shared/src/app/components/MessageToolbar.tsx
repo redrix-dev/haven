@@ -20,9 +20,23 @@ export interface MessageToolbarHandle {
 }
 
 interface MessageToolbarProps {
-  inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  value: string;
-  onChange: (newValue: string) => void;
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
+  value?: string;
+  onChange?: (newValue: string) => void;
+  richActions?: {
+    handleKeyboardShortcut: (event: ShortcutEvent) => boolean;
+    toggleBold: () => void;
+    toggleItalic: () => void;
+    toggleUnderline: () => void;
+    toggleStrike: () => void;
+    toggleInlineCode: () => void;
+    toggleCodeBlock: () => void;
+    toggleBlockquote: () => void;
+    setHeading: (level: 1 | 2 | 3) => void;
+    toggleBulletList: () => void;
+    toggleOrderedList: () => void;
+    insertHorizontalRule: () => void;
+  };
   variant?: 'toolbar' | 'menu';
   triggerClassName?: string;
   triggerLabel?: React.ReactNode;
@@ -52,8 +66,9 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
   function MessageToolbar(
     {
       inputRef,
-      value,
+      value = '',
       onChange,
+      richActions,
       variant = 'toolbar',
       triggerClassName,
       triggerLabel = '...',
@@ -64,6 +79,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
   ) {
     const commitChange = React.useCallback(
       (nextValue: string, selectionStart: number, selectionEnd: number) => {
+        if (!inputRef || !onChange) return;
         onChange(nextValue);
         scheduleSelection(inputRef, selectionStart, selectionEnd);
       },
@@ -72,6 +88,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
 
     const withSelection = React.useCallback(
       (apply: (input: HTMLTextAreaElement, start: number, end: number) => void) => {
+        if (!inputRef || !onChange) return false;
         const input = inputRef.current;
         if (!input) return false;
         const start = input.selectionStart ?? value.length;
@@ -139,25 +156,6 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
       });
     }, [commitChange, value, withSelection]);
 
-    const insertLink = React.useCallback(() => {
-      withSelection((input, start, end) => {
-        const selected = value.slice(start, end);
-        const before = value.slice(0, start);
-        const after = value.slice(end);
-        if (selected) {
-          const nextValue = `${before}[${selected}](url)${after}`;
-          const urlStart = start + selected.length + 3;
-          commitChange(nextValue, urlStart, urlStart + 3);
-          input.focus();
-          return;
-        }
-        const nextValue = `${before}[](url)${after}`;
-        const labelStart = start + 1;
-        commitChange(nextValue, labelStart, labelStart);
-        input.focus();
-      });
-    }, [commitChange, value, withSelection]);
-
     const insertHorizontalRule = React.useCallback(() => {
       withSelection((input, start, end) => {
         const before = value.slice(0, start);
@@ -172,6 +170,9 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
 
     const handleKeyboardShortcut = React.useCallback(
       (event: ShortcutEvent) => {
+        if (richActions) {
+          return richActions.handleKeyboardShortcut(event);
+        }
         const modifier = event.ctrlKey || event.metaKey;
         if (!modifier || event.altKey) return false;
 
@@ -194,7 +195,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
 
         return false;
       },
-      [applyWrappedFormat]
+      [applyWrappedFormat, richActions]
     );
 
     React.useImperativeHandle(
@@ -216,69 +217,128 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
       >
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => applyWrappedFormat('**')}
+          onSelect={() =>
+            richActions ? richActions.toggleBold() : applyWrappedFormat('**')
+          }
         >
           Bold
           <DropdownMenuShortcut className={menuShortcutClassName}>Ctrl+B</DropdownMenuShortcut>
         </DropdownMenuItem>
-        <DropdownMenuItem className={menuItemClassName} onSelect={() => applyWrappedFormat('*')}>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() =>
+            richActions ? richActions.toggleItalic() : applyWrappedFormat('*')
+          }
+        >
           Italic
           <DropdownMenuShortcut className={menuShortcutClassName}>Ctrl+I</DropdownMenuShortcut>
         </DropdownMenuItem>
-        <DropdownMenuItem className={menuItemClassName} onSelect={() => applyWrappedFormat('__')}>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() =>
+            richActions
+              ? richActions.toggleUnderline()
+              : applyWrappedFormat('__')
+          }
+        >
           Underline
           <DropdownMenuShortcut className={menuShortcutClassName}>Ctrl+U</DropdownMenuShortcut>
         </DropdownMenuItem>
-        <DropdownMenuItem className={menuItemClassName} onSelect={() => applyWrappedFormat('~~')}>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() =>
+            richActions ? richActions.toggleStrike() : applyWrappedFormat('~~')
+          }
+        >
           Strikethrough
         </DropdownMenuItem>
-        <DropdownMenuItem className={menuItemClassName} onSelect={() => applyWrappedFormat('`')}>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() =>
+            richActions
+              ? richActions.toggleInlineCode()
+              : applyWrappedFormat('`')
+          }
+        >
           Inline code
         </DropdownMenuItem>
-        <DropdownMenuItem className={menuItemClassName} onSelect={insertCodeBlock}>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() =>
+            richActions ? richActions.toggleCodeBlock() : insertCodeBlock()
+          }
+        >
           Code block
-        </DropdownMenuItem>
-        <DropdownMenuItem className={menuItemClassName} onSelect={insertLink}>
-          Link
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-[#304867]" />
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => prefixSelectedLines((line) => `> ${line}`)}
+          onSelect={() =>
+            richActions
+              ? richActions.toggleBlockquote()
+              : prefixSelectedLines((line) => `> ${line}`)
+          }
         >
           Blockquote
         </DropdownMenuItem>
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => prefixSelectedLines((line) => `# ${line}`)}
+          onSelect={() =>
+            richActions
+              ? richActions.setHeading(1)
+              : prefixSelectedLines((line) => `# ${line}`)
+          }
         >
           Heading 1
         </DropdownMenuItem>
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => prefixSelectedLines((line) => `## ${line}`)}
+          onSelect={() =>
+            richActions
+              ? richActions.setHeading(2)
+              : prefixSelectedLines((line) => `## ${line}`)
+          }
         >
           Heading 2
         </DropdownMenuItem>
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => prefixSelectedLines((line) => `### ${line}`)}
+          onSelect={() =>
+            richActions
+              ? richActions.setHeading(3)
+              : prefixSelectedLines((line) => `### ${line}`)
+          }
         >
           Heading 3
         </DropdownMenuItem>
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => prefixSelectedLines((line) => `- ${line}`)}
+          onSelect={() =>
+            richActions
+              ? richActions.toggleBulletList()
+              : prefixSelectedLines((line) => `- ${line}`)
+          }
         >
           Bullet list
         </DropdownMenuItem>
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => prefixSelectedLines((line, index) => `${index + 1}. ${line}`)}
+          onSelect={() =>
+            richActions
+              ? richActions.toggleOrderedList()
+              : prefixSelectedLines((line, index) => `${index + 1}. ${line}`)
+          }
         >
           Numbered list
         </DropdownMenuItem>
-        <DropdownMenuItem className={menuItemClassName} onSelect={insertHorizontalRule}>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() =>
+            richActions
+              ? richActions.insertHorizontalRule()
+              : insertHorizontalRule()
+          }
+        >
           Horizontal rule
           <DropdownMenuShortcut className={menuShortcutClassName}>---</DropdownMenuShortcut>
         </DropdownMenuItem>
@@ -289,12 +349,10 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
               className={cn(
-                'h-9 min-w-9 rounded-xl px-2 text-sm font-semibold text-[#cfe0ff] hover:bg-[#22334f] hover:text-white',
+                'inline-flex h-8 min-w-8 items-center justify-center rounded-xl px-2 text-xs font-semibold leading-none text-[#cfe0ff] transition-colors hover:bg-[#22334f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5f8fdd]',
                 triggerClassName
               )}
               title={triggerTitle}
@@ -302,7 +360,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
               onMouseDown={preventToolbarFocusLoss}
             >
               {triggerLabel}
-            </Button>
+            </button>
           </DropdownMenuTrigger>
           {renderMenuContent()}
         </DropdownMenu>
@@ -319,7 +377,9 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
           title="Bold (Ctrl+B)"
           aria-label="Bold"
           onMouseDown={preventToolbarFocusLoss}
-          onClick={() => applyWrappedFormat('**')}
+          onClick={() =>
+            richActions ? richActions.toggleBold() : applyWrappedFormat('**')
+          }
         >
           B
         </Button>
@@ -331,7 +391,9 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
           title="Italic (Ctrl+I)"
           aria-label="Italic"
           onMouseDown={preventToolbarFocusLoss}
-          onClick={() => applyWrappedFormat('*')}
+          onClick={() =>
+            richActions ? richActions.toggleItalic() : applyWrappedFormat('*')
+          }
         >
           I
         </Button>
@@ -343,7 +405,11 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
           title="Underline (Ctrl+U)"
           aria-label="Underline"
           onMouseDown={preventToolbarFocusLoss}
-          onClick={() => applyWrappedFormat('__')}
+          onClick={() =>
+            richActions
+              ? richActions.toggleUnderline()
+              : applyWrappedFormat('__')
+          }
         >
           U
         </Button>
@@ -355,7 +421,9 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
           title="Strikethrough"
           aria-label="Strikethrough"
           onMouseDown={preventToolbarFocusLoss}
-          onClick={() => applyWrappedFormat('~~')}
+          onClick={() =>
+            richActions ? richActions.toggleStrike() : applyWrappedFormat('~~')
+          }
         >
           S
         </Button>
@@ -367,7 +435,11 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
           title="Inline code"
           aria-label="Inline code"
           onMouseDown={preventToolbarFocusLoss}
-          onClick={() => applyWrappedFormat('`')}
+          onClick={() =>
+            richActions
+              ? richActions.toggleInlineCode()
+              : applyWrappedFormat('`')
+          }
         >
           &lt;/&gt;
         </Button>
@@ -379,21 +451,11 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
           title="Code block"
           aria-label="Code block"
           onMouseDown={preventToolbarFocusLoss}
-          onClick={insertCodeBlock}
+          onClick={() =>
+            richActions ? richActions.toggleCodeBlock() : insertCodeBlock()
+          }
         >
           {'{ }'}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          className={toolbarButtonClassName}
-          title="Link"
-          aria-label="Link"
-          onMouseDown={preventToolbarFocusLoss}
-          onClick={insertLink}
-        >
-          Link
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

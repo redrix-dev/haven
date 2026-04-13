@@ -18,8 +18,11 @@ import {
 
 export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
   const servers = useServersStore((state) => state.servers);
-  const currentServer = useNavigationStore((state) => state.currentServer);
   const currentServerId = useNavigationStore((state) => state.currentServerId);
+  const currentServer = useMemo(
+    () => servers.find((server) => server.id === currentServerId) ?? null,
+    [currentServerId, servers],
+  );
   const voiceJoined = useVoiceStore((state) => state.joined);
   const voiceMuted = useVoiceStore((state) => state.isMuted);
   const voiceDeafened = useVoiceStore((state) => state.isDeafened);

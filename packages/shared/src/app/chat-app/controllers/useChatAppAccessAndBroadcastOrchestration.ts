@@ -65,7 +65,6 @@ export function useChatAppAccessAndBroadcastOrchestration({
     (serverId: string) => {
       if (!serverId) return;
       useNavigationStore.getState().setCurrentServerId(null);
-      useNavigationStore.getState().setCurrentServer(null);
       useNavigationStore.getState().setCurrentChannelId(null);
       useNavigationStore.getState().setWorkspaceMode("community");
       resetMessageState();

@@ -29,13 +29,6 @@ export function useServers({
     useServersStore.getState().setServers(serverList);
   }, []);
 
-  const setStoredCurrentServer = useCallback(
-    (currentServer: ServerSummary | null) => {
-      useNavigationStore.getState().setCurrentServer(currentServer);
-    },
-    [],
-  );
-
   const setStoredIsLoading = useCallback((isLoading: boolean) => {
     useServersStore.getState().setIsLoading(isLoading);
   }, []);
@@ -43,17 +36,6 @@ export function useServers({
   const resetStoredServers = useCallback(() => {
     useServersStore.getState().reset();
   }, []);
-
-  const syncStoredCurrentServer = useCallback(
-    (serverList: ServerSummary[]) => {
-      const { currentServerId } = useNavigationStore.getState();
-      const nextCurrentServer = currentServerId
-        ? (serverList.find((server) => server.id === currentServerId) ?? null)
-        : null;
-      setStoredCurrentServer(nextCurrentServer);
-    },
-    [setStoredCurrentServer],
-  );
 
   const detectActiveServerAccessLoss = useCallback(
     (serverList: ServerSummary[]) => {
@@ -96,7 +78,6 @@ export function useServers({
     try {
       const serverList = await controlPlaneBackend.listUserCommunities(user.id);
       setStoredServers(serverList);
-      syncStoredCurrentServer(serverList);
       detectActiveServerAccessLoss(serverList);
       setStatus("success");
     } catch (err: unknown) {
@@ -111,7 +92,6 @@ export function useServers({
     resetStoredServers,
     setStoredIsLoading,
     setStoredServers,
-    syncStoredCurrentServer,
     user,
   ]);
 

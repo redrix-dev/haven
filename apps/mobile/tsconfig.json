@@ -5,7 +5,7 @@
     "moduleResolution": "bundler",
     "noEmit": true,
     "strict": true,
-    "types": ["react"]
+    "types": ["react", "nativewind/types"]
   },
-  "include": ["./**/*.ts", "./**/*.tsx"]
+  "include": ["./**/*.ts", "./**/*.tsx", "./nativewind-env.d.ts"]
 }

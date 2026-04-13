@@ -1,5 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-import { Database } from '../types/database';
+import { createHavenSupabaseClient } from './createHavenSupabaseClient';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -11,7 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+export const supabase = createHavenSupabaseClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: isProduction || isDev, // Persist sessions in production and developmentr environments
     detectSessionInUrl: false,

@@ -9,6 +9,7 @@ import { useChatAppVoiceIntegration } from "@shared/app/chat-app/useChatAppVoice
 import { getErrorMessage } from "@platform/lib/errors";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
+import { useServersStore } from "@shared/stores/serversStore";
 import { useUiStore } from "@shared/stores/uiStore";
 
 type CommunityWorkspaceShellProps = {
@@ -22,8 +23,12 @@ export function CommunityWorkspaceShell({
   user,
   voice,
 }: CommunityWorkspaceShellProps) {
-  const currentServer = useNavigationStore((state) => state.currentServer);
+  const servers = useServersStore((state) => state.servers);
   const currentServerId = useNavigationStore((state) => state.currentServerId);
+  const currentServer = React.useMemo(
+    () => servers.find((server) => server.id === currentServerId) ?? null,
+    [currentServerId, servers],
+  );
   const setCurrentChannelId = useNavigationStore(
     (state) => state.setCurrentChannelId,
   );
@@ -288,6 +293,7 @@ export function CommunityWorkspaceShell({
           }}
           onResolveBanEligibleServers={app.resolveBanEligibleServers}
           onDirectMessageUser={app.directMessageUser}
+          enableRichComposer={app.richComposerEnabled}
         />
       ) : (
         <div className="flex-1 flex items-center justify-center">

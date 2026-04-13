@@ -57,6 +57,7 @@ export function ChatAppDmWorkspace({ app, user }: ChatAppDmWorkspaceProps) {
         onToggleMute={app.toggleSelectedDmConversationMuted}
         onBlockUser={app.blockDirectMessageUser}
         onReportMessage={app.reportDirectMessage}
+        enableRichComposer={app.richComposerEnabled}
       />
     </>
   );

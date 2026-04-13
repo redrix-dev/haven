@@ -4,8 +4,19 @@
     "slug": "haven-mobile",
     "version": "0.0.0",
     "orientation": "portrait",
+    "scheme": "haven",
     "userInterfaceStyle": "automatic",
     "platforms": ["ios", "android"],
-    "assetBundlePatterns": ["**/*"]
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-dev-client"],
+    "web": {
+      "bundler": "metro"
+    },
+    "ios": {
+      "bundleIdentifier": "com.redrix.haven.mobile"
+    },
+    "android": {
+      "package": "com.redrix.haven.mobile"
+    }
   }
 }

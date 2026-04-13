@@ -12,7 +12,11 @@ import {
   type MessageToolbarHandle,
 } from "@shared/app/components/MessageToolbar";
 import { getErrorMessage } from "@platform/lib/errors";
-import { Plus } from "lucide-react";
+import { MoreHorizontal, Plus } from "lucide-react";
+import {
+  RichComposerInput,
+  useRichComposer,
+} from "@shared/features/messaging/components/richComposer";
 
 interface MessageInputProps {
   onSendMessage: (
@@ -32,6 +36,7 @@ interface MessageInputProps {
   } | null;
   onClearReplyTarget?: () => void;
   onContainerHeightChange?: (height: number) => void;
+  enableRichComposer?: boolean;
 }
 
 export function MessageInput({
@@ -41,6 +46,7 @@ export function MessageInput({
   replyTarget = null,
   onClearReplyTarget,
   onContainerHeightChange,
+  enableRichComposer = false,
 }: MessageInputProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -51,6 +57,41 @@ export function MessageInput({
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaExpiresInHours, setMediaExpiresInHours] = useState(24);
   const [sendError, setSendError] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    const content = input.trim();
+    if ((!content && !mediaFile) || sending) return;
+
+    setSending(true);
+    setSendError(null);
+
+    try {
+      await onSendMessage(content, {
+        replyToMessageId: replyTarget?.id,
+        mediaFile: mediaFile ?? undefined,
+        mediaExpiresInHours: mediaFile ? mediaExpiresInHours : undefined,
+      });
+      setInput("");
+      setMediaFile(null);
+      setMediaExpiresInHours(24);
+      onClearReplyTarget?.();
+    } catch (error: unknown) {
+      console.error("Failed to send message:", error);
+      setSendError(getErrorMessage(error, "Failed to send message."));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const richComposer = useRichComposer({
+    markdown: input,
+    onMarkdownChange: setInput,
+    placeholder: `Message #${channelName}`,
+    onSubmit: () => {
+      void handleSubmit();
+    },
+    disabled: sending,
+  });
 
   const syncInputHeight = useCallback(() => {
     const node = inputRef.current;
@@ -125,34 +166,10 @@ export function MessageInput({
     [],
   );
 
-  const handleSubmit = async () => {
-    const content = input.trim();
-    if ((!content && !mediaFile) || sending) return;
-
-    setSending(true);
-    setSendError(null);
-
-    try {
-      await onSendMessage(content, {
-        replyToMessageId: replyTarget?.id,
-        mediaFile: mediaFile ?? undefined,
-        mediaExpiresInHours: mediaFile ? mediaExpiresInHours : undefined,
-      });
-      setInput("");
-      setMediaFile(null);
-      setMediaExpiresInHours(24);
-      onClearReplyTarget?.();
-    } catch (error: unknown) {
-      console.error("Failed to send message:", error);
-      setSendError(getErrorMessage(error, "Failed to send message."));
-    } finally {
-      setSending(false);
-    }
-  };
-
   const handleInputKeyDown = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
+    if (enableRichComposer) return;
     if (toolbarRef.current?.handleKeyboardShortcut(event)) return;
     if (event.key !== "Enter" || event.shiftKey) return;
     event.preventDefault();
@@ -243,25 +260,33 @@ export function MessageInput({
 
         <MessageToolbar
           ref={toolbarRef}
-          inputRef={inputRef}
+          inputRef={enableRichComposer ? undefined : inputRef}
           value={input}
           onChange={setInput}
+          richActions={enableRichComposer ? richComposer.actions : undefined}
           variant="menu"
-          triggerLabel=". . ."
+          triggerLabel={<MoreHorizontal className="size-4" />}
           triggerTitle="Formatting options"
-          triggerClassName="absolute bottom-2.5 right-2.5 z-10 rounded-xl px-2 text-xs font-semibold tracking-[0.2em] text-[#d2dcef] hover:bg-[#22334f] hover:text-white"
+          triggerClassName="absolute bottom-2.5 right-2.5 z-10 text-[#d2dcef]"
           menuAlign="end"
         />
 
-        <Textarea
-          ref={inputRef}
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={handleInputKeyDown}
-          rows={1}
-          placeholder={`Message #${channelName}`}
-          className="min-h-[52px] max-h-[200px] resize-none border-none bg-transparent px-0 py-0 pb-[14px] pl-14 pr-16 pt-[14px] leading-6 text-[#e6edf7] placeholder:text-[#8897b1] shadow-none focus-visible:ring-0"
-        />
+        {enableRichComposer ? (
+          <RichComposerInput
+            editor={richComposer.editor}
+            className="pl-14 pr-16"
+          />
+        ) : (
+          <Textarea
+            ref={inputRef}
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={handleInputKeyDown}
+            rows={1}
+            placeholder={`Message #${channelName}`}
+            className="min-h-[52px] max-h-[200px] resize-none border-none bg-transparent px-0 py-0 pb-[14px] pl-14 pr-16 pt-[14px] leading-6 text-[#e6edf7] placeholder:text-[#8897b1] shadow-none focus-visible:ring-0"
+          />
+        )}
       </div>
       {sendError && <p className="text-xs text-[#f87171]">{sendError}</p>}
       <div

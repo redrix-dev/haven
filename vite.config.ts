@@ -32,6 +32,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: true,
+      open: false,
       allowedHosts: ["all", "local-haven.redrixx.com"],
     },
   };

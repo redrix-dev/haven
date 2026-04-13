@@ -1,4 +1,5 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { listUserCommunitiesWithClient } from '@shared/lib/listUserCommunitiesWithClient';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
 import type {
@@ -87,10 +88,6 @@ type InviteRecord = Pick<
   Database['public']['Tables']['invites']['Row'],
   'id' | 'code' | 'current_uses' | 'max_uses' | 'expires_at' | 'is_active'
 >;
-
-type CommunityMemberCommunityRow = {
-  communities: ServerSummary | null;
-};
 
 type FeatureFlagRow = {
   flag_key: string;
@@ -253,19 +250,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async listUserCommunities(userId) {
-    const { data, error } = await supabase
-      .from('community_members')
-      .select('communities(id, name, created_at)')
-      .eq('user_id', userId);
-
-    if (error) throw error;
-
-    return ((data ?? []) as CommunityMemberCommunityRow[])
-      .map((item) => item.communities)
-      .filter(
-        (community): community is ServerSummary =>
-          community !== null && community !== undefined
-      );
+    return listUserCommunitiesWithClient(supabase, userId);
   },
 
   async renameCommunity({ communityId, name }) {

@@ -24,6 +24,10 @@ import {
   type MessageToolbarHandle,
 } from "@shared/app/components/MessageToolbar";
 import {
+  RichComposerInput,
+  useRichComposer,
+} from "@shared/features/messaging/components/richComposer";
+import {
   DmReportModal,
   type DmReportTarget,
 } from "@shared/features/direct-messages/components/DmReportModal";
@@ -80,6 +84,7 @@ type DirectMessageAreaProps = {
     kind: DirectMessageReportKind;
     comment: string;
   }) => Promise<void>;
+  enableRichComposer?: boolean;
 };
 
 const formatTimestamp = (value: string) => {
@@ -145,6 +150,7 @@ export function DirectMessageArea({
   onToggleMute,
   onBlockUser,
   onReportMessage,
+  enableRichComposer = false,
 }: DirectMessageAreaProps) {
   const conversation = useDmStore((state) => state.currentConversation);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
@@ -224,6 +230,7 @@ export function DirectMessageArea({
   const handleComposerKeyDown = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
+    if (enableRichComposer) return;
     if (toolbarRef.current?.handleKeyboardShortcut(event)) return;
     if (event.key !== "Enter" || event.shiftKey) return;
     event.preventDefault();
@@ -293,6 +300,25 @@ export function DirectMessageArea({
     setActionNotice("DM report submitted to Haven.");
   };
 
+  const dmTitle =
+    conversation
+      ? resolveLiveUsername(
+          liveProfiles,
+          conversation.otherUserId,
+          conversation.otherUsername,
+        ) ?? "Direct Message"
+      : "Direct Message";
+
+  const richComposer = useRichComposer({
+    markdown: draft,
+    onMarkdownChange: setDraft,
+    placeholder: `Message ${dmTitle}`,
+    onSubmit: () => {
+      void handleSend();
+    },
+    disabled: sending || messagingUnavailable || !conversation,
+  });
+
   if (!conversation) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#111a2b] text-[#a9b8cf]">
@@ -307,12 +333,7 @@ export function DirectMessageArea({
     );
   }
 
-  const title =
-    resolveLiveUsername(
-      liveProfiles,
-      conversation.otherUserId,
-      conversation.otherUsername,
-    ) ?? "Direct Message";
+  const title = dmTitle;
   const otherAvatarUrl = resolveLiveAvatarUrl(
     liveProfiles,
     conversation.otherUserId,
@@ -632,20 +653,27 @@ export function DirectMessageArea({
                 </div>
               )}
               <MessageToolbar
-                inputRef={dmInputRef}
+                inputRef={enableRichComposer ? undefined : dmInputRef}
                 value={draft}
                 onChange={setDraft}
                 ref={toolbarRef}
+                richActions={enableRichComposer ? richComposer.actions : undefined}
               />
-              <Textarea
-                ref={dmInputRef}
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                placeholder={`Message ${title}`}
-                className="min-h-[84px] resize-y bg-[#111a2b] border-[#304867] text-white placeholder:text-[#89a1c3]"
-                disabled={sending}
-              />
+              {enableRichComposer ? (
+                <div className="rounded-md border border-[#304867] bg-[#111a2b] px-3">
+                  <RichComposerInput editor={richComposer.editor} />
+                </div>
+              ) : (
+                <Textarea
+                  ref={dmInputRef}
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
+                  placeholder={`Message ${title}`}
+                  className="min-h-[84px] resize-y bg-[#111a2b] border-[#304867] text-white placeholder:text-[#89a1c3]"
+                  disabled={sending}
+                />
+              )}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Button
