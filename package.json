@@ -35,7 +35,18 @@
     "ci:verify": "npm run test:ci",
     "dev:web": "npm run assets:generate && vite",
     "build:web": "npm run assets:generate && vite build",
-    "assets:generate": "node tooling/scripts/assets/generate-app-assets.mjs"
+    "assets:generate": "node tooling/scripts/assets/generate-app-assets.mjs",
+    "mobile:preflight": "node tooling/scripts/mobile/preflight.mjs",
+    "mobile:ownership": "node tooling/scripts/mobile/check-dependency-ownership.mjs",
+    "mobile:doctor": "node tooling/scripts/mobile/doctor.mjs",
+    "mobile:start": "node tooling/scripts/mobile/run-in-mobile.mjs npm run start",
+    "mobile:start:clear": "node tooling/scripts/mobile/run-in-mobile.mjs npm run start:clear",
+    "mobile:ios": "node tooling/scripts/mobile/run-in-mobile.mjs npm run ios",
+    "mobile:ios:device": "node tooling/scripts/mobile/run-in-mobile.mjs npm run ios:device",
+    "mobile:android": "node tooling/scripts/mobile/run-in-mobile.mjs npm run android",
+    "mobile:prebuild": "node tooling/scripts/mobile/run-in-mobile.mjs npm run prebuild",
+    "setup:mobile": "node tooling/scripts/mobile/run-in-mobile.mjs npm ci",
+    "reset:mobile": "node tooling/scripts/mobile/reset.mjs"
   },
   "keywords": [],
   "author": {

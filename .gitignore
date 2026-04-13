@@ -144,6 +144,10 @@ release/
 # Misc build caches
 .turbo/
 
+# Expo mobile generated artifacts (apps/mobile is prebuild-regenerated)
+apps/mobile/.expo/
+apps/mobile/ios/
+
 # Local planning docs
 mvp-roadmap/
 

@@ -32,6 +32,29 @@ const rendererBoundaryRestrictions = [
   },
 ];
 
+const mobileBoundaryRestrictions = [
+  {
+    group: ['@web/*', '**/apps/web/src/*'],
+    message: 'Mobile code must not import web modules.',
+  },
+  {
+    group: ['@electron/*', '**/apps/electron/src/*'],
+    message: 'Mobile code must not import Electron modules.',
+  },
+  {
+    group: ['@platform/desktop/*', '**/platform/desktop/*'],
+    message: 'Mobile code must not import desktop platform bridges.',
+  },
+  {
+    group: ['electron', 'electron/*'],
+    message: 'Mobile code must not import Electron APIs.',
+  },
+  {
+    group: ['node:*'],
+    message: 'Mobile runtime code must not import Node built-ins.',
+  },
+];
+
 export default [
   {
     ignores: ['node_modules/**', '.webpack/**', 'out/**', 'dist/**'],
@@ -118,6 +141,32 @@ export default [
         'error',
         {
           patterns: rendererBoundaryRestrictions,
+        },
+      ],
+    },
+  },
+  {
+    files: ['apps/mobile/**/*.{ts,tsx,js,jsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: mobileBoundaryRestrictions,
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'window',
+          message: 'Mobile code should use platform-safe abstractions from @shared/platform/appHost.',
+        },
+        {
+          name: 'document',
+          message: 'Mobile code cannot rely on DOM globals.',
+        },
+        {
+          name: 'localStorage',
+          message: 'Mobile code cannot use localStorage; use AsyncStorage-backed abstractions.',
         },
       ],
     },

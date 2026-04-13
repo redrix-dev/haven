@@ -15,6 +15,12 @@ cd apps/mobile
 npm ci
 ```
 
+From repo root you can also use wrappers that always execute in `apps/mobile`:
+
+```bash
+npm run setup:mobile
+```
+
 ## Environment (Supabase, later phases)
 
 Expo exposes public vars as `EXPO_PUBLIC_*`. The web app uses `SUPABASE_URL` / `SUPABASE_ANON_KEY` via bundlers; `@shared/lib/supabase` expects those today. For RN you will either map env in `app.config.js` or introduce a shared `createSupabaseClient` — see the inventory doc.
@@ -30,6 +36,44 @@ Copy `.env.example` to `.env` when you add keys (`.env` is gitignored at repo ro
 ## Development build (expo-dev-client)
 
 This project uses **development clients**, not Expo Go.
+
+### Canonical command matrix
+
+- First setup:
+
+```bash
+npm run setup:mobile
+```
+
+- Daily dev (preferred from repo root):
+
+```bash
+npm run mobile:start
+npm run mobile:ios:device
+```
+
+- Daily dev (inside `apps/mobile`):
+
+```bash
+npm run start
+npm run ios:device
+```
+
+- When native deps/config changed:
+
+```bash
+npm run mobile:prebuild
+npm run mobile:ios:device
+```
+
+- When caches/state are bad:
+
+```bash
+npm run reset:mobile
+npm run mobile:start:clear
+```
+
+### Manual commands
 
 ```bash
 cd apps/mobile
@@ -61,3 +105,25 @@ npx expo start --dev-client --clear
 ```bash
 npm run typecheck
 ```
+
+## Generated artifact policy
+
+`apps/mobile/ios` and `apps/mobile/.expo` are treated as generated local artifacts in this repo and are gitignored. Regenerate native files with:
+
+```bash
+npm run mobile:prebuild
+```
+
+## Diagnostics and troubleshooting
+
+Run a quick mobile health check from repo root:
+
+```bash
+npm run mobile:doctor
+```
+
+Common issues:
+
+- **Config/plugin missing errors** (`expo-asset`, Babel plugin, etc.): run `npm run setup:mobile` then `npm run mobile:start:clear`.
+- **iOS install succeeds but app will not launch on device** (invalid signature/trust): trust the developer profile on device under Settings > General > VPN & Device Management, then rerun `npm run mobile:ios:device`.
+- **Wrong project context issues**: always use root wrappers (`npm run mobile:*`) or `cd apps/mobile` before running Expo commands.

@@ -26,6 +26,12 @@ jobs:
           version: latest
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: npm ci
+      - run: npm run setup:mobile
+      - run: npm run mobile:ownership
+      - run: npm run mobile:preflight
+      - run: node tooling/scripts/mobile/run-in-mobile.mjs npx expo config --type public
+      - name: Lockfile discipline
+        run: git diff --exit-code -- package-lock.json apps/mobile/package-lock.json
       - run: supabase start
       - run: npm run ci:verify
       - name: Stop Supabase
