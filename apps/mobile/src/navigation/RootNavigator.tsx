@@ -5,10 +5,11 @@ import { useAuthSession } from "../hooks/useAuthSession";
 import { CreatePlaceholderScreen } from "../screens/CreatePlaceholderScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { JoinPlaceholderScreen } from "../screens/JoinPlaceholderScreen";
-import { LoginScreen } from "../screens/LoginScreen";
 import { SettingsPlaceholderScreen } from "../screens/SettingsPlaceholderScreen";
 import type { RootStackParamList } from "./types";
-
+import { MobileLogin } from "../screens/MobileLogin";
+import { PasswordRecoveryScreen } from "../screens/PasswordRecoveryScreen";
+import { SignUpScreen } from "../screens/SignUpScreen";
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
@@ -40,9 +41,14 @@ export function RootNavigator() {
               name="JoinPlaceholder"
               component={JoinPlaceholderScreen}
             />
+            
           </>
         ) : (
-          <Stack.Screen name="Login" component={LoginScreen} />
+          <>
+            <Stack.Screen name="Login" component={MobileLogin} />
+            <Stack.Screen name="PasswordRecovery" component={PasswordRecoveryScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

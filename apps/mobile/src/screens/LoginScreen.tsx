@@ -9,13 +9,15 @@ import {
 } from "react-native";
 import { getErrorMessage } from "@shared/platform/lib/errors";
 import { getMobileSupabase } from "../supabase/getMobileSupabase";
-
+import { useNavigation } from "@react-navigation/native";
+import type { RootStackParamList } from "../navigation/types";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 export function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
+  const navigation = useNavigation();
   const onSubmit = async () => {
     setError(null);
     setLoading(true);
@@ -73,7 +75,18 @@ export function LoginScreen() {
             {loading ? "Signing in…" : "Sign in"}
           </Text>
         </Pressable>
+        <Pressable
+          className="text-sm text-muted-foreground"
+          onPress={() => void navigation.navigate("PasswordRecovery" as unknown as never)}
+        >
+          <Text className="text-center text-sm text-muted-foreground">Forgot password?</Text>
+        </Pressable>
+        <Pressable
+          className="text-sm text-muted-foreground"
+          onPress={() => void navigation.navigate("SignUp" as unknown as never)}
+        >
+          <Text className="text-center text-sm text-muted-foreground">Don't have an account? Sign up</Text>
+        </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
-}

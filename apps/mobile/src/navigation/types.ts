@@ -4,4 +4,6 @@ export type RootStackParamList = {
   SettingsPlaceholder: undefined;
   CreatePlaceholder: undefined;
   JoinPlaceholder: undefined;
+  PasswordRecovery: undefined;
+  SignUp: undefined;
 };

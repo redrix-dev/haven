@@ -8,7 +8,11 @@
     "types": [
       "react",
       "nativewind/types"
-    ]
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@shared/*": ["../../packages/shared/src/*"]
+    }
   },
   "include": [
     "./**/*.ts",

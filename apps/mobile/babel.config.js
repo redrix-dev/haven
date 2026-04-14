@@ -14,6 +14,7 @@ module.exports = function (api) {
           root: [path.resolve(__dirname)],
           alias: {
             "@shared": path.resolve(__dirname, "../../packages/shared/src"),
+            "@": path.resolve(__dirname, "./src"),
           },
         },
       ],
