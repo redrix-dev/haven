@@ -45,9 +45,9 @@ interface MessageToolbarProps {
 }
 
 const toolbarButtonClassName =
-  'h-7 min-w-7 rounded-md px-2 text-xs font-semibold text-[#cfe0ff] hover:bg-[#22334f] hover:text-white';
-const menuItemClassName = 'cursor-pointer text-[#d8e5f7] focus:bg-[#22334f] focus:text-white';
-const menuShortcutClassName = 'text-[#8ea4c7]';
+  'h-7 min-w-7 rounded-md px-2 text-xs font-semibold text-pill hover:bg-surface-hover hover:text-white';
+const menuItemClassName = 'cursor-pointer text-row-heading focus:bg-surface-hover focus:text-white';
+const menuShortcutClassName = 'text-muted-foreground';
 
 const scheduleSelection = (
   inputRef: React.RefObject<HTMLTextAreaElement | null>,
@@ -213,7 +213,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
     const renderMenuContent = () => (
       <DropdownMenuContent
         align={menuAlign}
-        className="w-56 border-[#304867] bg-[#18243a] text-white"
+        className="w-56 border-border bg-surface-legal text-white"
       >
         <DropdownMenuItem
           className={menuItemClassName}
@@ -270,7 +270,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
         >
           Code block
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-[#304867]" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           className={menuItemClassName}
           onSelect={() =>
@@ -352,7 +352,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
             <button
               type="button"
               className={cn(
-                'inline-flex h-8 min-w-8 items-center justify-center rounded-xl px-2 text-xs font-semibold leading-none text-[#cfe0ff] transition-colors hover:bg-[#22334f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5f8fdd]',
+                'inline-flex h-8 min-w-8 items-center justify-center rounded-xl px-2 text-xs font-semibold leading-none text-pill transition-colors hover:bg-surface-hover hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 triggerClassName
               )}
               title={triggerTitle}
@@ -368,7 +368,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
     }
 
     return (
-      <div className="flex flex-wrap items-center gap-1 rounded-md border border-[#304867] bg-[#111a2b] px-2 py-1">
+      <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-surface-app px-2 py-1">
         <Button
           type="button"
           variant="ghost"

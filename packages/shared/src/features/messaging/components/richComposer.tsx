@@ -104,7 +104,7 @@ export function useRichComposer({
     editorProps: {
       attributes: {
         class:
-          "ProseMirror min-h-[52px] max-h-[200px] overflow-y-auto px-0 py-0 pb-[14px] pt-[14px] leading-6 text-[#e6edf7] focus:outline-none",
+          "ProseMirror min-h-[52px] max-h-[200px] overflow-y-auto px-0 py-0 pb-[14px] pt-[14px] leading-6 text-foreground focus:outline-none",
       },
       handleKeyDown(_view, event) {
         if (event.isComposing) return false;

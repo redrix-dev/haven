@@ -62,7 +62,7 @@ export function CreateChannelModal({ onClose, onCreate }: CreateChannelModalProp
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         size="sm"
-        className="bg-[#18243a] border-[#142033] text-white"
+        className="bg-surface-legal border-border-deep text-white"
         showCloseButton={false}
       >
         <DialogHeader>
@@ -71,7 +71,7 @@ export function CreateChannelModal({ onClose, onCreate }: CreateChannelModalProp
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="channel-name" className="text-xs font-semibold uppercase text-[#a9b8cf]">
+            <Label htmlFor="channel-name" className="text-xs font-semibold uppercase text-muted-foreground">
               Channel Name
             </Label>
             <Input
@@ -79,7 +79,7 @@ export function CreateChannelModal({ onClose, onCreate }: CreateChannelModalProp
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="new-channel"
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
               autoFocus
               required
               maxLength={80}
@@ -87,14 +87,14 @@ export function CreateChannelModal({ onClose, onCreate }: CreateChannelModalProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="channel-kind" className="text-xs font-semibold uppercase text-[#a9b8cf]">
+            <Label htmlFor="channel-kind" className="text-xs font-semibold uppercase text-muted-foreground">
               Channel Type
             </Label>
             <Select value={kind} onValueChange={(value) => setKind(value as ChannelKind)}>
-              <SelectTrigger id="channel-kind" className="w-full bg-[#142033] border-[#304867] text-white">
+              <SelectTrigger id="channel-kind" className="w-full bg-surface-panel border-border text-white">
                 <SelectValue placeholder="Select channel type" />
               </SelectTrigger>
-              <SelectContent className="bg-[#142033] border-[#304867] text-white">
+              <SelectContent className="bg-surface-panel border-border text-white">
                 <SelectItem value="text">Text</SelectItem>
                 <SelectItem value="voice">Voice</SelectItem>
               </SelectContent>
@@ -102,7 +102,7 @@ export function CreateChannelModal({ onClose, onCreate }: CreateChannelModalProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="channel-topic" className="text-xs font-semibold uppercase text-[#a9b8cf]">
+            <Label htmlFor="channel-topic" className="text-xs font-semibold uppercase text-muted-foreground">
               Topic (Optional)
             </Label>
             <Input
@@ -110,7 +110,7 @@ export function CreateChannelModal({ onClose, onCreate }: CreateChannelModalProp
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="What is this channel for?"
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
               maxLength={200}
             />
           </div>
@@ -129,7 +129,7 @@ export function CreateChannelModal({ onClose, onCreate }: CreateChannelModalProp
             <Button
               type="submit"
               disabled={loading || !name.trim()}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {loading ? 'Creating...' : 'Create Channel'}
             </Button>

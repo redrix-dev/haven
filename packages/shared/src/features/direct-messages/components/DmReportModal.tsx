@@ -76,28 +76,28 @@ export function DmReportModal({ open, onOpenChange, target, onSubmit }: DmReport
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-[#304867] bg-[#111a2b] text-white">
+      <DialogContent className="border-border bg-surface-app text-white">
         <DialogHeader>
           <DialogTitle>Report Direct Message</DialogTitle>
-          <DialogDescription className="text-[#a9b8cf]">
+          <DialogDescription className="text-muted-foreground">
             Reports are sent to the Haven Moderation Team for review. This is separate from server-based moderation reports.
           </DialogDescription>
         </DialogHeader>
 
         {!submitted ? (
           <div className="space-y-4">
-            <div className="rounded-md border border-[#304867] bg-[#142033] p-3">
-              <p className="text-xs uppercase tracking-wide text-[#9fb2cf]">Reported Message</p>
+            <div className="rounded-md border border-border bg-surface-panel p-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Reported Message</p>
               <p className="mt-1 text-sm font-semibold text-white">
                 {target?.authorUsername?.trim() || 'Unknown User'}
               </p>
-              <p className="mt-1 whitespace-pre-wrap break-words text-sm text-[#cddcf2]">
+              <p className="mt-1 whitespace-pre-wrap break-words text-sm text-report-body">
                 {target ? previewMessage(target.messagePreview) : 'No message selected.'}
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dm-report-kind" className="text-[#dce8fb]">
+              <Label htmlFor="dm-report-kind" className="text-form-label">
                 Report Type
               </Label>
               <Select
@@ -105,10 +105,10 @@ export function DmReportModal({ open, onOpenChange, target, onSubmit }: DmReport
                 onValueChange={(value) => setKind(value as DirectMessageReportKind)}
                 disabled={submitting}
               >
-                <SelectTrigger id="dm-report-kind" className="w-full bg-[#142033] border-[#304867] text-white">
+                <SelectTrigger id="dm-report-kind" className="w-full bg-surface-panel border-border text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                <SelectContent className="bg-surface-panel border-border text-white">
                   <SelectItem value="content_abuse">Content abuse</SelectItem>
                   <SelectItem value="bug">Bug / incorrect behavior</SelectItem>
                 </SelectContent>
@@ -116,7 +116,7 @@ export function DmReportModal({ open, onOpenChange, target, onSubmit }: DmReport
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dm-report-comment" className="text-[#dce8fb]">
+              <Label htmlFor="dm-report-comment" className="text-form-label">
                 Reason
               </Label>
               <Textarea
@@ -124,25 +124,25 @@ export function DmReportModal({ open, onOpenChange, target, onSubmit }: DmReport
                 value={comment}
                 onChange={(event) => setComment(event.target.value)}
                 placeholder="Briefly describe why you are reporting this DM."
-                className="min-h-[120px] resize-y bg-[#142033] border-[#304867] text-white placeholder:text-[#89a1c3]"
+                className="min-h-[120px] resize-y bg-surface-panel border-border text-white placeholder:text-muted-foreground"
                 disabled={submitting}
               />
-              <div className="flex items-center justify-between text-xs text-[#93a8c8]">
+              <div className="flex items-center justify-between text-xs text-report-meta">
                 <span>Required. 1-2000 characters.</span>
                 <span>{comment.trim().length}/2000</span>
               </div>
             </div>
 
             {submitError && (
-              <div className="rounded-md border border-[#5a2d3d] bg-[#2a1821] px-3 py-2 text-sm text-[#ffd4df]">
+              <div className="rounded-md border border-border-destructive-panel bg-surface-destructive-panel px-3 py-2 text-sm text-destructive-banner">
                 {submitError}
               </div>
             )}
           </div>
         ) : (
-          <div className="rounded-md border border-[#355077] bg-[#142033] p-4">
+          <div className="rounded-md border border-border-badge bg-surface-panel p-4">
             <p className="text-sm font-semibold text-white">Report submitted</p>
-            <p className="mt-1 text-sm text-[#a9b8cf]">
+            <p className="mt-1 text-sm text-muted-foreground">
               The Haven Moderation Team received your DM report and can review it in the DM moderation workflow.
             </p>
           </div>

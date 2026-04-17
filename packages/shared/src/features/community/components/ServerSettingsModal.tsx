@@ -695,7 +695,7 @@ export function ServerSettingsModal({
         */}
         <DialogContent
           size="app"
-          className="bg-[#18243a] border-[#142033] text-white
+          className="bg-surface-legal border-border-deep text-white
             md:w-[min(95vw,1160px)] md:max-w-none
             md:h-[min(88dvh,860px)] md:max-h-[calc(100dvh-1.5rem)]
             max-h-[88vh]
@@ -703,7 +703,7 @@ export function ServerSettingsModal({
           showCloseButton={false}
         >
           {/* ── Fixed header ── */}
-          <DialogHeader className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
+          <DialogHeader className="shrink-0 border-b border-border-dialog px-4 py-3 sm:px-6 sm:py-4">
             <DialogTitle className="text-2xl font-bold text-white">
               Community Settings
             </DialogTitle>
@@ -717,11 +717,11 @@ export function ServerSettingsModal({
               </div>
             ) : loadingInitialValues || !values ? (
               <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto space-y-4">
-                <Skeleton className="h-10 w-full bg-[#22334f]" />
-                <div className="rounded-md border border-[#304867] bg-[#142033] p-4 space-y-3">
-                  <Skeleton className="h-5 w-40 bg-[#22334f]" />
-                  <Skeleton className="h-10 w-full bg-[#1b2a42]" />
-                  <Skeleton className="h-24 w-full bg-[#1b2a42]" />
+                <Skeleton className="h-10 w-full bg-surface-hover" />
+                <div className="rounded-md border border-border bg-surface-panel p-4 space-y-3">
+                  <Skeleton className="h-5 w-40 bg-surface-hover" />
+                  <Skeleton className="h-10 w-full bg-surface-skeleton" />
+                  <Skeleton className="h-24 w-full bg-surface-skeleton" />
                 </div>
               </div>
             ) : (
@@ -735,8 +735,8 @@ export function ServerSettingsModal({
                 className="flex-1 min-h-0 flex flex-col gap-0 overflow-hidden"
               >
                 {/* Tab strip */}
-                <div className="shrink-0 border-b border-[#233753] pb-3">
-                  <TabsList className="bg-[#142033] border border-[#304867] w-full flex-wrap justify-start h-auto">
+                <div className="shrink-0 border-b border-border-dialog pb-3">
+                  <TabsList className="bg-surface-panel border border-border w-full flex-wrap justify-start h-auto">
                     {(
                       [
                         "general",
@@ -749,7 +749,7 @@ export function ServerSettingsModal({
                       <TabsTrigger
                         key={tab}
                         value={tab}
-                        className="text-[#a9b8cf] data-[state=active]:text-white capitalize"
+                        className="text-muted-foreground data-[state=active]:text-white capitalize"
                       >
                         {tab}
                       </TabsTrigger>
@@ -877,7 +877,7 @@ export function ServerSettingsModal({
           </div>
 
           {/* ── Fixed footer ── */}
-          <DialogFooter className="shrink-0 gap-3 border-t border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
+          <DialogFooter className="shrink-0 gap-3 border-t border-border-dialog px-4 py-3 sm:px-6 sm:py-4">
             <Button
               type="button"
               onClick={onClose}
@@ -896,14 +896,14 @@ export function ServerSettingsModal({
           if (!open) setPendingConfirm(null);
         }}
       >
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {pendingConfirm?.kind === "deleteRole"
                 ? "Delete Role?"
                 : "Unban User?"}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               {pendingConfirm?.kind === "deleteRole"
                 ? `Delete role "${pendingConfirm.roleName}"? This cannot be undone.`
                 : pendingConfirm
@@ -914,7 +914,7 @@ export function ServerSettingsModal({
           <AlertDialogFooter>
             <AlertDialogCancel
               disabled={Boolean(pendingConfirmBusy)}
-              className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]"
+              className="bg-muted border-border text-white hover:bg-secondary"
             >
               Cancel
             </AlertDialogCancel>

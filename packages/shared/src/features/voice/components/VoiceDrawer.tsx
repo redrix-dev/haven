@@ -151,21 +151,21 @@ export function VoiceDrawer({
       className={
         isPopoutSurface
           ? "p-0"
-          : "px-2 pt-2 pb-1 border-b border-[#22334f]"
+          : "px-2 pt-2 pb-1 border-b border-surface-hover"
       }
     >
-      <div className="rounded-md border border-[#304867] bg-[#142033] px-2.5 py-2.5">
+      <div className="rounded-md border border-border bg-surface-panel px-2.5 py-2.5">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8ea4c7]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Voice
               </span>
               <span
                 className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
                   voiceConnected
-                    ? "bg-[#2f9f73]/20 text-[#6dd5a6]"
-                    : "bg-[#44546f]/40 text-[#c6d2e7]"
+                    ? "bg-accent-success/20 text-voice-ok"
+                    : "bg-surface-neutral-muted/40 text-neutral-row"
                 }`}
               >
                 {statusLabel}
@@ -174,7 +174,7 @@ export function VoiceDrawer({
             <p className="mt-1 truncate text-sm font-semibold text-white">
               {channelName}
             </p>
-            <p className="truncate text-[11px] text-[#95a5bf]">{serverName}</p>
+            <p className="truncate text-[11px] text-meta">{serverName}</p>
           </div>
 
           <Popover open={voicePanelOpen} onOpenChange={onOpenChange}>
@@ -183,8 +183,8 @@ export function VoiceDrawer({
                 type="button"
                 size="icon-xs"
                 variant="ghost"
-                className={`shrink-0 hover:bg-[#22334f] hover:text-white ${
-                  voicePanelOpen ? "text-white" : "text-[#a9b8cf]"
+                className={`shrink-0 hover:bg-surface-hover hover:text-white ${
+                  voicePanelOpen ? "text-white" : "text-muted-foreground"
                 }`}
                 aria-label={
                   voicePanelOpen
@@ -197,31 +197,31 @@ export function VoiceDrawer({
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="w-[340px] max-w-[calc(100vw-1.5rem)] max-h-[70vh] overflow-y-auto border-[#304867] bg-[#111a2b] p-3 text-white"
+              className="w-[340px] max-w-[calc(100vw-1.5rem)] max-h-[70vh] overflow-y-auto border-border bg-surface-app p-3 text-white"
             >
               <div className="space-y-3">
                 <div>
                   <p className="text-sm font-semibold text-white">
                     Voice Quick Settings
                   </p>
-                  <p className="text-xs text-[#9fb2cf]">
+                  <p className="text-xs text-muted-foreground">
                     Fast device and mode changes. Thresholds, bindings, and
                     diagnostics stay in Voice Settings.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Microphone
                   </p>
                   <Select
                     value={selectedInputDeviceId}
                     onValueChange={onSelectInputDevice}
                   >
-                    <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+                    <SelectTrigger className="w-full border-border bg-surface-panel text-white">
                       <SelectValue placeholder="Select microphone" />
                     </SelectTrigger>
-                    <SelectContent className="border-[#304867] bg-[#142033] text-white">
+                    <SelectContent className="border-border bg-surface-panel text-white">
                       {inputDevices.length === 0 ? (
                         <SelectItem value="default">
                           Default microphone
@@ -241,7 +241,7 @@ export function VoiceDrawer({
                 </div>
 
                 <div className="space-y-1.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Speaker
                   </p>
                   <Select
@@ -249,10 +249,10 @@ export function VoiceDrawer({
                     onValueChange={onSelectOutputDevice}
                     disabled={!supportsOutputSelection}
                   >
-                    <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+                    <SelectTrigger className="w-full border-border bg-surface-panel text-white">
                       <SelectValue placeholder="Select speaker" />
                     </SelectTrigger>
-                    <SelectContent className="border-[#304867] bg-[#142033] text-white">
+                    <SelectContent className="border-border bg-surface-panel text-white">
                       {outputDevices.length === 0 ? (
                         <SelectItem value="default">
                           Default speaker
@@ -270,14 +270,14 @@ export function VoiceDrawer({
                     </SelectContent>
                   </Select>
                   {!supportsOutputSelection && (
-                    <p className="text-[11px] text-[#90a5c4]">
+                    <p className="text-[11px] text-auxiliary">
                       This runtime uses your system default output device.
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Transmission
                   </p>
                   <Select
@@ -288,10 +288,10 @@ export function VoiceDrawer({
                       )
                     }
                   >
-                    <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+                    <SelectTrigger className="w-full border-border bg-surface-panel text-white">
                       <SelectValue placeholder="Select mode" />
                     </SelectTrigger>
-                    <SelectContent className="border-[#304867] bg-[#142033] text-white">
+                    <SelectContent className="border-border bg-surface-panel text-white">
                       <SelectItem value="voice_activity">
                         Voice Activity
                       </SelectItem>
@@ -301,7 +301,7 @@ export function VoiceDrawer({
                       <SelectItem value="open_mic">Open Mic</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-[11px] text-[#90a5c4]">
+                  <p className="text-[11px] text-auxiliary">
                     {TRANSMISSION_MODE_LABELS[transmissionMode]}{" "}
                     selected. Use Voice Settings for threshold and binding
                     changes.
@@ -310,7 +310,7 @@ export function VoiceDrawer({
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       Member Volume
                     </p>
                     {canAdjustMemberVolumes && onResetAllMemberVolumes && (
@@ -320,13 +320,13 @@ export function VoiceDrawer({
                         variant="ghost"
                         onClick={onResetAllMemberVolumes}
                         disabled={voiceSessionState.isDeafened}
-                        className="h-7 px-2 text-[11px] text-[#c8d7ee] hover:bg-[#22334f] hover:text-white"
+                        className="h-7 px-2 text-[11px] text-row hover:bg-surface-hover hover:text-white"
                       >
                         Reset all
                       </Button>
                     )}
                   </div>
-                  <p className="text-[11px] text-[#90a5c4]">
+                  <p className="text-[11px] text-auxiliary">
                     Per-user volume is local to this client.
                   </p>
 
@@ -341,7 +341,7 @@ export function VoiceDrawer({
                         return (
                           <div
                             key={member.userId}
-                            className="rounded-md border border-[#304867] bg-[#142033] px-2.5 py-2"
+                            className="rounded-md border border-border bg-surface-panel px-2.5 py-2"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
@@ -351,11 +351,11 @@ export function VoiceDrawer({
                                 >
                                   {member.displayName}
                                 </p>
-                                <p className="text-[10px] text-[#90a5c4]">
+                                <p className="text-[10px] text-auxiliary">
                                   {statusLabel}
                                 </p>
                               </div>
-                              <span className="shrink-0 text-[11px] font-medium text-[#d8e5f7]">
+                              <span className="shrink-0 text-[11px] font-medium text-row-heading">
                                 {member.volume}%
                               </span>
                             </div>
@@ -387,7 +387,7 @@ export function VoiceDrawer({
                                     voiceSessionState.isDeafened ||
                                     member.volume === DEFAULT_MEMBER_VOLUME
                                   }
-                                  className="h-7 shrink-0 px-2 text-[11px] text-[#c8d7ee] hover:bg-[#22334f] hover:text-white"
+                                  className="h-7 shrink-0 px-2 text-[11px] text-row hover:bg-surface-hover hover:text-white"
                                 >
                                   100%
                                 </Button>
@@ -398,11 +398,11 @@ export function VoiceDrawer({
                       })}
                     </div>
                   ) : voiceSessionState.joined ? (
-                    <p className="text-[11px] text-[#90a5c4]">
+                    <p className="text-[11px] text-auxiliary">
                       No other participants are connected yet.
                     </p>
                   ) : (
-                    <p className="text-[11px] text-[#90a5c4]">
+                    <p className="text-[11px] text-auxiliary">
                       Join voice to adjust individual member volume.
                     </p>
                   )}
@@ -416,7 +416,7 @@ export function VoiceDrawer({
                       onOpenChange(false);
                       onOpenAdvancedOptions();
                     }}
-                    className="justify-start border-[#304867] bg-[#142033] text-white hover:bg-[#22334f]"
+                    className="justify-start border-border bg-surface-panel text-white hover:bg-surface-hover"
                   >
                     Open Voice Settings
                   </Button>
@@ -427,7 +427,7 @@ export function VoiceDrawer({
                       onOpenChange(false);
                       onOpenVoiceHardwareTest();
                     }}
-                    className="justify-start border-[#304867] bg-[#142033] text-white hover:bg-[#22334f]"
+                    className="justify-start border-border bg-surface-panel text-white hover:bg-surface-hover"
                   >
                     Open Voice Hardware Test
                   </Button>
@@ -436,7 +436,7 @@ export function VoiceDrawer({
                       type="button"
                       variant="outline"
                       onClick={onOpenVoicePopout}
-                      className="justify-start border-[#304867] bg-[#142033] text-white hover:bg-[#22334f]"
+                      className="justify-start border-border bg-surface-panel text-white hover:bg-surface-hover"
                     >
                       <ExternalLink className="size-4" />
                       Open Voice Popout
@@ -455,7 +455,7 @@ export function VoiceDrawer({
               size="icon-xs"
               variant="ghost"
               onClick={onJoin}
-              className="text-[#a9b8cf] hover:bg-[#22334f] hover:text-white"
+              className="text-muted-foreground hover:bg-surface-hover hover:text-white"
               aria-label="Join voice"
             >
               <Headphones className="size-4" />
@@ -467,10 +467,10 @@ export function VoiceDrawer({
                 size="icon-xs"
                 variant="ghost"
                 onClick={onToggleMute}
-                className={`hover:bg-[#22334f] ${
+                className={`hover:bg-surface-hover ${
                   voiceSessionState.isMuted
-                    ? "text-[#f3a2a2] hover:text-[#ffd2d2]"
-                    : "text-[#a9b8cf] hover:text-white"
+                    ? "text-destructive-icon hover:text-destructive-hover-fg"
+                    : "text-muted-foreground hover:text-white"
                 }`}
                 aria-label={voiceSessionState.isMuted ? "Unmute" : "Mute"}
               >
@@ -485,10 +485,10 @@ export function VoiceDrawer({
                 size="icon-xs"
                 variant="ghost"
                 onClick={onToggleDeafen}
-                className={`hover:bg-[#22334f] ${
+                className={`hover:bg-surface-hover ${
                   voiceSessionState.isDeafened
-                    ? "text-[#f3a2a2] hover:text-[#ffd2d2]"
-                    : "text-[#a9b8cf] hover:text-white"
+                    ? "text-destructive-icon hover:text-destructive-hover-fg"
+                    : "text-muted-foreground hover:text-white"
                 }`}
                 aria-label={
                   voiceSessionState.isDeafened ? "Undeafen" : "Deafen"
@@ -503,12 +503,12 @@ export function VoiceDrawer({
             size="icon-xs"
             variant="ghost"
             onClick={onDisconnect}
-            className="text-[#f0b0b0] hover:bg-[#3b2535] hover:text-[#ffd1d1]"
+            className="text-destructive-warm hover:bg-surface-destructive-row-hover hover:text-destructive-pale"
             aria-label="Leave voice"
           >
             <PhoneOff className="size-4" />
           </Button>
-          <div className="ml-auto text-[11px] text-[#95a5bf]">
+          <div className="ml-auto text-[11px] text-meta">
             {participantCount} in call
           </div>
         </div>
@@ -521,19 +521,19 @@ export function VoiceDrawer({
               <span
                 key={participant.userId}
                 title={participant.displayName}
-                className="size-5 rounded-full bg-[#304867] text-[10px] font-semibold text-white flex items-center justify-center"
+                className="size-5 rounded-full bg-border text-[10px] font-semibold text-white flex items-center justify-center"
               >
                 {initial}
               </span>
             );
           })}
           {participantPreview.length > 4 && (
-            <span className="size-5 rounded-full bg-[#22334f] text-[10px] font-semibold text-[#d1dff4] flex items-center justify-center">
+            <span className="size-5 rounded-full bg-surface-hover text-[10px] font-semibold text-avatar-fallback flex items-center justify-center">
               +{participantPreview.length - 4}
             </span>
           )}
           {participantPreview.length === 0 && (
-            <span className="text-[11px] text-[#90a5c4]">
+            <span className="text-[11px] text-auxiliary">
               Waiting for participants.
             </span>
           )}

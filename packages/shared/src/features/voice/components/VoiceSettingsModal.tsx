@@ -56,14 +56,14 @@ export function VoiceSettingsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="xl"
-        className="max-h-[90vh] bg-[#18243a] border-[#142033] text-white md:w-[min(94vw,1040px)] md:max-w-none min-h-0 flex flex-col gap-0 overflow-hidden p-0"
+        className="max-h-[90vh] bg-surface-legal border-border-deep text-white md:w-[min(94vw,1040px)] md:max-w-none min-h-0 flex flex-col gap-0 overflow-hidden p-0"
         showCloseButton={false}
       >
-        <DialogHeader className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
+        <DialogHeader className="shrink-0 border-b border-border-dialog px-4 py-3 sm:px-6 sm:py-4">
           <DialogTitle className="text-2xl font-bold text-white">
             Voice Settings
           </DialogTitle>
-          <DialogDescription className="text-sm text-[#9fb2cf]">
+          <DialogDescription className="text-sm text-muted-foreground">
             {activeChannelName
               ? "Advanced controls for the active voice session. The sidebar footer stays compact and only exposes quick actions."
               : "Configure voice devices, transmission defaults, and diagnostics before you join a channel."}
@@ -130,7 +130,7 @@ export function VoiceSettingsModal({
           />
         </div>
 
-        <DialogFooter className="shrink-0 border-t border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
+        <DialogFooter className="shrink-0 border-t border-border-dialog px-4 py-3 sm:px-6 sm:py-4">
           <Button
             type="button"
             onClick={() => onOpenChange(false)}

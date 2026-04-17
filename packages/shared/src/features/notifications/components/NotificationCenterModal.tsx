@@ -186,17 +186,17 @@ export function NotificationCenterModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="app"
-        className="border-[#304867] bg-[#111a2b] text-white p-0 overflow-hidden"
+        className="border-border bg-surface-app text-white p-0 overflow-hidden"
       >
         <div className="flex h-full min-h-0 flex-col">
-          <DialogHeader className="px-5 py-4 border-b border-[#263a58] bg-[linear-gradient(135deg,#16233a_0%,#101a2b_70%,#111a2b_100%)]">
+          <DialogHeader className="px-5 py-4 border-b border-border-panel bg-[linear-gradient(135deg,var(--card)_0%,var(--surface-inset)_70%,var(--surface-app)_100%)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <DialogTitle className="flex items-center gap-2 text-white">
-                  <Bell className="size-5 text-[#9ac0ff]" />
+                  <Bell className="size-5 text-icon-blue" />
                   Notification Center
                 </DialogTitle>
-                <DialogDescription className="text-[#a9b8cf]">
+                <DialogDescription className="text-muted-foreground">
                   Centralized in-app notifications with unread state and inbox
                   actions.
                 </DialogDescription>
@@ -204,13 +204,13 @@ export function NotificationCenterModal({
               <div className="flex items-center gap-2">
                 <Badge
                   variant="outline"
-                  className="border-[#355077] text-[#d5e4ff]"
+                  className="border-border-badge text-nav"
                 >
                   Unseen: {counts.unseenCount}
                 </Badge>
                 <Badge
                   variant="outline"
-                  className="border-[#355077] text-[#d5e4ff]"
+                  className="border-border-badge text-nav"
                 >
                   Unread: {visibleUnreadCount}
                 </Badge>
@@ -219,7 +219,7 @@ export function NotificationCenterModal({
                   variant="outline"
                   onClick={onRefresh}
                   disabled={refreshing}
-                  className="border-[#304867] text-white"
+                  className="border-border text-white"
                 >
                   <RefreshCcw
                     className={`size-4 ${refreshing ? "animate-spin" : ""}`}
@@ -232,23 +232,23 @@ export function NotificationCenterModal({
 
           <div className="flex min-h-0 flex-1 flex-col">
             {showSettings && (
-              <div className="border-b border-[#263a58] bg-[#13233c]/70 px-4 py-4">
+              <div className="border-b border-border-panel bg-surface-row-active/70 px-4 py-4">
                 <div className="mb-4">
                   <p className="text-sm font-semibold text-white">
                     Local sound settings
                   </p>
-                  <p className="mt-1 text-xs text-[#a9b8cf]">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     These controls only affect sounds played on this device.
                   </p>
                 </div>
 
-                <div className="rounded-md border border-[#304867] bg-[#142033]">
-                  <div className="flex items-center justify-between gap-3 border-b border-[#263a58] px-4 py-3">
+                <div className="rounded-md border border-border bg-surface-panel">
+                  <div className="flex items-center justify-between gap-3 border-b border-border-panel px-4 py-3">
                     <div>
                       <p className="text-sm font-semibold text-white">
                         Master sounds
                       </p>
-                      <p className="text-xs text-[#a9b8cf]">
+                      <p className="text-xs text-muted-foreground">
                         Turn all Haven notification and voice presence sounds on
                         or off.
                       </p>
@@ -265,12 +265,12 @@ export function NotificationCenterModal({
                     />
                   </div>
 
-                  <div className="border-b border-[#263a58] px-4 py-3">
+                  <div className="border-b border-border-panel px-4 py-3">
                     <div className="mb-2 flex items-center justify-between gap-2 text-sm">
                       <span className="font-semibold text-white">
                         Notification volume
                       </span>
-                      <span className="text-[#a9b8cf]">
+                      <span className="text-muted-foreground">
                         {localAudioSettings.notificationSoundVolume}%
                       </span>
                     </div>
@@ -292,12 +292,12 @@ export function NotificationCenterModal({
                     />
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 border-b border-[#263a58] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 border-b border-border-panel px-4 py-3">
                     <div>
                       <p className="text-sm font-semibold text-white">
                         Play sounds while Haven is focused
                       </p>
-                      <p className="text-xs text-[#a9b8cf]">
+                      <p className="text-xs text-muted-foreground">
                         Turn this off if you only want sounds while Haven is in
                         the background.
                       </p>
@@ -319,7 +319,7 @@ export function NotificationCenterModal({
                       <p className="text-sm font-semibold text-white">
                         Voice join/leave sounds
                       </p>
-                      <p className="text-xs text-[#a9b8cf]">
+                      <p className="text-xs text-muted-foreground">
                         Play a sound when someone joins or leaves a voice
                         channel you&apos;re in
                       </p>
@@ -337,12 +337,12 @@ export function NotificationCenterModal({
                   </div>
 
                   {localAudioSettings.voicePresenceSoundEnabled && (
-                    <div className="border-t border-[#263a58] px-4 py-3">
+                    <div className="border-t border-border-panel px-4 py-3">
                       <div className="mb-2 flex items-center justify-between gap-2 text-sm">
                         <span className="font-semibold text-white">
                           Join/leave volume
                         </span>
-                        <span className="text-[#a9b8cf]">
+                        <span className="text-muted-foreground">
                           {localAudioSettings.voicePresenceSoundVolume}%
                         </span>
                       </div>
@@ -369,7 +369,7 @@ export function NotificationCenterModal({
                 {(localAudioSaving || localAudioError) && (
                   <div className="mt-3 space-y-1">
                     {localAudioSaving && (
-                      <p className="text-xs text-[#a9b8cf]">
+                      <p className="text-xs text-muted-foreground">
                         Saving local sound settings...
                       </p>
                     )}
@@ -382,12 +382,12 @@ export function NotificationCenterModal({
             )}
 
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#263a58]">
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border-panel">
                 <div className="flex items-center gap-2">
                   {counts.unseenCount > 0 ? (
-                    <BellDot className="size-4 text-[#9ac0ff]" />
+                    <BellDot className="size-4 text-icon-blue" />
                   ) : (
-                    <Bell className="size-4 text-[#9ac0ff]" />
+                    <Bell className="size-4 text-icon-blue" />
                   )}
                   <span className="text-sm font-semibold">Inbox</span>
                 </div>
@@ -398,7 +398,7 @@ export function NotificationCenterModal({
                     variant="outline"
                     onClick={onMarkAllSeen}
                     disabled={counts.unseenCount === 0}
-                    className="border-[#304867] text-white"
+                    className="border-border text-white"
                   >
                     Mark all seen
                   </Button>
@@ -408,7 +408,7 @@ export function NotificationCenterModal({
                     variant="outline"
                     onClick={onDismissAll}
                     disabled={notifications.length === 0}
-                    className="border-[#304867] text-white"
+                    className="border-border text-white"
                   >
                     Dismiss all
                   </Button>
@@ -421,17 +421,17 @@ export function NotificationCenterModal({
                     Array.from({ length: 4 }, (_, index) => (
                       <div
                         key={index}
-                        className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3"
+                        className="rounded-md border border-border bg-surface-panel px-3 py-3"
                       >
                         <div className="flex items-start gap-3">
-                          <Skeleton className="size-9 rounded-xl bg-[#22334f]" />
+                          <Skeleton className="size-9 rounded-xl bg-surface-hover" />
                           <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex items-center gap-2">
-                              <Skeleton className="h-4 w-36 bg-[#22334f]" />
-                              <Skeleton className="h-4 w-12 rounded-full bg-[#22334f]" />
+                              <Skeleton className="h-4 w-36 bg-surface-hover" />
+                              <Skeleton className="h-4 w-12 rounded-full bg-surface-hover" />
                             </div>
-                            <Skeleton className="h-3 w-44 bg-[#1b2a42]" />
-                            <Skeleton className="h-3 w-full bg-[#1b2a42]" />
+                            <Skeleton className="h-3 w-44 bg-surface-skeleton" />
+                            <Skeleton className="h-3 w-full bg-surface-skeleton" />
                           </div>
                         </div>
                       </div>
@@ -439,11 +439,11 @@ export function NotificationCenterModal({
                   ) : error ? (
                     <p className="text-sm text-red-300">{error}</p>
                   ) : visibleNotifications.length === 0 ? (
-                    <div className="rounded-md border border-dashed border-[#304867] bg-[#142033]/50 p-4">
-                      <p className="text-sm text-[#a9b8cf]">
+                    <div className="rounded-md border border-dashed border-border bg-surface-panel/50 p-4">
+                      <p className="text-sm text-muted-foreground">
                         No notifications yet.
                       </p>
-                      <p className="mt-1 text-xs text-[#90a5c4]">
+                      <p className="mt-1 text-xs text-auxiliary">
                         Friend requests will appear here.
                       </p>
                     </div>
@@ -498,9 +498,9 @@ export function NotificationCenterModal({
                           key={notification.recipientId}
                           className={`rounded-md border px-3 py-3 ${
                             unread
-                              ? "border-[#4a78bd] bg-[#13233c]"
-                              : "border-[#304867] bg-[#142033]"
-                          } ${canOpenNotification ? "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5b92e8]" : ""}`}
+                              ? "border-border-notification bg-surface-row-active"
+                              : "border-border bg-surface-panel"
+                          } ${canOpenNotification ? "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-border-selected" : ""}`}
                           role={canOpenNotification ? "button" : undefined}
                           tabIndex={canOpenNotification ? 0 : undefined}
                           onClick={
@@ -520,14 +520,14 @@ export function NotificationCenterModal({
                           }
                         >
                           <div className="flex items-start gap-3">
-                            <Avatar className="size-9 rounded-xl border border-[#304867] bg-[#1b2a42]">
+                            <Avatar className="size-9 rounded-xl border border-border bg-surface-skeleton">
                               {actorAvatarUrl && (
                                 <AvatarImage
                                   src={actorAvatarUrl}
                                   alt={actorLabel}
                                 />
                               )}
-                              <AvatarFallback className="rounded-xl bg-[#1b2a42] text-white text-xs">
+                              <AvatarFallback className="rounded-xl bg-surface-skeleton text-white text-xs">
                                 {actorInitial}
                               </AvatarFallback>
                             </Avatar>
@@ -540,7 +540,7 @@ export function NotificationCenterModal({
                                 {unread && (
                                   <Badge
                                     variant="default"
-                                    className="bg-[#3f79d8] text-white"
+                                    className="bg-primary text-white"
                                   >
                                     Unread
                                   </Badge>
@@ -548,22 +548,22 @@ export function NotificationCenterModal({
                                 {!notification.seenAt && (
                                   <Badge
                                     variant="outline"
-                                    className="border-[#3b5f91] text-[#b7d1ff]"
+                                    className="border-border-notification-action text-notification-link"
                                   >
                                     New
                                   </Badge>
                                 )}
                               </div>
 
-                              <p className="mt-1 text-xs text-[#c8d7ee]">
+                              <p className="mt-1 text-xs text-row">
                                 {actorLabel}
-                                <span className="text-[#8ea4c7]">
+                                <span className="text-muted-foreground">
                                   {" "}
                                   · {formatTimestamp(notification.createdAt)}
                                 </span>
                               </p>
 
-                              <p className="mt-1 text-sm text-[#a9b8cf] break-words">
+                              <p className="mt-1 text-sm text-muted-foreground break-words">
                                 {getNotificationSummary(notification)}
                               </p>
 
@@ -608,7 +608,7 @@ export function NotificationCenterModal({
                                           type="button"
                                           size="sm"
                                           variant="ghost"
-                                          className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
+                                          className="text-muted-foreground hover:text-white hover:bg-surface-hover"
                                           onClick={(event) => {
                                             stopRowOpenPropagation(event);
                                             onDismissFriendRequestNotification({
@@ -643,7 +643,7 @@ export function NotificationCenterModal({
                                     type="button"
                                     size="sm"
                                     variant="ghost"
-                                    className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
+                                    className="text-muted-foreground hover:text-white hover:bg-surface-hover"
                                     onClick={(event) => {
                                       stopRowOpenPropagation(event);
                                       onDismissNotification(
@@ -657,7 +657,7 @@ export function NotificationCenterModal({
                                 {!notification.deliverSound && (
                                   <Badge
                                     variant="outline"
-                                    className="border-[#304867] text-[#9eb4d3]"
+                                    className="border-border text-muted-strong"
                                   >
                                     Sound off
                                   </Badge>
@@ -672,11 +672,11 @@ export function NotificationCenterModal({
                 </div>
               </ScrollArea>
             </div>
-            <div className="border-t border-[#263a58] px-4 py-3">
+            <div className="border-t border-border-panel px-4 py-3">
               <Button
                 type="button"
                 variant="outline"
-                className="border-[#304867] text-white"
+                className="border-border text-white"
                 onClick={() => setShowSettings((current) => !current)}
                 aria-expanded={showSettings}
               >

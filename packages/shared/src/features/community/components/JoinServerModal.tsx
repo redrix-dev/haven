@@ -44,19 +44,19 @@ export function JoinServerModal({ onClose, onJoin }: JoinServerModalProps) {
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         size="sm"
-        className="bg-[#18243a] border-[#142033] text-white"
+        className="bg-surface-legal border-border-deep text-white"
         showCloseButton={false}
       >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-white">Join a Server</DialogTitle>
-          <DialogDescription className="text-[#a9b8cf]">
+          <DialogDescription className="text-muted-foreground">
             Paste an invite code or invite link to join.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="invite-input" className="text-xs font-semibold uppercase text-[#a9b8cf]">
+            <Label htmlFor="invite-input" className="text-xs font-semibold uppercase text-muted-foreground">
               Invite
             </Label>
             <Input
@@ -64,7 +64,7 @@ export function JoinServerModal({ onClose, onJoin }: JoinServerModalProps) {
               value={inviteInput}
               onChange={(e) => setInviteInput(e.target.value)}
               placeholder={getPlatformInviteInputPlaceholder()}
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
               autoFocus
               required
             />
@@ -84,7 +84,7 @@ export function JoinServerModal({ onClose, onJoin }: JoinServerModalProps) {
             <Button
               type="submit"
               disabled={loading || !inviteInput.trim()}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {loading ? 'Joining...' : 'Join Server'}
             </Button>

@@ -241,14 +241,14 @@ export function ProfileActionSurface({
       <DropdownMenuContent
         align="start"
         sideOffset={6}
-        className="bg-[#18243a] border-[#304867] text-white min-w-[220px]"
+        className="bg-surface-legal border-border text-white min-w-[220px]"
         onCloseAutoFocus={(event) => {
           // Prevent focus from being restored to a trigger that may be unmounted
           // immediately after navigation-style actions (e.g. "Direct Message").
           event.preventDefault();
         }}
       >
-        <div className="flex items-center gap-2 rounded-md bg-[#111a2b] px-2 py-2">
+        <div className="flex items-center gap-2 rounded-md bg-surface-app px-2 py-2">
           <Avatar size="sm">
             {resolvedAvatarUrl && (
               <AvatarImage src={resolvedAvatarUrl} alt={resolvedUsername} />

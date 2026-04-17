@@ -1,11 +1,11 @@
 import { RootStackParamList } from "@/navigation/types";
-import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getErrorMessage } from "@shared/platform/lib/errors";
 import { useState } from "react";
 import { View, Text, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { signInWithPassword } from "@/auth/mobileAuthService";
 
 export function MobileLogin() {
   const insets = useSafeAreaInsets();
@@ -18,10 +18,7 @@ export function MobileLogin() {
     setError("");
     setLoading(true);
     try {
-      const { error } = await getMobileSupabase().auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await signInWithPassword(email, password);
       if (error) throw error;
     } catch (error) {
       setError(getErrorMessage(error));
@@ -71,13 +68,13 @@ export function MobileLogin() {
           </Pressable>
           <Pressable
             className="text-sm text-muted-foreground"
-            onPress={() => void navigation.navigate("PasswordRecovery" as unknown as never)}
+            onPress={() => void navigation.navigate("PasswordRecovery")}
           >
             <Text className="text-center text-sm text-muted-foreground">Forgot password?</Text>
           </Pressable>
           <Pressable
             className="text-sm text-muted-foreground"
-            onPress={() => void navigation.navigate("SignUp" as unknown as never)}
+            onPress={() => void navigation.navigate("SignUp")}
           >
             <Text className="text-center text-sm text-muted-foreground">Don't have an account? Sign up</Text>
           </Pressable>

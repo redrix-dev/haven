@@ -82,15 +82,15 @@ export function PushToTalkBindingField({
             setCapturing(false);
           }}
           disabled={disabled || !value}
-          className="border-[#304867] text-white"
+          className="border-border text-white"
         >
           Clear
         </Button>
-        <span className="rounded border border-[#304867] bg-[#111a2b] px-2 py-1 text-xs text-[#d7e4fa]">
+        <span className="rounded border border-border bg-surface-app px-2 py-1 text-xs text-body-soft">
           {capturing ? 'Listening for next key… (Esc to cancel)' : formatVoicePushToTalkBindingLabel(value)}
         </span>
       </div>
-      {helperText && <p className="mt-2 text-xs text-[#8fa6c8]">{helperText}</p>}
+      {helperText && <p className="mt-2 text-xs text-helper">{helperText}</p>}
     </div>
   );
 }

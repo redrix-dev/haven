@@ -43,7 +43,7 @@ export function VoicePopoutApp() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0f1726] p-3">
+    <div className="min-h-screen bg-surface-voice-scrim p-3">
       <VoiceQuickControlsDrawer
         surface="popout"
         serverName={state.serverName ?? 'Voice'}

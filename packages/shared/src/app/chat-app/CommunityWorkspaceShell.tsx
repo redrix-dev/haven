@@ -45,7 +45,7 @@ export function CommunityWorkspaceShell({
   if (!currentServer) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-[#a9b8cf]">
+        <p className="text-muted-foreground">
           {app.serversError ?? "No servers yet. Create one to get started!"}
         </p>
       </div>
@@ -239,7 +239,7 @@ export function CommunityWorkspaceShell({
 
       {app.channelsLoading && !app.currentRenderableChannel ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-[#a9b8cf]">Loading channels...</p>
+          <p className="text-muted-foreground">Loading channels...</p>
         </div>
       ) : app.currentRenderableChannel ? (
         <ChatArea
@@ -297,7 +297,7 @@ export function CommunityWorkspaceShell({
         />
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-[#a9b8cf]">
+          <p className="text-muted-foreground">
             {app.channelsError ??
               "No channels yet. Create one to get started!"}
           </p>

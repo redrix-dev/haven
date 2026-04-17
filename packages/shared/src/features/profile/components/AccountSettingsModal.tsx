@@ -410,10 +410,10 @@ export function AccountSettingsModal({
       <Dialog open onOpenChange={(open) => !open && onClose()}>
         <DialogContent
           size="sm"
-          className="bg-[#18243a] border-[#142033] text-white md:w-[min(92vw,640px)] md:max-w-none md:h-[min(86dvh,720px)] md:max-h-[calc(100dvh-1.5rem)] max-h-[88vh] flex flex-col gap-0 overflow-hidden p-0"
+          className="bg-surface-legal border-border-deep text-white md:w-[min(92vw,640px)] md:max-w-none md:h-[min(86dvh,720px)] md:max-h-[calc(100dvh-1.5rem)] max-h-[88vh] flex flex-col gap-0 overflow-hidden p-0"
           showCloseButton={false}
         >
-          <DialogHeader className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
+          <DialogHeader className="shrink-0 border-b border-border-dialog px-4 py-3 sm:px-6 sm:py-4">
             <DialogTitle className="text-2xl font-bold text-white">Account Settings</DialogTitle>
           </DialogHeader>
 
@@ -422,15 +422,15 @@ export function AccountSettingsModal({
               <div className="flex items-center gap-3">
                 <Avatar
                   size="lg"
-                  className="rounded-2xl bg-[#142033] border border-[#304867] data-[size=lg]:size-12"
+                  className="rounded-2xl bg-surface-panel border border-border data-[size=lg]:size-12"
                 >
                   {avatarPreviewUrl && <AvatarImage src={avatarPreviewUrl} alt="Avatar preview" />}
-                  <AvatarFallback className="rounded-2xl bg-[#142033] text-white font-semibold">
+                  <AvatarFallback className="rounded-2xl bg-surface-panel text-white font-semibold">
                     {previewInitial}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-xs uppercase font-semibold text-[#a9b8cf]">Email</p>
+                  <p className="text-xs uppercase font-semibold text-muted-foreground">Email</p>
                   <p className="text-sm text-white">{userEmail}</p>
                 </div>
                 <div className="ml-auto">
@@ -449,7 +449,7 @@ export function AccountSettingsModal({
               <div className="space-y-2">
                 <Label
                   htmlFor="account-username"
-                  className="text-xs font-semibold uppercase text-[#a9b8cf]"
+                  className="text-xs font-semibold uppercase text-muted-foreground"
                 >
                   Username
                 </Label>
@@ -457,17 +457,17 @@ export function AccountSettingsModal({
                   id="account-username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="bg-[#142033] border-[#304867] text-white"
+                  className="bg-surface-panel border-border text-white"
                   maxLength={32}
                   required
                 />
               </div>
 
-              <div className="space-y-3 rounded-xl border border-[#304867] bg-[#142033] px-4 py-4">
+              <div className="space-y-3 rounded-xl border border-border bg-surface-panel px-4 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-white">Profile photo</p>
-                    <p className="text-xs text-[#a9b8cf]">
+                    <p className="text-xs text-muted-foreground">
                       Upload a square image. Haven will crop and save a 512x512 WEBP avatar.
                     </p>
                   </div>
@@ -505,7 +505,7 @@ export function AccountSettingsModal({
 
                 {cropSourceUrl ? (
                   <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_120px]">
-                    <div className="overflow-hidden rounded-xl border border-[#304867] bg-[#101a2b] p-3">
+                    <div className="overflow-hidden rounded-xl border border-border bg-surface-inset p-3">
                       <ReactCrop
                         crop={crop}
                         onChange={(_, percentCrop) => setCrop(percentCrop)}
@@ -533,11 +533,11 @@ export function AccountSettingsModal({
 
                     <div className="space-y-3">
                       <div>
-                        <p className="text-xs uppercase font-semibold text-[#a9b8cf]">Live Preview</p>
-                        <div className="mt-2 flex items-center justify-center rounded-xl border border-[#304867] bg-[#101a2b] p-4">
+                        <p className="text-xs uppercase font-semibold text-muted-foreground">Live Preview</p>
+                        <div className="mt-2 flex items-center justify-center rounded-xl border border-border bg-surface-inset p-4">
                           <canvas
                             ref={previewCanvasRef}
-                            className="size-12 rounded-2xl border border-[#304867] bg-[#142033]"
+                            className="size-12 rounded-2xl border border-border bg-surface-panel"
                           />
                         </div>
                       </div>
@@ -559,17 +559,17 @@ export function AccountSettingsModal({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-[#90a5c4]">
+                  <p className="text-xs text-auxiliary">
                     JPG, PNG, and WEBP are supported. Maximum file size is 5MB.
                   </p>
                 )}
               </div>
 
-              <div className="rounded-xl border border-[#304867] bg-[#142033] px-3 py-3 space-y-2">
+              <div className="rounded-xl border border-border bg-surface-panel px-3 py-3 space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-white">Automatic Updates</p>
-                    <p className="text-xs text-[#a9b8cf]">
+                    <p className="text-xs text-muted-foreground">
                       Keeps this app current with security and compatibility fixes.
                     </p>
                   </div>
@@ -581,7 +581,7 @@ export function AccountSettingsModal({
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs text-[#a9b8cf]">
+                  <p className="text-xs text-muted-foreground">
                     Status: {updaterStatusLoading ? 'Loading...' : updaterStatusLabel}
                   </p>
                   <Button
@@ -606,19 +606,19 @@ export function AccountSettingsModal({
                 )}
               </div>
 
-              <div className="rounded-xl border border-[#304867] bg-[#142033] px-4 py-4 space-y-2">
+              <div className="rounded-xl border border-border bg-surface-panel px-4 py-4 space-y-2">
                 <p className="text-sm font-semibold text-white">Legal</p>
-                <div className="flex flex-wrap items-center gap-3 text-xs text-[#a9b8cf]">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                   <button
                     type="button"
-                    className="text-[#8fc1ff] underline underline-offset-2 hover:text-[#b7dbff]"
+                    className="text-info underline underline-offset-2 hover:text-account-link-hover"
                     onClick={() => void openPlatformExternalUrl(HAVEN_TERMS_URL)}
                   >
                     Terms of Service
                   </button>
                   <button
                     type="button"
-                    className="text-[#8fc1ff] underline underline-offset-2 hover:text-[#b7dbff]"
+                    className="text-info underline underline-offset-2 hover:text-account-link-hover"
                     onClick={() => void openPlatformExternalUrl(HAVEN_PRIVACY_URL)}
                   >
                     Privacy Policy
@@ -630,7 +630,7 @@ export function AccountSettingsModal({
               {autoUpdateError && <p className="text-sm text-red-400">{autoUpdateError}</p>}
             </div>
 
-            <DialogFooter className="justify-between sm:justify-between shrink-0 border-t border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
+            <DialogFooter className="justify-between sm:justify-between shrink-0 border-t border-border-dialog px-4 py-3 sm:px-6 sm:py-4">
               <div className="flex gap-2">
                 <Button
                   type="button"
@@ -664,7 +664,7 @@ export function AccountSettingsModal({
                 <Button
                   type="submit"
                   disabled={saving || deletingAccount}
-                  className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                  className="bg-primary hover:bg-primary-hover text-white"
                 >
                   {saving ? 'Saving...' : 'Save'}
                 </Button>
@@ -678,21 +678,21 @@ export function AccountSettingsModal({
         open={showDisableAutoUpdateConfirm}
         onOpenChange={setShowDisableAutoUpdateConfirm}
       >
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Disable automatic updates?</AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               Turning updates off can leave you on incompatible builds and may break login, realtime,
               and voice features over time.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]">
+            <AlertDialogCancel className="bg-muted border-border text-white hover:bg-secondary">
               Keep enabled
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void handleDisableAutoUpdateConfirmed()}
-              className="bg-[#b74a56] hover:bg-[#a6424d] text-white"
+              className="bg-destructive hover:bg-destructive-hover text-white"
             >
               Disable updates
             </AlertDialogAction>
@@ -707,24 +707,24 @@ export function AccountSettingsModal({
           setShowDeleteAccountConfirm(open);
         }}
       >
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete account permanently?</AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               This cannot be undone. Your profile, memberships, messages, and owned communities will
               be removed permanently.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel
-              className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]"
+              className="bg-muted border-border text-white hover:bg-secondary"
               disabled={deletingAccount}
             >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void handleDeleteAccount()}
-              className="bg-[#b74a56] hover:bg-[#a6424d] text-white"
+              className="bg-destructive hover:bg-destructive-hover text-white"
               disabled={deletingAccount}
             >
               {deletingAccount ? 'Deleting...' : 'Delete account'}

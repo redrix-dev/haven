@@ -160,4 +160,5 @@ docs/reference/
 test-reports/
 
 .claude/
-Haven-Obsidian-Vault
+Haven-Obsidian-Vault/
+.cursor/

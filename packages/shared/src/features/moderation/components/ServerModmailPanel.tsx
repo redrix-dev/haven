@@ -144,15 +144,15 @@ const statusLabel = (status: SupportReportStatus) => {
 const statusBadgeClass = (status: SupportReportStatus) => {
   switch (status) {
     case 'pending':
-      return 'border-[#6a9bff] text-[#d5e6ff]';
+      return 'border-mod-tier-blue-border text-nav-strong';
     case 'under_review':
-      return 'border-[#c4a35f] text-[#ffe7b7]';
+      return 'border-mod-tier-gold-border text-mod-tier-gold-text';
     case 'resolved':
-      return 'border-[#5ea779] text-[#c8f2d7]';
+      return 'border-mod-tier-green-border text-mod-tier-green-text';
     case 'dismissed':
-      return 'border-[#7f7f93] text-[#d2d2e3]';
+      return 'border-mod-tier-gray-border text-mod-tier-gray-text';
     case 'escalated':
-      return 'border-[#d58cff] text-[#f2ddff]';
+      return 'border-mod-tier-purple-border text-mod-tier-purple-text';
   }
 };
 
@@ -165,17 +165,17 @@ const statusMatchesFilter = (status: SupportReportStatus, filter: VisibleStatusF
 const renderSnapshotMessage = (
   message: SupportReportSnapshotMessage,
   label: string,
-  accentClassName = 'border-[#304867]'
+  accentClassName = 'border-border'
 ) => (
-  <div className={`rounded-md border ${accentClassName} bg-[#101a2b] p-3`}>
+  <div className={`rounded-md border ${accentClassName} bg-surface-inset p-3`}>
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-xs uppercase tracking-wide text-[#97acd0]">{label}</p>
-      <p className="text-xs text-[#8ea4c7]">{safeFmt(message.createdAt)}</p>
+      <p className="text-xs uppercase tracking-wide text-label-muted">{label}</p>
+      <p className="text-xs text-muted-foreground">{safeFmt(message.createdAt)}</p>
     </div>
     <p className="mt-1 text-sm font-medium text-white">
       {message.authorUsername ?? message.authorUserId ?? 'Unknown user'}
     </p>
-    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[#dbe7f8]">
+    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-banner">
       {message.content || '(No content captured)'}
     </p>
   </div>
@@ -316,27 +316,27 @@ export function ServerModmailPanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="app" className="border-[#304867] bg-[#111a2b] p-0 text-white">
+      <DialogContent size="app" className="border-border bg-surface-app p-0 text-white">
         <div className="flex h-full min-h-0 flex-col">
-          <DialogHeader className="border-b border-[#263a58] px-5 py-4">
+          <DialogHeader className="border-b border-border-panel px-5 py-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <DialogTitle className="flex items-center gap-2 text-white">
-                  <ShieldAlert className="size-5 text-[#ffcf82]" />
+                  <ShieldAlert className="size-5 text-mod-callout" />
                   Server Modmail
                 </DialogTitle>
-                <DialogDescription className="text-[#a9b8cf]">
+                <DialogDescription className="text-muted-foreground">
                   Review reports filed against the servers you manage.
                 </DialogDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="border-[#355077] text-[#d5e4ff]">
+                <Badge variant="outline" className="border-border-badge text-nav">
                   {currentUserDisplayName}
                 </Badge>
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-[#304867] text-white"
+                  className="border-border text-white"
                   onClick={() => {
                     void refreshReports();
                     if (selectedReportId) void refreshDetail(selectedReportId);
@@ -353,23 +353,23 @@ export function ServerModmailPanel({
           </DialogHeader>
 
           <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[0.95fr_1.45fr]">
-            <div className="min-h-0 border-b border-[#263a58] xl:border-b-0 xl:border-r">
-              <div className="space-y-3 border-b border-[#263a58] px-4 py-3">
+            <div className="min-h-0 border-b border-border-panel xl:border-b-0 xl:border-r">
+              <div className="space-y-3 border-b border-border-panel px-4 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold">Report Inbox</span>
-                  <Badge variant="outline" className="border-[#304867] text-[#cfe0ff]">
+                  <Badge variant="outline" className="border-border text-pill">
                     {visibleReports.length}
                   </Badge>
                 </div>
 
                 {managedServers.length > 1 && (
                   <div className="space-y-1">
-                    <Label className="text-xs text-[#a9b8cf]">Server</Label>
+                    <Label className="text-xs text-muted-foreground">Server</Label>
                     <Select value={serverFilter} onValueChange={setServerFilter}>
-                      <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+                      <SelectTrigger className="w-full border-border bg-surface-panel text-white">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="border-[#304867] bg-[#142033] text-white">
+                      <SelectContent className="border-border bg-surface-panel text-white">
                         <SelectItem value="all">All servers</SelectItem>
                         {managedServers.map((server) => (
                           <SelectItem key={server.id} value={server.id}>
@@ -390,8 +390,8 @@ export function ServerModmailPanel({
                       variant="outline"
                       className={
                         statusFilter === filter.value
-                          ? 'border-[#5b92e8] bg-[#13233c] text-white'
-                          : 'border-[#304867] bg-[#142033] text-[#cfe0ff]'
+                          ? 'border-border-selected bg-surface-row-active text-white'
+                          : 'border-border bg-surface-panel text-pill'
                       }
                       onClick={() => setStatusFilter(filter.value)}
                     >
@@ -407,20 +407,20 @@ export function ServerModmailPanel({
                     Array.from({ length: 4 }, (_, index) => (
                       <div
                         key={index}
-                        className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3"
+                        className="rounded-md border border-border bg-surface-panel px-3 py-3"
                       >
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
-                            <Skeleton className="h-4 w-36 bg-[#22334f]" />
-                            <Skeleton className="h-5 w-20 rounded-full bg-[#22334f]" />
+                            <Skeleton className="h-4 w-36 bg-surface-hover" />
+                            <Skeleton className="h-5 w-20 rounded-full bg-surface-hover" />
                           </div>
-                          <Skeleton className="h-3 w-40 bg-[#1b2a42]" />
-                          <Skeleton className="h-3 w-44 bg-[#1b2a42]" />
+                          <Skeleton className="h-3 w-40 bg-surface-skeleton" />
+                          <Skeleton className="h-3 w-44 bg-surface-skeleton" />
                         </div>
                       </div>
                     ))
                   ) : visibleReports.length === 0 ? (
-                    <p className="text-sm text-[#a9b8cf]">No reports in this filter.</p>
+                    <p className="text-sm text-muted-foreground">No reports in this filter.</p>
                   ) : (
                     visibleReports.map((report) => (
                       <button
@@ -429,12 +429,12 @@ export function ServerModmailPanel({
                         onClick={() => setSelectedReportId(report.reportId)}
                         className={`w-full rounded-md border px-3 py-3 text-left ${
                           report.reportId === selectedReportId
-                            ? 'border-[#5b92e8] bg-[#13233c]'
-                            : 'border-[#304867] bg-[#142033] hover:bg-[#182841]'
+                            ? 'border-border-selected bg-surface-row-active'
+                            : 'border-border bg-surface-panel hover:bg-surface-list-hover'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <Badge variant="outline" className="border-[#304867] text-[#d5e4ff]">
+                          <Badge variant="outline" className="border-border text-nav">
                             {reportTypeLabel(report.reportType)}
                           </Badge>
                           <Badge variant="outline" className={statusBadgeClass(report.status)}>
@@ -444,8 +444,8 @@ export function ServerModmailPanel({
                         <p className="mt-2 text-sm font-semibold text-white">
                           {report.reporterUsername ?? report.reporterUserId}
                         </p>
-                        <p className="mt-1 text-xs text-[#a9b8cf]">{report.serverName}</p>
-                        <p className="mt-1 text-xs text-[#8ea4c7]">{safeFmt(report.createdAt)}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{report.serverName}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{safeFmt(report.createdAt)}</p>
                       </button>
                     ))
                   )}
@@ -462,25 +462,25 @@ export function ServerModmailPanel({
                       {Array.from({ length: 3 }, (_, index) => (
                         <div
                           key={index}
-                          className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3"
+                          className="rounded-md border border-border bg-surface-panel p-3 space-y-3"
                         >
-                          <Skeleton className="h-4 w-40 bg-[#22334f]" />
-                          <Skeleton className="h-3 w-2/3 bg-[#1b2a42]" />
-                          <Skeleton className="h-20 w-full bg-[#1b2a42]" />
+                          <Skeleton className="h-4 w-40 bg-surface-hover" />
+                          <Skeleton className="h-3 w-2/3 bg-surface-skeleton" />
+                          <Skeleton className="h-20 w-full bg-surface-skeleton" />
                         </div>
                       ))}
                     </div>
                   ) : !detail ? (
-                    <p className="text-sm text-[#a9b8cf]">Select a report to review.</p>
+                    <p className="text-sm text-muted-foreground">Select a report to review.</p>
                   ) : (
                     <>
-                      <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-2">
+                      <div className="rounded-md border border-border bg-surface-panel p-3 space-y-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="border-[#304867] text-[#d5e4ff]">
+                            <Badge variant="outline" className="border-border text-nav">
                               {reportTypeLabel(detail.reportType)}
                             </Badge>
-                            <Badge variant="outline" className="border-[#304867] text-[#d5e4ff]">
+                            <Badge variant="outline" className="border-border text-nav">
                               {destinationLabel(detail.destination)}
                             </Badge>
                           </div>
@@ -491,12 +491,12 @@ export function ServerModmailPanel({
                         <p className="text-sm font-semibold text-white">
                           Reporter: {detail.reporterUsername ?? detail.reporterUserId}
                         </p>
-                        <p className="text-xs text-[#a9b8cf]">
+                        <p className="text-xs text-muted-foreground">
                           Filed {safeFmt(detail.createdAt)} | Last updated {safeFmt(detail.updatedAt)}
                         </p>
                       </div>
 
-                      <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
+                      <div className="rounded-md border border-border bg-surface-panel p-3 space-y-3">
                         <div className="flex flex-wrap gap-2">
                           {STATUS_ACTIONS.map((action) => (
                             <Button
@@ -506,8 +506,8 @@ export function ServerModmailPanel({
                               variant="outline"
                               className={
                                 detail.status === action.value
-                                  ? 'border-[#5b92e8] bg-[#13233c] text-white'
-                                  : 'border-[#304867] bg-[#101a2b] text-[#d5e4ff]'
+                                  ? 'border-border-selected bg-surface-row-active text-white'
+                                  : 'border-border bg-surface-inset text-nav'
                               }
                               disabled={busy || detail.status === action.value}
                               onClick={() => {
@@ -531,7 +531,7 @@ export function ServerModmailPanel({
                             <Button
                               type="button"
                               variant="outline"
-                              className="border-[#304867] bg-[#101a2b] text-white"
+                              className="border-border bg-surface-inset text-white"
                               onClick={() =>
                                 setActionConfirm({
                                   kind: 'delete_message',
@@ -548,7 +548,7 @@ export function ServerModmailPanel({
                             <Button
                               type="button"
                               variant="outline"
-                              className="border-[#304867] bg-[#101a2b] text-white"
+                              className="border-border bg-surface-inset text-white"
                               onClick={() => {
                                 const targetUserId = detail.targetUserId;
                                 if (!targetUserId) return;
@@ -571,7 +571,7 @@ export function ServerModmailPanel({
                             <Button
                               type="button"
                               variant="outline"
-                              className="border-[#304867] bg-[#101a2b] text-white"
+                              className="border-border bg-surface-inset text-white"
                               onClick={() => {
                                 const targetUserId = detail.targetUserId;
                                 if (!targetUserId) return;
@@ -594,7 +594,7 @@ export function ServerModmailPanel({
                             <Button
                               type="button"
                               variant="outline"
-                              className="border-[#805e22] bg-[#2f2210] text-[#ffd9a2]"
+                              className="border-mod-tier-warn-border bg-mod-tier-warn-bg text-mod-tier-warn-text"
                               onClick={() => setEscalateConfirmOpen(true)}
                             >
                               Escalate to Haven Moderation
@@ -606,16 +606,16 @@ export function ServerModmailPanel({
                       {detail.reportType === 'message_report' &&
                       detail.snapshot &&
                       'reportedMessage' in detail.snapshot ? (
-                        <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
+                        <div className="rounded-md border border-border bg-surface-panel p-3 space-y-3">
                           <p className="text-sm font-semibold text-white">Captured message snapshot</p>
                           {renderSnapshotMessage(
                             detail.snapshot.reportedMessage,
                             'Reported Message',
-                            'border-[#5b92e8]'
+                            'border-border-selected'
                           )}
                           {detail.snapshot.contextBefore.length > 0 && (
                             <div className="space-y-2">
-                              <p className="text-xs uppercase tracking-wide text-[#97acd0]">
+                              <p className="text-xs uppercase tracking-wide text-label-muted">
                                 Context Before
                               </p>
                               {detail.snapshot.contextBefore.map((message) =>
@@ -625,7 +625,7 @@ export function ServerModmailPanel({
                           )}
                           {detail.snapshot.contextAfter.length > 0 && (
                             <div className="space-y-2">
-                              <p className="text-xs uppercase tracking-wide text-[#97acd0]">
+                              <p className="text-xs uppercase tracking-wide text-label-muted">
                                 Context After
                               </p>
                               {detail.snapshot.contextAfter.map((message) =>
@@ -637,30 +637,30 @@ export function ServerModmailPanel({
                       ) : detail.reportType === 'user_report' &&
                         detail.snapshot &&
                         'targetUserId' in detail.snapshot ? (
-                        <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-2">
+                        <div className="rounded-md border border-border bg-surface-panel p-3 space-y-2">
                           <p className="text-sm font-semibold text-white">Captured profile snapshot</p>
                           <p className="text-sm text-white">
                             {detail.snapshot.targetUsername ?? detail.snapshot.targetUserId}
                           </p>
-                          <p className="text-xs text-[#a9b8cf]">
+                          <p className="text-xs text-muted-foreground">
                             Captured {safeFmt(detail.snapshot.capturedAt)}
                           </p>
                         </div>
                       ) : (
-                        <div className="rounded-md border border-[#304867] bg-[#142033] p-3">
-                          <p className="text-sm text-[#a9b8cf]">
+                        <div className="rounded-md border border-border bg-surface-panel p-3">
+                          <p className="text-sm text-muted-foreground">
                             No snapshot data was captured for this report.
                           </p>
                         </div>
                       )}
 
-                      <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
+                      <div className="rounded-md border border-border bg-surface-panel p-3 space-y-3">
                         <p className="text-sm font-semibold text-white">Linked report context</p>
                         {detail.linkedChannels.length > 0 && (
                           <div className="space-y-1">
-                            <p className="text-xs uppercase tracking-wide text-[#97acd0]">Channels</p>
+                            <p className="text-xs uppercase tracking-wide text-label-muted">Channels</p>
                             {detail.linkedChannels.map((channel) => (
-                              <p key={channel.channelId} className="text-sm text-[#dbe7f8]">
+                              <p key={channel.channelId} className="text-sm text-banner">
                                 {channel.channelName ?? channel.channelId}
                               </p>
                             ))}
@@ -668,11 +668,11 @@ export function ServerModmailPanel({
                         )}
                         {detail.linkedMessages.length > 0 && (
                           <div className="space-y-1">
-                            <p className="text-xs uppercase tracking-wide text-[#97acd0]">
+                            <p className="text-xs uppercase tracking-wide text-label-muted">
                               Linked Messages
                             </p>
                             {detail.linkedMessages.map((message) => (
-                              <p key={message.messageId} className="text-sm text-[#dbe7f8]">
+                              <p key={message.messageId} className="text-sm text-banner">
                                 {message.channelName ? `${message.channelName} - ` : ''}
                                 {message.messageId}
                               </p>
@@ -681,24 +681,24 @@ export function ServerModmailPanel({
                         )}
                       </div>
 
-                      <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
+                      <div className="rounded-md border border-border bg-surface-panel p-3 space-y-3">
                         <p className="text-sm font-semibold text-white">Internal notes</p>
                         {detail.internalNotes.length === 0 ? (
-                          <p className="text-sm text-[#a9b8cf]">No internal notes yet.</p>
+                          <p className="text-sm text-muted-foreground">No internal notes yet.</p>
                         ) : (
                           <div className="space-y-2">
                             {detail.internalNotes.map((note) => (
                               <div
                                 key={note.id}
-                                className="rounded-md border border-[#304867] bg-[#101a2b] p-3"
+                                className="rounded-md border border-border bg-surface-inset p-3"
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <p className="text-sm font-medium text-white">
                                     {note.authorDisplayName ?? note.authorUserId}
                                   </p>
-                                  <p className="text-xs text-[#8ea4c7]">{safeFmt(note.createdAt)}</p>
+                                  <p className="text-xs text-muted-foreground">{safeFmt(note.createdAt)}</p>
                                 </div>
-                                <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[#dbe7f8]">
+                                <p className="mt-2 whitespace-pre-wrap break-words text-sm text-banner">
                                   {note.body}
                                 </p>
                               </div>
@@ -710,12 +710,12 @@ export function ServerModmailPanel({
                             value={internalNoteDraft}
                             onChange={(event) => setInternalNoteDraft(event.target.value)}
                             placeholder="Add an internal note for other moderators..."
-                            className="min-h-[96px] border-[#304867] bg-[#101a2b] text-white"
+                            className="min-h-[96px] border-border bg-surface-inset text-white"
                           />
                           <Button
                             type="button"
                             variant="outline"
-                            className="border-[#304867] bg-[#101a2b] text-white"
+                            className="border-border bg-surface-inset text-white"
                             disabled={busy || internalNoteDraft.trim().length === 0}
                             onClick={() => {
                               void runAction(
@@ -749,7 +749,7 @@ export function ServerModmailPanel({
           if (!nextOpen) setActionConfirm(null);
         }}
       >
-        <AlertDialogContent className="border-[#304867] bg-[#18243a] text-white">
+        <AlertDialogContent className="border-border bg-surface-legal text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {actionConfirm?.kind === 'delete_message'
@@ -758,7 +758,7 @@ export function ServerModmailPanel({
                   ? 'Kick reported user?'
                   : 'Ban reported user?'}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               {actionConfirm?.kind === 'delete_message'
                 ? 'This removes the reported message from the server.'
                 : actionConfirm?.kind === 'kick_user'
@@ -769,11 +769,11 @@ export function ServerModmailPanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-[#304867] bg-[#1d2a42] text-white hover:bg-[#22324d]">
+            <AlertDialogCancel className="border-border bg-muted text-white hover:bg-secondary">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-[#3f79d8] text-white hover:bg-[#325fae]"
+              className="bg-primary text-white hover:bg-primary-hover"
               onClick={(event) => {
                 event.preventDefault();
                 if (!actionConfirm) return;
@@ -830,10 +830,10 @@ export function ServerModmailPanel({
       </AlertDialog>
 
       <AlertDialog open={escalateConfirmOpen} onOpenChange={setEscalateConfirmOpen}>
-        <AlertDialogContent className="border-[#304867] bg-[#18243a] text-white">
+        <AlertDialogContent className="border-border bg-surface-legal text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Share with Haven Moderation Staff</AlertDialogTitle>
-            <div className="space-y-3 text-sm text-[#a9b8cf]">
+            <div className="space-y-3 text-sm text-muted-foreground">
               <p>
                 You are about to share this report with Haven Moderation Staff. By
                 confirming you understand that the following will be submitted and
@@ -854,11 +854,11 @@ export function ServerModmailPanel({
             </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-[#304867] bg-[#1d2a42] text-white hover:bg-[#22324d]">
+            <AlertDialogCancel className="border-border bg-muted text-white hover:bg-secondary">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-[#3f79d8] text-white hover:bg-[#325fae]"
+              className="bg-primary text-white hover:bg-primary-hover"
               onClick={(event) => {
                 event.preventDefault();
                 if (!detail) return;

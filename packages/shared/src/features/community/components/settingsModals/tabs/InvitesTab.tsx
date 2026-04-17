@@ -84,7 +84,7 @@ export function InvitesTab({
   return (
     <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto space-y-4">
       <h3 className="text-white font-semibold">Invite Links</h3>
-      <p className="text-sm text-[#a9b8cf]">
+      <p className="text-sm text-muted-foreground">
         Create and share invite links for this community.
       </p>
 
@@ -95,29 +95,29 @@ export function InvitesTab({
               value={inviteMaxUsesInput}
               onChange={(e) => setInviteMaxUsesInput(e.target.value)}
               placeholder="Max uses (blank = unlimited)"
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
             />
             <Input
               value={inviteExpiryHoursInput}
               onChange={(e) => setInviteExpiryHoursInput(e.target.value)}
               placeholder="Expires in hours (blank = 1 hour)"
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
             />
             <Button
               type="button"
               onClick={() => void handleCreateInvite()}
               disabled={inviteCreating}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {inviteCreating ? "Creating..." : "Create Invite"}
             </Button>
           </div>
-          <p className="text-xs text-[#8ea4c7]">
+          <p className="text-xs text-muted-foreground">
             Invite expiry defaults to 1 hour unless you enter a different value.
           </p>
         </div>
       ) : (
-        <p className="text-xs text-[#d6a24a]">
+        <p className="text-xs text-accent-amber">
           You can view active invites, but only members with Manage Invites can
           create or revoke them.
         </p>
@@ -131,26 +131,26 @@ export function InvitesTab({
       {invitesLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 3 }, (_, i) => (
-            <div key={i} className="rounded-md bg-[#142033] p-3 space-y-2">
-              <Skeleton className="h-4 w-full bg-[#22334f]" />
-              <Skeleton className="h-3 w-44 bg-[#1b2a42]" />
+            <div key={i} className="rounded-md bg-surface-panel p-3 space-y-2">
+              <Skeleton className="h-4 w-full bg-surface-hover" />
+              <Skeleton className="h-3 w-44 bg-surface-skeleton" />
             </div>
           ))}
         </div>
       ) : invites.length === 0 ? (
-        <p className="text-sm text-[#a9b8cf]">No active invites.</p>
+        <p className="text-sm text-muted-foreground">No active invites.</p>
       ) : (
         <div className="space-y-2">
           {invites.map((invite) => (
             <div
               key={invite.id}
-              className="bg-[#142033] rounded-md p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+              className="bg-surface-panel rounded-md p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
             >
               <div className="min-w-0">
                 <p className="text-white font-semibold text-sm break-all">
                   {`${inviteBaseUrl}${invite.code}`}
                 </p>
-                <p className="text-xs text-[#a9b8cf] mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Uses: {invite.currentUses}
                   {invite.maxUses ? ` / ${invite.maxUses}` : " / unlimited"}
                   {" | "}
@@ -165,7 +165,7 @@ export function InvitesTab({
                   type="button"
                   variant="ghost"
                   onClick={() => void copyInviteLink(invite.code, invite.id)}
-                  className="text-white hover:bg-[#22334f]"
+                  className="text-white hover:bg-surface-hover"
                 >
                   {copiedInviteId === invite.id ? "Copied" : "Copy"}
                 </Button>

@@ -321,8 +321,8 @@ export function DirectMessageArea({
 
   if (!conversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#111a2b] text-[#a9b8cf]">
-        <div className="rounded-md border border-dashed border-[#304867] bg-[#142033]/60 p-6 max-w-md text-center">
+      <div className="flex-1 flex items-center justify-center bg-surface-app text-muted-foreground">
+        <div className="rounded-md border border-dashed border-border bg-surface-panel/60 p-6 max-w-md text-center">
           <p className="text-white font-semibold">Select a direct message</p>
           <p className="mt-2 text-sm">
             Open a DM from the Friends panel, or select an existing thread from
@@ -342,15 +342,15 @@ export function DirectMessageArea({
   const errorHint = getConversationErrorHint(error);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-[#111a2b]">
-      <div className="h-16 px-4 border-b border-[#22334f] bg-[#142033] flex items-center">
+    <div className="flex-1 min-w-0 flex flex-col bg-surface-app">
+      <div className="h-16 px-4 border-b border-surface-hover bg-surface-panel flex items-center">
         <div className="flex items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-3 min-w-0">
-            <Avatar className="size-10 rounded-xl border border-[#304867] bg-[#1b2a42]">
+            <Avatar className="size-10 rounded-xl border border-border bg-surface-skeleton">
               {otherAvatarUrl && (
                 <AvatarImage src={otherAvatarUrl} alt={title} />
               )}
-              <AvatarFallback className="rounded-xl bg-[#1b2a42] text-white text-xs">
+              <AvatarFallback className="rounded-xl bg-surface-skeleton text-white text-xs">
                 {getInitial(title)}
               </AvatarFallback>
             </Avatar>
@@ -358,12 +358,12 @@ export function DirectMessageArea({
               <p className="text-sm font-semibold text-white truncate">
                 {title}
               </p>
-              <div className="flex items-center gap-2 text-xs text-[#9fb2cf]">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>1:1 Direct Message</span>
                 {conversation.isMuted && (
                   <Badge
                     variant="outline"
-                    className="border-[#304867] text-[#cfe0ff]"
+                    className="border-border text-pill"
                   >
                     Muted
                   </Badge>
@@ -377,7 +377,7 @@ export function DirectMessageArea({
               type="button"
               size="sm"
               variant="outline"
-              className="border-[#304867] text-white"
+              className="border-border text-white"
               onClick={onRefresh}
               disabled={loading || refreshing}
             >
@@ -390,7 +390,7 @@ export function DirectMessageArea({
               type="button"
               size="sm"
               variant="outline"
-              className="border-[#304867] text-white"
+              className="border-border text-white"
               onClick={() => {
                 void onToggleMute(!conversation.isMuted).catch(
                   (toggleError) => {
@@ -412,7 +412,7 @@ export function DirectMessageArea({
               type="button"
               size="sm"
               variant="outline"
-              className="border-[#5f3544] text-[#ffd4df] hover:bg-[#341f2a]"
+              className="border-border-dm-warn text-destructive-banner hover:bg-surface-dm-warn-hover"
               onClick={handleBlockUser}
               disabled={blockingUser || !conversation.otherUserId}
             >
@@ -430,32 +430,32 @@ export function DirectMessageArea({
               Array.from({ length: 4 }, (_, index) => (
                 <div
                   key={index}
-                  className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3"
+                  className="rounded-md border border-border bg-surface-panel px-3 py-3"
                 >
                   <div className="flex items-start gap-3">
-                    <Skeleton className="size-9 rounded-xl bg-[#22334f]" />
+                    <Skeleton className="size-9 rounded-xl bg-surface-hover" />
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex items-center gap-2">
-                        <Skeleton className="h-4 w-28 bg-[#22334f]" />
-                        <Skeleton className="h-3 w-24 bg-[#1b2a42]" />
+                        <Skeleton className="h-4 w-28 bg-surface-hover" />
+                        <Skeleton className="h-3 w-24 bg-surface-skeleton" />
                       </div>
-                      <Skeleton className="h-3 w-full bg-[#1b2a42]" />
-                      <Skeleton className="h-3 w-5/6 bg-[#1b2a42]" />
+                      <Skeleton className="h-3 w-full bg-surface-skeleton" />
+                      <Skeleton className="h-3 w-5/6 bg-surface-skeleton" />
                     </div>
                   </div>
                 </div>
               ))
             ) : error ? (
-              <div className="rounded-md border border-[#5a2d3d] bg-[#2a1821] p-3">
+              <div className="rounded-md border border-border-destructive-panel bg-surface-destructive-panel p-3">
                 <p className="text-sm text-red-300">{error}</p>
                 {errorHint && (
-                  <p className="mt-1 text-xs text-[#ffd4df]">{errorHint}</p>
+                  <p className="mt-1 text-xs text-destructive-banner">{errorHint}</p>
                 )}
               </div>
             ) : messages.length === 0 ? (
-              <div className="rounded-md border border-dashed border-[#304867] bg-[#142033]/60 p-4">
-                <p className="text-sm text-[#a9b8cf]">No messages yet.</p>
-                <p className="mt-1 text-xs text-[#90a5c4]">
+              <div className="rounded-md border border-dashed border-border bg-surface-panel/60 p-4">
+                <p className="text-sm text-muted-foreground">No messages yet.</p>
+                <p className="mt-1 text-xs text-auxiliary">
                   Say hi to start the conversation.
                 </p>
               </div>
@@ -489,19 +489,19 @@ export function DirectMessageArea({
                     key={message.messageId}
                     className={`rounded-md border px-3 py-3 ${
                       isSelf
-                        ? "border-[#355a95] bg-[#13233c]"
-                        : "border-[#304867] bg-[#142033]"
+                        ? "border-border-dm-selected bg-surface-row-active"
+                        : "border-border bg-surface-panel"
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <Avatar className="size-9 rounded-xl border border-[#304867] bg-[#1b2a42]">
+                      <Avatar className="size-9 rounded-xl border border-border bg-surface-skeleton">
                         {authorAvatarUrl && (
                           <AvatarImage
                             src={authorAvatarUrl}
                             alt={authorUsername}
                           />
                         )}
-                        <AvatarFallback className="rounded-xl bg-[#1b2a42] text-white text-xs">
+                        <AvatarFallback className="rounded-xl bg-surface-skeleton text-white text-xs">
                           {getInitial(authorUsername)}
                         </AvatarFallback>
                       </Avatar>
@@ -513,20 +513,20 @@ export function DirectMessageArea({
                               ? `${currentUserDisplayName} (You)`
                               : authorUsername}
                           </p>
-                          <span className="text-xs text-[#8ea4c7]">
+                          <span className="text-xs text-muted-foreground">
                             {formatTimestamp(message.createdAt)}
                           </span>
                           {message.editedAt && (
                             <Badge
                               variant="outline"
-                              className="border-[#304867] text-[#a9b8cf]"
+                              className="border-border text-muted-foreground"
                             >
                               Edited
                             </Badge>
                           )}
                         </div>
                         {visibleText && (
-                          <div className="mt-1 text-sm text-[#dbe7f8]">
+                          <div className="mt-1 text-sm text-banner">
                             <MarkdownText content={visibleText} />
                           </div>
                         )}
@@ -545,14 +545,14 @@ export function DirectMessageArea({
                                     <img
                                       src={attachment.signedUrl}
                                       alt={attachmentLabel}
-                                      className="max-h-80 rounded-md border border-[#304867] bg-[#0d1626] object-contain"
+                                      className="max-h-80 rounded-md border border-border bg-surface-desktop-shell object-contain"
                                     />
                                   ) : (
-                                    <div className="rounded-md border border-dashed border-[#304867] bg-[#0d1626] px-3 py-2 text-xs text-[#a9b8cf]">
+                                    <div className="rounded-md border border-dashed border-border bg-surface-desktop-shell px-3 py-2 text-xs text-muted-foreground">
                                       Image unavailable
                                     </div>
                                   )}
-                                  <p className="text-[11px] text-[#8ea4c7]">
+                                  <p className="text-[11px] text-muted-foreground">
                                     {attachmentLabel} | Expires {expiresAtLabel}
                                   </p>
                                 </div>
@@ -566,7 +566,7 @@ export function DirectMessageArea({
                               type="button"
                               size="sm"
                               variant="ghost"
-                              className="text-[#a9b8cf] hover:text-white hover:bg-[#22334f]"
+                              className="text-muted-foreground hover:text-white hover:bg-surface-hover"
                               onClick={() => {
                                 setActionError(null);
                                 setActionNotice(null);
@@ -592,10 +592,10 @@ export function DirectMessageArea({
         </ScrollArea>
       </div>
 
-      <div className="border-t border-[#22334f] bg-[#142033] p-3">
+      <div className="border-t border-surface-hover bg-surface-panel p-3">
         <div className="space-y-2">
           {messagingUnavailable ? (
-            <div className="rounded-md border border-[#304867] bg-[#111a2b] px-3 py-3 text-sm text-[#a9b8cf]">
+            <div className="rounded-md border border-border bg-surface-app px-3 py-3 text-sm text-muted-foreground">
               Messaging is unavailable in this conversation.
             </div>
           ) : (
@@ -608,28 +608,28 @@ export function DirectMessageArea({
                 onChange={handleSelectImage}
               />
               {imageAttachment && (
-                <div className="rounded-md border border-[#304867] bg-[#111a2b] px-3 py-3">
+                <div className="rounded-md border border-border bg-surface-app px-3 py-3">
                   <div className="flex items-start gap-3">
                     <img
                       src={imageAttachment.previewUrl}
                       alt={imageAttachment.file.name || "Selected image"}
-                      className="size-16 rounded-md border border-[#304867] object-cover"
+                      className="size-16 rounded-md border border-border object-cover"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
                         Image attached
                       </p>
                       <p className="mt-1 text-sm text-white truncate">
                         {imageAttachment.file.name}
                       </p>
-                      <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#a9b8cf]">
+                      <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
                         Expires
                         <select
                           value={imageExpiresInHours}
                           onChange={(event) =>
                             setImageExpiresInHours(Number(event.target.value))
                           }
-                          className="rounded border border-[#304867] bg-[#18243a] px-2 py-1 text-xs text-white"
+                          className="rounded border border-border bg-surface-legal px-2 py-1 text-xs text-white"
                           disabled={sending}
                         >
                           <option value={1}>1h</option>
@@ -643,7 +643,7 @@ export function DirectMessageArea({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="text-[#a9b8cf] hover:text-white"
+                      className="text-muted-foreground hover:text-white"
                       onClick={clearImageAttachment}
                       disabled={sending}
                     >
@@ -660,7 +660,7 @@ export function DirectMessageArea({
                 richActions={enableRichComposer ? richComposer.actions : undefined}
               />
               {enableRichComposer ? (
-                <div className="rounded-md border border-[#304867] bg-[#111a2b] px-3">
+                <div className="rounded-md border border-border bg-surface-app px-3">
                   <RichComposerInput editor={richComposer.editor} />
                 </div>
               ) : (
@@ -670,7 +670,7 @@ export function DirectMessageArea({
                   onChange={(event) => setDraft(event.target.value)}
                   onKeyDown={handleComposerKeyDown}
                   placeholder={`Message ${title}`}
-                  className="min-h-[84px] resize-y bg-[#111a2b] border-[#304867] text-white placeholder:text-[#89a1c3]"
+                  className="min-h-[84px] resize-y bg-surface-app border-border text-white placeholder:text-muted-foreground"
                   disabled={sending}
                 />
               )}
@@ -679,14 +679,14 @@ export function DirectMessageArea({
                   <Button
                     type="button"
                     variant="outline"
-                    className="border-[#304867] text-white"
+                    className="border-border text-white"
                     onClick={() => imageInputRef.current?.click()}
                     disabled={sending}
                   >
                     <ImagePlus className="size-4" />
                     Attach Image
                   </Button>
-                  <p className="text-xs text-[#8ea4c7]">
+                  <p className="text-xs text-muted-foreground">
                     Enter sends; Shift+Enter for newline
                   </p>
                 </div>
@@ -704,7 +704,7 @@ export function DirectMessageArea({
           {/* CHECKPOINT 5 COMPLETE */}
           {/* CHECKPOINT 6 COMPLETE */}
           {actionNotice && (
-            <p className="text-sm text-[#bfe1b8]">{actionNotice}</p>
+            <p className="text-sm text-notice-success">{actionNotice}</p>
           )}
           {actionError && <p className="text-sm text-red-300">{actionError}</p>}
         </div>
@@ -729,10 +729,10 @@ export function DirectMessageArea({
           }
         }}
       >
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Block User?</AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               {pendingBlockConfirm
                 ? `Block "${pendingBlockConfirm.username}"? This removes the friendship, cancels pending requests, and blocks future DMs.`
                 : ""}
@@ -741,7 +741,7 @@ export function DirectMessageArea({
           <AlertDialogFooter>
             <AlertDialogCancel
               disabled={blockingUser}
-              className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]"
+              className="bg-muted border-border text-white hover:bg-secondary"
             >
               Cancel
             </AlertDialogCancel>

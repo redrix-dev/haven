@@ -35,26 +35,26 @@ export function ChatAppShellDialogs({ app, ui }: ChatAppShellDialogsProps) {
         open={Boolean(app.voiceJoinPrompt)}
         onOpenChange={(open) => !open && app.cancelVoiceChannelJoinPrompt()}
       >
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {app.voiceJoinPrompt?.mode === "switch"
                 ? "Switch voice channel?"
                 : "Join voice channel?"}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               {app.voiceJoinPrompt?.mode === "switch"
                 ? "You are already connected to voice. Switching will move your session to the new channel."
                 : "Join this voice channel now? You can keep browsing text channels while connected."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]">
+            <AlertDialogCancel className="bg-muted border-border text-white hover:bg-secondary">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={app.confirmVoiceChannelJoin}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {app.voiceJoinPrompt?.mode === "switch" ? "Switch" : "Join"}
             </AlertDialogAction>
@@ -68,17 +68,17 @@ export function ChatAppShellDialogs({ app, ui }: ChatAppShellDialogsProps) {
           if (!open) setPendingUiConfirmation(null);
         }}
       >
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {pendingUiConfirmationCopy.title}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               {pendingUiConfirmationCopy.description}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]">
+            <AlertDialogCancel className="bg-muted border-border text-white hover:bg-secondary">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
@@ -89,7 +89,7 @@ export function ChatAppShellDialogs({ app, ui }: ChatAppShellDialogsProps) {
               className={
                 pendingUiConfirmationCopy.isDestructive
                   ? "bg-red-600 text-white hover:bg-red-500"
-                  : "bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                  : "bg-primary hover:bg-primary-hover text-white"
               }
             >
               {pendingUiConfirmationCopy.confirmLabel}

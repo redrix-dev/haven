@@ -459,23 +459,23 @@ export function VoiceHardwareDebugPanel({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="app"
-        className="border-[#304867] bg-[#101929] text-white p-0 overflow-hidden"
+        className="border-border bg-surface-peek text-white p-0 overflow-hidden"
       >
         <div className="flex h-full min-h-0 flex-col">
-          <DialogHeader className="px-5 py-4 border-b border-[#263a58] bg-[linear-gradient(135deg,#16233a_0%,#0f1828_65%,#101929_100%)]">
+          <DialogHeader className="px-5 py-4 border-b border-border-panel bg-[linear-gradient(135deg,var(--card)_0%,var(--surface-embedded)_65%,var(--surface-peek)_100%)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <DialogTitle className="flex items-center gap-2 text-white">
-                  <Waves className="size-5 text-[#87b5ff]" />
+                  <Waves className="size-5 text-icon-soft" />
                   {title}
                 </DialogTitle>
-                <DialogDescription className="text-[#a9b8cf]">
+                <DialogDescription className="text-muted-foreground">
                   {description}
                 </DialogDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {hotkeyLabel && (
-                  <Badge variant="outline" className="border-[#355077] text-[#d5e4ff]">
+                  <Badge variant="outline" className="border-border-badge text-nav">
                     Hotkey: {hotkeyLabel}
                   </Badge>
                 )}
@@ -483,8 +483,8 @@ export function VoiceHardwareDebugPanel({
                   variant={micResponsive ? 'default' : 'outline'}
                   className={
                     micResponsive
-                      ? 'bg-[#1c8b63] text-white border-transparent'
-                      : 'border-[#355077] text-[#d5e4ff]'
+                      ? 'bg-voice-connected text-white border-transparent'
+                      : 'border-border-badge text-nav'
                   }
                 >
                   Mic {micConnected ? (micResponsive ? 'Active' : 'Connected') : 'Idle'}
@@ -495,20 +495,20 @@ export function VoiceHardwareDebugPanel({
 
           <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
             <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-4">
-              <Card className="border-[#263a58] bg-[#152239] text-white">
+              <Card className="border-border-panel bg-surface-card-deep text-white">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <Mic className="size-4 text-[#a7c8ff]" />
+                    <Mic className="size-4 text-icon-highlight" />
                     Microphone Test
                   </CardTitle>
-                  <CardDescription className="text-[#9fb2cf]">
+                  <CardDescription className="text-muted-foreground">
                     Live meter checks microphone signal, permissions, and client-side input gain.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Input device</p>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Input device</p>
                       <Select
                         value={selectedInputDeviceId}
                         onValueChange={(value) => {
@@ -518,10 +518,10 @@ export function VoiceHardwareDebugPanel({
                           }
                         }}
                       >
-                        <SelectTrigger className="w-full bg-[#0f1828] border-[#304867] text-white">
+                        <SelectTrigger className="w-full bg-surface-embedded border-border text-white">
                           <SelectValue placeholder="Select microphone" />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                        <SelectContent className="bg-surface-panel border-border text-white">
                           {inputDevices.length === 0 ? (
                             <SelectItem value="default">Default microphone</SelectItem>
                           ) : (
@@ -536,7 +536,7 @@ export function VoiceHardwareDebugPanel({
                     </div>
 
                     <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
                         Input volume ({inputGainPercent}%)
                       </p>
                       <input
@@ -546,16 +546,16 @@ export function VoiceHardwareDebugPanel({
                         step={1}
                         value={inputGainPercent}
                         onChange={(event) => setInputGainPercent(Number(event.target.value))}
-                        className="w-full accent-[#4f8df5]"
+                        className="w-full accent-slider"
                         aria-label="Microphone input volume"
                       />
-                      <p className="text-[11px] text-[#90a5c4]">
+                      <p className="text-[11px] text-auxiliary">
                         Debug-only gain for local meter testing. Does not change the OS device level.
                       </p>
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-[#2a4162] bg-[#0f1828] p-3">
+                  <div className="rounded-lg border border-border-inset-panel bg-surface-embedded p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Badge
@@ -571,7 +571,7 @@ export function VoiceHardwareDebugPanel({
                                 ? 'Microphone test error'
                                 : 'Microphone test stopped'}
                         </Badge>
-                        <span className="text-xs text-[#a9b8cf]">
+                        <span className="text-xs text-muted-foreground">
                           Level: {Math.round(meterSnapshot.level * 100)}% | Peak:{' '}
                           {Math.round(meterSnapshot.peak * 100)}%
                         </span>
@@ -587,7 +587,7 @@ export function VoiceHardwareDebugPanel({
                             type="button"
                             onClick={() => void startMicTest()}
                             disabled={micStatus === 'requesting'}
-                            className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                            className="bg-primary hover:bg-primary-hover text-white"
                           >
                             <Mic className="size-4" />
                             {micStatus === 'requesting' ? 'Starting...' : 'Start Mic Test'}
@@ -598,29 +598,29 @@ export function VoiceHardwareDebugPanel({
 
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px] text-[#96abc8]">
+                        <div className="flex items-center justify-between text-[11px] text-meta-2">
                           <span>Live level</span>
                           <span>{Math.round(meterSnapshot.level * 100)}%</span>
                         </div>
                         <Progress
                           value={Math.round(meterSnapshot.level * 100)}
-                          className="h-1.5 bg-[#22334f]"
+                          className="h-1.5 bg-surface-hover"
                         />
                       </div>
                       <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px] text-[#96abc8]">
+                        <div className="flex items-center justify-between text-[11px] text-meta-2">
                           <span>Peak hold</span>
                           <span>{Math.round(meterSnapshot.peak * 100)}%</span>
                         </div>
                         <Progress
                           value={Math.round(meterSnapshot.peak * 100)}
-                          className="h-1.5 bg-[#22334f]"
+                          className="h-1.5 bg-surface-hover"
                         />
                       </div>
                     </div>
 
                     <div className="mt-3">
-                      <div className="relative overflow-hidden rounded-md border border-[#2a4162] bg-[radial-gradient(circle_at_20%_20%,rgba(79,141,245,0.12),transparent_55%),linear-gradient(180deg,#09101b_0%,#111b2b_100%)] px-2 py-4">
+                      <div className="relative overflow-hidden rounded-md border border-border-inset-panel bg-[radial-gradient(circle_at_20%_20%,rgba(79,141,245,0.12),transparent_55%),linear-gradient(180deg,var(--gradient-voice-0)_0%,var(--gradient-voice-1)_100%)] px-2 py-4">
                         <div className="pointer-events-none absolute inset-0 opacity-50 [background-image:linear-gradient(to_right,rgba(140,169,211,0.08)_1px,transparent_1px)] [background-size:10px_100%]" />
                         <div className="relative flex h-28 items-end gap-[3px]">
                           {meterSnapshot.bars.map((barLevel, index) => {
@@ -650,9 +650,9 @@ export function VoiceHardwareDebugPanel({
                           })}
                         </div>
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#96abc8]">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-meta-2">
                         <span>Speak normally to confirm live response.</span>
-                        <span className="text-[#6f87ab]">|</span>
+                        <span className="text-divider">|</span>
                         <span>
                           {micConnected
                             ? micResponsive
@@ -668,28 +668,28 @@ export function VoiceHardwareDebugPanel({
                 </CardContent>
               </Card>
 
-              <Card className="border-[#263a58] bg-[#152239] text-white">
+              <Card className="border-border-panel bg-surface-card-deep text-white">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <Headphones className="size-4 text-[#a7c8ff]" />
+                    <Headphones className="size-4 text-icon-highlight" />
                     Speaker Test
                   </CardTitle>
-                  <CardDescription className="text-[#9fb2cf]">
+                  <CardDescription className="text-muted-foreground">
                     Route a local test clip to your selected output device and adjust playback volume.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">Output device</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Output device</p>
                     <Select
                       value={selectedOutputDeviceId}
                       onValueChange={setSelectedOutputDeviceId}
                       disabled={!supportsOutputSelection}
                     >
-                      <SelectTrigger className="w-full bg-[#0f1828] border-[#304867] text-white">
+                      <SelectTrigger className="w-full bg-surface-embedded border-border text-white">
                         <SelectValue placeholder="Select speaker" />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                      <SelectContent className="bg-surface-panel border-border text-white">
                         {outputDevices.length === 0 ? (
                           <SelectItem value="default">Default speaker</SelectItem>
                         ) : (
@@ -702,20 +702,20 @@ export function VoiceHardwareDebugPanel({
                       </SelectContent>
                     </Select>
                     {!supportsOutputSelection && (
-                      <p className="text-[11px] text-[#90a5c4]">
+                      <p className="text-[11px] text-auxiliary">
                         This runtime does not support output device routing (`setSinkId`). System
                         default output will be used.
                       </p>
                     )}
                   </div>
 
-                  <div className="rounded-lg border border-[#2a4162] bg-[#0f1828] p-3 space-y-3">
+                  <div className="rounded-lg border border-border-inset-panel bg-surface-embedded p-3 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Badge variant={speakerTestPlaying ? 'default' : 'outline'}>
                           {speakerTestPlaying ? 'Speaker test playing' : 'Speaker test idle'}
                         </Badge>
-                        <span className="text-xs text-[#a9b8cf] truncate max-w-[260px]">
+                        <span className="text-xs text-muted-foreground truncate max-w-[260px]">
                           File: {speakerTestAudioPath}
                         </span>
                       </div>
@@ -729,7 +729,7 @@ export function VoiceHardwareDebugPanel({
                           <Button
                             type="button"
                             onClick={() => void playSpeakerTest()}
-                            className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                            className="bg-primary hover:bg-primary-hover text-white"
                           >
                             <Play className="size-4" />
                             Test Speakers
@@ -739,7 +739,7 @@ export function VoiceHardwareDebugPanel({
                     </div>
 
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2 text-xs text-[#a9b8cf]">
+                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           {speakerVolumePercent === 0 ? (
                             <VolumeX className="size-3.5" />
@@ -757,19 +757,19 @@ export function VoiceHardwareDebugPanel({
                         step={1}
                         value={speakerVolumePercent}
                         onChange={(event) => setSpeakerVolumePercent(Number(event.target.value))}
-                        className="w-full accent-[#4f8df5]"
+                        className="w-full accent-slider"
                         aria-label="Speaker volume"
                       />
                     </div>
 
-                    <p className="text-[11px] text-[#90a5c4]">
+                    <p className="text-[11px] text-auxiliary">
                       Test clip is bundled through the shared runtime audio helper so it ships in web and desktop builds.
                     </p>
                     {speakerError && <p className="text-sm text-red-300">{speakerError}</p>}
                   </div>
 
                   {showDebugWorkflow && (
-                    <div className="rounded-lg border border-dashed border-[#304867] bg-[#111a2b]/70 p-3 text-xs text-[#9fb2cf] space-y-1">
+                    <div className="rounded-lg border border-dashed border-border bg-surface-app/70 p-3 text-xs text-muted-foreground space-y-1">
                       <p className="font-medium text-white">Debug workflow</p>
                       <p>1. Start mic test and confirm the meter reacts.</p>
                       <p>2. Adjust input volume to reproduce clipping/low-gain client issues.</p>

@@ -1,9 +1,9 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import {
   createHavenSupabaseClient,
   type HavenSupabaseClient,
 } from "@shared/lib/createHavenSupabaseClient";
+import { getMobileAuthStorageAdapter } from "./authStorage";
 
 let client: HavenSupabaseClient | null = null;
 
@@ -24,7 +24,7 @@ export function getMobileSupabase(): HavenSupabaseClient {
 
   client = createHavenSupabaseClient(url, key, {
     auth: {
-      storage: AsyncStorage,
+      storage: getMobileAuthStorageAdapter(),
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,

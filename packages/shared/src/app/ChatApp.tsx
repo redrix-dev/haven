@@ -63,7 +63,7 @@ export function ChatApp() {
 
   if (app.authStatus === "initializing") {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#111a2b] text-white">
+      <div className="flex items-center justify-center h-screen bg-surface-app text-white">
         Loading...
       </div>
     );
@@ -71,7 +71,7 @@ export function ChatApp() {
 
   if (app.authStatus === "error") {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#111a2b] text-white">
+      <div className="flex items-center justify-center h-screen bg-surface-app text-white">
         <p>
           {app.authError ?? "Authentication failed. Please restart the app."}
         </p>
@@ -92,7 +92,7 @@ export function ChatApp() {
 
   return (
     <>
-      <div className="flex h-screen overflow-hidden bg-[#111a2b] text-[#e6edf7]">
+      <div className="flex h-screen overflow-hidden bg-surface-app text-foreground">
         <ServerList
           onReorder={setServerOrder}
           currentServerIsOwner={serverPermissions.isOwner}
@@ -152,7 +152,7 @@ export function ChatApp() {
           <ChatAppDmWorkspace app={app} user={user} />
         ) : app.isServersLoading ? (
           <div className="flex-1 flex items-center justify-center">
-            <p className="text-[#a9b8cf]">Loading servers...</p>
+            <p className="text-muted-foreground">Loading servers...</p>
           </div>
         ) : (
           <CommunityWorkspaceShell app={app} user={user} voice={voice} />

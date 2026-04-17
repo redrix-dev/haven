@@ -72,13 +72,13 @@ function CreateRoleForm({
   | "onCreateRole"
 >) {
   return (
-    <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3">
+    <div className="rounded-md border border-border bg-surface-panel p-3 space-y-3">
       <p className="text-sm font-semibold text-white">Create Role</p>
       <Input
         value={newRoleName}
         onChange={(e) => onNewNameChange(e.target.value)}
         placeholder="Role name"
-        className="bg-[#101a2b] border-[#304867] text-white"
+        className="bg-surface-inset border-border text-white"
         disabled={!canManageRoles || roleActionSaving}
       />
       <div className="flex items-center gap-2">
@@ -86,20 +86,20 @@ function CreateRoleForm({
           type="color"
           value={newRoleColor}
           onChange={(e) => onNewColorChange(e.target.value)}
-          className="h-9 w-14 p-1 bg-[#101a2b] border-[#304867]"
+          className="h-9 w-14 p-1 bg-surface-inset border-border"
           disabled={!canManageRoles || roleActionSaving}
         />
         <Button
           type="button"
           onClick={() => void onCreateRole()}
           disabled={!canManageRoles || roleActionSaving}
-          className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+          className="bg-primary hover:bg-primary-hover text-white"
         >
           {roleActionSaving ? "Creating..." : "Create"}
         </Button>
       </div>
       {!canManageRoles && (
-        <p className="text-xs text-[#d6a24a]">
+        <p className="text-xs text-accent-amber">
           You need Manage Roles to create or edit roles.
         </p>
       )}
@@ -115,7 +115,7 @@ function RoleList({
   return (
     <div className="scrollbar-inset h-full overflow-y-auto p-2 space-y-1">
       {roles.length === 0 ? (
-        <p className="text-sm text-[#a9b8cf] px-2 py-3">No roles found.</p>
+        <p className="text-sm text-muted-foreground px-2 py-3">No roles found.</p>
       ) : (
         roles.map((role) => {
           const isSelected = role.id === selectedRoleId;
@@ -126,8 +126,8 @@ function RoleList({
               onClick={() => onSelectRole(role.id)}
               className={`w-full text-left rounded-md px-2 py-2 border transition-colors ${
                 isSelected
-                  ? "border-[#3f79d8] bg-[#1a2a43]"
-                  : "border-transparent hover:border-[#304867] hover:bg-[#17263d]"
+                  ? "border-primary bg-surface-row-selected"
+                  : "border-transparent hover:border-border hover:bg-surface-role-hover"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -141,7 +141,7 @@ function RoleList({
                     {role.name}
                   </span>
                 </div>
-                <span className="text-[11px] text-[#8ea4c7]">
+                <span className="text-[11px] text-muted-foreground">
                   {role.position}
                 </span>
               </div>
@@ -180,7 +180,7 @@ function RoleEditor({
 }) {
   if (!selectedRole || !roleDraft) {
     return (
-      <p className="p-4 text-sm text-[#a9b8cf]">
+      <p className="p-4 text-sm text-muted-foreground">
         Select a role to edit its permissions.
       </p>
     );
@@ -200,10 +200,10 @@ function RoleEditor({
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 Role Name
-                {selectedRole.isSystem && <Lock className="size-3.5 text-[#d6a24a]" />}
+                {selectedRole.isSystem && <Lock className="size-3.5 text-accent-amber" />}
               </span>
             </Label>
             <Input
@@ -211,18 +211,18 @@ function RoleEditor({
               onChange={(e) =>
                 onRoleDraftChange({ ...roleDraft, name: e.target.value })
               }
-              className="bg-[#101a2b] border-[#304867] text-white"
+              className="bg-surface-inset border-border text-white"
               disabled={selectedRole.isSystem || !canEditSelectedRoleDetails || roleActionSaving}
               readOnly={selectedRole.isSystem}
             />
             {selectedRole.isSystem && (
-              <p className="text-[11px] text-[#d6a24a]">
+              <p className="text-[11px] text-accent-amber">
                 System role names are protected. Custom roles do not inherit block visibility protection.
               </p>
             )} 
           </div>
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">
               Color
             </Label>
             <div className="flex items-center gap-2">
@@ -232,7 +232,7 @@ function RoleEditor({
                 onChange={(e) =>
                   onRoleDraftChange({ ...roleDraft, color: e.target.value })
                 }
-                className="h-9 w-14 p-1 bg-[#101a2b] border-[#304867]"
+                className="h-9 w-14 p-1 bg-surface-inset border-border"
                 disabled={!canEditSelectedRoleDetails || roleActionSaving}
               />
               <Input
@@ -240,13 +240,13 @@ function RoleEditor({
                 onChange={(e) =>
                   onRoleDraftChange({ ...roleDraft, color: e.target.value })
                 }
-                className="bg-[#101a2b] border-[#304867] text-white"
+                className="bg-surface-inset border-border text-white"
                 disabled={!canEditSelectedRoleDetails || roleActionSaving}
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase text-[#a9b8cf]">
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">
               Tier
             </Label>
             <Input
@@ -258,17 +258,17 @@ function RoleEditor({
                   position: Number(e.target.value),
                 })
               }
-              className="bg-[#101a2b] border-[#304867] text-white"
+              className="bg-surface-inset border-border text-white"
               disabled={!canEditSelectedRoleDetails || roleActionSaving}
             />
           </div>
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase text-[#a9b8cf]">
+          <p className="text-xs font-semibold uppercase text-muted-foreground">
             Permissions
           </p>
-          <p className="text-[11px] text-[#8ea4c7]">
+          <p className="text-[11px] text-muted-foreground">
             Reserved internal permissions are hidden from this editor.
           </p>
         </div>
@@ -277,12 +277,12 @@ function RoleEditor({
           {visiblePermissionGroups.map((group) => (
             <section
               key={group.scope}
-              className="rounded-md border border-[#304867] bg-[#101a2b]"
+              className="rounded-md border border-border bg-surface-inset"
             >
-              <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c7]">
+              <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {group.label}
               </p>
-              <div className="divide-y divide-[#233753]">
+              <div className="divide-y divide-border-dialog">
                 {group.permissions.map((permission) => {
                   const checked = roleDraft.permissionKeys.includes(
                     permission.key,
@@ -290,7 +290,7 @@ function RoleEditor({
                   return (
                     <label
                       key={permission.key}
-                      className="flex items-start gap-3 p-3 text-sm text-[#e6edf7]"
+                      className="flex items-start gap-3 p-3 text-sm text-foreground"
                     >
                       <Checkbox
                         checked={checked}
@@ -305,7 +305,7 @@ function RoleEditor({
                         <span className="block font-medium text-white">
                           {permission.label}
                         </span>
-                        <span className="block text-xs text-[#a9b8cf]">
+                        <span className="block text-xs text-muted-foreground">
                           {permission.description}
                         </span>
                       </span>
@@ -318,7 +318,7 @@ function RoleEditor({
         </div>
       </div>
 
-      <div className="shrink-0 flex items-center justify-between gap-3 border-t border-[#233753] px-4 py-3">
+      <div className="shrink-0 flex items-center justify-between gap-3 border-t border-border-dialog px-4 py-3">
         <Button
           type="button"
           variant="ghost"
@@ -332,7 +332,7 @@ function RoleEditor({
           type="button"
           onClick={() => void onSaveRole()}
           disabled={roleActionSaving || !canEditSelectedRolePermissions}
-          className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+          className="bg-primary hover:bg-primary-hover text-white"
         >
           {roleActionSaving ? "Saving..." : "Save Role"}
         </Button>
@@ -386,7 +386,7 @@ export function RolesTab({
   return (
     <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3">
       <div className="shrink-0 space-y-1">
-        <p className="text-sm text-[#a9b8cf]">
+        <p className="text-sm text-muted-foreground">
           Roles define what people can do community-wide. The database enforces
           permissions using role assignments and role permission entries.
         </p>
@@ -403,11 +403,11 @@ export function RolesTab({
           {Array.from({ length: 3 }, (_, i) => (
             <div
               key={i}
-              className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-3"
+              className="rounded-md border border-border bg-surface-panel p-3 space-y-3"
             >
-              <Skeleton className="h-4 w-32 bg-[#22334f]" />
-              <Skeleton className="h-10 w-full bg-[#1b2a42]" />
-              <Skeleton className="h-10 w-full bg-[#1b2a42]" />
+              <Skeleton className="h-4 w-32 bg-surface-hover" />
+              <Skeleton className="h-10 w-full bg-surface-skeleton" />
+              <Skeleton className="h-10 w-full bg-surface-skeleton" />
             </div>
           ))}
         </div>
@@ -425,7 +425,7 @@ export function RolesTab({
                 onNewColorChange={onNewColorChange}
                 onCreateRole={onCreateRole}
               />
-              <div className="rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
+              <div className="rounded-md border border-border bg-surface-panel overflow-hidden">
                 <RoleList
                   roles={roles}
                   selectedRoleId={selectedRoleId}
@@ -433,7 +433,7 @@ export function RolesTab({
                 />
               </div>
             </div>
-            <div className="flex-1 min-h-0 flex flex-col rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
+            <div className="flex-1 min-h-0 flex flex-col rounded-md border border-border bg-surface-panel overflow-hidden">
               <RoleEditor {...editorProps} />
             </div>
           </div>
@@ -450,7 +450,7 @@ export function RolesTab({
                 onNewColorChange={onNewColorChange}
                 onCreateRole={onCreateRole}
               />
-              <div className="min-h-0 flex-1 rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
+              <div className="min-h-0 flex-1 rounded-md border border-border bg-surface-panel overflow-hidden">
                 <RoleList
                   roles={roles}
                   selectedRoleId={selectedRoleId}
@@ -458,7 +458,7 @@ export function RolesTab({
                 />
               </div>
             </div>
-            <div className="min-h-0 flex flex-col rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
+            <div className="min-h-0 flex flex-col rounded-md border border-border bg-surface-panel overflow-hidden">
               <RoleEditor {...editorProps} />
             </div>
           </div>

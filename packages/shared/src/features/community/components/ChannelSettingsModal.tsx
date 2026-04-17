@@ -369,10 +369,10 @@ export function ChannelSettingsModal({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         size="xl"
-        className="bg-[#18243a] border-[#142033] text-white max-h-[85vh] md:w-[min(94vw,980px)] md:max-w-none md:h-[min(86dvh,780px)] md:max-h-[calc(100dvh-1.5rem)] min-h-0 flex flex-col gap-0 overflow-hidden p-0"
+        className="bg-surface-legal border-border-deep text-white max-h-[85vh] md:w-[min(94vw,980px)] md:max-w-none md:h-[min(86dvh,780px)] md:max-h-[calc(100dvh-1.5rem)] min-h-0 flex flex-col gap-0 overflow-hidden p-0"
         showCloseButton={false}
       >
-        <DialogHeader className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6 sm:py-4">
+        <DialogHeader className="shrink-0 border-b border-border-dialog px-4 py-3 sm:px-6 sm:py-4">
           <DialogTitle className="text-2xl font-bold text-white">Channel Settings</DialogTitle>
         </DialogHeader>
 
@@ -381,15 +381,15 @@ export function ChannelSettingsModal({
           onValueChange={(value) => setActiveTab(value as TabKey)}
           className="min-h-0 flex flex-1 flex-col gap-0 overflow-hidden"
         >
-          <div className="shrink-0 border-b border-[#233753] px-4 py-3 sm:px-6">
-            <TabsList className="bg-[#142033] h-auto w-full flex-wrap justify-start border border-[#304867]">
+          <div className="shrink-0 border-b border-border-dialog px-4 py-3 sm:px-6">
+            <TabsList className="bg-surface-panel h-auto w-full flex-wrap justify-start border border-border">
               {canManageChannelStructure && (
-                <TabsTrigger value="general" className="text-[#a9b8cf] data-[state=active]:text-white">
+                <TabsTrigger value="general" className="text-muted-foreground data-[state=active]:text-white">
                   General
                 </TabsTrigger>
               )}
               {canManageChannelPermissions && (
-                <TabsTrigger value="permissions" className="text-[#a9b8cf] data-[state=active]:text-white">
+                <TabsTrigger value="permissions" className="text-muted-foreground data-[state=active]:text-white">
                   Permissions
                 </TabsTrigger>
               )}
@@ -407,14 +407,14 @@ export function ChannelSettingsModal({
               >
                 <div className="scrollbar-inset min-h-0 flex-1 overflow-y-auto space-y-4 pr-1">
                 <div className="space-y-2">
-                  <Label htmlFor="channel-settings-name" className="text-xs font-semibold uppercase text-[#a9b8cf]">
+                  <Label htmlFor="channel-settings-name" className="text-xs font-semibold uppercase text-muted-foreground">
                     Channel Name
                   </Label>
                   <Input
                     id="channel-settings-name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="bg-[#142033] border-[#304867] text-white"
+                    className="bg-surface-panel border-border text-white"
                     required
                     maxLength={80}
                     disabled={!canManageChannelStructure || saving || deleting}
@@ -422,14 +422,14 @@ export function ChannelSettingsModal({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="channel-settings-topic" className="text-xs font-semibold uppercase text-[#a9b8cf]">
+                  <Label htmlFor="channel-settings-topic" className="text-xs font-semibold uppercase text-muted-foreground">
                     Topic
                   </Label>
                   <Input
                     id="channel-settings-topic"
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
-                    className="bg-[#142033] border-[#304867] text-white"
+                    className="bg-surface-panel border-border text-white"
                     placeholder="What is this channel for?"
                     maxLength={200}
                     disabled={!canManageChannelStructure || saving || deleting}
@@ -438,13 +438,13 @@ export function ChannelSettingsModal({
 
                 {generalError && <p className="text-sm text-red-400">{generalError}</p>}
                 {!canManageChannelStructure && (
-                  <p className="text-xs text-[#d6a24a]">
+                  <p className="text-xs text-accent-amber">
                     You can view this tab, but only members with Manage Channels can edit channel structure.
                   </p>
                 )}
                 </div>
 
-                <DialogFooter className="justify-between sm:justify-between mt-4 shrink-0 border-t border-[#233753] pt-4">
+                <DialogFooter className="justify-between sm:justify-between mt-4 shrink-0 border-t border-border-dialog pt-4">
                   {canDelete && canManageChannelStructure ? (
                     <Button
                       type="button"
@@ -471,7 +471,7 @@ export function ChannelSettingsModal({
                     <Button
                       type="submit"
                       disabled={saving || deleting || !canManageChannelStructure}
-                      className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                      className="bg-primary hover:bg-primary-hover text-white"
                     >
                       {saving ? 'Saving...' : 'Save'}
                     </Button>
@@ -485,15 +485,15 @@ export function ChannelSettingsModal({
               className="min-h-0 flex-1 overflow-hidden flex flex-col data-[state=inactive]:hidden"
             >
               <div className="scrollbar-inset space-y-5 min-h-0 flex-1 overflow-y-auto pr-1">
-                <div className="rounded-md border border-[#304867] bg-[#142033] p-3 space-y-1">
+                <div className="rounded-md border border-border bg-surface-panel p-3 space-y-1">
                   <p className="text-sm font-medium text-white">How channel permissions work</p>
-                  <p className="text-xs text-[#a9b8cf]">
+                  <p className="text-xs text-muted-foreground">
                     Role rows show the effective community default directly in the dropdown.
                   </p>
-                  <p className="text-xs text-[#a9b8cf]">
+                  <p className="text-xs text-muted-foreground">
                     Priority: Member overwrites, then role overwrites, then community role permissions.
                   </p>
-                  <p className="text-xs text-[#a9b8cf]">At each layer, Deny overrides Allow.</p>
+                  <p className="text-xs text-muted-foreground">At each layer, Deny overrides Allow.</p>
                 </div>
 
               {permissionsLoadError && <p className="text-sm text-red-400">{permissionsLoadError}</p>}
@@ -504,38 +504,38 @@ export function ChannelSettingsModal({
                   {Array.from({ length: 2 }, (_, cardIndex) => (
                     <div
                       key={cardIndex}
-                      className="rounded-lg border border-[#304867] bg-[#142033] p-3 space-y-3"
+                      className="rounded-lg border border-border bg-surface-panel p-3 space-y-3"
                     >
-                      <Skeleton className="h-4 w-36 bg-[#22334f]" />
+                      <Skeleton className="h-4 w-36 bg-surface-hover" />
                       {Array.from({ length: 3 }, (_, rowIndex) => (
                         <div
                           key={rowIndex}
-                          className="grid grid-cols-1 gap-2 rounded-md border border-[#304867] bg-[#111a2b] p-2 md:grid-cols-[1fr_220px]"
+                          className="grid grid-cols-1 gap-2 rounded-md border border-border bg-surface-app p-2 md:grid-cols-[1fr_220px]"
                         >
                           <div className="space-y-2">
-                            <Skeleton className="h-4 w-44 bg-[#22334f]" />
-                            <Skeleton className="h-3 w-32 bg-[#1b2a42]" />
+                            <Skeleton className="h-4 w-44 bg-surface-hover" />
+                            <Skeleton className="h-3 w-32 bg-surface-skeleton" />
                           </div>
-                          <Skeleton className="h-9 w-full bg-[#22334f]" />
+                          <Skeleton className="h-9 w-full bg-surface-hover" />
                         </div>
                       ))}
                     </div>
                   ))}
                 </div>
               ) : !hasPermissionRows ? (
-                <p className="text-[#a9b8cf]">No roles or member overwrites found for this channel.</p>
+                <p className="text-muted-foreground">No roles or member overwrites found for this channel.</p>
               ) : (
                 <>
                   <section className="space-y-3">
                     <h3 className="text-white font-semibold">Role Overwrites</h3>
-                    <p className="text-xs text-[#8ea4c7]">
+                    <p className="text-xs text-muted-foreground">
                       Applies to everyone with that role in this channel.
                     </p>
                     <div className="space-y-2">
                       {visibleRoleRows.map((roleRow) => (
                         <div
                           key={roleRow.roleId}
-                          className="bg-[#142033] rounded-lg p-3 flex flex-col gap-2"
+                          className="bg-surface-panel rounded-lg p-3 flex flex-col gap-2"
                         >
                           <div className="flex items-center gap-2">
                             <span
@@ -547,7 +547,7 @@ export function ChannelSettingsModal({
                               {roleRow.isDefault ? ' (@everyone)' : ''}
                             </span>
                             {!roleRow.editable && (
-                              <span className="px-1.5 py-0.5 rounded bg-[#d6a24a]/20 text-[#d6a24a] text-[10px] font-semibold uppercase tracking-wide">
+                              <span className="px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber text-[10px] font-semibold uppercase tracking-wide">
                                 Locked
                               </span>
                             )}
@@ -560,7 +560,7 @@ export function ChannelSettingsModal({
                               return (
                                 <div
                                   key={column.key}
-                                  className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-[#304867] bg-[#111a2b] p-2"
+                                  className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-border bg-surface-app p-2"
                                 >
                                   <div className="min-w-0">
                                     <p className="text-sm text-white">{column.label}</p>
@@ -582,12 +582,12 @@ export function ChannelSettingsModal({
                                       !canManageChannelPermissions
                                     }
                                   >
-                                    <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
+                                    <SelectTrigger className="w-full bg-surface-panel border-border text-white">
                                       <SelectValue
                                         placeholder={roleDefaultSelectLabel(defaultValue)}
                                       />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                                    <SelectContent className="bg-surface-panel border-border text-white">
                                       <SelectItem value="default">
                                         {permissionSavingKey === saveKey
                                           ? 'Saving...'
@@ -608,10 +608,10 @@ export function ChannelSettingsModal({
 
                   <section className="space-y-3">
                     <h3 className="text-white font-semibold">Member Overwrites</h3>
-                    <p className="text-xs text-[#8ea4c7]">
+                    <p className="text-xs text-muted-foreground">
                       Member-specific settings take priority over role overwrites.
                     </p>
-                    <p className="text-xs text-[#8ea4c7]">
+                    <p className="text-xs text-muted-foreground">
                       Community owner overwrite controls are hidden in this view.
                     </p>
 
@@ -620,7 +620,7 @@ export function ChannelSettingsModal({
                         value={memberSearch}
                         onChange={(e) => setMemberSearch(e.target.value)}
                         placeholder="Search overwrites..."
-                        className="bg-[#142033] border-[#304867] text-white"
+                        className="bg-surface-panel border-border text-white"
                         disabled={!canManageChannelPermissions}
                       />
                       <Select
@@ -628,10 +628,10 @@ export function ChannelSettingsModal({
                         onValueChange={setAddMemberId}
                         disabled={!canManageChannelPermissions || availableMembersForAdd.length === 0}
                       >
-                        <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
+                        <SelectTrigger className="w-full bg-surface-panel border-border text-white">
                           <SelectValue placeholder="Select member" />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                        <SelectContent className="bg-surface-panel border-border text-white">
                           {availableMembersForAdd.length === 0 ? (
                             <SelectItem value="__none__" disabled>
                               No members left to add
@@ -651,7 +651,7 @@ export function ChannelSettingsModal({
                         disabled={
                           !canManageChannelPermissions || !addMemberId || availableMembersForAdd.length === 0
                         }
-                        className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                        className="bg-primary hover:bg-primary-hover text-white"
                       >
                         Add Member Overwrite
                       </Button>
@@ -659,12 +659,12 @@ export function ChannelSettingsModal({
 
                     <div className="space-y-2">
                       {filteredMemberRows.length === 0 ? (
-                        <p className="text-sm text-[#a9b8cf]">No matching member overwrites.</p>
+                        <p className="text-sm text-muted-foreground">No matching member overwrites.</p>
                       ) : (
                         filteredMemberRows.map((memberRow) => (
                           <div
                             key={memberRow.memberId}
-                            className="bg-[#142033] rounded-lg p-3 flex flex-col gap-2"
+                            className="bg-surface-panel rounded-lg p-3 flex flex-col gap-2"
                           >
                             <div className="flex items-center gap-2">
                               <span className="text-white text-sm font-medium">{memberRow.displayName}</span>
@@ -676,7 +676,7 @@ export function ChannelSettingsModal({
                                 return (
                                   <div
                                     key={column.key}
-                                    className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-[#304867] bg-[#111a2b] p-2"
+                                    className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded-md border border-border bg-surface-app p-2"
                                   >
                                     <div className="min-w-0">
                                       <p className="text-sm text-white">{column.label}</p>
@@ -694,10 +694,10 @@ export function ChannelSettingsModal({
                                       }
                                       disabled={permissionSavingKey !== null || !canManageChannelPermissions}
                                     >
-                                      <SelectTrigger className="w-full bg-[#142033] border-[#304867] text-white">
+                                      <SelectTrigger className="w-full bg-surface-panel border-border text-white">
                                         <SelectValue placeholder={memberDefaultSelectLabel()} />
                                       </SelectTrigger>
-                                      <SelectContent className="bg-[#142033] border-[#304867] text-white">
+                                      <SelectContent className="bg-surface-panel border-border text-white">
                                         <SelectItem value="default">
                                           {permissionSavingKey === saveKey
                                             ? 'Saving...'
@@ -720,7 +720,7 @@ export function ChannelSettingsModal({
               )}
               </div>
 
-              <div className="flex justify-end mt-4 shrink-0 border-t border-[#233753] pt-4">
+              <div className="flex justify-end mt-4 shrink-0 border-t border-border-dialog pt-4">
                 <Button
                   type="button"
                   onClick={onClose}
@@ -735,10 +735,10 @@ export function ChannelSettingsModal({
         </Tabs>
 
         <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-          <AlertDialogContent className="bg-[#18243a] border-[#142033] text-white">
+          <AlertDialogContent className="bg-surface-legal border-border-deep text-white">
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Channel?</AlertDialogTitle>
-              <AlertDialogDescription className="text-[#a9b8cf]">
+              <AlertDialogDescription className="text-muted-foreground">
                 This cannot be undone. All messages in this channel will be permanently removed.
               </AlertDialogDescription>
             </AlertDialogHeader>

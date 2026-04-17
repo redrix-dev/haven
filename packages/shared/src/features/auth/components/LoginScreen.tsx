@@ -190,11 +190,11 @@ export function LoginScreen() {
   };
 
   return (
-    <div className="flex items-center justify-center h-screen bg-[#111a2b]">
-      <Card className="w-full max-w-md bg-[#1c2a43] border-[#142033] shadow-xl">
+    <div className="flex items-center justify-center h-screen bg-surface-app">
+      <Card className="w-full max-w-md bg-surface-modal border-border-deep shadow-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-white">Haven</CardTitle>
-          <CardDescription className="text-[#aebad0]">
+          <CardDescription className="text-auth-label">
             {isSignUp ? 'Create your account' : 'Welcome back!'}
           </CardDescription>
         </CardHeader>
@@ -203,7 +203,7 @@ export function LoginScreen() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignUp && (
             <div className="space-y-2">
-              <Label htmlFor="signup-username" className="text-xs font-semibold text-[#aebad0] uppercase">
+              <Label htmlFor="signup-username" className="text-xs font-semibold text-auth-label uppercase">
                 Username
               </Label>
               <Input
@@ -211,14 +211,14 @@ export function LoginScreen() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="bg-[#263a58] border-[#304867] text-white"
+                className="bg-surface-input border-border text-white"
                 required
               />
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="auth-email" className="text-xs font-semibold text-[#aebad0] uppercase">
+            <Label htmlFor="auth-email" className="text-xs font-semibold text-auth-label uppercase">
               Email
             </Label>
             <Input
@@ -226,13 +226,13 @@ export function LoginScreen() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="bg-[#263a58] border-[#304867] text-white"
+              className="bg-surface-input border-border text-white"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="auth-password" className="text-xs font-semibold text-[#aebad0] uppercase">
+            <Label htmlFor="auth-password" className="text-xs font-semibold text-auth-label uppercase">
               Password
             </Label>
             <Input
@@ -240,7 +240,7 @@ export function LoginScreen() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="bg-[#263a58] border-[#304867] text-white"
+              className="bg-surface-input border-border text-white"
               required
             />
           </div>
@@ -256,7 +256,7 @@ export function LoginScreen() {
                   setForgotPasswordStatus('');
                   setShowForgotPasswordModal(true);
                 }}
-                className="h-auto px-0 text-xs text-[#59b7ff] hover:text-[#86ccff]"
+                className="h-auto px-0 text-xs text-link hover:text-link-hover"
               >
                 Forgot password?
               </Button>
@@ -264,22 +264,22 @@ export function LoginScreen() {
           )}
 
           {isSignUp && (
-            <div className="rounded-md border border-[#304867] bg-[#18243a] px-3 py-3">
+            <div className="rounded-md border border-border bg-surface-legal px-3 py-3">
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="signup-legal-acceptance"
                   checked={acceptedLegal}
                   onCheckedChange={(checked) => setAcceptedLegal(checked === true)}
-                  className="mt-0.5 border-[#4d6484] data-[state=checked]:bg-[#3f79d8] data-[state=checked]:border-[#3f79d8]"
+                  className="mt-0.5 border-border-control data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
                 <Label
                   htmlFor="signup-legal-acceptance"
-                  className="text-sm font-normal leading-5 text-[#d7e3f5]"
+                  className="text-sm font-normal leading-5 text-body-soft"
                 >
                   I agree to the{' '}
                   <button
                     type="button"
-                    className="text-[#59b7ff] underline underline-offset-2 hover:text-[#86ccff]"
+                    className="text-link underline underline-offset-2 hover:text-link-hover"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -291,7 +291,7 @@ export function LoginScreen() {
                   and{' '}
                   <button
                     type="button"
-                    className="text-[#59b7ff] underline underline-offset-2 hover:text-[#86ccff]"
+                    className="text-link underline underline-offset-2 hover:text-link-hover"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -314,7 +314,7 @@ export function LoginScreen() {
           <Button
             type="submit"
             disabled={loading || (isSignUp && !acceptedLegal)}
-            className="w-full bg-[#3f79d8] hover:bg-[#325fae] text-white"
+            className="w-full bg-primary hover:bg-primary-hover text-white"
           >
             {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
           </Button>
@@ -328,7 +328,7 @@ export function LoginScreen() {
             setError('');
             setAcceptedLegal(false);
           }}
-          className="mt-4 text-sm text-[#59b7ff] hover:text-[#86ccff] w-full text-center"
+          className="mt-4 text-sm text-link hover:text-link-hover w-full text-center"
         >
           {isSignUp
             ? 'Already have an account? Sign in'
@@ -338,29 +338,29 @@ export function LoginScreen() {
       </Card>
 
       <Dialog open={showVerificationModal} onOpenChange={setShowVerificationModal}>
-        <DialogContent className="bg-[#1c2a43] border-[#142033] text-white sm:max-w-md">
+        <DialogContent className="bg-surface-modal border-border-deep text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Check your email</DialogTitle>
-            <DialogDescription className="text-[#aebad0]">
+            <DialogDescription className="text-auth-label">
               Open the verification link from your email. Haven will complete sign-in automatically when possible.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <p className="text-xs text-[#aebad0]">
+            <p className="text-xs text-auth-label">
               {pendingVerificationCredentials?.email
                 ? `Verification email sent to ${pendingVerificationCredentials.email}.`
                 : 'Verification email sent. Use the same credentials to recheck.'}
             </p>
 
             {verificationStatus && (
-              <p className="text-xs text-[#8fc1ff] bg-[#1c3352] rounded px-3 py-2">
+              <p className="text-xs text-info bg-surface-info rounded px-3 py-2">
                 {verificationStatus}
               </p>
             )}
 
             {verificationError && (
-              <p className="text-xs text-[#fca5a5] bg-[#4a1f2c] rounded px-3 py-2">
+              <p className="text-xs text-destructive-soft bg-destructive-surface rounded px-3 py-2">
                 {verificationError}
               </p>
             )}
@@ -378,7 +378,7 @@ export function LoginScreen() {
               type="button"
               onClick={() => void handleVerificationRecheck()}
               disabled={verificationChecking || !canRecheckVerification}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {verificationChecking ? 'Checking...' : 'I verified, recheck now'}
             </Button>
@@ -387,17 +387,17 @@ export function LoginScreen() {
       </Dialog>
 
       <Dialog open={showForgotPasswordModal} onOpenChange={setShowForgotPasswordModal}>
-        <DialogContent className="bg-[#1c2a43] border-[#142033] text-white sm:max-w-md">
+        <DialogContent className="bg-surface-modal border-border-deep text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reset password</DialogTitle>
-            <DialogDescription className="text-[#aebad0]">
+            <DialogDescription className="text-auth-label">
               Enter your account email and we&apos;ll send a password reset link.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="forgot-password-email" className="text-xs font-semibold text-[#aebad0] uppercase">
+              <Label htmlFor="forgot-password-email" className="text-xs font-semibold text-auth-label uppercase">
                 Email
               </Label>
               <Input
@@ -405,19 +405,19 @@ export function LoginScreen() {
                 type="email"
                 value={forgotPasswordEmail}
                 onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                className="bg-[#263a58] border-[#304867] text-white"
+                className="bg-surface-input border-border text-white"
                 autoFocus
               />
             </div>
 
             {forgotPasswordStatus && (
-              <p className="text-xs text-[#8fc1ff] bg-[#1c3352] rounded px-3 py-2">
+              <p className="text-xs text-info bg-surface-info rounded px-3 py-2">
                 {forgotPasswordStatus}
               </p>
             )}
 
             {forgotPasswordError && (
-              <p className="text-xs text-[#fca5a5] bg-[#4a1f2c] rounded px-3 py-2">
+              <p className="text-xs text-destructive-soft bg-destructive-surface rounded px-3 py-2">
                 {forgotPasswordError}
               </p>
             )}
@@ -435,7 +435,7 @@ export function LoginScreen() {
               type="button"
               onClick={() => void handleForgotPasswordSubmit()}
               disabled={forgotPasswordSending}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {forgotPasswordSending ? 'Sending...' : 'Send reset link'}
             </Button>

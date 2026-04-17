@@ -9,7 +9,7 @@ type VoiceDrawerProps = {
 
 export function VoiceDrawer({ layout = 'modal', open, onDismiss, children }: VoiceDrawerProps) {
   if (layout === 'popout') {
-    return <div className="h-screen w-screen bg-[#0f1726] p-3">{children}</div>;
+    return <div className="h-screen w-screen bg-surface-voice-scrim p-3">{children}</div>;
   }
 
   return (
@@ -26,7 +26,7 @@ export function VoiceDrawer({ layout = 'modal', open, onDismiss, children }: Voi
         onClick={onDismiss}
       />
       <div
-        className={`relative z-10 w-full max-w-4xl max-h-[88vh] rounded-lg border border-[#304867] bg-[#111a2b] shadow-2xl overflow-hidden transition-all duration-200 ${
+        className={`relative z-10 w-full max-w-4xl max-h-[88vh] rounded-lg border border-border bg-surface-app shadow-2xl overflow-hidden transition-all duration-200 ${
           open ? 'translate-y-0 scale-100' : 'translate-y-3 scale-[0.98]'
         }`}
       >

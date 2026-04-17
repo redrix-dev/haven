@@ -55,7 +55,7 @@ export function QuickRenameDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="bg-[#18243a] border-[#304867] text-white">
+      <DialogContent className="bg-surface-legal border-border text-white">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -64,7 +64,7 @@ export function QuickRenameDialog({
             value={value}
             onChange={(event) => setValue(event.target.value)}
             maxLength={maxLength}
-            className="bg-[#142033] border-[#304867] text-white"
+            className="bg-surface-panel border-border text-white"
             autoFocus
           />
           {error && <p className="text-xs text-red-400">{error}</p>}
@@ -77,7 +77,7 @@ export function QuickRenameDialog({
             type="button"
             onClick={() => void handleSave()}
             disabled={saving}
-            className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+            className="bg-primary hover:bg-primary-hover text-white"
           >
             {saving ? 'Saving...' : confirmLabel}
           </Button>

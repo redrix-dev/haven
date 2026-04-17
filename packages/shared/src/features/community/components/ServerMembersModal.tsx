@@ -153,7 +153,7 @@ export function ServerMembersModal({
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent
         size="lg"
-        className="bg-[#18243a] border-[#304867] text-white"
+        className="bg-surface-legal border-border text-white"
       >
         <DialogHeader>
           <DialogTitle>Members - {serverName}</DialogTitle>
@@ -163,33 +163,33 @@ export function ServerMembersModal({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search members..."
-            className="bg-[#142033] border-[#304867] text-white"
+            className="bg-surface-panel border-border text-white"
           />
           {error && <p className="text-xs text-red-400">{error}</p>}
           {actionError && <p className="text-xs text-red-400">{actionError}</p>}
           {loading ? (
-            <div className="rounded-md border border-[#304867] bg-[#142033] p-2 space-y-1">
+            <div className="rounded-md border border-border bg-surface-panel p-2 space-y-1">
               {Array.from({ length: 5 }, (_, index) => (
                 <div
                   key={index}
                   className="flex items-center justify-between gap-2 rounded-md px-2 py-2"
                 >
                   <div className="min-w-0 flex items-center gap-2">
-                    <Skeleton className="size-8 rounded-full bg-[#22334f]" />
+                    <Skeleton className="size-8 rounded-full bg-surface-hover" />
                     <div className="min-w-0 space-y-2">
-                      <Skeleton className="h-4 w-28 bg-[#22334f]" />
-                      <Skeleton className="h-3 w-40 bg-[#1b2a42]" />
+                      <Skeleton className="h-4 w-28 bg-surface-hover" />
+                      <Skeleton className="h-3 w-40 bg-surface-skeleton" />
                     </div>
                   </div>
-                  <Skeleton className="h-5 w-12 rounded-full bg-[#22334f]" />
+                  <Skeleton className="h-5 w-12 rounded-full bg-surface-hover" />
                 </div>
               ))}
             </div>
           ) : (
-            <ScrollArea className="h-[420px] rounded-md border border-[#304867] bg-[#142033]">
+            <ScrollArea className="h-[420px] rounded-md border border-border bg-surface-panel">
               <div className="p-2 space-y-1">
                 {filteredMembers.length === 0 ? (
-                  <p className="px-2 py-3 text-sm text-[#a9b8cf]">
+                  <p className="px-2 py-3 text-sm text-muted-foreground">
                     No members found.
                   </p>
                 ) : (
@@ -261,7 +261,7 @@ export function ServerMembersModal({
                       >
                         <HoverCard openDelay={120} closeDelay={100}>
                           <HoverCardTrigger asChild>
-                            <div className="flex items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-[#1a2a43]">
+                            <div className="flex items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-surface-row-selected">
                               <div className="min-w-0 flex items-center gap-2">
                                 <Avatar size="sm">
                                   {liveAvatarUrl && (
@@ -278,7 +278,7 @@ export function ServerMembersModal({
                                   <p className="truncate text-sm font-medium text-white">
                                     {member.displayName}
                                   </p>
-                                  <p className="truncate text-[11px] text-[#8ea4c7]">
+                                  <p className="truncate text-[11px] text-muted-foreground">
                                     {member.userId}
                                   </p>
                                 </div>
@@ -290,21 +290,21 @@ export function ServerMembersModal({
                               </div>
                             </div>
                           </HoverCardTrigger>
-                          <HoverCardContent className="w-72 border-[#304867] bg-[#18243a] text-white">
+                          <HoverCardContent className="w-72 border-border bg-surface-legal text-white">
                             <div className="space-y-2">
                               <div>
                                 <p className="text-sm font-semibold text-white">
                                   {member.displayName}
                                 </p>
-                                <p className="text-xs text-[#a9b8cf] break-all">
+                                <p className="text-xs text-muted-foreground break-all">
                                   {member.userId}
                                 </p>
                               </div>
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-[#9fb2cf]">
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                 {member.isOwner && (
                                   <Badge
                                     variant="outline"
-                                    className="border-[#587aa8] text-[#d5e6ff]"
+                                    className="border-border-cta text-nav-strong"
                                   >
                                     Owner
                                   </Badge>
@@ -336,25 +336,25 @@ export function ServerMembersModal({
           setReportSubmitting(false);
         }}
       >
-        <DialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <DialogContent className="bg-surface-legal border-border text-white">
           <DialogHeader>
             <DialogTitle>Report Profile</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <p className="text-sm text-[#c7d5ea]">
+            <p className="text-sm text-settings-body">
               Target:{" "}
               <span className="font-semibold text-white">
                 {reportDraft?.username ?? "Unknown user"}
               </span>
             </p>
-            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+            <label className="text-xs uppercase tracking-wide text-muted-foreground">
               Reason (required)
             </label>
             <Textarea
               value={reportReason}
               onChange={(event) => setReportReason(event.target.value)}
               maxLength={1000}
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
               placeholder="Describe why this profile should be reviewed."
             />
           </div>
@@ -403,7 +403,7 @@ export function ServerMembersModal({
                   });
               }}
               disabled={reportSubmitting}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {reportSubmitting ? "Submitting..." : "Submit Report"}
             </Button>
@@ -421,25 +421,25 @@ export function ServerMembersModal({
           setBanConfirmOpen(false);
         }}
       >
-        <DialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <DialogContent className="bg-surface-legal border-border text-white">
           <DialogHeader>
             <DialogTitle>Ban User</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <p className="text-sm text-[#c7d5ea]">
+            <p className="text-sm text-settings-body">
               Target:{" "}
               <span className="font-semibold text-white">
                 {banDraft?.username ?? "Unknown user"}
               </span>
             </p>
-            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+            <label className="text-xs uppercase tracking-wide text-muted-foreground">
               Reason (required)
             </label>
             <Textarea
               value={banReason}
               onChange={(event) => setBanReason(event.target.value)}
               maxLength={1000}
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
               placeholder="Describe why this user is being banned."
             />
           </div>
@@ -476,10 +476,10 @@ export function ServerMembersModal({
       </Dialog>
 
       <AlertDialog open={banConfirmOpen} onOpenChange={setBanConfirmOpen}>
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Ban</AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               This action is immediate. Confirm banning this user from the
               selected server.
             </AlertDialogDescription>
@@ -537,10 +537,10 @@ export function ServerMembersModal({
           setKickSubmitting(false);
         }}
       >
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Removal</AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               Remove this user from the server now. They can rejoin later if
               they still have a valid invite.
             </AlertDialogDescription>

@@ -172,9 +172,9 @@ export function ChatArea({
   );
 
   return (
-    <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col bg-[#111a2b]">
+    <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col bg-surface-app">
       {/* Channel header */}
-      <div className="h-12 px-4 flex items-center justify-between border-b border-[#263a58]">
+      <div className="h-12 px-4 flex items-center justify-between border-b border-border-panel">
         <span className="text-white font-semibold text-base">
           {isVoiceChannel ? (
             <span className="inline-flex items-center gap-2">
@@ -189,9 +189,9 @@ export function ChatArea({
           {!isVoiceChannel && canViewBanHidden && (
             <label
               htmlFor={hiddenMessagesToggleId}
-              className="inline-flex items-center gap-2 rounded-md border border-[#304867] bg-[#142033]/90 px-2.5 py-1"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface-panel/90 px-2.5 py-1"
             >
-              <span className="text-xs font-medium text-[#d7e3f5]">
+              <span className="text-xs font-medium text-body-soft">
                 Show hidden messages
               </span>
               <Switch
@@ -199,7 +199,7 @@ export function ChatArea({
                 size="sm"
                 checked={showHiddenMessages}
                 onCheckedChange={setShowHiddenMessages}
-                className="data-[state=checked]:bg-red-500/70 data-[state=unchecked]:bg-[#233753]"
+                className="data-[state=checked]:bg-red-500/70 data-[state=unchecked]:bg-border-dialog"
               />
             </label>
           )}
@@ -209,7 +209,7 @@ export function ChatArea({
               variant="ghost"
               size="sm"
               onClick={onOpenChannelSettings}
-              className="text-[#a9b8cf] hover:text-white hover:bg-[#304867]"
+              className="text-muted-foreground hover:text-white hover:bg-border"
             >
               Channel Settings
             </Button>
@@ -219,11 +219,11 @@ export function ChatArea({
 
       {isVoiceChannel ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
-          <Headphones className="size-7 text-[#8ea4c7]" />
+          <Headphones className="size-7 text-muted-foreground" />
           <p className="text-white font-semibold">
             Voice channel selected: {channelName}
           </p>
-          <p className="text-sm text-[#a9b8cf] max-w-xl">
+          <p className="text-sm text-muted-foreground max-w-xl">
             Voice stays connected while you browse text channels. Use the footer
             controls for quick actions, or open Voice Settings for devices,
             transmission tuning, and diagnostics.
@@ -232,13 +232,13 @@ export function ChatArea({
             <Button
               type="button"
               onClick={onOpenVoiceControls}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               Open Voice Settings
             </Button>
           )}
           {showVoiceDiagnostics && (
-            <p className="text-xs text-[#8ea4c7]">
+            <p className="text-xs text-muted-foreground">
               Staff diagnostics are available in Voice Settings.
             </p>
           )}

@@ -367,14 +367,14 @@ export function FriendsModal({
         key={input.id}
         className={`rounded-md border px-3 py-3 ${
           input.highlighted
-            ? "border-[#5b92e8] bg-[#13233c] ring-1 ring-[#5b92e8]/50"
-            : "border-[#304867] bg-[#142033]"
+            ? "border-border-selected bg-surface-row-active ring-1 ring-border-selected/50"
+            : "border-border bg-surface-panel"
         }`}
       >
         <div className="flex items-start gap-3">
-          <Avatar className="size-10 rounded-xl border border-[#304867] bg-[#1b2a42]">
+          <Avatar className="size-10 rounded-xl border border-border bg-surface-skeleton">
             {avatarUrl && <AvatarImage src={avatarUrl} alt={username} />}
-            <AvatarFallback className="rounded-xl bg-[#1b2a42] text-white text-xs">
+            <AvatarFallback className="rounded-xl bg-surface-skeleton text-white text-xs">
               {renderAvatarInitial(username)}
             </AvatarFallback>
           </Avatar>
@@ -387,7 +387,7 @@ export function FriendsModal({
               {input.badges}
             </div>
             {input.subtitle && (
-              <p className="mt-1 text-xs text-[#a9b8cf]">{input.subtitle}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{input.subtitle}</p>
             )}
             {input.actions && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -415,17 +415,17 @@ export function FriendsModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           size="app"
-          className="border-[#304867] bg-[#111a2b] text-white p-0 overflow-hidden"
+          className="border-border bg-surface-app text-white p-0 overflow-hidden"
         >
           <div className="flex h-full min-h-0 flex-col">
-            <DialogHeader className="px-5 py-4 border-b border-[#263a58] bg-[linear-gradient(135deg,#16233a_0%,#101a2b_70%,#111a2b_100%)]">
+            <DialogHeader className="px-5 py-4 border-b border-border-panel bg-[linear-gradient(135deg,var(--card)_0%,var(--surface-inset)_70%,var(--surface-app)_100%)]">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <DialogTitle className="flex items-center gap-2 text-white">
-                    <Users className="size-5 text-[#9ac0ff]" />
+                    <Users className="size-5 text-icon-blue" />
                     Friends
                   </DialogTitle>
-                  <DialogDescription className="text-[#a9b8cf]">
+                  <DialogDescription className="text-muted-foreground">
                     Manage friends, requests, and blocked users before starting
                     direct messages.
                   </DialogDescription>
@@ -433,7 +433,7 @@ export function FriendsModal({
                 <div className="flex items-center gap-2">
                   <Badge
                     variant="outline"
-                    className="border-[#355077] text-[#d5e4ff]"
+                    className="border-border-badge text-nav"
                   >
                     {currentUserDisplayName}
                   </Badge>
@@ -444,7 +444,7 @@ export function FriendsModal({
                       void refreshData({ suppressLoadingState: true });
                     }}
                     disabled={refreshing || loading}
-                    className="border-[#304867] text-white"
+                    className="border-border text-white"
                   >
                     <RefreshCcw
                       className={`size-4 ${refreshing ? "animate-spin" : ""}`}
@@ -461,36 +461,36 @@ export function FriendsModal({
                 onValueChange={(value) => setActiveTab(value as FriendsTab)}
                 className="h-full min-h-0"
               >
-                <TabsList className="bg-[#18243a] border border-[#304867]">
+                <TabsList className="bg-surface-legal border border-border">
                   <TabsTrigger
                     value="friends"
-                    className="data-[state=active]:bg-[#22334f]"
+                    className="data-[state=active]:bg-surface-hover"
                   >
                     Friends
                     <Badge
                       variant="outline"
-                      className="ml-1 border-[#304867] text-[#cfe0ff]"
+                      className="ml-1 border-border text-pill"
                     >
                       {counts.friendsCount}
                     </Badge>
                   </TabsTrigger>
                   <TabsTrigger
                     value="add"
-                    className="data-[state=active]:bg-[#22334f]"
+                    className="data-[state=active]:bg-surface-hover"
                   >
                     Add Friend
                   </TabsTrigger>
                   <TabsTrigger
                     value="requests"
-                    className="data-[state=active]:bg-[#22334f]"
+                    className="data-[state=active]:bg-surface-hover"
                   >
                     Requests
                     <Badge
                       variant="outline"
-                      className={`ml-1 border-[#304867] ${
+                      className={`ml-1 border-border ${
                         counts.incomingPendingRequestCount > 0
-                          ? "text-[#ffd9d9]"
-                          : "text-[#cfe0ff]"
+                          ? "text-danger-pale"
+                          : "text-pill"
                       }`}
                     >
                       {counts.incomingPendingRequestCount}
@@ -498,12 +498,12 @@ export function FriendsModal({
                   </TabsTrigger>
                   <TabsTrigger
                     value="blocked"
-                    className="data-[state=active]:bg-[#22334f]"
+                    className="data-[state=active]:bg-surface-hover"
                   >
                     Blocked
                     <Badge
                       variant="outline"
-                      className="ml-1 border-[#304867] text-[#cfe0ff]"
+                      className="ml-1 border-border text-pill"
                     >
                       {counts.blockedUserCount}
                     </Badge>
@@ -511,14 +511,14 @@ export function FriendsModal({
                 </TabsList>
 
                 {(loadError || actionError) && (
-                  <div className="mt-3 rounded-md border border-[#5a2d3d] bg-[#2a1821] px-3 py-2 text-sm text-[#ffd4df]">
+                  <div className="mt-3 rounded-md border border-border-destructive-panel bg-surface-destructive-panel px-3 py-2 text-sm text-destructive-banner">
                     {actionError ?? loadError}
                   </div>
                 )}
 
                 <TabsContent value="friends" className="mt-3 min-h-0">
-                  <div className="rounded-md border border-[#304867] bg-[#142033]">
-                    <div className="px-3 py-2 border-b border-[#263a58] text-xs text-[#a9b8cf] uppercase tracking-wide">
+                  <div className="rounded-md border border-border bg-surface-panel">
+                    <div className="px-3 py-2 border-b border-border-panel text-xs text-muted-foreground uppercase tracking-wide">
                       Friends ({friends.length})
                     </div>
                     <ScrollArea className="h-[52dvh] xl:h-[56dvh]">
@@ -527,27 +527,27 @@ export function FriendsModal({
                           Array.from({ length: 4 }, (_, index) => (
                             <div
                               key={index}
-                              className="rounded-md border border-[#304867] bg-[#111a2b]/60 px-3 py-3"
+                              className="rounded-md border border-border bg-surface-app/60 px-3 py-3"
                             >
                               <div className="flex items-start gap-3">
-                                <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                                <Skeleton className="size-10 rounded-xl bg-surface-hover" />
                                 <div className="min-w-0 flex-1 space-y-2">
-                                  <Skeleton className="h-4 w-28 bg-[#22334f]" />
-                                  <Skeleton className="h-3 w-3/4 bg-[#1b2a42]" />
+                                  <Skeleton className="h-4 w-28 bg-surface-hover" />
+                                  <Skeleton className="h-3 w-3/4 bg-surface-skeleton" />
                                   <div className="flex gap-2">
-                                    <Skeleton className="h-8 w-20 bg-[#22334f]" />
-                                    <Skeleton className="h-8 w-20 bg-[#22334f]" />
+                                    <Skeleton className="h-8 w-20 bg-surface-hover" />
+                                    <Skeleton className="h-8 w-20 bg-surface-hover" />
                                   </div>
                                 </div>
                               </div>
                             </div>
                           ))
                         ) : friends.length === 0 ? (
-                          <div className="rounded-md border border-dashed border-[#304867] bg-[#111a2b]/60 p-4">
-                            <p className="text-sm text-[#a9b8cf]">
+                          <div className="rounded-md border border-dashed border-border bg-surface-app/60 p-4">
+                            <p className="text-sm text-muted-foreground">
                               No friends yet.
                             </p>
-                            <p className="mt-1 text-xs text-[#90a5c4]">
+                            <p className="mt-1 text-xs text-auxiliary">
                               Use the Add Friend tab to search by exact
                               username.
                             </p>
@@ -590,7 +590,7 @@ export function FriendsModal({
                                     type="button"
                                     size="sm"
                                     variant="ghost"
-                                    className="text-[#f3b3b3] hover:text-[#ffd2d2] hover:bg-[#3b2535]"
+                                    className="text-destructive-row hover:text-destructive-hover-fg hover:bg-surface-destructive-row-hover"
                                     onClick={() =>
                                       handleBlockUser({
                                         userId: friend.friendUserId,
@@ -620,19 +620,19 @@ export function FriendsModal({
                 </TabsContent>
 
                 <TabsContent value="add" className="mt-3 min-h-0">
-                  <div className="rounded-md border border-[#304867] bg-[#142033] p-3">
+                  <div className="rounded-md border border-border bg-surface-panel p-3">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <Input
                         value={searchQuery}
                         onChange={(event) => setSearchQuery(event.target.value)}
                         placeholder="Enter exact username"
-                        className="bg-[#111a2b] border-[#304867] text-white placeholder:text-[#89a1c3]"
+                        className="bg-surface-app border-border text-white placeholder:text-muted-foreground"
                         autoComplete="off"
                       />
                       <Button
                         type="button"
                         variant="outline"
-                        className="border-[#304867] text-white"
+                        className="border-border text-white"
                         onClick={() => {
                           if (searchQuery.trim().length < 2) return;
                           searchRequestIdRef.current += 1;
@@ -663,7 +663,7 @@ export function FriendsModal({
                         Search
                       </Button>
                     </div>
-                    <p className="mt-2 text-xs text-[#9fb2cf]">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       Search is exact username match (case-insensitive) and
                       debounced by 150ms.
                     </p>
@@ -672,20 +672,20 @@ export function FriendsModal({
                     )}
                   </div>
 
-                  <div className="mt-3 rounded-md border border-[#304867] bg-[#142033]">
-                    <div className="px-3 py-2 border-b border-[#263a58] text-xs text-[#a9b8cf] uppercase tracking-wide">
+                  <div className="mt-3 rounded-md border border-border bg-surface-panel">
+                    <div className="px-3 py-2 border-b border-border-panel text-xs text-muted-foreground uppercase tracking-wide">
                       Search Results
                     </div>
                     <ScrollArea className="h-[44dvh] xl:h-[48dvh]">
                       <div className="p-3 space-y-2">
                         {searchLoading ? (
-                          <p className="text-sm text-[#a9b8cf]">Searching...</p>
+                          <p className="text-sm text-muted-foreground">Searching...</p>
                         ) : searchQuery.trim().length < 2 ? (
-                          <p className="text-sm text-[#a9b8cf]">
+                          <p className="text-sm text-muted-foreground">
                             Type at least 2 characters to search.
                           </p>
                         ) : searchResults.length === 0 ? (
-                          <p className="text-sm text-[#a9b8cf]">
+                          <p className="text-sm text-muted-foreground">
                             No matching users found.
                           </p>
                         ) : (
@@ -698,7 +698,7 @@ export function FriendsModal({
                                   return (
                                     <Badge
                                       variant="outline"
-                                      className="border-[#304867] text-[#cfe0ff]"
+                                      className="border-border text-pill"
                                     >
                                       Friend
                                     </Badge>
@@ -707,7 +707,7 @@ export function FriendsModal({
                                   return (
                                     <Badge
                                       variant="outline"
-                                      className="border-[#587aa8] text-[#d5e6ff]"
+                                      className="border-border-cta text-nav-strong"
                                     >
                                       Incoming request
                                     </Badge>
@@ -716,7 +716,7 @@ export function FriendsModal({
                                   return (
                                     <Badge
                                       variant="outline"
-                                      className="border-[#587aa8] text-[#d5e6ff]"
+                                      className="border-border-cta text-nav-strong"
                                     >
                                       Request sent
                                     </Badge>
@@ -810,8 +810,8 @@ export function FriendsModal({
 
                 <TabsContent value="requests" className="mt-3 min-h-0">
                   <div className="grid min-h-0 grid-cols-1 xl:grid-cols-2 gap-3">
-                    <div className="rounded-md border border-[#304867] bg-[#142033]">
-                      <div className="px-3 py-2 border-b border-[#263a58] text-xs text-[#a9b8cf] uppercase tracking-wide">
+                    <div className="rounded-md border border-border bg-surface-panel">
+                      <div className="px-3 py-2 border-b border-border-panel text-xs text-muted-foreground uppercase tracking-wide">
                         Incoming ({incomingRequests.length})
                       </div>
                       <ScrollArea className="h-[48dvh] xl:h-[54dvh]">
@@ -820,23 +820,23 @@ export function FriendsModal({
                             Array.from({ length: 3 }, (_, index) => (
                               <div
                                 key={index}
-                                className="rounded-md border border-[#304867] bg-[#111a2b]/60 px-3 py-3"
+                                className="rounded-md border border-border bg-surface-app/60 px-3 py-3"
                               >
                                 <div className="flex items-start gap-3">
-                                  <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                                  <Skeleton className="size-10 rounded-xl bg-surface-hover" />
                                   <div className="min-w-0 flex-1 space-y-2">
-                                    <Skeleton className="h-4 w-28 bg-[#22334f]" />
-                                    <Skeleton className="h-3 w-3/4 bg-[#1b2a42]" />
+                                    <Skeleton className="h-4 w-28 bg-surface-hover" />
+                                    <Skeleton className="h-3 w-3/4 bg-surface-skeleton" />
                                     <div className="flex gap-2">
-                                      <Skeleton className="h-8 w-16 bg-[#22334f]" />
-                                      <Skeleton className="h-8 w-16 bg-[#22334f]" />
+                                      <Skeleton className="h-8 w-16 bg-surface-hover" />
+                                      <Skeleton className="h-8 w-16 bg-surface-hover" />
                                     </div>
                                   </div>
                                 </div>
                               </div>
                             ))
                           ) : incomingRequests.length === 0 ? (
-                            <p className="text-sm text-[#a9b8cf]">
+                            <p className="text-sm text-muted-foreground">
                               No incoming requests.
                             </p>
                           ) : (
@@ -853,7 +853,7 @@ export function FriendsModal({
                                 badges: (
                                   <Badge
                                     variant="outline"
-                                    className="border-[#587aa8] text-[#d5e6ff]"
+                                    className="border-border-cta text-nav-strong"
                                   >
                                     Incoming
                                   </Badge>
@@ -895,7 +895,7 @@ export function FriendsModal({
                                       type="button"
                                       size="sm"
                                       variant="ghost"
-                                      className="text-[#f3b3b3] hover:text-[#ffd2d2] hover:bg-[#3b2535]"
+                                      className="text-destructive-row hover:text-destructive-hover-fg hover:bg-surface-destructive-row-hover"
                                       onClick={() =>
                                         handleBlockUser({
                                           userId: request.senderUserId,
@@ -925,8 +925,8 @@ export function FriendsModal({
                       </ScrollArea>
                     </div>
 
-                    <div className="rounded-md border border-[#304867] bg-[#142033]">
-                      <div className="px-3 py-2 border-b border-[#263a58] text-xs text-[#a9b8cf] uppercase tracking-wide">
+                    <div className="rounded-md border border-border bg-surface-panel">
+                      <div className="px-3 py-2 border-b border-border-panel text-xs text-muted-foreground uppercase tracking-wide">
                         Sent ({outgoingRequests.length})
                       </div>
                       <ScrollArea className="h-[48dvh] xl:h-[54dvh]">
@@ -935,22 +935,22 @@ export function FriendsModal({
                             Array.from({ length: 3 }, (_, index) => (
                               <div
                                 key={index}
-                                className="rounded-md border border-[#304867] bg-[#111a2b]/60 px-3 py-3"
+                                className="rounded-md border border-border bg-surface-app/60 px-3 py-3"
                               >
                                 <div className="flex items-start gap-3">
-                                  <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                                  <Skeleton className="size-10 rounded-xl bg-surface-hover" />
                                   <div className="min-w-0 flex-1 space-y-2">
-                                    <Skeleton className="h-4 w-28 bg-[#22334f]" />
-                                    <Skeleton className="h-3 w-3/4 bg-[#1b2a42]" />
+                                    <Skeleton className="h-4 w-28 bg-surface-hover" />
+                                    <Skeleton className="h-3 w-3/4 bg-surface-skeleton" />
                                     <div className="flex gap-2">
-                                      <Skeleton className="h-8 w-20 bg-[#22334f]" />
+                                      <Skeleton className="h-8 w-20 bg-surface-hover" />
                                     </div>
                                   </div>
                                 </div>
                               </div>
                             ))
                           ) : outgoingRequests.length === 0 ? (
-                            <p className="text-sm text-[#a9b8cf]">
+                            <p className="text-sm text-muted-foreground">
                               No sent requests.
                             </p>
                           ) : (
@@ -967,7 +967,7 @@ export function FriendsModal({
                                 badges: (
                                   <Badge
                                     variant="outline"
-                                    className="border-[#587aa8] text-[#d5e6ff]"
+                                    className="border-border-cta text-nav-strong"
                                   >
                                     Pending
                                   </Badge>
@@ -1002,8 +1002,8 @@ export function FriendsModal({
                 </TabsContent>
 
                 <TabsContent value="blocked" className="mt-3 min-h-0">
-                  <div className="rounded-md border border-[#304867] bg-[#142033]">
-                    <div className="px-3 py-2 border-b border-[#263a58] text-xs text-[#a9b8cf] uppercase tracking-wide">
+                  <div className="rounded-md border border-border bg-surface-panel">
+                    <div className="px-3 py-2 border-b border-border-panel text-xs text-muted-foreground uppercase tracking-wide">
                       Blocked Users ({blockedUsers.length})
                     </div>
                     <ScrollArea className="h-[52dvh] xl:h-[56dvh]">
@@ -1012,20 +1012,20 @@ export function FriendsModal({
                           Array.from({ length: 3 }, (_, index) => (
                             <div
                               key={index}
-                              className="rounded-md border border-[#304867] bg-[#111a2b]/60 px-3 py-3"
+                              className="rounded-md border border-border bg-surface-app/60 px-3 py-3"
                             >
                               <div className="flex items-start gap-3">
-                                <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                                <Skeleton className="size-10 rounded-xl bg-surface-hover" />
                                 <div className="min-w-0 flex-1 space-y-2">
-                                  <Skeleton className="h-4 w-28 bg-[#22334f]" />
-                                  <Skeleton className="h-3 w-3/4 bg-[#1b2a42]" />
-                                  <Skeleton className="h-8 w-20 bg-[#22334f]" />
+                                  <Skeleton className="h-4 w-28 bg-surface-hover" />
+                                  <Skeleton className="h-3 w-3/4 bg-surface-skeleton" />
+                                  <Skeleton className="h-8 w-20 bg-surface-hover" />
                                 </div>
                               </div>
                             </div>
                           ))
                         ) : blockedUsers.length === 0 ? (
-                          <p className="text-sm text-[#a9b8cf]">
+                          <p className="text-sm text-muted-foreground">
                             No blocked users.
                           </p>
                         ) : (
@@ -1075,14 +1075,14 @@ export function FriendsModal({
           }
         }}
       >
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {pendingConfirm?.kind === "removeFriend"
                 ? "Remove Friend?"
                 : "Block User?"}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               {pendingConfirm?.kind === "removeFriend"
                 ? `Remove "${pendingConfirm.username}" from your friends list?`
                 : pendingConfirm
@@ -1093,7 +1093,7 @@ export function FriendsModal({
           <AlertDialogFooter>
             <AlertDialogCancel
               disabled={pendingConfirmBusy}
-              className="bg-[#1d2a42] border-[#304867] text-white hover:bg-[#22324d]"
+              className="bg-muted border-border text-white hover:bg-secondary"
             >
               Cancel
             </AlertDialogCancel>

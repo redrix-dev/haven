@@ -4,6 +4,6 @@ export type RootStackParamList = {
   SettingsPlaceholder: undefined;
   CreatePlaceholder: undefined;
   JoinPlaceholder: undefined;
-  PasswordRecovery: undefined;
+  PasswordRecovery: { flow?: "requestReset" | "setNewPassword" } | undefined;
   SignUp: undefined;
 };

@@ -103,7 +103,7 @@ export function ActionMenuContent({ mode, actions, scope }: ActionMenuContentPro
         {node.label}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent
-        className="bg-[#18243a] border-[#304867] text-white"
+        className="bg-surface-legal border-border text-white"
         onPointerEnter={() => {
           traceContextMenuEvent(scope, 'pointerenter-sub-content', { key: node.key });
           submenuController.clearCloseTimer();
@@ -181,7 +181,7 @@ export function ActionMenuContent({ mode, actions, scope }: ActionMenuContentPro
         {node.label}
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent
-        className="bg-[#18243a] border-[#304867] text-white"
+        className="bg-surface-legal border-border text-white"
         onPointerEnter={() => {
           traceContextMenuEvent(scope, 'pointerenter-sub-content', { key: node.key });
           submenuController.clearCloseTimer();

@@ -10,6 +10,13 @@ import { supabase } from "@shared/lib/supabase";
 import { getAppHost } from "@shared/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
+import {
+  buildSignUpMetadata,
+  parseAuthConfirmParams,
+  parseAuthConfirmUrl,
+  SUPPORTED_EMAIL_OTP_TYPES,
+  validateLegalAcceptance,
+} from "@shared/features/auth/domain";
 import { useAuthStore } from "@shared/stores/authStore";
 import type {
   AuthError,
@@ -54,61 +61,6 @@ type UseAuthResult = AuthContextValue & {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-const SUPPORTED_EMAIL_OTP_TYPES = new Set<EmailOtpType>([
-  "signup",
-  "invite",
-  "magiclink",
-  "recovery",
-  "email_change",
-  "email",
-]);
-
-const CURRENT_TOS_VERSION = "2026-03-24";
-
-const normalizePathname = (pathname: string): string => {
-  const normalized = pathname.replace(/\/+$/, "");
-  return normalized || "/";
-};
-
-const parseAuthConfirmUrl = (url: string): URL | null => {
-  try {
-    const parsed = new URL(url);
-    const pathname = normalizePathname(parsed.pathname);
-    if (parsed.protocol === "haven:") {
-      return parsed.hostname === "auth" && pathname === "/confirm"
-        ? parsed
-        : null;
-    }
-    if (
-      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
-      pathname === "/auth/confirm"
-    ) {
-      return parsed;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-};
-
-const parseAuthConfirmParams = (parsed: URL): Record<string, string> => {
-  const next: Record<string, string> = {};
-  const applyParams = (params: URLSearchParams) => {
-    for (const [key, value] of params.entries()) {
-      if (!next[key]) {
-        next[key] = value;
-      }
-    }
-  };
-
-  applyParams(parsed.searchParams);
-  if (parsed.hash.startsWith("#")) {
-    applyParams(new URLSearchParams(parsed.hash.slice(1)));
-  }
-
-  return next;
-};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("initializing");
@@ -326,9 +278,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     username: string,
     acceptedLegal: boolean,
   ) => {
-    if (!acceptedLegal) {
+    const legalValidation = validateLegalAcceptance(acceptedLegal);
+    if (!legalValidation.ok) {
       return {
-        error: new Error("You must agree to the Terms of Service and Privacy Policy."),
+        error: new Error(legalValidation.error ?? "Legal acceptance is required."),
       };
     }
 
@@ -337,12 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
       options: {
         emailRedirectTo: getPlatformAuthConfirmRedirectUrl(),
-        data: {
-          username: username.trim(),
-          accepted_tos: true,
-          tos_version: CURRENT_TOS_VERSION,
-          tos_accepted_at: new Date().toISOString(),
-        },
+        data: buildSignUpMetadata(username),
       },
     });
 

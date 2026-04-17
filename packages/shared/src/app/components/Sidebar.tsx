@@ -84,9 +84,9 @@ interface SidebarProps {
   footerStatusActions?: React.ReactNode;
 }
 function getStatusColor(status: "online" | "away" | "dnd"): string {
-  if (status === "online") return "#44b894";
-  if (status === "away") return "#f0a832";
-  return "#f04747";
+  if (status === "online") return "var(--status-online)";
+  if (status === "away") return "var(--status-away)";
+  return "var(--status-dnd)";
 }
 export function Sidebar({
   serverName,
@@ -261,8 +261,8 @@ export function Sidebar({
         }
         className={`w-full px-2 py-1.5 rounded text-left text-sm transition-colors justify-start ${
           isActive
-            ? "bg-[#3f79d8] text-white"
-            : "text-[#95a5bf] hover:bg-[#22334f] hover:text-[#e6edf7]"
+            ? "bg-primary text-white"
+            : "text-meta hover:bg-surface-hover hover:text-foreground"
         }`}
       >
         {isVoiceChannel ? (
@@ -287,7 +287,7 @@ export function Sidebar({
               return (
                 <Tooltip key={participant.userId}>
                   <TooltipTrigger asChild>
-                    <span className="size-5 rounded-full bg-[#304867] text-[10px] text-white font-semibold flex items-center justify-center">
+                    <span className="size-5 rounded-full bg-border text-[10px] text-white font-semibold flex items-center justify-center">
                       {initial}
                     </span>
                   </TooltipTrigger>
@@ -300,7 +300,7 @@ export function Sidebar({
           {voiceChannelParticipants[channel.id].length > 4 && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="size-5 rounded-full bg-[#22334f] text-[10px] text-[#d1dff4] font-semibold flex items-center justify-center">
+                <span className="size-5 rounded-full bg-surface-hover text-[10px] text-avatar-fallback font-semibold flex items-center justify-center">
                   ...
                 </span>
               </TooltipTrigger>
@@ -416,7 +416,7 @@ export function Sidebar({
             </div>
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent className="bg-[#18243a] border-[#304867] text-white">
+        <ContextMenuContent className="bg-surface-legal border-border text-white">
           <ActionMenuContent
             mode="context"
             scope="channel"
@@ -480,7 +480,7 @@ export function Sidebar({
               onClick={() =>
                 onToggleChannelGroup?.(group.id, !group.isCollapsed)
               }
-              className="w-full px-2 pb-1 text-left text-[10px] uppercase tracking-wide font-semibold text-[#7f90ac] hover:text-[#c8d5ea] inline-flex items-center gap-1"
+              className="w-full px-2 pb-1 text-left text-[10px] uppercase tracking-wide font-semibold text-channel-section hover:text-channel-section-hover inline-flex items-center gap-1"
             >
               {group.isCollapsed ? (
                 <ChevronRight className="size-3" />
@@ -490,7 +490,7 @@ export function Sidebar({
               <span className="truncate">{group.name}</span>
             </button>
           </ContextMenuTrigger>
-          <ContextMenuContent className="bg-[#18243a] border-[#304867] text-white">
+          <ContextMenuContent className="bg-surface-legal border-border text-white">
             <ActionMenuContent
               mode="context"
               scope="channel"
@@ -528,14 +528,14 @@ export function Sidebar({
   return (
     <div
       ref={sidebarRef}
-      className={`relative shrink-0 bg-[#1c2a43] flex flex-col ${isResizing ? "select-none" : ""}`}
+      className={`relative shrink-0 bg-surface-modal flex flex-col ${isResizing ? "select-none" : ""}`}
       style={{
         width: `${sidebarWidth}px`,
         minWidth: `${computedMinWidth}px`,
         maxWidth: `${SIDEBAR_MAX_WIDTH}px`,
       }}
     >
-      <div className="h-12 px-3 flex items-center justify-between font-semibold text-white border-b border-[#263a58]">
+      <div className="h-12 px-3 flex items-center justify-between font-semibold text-white border-b border-border-panel">
         <span ref={serverNameRef} className="min-w-0 whitespace-nowrap pr-2">
           {serverName}
         </span>
@@ -548,7 +548,7 @@ export function Sidebar({
                   variant="ghost"
                   size="icon-xs"
                   onClick={onCreateChannel}
-                  className="text-[#a9b8cf] hover:text-white hover:bg-[#304867]"
+                  className="text-muted-foreground hover:text-white hover:bg-border"
                 >
                   <Plus className="size-4" />
                 </Button>
@@ -566,7 +566,7 @@ export function Sidebar({
                   variant="ghost"
                   size="icon-xs"
                   onClick={onOpenServerSettings}
-                  className="text-[#a9b8cf] hover:text-white hover:bg-[#304867]"
+                  className="text-muted-foreground hover:text-white hover:bg-border"
                 >
                   <Settings className="size-4" />
                 </Button>
@@ -612,7 +612,7 @@ export function Sidebar({
 
               {(orderedUngroupedChannels.length > 0 || !hasAnyGroups) && (
                 <div className="mb-3">
-                  <p className="px-2 pb-1 text-[10px] uppercase tracking-wide font-semibold text-[#7f90ac]">
+                  <p className="px-2 pb-1 text-[10px] uppercase tracking-wide font-semibold text-channel-section">
                     {hasAnyGroups ? "Ungrouped Channels" : "Channels"}
                   </p>
                   {orderedUngroupedChannels.map(renderChannelButton)}
@@ -621,7 +621,7 @@ export function Sidebar({
             </div>
           </ScrollArea>
         </ContextMenuTrigger>
-        <ContextMenuContent className="bg-[#18243a] border-[#304867] text-white">
+        <ContextMenuContent className="bg-surface-legal border-border text-white">
           <ActionMenuContent
             mode="context"
             scope="channel"
@@ -631,13 +631,13 @@ export function Sidebar({
       </ContextMenu>
 
       <div
-        className="bg-[#172338] border-t border-[#263a58]"
+        className="bg-surface-footer-bar border-t border-border-panel"
         data-component="sidebar"
       >
         {voiceStatusPanel}
         <div className={voiceStatusPanel ? "px-2 pb-2 pt-1" : "p-2"}>
           <div
-            className={`rounded-md bg-[#142033] px-2.5 py-2.5 ${rainbowMode ? "rainbow-border" : "border border-[#304867] status-breathe"}`}
+            className={`rounded-md bg-surface-panel px-2.5 py-2.5 ${rainbowMode ? "rainbow-border" : "border border-border status-breathe"}`}
           >
             <div className="flex items-center justify-between">
               <p className="truncate text-sm font-semibold leading-5 text-white">
@@ -655,7 +655,7 @@ export function Sidebar({
                         ? "Away"
                         : "Do Not Disturb"}
                   </span>
-                  <ChevronDownIcon className="size-3 text-[#8ea4c7]" />
+                  <ChevronDownIcon className="size-3 text-muted-foreground" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuRadioGroup
@@ -693,8 +693,8 @@ export function Sidebar({
         aria-orientation="vertical"
         className={`absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize ${
           isResizing
-            ? "bg-[#3f79d8]/40"
-            : "bg-transparent hover:bg-[#3f79d8]/20"
+            ? "bg-primary/40"
+            : "bg-transparent hover:bg-primary/20"
         }`}
         onPointerDown={handleResizePointerDown}
         onPointerMove={handleResizePointerMove}

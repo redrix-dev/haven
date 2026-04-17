@@ -39,19 +39,19 @@ export function CreateServerModal({ onClose, onCreate }: CreateServerModalProps)
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         size="sm"
-        className="bg-[#18243a] border-[#142033] text-white"
+        className="bg-surface-legal border-border-deep text-white"
         showCloseButton={false}
       >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-white">Create Your Server</DialogTitle>
-          <DialogDescription className="text-[#a9b8cf]">
+          <DialogDescription className="text-muted-foreground">
             Give your server a personality with a name. You can always change it later.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="server-name" className="text-xs font-semibold uppercase text-[#a9b8cf]">
+            <Label htmlFor="server-name" className="text-xs font-semibold uppercase text-muted-foreground">
               Server Name
             </Label>
             <Input
@@ -59,7 +59,7 @@ export function CreateServerModal({ onClose, onCreate }: CreateServerModalProps)
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="My Awesome Server"
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
               autoFocus
               required
             />
@@ -77,7 +77,7 @@ export function CreateServerModal({ onClose, onCreate }: CreateServerModalProps)
             <Button
               type="submit"
               disabled={loading || !name.trim()}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {loading ? 'Creating...' : 'Create'}
             </Button>

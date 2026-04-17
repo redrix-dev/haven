@@ -98,7 +98,7 @@ export function ServerList({
     "size-12 p-0 rounded-2xl flex items-center justify-center overflow-hidden transition-colors";
 
   return (
-    <div className="w-[72px] bg-[#142033] overflow-hidden">
+    <div className="w-[72px] bg-surface-panel overflow-hidden">
       <div className="flex h-full w-full flex-col px-3 py-3">
         <ScrollArea className="min-h-0 flex-1 [--scrollbar-size:8px] [&_[data-slot=scroll-area-scrollbar]]:opacity-0 [&:hover_[data-slot=scroll-area-scrollbar]]:opacity-100 [&_[data-slot=scroll-area-scrollbar]]:transition-opacity">
           <div className="flex w-full flex-col items-center gap-2">
@@ -196,7 +196,7 @@ export function ServerList({
                     setDragFromIdx(null);
                     setDragOverIdx(null);
                   }}
-                  className={`transition-opacity ${isDragging ? "opacity-40" : ""} ${isDragTarget ? "ring-2 ring-[#3f79d8] rounded-2xl" : ""}`}
+                  className={`transition-opacity ${isDragging ? "opacity-40" : ""} ${isDragTarget ? "ring-2 ring-primary rounded-2xl" : ""}`}
                 >
                   <ContextMenu
                     onOpenChange={(nextOpen) => {
@@ -233,8 +233,8 @@ export function ServerList({
                             onClick={() => onServerClick(server.id)}
                             className={`${squareButtonBaseClass} font-semibold text-white leading-none ${
                               isCurrentServer
-                                ? "bg-[#3f79d8] hover:bg-[#3f79d8]"
-                                : "bg-[#18243a] hover:bg-[#3f79d8]"
+                                ? "bg-primary hover:bg-primary"
+                                : "bg-surface-legal hover:bg-primary"
                             }`}
                           >
                             <span className="text-base leading-none">
@@ -247,7 +247,7 @@ export function ServerList({
                         {server.name}
                       </TooltipContent>
                     </Tooltip>
-                    <ContextMenuContent className="bg-[#18243a] border-[#304867] text-white">
+                    <ContextMenuContent className="bg-surface-legal border-border text-white">
                       <ActionMenuContent
                         mode="context"
                         scope="server"
@@ -267,7 +267,7 @@ export function ServerList({
               <Button
                 type="button"
                 onClick={onCreateServer}
-                className={`${squareButtonBaseClass} bg-[#18243a] hover:bg-[#2f9f73] text-[#2f9f73] hover:text-white`}
+                className={`${squareButtonBaseClass} bg-surface-legal hover:bg-accent-success text-accent-success hover:text-white`}
               >
                 <Plus className="size-5" />
               </Button>
@@ -282,7 +282,7 @@ export function ServerList({
               <Button
                 type="button"
                 onClick={onJoinServer}
-                className={`${squareButtonBaseClass} bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white`}
+                className={`${squareButtonBaseClass} bg-surface-legal hover:bg-primary text-muted-foreground hover:text-white`}
               >
                 <LogIn className="size-5" />
               </Button>
@@ -298,11 +298,11 @@ export function ServerList({
                 <Button
                   type="button"
                   onClick={onOpenNotifications}
-                  className={`${squareButtonBaseClass} relative overflow-visible bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white`}
+                  className={`${squareButtonBaseClass} relative overflow-visible bg-surface-legal hover:bg-primary text-muted-foreground hover:text-white`}
                 >
                   <Bell className="size-5" />
                   {notificationUnseenCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d95c5c] text-white text-[10px] leading-[18px] font-semibold">
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-badge-unread text-white text-[10px] leading-[18px] font-semibold">
                       {notificationUnseenCount > 99
                         ? "99+"
                         : notificationUnseenCount}
@@ -311,7 +311,7 @@ export function ServerList({
                   {notificationHasUnseenPulse && (
                     <span
                       aria-hidden="true"
-                      className="absolute inset-0 rounded-2xl border border-[#6aa1ff] animate-pulse"
+                      className="absolute inset-0 rounded-2xl border border-border-invite-pulse animate-pulse"
                     />
                   )}
                 </Button>
@@ -328,11 +328,11 @@ export function ServerList({
                 <Button
                   type="button"
                   onClick={onOpenFriends}
-                  className={`${squareButtonBaseClass} relative overflow-visible bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white`}
+                  className={`${squareButtonBaseClass} relative overflow-visible bg-surface-legal hover:bg-primary text-muted-foreground hover:text-white`}
                 >
                   <Users className="size-5" />
                   {friendRequestIncomingCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d95c5c] text-white text-[10px] leading-[18px] font-semibold">
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-badge-unread text-white text-[10px] leading-[18px] font-semibold">
                       {friendRequestIncomingCount > 99
                         ? "99+"
                         : friendRequestIncomingCount}
@@ -341,7 +341,7 @@ export function ServerList({
                   {friendRequestHasPendingPulse && (
                     <span
                       aria-hidden="true"
-                      className="absolute inset-0 rounded-2xl border border-[#6aa1ff] animate-pulse"
+                      className="absolute inset-0 rounded-2xl border border-border-invite-pulse animate-pulse"
                     />
                   )}
                 </Button>
@@ -360,13 +360,13 @@ export function ServerList({
                   onClick={onOpenDirectMessages}
                   className={`${squareButtonBaseClass} relative overflow-visible ${
                     directMessagesActive
-                      ? "bg-[#3f79d8] hover:bg-[#3f79d8] text-white"
-                      : "bg-[#18243a] hover:bg-[#3f79d8] text-[#a9b8cf] hover:text-white"
+                      ? "bg-primary hover:bg-primary text-white"
+                      : "bg-surface-legal hover:bg-primary text-muted-foreground hover:text-white"
                   }`}
                 >
                   <MessageCircle className="size-5" />
                   {directMessageUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d95c5c] text-white text-[10px] leading-[18px] font-semibold">
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-badge-unread text-white text-[10px] leading-[18px] font-semibold">
                       {directMessageUnreadCount > 99
                         ? "99+"
                         : directMessageUnreadCount}
@@ -386,7 +386,7 @@ export function ServerList({
                 <Button
                   type="button"
                   onClick={onOpenServerModmail}
-                  className={`${squareButtonBaseClass} bg-[#18243a] hover:bg-[#9a5b20] text-[#f7c793] hover:text-white`}
+                  className={`${squareButtonBaseClass} bg-surface-legal hover:bg-hub-hover-warm text-hub-warm hover:text-white`}
                 >
                   <ShieldAlert className="size-5" />
                 </Button>
@@ -402,16 +402,16 @@ export function ServerList({
               <Button
                 type="button"
                 onClick={onOpenAccountSettings}
-                className={`${squareButtonBaseClass} bg-[#18243a] hover:bg-[#304867]`}
+                className={`${squareButtonBaseClass} bg-surface-legal hover:bg-border`}
               >
                 <Avatar
-                  className="w-full h-full rounded-2xl border border-[#304867] bg-[#18243a]"
+                  className="w-full h-full rounded-2xl border border-border bg-surface-legal"
                   size="lg"
                 >
                   {userAvatarUrl && (
                     <AvatarImage src={userAvatarUrl} alt="Account" />
                   )}
-                  <AvatarFallback className="rounded-2xl bg-[#18243a] text-white font-semibold">
+                  <AvatarFallback className="rounded-2xl bg-surface-legal text-white font-semibold">
                     {avatarInitial}
                   </AvatarFallback>
                 </Avatar>

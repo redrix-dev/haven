@@ -391,7 +391,7 @@ const MessageRow = React.memo(function MessageRow({
         className="flex gap-3"
         style={isReply ? { marginLeft: `${replyIndent}px` } : undefined}
       >
-        <div className="min-w-0 flex-1 rounded-xl border border-dashed border-[#304867] bg-[#142033] px-4 py-3 text-sm italic text-[#8ea4c7]">
+        <div className="min-w-0 flex-1 rounded-xl border border-dashed border-border bg-surface-panel px-4 py-3 text-sm italic text-muted-foreground">
           {BANNED_REPLY_PLACEHOLDER_CONTENT}
         </div>
       </div>
@@ -600,8 +600,8 @@ const MessageRow = React.memo(function MessageRow({
           className={`group rounded-md border px-3 py-2 transition-colors backdrop-blur-sm ${
             isHiddenMessage
               ? "bg-red-500/10 border-red-400/25 hover:bg-red-500/15 hover:border-red-300/35"
-              : "bg-[#16263d] border-[#2b4263] hover:bg-[#1b2f4a] hover:border-[#3d5f8d]"
-          } ${isReply ? "border-l-2 border-l-[#4c74a6]" : ""}`}
+              : "bg-surface-message-row border-border-message-row hover:bg-surface-message-row-hover hover:border-border-message-row-hover"
+          } ${isReply ? "border-l-2 border-l-border-reply-thread" : ""}`}
           style={isReply ? { marginLeft: `${replyIndent}px` } : undefined}
         >
           <div className="flex items-start justify-between gap-2 mb-1">
@@ -634,7 +634,7 @@ const MessageRow = React.memo(function MessageRow({
                 authorIdentity
               )}
               {isStaffUserMessage && (
-                <span className="px-1.5 py-0.5 rounded bg-[#59b7ff]/20 text-[#9cd6ff] text-[10px] font-semibold uppercase tracking-wide">
+                <span className="px-1.5 py-0.5 rounded bg-link/20 text-link-bright text-[10px] font-semibold uppercase tracking-wide">
                   Staff
                 </span>
               )}
@@ -643,7 +643,7 @@ const MessageRow = React.memo(function MessageRow({
                   Hidden - banned user
                 </span>
               )}
-              <span className="text-xs text-[#8897b1] shrink-0">
+              <span className="text-xs text-placeholder-dim shrink-0">
                 {new Date(message.created_at).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -665,14 +665,14 @@ const MessageRow = React.memo(function MessageRow({
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    className="text-[#95a5bf] hover:text-white hover:bg-[#22334f]"
+                    className="text-meta hover:text-white hover:bg-surface-hover"
                   >
                     <MoreHorizontal className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="bg-[#18243a] border-[#304867] text-white"
+                  className="bg-surface-legal border-border text-white"
                 >
                   <ActionMenuContent
                     mode="dropdown"
@@ -689,7 +689,7 @@ const MessageRow = React.memo(function MessageRow({
               <Input
                 value={editingContent}
                 onChange={(event) => onEditingContentChange(event.target.value)}
-                className="bg-[#142033] border-[#304867] text-white"
+                className="bg-surface-panel border-border text-white"
                 maxLength={4000}
               />
               <div className="flex items-center gap-2">
@@ -700,7 +700,7 @@ const MessageRow = React.memo(function MessageRow({
                     onSaveEditedMessage(message.id, editingContent);
                   }}
                   disabled={isActionBusy}
-                  className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                  className="bg-primary hover:bg-primary-hover text-white"
                 >
                   Save
                 </Button>
@@ -717,17 +717,17 @@ const MessageRow = React.memo(function MessageRow({
           ) : (
             <div className="space-y-2">
               {!hideMediaPlaceholder && (
-                <div className="text-[#e6edf7] text-[15px] leading-[1.375] break-words">
+                <div className="text-foreground text-[15px] leading-[1.375] break-words">
                   <MarkdownText content={message.content} />
                 </div>
               )}
 
               {messageLinkPreviewRow?.status === "pending" && (
-                <div className="rounded-md border border-[#304867] bg-[#142033] px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">
+                <div className="rounded-md border border-border bg-surface-panel px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
                     Link preview
                   </p>
-                  <p className="text-xs text-[#a9b8cf]">Fetching preview...</p>
+                  <p className="text-xs text-muted-foreground">Fetching preview...</p>
                 </div>
               )}
               {messageLinkPreviewRow?.status === "ready" &&
@@ -743,11 +743,11 @@ const MessageRow = React.memo(function MessageRow({
                         return (
                           <div className="space-y-2">
                             <div
-                              className="overflow-hidden rounded-md border border-[#304867] bg-[#0d1626]"
+                              className="overflow-hidden rounded-md border border-border bg-surface-desktop-shell"
                               style={{ maxWidth: "480px" }}
                             >
                               <div
-                                className="bg-[#0d1626]"
+                                className="bg-surface-desktop-shell"
                                 style={{
                                   aspectRatio: String(
                                     messageLinkPreviewRow.snapshot.embed
@@ -781,12 +781,12 @@ const MessageRow = React.memo(function MessageRow({
                                   }
                                   target="_blank"
                                   rel="noreferrer noopener"
-                                  className="block border-t border-[#304867] bg-[#142033] px-3 py-2 hover:bg-[#182740] transition-colors"
+                                  className="block border-t border-border bg-surface-panel px-3 py-2 hover:bg-surface-embed-hover transition-colors"
                                 >
                                   <div className="flex items-center gap-2 min-w-0">
                                     {messageLinkPreviewRow.snapshot
                                       .siteName && (
-                                      <span className="shrink-0 rounded-sm bg-[#223754] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#a8c4ea]">
+                                      <span className="shrink-0 rounded-sm bg-surface-embed-chip px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-embed-chip">
                                         {
                                           messageLinkPreviewRow.snapshot
                                             .siteName
@@ -798,13 +798,13 @@ const MessageRow = React.memo(function MessageRow({
                                         {messageLinkPreviewRow.snapshot.title}
                                       </p>
                                     )}
-                                    <span className="shrink-0 text-[11px] text-[#8ea4c7]">
+                                    <span className="shrink-0 text-[11px] text-muted-foreground">
                                       Open
                                     </span>
                                   </div>
                                   {messageLinkPreviewRow.snapshot
                                     .description && (
-                                    <p className="mt-1 text-xs text-[#bfd0ea] leading-snug max-h-8 overflow-hidden">
+                                    <p className="mt-1 text-xs text-embed-preview leading-snug max-h-8 overflow-hidden">
                                       {
                                         messageLinkPreviewRow.snapshot
                                           .description
@@ -825,7 +825,7 @@ const MessageRow = React.memo(function MessageRow({
                         }
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="block rounded-md border border-[#304867] bg-[#142033] hover:bg-[#1a2943] transition-colors overflow-hidden"
+                        className="block rounded-md border border-border bg-surface-panel hover:bg-surface-attachment-hover transition-colors overflow-hidden"
                       >
                         {messageLinkPreviewRow.snapshot.thumbnail
                           ?.signedUrl && (
@@ -837,12 +837,12 @@ const MessageRow = React.memo(function MessageRow({
                               messageLinkPreviewRow.snapshot.title ??
                               "Link preview"
                             }
-                            className="w-full h-48 object-contain bg-[#0d1626]"
+                            className="w-full h-48 object-contain bg-surface-desktop-shell"
                           />
                         )}
                         <div className="px-3 py-2 space-y-1">
                           {messageLinkPreviewRow.snapshot.siteName && (
-                            <p className="text-[11px] uppercase tracking-wide text-[#8ea4c7]">
+                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                               {messageLinkPreviewRow.snapshot.siteName}
                             </p>
                           )}
@@ -852,7 +852,7 @@ const MessageRow = React.memo(function MessageRow({
                             </p>
                           )}
                           {messageLinkPreviewRow.snapshot.description && (
-                            <p className="text-xs text-[#bfd0ea] leading-snug">
+                            <p className="text-xs text-embed-preview leading-snug">
                               {messageLinkPreviewRow.snapshot.description}
                             </p>
                           )}
@@ -882,9 +882,9 @@ const MessageRow = React.memo(function MessageRow({
                           <img
                             src={attachment.signedUrl}
                             alt={attachmentLabel}
-                            className="max-h-64 rounded-md border border-[#304867] object-contain bg-[#0d1626]"
+                            className="max-h-64 rounded-md border border-border object-contain bg-surface-desktop-shell"
                           />
-                          <p className="text-[11px] text-[#8ea4c7]">
+                          <p className="text-[11px] text-muted-foreground">
                             Expires {expiresAtLabel}
                           </p>
                         </div>
@@ -900,9 +900,9 @@ const MessageRow = React.memo(function MessageRow({
                           <video
                             controls
                             src={attachment.signedUrl}
-                            className="max-h-72 rounded-md border border-[#304867] bg-[#0d1626]"
+                            className="max-h-72 rounded-md border border-border bg-surface-desktop-shell"
                           />
-                          <p className="text-[11px] text-[#8ea4c7]">
+                          <p className="text-[11px] text-muted-foreground">
                             Expires {expiresAtLabel}
                           </p>
                         </div>
@@ -916,16 +916,16 @@ const MessageRow = React.memo(function MessageRow({
                             href={attachment.signedUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-sm text-[#8fc1ff] hover:text-[#b4d6ff] underline"
+                            className="text-sm text-info hover:text-link-soft underline"
                           >
                             {attachmentLabel}
                           </a>
                         ) : (
-                          <span className="text-sm text-[#a9b8cf]">
+                          <span className="text-sm text-muted-foreground">
                             {attachmentLabel}
                           </span>
                         )}
-                        <p className="text-[11px] text-[#8ea4c7]">
+                        <p className="text-[11px] text-muted-foreground">
                           Expires {expiresAtLabel}
                         </p>
                       </div>
@@ -953,8 +953,8 @@ const MessageRow = React.memo(function MessageRow({
                         }}
                         className={`h-6 rounded-full border px-2 text-xs ${
                           summary.reactedByCurrentUser
-                            ? "border-[#3f79d8] bg-[#3f79d8]/20 text-[#dbe9ff]"
-                            : "border-[#304867] bg-[#142033] text-[#b8c7dd] hover:text-white"
+                            ? "border-primary bg-primary/20 text-chip-selected"
+                            : "border-border bg-surface-panel text-chip-muted hover:text-white"
                         }`}
                       >
                         <span>{emoji}</span>
@@ -968,7 +968,7 @@ const MessageRow = React.memo(function MessageRow({
           )}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent className="bg-[#18243a] border-[#304867] text-white">
+      <ContextMenuContent className="bg-surface-legal border-border text-white">
         <ActionMenuContent
           mode="context"
           scope="message"
@@ -1087,7 +1087,7 @@ const MessageTreeItem = React.memo(function MessageTreeItem({
         <div className="ml-1">
           <CollapsibleTrigger
             type="button"
-            className="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-[#8ea4c7] gpu-layer transition-colors hover:bg-[#22334f] hover:text-white focus-visible:ring-2 focus-visible:ring-[#5b92e8] focus-visible:outline-none"
+            className="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-muted-foreground gpu-layer transition-colors hover:bg-surface-hover hover:text-white focus-visible:ring-2 focus-visible:ring-border-selected focus-visible:outline-none"
           >
             {repliesExpanded
               ? `Hide replies (${renderableReplies.length})`
@@ -1875,7 +1875,7 @@ export function MessageList({
       isLoadingOlderMessages || hasOlderMessages ? (
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-center">
-            <div className="rounded-full border border-[#304867] bg-[#142033] px-3 py-1 text-[11px] text-[#9fb4d5]">
+            <div className="rounded-full border border-border bg-surface-panel px-3 py-1 text-[11px] text-composer-hint">
               {isLoadingOlderMessages
                 ? "Loading older messages..."
                 : "Scroll up to load older messages"}
@@ -1953,29 +1953,29 @@ export function MessageList({
           setProfileReportSubmitting(false);
         }}
       >
-        <DialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <DialogContent className="bg-surface-legal border-border text-white">
           <DialogHeader>
             <DialogTitle>Report Profile</DialogTitle>
-            <DialogDescription className="text-[#a9b8cf]">
+            <DialogDescription className="text-muted-foreground">
               Send a profile report to moderators for review.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <p className="text-sm text-[#c7d5ea]">
+            <p className="text-sm text-settings-body">
               Target:{" "}
               <span className="font-semibold text-white">
                 {profileReportDraft?.username ?? "Unknown user"}
               </span>
             </p>
-            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+            <label className="text-xs uppercase tracking-wide text-muted-foreground">
               Reason (required)
             </label>
             <Textarea
               value={profileReportReason}
               onChange={(event) => setProfileReportReason(event.target.value)}
               maxLength={1000}
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
               placeholder="Describe why this profile should be reviewed."
             />
           </div>
@@ -2027,7 +2027,7 @@ export function MessageList({
                   });
               }}
               disabled={profileReportSubmitting}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {profileReportSubmitting ? "Submitting..." : "Submit Report"}
             </Button>
@@ -2039,10 +2039,10 @@ export function MessageList({
         open={Boolean(reportDialogMessageId)}
         onOpenChange={(open) => !open && setReportDialogMessageId(null)}
       >
-        <DialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <DialogContent className="bg-surface-legal border-border text-white">
           <DialogHeader>
             <DialogTitle>Report Message</DialogTitle>
-            <DialogDescription className="text-[#a9b8cf]">
+            <DialogDescription className="text-muted-foreground">
               Route this report to server staff, the Haven Moderation Team, or
               both while preserving a snapshot of the current context.
             </DialogDescription>
@@ -2051,7 +2051,7 @@ export function MessageList({
 
           <div className="space-y-3">
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              <label className="text-xs uppercase tracking-wide text-muted-foreground">
                 Destination
               </label>
               <select
@@ -2059,7 +2059,7 @@ export function MessageList({
                 onChange={(event) =>
                   setReportTarget(event.target.value as MessageReportTarget)
                 }
-                className="w-full rounded-md border border-[#304867] bg-[#142033] px-3 py-2 text-sm text-white"
+                className="w-full rounded-md border border-border bg-surface-panel px-3 py-2 text-sm text-white"
               >
                 <option value="haven_staff">Haven Moderation Team</option>
                 <option value="server_admins">Server Staff</option>
@@ -2069,7 +2069,7 @@ export function MessageList({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              <label className="text-xs uppercase tracking-wide text-muted-foreground">
                 Type
               </label>
               <select
@@ -2077,7 +2077,7 @@ export function MessageList({
                 onChange={(event) =>
                   setReportKind(event.target.value as MessageReportKind)
                 }
-                className="w-full rounded-md border border-[#304867] bg-[#142033] px-3 py-2 text-sm text-white"
+                className="w-full rounded-md border border-border bg-surface-panel px-3 py-2 text-sm text-white"
               >
                 <option value="content_abuse">Report Content Abuse</option>
                 <option value="bug">Report Bug</option>
@@ -2085,14 +2085,14 @@ export function MessageList({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+              <label className="text-xs uppercase tracking-wide text-muted-foreground">
                 Comment
               </label>
               <Textarea
                 value={reportComment}
                 onChange={(event) => setReportComment(event.target.value)}
                 maxLength={1000}
-                className="bg-[#142033] border-[#304867] text-white"
+                className="bg-surface-panel border-border text-white"
                 placeholder="Add context for moderators (optional)."
               />
             </div>
@@ -2135,7 +2135,7 @@ export function MessageList({
                     setReportSubmitting(false);
                   });
               }}
-              className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+              className="bg-primary hover:bg-primary-hover text-white"
             >
               {reportSubmitting ? "Submitting..." : "Submit report"}
             </Button>
@@ -2153,29 +2153,29 @@ export function MessageList({
           setBanConfirmOpen(false);
         }}
       >
-        <DialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <DialogContent className="bg-surface-legal border-border text-white">
           <DialogHeader>
             <DialogTitle>Ban User</DialogTitle>
-            <DialogDescription className="text-[#a9b8cf]">
+            <DialogDescription className="text-muted-foreground">
               Bans remove server access immediately and block rejoin until
               unbanned.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <p className="text-sm text-[#c7d5ea]">
+            <p className="text-sm text-settings-body">
               Target:{" "}
               <span className="font-semibold text-white">
                 {banDraft?.username ?? "Unknown user"}
               </span>
             </p>
-            <label className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+            <label className="text-xs uppercase tracking-wide text-muted-foreground">
               Reason (required)
             </label>
             <Textarea
               value={banReason}
               onChange={(event) => setBanReason(event.target.value)}
               maxLength={1000}
-              className="bg-[#142033] border-[#304867] text-white"
+              className="bg-surface-panel border-border text-white"
               placeholder="Describe why this user is being banned."
             />
           </div>
@@ -2212,10 +2212,10 @@ export function MessageList({
       </Dialog>
 
       <AlertDialog open={banConfirmOpen} onOpenChange={setBanConfirmOpen}>
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Ban</AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               This action is immediate. Confirm banning this user from the
               selected server.
             </AlertDialogDescription>
@@ -2270,10 +2270,10 @@ export function MessageList({
           setKickSubmitting(false);
         }}
       >
-        <AlertDialogContent className="bg-[#18243a] border-[#304867] text-white">
+        <AlertDialogContent className="bg-surface-legal border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Removal</AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a9b8cf]">
+            <AlertDialogDescription className="text-muted-foreground">
               Remove this user from the server now. They can rejoin later if
               they still have a valid invite.
             </AlertDialogDescription>

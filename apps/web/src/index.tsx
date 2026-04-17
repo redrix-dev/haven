@@ -21,28 +21,29 @@ root.render(
         theme="dark"
         closeButton
         toastOptions={{
-          className: '!bg-[#162238] !border !border-[#304867] !text-white !shadow-2xl',
-          descriptionClassName: '!text-[#a9b8cf]',
+          className:
+            '!bg-surface-toast !border !border-border !text-white !shadow-2xl',
+          descriptionClassName: '!text-muted-foreground',
           classNames: {
             actionButton:
-              '!bg-[#3f79d8] !text-white !border !border-[#325fae] hover:!bg-[#325fae] focus:!ring-2 focus:!ring-[#6ea2ff] focus:!ring-offset-0',
+              '!bg-primary !text-white !border !border-primary-hover hover:!bg-primary-hover focus:!ring-2 focus:!ring-ring-focus focus:!ring-offset-0',
             cancelButton:
-              '!bg-[#1d2a42] !text-white !border !border-[#304867] hover:!bg-[#22324d]',
+              '!bg-muted !text-white !border !border-border hover:!bg-secondary',
           },
           actionButtonStyle: {
-            background: '#3f79d8',
+            background: 'var(--primary)',
             color: '#ffffff',
-            border: '1px solid #325fae',
+            border: '1px solid var(--primary-hover)',
           },
           cancelButtonStyle: {
-            background: '#1d2a42',
+            background: 'var(--muted)',
             color: '#ffffff',
-            border: '1px solid #304867',
+            border: '1px solid var(--border)',
           },
           style: {
-            background: '#162238',
-            color: '#e6edf7',
-            border: '1px solid #304867',
+            background: 'var(--surface-toast)',
+            color: 'var(--foreground)',
+            border: '1px solid var(--border)',
           },
         }}
       />

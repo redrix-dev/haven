@@ -75,21 +75,21 @@ export function PasswordRecoveryDialog({
       }}
     >
       <DialogContent
-        className="bg-[#1c2a43] border-[#142033] text-white sm:max-w-md"
+        className="bg-surface-modal border-border-deep text-white sm:max-w-md"
         showCloseButton={false}
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>Set a new password</DialogTitle>
-          <DialogDescription className="text-[#aebad0]">
+          <DialogDescription className="text-auth-label">
             Your reset link is verified. Set a new password to finish account recovery.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="recovery-new-password" className="text-xs font-semibold text-[#aebad0] uppercase">
+            <Label htmlFor="recovery-new-password" className="text-xs font-semibold text-auth-label uppercase">
               New Password
             </Label>
             <Input
@@ -97,12 +97,12 @@ export function PasswordRecoveryDialog({
               type="password"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
-              className="bg-[#263a58] border-[#304867] text-white"
+              className="bg-surface-input border-border text-white"
               autoFocus
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="recovery-confirm-password" className="text-xs font-semibold text-[#aebad0] uppercase">
+            <Label htmlFor="recovery-confirm-password" className="text-xs font-semibold text-auth-label uppercase">
               Confirm Password
             </Label>
             <Input
@@ -110,11 +110,11 @@ export function PasswordRecoveryDialog({
               type="password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              className="bg-[#263a58] border-[#304867] text-white"
+              className="bg-surface-input border-border text-white"
             />
           </div>
           {error && (
-            <p className="text-xs text-[#fca5a5] bg-[#4a1f2c] rounded px-3 py-2">
+            <p className="text-xs text-destructive-soft bg-destructive-surface rounded px-3 py-2">
               {error}
             </p>
           )}
@@ -135,7 +135,7 @@ export function PasswordRecoveryDialog({
             type="button"
             onClick={() => void handleSubmit()}
             disabled={saving}
-            className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+            className="bg-primary hover:bg-primary-hover text-white"
           >
             {saving ? 'Updating...' : 'Update Password'}
           </Button>

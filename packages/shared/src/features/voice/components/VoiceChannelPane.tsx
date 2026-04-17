@@ -158,13 +158,13 @@ export function VoiceChannelPane({
 
   return (
     <div className="scrollbar-inset flex flex-col gap-4 overflow-y-auto p-4">
-      <Card className="border-[#263a58] bg-[#1c2a43] text-white">
+      <Card className="border-border-panel bg-surface-modal text-white">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Headphones className="size-5" />
             <span>{channelName ?? "Voice Controls"}</span>
           </CardTitle>
-          <CardDescription className="text-[#a9b8cf]">
+          <CardDescription className="text-muted-foreground">
             Advanced voice routing, diagnostics, and local per-member volume
             controls.
           </CardDescription>
@@ -184,7 +184,7 @@ export function VoiceChannelPane({
           {notice && <p className="text-sm text-amber-300">{notice}</p>}
           {error && <p className="text-sm text-red-400">{error}</p>}
           {!channelName && (
-            <p className="text-sm text-[#a9b8cf]">
+            <p className="text-sm text-muted-foreground">
               Join a voice channel to view live peers, diagnostics, and member
               volume controls.
             </p>
@@ -196,7 +196,7 @@ export function VoiceChannelPane({
                 type="button"
                 onClick={onJoin}
                 disabled={!channelName || joining}
-                className="bg-[#3f79d8] text-white hover:bg-[#325fae]"
+                className="bg-primary text-white hover:bg-primary-hover"
               >
                 <PhoneCall className="size-4" />
                 {joining ? "Joining..." : "Join Voice"}
@@ -210,7 +210,7 @@ export function VoiceChannelPane({
                   className={`text-white ${
                     isMuted
                       ? "border-red-500/40 bg-red-500/15 hover:bg-red-500/20"
-                      : "border-[#304867] bg-[#142033] hover:bg-[#22334f]"
+                      : "border-border bg-surface-panel hover:bg-surface-hover"
                   }`}
                 >
                   {isMuted ? (
@@ -227,7 +227,7 @@ export function VoiceChannelPane({
                   className={`text-white ${
                     isDeafened
                       ? "border-red-500/40 bg-red-500/15 hover:bg-red-500/20"
-                      : "border-[#304867] bg-[#142033] hover:bg-[#22334f]"
+                      : "border-border bg-surface-panel hover:bg-surface-hover"
                   }`}
                 >
                   <VolumeX className="size-4" />
@@ -269,13 +269,13 @@ export function VoiceChannelPane({
         </CardContent>
       </Card>
 
-      <Card className="border-[#263a58] bg-[#1c2a43] text-white">
+      <Card className="border-border-panel bg-surface-modal text-white">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mic className="size-5" />
             <span>Voice Transmission</span>
           </CardTitle>
-          <CardDescription className="text-[#a9b8cf]">
+          <CardDescription className="text-muted-foreground">
             Adjust how your microphone transmits while unmuted.
           </CardDescription>
         </CardHeader>
@@ -300,7 +300,7 @@ export function VoiceChannelPane({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Transmission mode
             </p>
             <Select
@@ -312,10 +312,10 @@ export function VoiceChannelPane({
               }
               disabled={voiceSettingsSaving}
             >
-              <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+              <SelectTrigger className="w-full border-border bg-surface-panel text-white">
                 <SelectValue placeholder="Select mode" />
               </SelectTrigger>
-              <SelectContent className="border-[#304867] bg-[#142033] text-white">
+              <SelectContent className="border-border bg-surface-panel text-white">
                 <SelectItem value="voice_activity">Voice Activity</SelectItem>
                 <SelectItem value="push_to_talk">Push to Talk</SelectItem>
                 <SelectItem value="open_mic">Open Mic</SelectItem>
@@ -325,7 +325,7 @@ export function VoiceChannelPane({
 
           {voiceSettings.transmissionMode === "voice_activity" && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 text-xs text-[#a9b8cf]">
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span>Gate threshold</span>
                 <span>{voiceSettings.voiceActivationThreshold}%</span>
               </div>
@@ -365,27 +365,27 @@ export function VoiceChannelPane({
         </CardContent>
       </Card>
 
-      <Card className="border-[#263a58] bg-[#1c2a43] text-white">
+      <Card className="border-border-panel bg-surface-modal text-white">
         <CardHeader>
           <CardTitle>Devices</CardTitle>
-          <CardDescription className="text-[#a9b8cf]">
+          <CardDescription className="text-muted-foreground">
             Select microphone and speaker devices. Input switching applies live
             while connected.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Microphone
             </p>
             <Select
               value={selectedInputDeviceId}
               onValueChange={(value) => void onSelectInputDevice?.(value)}
             >
-              <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+              <SelectTrigger className="w-full border-border bg-surface-panel text-white">
                 <SelectValue placeholder="Select microphone" />
               </SelectTrigger>
-              <SelectContent className="border-[#304867] bg-[#142033] text-white">
+              <SelectContent className="border-border bg-surface-panel text-white">
                 {inputDevices.length === 0 ? (
                   <SelectItem value="default">Default microphone</SelectItem>
                 ) : (
@@ -398,12 +398,12 @@ export function VoiceChannelPane({
               </SelectContent>
             </Select>
             {switchingInput && (
-              <p className="text-xs text-[#a9b8cf]">Switching microphone...</p>
+              <p className="text-xs text-muted-foreground">Switching microphone...</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#a9b8cf]">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Speaker
             </p>
             <Select
@@ -411,10 +411,10 @@ export function VoiceChannelPane({
               onValueChange={(value) => onSelectOutputDevice?.(value)}
               disabled={!supportsOutputSelection}
             >
-              <SelectTrigger className="w-full border-[#304867] bg-[#142033] text-white">
+              <SelectTrigger className="w-full border-border bg-surface-panel text-white">
                 <SelectValue placeholder="Select speaker" />
               </SelectTrigger>
-              <SelectContent className="border-[#304867] bg-[#142033] text-white">
+              <SelectContent className="border-border bg-surface-panel text-white">
                 {outputDevices.length === 0 ? (
                   <SelectItem value="default">Default speaker</SelectItem>
                 ) : (
@@ -427,7 +427,7 @@ export function VoiceChannelPane({
               </SelectContent>
             </Select>
             {!supportsOutputSelection && (
-              <p className="text-xs text-[#a9b8cf]">
+              <p className="text-xs text-muted-foreground">
                 Output selection is not supported by this runtime. Your system
                 default speaker is used.
               </p>
@@ -437,18 +437,18 @@ export function VoiceChannelPane({
       </Card>
 
       {showDiagnostics && (
-        <Card className="border-[#263a58] bg-[#1c2a43] text-white">
+        <Card className="border-border-panel bg-surface-modal text-white">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span>Voice Diagnostics</span>
               <Badge variant="outline">Staff only</Badge>
             </CardTitle>
-            <CardDescription className="text-[#a9b8cf]">
+            <CardDescription className="text-muted-foreground">
               Live WebRTC state and selected ICE route details for debugging.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-[#a9b8cf]">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>Peers: {diagnosticsRows.length}</span>
               <span>
                 ICE source:{" "}
@@ -475,22 +475,22 @@ export function VoiceChannelPane({
             </div>
 
             {!joined ? (
-              <p className="text-sm text-[#a9b8cf]">
+              <p className="text-sm text-muted-foreground">
                 Join voice to view diagnostics.
               </p>
             ) : diagnosticsRows.length === 0 ? (
-              <p className="text-sm text-[#a9b8cf]">No peer connections yet.</p>
+              <p className="text-sm text-muted-foreground">No peer connections yet.</p>
             ) : (
               <div className="space-y-2">
                 {diagnosticsRows.map((diag) => (
                   <details
                     key={diag.userId}
-                    className="rounded-md border border-[#304867] bg-[#142033] px-3 py-2"
+                    className="rounded-md border border-border bg-surface-panel px-3 py-2"
                   >
                     <summary className="cursor-pointer text-sm font-medium text-white">
                       {diag.displayName} ({diag.connectionState})
                     </summary>
-                    <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-[#a9b8cf] md:grid-cols-2">
+                    <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-muted-foreground md:grid-cols-2">
                       <p>Connection: {diag.connectionState}</p>
                       <p>ICE connection: {diag.iceConnectionState}</p>
                       <p>Signaling: {diag.signalingState}</p>
@@ -522,18 +522,18 @@ export function VoiceChannelPane({
         </Card>
       )}
 
-      <Card className="border-[#263a58] bg-[#1c2a43] text-white">
+      <Card className="border-border-panel bg-surface-modal text-white">
         <CardHeader>
           <CardTitle>
             Participants ({participants.length + (joined ? 1 : 0)})
           </CardTitle>
-          <CardDescription className="text-[#a9b8cf]">
+          <CardDescription className="text-muted-foreground">
             Per-user volume is local to this client.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {joined && (
-            <div className="flex items-center justify-between gap-3 rounded-md border border-[#304867] bg-[#142033] px-3 py-2">
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-panel px-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
                 <Avatar
                   size="sm"
@@ -542,7 +542,7 @@ export function VoiceChannelPane({
                     voiceActivityGateOpen &&
                       !isMuted &&
                       !isDeafened &&
-                      "ring-[#64f0a8]",
+                      "ring-voice-speaking",
                   )}
                 >
                   <AvatarImage
@@ -568,7 +568,7 @@ export function VoiceChannelPane({
           )}
 
           {participants.length === 0 ? (
-            <p className="text-sm text-[#a9b8cf]">
+            <p className="text-sm text-muted-foreground">
               No other participants are connected.
             </p>
           ) : (
@@ -579,7 +579,7 @@ export function VoiceChannelPane({
                   variant="ghost"
                   size="sm"
                   onClick={resetAllMemberVolumes}
-                  className="h-8 text-xs text-[#c8d7ee] hover:text-white"
+                  className="h-8 text-xs text-row hover:text-white"
                   disabled={isDeafened}
                 >
                   <RefreshCcw className="mr-1.5 size-3.5" />
@@ -603,14 +603,14 @@ export function VoiceChannelPane({
                 return (
                   <div
                     key={participant.userId}
-                    className="flex items-center justify-between gap-3 rounded-md border border-[#304867] bg-[#142033] px-3 py-2"
+                    className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-panel px-3 py-2"
                   >
                     <div className="min-w-0 flex items-center gap-3">
                       <Avatar
                         size="sm"
                         className={cn(
                           "ring-2 ring-transparent transition-colors",
-                          participant.isSpeaking && "ring-[#64f0a8]",
+                          participant.isSpeaking && "ring-voice-speaking",
                         )}
                       >
                         <AvatarImage
@@ -640,7 +640,7 @@ export function VoiceChannelPane({
                     </div>
 
                     <div className="flex min-w-[220px] items-center gap-3">
-                      <Volume2 className="size-4 text-[#a9b8cf]" />
+                      <Volume2 className="size-4 text-muted-foreground" />
                       <Slider
                         min={REMOTE_VOLUME_OPTIONS[0]}
                         max={
@@ -659,7 +659,7 @@ export function VoiceChannelPane({
                         className="w-full"
                         aria-label={`Volume for ${participantDisplayName}`}
                       />
-                      <span className="w-10 shrink-0 text-right text-xs text-[#c8d7ee]">
+                      <span className="w-10 shrink-0 text-right text-xs text-row">
                         {getMemberVolume(participant.userId)}%
                       </span>
                       <Button

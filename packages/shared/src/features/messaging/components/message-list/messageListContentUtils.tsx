@@ -64,10 +64,10 @@ export const getAuthorColor = (
   const isOwnMessage =
     message.author_type === "user" && message.author_user_id === currentUserId;
 
-  if (message.author_type === "haven_dev") return "#d6a24a";
-  if (isOwnMessage) return "#3f79d8";
-  if (isStaffUserMessage) return "#59b7ff";
-  return "#44b894";
+  if (message.author_type === "haven_dev") return "var(--accent-amber)";
+  if (isOwnMessage) return "var(--primary)";
+  if (isStaffUserMessage) return "var(--link)";
+  return "var(--status-online)";
 };
 
 const URL_SEGMENT_PATTERN = /https?:\/\/[^\s<>"'`]+/gi;
@@ -112,7 +112,7 @@ export const renderLinkifiedMessageText = (
           href={url}
           target="_blank"
           rel="noreferrer noopener"
-          className="text-[#8fc1ff] hover:text-[#b4d6ff] underline break-all"
+          className="text-info hover:text-link-soft underline break-all"
         >
           {url}
         </a>,

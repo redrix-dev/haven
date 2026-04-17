@@ -140,7 +140,7 @@ export function DirectMessagesSidebar({
   return (
     <div
       ref={sidebarRef}
-      className={`relative shrink-0 border-r border-[#22334f] bg-[#162238] flex flex-col ${
+      className={`relative shrink-0 border-r border-surface-hover bg-surface-toast flex flex-col ${
         isResizing ? "select-none" : ""
       }`}
       style={{
@@ -149,10 +149,10 @@ export function DirectMessagesSidebar({
         maxWidth: `${DM_SIDEBAR_MAX_WIDTH}px`,
       }}
     >
-      <div className="h-16 px-4 border-b border-[#22334f] bg-[#142033] flex items-center">
+      <div className="h-16 px-4 border-b border-surface-hover bg-surface-panel flex items-center">
         <div className="flex w-full items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-wide text-[#8ea4c7]">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Direct Messages
             </p>
             <p
@@ -166,7 +166,7 @@ export function DirectMessagesSidebar({
             type="button"
             size="sm"
             variant="outline"
-            className="border-[#304867] text-white"
+            className="border-border text-white"
             onClick={onRefresh}
             disabled={loading || refreshing}
             aria-label="Refresh direct messages"
@@ -184,16 +184,16 @@ export function DirectMessagesSidebar({
             Array.from({ length: 4 }, (_, index) => (
               <div
                 key={index}
-                className="rounded-md border border-[#304867] bg-[#142033] px-3 py-3"
+                className="rounded-md border border-border bg-surface-panel px-3 py-3"
               >
                 <div className="flex items-start gap-3">
-                  <Skeleton className="size-10 rounded-xl bg-[#22334f]" />
+                  <Skeleton className="size-10 rounded-xl bg-surface-hover" />
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex items-center gap-2">
-                      <Skeleton className="h-4 w-28 bg-[#22334f]" />
-                      <Skeleton className="ml-auto h-4 w-8 rounded-full bg-[#22334f]" />
+                      <Skeleton className="h-4 w-28 bg-surface-hover" />
+                      <Skeleton className="ml-auto h-4 w-8 rounded-full bg-surface-hover" />
                     </div>
-                    <Skeleton className="h-3 w-full bg-[#1b2a42]" />
+                    <Skeleton className="h-3 w-full bg-surface-skeleton" />
                   </div>
                 </div>
               </div>
@@ -201,9 +201,9 @@ export function DirectMessagesSidebar({
           ) : error ? (
             <p className="text-sm text-red-300">{error}</p>
           ) : conversations.length === 0 ? (
-            <div className="rounded-md border border-dashed border-[#304867] bg-[#142033]/60 p-4">
-              <p className="text-sm text-[#a9b8cf]">No DM conversations yet.</p>
-              <p className="mt-1 text-xs text-[#90a5c4]">
+            <div className="rounded-md border border-dashed border-border bg-surface-panel/60 p-4">
+              <p className="text-sm text-muted-foreground">No DM conversations yet.</p>
+              <p className="mt-1 text-xs text-auxiliary">
                 Add a friend, then click Message from the Friends panel to start
                 one.
               </p>
@@ -237,14 +237,14 @@ export function DirectMessagesSidebar({
                   }
                   className={`w-full rounded-md border px-3 py-3 text-left transition-colors ${
                     isSelected
-                      ? "border-[#4a78bd] bg-[#13233c]"
-                      : "border-[#304867] bg-[#142033] hover:bg-[#192946]"
+                      ? "border-border-notification bg-surface-row-active"
+                      : "border-border bg-surface-panel hover:bg-surface-dm-row-hover"
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <Avatar className="size-10 rounded-xl border border-[#304867] bg-[#1b2a42]">
+                    <Avatar className="size-10 rounded-xl border border-border bg-surface-skeleton">
                       {avatarUrl && <AvatarImage src={avatarUrl} alt={title} />}
-                      <AvatarFallback className="rounded-xl bg-[#1b2a42] text-white text-xs">
+                      <AvatarFallback className="rounded-xl bg-surface-skeleton text-white text-xs">
                         {getInitial(title)}
                       </AvatarFallback>
                     </Avatar>
@@ -255,13 +255,13 @@ export function DirectMessagesSidebar({
                           {title}
                         </p>
                         {conversation.isMuted && (
-                          <VolumeX className="size-3.5 text-[#95a5bf] shrink-0" />
+                          <VolumeX className="size-3.5 text-meta shrink-0" />
                         )}
                         {(unreadCounts[conversation.conversationId] ??
                           conversation.unreadCount) > 0 && (
                           <Badge
                             variant="default"
-                            className="bg-[#3f79d8] text-white ml-auto"
+                            className="bg-primary text-white ml-auto"
                           >
                             {(unreadCounts[conversation.conversationId] ??
                               conversation.unreadCount) > 99
@@ -273,12 +273,12 @@ export function DirectMessagesSidebar({
                       </div>
 
                       <div className="mt-1 flex items-center gap-2">
-                        <MessageCircle className="size-3 text-[#8ea4c7] shrink-0" />
-                        <p className="text-xs text-[#a9b8cf] truncate">
+                        <MessageCircle className="size-3 text-muted-foreground shrink-0" />
+                        <p className="text-xs text-muted-foreground truncate">
                           {preview}
                         </p>
                         {conversation.lastMessageCreatedAt && (
-                          <span className="ml-auto shrink-0 text-[11px] text-[#8398ba]">
+                          <span className="ml-auto shrink-0 text-[11px] text-dm-meta">
                             {formatTimestamp(conversation.lastMessageCreatedAt)}
                           </span>
                         )}
@@ -298,8 +298,8 @@ export function DirectMessagesSidebar({
         aria-orientation="vertical"
         className={`absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize ${
           isResizing
-            ? "bg-[#3f79d8]/40"
-            : "bg-transparent hover:bg-[#3f79d8]/20"
+            ? "bg-primary/40"
+            : "bg-transparent hover:bg-primary/20"
         }`}
         onPointerDown={handleResizePointerDown}
         onPointerMove={handleResizePointerMove}

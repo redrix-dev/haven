@@ -54,7 +54,7 @@ export function MembersTab({
   return (
     <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3">
       <div className="shrink-0 space-y-1">
-        <p className="text-sm text-[#a9b8cf]">
+        <p className="text-sm text-muted-foreground">
           Assign roles to members. Role assignments are stored in the database
           and enforced by role-based permission checks.
         </p>
@@ -68,18 +68,18 @@ export function MembersTab({
 
       {roleManagementLoading ? (
         <div className="scrollbar-inset flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
-          <Skeleton className="h-10 w-full bg-[#22334f]" />
+          <Skeleton className="h-10 w-full bg-surface-hover" />
           {Array.from({ length: 4 }, (_, i) => (
             <div
               key={i}
-              className="rounded-md border border-[#304867] bg-[#142033] p-3"
+              className="rounded-md border border-border bg-surface-panel p-3"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="space-y-2">
-                  <Skeleton className="h-4 w-32 bg-[#22334f]" />
-                  <Skeleton className="h-3 w-24 bg-[#1b2a42]" />
+                  <Skeleton className="h-4 w-32 bg-surface-hover" />
+                  <Skeleton className="h-3 w-24 bg-surface-skeleton" />
                 </div>
-                <Skeleton className="h-8 w-24 bg-[#22334f]" />
+                <Skeleton className="h-8 w-24 bg-surface-hover" />
               </div>
             </div>
           ))}
@@ -92,12 +92,12 @@ export function MembersTab({
               value={memberSearch}
               onChange={(e) => setMemberSearch(e.target.value)}
               placeholder="Search community members..."
-              className="shrink-0 bg-[#142033] border-[#304867] text-white"
+              className="shrink-0 bg-surface-panel border-border text-white"
             />
-            <div className="min-h-0 flex-1 rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
+            <div className="min-h-0 flex-1 rounded-md border border-border bg-surface-panel overflow-hidden">
               <div className="scrollbar-inset h-full overflow-y-auto p-2 space-y-1">
                 {filteredMembers.length === 0 ? (
-                  <p className="text-sm text-[#a9b8cf] px-2 py-3">
+                  <p className="text-sm text-muted-foreground px-2 py-3">
                     No matching members.
                   </p>
                 ) : (
@@ -110,8 +110,8 @@ export function MembersTab({
                         onClick={() => onSelectedMemberId(member.memberId)}
                         className={`w-full text-left rounded-md px-2 py-2 border transition-colors ${
                           isSelected
-                            ? "border-[#3f79d8] bg-[#1a2a43]"
-                            : "border-transparent hover:border-[#304867] hover:bg-[#17263d]"
+                            ? "border-primary bg-surface-row-selected"
+                            : "border-transparent hover:border-border hover:bg-surface-role-hover"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -119,7 +119,7 @@ export function MembersTab({
                             <p className="text-sm font-medium text-white truncate">
                               {member.displayName}
                             </p>
-                            <p className="text-[11px] text-[#8ea4c7] truncate">
+                            <p className="text-[11px] text-muted-foreground truncate">
                               {member.userId}
                             </p>
                           </div>
@@ -136,9 +136,9 @@ export function MembersTab({
           </div>
 
           {/* Right: member editor with pinned footer */}
-          <div className="min-h-0 flex flex-col rounded-md border border-[#304867] bg-[#142033] overflow-hidden">
+          <div className="min-h-0 flex flex-col rounded-md border border-border bg-surface-panel overflow-hidden">
             {!selectedMember ? (
-              <p className="p-4 text-sm text-[#a9b8cf]">
+              <p className="p-4 text-sm text-muted-foreground">
                 Select a member to assign roles.
               </p>
             ) : (
@@ -149,27 +149,27 @@ export function MembersTab({
                     <p className="text-lg font-semibold text-white">
                       {selectedMember.displayName}
                     </p>
-                    <p className="text-xs text-[#8ea4c7] mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {selectedMember.userId}
                     </p>
                   </div>
 
                   {selectedMember.isOwner ? (
-                    <p className="text-xs text-[#d6a24a]">
+                    <p className="text-xs text-accent-amber">
                       Owner membership is fixed and cannot be changed here.
                     </p>
                   ) : !canManageRoles ? (
-                    <p className="text-xs text-[#d6a24a]">
+                    <p className="text-xs text-accent-amber">
                       You need Manage Roles to change member role assignments.
                     </p>
                   ) : canManageMembers ? null : (
-                    <p className="text-xs text-[#8ea4c7]">
+                    <p className="text-xs text-muted-foreground">
                       Manage Members is available, but role assignment is
                       controlled by Manage Roles.
                     </p>
                   )}
 
-                  <div className="divide-y divide-[#233753] rounded-md border border-[#304867] overflow-hidden">
+                  <div className="divide-y divide-border-dialog rounded-md border border-border overflow-hidden">
                     {roles.map((role) => {
                       const checked =
                         memberDraftRoleIds.includes(role.id) ||
@@ -182,7 +182,7 @@ export function MembersTab({
                       return (
                         <label
                           key={role.id}
-                          className="flex items-center justify-between gap-3 p-3 text-sm text-[#e6edf7]"
+                          className="flex items-center justify-between gap-3 p-3 text-sm text-foreground"
                         >
                           <span className="flex items-center gap-2 min-w-0">
                             <span
@@ -214,7 +214,7 @@ export function MembersTab({
                 </div>
 
                 {/* Pinned footer */}
-                <div className="shrink-0 flex justify-end border-t border-[#233753] px-4 py-3">
+                <div className="shrink-0 flex justify-end border-t border-border-dialog px-4 py-3">
                   <Button
                     type="button"
                     onClick={() => void onSaveMemberRoles()}
@@ -223,7 +223,7 @@ export function MembersTab({
                       selectedMember.isOwner ||
                       memberActionSaving
                     }
-                    className="bg-[#3f79d8] hover:bg-[#325fae] text-white"
+                    className="bg-primary hover:bg-primary-hover text-white"
                   >
                     {memberActionSaving ? "Saving..." : "Save Member Roles"}
                   </Button>
