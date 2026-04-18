@@ -11,6 +11,9 @@
     "ios": "npm run preflight && expo run:ios",
     "ios:device": "npm run preflight && expo run:ios --device",
     "prebuild": "npm run preflight && expo prebuild",
+    "eas:build": "npm run preflight && eas build",
+    "eas:submit": "npm run preflight && eas submit",
+    "eas:credentials": "npm run preflight && eas credentials",
     "typecheck": "tsc --noEmit",
     "doctor": "node ../../tooling/scripts/mobile/doctor.mjs"
   },
@@ -40,6 +43,7 @@
     "@babel/core": "^7.26.0",
     "@types/react": "~18.3.12",
     "babel-plugin-module-resolver": "^5.0.2",
+    "eas-cli": "^18.7.0",
     "typescript": "~5.6.0"
   }
 }

@@ -46,6 +46,9 @@
     "mobile:ios:device": "node tooling/scripts/mobile/run-in-mobile.mjs npm run ios:device",
     "mobile:android": "node tooling/scripts/mobile/run-in-mobile.mjs npm run android",
     "mobile:prebuild": "node tooling/scripts/mobile/run-in-mobile.mjs npm run prebuild",
+    "mobile:eas:build": "node tooling/scripts/mobile/run-in-mobile.mjs npm run eas:build",
+    "mobile:eas:submit": "node tooling/scripts/mobile/run-in-mobile.mjs npm run eas:submit",
+    "mobile:eas:credentials": "node tooling/scripts/mobile/run-in-mobile.mjs npm run eas:credentials",
     "setup:mobile": "node tooling/scripts/mobile/run-in-mobile.mjs npm ci",
     "reset:mobile": "node tooling/scripts/mobile/reset.mjs"
   },
