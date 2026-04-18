@@ -6,9 +6,16 @@
     "orientation": "portrait",
     "scheme": "haven",
     "userInterfaceStyle": "automatic",
-    "platforms": ["ios", "android"],
-    "assetBundlePatterns": ["**/*"],
-    "plugins": ["expo-dev-client"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-dev-client"
+    ],
     "web": {
       "bundler": "metro"
     },
@@ -17,6 +24,13 @@
     },
     "android": {
       "package": "com.redrix.haven.mobile"
+    },
+    "extra": {
+      "supabaseUrl": "",
+      "supabaseAnonKey": "",
+      "eas": {
+        "projectId": "ceae6631-4ddf-4d13-8bf2-952563823420"
+      }
     }
   }
 }

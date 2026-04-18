@@ -15,6 +15,14 @@
     },
     "preview": {
       "distribution": "internal"
+    },
+    "production": {
+      "ios": {
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "aab"
+      }
     }
   },
   "submit": {
