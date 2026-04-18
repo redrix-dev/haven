@@ -205,8 +205,26 @@ select test_support.assert_eq_text(
   'profile identity trigger should sync avatar updates'
 );
 
+select test_support.expect_exception(
+  format(
+    $sql$
+      insert into public.tos_acceptances (user_id, tos_version, ip_address)
+      values (%L::uuid, '2026-03-24', null)
+    $sql$,
+    test_support.fixture_user_id('member_a')
+  ),
+  'permission denied'
+);
+
+reset role;
+set local role postgres;
+
 insert into public.tos_acceptances (user_id, tos_version, ip_address)
-values (auth.uid(), '2026-03-24', null);
+values (test_support.fixture_user_id('member_a'), '2026-03-24', null);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 
 select test_support.assert_eq_int(
   (
