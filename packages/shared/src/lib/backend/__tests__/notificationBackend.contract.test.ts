@@ -171,6 +171,51 @@ describe.sequential('NotificationBackend (contract)', () => {
     expect(deletedAgain).toBe(false);
   });
 
+  it('manages expo push subscriptions with owner isolation', async () => {
+    const tokenA = `ExponentPushToken[contract-${crypto.randomUUID()}]`;
+    const installationId = `vitest-expo-install-${crypto.randomUUID()}`;
+
+    const created = await centralNotificationBackend.upsertExpoPushSubscription({
+      expoPushToken: tokenA,
+      platform: 'android',
+      installationId,
+      metadata: { suite: 'notificationBackend.contract', device: 'expo-a1' },
+    });
+
+    expect(created.userId).toBe(users.member_a.id);
+    expect(created.expoPushToken).toBe(tokenA);
+    expect(created.installationId).toBe(installationId);
+    expect(created.platform).toBe('android');
+
+    const listedA = await centralNotificationBackend.listExpoPushSubscriptions();
+    expect(listedA.some((row) => row.expoPushToken === tokenA)).toBe(true);
+
+    const tokenB = `ExponentPushToken[contract-${crypto.randomUUID()}]`;
+    const rotated = await centralNotificationBackend.upsertExpoPushSubscription({
+      expoPushToken: tokenB,
+      platform: 'android',
+      installationId,
+      metadata: { suite: 'notificationBackend.contract', device: 'expo-a1', rev: 2 },
+    });
+
+    expect(rotated.expoPushToken).toBe(tokenB);
+    const listedAfterRotate = await centralNotificationBackend.listExpoPushSubscriptions();
+    expect(listedAfterRotate.filter((row) => row.installationId === installationId)).toHaveLength(1);
+
+    await signInAsTestUser('member_b');
+    const listedB = await centralNotificationBackend.listExpoPushSubscriptions();
+    expect(listedB.some((row) => row.expoPushToken === tokenB)).toBe(false);
+
+    const deletedByB = await centralNotificationBackend.deleteExpoPushSubscription(tokenB);
+    expect(deletedByB).toBe(false);
+
+    await signInAsTestUser('member_a');
+    const deletedByA = await centralNotificationBackend.deleteExpoPushSubscription(tokenB);
+    expect(deletedByA).toBe(true);
+    const deletedAgain = await centralNotificationBackend.deleteExpoPushSubscription(tokenB);
+    expect(deletedAgain).toBe(false);
+  });
+
   it('lists delivery traces for the current user', async () => {
     const recipientId = crypto.randomUUID();
     const eventId = crypto.randomUUID();

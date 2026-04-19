@@ -6,7 +6,12 @@ export type NotificationRouteMode =
 
 export type NotificationRouteDecision = 'send' | 'skip' | 'defer';
 
-export type NotificationDeliveryTransport = 'in_app' | 'web_push' | 'simulated_push' | 'route_policy';
+export type NotificationDeliveryTransport =
+  | 'in_app'
+  | 'web_push'
+  | 'expo_push'
+  | 'simulated_push'
+  | 'route_policy';
 
 export type NotificationDecisionStage = 'enqueue' | 'claim' | 'send_time' | 'client_route';
 

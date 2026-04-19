@@ -11,6 +11,8 @@ import type {
   WebPushDispatchWakeupDiagnostics,
   WebPushSubscriptionRecord,
   WebPushSubscriptionUpsertInput,
+  ExpoPushSubscriptionRecord,
+  ExpoPushSubscriptionUpsertInput,
 } from './types';
 
 export interface NotificationBackend {
@@ -27,6 +29,9 @@ export interface NotificationBackend {
   listWebPushSubscriptions(): Promise<WebPushSubscriptionRecord[]>;
   upsertWebPushSubscription(input: WebPushSubscriptionUpsertInput): Promise<WebPushSubscriptionRecord>;
   deleteWebPushSubscription(endpoint: string): Promise<boolean>;
+  listExpoPushSubscriptions(): Promise<ExpoPushSubscriptionRecord[]>;
+  upsertExpoPushSubscription(input: ExpoPushSubscriptionUpsertInput): Promise<ExpoPushSubscriptionRecord>;
+  deleteExpoPushSubscription(expoPushToken: string): Promise<boolean>;
   listNotificationDeliveryTraces(input?: {
     limit?: number;
     recipientId?: string | null;
@@ -98,6 +103,18 @@ type WebPushSubscriptionRow = {
   user_agent: string | null;
   client_platform: string | null;
   app_display_mode: string | null;
+  metadata: unknown;
+  created_at: string;
+  updated_at: string;
+  last_seen_at: string;
+};
+
+type ExpoPushSubscriptionRow = {
+  id: string;
+  user_id: string;
+  expo_push_token: string;
+  platform: string;
+  installation_id: string | null;
   metadata: unknown;
   created_at: string;
   updated_at: string;
@@ -208,6 +225,18 @@ const mapWebPushSubscriptionRecord = (row: WebPushSubscriptionRow): WebPushSubsc
   userAgent: row.user_agent,
   clientPlatform: row.client_platform,
   appDisplayMode: row.app_display_mode,
+  metadata: asRecord(row.metadata),
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  lastSeenAt: row.last_seen_at,
+});
+
+const mapExpoPushSubscriptionRecord = (row: ExpoPushSubscriptionRow): ExpoPushSubscriptionRecord => ({
+  id: row.id,
+  userId: row.user_id,
+  expoPushToken: row.expo_push_token,
+  platform: row.platform,
+  installationId: row.installation_id ?? null,
   metadata: asRecord(row.metadata),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -365,6 +394,50 @@ export const centralNotificationBackend: NotificationBackend = {
       'delete_my_web_push_subscription' as never,
       {
         p_endpoint: normalizedEndpoint,
+      } as never
+    );
+    if (error) throw error;
+    return Boolean(data);
+  },
+
+  async listExpoPushSubscriptions() {
+    const { data, error } = await supabase.rpc('list_my_expo_push_subscriptions' as never);
+    if (error) throw error;
+    return ((data ?? []) as ExpoPushSubscriptionRow[]).map(mapExpoPushSubscriptionRecord);
+  },
+
+  async upsertExpoPushSubscription(input) {
+    const token = input.expoPushToken?.trim();
+    if (!token) throw new Error('Expo push token is required.');
+
+    const platform = input.platform ?? 'unknown';
+
+    const { data, error } = await supabase.rpc(
+      'upsert_my_expo_push_subscription' as never,
+      {
+        p_expo_push_token: token,
+        p_platform: platform,
+        p_installation_id: input.installationId ?? null,
+        p_metadata: input.metadata ?? {},
+      } as never
+    );
+    if (error) throw error;
+
+    const row = (Array.isArray(data) ? data[0] : null) as ExpoPushSubscriptionRow | null;
+    if (!row) {
+      throw new Error('Expo push subscription upsert returned no row.');
+    }
+    return mapExpoPushSubscriptionRecord(row);
+  },
+
+  async deleteExpoPushSubscription(expoPushToken) {
+    const normalized = expoPushToken?.trim();
+    if (!normalized) return false;
+
+    const { data, error } = await supabase.rpc(
+      'delete_my_expo_push_subscription' as never,
+      {
+        p_expo_push_token: normalized,
       } as never
     );
     if (error) throw error;

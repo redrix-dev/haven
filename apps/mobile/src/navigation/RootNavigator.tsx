@@ -2,6 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
 import { useAuthSession } from "../hooks/useAuthSession";
+import { useMobileExpoPushRegistration } from "../hooks/useMobileExpoPushRegistration";
 import { CreatePlaceholderScreen } from "../screens/CreatePlaceholderScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { JoinPlaceholderScreen } from "../screens/JoinPlaceholderScreen";
@@ -19,6 +20,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   const session = useAuthSession();
+  useMobileExpoPushRegistration(session);
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] = useState(false);
   const url = Linking.useURL();
   const processedAuthConfirmUrlsRef = useRef<Set<string>>(new Set());

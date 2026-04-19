@@ -260,6 +260,9 @@ verify_jwt = false
 [functions.web-push-worker]
 verify_jwt = false
 
+[functions.expo-push-worker]
+verify_jwt = false
+
 [functions.report-alert]
 verify_jwt = false
 

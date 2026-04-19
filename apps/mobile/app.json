@@ -14,13 +14,17 @@
       "**/*"
     ],
     "plugins": [
-      "expo-dev-client"
+      "expo-dev-client",
+      "expo-notifications"
     ],
     "web": {
       "bundler": "metro"
     },
     "ios": {
-      "bundleIdentifier": "com.redrix.haven.mobile"
+      "bundleIdentifier": "com.redrix.haven.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.redrix.haven.mobile"

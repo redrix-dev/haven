@@ -403,7 +403,31 @@ export type WebPushSubscriptionUpsertInput = {
   metadata?: Record<string, unknown>;
 };
 
-export type NotificationDeliveryTransport = 'web_push' | 'in_app' | 'simulated_push' | 'route_policy';
+export type ExpoPushSubscriptionRecord = {
+  id: string;
+  userId: string;
+  expoPushToken: string;
+  platform: string;
+  installationId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  lastSeenAt: string;
+};
+
+export type ExpoPushSubscriptionUpsertInput = {
+  expoPushToken: string;
+  platform?: 'ios' | 'android' | 'unknown';
+  installationId?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type NotificationDeliveryTransport =
+  | 'web_push'
+  | 'expo_push'
+  | 'in_app'
+  | 'simulated_push'
+  | 'route_policy';
 
 export type NotificationDeliveryDecisionStage = 'enqueue' | 'claim' | 'send_time' | 'client_route';
 
