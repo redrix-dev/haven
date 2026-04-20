@@ -14,11 +14,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getControlPlaneBackend } from "@shared/lib/backend";
-import { getErrorMessage } from "@shared/platform/lib/errors";
-import { useNavigationStore } from "@shared/stores/navigationStore";
 import type { RootStackParamList } from "../navigation/types";
-import { getMobileSupabase } from "../supabase/getMobileSupabase";
+import { useMobileCommunityWorkspace } from "../features/community/useMobileCommunityWorkspace";
 
 type CommunityNav = NativeStackNavigationProp<
   RootStackParamList,
@@ -35,67 +32,12 @@ export function CommunityScreen() {
   const navigation = useNavigation<CommunityNav>();
   const route = useRoute<RouteProp<RootStackParamList, "Community">>();
   const { communityId } = route.params;
-
-  const [communityName, setCommunityName] = useState<string | null>(null);
-  const [phase, setPhase] = useState<"loading" | "ready" | "missing" | "error">(
-    "loading",
-  );
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  useFocusEffect(
-    useCallback(() => {
-      useNavigationStore.getState().setCurrentServerId(communityId);
-
-      let cancelled = false;
-
-      const load = async () => {
-        setPhase("loading");
-        setErrorMessage(null);
-        setCommunityName(null);
-
-        try {
-          const supabase = getMobileSupabase();
-          const {
-            data: { user },
-            error: authError,
-          } = await supabase.auth.getUser();
-          if (authError) throw authError;
-          if (!user?.id) {
-            throw new Error("Not signed in.");
-          }
-
-          const servers = await getControlPlaneBackend().listUserCommunities(
-            user.id,
-          );
-          if (cancelled) return;
-
-          const match = servers.find((row) => row.id === communityId);
-          if (!match) {
-            setPhase("missing");
-            return;
-          }
-
-          setCommunityName(match.name);
-          setPhase("ready");
-        } catch (e) {
-          if (cancelled) return;
-          setErrorMessage(getErrorMessage(e, "Failed to load community."));
-          setPhase("error");
-        }
-      };
-
-      void load();
-
-      return () => {
-        cancelled = true;
-        useNavigationStore.getState().setCurrentServerId(null);
-      };
-    }, [communityId]),
-  );
+  const { phase, errorMessage, community, refresh } =
+  useMobileCommunityWorkspace(communityId);
 
   const title =
-    phase === "ready" && communityName
-      ? communityName
+    phase === "ready" && community
+      ? community.name
       : phase === "loading"
         ? "Community"
         : phase === "missing"
@@ -125,10 +67,10 @@ export function CommunityScreen() {
           <ActivityIndicator color="#e6edf7" size="large" />
         ) : null}
 
-        {phase === "ready" && communityName ? (
+        {phase === "ready" && community?.name ? (
           <Text className="text-center text-base text-muted-foreground">
             Placeholder —{" "}
-            <Text className="font-semibold text-foreground">{communityName}</Text>
+            <Text className="font-semibold text-foreground">{community.name}</Text>
           </Text>
         ) : null}
 
