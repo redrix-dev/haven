@@ -43,6 +43,7 @@ const sharedResolve = {
   alias: {
     '@electron': path.resolve(__dirname, 'apps/electron/src'),
     '@web': path.resolve(__dirname, 'apps/web/src'),
+    '@shared/app/ui': path.resolve(__dirname, 'packages/web-client/src/app-ui'),
     '@shared': path.resolve(__dirname, 'packages/shared/src'),
     '@client': path.resolve(__dirname, 'packages/shared/src/client'),
     '@platform': path.resolve(__dirname, 'packages/shared/src/platform'),

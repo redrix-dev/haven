@@ -46,6 +46,7 @@ export function HomeScreen() {
   const width = Dimensions.get("window").width;
   const cell = (width - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
   const tile = Math.max(cell - 24, 56);
+  
 
   const refresh = useCallback(async () => {
     setLoadError(null);
@@ -85,18 +86,18 @@ export function HomeScreen() {
   ) => (
     <Pressable
       accessibilityRole="button"
-      className="h-11 w-11 items-center justify-center rounded-xl bg-slate-800 active:bg-slate-700"
+      className="h-11 w-11 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
       onPress={onPress}
     >
-      <Ionicons name={name} size={22} color="#f8fafc" />
+      <Ionicons name={name} size={22} color="#e6edf7" />
     </Pressable>
   );
 
   if (initialLoad && servers.length === 0) {
     return (
-      <View className="flex-1 bg-slate-950">
+      <View className="flex-1 bg-surface-modal">
         <View
-          className="border-b border-slate-800 bg-slate-900"
+          className="border-b border-border-panel bg-surface-modal"
           style={{ paddingTop: insets.top + 8 }}
         >
           <View className="flex-row items-center justify-between px-3 pb-3">
@@ -105,7 +106,7 @@ export function HomeScreen() {
               {iconBtn("home", () => undefined)}
               {iconBtn("people", () => undefined)}
             </View>
-            <Text className="absolute left-0 right-0 text-center text-lg font-semibold text-slate-50">
+            <Text className="absolute left-0 right-0 text-center text-lg font-semibold text-foreground">
               Haven
             </Text>
             <View className="z-10 flex-row gap-2">
@@ -118,16 +119,16 @@ export function HomeScreen() {
           </View>
         </View>
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#f8fafc" size="large" />
+          <ActivityIndicator color="#e6edf7" size="large" />
         </View>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-slate-950">
+    <View className="flex-1 bg-surface-modal">
       <View
-        className="border-b border-slate-800 bg-slate-900"
+        className="border-b border-border-panel bg-surface-modal"
         style={{ paddingTop: insets.top + 8 }}
       >
         <View className="flex-row items-center justify-between px-3 pb-3">
@@ -136,7 +137,7 @@ export function HomeScreen() {
             {iconBtn("home", () => undefined)}
             {iconBtn("people", () => undefined)}
           </View>
-          <Text className="absolute left-0 right-0 text-center text-lg font-semibold text-slate-50">
+          <Text className="absolute left-0 right-0 text-center text-lg font-semibold text-foreground">
             Haven
           </Text>
           <View className="z-10 flex-row gap-2">
@@ -150,7 +151,7 @@ export function HomeScreen() {
       </View>
 
       {loadError ? (
-        <Text className="px-4 pt-4 text-center text-sm text-red-400">{loadError}</Text>
+        <Text className="px-4 pt-4 text-center text-sm text-destructive">{loadError}</Text>
       ) : null}
 
       <FlatList
@@ -174,13 +175,18 @@ export function HomeScreen() {
             return (
               <View style={{ width: cell }}>
                 <Pressable
-                  style={{ height: tile }}
-                  className="items-center justify-center rounded-2xl bg-slate-800 active:bg-slate-700"
+                  style={{ height: cell }}
+                  className="items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
+                  onPress={() =>
+                    navigation.navigate("Community", {
+                      communityId: item.server.id,
+                    })
+                  }
                 >
-                  <Text className="text-3xl font-bold text-slate-50">{initial}</Text>
+                  <Text className="text-3xl font-bold text-foreground">{initial}</Text>
                 </Pressable>
                 <Text
-                  className="mt-1 text-center text-xs text-slate-400"
+                  className="mt-1 text-center text-xs text-muted-foreground"
                   numberOfLines={1}
                 >
                   {item.server.name}
@@ -192,14 +198,14 @@ export function HomeScreen() {
             return (
               <View style={{ width: cell }}>
                 <Pressable
-                  style={{ height: tile }}
-                  className="items-center justify-center rounded-2xl border-2 border-dashed border-slate-500 bg-transparent active:bg-slate-900"
+                  style={{ height: cell }}
+                  className="items-center justify-center rounded-2xl border-2 border-dashed border-border-control bg-transparent active:bg-surface-embedded"
                   onPress={() => navigation.navigate("CreatePlaceholder")}
                 >
-                  <Text className="text-3xl font-light text-slate-50">+</Text>
+                  <Text className="text-3xl font-light text-foreground">+</Text>
                 </Pressable>
                 <Text
-                  className="mt-1 text-center text-xs text-slate-400"
+                  className="mt-1 text-center text-xs text-muted-foreground"
                   numberOfLines={1}
                 >
                   Create
@@ -210,14 +216,14 @@ export function HomeScreen() {
           return (
             <View style={{ width: cell }}>
               <Pressable
-                style={{ height: tile }}
-                className="items-center justify-center rounded-2xl border-2 border-dashed border-slate-500 bg-transparent active:bg-slate-900"
+                style={{ height: cell }}
+                className="items-center justify-center rounded-2xl border-2 border-dashed border-border-control bg-transparent active:bg-surface-embedded"
                 onPress={() => navigation.navigate("JoinPlaceholder")}
               >
-                <Text className="text-3xl font-light text-slate-50">#</Text>
+                <Text className="text-3xl font-light text-foreground">#</Text>
               </Pressable>
               <Text
-                className="mt-1 text-center text-xs text-slate-400"
+                className="mt-1 text-center text-xs text-muted-foreground"
                 numberOfLines={1}
               >
                 Join

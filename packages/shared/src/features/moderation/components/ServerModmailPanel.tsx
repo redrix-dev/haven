@@ -80,8 +80,6 @@ type ActionConfirmState =
       username: string;
     };
 
-const serverModmailBackend = getServerModmailBackend();
-
 const STATUS_FILTERS: Array<{ value: VisibleStatusFilter; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
@@ -203,6 +201,7 @@ export function ServerModmailPanel({
   const [internalNoteDraft, setInternalNoteDraft] = React.useState('');
   const [actionConfirm, setActionConfirm] = React.useState<ActionConfirmState | null>(null);
   const [escalateConfirmOpen, setEscalateConfirmOpen] = React.useState(false);
+  const serverModmailBackend = React.useMemo(() => getServerModmailBackend(), []);
 
   const visibleServerIds = React.useMemo(
     () =>
@@ -226,7 +225,7 @@ export function ServerModmailPanel({
     } finally {
       setLoadingReports(false);
     }
-  }, [open, visibleServerIds]);
+  }, [open, visibleServerIds, serverModmailBackend]);
 
   const refreshDetail = React.useCallback(
     async (reportId: string) => {
@@ -242,7 +241,7 @@ export function ServerModmailPanel({
         setLoadingDetail(false);
       }
     },
-    [open]
+    [open, serverModmailBackend]
   );
 
   React.useEffect(() => {

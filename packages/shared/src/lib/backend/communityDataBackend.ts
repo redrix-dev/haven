@@ -1,13 +1,9 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@shared/lib/supabase';
+import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import type { Database } from '@shared/types/database';
-import { messageObjectStore } from './messageObjectStore';
-import {
-  MEDIA_ONLY_CONTENT_PLACEHOLDER,
-  createSignedUrlMap,
-  removeUploadedMediaObject,
-  uploadMediaToObjectStore,
-} from './mediaAttachmentUtils';
+import type { MessageObjectStore } from "./messageObjectStore";
+import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
+import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from "./mediaAttachmentUtils";
 import type {
   AuthorProfile,
   BanCommunityMemberResult,
@@ -75,6 +71,46 @@ const getRealtimeRowChannelId = (value: unknown): string | null => {
   const maybeChannelId = (value as { channel_id?: unknown }).channel_id;
   return typeof maybeChannelId === 'string' ? maybeChannelId : null;
 };
+
+let havenCommunityClient: HavenSupabaseClient | null = null;
+let havenCommunityEdgeConfig: { supabaseUrl: string; supabaseAnonKey: string } | null = null;
+let havenCommunityMedia: MediaAttachmentHelpers | null = null;
+let havenCommunityObjectStore: MessageObjectStore | null = null;
+
+export function configureCommunityDataBackendRuntime(input: {
+  client: HavenSupabaseClient;
+  edge: { supabaseUrl: string; supabaseAnonKey: string };
+  media: MediaAttachmentHelpers;
+  messageStore: MessageObjectStore;
+}): void {
+  havenCommunityClient = input.client;
+  havenCommunityEdgeConfig = input.edge;
+  havenCommunityMedia = input.media;
+  havenCommunityObjectStore = input.messageStore;
+}
+
+function havenCommunitySb(): HavenSupabaseClient {
+  if (!havenCommunityClient) {
+    throw new Error(
+      'Community data backend used before Haven data runtime was initialized.',
+    );
+  }
+  return havenCommunityClient;
+}
+
+function havenCommunityMediaHelpers(): MediaAttachmentHelpers {
+  if (!havenCommunityMedia) {
+    throw new Error('Community media helpers not configured.');
+  }
+  return havenCommunityMedia;
+}
+
+function havenCommunityStore(): MessageObjectStore {
+  if (!havenCommunityObjectStore) {
+    throw new Error('Community message object store not configured.');
+  }
+  return havenCommunityObjectStore;
+}
 
 const MESSAGE_MEDIA_BUCKET = 'message-media';
 const LINK_PREVIEW_IMAGE_BUCKET = 'link-preview-images';
@@ -268,8 +304,7 @@ const listProfileSnapshotsByUserId = async (userIds: readonly (string | null | u
     return new Map<string, ReportProfileRow>();
   }
 
-  const { data, error } = await supabase
-    .from('profiles')
+  const { data, error } = await havenCommunitySb().from('profiles')
     .select('id, username, avatar_url')
     .in('id', uniqueUserIds);
   if (error) throw error;
@@ -296,8 +331,7 @@ const fetchSupportReportMessageSnapshot = async (input: {
   channelId: string;
   messageId: string;
 }): Promise<SupportReportMessageSnapshot | null> => {
-  const { data: reportedMessage, error: reportedMessageError } = await supabase
-    .from('messages')
+  const { data: reportedMessage, error: reportedMessageError } = await havenCommunitySb().from('messages')
     .select('*')
     .eq('community_id', input.communityId)
     .eq('channel_id', input.channelId)
@@ -311,8 +345,7 @@ const fetchSupportReportMessageSnapshot = async (input: {
   let orderedContextMessages: Message[] = [];
 
   if (replyToMessageId) {
-    const { data: channelMessages, error: channelMessagesError } = await supabase
-      .from('messages')
+    const { data: channelMessages, error: channelMessagesError } = await havenCommunitySb().from('messages')
       .select('*')
       .eq('community_id', input.communityId)
       .eq('channel_id', input.channelId)
@@ -371,9 +404,7 @@ const fetchSupportReportMessageSnapshot = async (input: {
     const [
       { data: contextBeforeRows, error: contextBeforeError },
       { data: contextAfterRows, error: contextAfterError },
-    ] = await Promise.all([
-      supabase
-        .from('messages')
+    ] = await Promise.all([havenCommunitySb().from('messages')
         .select('*')
         .eq('community_id', input.communityId)
         .eq('channel_id', input.channelId)
@@ -381,9 +412,7 @@ const fetchSupportReportMessageSnapshot = async (input: {
         .or(beforeFilter)
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
-        .limit(5),
-      supabase
-        .from('messages')
+        .limit(5),havenCommunitySb().from('messages')
         .select('*')
         .eq('community_id', input.communityId)
         .eq('channel_id', input.channelId)
@@ -435,8 +464,10 @@ const fetchSupportReportMessageSnapshot = async (input: {
 };
 
 const supabaseFunctionJson = async <TResponse>(functionName: string, body: unknown): Promise<TResponse> => {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  if (!havenCommunityEdgeConfig) {
+    throw new Error('Supabase edge configuration missing for community backend.');
+  }
+  const { supabaseUrl, supabaseAnonKey } = havenCommunityEdgeConfig;
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase URL or key is missing.');
   }
@@ -445,7 +476,7 @@ const supabaseFunctionJson = async <TResponse>(functionName: string, body: unkno
     const {
       data: { session },
       error: sessionError,
-    } = await supabase.auth.getSession();
+    } = await havenCommunitySb().auth.getSession();
     if (sessionError) throw sessionError;
     const accessToken = session?.access_token;
     if (!accessToken) {
@@ -495,7 +526,7 @@ const supabaseFunctionJson = async <TResponse>(functionName: string, body: unkno
 
   if (!result.ok && result.status === 401) {
     try {
-      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      const { data: refreshed, error: refreshError } = await havenCommunitySb().auth.refreshSession();
       if (!refreshError && refreshed.session?.access_token) {
         result = await callWithToken(refreshed.session.access_token);
       }
@@ -524,10 +555,10 @@ const waitForConfirmedSupabaseSession = async (timeoutMs = 4000): Promise<boolea
     const {
       data: { session },
       error: sessionError,
-    } = await supabase.auth.getSession();
+    } = await havenCommunitySb().auth.getSession();
 
     if (!sessionError && session?.access_token) {
-      const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
+      const { data: userData, error: userError } = await havenCommunitySb().auth.getUser(session.access_token);
       if (!userError && userData.user) {
         return true;
       }
@@ -536,9 +567,9 @@ const waitForConfirmedSupabaseSession = async (timeoutMs = 4000): Promise<boolea
     if (!refreshAttempted) {
       refreshAttempted = true;
       try {
-        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        const { data: refreshed, error: refreshError } = await havenCommunitySb().auth.refreshSession();
         if (!refreshError && refreshed.session?.access_token) {
-          const { data: refreshedUser, error: refreshedUserError } = await supabase.auth.getUser(
+          const { data: refreshedUser, error: refreshedUserError } = await havenCommunitySb().auth.getUser(
             refreshed.session.access_token
           );
           if (!refreshedUserError && refreshedUser.user) {
@@ -560,11 +591,12 @@ const uploadMessageMediaToObjectStore = async (input: {
   communityId: string;
   channelId: string;
   mediaUpload?: {
-    file: File;
+    body: Blob;
+    filename?: string;
     expiresInHours?: number;
   };
 }) =>
-  uploadMediaToObjectStore({
+  havenCommunityMediaHelpers().uploadMediaToObjectStore({
     bucketName: MESSAGE_MEDIA_BUCKET,
     objectPathPrefix: `${input.communityId}/${input.channelId}`,
     mediaUpload: input.mediaUpload,
@@ -586,7 +618,10 @@ const mapMessageAttachmentRowsWithSignedUrls = async (
 
   let signedUrlByBucketAndPath = new Map<string, string>();
   try {
-    signedUrlByBucketAndPath = await createSignedUrlMap(attachmentRows, 60 * 60);
+    signedUrlByBucketAndPath = await havenCommunityMediaHelpers().createSignedUrlMap(
+      attachmentRows,
+      60 * 60,
+    );
   } catch (signedError) {
     console.error('Failed to create signed URLs for message attachments:', signedError);
   }
@@ -629,7 +664,7 @@ const mapMessageLinkPreviewRowsWithSignedUrls = async (
   const signedUrlByBucketAndPath = new Map<string, string>();
   for (const [bucketName, paths] of pathsByBucket.entries()) {
     try {
-      const signedRowsByPath = await messageObjectStore.createSignedUrls(bucketName, paths, 60 * 30);
+      const signedRowsByPath = await havenCommunityStore().createSignedUrls(bucketName, paths, 60 * 30);
       for (const [path, signedUrl] of Object.entries(signedRowsByPath)) {
         signedUrlByBucketAndPath.set(`${bucketName}/${path}`, signedUrl);
       }
@@ -698,56 +733,56 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: canRefreshLinkPreviews },
       { data: canManageInvites },
     ] = await Promise.all([
-      supabase.rpc('is_community_owner', { p_community_id: communityId }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('is_community_owner', { p_community_id: communityId }),
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_server',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_roles',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_members',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'create_channels',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_channels',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_channel_permissions',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_messages',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_bans',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'can_view_ban_hidden',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'create_reports',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_reports',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'refresh_link_previews',
       }),
-      supabase.rpc('user_has_permission', {
+      havenCommunitySb().rpc('user_has_permission', {
         p_community_id: communityId,
         p_permission_key: 'manage_invites',
       }),
@@ -776,8 +811,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listCommunityMembers(communityId) {
-    const { data, error } = await supabase
-      .from('community_members')
+    const { data, error } = await havenCommunitySb().from('community_members')
       .select('id, user_id, nickname, is_owner, joined_at, profiles(username, avatar_url)')
       .eq('community_id', communityId)
       .order('joined_at', { ascending: true });
@@ -826,7 +860,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       reason: normalizedReason,
     });
 
-    const { error } = await supabase.from('support_reports').insert({
+    const { error } = await havenCommunitySb().from('support_reports').insert({
       id: reportId,
       community_id: communityId,
       destination: 'haven_staff',
@@ -840,7 +874,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listCommunityBans(communityId) {
-    const { data, error } = await supabase.rpc('list_community_bans', {
+    const { data, error } = await havenCommunitySb().rpc('list_community_bans', {
       p_community_id: communityId,
     });
     if (error) throw error;
@@ -879,7 +913,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       throw new Error('Ban reason is required.');
     }
 
-    const { data, error } = await supabase.rpc('ban_community_member', {
+    const { data, error } = await havenCommunitySb().rpc('ban_community_member', {
       p_community_id: communityId,
       p_target_user_id: targetUserId,
       p_reason: normalizedReason,
@@ -903,7 +937,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async kickCommunityMember({ communityId, targetUserId }) {
-    const { data, error } = await supabase.rpc('kick_community_member', {
+    const { data, error } = await havenCommunitySb().rpc('kick_community_member', {
       p_community_id: communityId,
       p_target_user_id: targetUserId,
     });
@@ -927,7 +961,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
   async unbanCommunityMember({ communityId, targetUserId, reason }) {
     const normalizedReason = reason?.trim() ?? null;
-    const { error } = await supabase.rpc('unban_community_member', {
+    const { error } = await havenCommunitySb().rpc('unban_community_member', {
       p_community_id: communityId,
       p_target_user_id: targetUserId,
       p_reason: normalizedReason && normalizedReason.length > 0 ? normalizedReason : undefined,
@@ -938,7 +972,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   async listBanEligibleServersForUser(targetUserId) {
     if (!targetUserId) return [];
 
-    const { data, error } = await supabase.rpc('list_bannable_shared_communities', {
+    const { data, error } = await havenCommunitySb().rpc('list_bannable_shared_communities', {
       p_target_user_id: targetUserId,
     });
     if (error) throw error;
@@ -950,8 +984,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listChannels(communityId) {
-    const { data, error } = await supabase
-      .from('channels')
+    const { data, error } = await havenCommunitySb().from('channels')
       .select('*')
       .eq('community_id', communityId)
       .order('position', { ascending: true });
@@ -964,18 +997,14 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: groupRows, error: groupRowsError },
       { data: mappingRows, error: mappingRowsError },
       authResult,
-    ] = await Promise.all([
-      supabase
-        .from('channel_groups')
+    ] = await Promise.all([havenCommunitySb().from('channel_groups')
         .select('id, community_id, name, position')
         .eq('community_id', communityId)
-        .order('position', { ascending: true }),
-      supabase
-        .from('channel_group_channels')
+        .order('position', { ascending: true }),havenCommunitySb().from('channel_group_channels')
         .select('channel_id, group_id, position')
         .eq('community_id', communityId)
         .order('position', { ascending: true }),
-      supabase.auth.getUser(),
+      havenCommunitySb().auth.getUser(),
     ]);
 
     if (groupRowsError) throw groupRowsError;
@@ -986,8 +1015,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     let collapsedGroupIds: string[] = [];
     if (currentUserId) {
-      const { data: preferenceRows, error: preferenceRowsError } = await supabase
-        .from('channel_group_preferences')
+      const { data: preferenceRows, error: preferenceRowsError } = await havenCommunitySb().from('channel_group_preferences')
         .select('group_id, is_collapsed')
         .eq('community_id', communityId)
         .eq('user_id', currentUserId)
@@ -1023,8 +1051,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async createChannelGroup({ communityId, name, position, createdByUserId }) {
-    const { data, error } = await supabase
-      .from('channel_groups')
+    const { data, error } = await havenCommunitySb().from('channel_groups')
       .insert({
         community_id: communityId,
         name,
@@ -1046,8 +1073,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async renameChannelGroup({ communityId, groupId, name }) {
-    const { error } = await supabase
-      .from('channel_groups')
+    const { error } = await havenCommunitySb().from('channel_groups')
       .update({ name })
       .eq('community_id', communityId)
       .eq('id', groupId);
@@ -1055,8 +1081,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async deleteChannelGroup({ communityId, groupId }) {
-    const { error } = await supabase
-      .from('channel_groups')
+    const { error } = await havenCommunitySb().from('channel_groups')
       .delete()
       .eq('community_id', communityId)
       .eq('id', groupId);
@@ -1065,8 +1090,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
   async setChannelGroupForChannel({ communityId, channelId, groupId, position }) {
     if (!groupId) {
-      const { error } = await supabase
-        .from('channel_group_channels')
+      const { error } = await havenCommunitySb().from('channel_group_channels')
         .delete()
         .eq('community_id', communityId)
         .eq('channel_id', channelId);
@@ -1074,8 +1098,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       return;
     }
 
-    const { error } = await supabase
-      .from('channel_group_channels')
+    const { error } = await havenCommunitySb().from('channel_group_channels')
       .upsert(
         {
           community_id: communityId,
@@ -1092,13 +1115,12 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await havenCommunitySb().auth.getUser();
     if (authError) throw authError;
     if (!user?.id) throw new Error('Not authenticated.');
 
     if (!isCollapsed) {
-      const { error } = await supabase
-        .from('channel_group_preferences')
+      const { error } = await havenCommunitySb().from('channel_group_preferences')
         .delete()
         .eq('community_id', communityId)
         .eq('group_id', groupId)
@@ -1107,8 +1129,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       return;
     }
 
-    const { error } = await supabase
-      .from('channel_group_preferences')
+    const { error } = await havenCommunitySb().from('channel_group_preferences')
       .upsert(
         {
           community_id: communityId,
@@ -1122,8 +1143,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   subscribeToChannels(communityId, onChange, options) {
-    const channel = supabase
-      .channel(`channels:${communityId}`)
+    const channel = havenCommunitySb().channel(`channels:${communityId}`)
       .on(
         'postgres_changes',
         {
@@ -1292,8 +1312,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listMessages(communityId, channelId) {
-    const { data, error } = await supabase
-      .from('messages')
+    const { data, error } = await havenCommunitySb().from('messages')
       .select('*')
       .eq('community_id', communityId)
       .eq('channel_id', channelId)
@@ -1309,8 +1328,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       ? Math.min(Math.max(Math.floor(limit), 1), 100)
       : 60;
 
-    let query = supabase
-      .from('messages')
+    let query = havenCommunitySb().from('messages')
       .select('*')
       .eq('community_id', communityId)
       .eq('channel_id', channelId)
@@ -1340,8 +1358,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   subscribeToMessages(channelId, onChange) {
-    return supabase
-      .channel(`messages:${channelId}`)
+    return havenCommunitySb().channel(`messages:${channelId}`)
       .on(
         'postgres_changes',
         {
@@ -1382,8 +1399,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listMessageReactions(communityId, channelId) {
-    const { data, error } = await supabase
-      .from('message_reactions' as never)
+    const { data, error } = await havenCommunitySb().from('message_reactions' as never)
       .select('id, message_id, user_id, emoji, created_at')
       .eq('community_id', communityId)
       .eq('channel_id', channelId)
@@ -1406,8 +1422,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     const chunkResults = await Promise.all(
       chunks.map(async (chunk) => {
-        const { data, error } = await supabase
-          .from('message_reactions' as never)
+        const { data, error } = await havenCommunitySb().from('message_reactions' as never)
           .select('id, message_id, user_id, emoji, created_at')
           .eq('community_id', communityId)
           .eq('channel_id', channelId)
@@ -1422,8 +1437,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   subscribeToMessageReactions(channelId, onChange) {
-    return supabase
-      .channel(`message_reactions:${channelId}`)
+    return havenCommunitySb().channel(`message_reactions:${channelId}`)
       .on(
         'postgres_changes',
         {
@@ -1473,12 +1487,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await havenCommunitySb().auth.getUser();
     if (authError) throw authError;
     if (!user?.id) throw new Error('Not authenticated.');
 
-    const { data: messageRow, error: messageError } = await supabase
-      .from('messages')
+    const { data: messageRow, error: messageError } = await havenCommunitySb().from('messages')
       .select('id, community_id, channel_id, deleted_at')
       .eq('id', messageId)
       .maybeSingle();
@@ -1490,8 +1503,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       throw new Error('Message does not belong to this channel.');
     }
 
-    const { data: existingReaction, error: existingReactionError } = await supabase
-      .from('message_reactions' as never)
+    const { data: existingReaction, error: existingReactionError } = await havenCommunitySb().from('message_reactions' as never)
       .select('id')
       .eq('message_id', messageId)
       .eq('user_id', user.id)
@@ -1500,16 +1512,14 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (existingReactionError) throw existingReactionError;
 
     if (existingReaction && typeof existingReaction === 'object' && 'id' in existingReaction) {
-      const { error: deleteError } = await supabase
-        .from('message_reactions' as never)
+      const { error: deleteError } = await havenCommunitySb().from('message_reactions' as never)
         .delete()
         .eq('id', (existingReaction as { id: string }).id);
       if (deleteError) throw deleteError;
       return;
     }
 
-    const { error: insertError } = await supabase
-      .from('message_reactions' as never)
+    const { error: insertError } = await havenCommunitySb().from('message_reactions' as never)
       .insert({
         message_id: messageId,
         community_id: communityId,
@@ -1526,8 +1536,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
   async listMessageAttachments(communityId, channelId) {
     const nowIso = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('message_attachments' as never)
+    const { data, error } = await havenCommunitySb().from('message_attachments' as never)
       .select(
         'id, message_id, community_id, channel_id, owner_user_id, bucket_name, object_path, original_filename, mime_type, media_kind, size_bytes, created_at, expires_at'
       )
@@ -1554,8 +1563,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     const chunkResults = await Promise.all(
       chunks.map(async (chunk) => {
-        const { data, error } = await supabase
-          .from('message_attachments' as never)
+        const { data, error } = await havenCommunitySb().from('message_attachments' as never)
           .select(
             'id, message_id, community_id, channel_id, owner_user_id, bucket_name, object_path, original_filename, mime_type, media_kind, size_bytes, created_at, expires_at'
           )
@@ -1574,8 +1582,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   subscribeToMessageAttachments(channelId, onChange) {
-    return supabase
-      .channel(`message_attachments:${channelId}`)
+    return havenCommunitySb().channel(`message_attachments:${channelId}`)
       .on(
         'postgres_changes',
         {
@@ -1618,7 +1625,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       ? Math.min(Math.max(Math.floor(limit), 1), 500)
       : 100;
 
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await havenCommunitySb().rpc(
       'cleanup_expired_message_attachments' as never,
       { p_limit: boundedLimit } as never
     );
@@ -1627,8 +1634,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listMessageLinkPreviews(communityId, channelId) {
-    const { data, error } = await supabase
-      .from('message_link_previews' as never)
+    const { data, error } = await havenCommunitySb().from('message_link_previews' as never)
       .select(
         'id, message_id, community_id, channel_id, source_url, normalized_url, status, cache_id, snapshot, embed_provider, thumbnail_bucket_name, thumbnail_object_path, created_at, updated_at'
       )
@@ -1653,8 +1659,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     const chunkResults = await Promise.all(
       chunks.map(async (chunk) => {
-        const { data, error } = await supabase
-          .from('message_link_previews' as never)
+        const { data, error } = await havenCommunitySb().from('message_link_previews' as never)
           .select(
             'id, message_id, community_id, channel_id, source_url, normalized_url, status, cache_id, snapshot, embed_provider, thumbnail_bucket_name, thumbnail_object_path, created_at, updated_at'
           )
@@ -1672,8 +1677,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   subscribeToMessageLinkPreviews(channelId, onChange) {
-    return supabase
-      .channel(`message_link_previews:${channelId}`)
+    return havenCommunitySb().channel(`message_link_previews:${channelId}`)
       .on(
         'postgres_changes',
         {
@@ -1776,7 +1780,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       };
     }
 
-    const { data: profileRows, error: profileRowsError } = await supabase.rpc(
+    const { data: profileRows, error: profileRowsError } = await havenCommunitySb().rpc(
       'get_message_author_profiles',
       {
         p_author_user_ids: authorIds,
@@ -1818,8 +1822,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       return profileMap;
     }
 
-    const { data: activeStaffRows, error: staffError } = await supabase
-      .from('platform_staff')
+    const { data: activeStaffRows, error: staffError } = await havenCommunitySb().from('platform_staff')
       .select('user_id, display_prefix')
       .in('user_id', staffCandidateIds)
       .eq('is_active', true);
@@ -1847,12 +1850,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await havenCommunitySb().auth.getUser();
     if (authError) throw authError;
     if (!user?.id || !communityId) return false;
 
-    const { data: memberRow, error: memberError } = await supabase
-      .from('community_members')
+    const { data: memberRow, error: memberError } = await havenCommunitySb().from('community_members')
       .select('id, is_owner')
       .eq('community_id', communityId)
       .eq('user_id', user.id)
@@ -1861,8 +1863,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (!memberRow) return false;
     if (memberRow.is_owner) return true;
 
-    const { data: memberRoleRows, error: memberRoleError } = await supabase
-      .from('member_roles')
+    const { data: memberRoleRows, error: memberRoleError } = await havenCommunitySb().from('member_roles')
       .select('role_id')
       .eq('community_id', communityId)
       .eq('member_id', memberRow.id);
@@ -1877,8 +1878,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     );
     if (roleIds.length === 0) return false;
 
-    const { data: roleRows, error: roleError } = await supabase
-      .from('roles')
+    const { data: roleRows, error: roleError } = await havenCommunitySb().from('roles')
       .select('name, is_system')
       .eq('community_id', communityId)
       .in('id', roleIds);
@@ -1892,7 +1892,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async canSendInChannel(channelId) {
-    const { data, error } = await supabase.rpc('can_send_in_channel', {
+    const { data, error } = await havenCommunitySb().rpc('can_send_in_channel', {
       p_channel_id: channelId,
     });
 
@@ -1904,14 +1904,10 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const [
       { data: community, error: communityError },
       { data: communitySettings, error: communitySettingsError },
-    ] = await Promise.all([
-      supabase
-        .from('communities')
+    ] = await Promise.all([havenCommunitySb().from('communities')
         .select('name, description')
         .eq('id', communityId)
-        .maybeSingle(),
-      supabase
-        .from('community_settings')
+        .maybeSingle(),havenCommunitySb().from('community_settings')
         .select('allow_public_invites, require_report_reason')
         .eq('community_id', communityId)
         .maybeSingle(),
@@ -1929,8 +1925,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async updateServerSettings({ communityId, values }) {
-    const { error: communityError } = await supabase
-      .from('communities')
+    const { error: communityError } = await havenCommunitySb().from('communities')
       .update({
         name: values.name.trim(),
         description: values.description?.trim() ? values.description.trim() : null,
@@ -1938,8 +1933,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .eq('id', communityId);
     if (communityError) throw communityError;
 
-    const { error: communitySettingsError } = await supabase
-      .from('community_settings')
+    const { error: communitySettingsError } = await havenCommunitySb().from('community_settings')
       .update({
         allow_public_invites: values.allowPublicInvites,
         require_report_reason: values.requireReportReason,
@@ -1955,21 +1949,15 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: members, error: membersError },
       { data: memberRoles, error: memberRolesError },
       { data: permissionsCatalog, error: permissionsCatalogError },
-    ] = await Promise.all([
-      supabase
-        .from('roles')
+    ] = await Promise.all([havenCommunitySb().from('roles')
         .select('id, name, color, position, is_default, is_system')
         .eq('community_id', communityId)
-        .order('position', { ascending: false }),
-      supabase
-        .from('community_members')
+        .order('position', { ascending: false }),havenCommunitySb().from('community_members')
         .select('id, user_id, nickname, is_owner, profiles(username, avatar_url)')
-        .eq('community_id', communityId),
-      supabase
-        .from('member_roles')
+        .eq('community_id', communityId),havenCommunitySb().from('member_roles')
         .select('member_id, role_id')
         .eq('community_id', communityId),
-      supabase.from('permissions_catalog').select('key, description').order('key', { ascending: true }),
+      havenCommunitySb().from('permissions_catalog').select('key, description').order('key', { ascending: true }),
     ]);
 
     if (rolesError) throw rolesError;
@@ -1981,8 +1969,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     let rolePermissions: Array<{ role_id: string; permission_key: string }> = [];
 
     if (roleIds.length > 0) {
-      const { data: rolePermissionRows, error: rolePermissionsError } = await supabase
-        .from('role_permissions')
+      const { data: rolePermissionRows, error: rolePermissionsError } = await havenCommunitySb().from('role_permissions')
         .select('role_id, permission_key')
         .in('role_id', roleIds);
 
@@ -2066,7 +2053,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async createServerRole({ communityId, name, color, position }) {
-    const { error } = await supabase.from('roles').insert({
+    const { error } = await havenCommunitySb().from('roles').insert({
       community_id: communityId,
       name,
       color,
@@ -2077,8 +2064,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async updateServerRole({ communityId, roleId, name, color, position }) {
-    const { error } = await supabase
-      .from('roles')
+    const { error } = await havenCommunitySb().from('roles')
       .update({
         name,
         color,
@@ -2091,8 +2077,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async deleteServerRole({ communityId, roleId }) {
-    const { error } = await supabase
-      .from('roles')
+    const { error } = await havenCommunitySb().from('roles')
       .delete()
       .eq('community_id', communityId)
       .eq('id', roleId);
@@ -2103,8 +2088,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   async saveServerRolePermissions({ roleId, permissionKeys }) {
     const uniquePermissionKeys = Array.from(new Set(permissionKeys));
 
-    const { error: deleteError } = await supabase
-      .from('role_permissions')
+    const { error: deleteError } = await havenCommunitySb().from('role_permissions')
       .delete()
       .eq('role_id', roleId);
     if (deleteError) throw deleteError;
@@ -2116,15 +2100,14 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       permission_key: permissionKey,
     }));
 
-    const { error: insertError } = await supabase.from('role_permissions').insert(rowsToInsert);
+    const { error: insertError } = await havenCommunitySb().from('role_permissions').insert(rowsToInsert);
     if (insertError) throw insertError;
   },
 
   async saveServerMemberRoles({ communityId, memberId, roleIds, assignedByUserId }) {
     const uniqueRoleIds = Array.from(new Set(roleIds));
 
-    const { data: existingRows, error: existingRowsError } = await supabase
-      .from('member_roles')
+    const { data: existingRows, error: existingRowsError } = await havenCommunitySb().from('member_roles')
       .select('role_id')
       .eq('community_id', communityId)
       .eq('member_id', memberId);
@@ -2138,8 +2121,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const roleIdsToInsert = uniqueRoleIds.filter((roleId) => !existingRoleIdSet.has(roleId));
 
     if (roleIdsToDelete.length > 0) {
-      const { error: deleteError } = await supabase
-        .from('member_roles')
+      const { error: deleteError } = await havenCommunitySb().from('member_roles')
         .delete()
         .eq('community_id', communityId)
         .eq('member_id', memberId)
@@ -2155,7 +2137,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         assigned_by_user_id: assignedByUserId,
       }));
 
-      const { error: insertError } = await supabase.from('member_roles').insert(rowsToInsert);
+      const { error: insertError } = await havenCommunitySb().from('member_roles').insert(rowsToInsert);
       if (insertError) throw insertError;
     }
   },
@@ -2164,7 +2146,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await havenCommunitySb().auth.getUser();
     if (authError) throw authError;
     if (!user?.id) throw new Error('Not authenticated.');
 
@@ -2177,8 +2159,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       kind: input.kind,
     };
 
-    const { error } = await supabase
-      .from('channels')
+    const { error } = await havenCommunitySb().from('channels')
       .insert(insertPayload);
 
     if (error) {
@@ -2194,8 +2175,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       });
       throw error;
     }
-    const { data: fallbackChannel, error: fallbackError } = await supabase
-      .from('channels')
+    const { data: fallbackChannel, error: fallbackError } = await havenCommunitySb().from('channels')
       .select('*')
       .eq('community_id', input.communityId)
       .eq('name', input.name)
@@ -2216,28 +2196,18 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: roleOverwrites, error: roleOverwritesError },
       { data: memberOverwrites, error: memberOverwritesError },
       { data: myMember, error: myMemberError },
-    ] = await Promise.all([
-      supabase
-        .from('roles')
+    ] = await Promise.all([havenCommunitySb().from('roles')
         .select('id, name, color, is_default, position')
         .eq('community_id', communityId)
-        .order('position', { ascending: false }),
-      supabase
-        .from('community_members')
+        .order('position', { ascending: false }),havenCommunitySb().from('community_members')
         .select('id, nickname, is_owner, user_id, profiles(username)')
-        .eq('community_id', communityId),
-      supabase
-        .from('channel_role_overwrites')
+        .eq('community_id', communityId),havenCommunitySb().from('channel_role_overwrites')
         .select('role_id, can_view, can_send, can_manage')
         .eq('community_id', communityId)
-        .eq('channel_id', channelId),
-      supabase
-        .from('channel_member_overwrites')
+        .eq('channel_id', channelId),havenCommunitySb().from('channel_member_overwrites')
         .select('member_id, can_view, can_send, can_manage')
         .eq('community_id', communityId)
-        .eq('channel_id', channelId),
-      supabase
-        .from('community_members')
+        .eq('channel_id', channelId),havenCommunitySb().from('community_members')
         .select('id, is_owner')
         .eq('community_id', communityId)
         .eq('user_id', userId)
@@ -2282,8 +2252,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     let rolePermissionRows: Array<{ role_id: string; permission_key: string }> = [];
 
     if (roleIds.length > 0) {
-      const { data: rolePermissionData, error: rolePermissionsError } = await supabase
-        .from('role_permissions')
+      const { data: rolePermissionData, error: rolePermissionsError } = await havenCommunitySb().from('role_permissions')
         .select('role_id, permission_key')
         .in('role_id', roleIds);
 
@@ -2302,8 +2271,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     let myHighestRolePosition = Number.NEGATIVE_INFINITY;
 
     if (!canEditAllRoles && myMember?.id) {
-      const { data: myAssignedRoles, error: myAssignedRolesError } = await supabase
-        .from('member_roles')
+      const { data: myAssignedRoles, error: myAssignedRolesError } = await havenCommunitySb().from('member_roles')
         .select('role_id')
         .eq('community_id', communityId)
         .eq('member_id', myMember.id);
@@ -2371,8 +2339,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       permissions.canManage === null;
 
     if (allInherited) {
-      const { error } = await supabase
-        .from('channel_role_overwrites')
+      const { error } = await havenCommunitySb().from('channel_role_overwrites')
         .delete()
         .eq('community_id', communityId)
         .eq('channel_id', channelId)
@@ -2381,8 +2348,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       return;
     }
 
-    const { error } = await supabase
-      .from('channel_role_overwrites')
+    const { error } = await havenCommunitySb().from('channel_role_overwrites')
       .upsert(
         {
           community_id: communityId,
@@ -2401,15 +2367,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const [
       { data: memberRow, error: memberError },
       { data: existingOverwrite, error: existingOverwriteError },
-    ] = await Promise.all([
-      supabase
-        .from('community_members')
+    ] = await Promise.all([havenCommunitySb().from('community_members')
         .select('user_id')
         .eq('community_id', communityId)
         .eq('id', memberId)
-        .maybeSingle(),
-      supabase
-        .from('channel_member_overwrites')
+        .maybeSingle(),havenCommunitySb().from('channel_member_overwrites')
         .select('can_view')
         .eq('community_id', communityId)
         .eq('channel_id', channelId)
@@ -2431,8 +2393,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       permissions.canManage === null;
 
     if (allInherited) {
-      const { error } = await supabase
-        .from('channel_member_overwrites')
+      const { error } = await havenCommunitySb().from('channel_member_overwrites')
         .delete()
         .eq('community_id', communityId)
         .eq('channel_id', channelId)
@@ -2441,8 +2402,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       return null;
     }
 
-    const { error } = await supabase
-      .from('channel_member_overwrites')
+    const { error } = await havenCommunitySb().from('channel_member_overwrites')
       .upsert(
         {
           community_id: communityId,
@@ -2467,8 +2427,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listChannelRevokedUserIds({ communityId, channelId }) {
-    const { data: overwriteRows, error: overwriteError } = await supabase
-      .from('channel_member_overwrites')
+    const { data: overwriteRows, error: overwriteError } = await havenCommunitySb().from('channel_member_overwrites')
       .select('member_id')
       .eq('community_id', communityId)
       .eq('channel_id', channelId)
@@ -2486,8 +2445,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       return [] as string[];
     }
 
-    const { data: memberRows, error: memberError } = await supabase
-      .from('community_members')
+    const { data: memberRows, error: memberError } = await havenCommunitySb().from('community_members')
       .select('user_id')
       .eq('community_id', communityId)
       .in('id', memberIds);
@@ -2503,8 +2461,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async updateChannel({ communityId, channelId, name, topic }) {
-    const { error } = await supabase
-      .from('channels')
+    const { error } = await havenCommunitySb().from('channels')
       .update({
         name,
         topic,
@@ -2516,8 +2473,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async deleteChannel({ communityId, channelId }) {
-    const { error } = await supabase
-      .from('channels')
+    const { error } = await havenCommunitySb().from('channels')
       .delete()
       .eq('community_id', communityId)
       .eq('id', channelId);
@@ -2527,7 +2483,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
   async sendUserMessage({ communityId, channelId, userId, content, replyToMessageId, mediaUpload }) {
     const trimmedContent = content.trim();
-    const hasMediaUpload = Boolean(mediaUpload?.file);
+    const hasMediaUpload = Boolean(mediaUpload?.body);
     if (!trimmedContent && !hasMediaUpload) {
       throw new Error('Message content or media is required.');
     }
@@ -2535,7 +2491,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const uploadedMedia = await uploadMessageMediaToObjectStore({
       communityId,
       channelId,
-      mediaUpload,
+      mediaUpload: mediaUpload?.body
+        ? {
+            body: mediaUpload.body,
+            filename: mediaUpload.filename,
+            expiresInHours: mediaUpload.expiresInHours,
+          }
+        : undefined,
     });
 
     const nextMetadata = {
@@ -2545,8 +2507,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       ...(uploadedMedia ? { hasAttachment: true } : {}),
     };
 
-    const { data: createdMessage, error: insertError } = await supabase
-      .from('messages')
+    const { data: createdMessage, error: insertError } = await havenCommunitySb().from('messages')
       .insert({
         community_id: communityId,
         channel_id: channelId,
@@ -2558,14 +2519,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .select('*')
       .single();
     if (insertError) {
-      await removeUploadedMediaObject(uploadedMedia);
+      await havenCommunityMediaHelpers().removeUploadedMediaObject(uploadedMedia);
       throw insertError;
     }
 
     if (!uploadedMedia) return;
 
-    const { error: attachmentError } = await supabase
-      .from('message_attachments' as never)
+    const { error: attachmentError } = await havenCommunitySb().from('message_attachments' as never)
       .insert({
         message_id: createdMessage.id,
         community_id: communityId,
@@ -2582,14 +2542,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     if (!attachmentError) return;
 
-    await removeUploadedMediaObject(uploadedMedia);
-    await supabase.from('messages').delete().eq('id', createdMessage.id);
+    await havenCommunityMediaHelpers().removeUploadedMediaObject(uploadedMedia);
+    await havenCommunitySb().from('messages').delete().eq('id', createdMessage.id);
     throw attachmentError;
   },
 
   async editUserMessage({ communityId, messageId, content }) {
-    const { error } = await supabase
-      .from('messages')
+    const { error } = await havenCommunitySb().from('messages')
       .update({
         content,
         edited_at: new Date().toISOString(),
@@ -2601,8 +2560,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
   async deleteMessage({ communityId, messageId }) {
     // Storage objects must be removed through the Storage API, not direct SQL.
-    const { data: attachmentRows, error: attachmentRowsError } = await supabase
-      .from('message_attachments' as never)
+    const { data: attachmentRows, error: attachmentRowsError } = await havenCommunitySb().from('message_attachments' as never)
       .select('bucket_name, object_path')
       .eq('community_id', communityId)
       .eq('message_id', messageId);
@@ -2619,7 +2577,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       if (paths.length === 0) continue;
 
       try {
-        await messageObjectStore.removeObjects(bucketName, paths);
+        await havenCommunityStore().removeObjects(bucketName, paths);
       } catch (removeError) {
         console.warn('Failed to remove message attachment objects before message delete:', {
           messageId,
@@ -2629,8 +2587,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       }
     }
 
-    const { error } = await supabase
-      .from('messages')
+    const { error } = await havenCommunitySb().from('messages')
       .delete()
       .eq('community_id', communityId)
       .eq('id', messageId);
@@ -2663,8 +2620,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     const reportId = crypto.randomUUID();
 
-    const { error: reportError } = await supabase
-      .from('support_reports')
+    const { error: reportError } = await havenCommunitySb().from('support_reports')
       .insert({
         id: reportId,
         community_id: communityId,
@@ -2678,14 +2634,14 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     if (reportError) throw reportError;
 
-    const { error: channelLinkError } = await supabase.from('support_report_channels').insert({
+    const { error: channelLinkError } = await havenCommunitySb().from('support_report_channels').insert({
       report_id: reportId,
       community_id: communityId,
       channel_id: channelId,
     });
     if (channelLinkError) throw channelLinkError;
 
-    const { error: messageLinkError } = await supabase.from('support_report_messages').insert({
+    const { error: messageLinkError } = await havenCommunitySb().from('support_report_messages').insert({
       report_id: reportId,
       message_id: messageId,
     });

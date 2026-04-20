@@ -20,10 +20,11 @@ const conditionalReporters = markdownOutputFile
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@electron': path.resolve(__dirname, 'apps/electron/src'),
-      '@web': path.resolve(__dirname, 'apps/web/src'),
-      '@shared': path.resolve(__dirname, 'packages/shared/src'),
+      alias: {
+        '@electron': path.resolve(__dirname, 'apps/electron/src'),
+        '@web': path.resolve(__dirname, 'apps/web/src'),
+        '@shared/app/ui': path.resolve(__dirname, 'packages/web-client/src/app-ui'),
+        '@shared': path.resolve(__dirname, 'packages/shared/src'),
       '@client': path.resolve(__dirname, 'packages/shared/src/client'),
       '@platform': path.resolve(__dirname, 'packages/shared/src/platform'),
       '@test-support': path.resolve(__dirname, 'tooling/test-support'),

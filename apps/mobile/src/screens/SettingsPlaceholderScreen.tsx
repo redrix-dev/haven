@@ -9,28 +9,28 @@ export function SettingsPlaceholderScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View className="flex-1 bg-slate-950" style={{ paddingTop: insets.top }}>
-      <View className="flex-row items-center border-b border-slate-800 px-3 py-3">
+    <View className="flex-1 bg-surface-app" style={{ paddingTop: insets.top }}>
+      <View className="flex-row items-center border-b border-border-panel bg-surface-modal px-3 py-3">
         <Pressable
           accessibilityRole="button"
-          className="mr-2 h-10 w-10 items-center justify-center rounded-xl bg-slate-800"
+          className="mr-2 h-10 w-10 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back" size={22} color="#f8fafc" />
+          <Ionicons name="chevron-back" size={22} color="#e6edf7" />
         </Pressable>
-        <Text className="text-lg font-semibold text-slate-50">
+        <Text className="text-lg font-semibold text-foreground">
           Account & settings
         </Text>
       </View>
       <View className="flex-1 justify-center px-6">
-        <Text className="mb-8 text-center text-slate-400">
+        <Text className="mb-8 text-center text-muted-foreground">
           Settings and account management will live here.
         </Text>
         <Pressable
-          className="rounded-xl border border-slate-600 py-4 active:bg-slate-900"
+          className="rounded-xl border border-border-control py-4 active:bg-surface-embedded"
           onPress={() => void getMobileSupabase().auth.signOut()}
         >
-          <Text className="text-center text-base font-semibold text-slate-200">
+          <Text className="text-center text-base font-semibold text-foreground">
             Sign out
           </Text>
         </Pressable>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useAuthStore } from "@shared/stores/authStore";
@@ -6,8 +6,6 @@ import { useServersStore } from "@shared/stores/serversStore";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { stableOnActiveServerAccessLost } from "@shared/app/chat-app/realtime/communityAccessBroadcastBridge";
-
-const controlPlaneBackend = getControlPlaneBackend();
 
 type ServersStatus = "idle" | "loading" | "success" | "error";
 
@@ -18,6 +16,7 @@ type UseServersInput = {
 export function useServers({
   onActiveServerAccessLost = stableOnActiveServerAccessLost,
 }: UseServersInput = {}) {
+  const controlPlaneBackend = useMemo(() => getControlPlaneBackend(), []);
   const user = useAuthStore((state) => state.user);
   const [status, setStatus] = useState<ServersStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +87,7 @@ export function useServers({
       setStoredIsLoading(false);
     }
   }, [
+    controlPlaneBackend,
     detectActiveServerAccessLoss,
     resetStoredServers,
     setStoredIsLoading,
@@ -114,7 +114,7 @@ export function useServers({
     return () => {
       void subscription.unsubscribe();
     };
-  }, [user, loadServers, resetStoredServers]);
+  }, [user, loadServers, resetStoredServers, controlPlaneBackend]);
 
   async function createServer(name: string) {
     if (!user) throw new Error("Not authenticated");

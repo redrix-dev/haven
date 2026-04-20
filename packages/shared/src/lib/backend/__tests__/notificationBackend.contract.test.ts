@@ -1,5 +1,5 @@
 import { describe, beforeAll, afterAll, beforeEach, expect, it } from 'vitest';
-import { centralNotificationBackend } from '@shared/lib/backend/notificationBackend';
+import { getNotificationBackend } from '@shared/lib/backend';
 import { loadBootstrappedTestUsers } from '@test-support/fixtures/users';
 import {
   resetFixtureDomainState,
@@ -25,10 +25,10 @@ describe.sequential('NotificationBackend (contract)', () => {
   });
 
   it('reads and updates global notification preferences', async () => {
-    const original = await centralNotificationBackend.getNotificationPreferences();
+    const original = await getNotificationBackend().getNotificationPreferences();
     expect(original.userId).toBe(users.member_a.id);
 
-    const next = await centralNotificationBackend.updateNotificationPreferences({
+    const next = await getNotificationBackend().updateNotificationPreferences({
       ...original,
       mentionSoundEnabled: !original.mentionSoundEnabled,
       dmPushEnabled: !original.dmPushEnabled,
@@ -38,22 +38,22 @@ describe.sequential('NotificationBackend (contract)', () => {
     expect(next.mentionSoundEnabled).toBe(!original.mentionSoundEnabled);
     expect(next.dmPushEnabled).toBe(!original.dmPushEnabled);
 
-    const reloaded = await centralNotificationBackend.getNotificationPreferences();
+    const reloaded = await getNotificationBackend().getNotificationPreferences();
     expect(reloaded.mentionSoundEnabled).toBe(next.mentionSoundEnabled);
     expect(reloaded.dmPushEnabled).toBe(next.dmPushEnabled);
   });
 
   it('lists inbox notifications and supports read/dismiss mutations', async () => {
-    const notifications = await centralNotificationBackend.listNotifications({ limit: 20 });
+    const notifications = await getNotificationBackend().listNotifications({ limit: 20 });
     expect(Array.isArray(notifications)).toBe(true);
 
     if (notifications.length === 0) return;
 
     const target = notifications[0];
-    const markedRead = await centralNotificationBackend.markNotificationsRead([target.recipientId]);
+    const markedRead = await getNotificationBackend().markNotificationsRead([target.recipientId]);
     expect(markedRead).toBeGreaterThanOrEqual(0);
 
-    const dismissed = await centralNotificationBackend.dismissNotifications([target.recipientId]);
+    const dismissed = await getNotificationBackend().dismissNotifications([target.recipientId]);
     expect(dismissed).toBeGreaterThanOrEqual(0);
   });
 
@@ -81,10 +81,10 @@ describe.sequential('NotificationBackend (contract)', () => {
     );
     expect(createError).toBeNull();
 
-    const inboxNotifications = await centralNotificationBackend.listNotifications({ limit: 50 });
+    const inboxNotifications = await getNotificationBackend().listNotifications({ limit: 50 });
     expect(inboxNotifications.some((item) => item.sourceId === sourceId)).toBe(false);
 
-    const soundNotifications = await centralNotificationBackend.listSoundNotifications({ limit: 50 });
+    const soundNotifications = await getNotificationBackend().listSoundNotifications({ limit: 50 });
     const target = soundNotifications.find((item) => item.sourceId === sourceId);
 
     expect(target).toBeTruthy();
@@ -96,7 +96,7 @@ describe.sequential('NotificationBackend (contract)', () => {
     const endpoint = `https://push.example.test/member-a/${crypto.randomUUID()}`;
     const installationId = `vitest-installation-${crypto.randomUUID()}`;
 
-    const created = await centralNotificationBackend.upsertWebPushSubscription({
+    const created = await getNotificationBackend().upsertWebPushSubscription({
       endpoint,
       installationId,
       p256dhKey: 'p256dh-member-a',
@@ -113,10 +113,10 @@ describe.sequential('NotificationBackend (contract)', () => {
     expect(created.clientPlatform).toBe('android');
     expect(created.metadata).toMatchObject({ device: 'a1' });
 
-    const listedForMemberA = await centralNotificationBackend.listWebPushSubscriptions();
+    const listedForMemberA = await getNotificationBackend().listWebPushSubscriptions();
     expect(listedForMemberA.some((row) => row.endpoint === endpoint)).toBe(true);
 
-    const updated = await centralNotificationBackend.upsertWebPushSubscription({
+    const updated = await getNotificationBackend().upsertWebPushSubscription({
       endpoint,
       installationId,
       p256dhKey: 'p256dh-member-a-updated',
@@ -133,7 +133,7 @@ describe.sequential('NotificationBackend (contract)', () => {
     expect(updated.metadata).toMatchObject({ rev: 2 });
 
     const rotatedEndpoint = `https://push.example.test/member-a/${crypto.randomUUID()}`;
-    const rotated = await centralNotificationBackend.upsertWebPushSubscription({
+    const rotated = await getNotificationBackend().upsertWebPushSubscription({
       endpoint: rotatedEndpoint,
       installationId,
       p256dhKey: 'p256dh-member-a-rotated',
@@ -147,27 +147,27 @@ describe.sequential('NotificationBackend (contract)', () => {
     expect(rotated.endpoint).toBe(rotatedEndpoint);
     expect(rotated.installationId).toBe(installationId);
 
-    const listedAfterRotate = await centralNotificationBackend.listWebPushSubscriptions();
+    const listedAfterRotate = await getNotificationBackend().listWebPushSubscriptions();
     expect(listedAfterRotate.filter((row) => row.installationId === installationId)).toHaveLength(1);
 
     await signInAsTestUser('member_b');
 
-    const listedForMemberB = await centralNotificationBackend.listWebPushSubscriptions();
+    const listedForMemberB = await getNotificationBackend().listWebPushSubscriptions();
     expect(listedForMemberB.some((row) => row.endpoint === endpoint)).toBe(false);
 
-    const deletedByMemberB = await centralNotificationBackend.deleteWebPushSubscription(endpoint);
+    const deletedByMemberB = await getNotificationBackend().deleteWebPushSubscription(endpoint);
     expect(deletedByMemberB).toBe(false);
 
     await signInAsTestUser('member_a');
 
-    const stillPresentForMemberA = await centralNotificationBackend.listWebPushSubscriptions();
+    const stillPresentForMemberA = await getNotificationBackend().listWebPushSubscriptions();
     expect(stillPresentForMemberA.some((row) => row.endpoint === endpoint)).toBe(false);
     expect(stillPresentForMemberA.some((row) => row.endpoint === rotatedEndpoint)).toBe(true);
 
-    const deletedByMemberA = await centralNotificationBackend.deleteWebPushSubscription(rotatedEndpoint);
+    const deletedByMemberA = await getNotificationBackend().deleteWebPushSubscription(rotatedEndpoint);
     expect(deletedByMemberA).toBe(true);
 
-    const deletedAgain = await centralNotificationBackend.deleteWebPushSubscription(rotatedEndpoint);
+    const deletedAgain = await getNotificationBackend().deleteWebPushSubscription(rotatedEndpoint);
     expect(deletedAgain).toBe(false);
   });
 
@@ -175,7 +175,7 @@ describe.sequential('NotificationBackend (contract)', () => {
     const tokenA = `ExponentPushToken[contract-${crypto.randomUUID()}]`;
     const installationId = `vitest-expo-install-${crypto.randomUUID()}`;
 
-    const created = await centralNotificationBackend.upsertExpoPushSubscription({
+    const created = await getNotificationBackend().upsertExpoPushSubscription({
       expoPushToken: tokenA,
       platform: 'android',
       installationId,
@@ -187,11 +187,11 @@ describe.sequential('NotificationBackend (contract)', () => {
     expect(created.installationId).toBe(installationId);
     expect(created.platform).toBe('android');
 
-    const listedA = await centralNotificationBackend.listExpoPushSubscriptions();
+    const listedA = await getNotificationBackend().listExpoPushSubscriptions();
     expect(listedA.some((row) => row.expoPushToken === tokenA)).toBe(true);
 
     const tokenB = `ExponentPushToken[contract-${crypto.randomUUID()}]`;
-    const rotated = await centralNotificationBackend.upsertExpoPushSubscription({
+    const rotated = await getNotificationBackend().upsertExpoPushSubscription({
       expoPushToken: tokenB,
       platform: 'android',
       installationId,
@@ -199,20 +199,20 @@ describe.sequential('NotificationBackend (contract)', () => {
     });
 
     expect(rotated.expoPushToken).toBe(tokenB);
-    const listedAfterRotate = await centralNotificationBackend.listExpoPushSubscriptions();
+    const listedAfterRotate = await getNotificationBackend().listExpoPushSubscriptions();
     expect(listedAfterRotate.filter((row) => row.installationId === installationId)).toHaveLength(1);
 
     await signInAsTestUser('member_b');
-    const listedB = await centralNotificationBackend.listExpoPushSubscriptions();
+    const listedB = await getNotificationBackend().listExpoPushSubscriptions();
     expect(listedB.some((row) => row.expoPushToken === tokenB)).toBe(false);
 
-    const deletedByB = await centralNotificationBackend.deleteExpoPushSubscription(tokenB);
+    const deletedByB = await getNotificationBackend().deleteExpoPushSubscription(tokenB);
     expect(deletedByB).toBe(false);
 
     await signInAsTestUser('member_a');
-    const deletedByA = await centralNotificationBackend.deleteExpoPushSubscription(tokenB);
+    const deletedByA = await getNotificationBackend().deleteExpoPushSubscription(tokenB);
     expect(deletedByA).toBe(true);
-    const deletedAgain = await centralNotificationBackend.deleteExpoPushSubscription(tokenB);
+    const deletedAgain = await getNotificationBackend().deleteExpoPushSubscription(tokenB);
     expect(deletedAgain).toBe(false);
   });
 
@@ -239,7 +239,7 @@ describe.sequential('NotificationBackend (contract)', () => {
 
     expect(insertError).toBeNull();
 
-    const traces = await centralNotificationBackend.listNotificationDeliveryTraces({ limit: 20 });
+    const traces = await getNotificationBackend().listNotificationDeliveryTraces({ limit: 20 });
     const target = traces.find(
       (trace) =>
         trace.details.syntheticRecipientId === recipientId &&
@@ -273,7 +273,7 @@ describe.sequential('NotificationBackend (contract)', () => {
 
     expect(upsertError).toBeNull();
 
-    const diagnostics = await centralNotificationBackend.getWebPushDispatchWakeupDiagnostics();
+    const diagnostics = await getNotificationBackend().getWebPushDispatchWakeupDiagnostics();
     expect(diagnostics).toBeTruthy();
     expect(diagnostics?.enabled).toBe(true);
     expect(diagnostics?.shadowMode).toBe(true);
@@ -286,7 +286,7 @@ describe.sequential('NotificationBackend (contract)', () => {
 
   it('reads web push dispatch queue health diagnostics for active platform staff and rejects non-staff', async () => {
     const endpoint = `https://push.example.test/member-a/${crypto.randomUUID()}`;
-    await centralNotificationBackend.upsertWebPushSubscription({
+    await getNotificationBackend().upsertWebPushSubscription({
       endpoint,
       installationId: `vitest-queue-health-${crypto.randomUUID()}`,
       p256dhKey: 'p256dh-queue-health',
@@ -320,11 +320,11 @@ describe.sequential('NotificationBackend (contract)', () => {
     );
     expect(createError).toBeNull();
 
-    await expect(centralNotificationBackend.getWebPushDispatchQueueHealthDiagnostics()).rejects.toBeTruthy();
+    await expect(getNotificationBackend().getWebPushDispatchQueueHealthDiagnostics()).rejects.toBeTruthy();
 
     await signInAsTestUser('platform_staff_active');
 
-    const diagnostics = await centralNotificationBackend.getWebPushDispatchQueueHealthDiagnostics();
+    const diagnostics = await getNotificationBackend().getWebPushDispatchQueueHealthDiagnostics();
     expect(diagnostics).toBeTruthy();
     expect(diagnostics?.totalPending).toBeGreaterThanOrEqual(1);
     expect(diagnostics?.claimableNowCount).toBeGreaterThanOrEqual(1);
@@ -335,7 +335,7 @@ describe.sequential('NotificationBackend (contract)', () => {
 
   it('allows active platform staff to update wakeup config and rejects non-staff', async () => {
     await expect(
-      centralNotificationBackend.updateWebPushDispatchWakeupConfig({
+      getNotificationBackend().updateWebPushDispatchWakeupConfig({
         enabled: false,
         shadowMode: false,
         minIntervalSeconds: 1,
@@ -344,7 +344,7 @@ describe.sequential('NotificationBackend (contract)', () => {
 
     await signInAsTestUser('platform_staff_active');
 
-    const updated = await centralNotificationBackend.updateWebPushDispatchWakeupConfig({
+    const updated = await getNotificationBackend().updateWebPushDispatchWakeupConfig({
       enabled: true,
       shadowMode: true,
       minIntervalSeconds: 2,

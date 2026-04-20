@@ -1,5 +1,7 @@
 import React from "react";
-import { supabase } from "@shared/lib/supabase";
+import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
+
+const voiceRt = () => requireHavenDataRuntime().client;
 import type { Channel } from "@shared/lib/backend/types";
 import type {
   VoicePresenceStateRow,
@@ -135,7 +137,7 @@ export function useVoice({
     if (!activeVoiceChannel) return;
 
     const expectedTopic = `voice:presence:${activeVoiceChannel.community_id}:${activeVoiceChannel.id}`;
-    const channels = supabase.getChannels().filter((channel) => {
+    const channels = voiceRt().getChannels().filter((channel) => {
       const topic = channel.topic ?? "";
       return (
         topic === expectedTopic ||
@@ -144,7 +146,7 @@ export function useVoice({
       );
     });
     await Promise.all(
-      channels.map((channel) => supabase.removeChannel(channel)),
+      channels.map((channel) => voiceRt().removeChannel(channel)),
     );
   }, [activeVoiceChannel]);
 
@@ -312,7 +314,7 @@ export function useVoice({
     let disposed = false;
 
     const subscriptionChannels = voiceChannelIds.map((voiceChannelId) => {
-      const subscriptionChannel = supabase.channel(
+      const subscriptionChannel = voiceRt().channel(
         `voice:presence:${currentServerId}:${voiceChannelId}`,
       );
 
@@ -404,7 +406,7 @@ export function useVoice({
     return () => {
       disposed = true;
       for (const subscriptionChannel of subscriptionChannels) {
-        void supabase.removeChannel(subscriptionChannel);
+        void voiceRt().removeChannel(subscriptionChannel);
       }
     };
   }, [activeVoiceChannelId, channels, currentServerId, currentUserId]);

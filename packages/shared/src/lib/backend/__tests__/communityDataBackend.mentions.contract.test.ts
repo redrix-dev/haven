@@ -1,6 +1,5 @@
 import { describe, beforeAll, beforeEach, afterAll, expect, it } from 'vitest';
-import { centralCommunityDataBackend } from '@shared/lib/backend/communityDataBackend';
-import { centralNotificationBackend } from '@shared/lib/backend/notificationBackend';
+import { getCommunityDataBackend, getNotificationBackend } from '@shared/lib/backend';
 import { loadBootstrappedTestUsers } from '@test-support/fixtures/users';
 import {
   getFixtureChannelByName,
@@ -33,7 +32,7 @@ describe.sequential('CommunityDataBackend mention integration (contract)', () =>
   });
 
   it('message send path produces a channel_mention notification via DB trigger', async () => {
-    await centralCommunityDataBackend.sendUserMessage({
+    await getCommunityDataBackend(fixtureCommunityId).sendUserMessage({
       communityId: fixtureCommunityId,
       channelId: fixtureGeneralChannelId,
       userId: users.member_a.id,
@@ -43,7 +42,7 @@ describe.sequential('CommunityDataBackend mention integration (contract)', () =>
     });
 
     await signInAsTestUser('member_b');
-    const inbox = await centralNotificationBackend.listNotifications({ limit: 25 });
+    const inbox = await getNotificationBackend().listNotifications({ limit: 25 });
     const mention = inbox.find(
       (row) =>
         row.kind === 'channel_mention' &&

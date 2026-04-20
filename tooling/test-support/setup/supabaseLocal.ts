@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { execFileSync } from 'node:child_process';
-import { supabase } from '@shared/lib/supabase';
+import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
+import { initializeHavenDataFromClient } from '@shared/lib/bootstrap/initializeHavenDataFromClient';
 import type { Database } from '@shared/types/database';
 import { loadBootstrappedTestUsers, type TestUserKey } from '../fixtures/users';
 
@@ -24,8 +25,21 @@ export const serviceSupabase = createClient<Database>(
       persistSession: false,
       autoRefreshToken: false,
     },
-  }
+  },
 );
+
+export const supabase = createHavenSupabaseClient(localSupabaseEnv.url, localSupabaseEnv.anonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+});
+
+initializeHavenDataFromClient(supabase, {
+  supabaseUrl: localSupabaseEnv.url,
+  supabaseAnonKey: localSupabaseEnv.anonKey,
+});
 
 export async function signInAsTestUser(userKey: TestUserKey) {
   const users = loadBootstrappedTestUsers();
@@ -59,7 +73,7 @@ export async function getFixtureCommunityByName(name = 'TEST:RLS Community') {
   if (error) throw error;
   if (!data?.id) {
     throw new Error(
-      `Fixture community "${name}" not found. Run "npm run test:db" (or at least db reset + fixtures) first.`
+      `Fixture community "${name}" not found. Run "npm run test:db" (or at least db reset + fixtures) first.`,
     );
   }
   return data;

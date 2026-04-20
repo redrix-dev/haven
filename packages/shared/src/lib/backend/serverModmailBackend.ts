@@ -1,6 +1,6 @@
-import { supabase } from '@shared/lib/supabase';
+import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import type { Database } from '@shared/types/database';
-import { centralCommunityDataBackend } from './communityDataBackend';
+import type { CommunityDataBackend } from './communityDataBackend.interface';
 import type {
   ServerReportDetail,
   ServerReportLinkedChannel,
@@ -196,13 +196,13 @@ const mapSupportReportRowToSummary = (row: SupportReportRow): ServerReportSummar
   };
 };
 
-const loadChannelNameMap = async (channelIds: readonly string[]) => {
+const loadChannelNameMap = async (sb: HavenSupabaseClient, channelIds: readonly string[]) => {
   const uniqueChannelIds = Array.from(new Set(channelIds.filter(Boolean)));
   if (uniqueChannelIds.length === 0) {
     return new Map<string, string>();
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('channels')
     .select('id, name')
     .in('id', uniqueChannelIds);
@@ -211,11 +211,11 @@ const loadChannelNameMap = async (channelIds: readonly string[]) => {
   return new Map((data ?? []).map((row) => [row.id, (row as ChannelNameRow).name]));
 };
 
-const loadEscalationContext = async (communityId: string, userId: string) => {
+const loadEscalationContext = async (sb: HavenSupabaseClient, communityId: string, userId: string) => {
   const [{ data: profile, error: profileError }, { data: membership, error: membershipError }] =
     await Promise.all([
-      supabase.from('profiles').select('id, username, avatar_url').eq('id', userId).maybeSingle(),
-      supabase
+      sb.from('profiles').select('id, username, avatar_url').eq('id', userId).maybeSingle(),
+      sb
         .from('community_members')
         .select('id, nickname')
         .eq('community_id', communityId)
@@ -229,7 +229,7 @@ const loadEscalationContext = async (communityId: string, userId: string) => {
   let roleNames: string[] = [];
   if (membership?.id) {
     const [{ data: memberRoles, error: memberRolesError }] = await Promise.all([
-      supabase
+      sb
         .from('member_roles')
         .select('role_id')
         .eq('community_id', communityId)
@@ -239,7 +239,7 @@ const loadEscalationContext = async (communityId: string, userId: string) => {
 
     const roleIds = (memberRoles ?? []).map((row) => (row as MemberRoleRow).role_id);
     if (roleIds.length > 0) {
-      const { data: roleRows, error: roleRowsError } = await supabase
+      const { data: roleRows, error: roleRowsError } = await sb
         .from('roles')
         .select('id, name')
         .eq('community_id', communityId)
@@ -255,8 +255,8 @@ const loadEscalationContext = async (communityId: string, userId: string) => {
   };
 };
 
-const fetchSupportReportRow = async (reportId: string) => {
-  const { data, error } = await supabase
+const fetchSupportReportRow = async (sb: HavenSupabaseClient, reportId: string) => {
+  const { data, error } = await sb
     .from('support_reports')
     .select(
       'id, community_id, destination, status, title, notes, snapshot, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
@@ -276,12 +276,16 @@ export interface ServerModmailBackend {
   escalateReport(reportId: string): Promise<string>;
 }
 
-export const centralServerModmailBackend: ServerModmailBackend = {
+export function createServerModmailBackend(
+  client: HavenSupabaseClient,
+  communityBackend: CommunityDataBackend,
+): ServerModmailBackend {
+  const modmail: ServerModmailBackend = {
   async listServerReports(communityIds) {
     const uniqueCommunityIds = Array.from(new Set(communityIds.filter(Boolean)));
     if (uniqueCommunityIds.length === 0) return [];
 
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('support_reports')
       .select(
         'id, community_id, destination, status, title, notes, snapshot, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
@@ -295,7 +299,7 @@ export const centralServerModmailBackend: ServerModmailBackend = {
   },
 
   async getServerReport(reportId) {
-    const reportRow = await fetchSupportReportRow(reportId);
+    const reportRow = await fetchSupportReportRow(client, reportId);
     if (!reportRow) return null;
 
     const summary = mapSupportReportRowToSummary(reportRow);
@@ -305,11 +309,11 @@ export const centralServerModmailBackend: ServerModmailBackend = {
       { data: channelLinks, error: channelLinksError },
       { data: messageLinks, error: messageLinksError },
     ] = await Promise.all([
-      supabase
+      client
         .from('support_report_channels')
         .select('channel_id, channels(name)')
         .eq('report_id', reportId),
-      supabase
+      client
         .from('support_report_messages')
         .select('message_id')
         .eq('report_id', reportId),
@@ -331,14 +335,14 @@ export const centralServerModmailBackend: ServerModmailBackend = {
 
     let linkedMessages: ServerReportLinkedMessage[] = [];
     if (messageIds.length > 0) {
-      const { data: messages, error: messagesError } = await supabase
+      const { data: messages, error: messagesError } = await client
         .from('messages')
         .select('id, channel_id')
         .in('id', messageIds);
       if (messagesError) throw messagesError;
 
       const messageRows = (messages ?? []) as MessageChannelRow[];
-      const channelNameMap = await loadChannelNameMap(
+      const channelNameMap = await loadChannelNameMap(client,
         messageRows.map((row) => row.channel_id).filter((channelId): channelId is string => Boolean(channelId))
       );
 
@@ -373,23 +377,23 @@ export const centralServerModmailBackend: ServerModmailBackend = {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await client.auth.getUser();
     if (authError) throw authError;
     if (!user?.id) throw new Error('Not authenticated.');
 
-    const reportRow = await fetchSupportReportRow(reportId);
+    const reportRow = await fetchSupportReportRow(client, reportId);
     if (!reportRow) {
       throw new Error('Report not found.');
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await client
       .from('support_reports')
       .update({ status })
       .eq('id', reportId);
     if (updateError) throw updateError;
 
     try {
-      await centralCommunityDataBackend.broadcastReportStatusUpdated({
+      await communityBackend.broadcastReportStatusUpdated({
         reportId,
         status,
         communityId: reportRow.community_id,
@@ -409,18 +413,18 @@ export const centralServerModmailBackend: ServerModmailBackend = {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await client.auth.getUser();
     if (authError) throw authError;
     if (!user?.id) throw new Error('Not authenticated.');
 
-    const reportRow = await fetchSupportReportRow(reportId);
+    const reportRow = await fetchSupportReportRow(client, reportId);
     if (!reportRow) {
       throw new Error('Report not found.');
     }
 
     const notes = parseJsonRecord(reportRow.notes) ?? {};
     const existingNotes = parseInternalNotes(notes);
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await client
       .from('profiles')
       .select('id, username')
       .eq('id', user.id)
@@ -438,7 +442,7 @@ export const centralServerModmailBackend: ServerModmailBackend = {
       } satisfies SupportReportInternalNote,
     ];
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await client
       .from('support_reports')
       .update({
         notes: JSON.stringify({
@@ -454,11 +458,11 @@ export const centralServerModmailBackend: ServerModmailBackend = {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await client.auth.getUser();
     if (authError) throw authError;
     if (!user?.id) throw new Error('Not authenticated.');
 
-    const reportRow = await fetchSupportReportRow(reportId);
+    const reportRow = await fetchSupportReportRow(client, reportId);
     if (!reportRow) {
       throw new Error('Report not found.');
     }
@@ -469,15 +473,15 @@ export const centralServerModmailBackend: ServerModmailBackend = {
     const parsedOriginalNotes = parseJsonRecord(reportRow.notes);
     const [{ data: originalChannelLinks, error: channelLinksError }, { data: originalMessageLinks, error: messageLinksError }, { data: originalReporter, error: originalReporterError }] =
       await Promise.all([
-        supabase
+        client
           .from('support_report_channels')
           .select('channel_id')
           .eq('report_id', reportId),
-        supabase
+        client
           .from('support_report_messages')
           .select('message_id')
           .eq('report_id', reportId),
-        supabase
+        client
           .from('profiles')
           .select('id, username, avatar_url')
           .eq('id', reportRow.reporter_user_id)
@@ -488,7 +492,7 @@ export const centralServerModmailBackend: ServerModmailBackend = {
     if (messageLinksError) throw messageLinksError;
     if (originalReporterError) throw originalReporterError;
 
-    const escalationContext = await loadEscalationContext(reportRow.community_id, user.id);
+    const escalationContext = await loadEscalationContext(client, reportRow.community_id, user.id);
     const escalatedAt = new Date().toISOString();
     const escalatedReportId = crypto.randomUUID();
 
@@ -505,7 +509,7 @@ export const centralServerModmailBackend: ServerModmailBackend = {
       originalNotes: parsedOriginalNotes,
     };
 
-    const { error: insertError } = await supabase.from('support_reports').insert({
+    const { error: insertError } = await client.from('support_reports').insert({
       id: escalatedReportId,
       community_id: reportRow.community_id,
       destination: 'haven_staff',
@@ -526,7 +530,7 @@ export const centralServerModmailBackend: ServerModmailBackend = {
       })
     );
     if (nextChannelLinks.length > 0) {
-      const { error: copyChannelLinksError } = await supabase
+      const { error: copyChannelLinksError } = await client
         .from('support_report_channels')
         .insert(nextChannelLinks);
       if (copyChannelLinksError) throw copyChannelLinksError;
@@ -539,13 +543,17 @@ export const centralServerModmailBackend: ServerModmailBackend = {
       })
     );
     if (nextMessageLinks.length > 0) {
-      const { error: copyMessageLinksError } = await supabase
+      const { error: copyMessageLinksError } = await client
         .from('support_report_messages')
         .insert(nextMessageLinks);
       if (copyMessageLinksError) throw copyMessageLinksError;
     }
 
-    await centralServerModmailBackend.updateReportStatus(reportId, 'escalated');
+    await modmail.updateReportStatus(reportId, 'escalated');
     return escalatedReportId;
   },
 };
+
+  return modmail;
+}
+

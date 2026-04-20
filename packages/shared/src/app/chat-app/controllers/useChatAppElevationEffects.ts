@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { getCommunityDataBackend } from "@shared/lib/backend";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 
 type UseChatAppElevationEffectsInput = {
@@ -49,7 +50,11 @@ export function useChatAppElevationEffects({
       };
     }
 
-    void ensureElevatedInServer(currentServerId, userId)
+    void ensureElevatedInServer(
+      currentServerId,
+      userId,
+      getCommunityDataBackend(currentServerId),
+    )
       .then((isElevated) => {
         if (!cancelled) {
           setIsCurrentUserElevatedInCurrentServer(isElevated);
@@ -83,7 +88,11 @@ export function useChatAppElevationEffects({
       };
     }
 
-    void ensureElevatedInServer(activeVoiceCommunityId, userId)
+    void ensureElevatedInServer(
+      activeVoiceCommunityId,
+      userId,
+      getCommunityDataBackend(activeVoiceCommunityId),
+    )
       .then((isElevated) => {
         if (!cancelled) {
           setIsCurrentUserElevatedInActiveVoiceServer(isElevated);
@@ -114,7 +123,11 @@ export function useChatAppElevationEffects({
       };
     }
 
-    void ensureElevatedInServer(membersModalCommunityId, userId)
+    void ensureElevatedInServer(
+      membersModalCommunityId,
+      userId,
+      getCommunityDataBackend(membersModalCommunityId),
+    )
       .then((isElevated) => {
         if (!cancelled) {
           setIsCurrentUserElevatedInMembersModalServer(isElevated);

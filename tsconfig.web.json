@@ -10,6 +10,7 @@
     "vite.config.ts",
     "apps/web/src/**/*",
     "apps/electron/src/renderer/**/*",
+    "packages/web-client/src/**/*",
     "packages/shared/src/**/*",
     "tooling/test-support/setup/jsdom.ts"
   ],

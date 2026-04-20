@@ -1,5 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
+import { initializeHavenDataFromClient } from '@shared/lib/bootstrap/initializeHavenDataFromClient';
 import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { registerElectronAppHost } from './registerElectronAppHost';
@@ -7,6 +9,22 @@ import { AppRoot } from '@shared/app/AppRoot';
 import '@shared/styles/globals.css';
 
 registerElectronAppHost();
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing SUPABASE_URL / SUPABASE_ANON_KEY for electron renderer bootstrap.');
+}
+const havenElectronClient = createHavenSupabaseClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
+initializeHavenDataFromClient(havenElectronClient, {
+  supabaseUrl,
+  supabaseAnonKey,
+});
 
 const root = createRoot(document.body);
 

@@ -1,15 +1,20 @@
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
 const path = require("path");
+const metroResolver = require("metro-resolver");
 
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, "../..");
 const mobileNodeModules = path.resolve(projectRoot, "node_modules");
 const sharedPackageRoot = path.resolve(monorepoRoot, "packages/shared");
+const webClientPackageRoot = path.resolve(monorepoRoot, "packages/web-client");
+const sharedSrcRoot = path.join(sharedPackageRoot, "src");
+const webClientAppUiRoot = path.join(webClientPackageRoot, "src", "app-ui");
+const mobileSrcRoot = path.join(projectRoot, "src");
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [sharedPackageRoot];
+config.watchFolders = [sharedPackageRoot, webClientPackageRoot];
 config.resolver.disableHierarchicalLookup = true;
 config.resolver.nodeModulesPaths = [
   mobileNodeModules,
@@ -24,4 +29,84 @@ config.resolver.extraNodeModules = {
   "react-native-reanimated": path.join(mobileNodeModules, "react-native-reanimated"),
 };
 
-module.exports = withNativeWind(config, { input: "./global.css" });
+const finalConfig = withNativeWind(config, { input: "./global.css" });
+
+const upstreamResolveRequest = finalConfig.resolver.resolveRequest;
+
+/**
+ * Metro resolves imports before Babel rewrites them, so path aliases from
+ * babel-plugin-module-resolver / tsconfig must be mirrored here.
+ */
+finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
+  const resolve = metroResolver.resolve;
+
+  if (moduleName.startsWith("@shared/app/ui/")) {
+    const absolutePath = path.join(
+      webClientAppUiRoot,
+      moduleName.slice("@shared/app/ui/".length),
+    );
+    return resolve(
+      { ...context, resolveRequest: resolve },
+      absolutePath,
+      platform,
+    );
+  }
+
+  if (moduleName.startsWith("@shared/")) {
+    const absolutePath = path.join(
+      sharedSrcRoot,
+      moduleName.slice("@shared/".length),
+    );
+    return resolve(
+      { ...context, resolveRequest: resolve },
+      absolutePath,
+      platform,
+    );
+  }
+
+  if (moduleName.startsWith("@platform/")) {
+    const absolutePath = path.join(
+      sharedSrcRoot,
+      "platform",
+      moduleName.slice("@platform/".length),
+    );
+    return resolve(
+      { ...context, resolveRequest: resolve },
+      absolutePath,
+      platform,
+    );
+  }
+
+  if (moduleName.startsWith("@client/app/")) {
+    const absolutePath = path.join(
+      sharedSrcRoot,
+      "app",
+      moduleName.slice("@client/app/".length),
+    );
+    return resolve(
+      { ...context, resolveRequest: resolve },
+      absolutePath,
+      platform,
+    );
+  }
+
+  if (moduleName.startsWith("@/")) {
+    const absolutePath = path.join(
+      mobileSrcRoot,
+      moduleName.slice("@/".length),
+    );
+    return resolve(
+      { ...context, resolveRequest: resolve },
+      absolutePath,
+      platform,
+    );
+  }
+
+  if (upstreamResolveRequest) {
+    return upstreamResolveRequest(context, moduleName, platform);
+  }
+
+  return resolve(context, moduleName, platform);
+};
+
+module.exports = finalConfig;

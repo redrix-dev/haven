@@ -1,10 +1,11 @@
-import { centralCommunityDataBackend, type CommunityDataBackend } from './communityDataBackend';
-import { centralControlPlaneBackend, type ControlPlaneBackend } from './controlPlaneBackend';
-import { centralDirectMessageBackend, type DirectMessageBackend } from './directMessageBackend';
-import { centralModerationBackend, type ModerationBackend } from './moderationBackend';
-import { centralNotificationBackend, type NotificationBackend } from './notificationBackend';
-import { centralServerModmailBackend, type ServerModmailBackend } from './serverModmailBackend';
-import { centralSocialBackend, type SocialBackend } from './socialBackend';
+import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
+import type { CommunityDataBackend } from './communityDataBackend.interface';
+import type { ControlPlaneBackend } from './controlPlaneBackend';
+import type { DirectMessageBackend } from './directMessageBackend';
+import type { ModerationBackend } from './moderationBackend';
+import type { NotificationBackend } from './notificationBackend';
+import type { ServerModmailBackend } from './serverModmailBackend';
+import type { SocialBackend } from './socialBackend';
 
 export type BackendMode = 'central_supabase';
 
@@ -32,7 +33,7 @@ export const getControlPlaneBackend = (): ControlPlaneBackend => {
   switch (backendMode) {
     case 'central_supabase':
     default:
-      return centralControlPlaneBackend;
+      return requireHavenDataRuntime().controlPlane;
   }
 };
 
@@ -40,7 +41,7 @@ export const getCommunityDataBackend = (_communityId: string): CommunityDataBack
   switch (backendMode) {
     case 'central_supabase':
     default:
-      return centralCommunityDataBackend;
+      return requireHavenDataRuntime().communityData;
   }
 };
 
@@ -48,7 +49,7 @@ export const getNotificationBackend = (): NotificationBackend => {
   switch (backendMode) {
     case 'central_supabase':
     default:
-      return centralNotificationBackend;
+      return requireHavenDataRuntime().notifications;
   }
 };
 
@@ -56,7 +57,7 @@ export const getSocialBackend = (): SocialBackend => {
   switch (backendMode) {
     case 'central_supabase':
     default:
-      return centralSocialBackend;
+      return requireHavenDataRuntime().social;
   }
 };
 
@@ -64,7 +65,7 @@ export const getDirectMessageBackend = (): DirectMessageBackend => {
   switch (backendMode) {
     case 'central_supabase':
     default:
-      return centralDirectMessageBackend;
+      return requireHavenDataRuntime().directMessages;
   }
 };
 
@@ -72,7 +73,7 @@ export const getModerationBackend = (): ModerationBackend => {
   switch (backendMode) {
     case 'central_supabase':
     default:
-      return centralModerationBackend;
+      return requireHavenDataRuntime().moderation;
   }
 };
 
@@ -80,6 +81,6 @@ export const getServerModmailBackend = (): ServerModmailBackend => {
   switch (backendMode) {
     case 'central_supabase':
     default:
-      return centralServerModmailBackend;
+      return requireHavenDataRuntime().serverModmail;
   }
 };

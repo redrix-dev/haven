@@ -234,7 +234,8 @@ export interface CommunityDataBackend {
     content: string;
     replyToMessageId?: string;
     mediaUpload?: {
-      file: File;
+      body: Blob;
+      filename?: string;
       expiresInHours?: number;
     };
   }): Promise<void>;

@@ -1,9 +1,27 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
+import { initializeHavenDataFromClient } from '@shared/lib/bootstrap/initializeHavenDataFromClient';
 import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppRoot } from '@shared/app/AppRoot';
 import '@shared/styles/globals.css';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing SUPABASE_URL / SUPABASE_ANON_KEY for web bootstrap.');
+}
+const havenWebClient = createHavenSupabaseClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
+initializeHavenDataFromClient(havenWebClient, {
+  supabaseUrl,
+  supabaseAnonKey,
+});
 
 document.documentElement.classList.add('haven-web-shell');
 document.body.classList.add('haven-web-shell');

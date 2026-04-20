@@ -73,7 +73,8 @@ type DirectMessageAreaProps = {
   onSendMessage: (
     content: string,
     options?: {
-      imageFile?: File;
+      imageBody?: Blob;
+      imageFilename?: string;
       imageExpiresInHours?: number;
     },
   ) => Promise<void>;
@@ -217,7 +218,8 @@ export function DirectMessageArea({
     setActionNotice(null);
     try {
       await onSendMessage(next, {
-        imageFile: imageAttachment?.file,
+        imageBody: imageAttachment?.file,
+        imageFilename: imageAttachment?.file.name,
         imageExpiresInHours: imageAttachment ? imageExpiresInHours : undefined,
       });
       setDraft("");

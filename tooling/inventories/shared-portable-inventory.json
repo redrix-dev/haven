@@ -1,0 +1,19 @@
+{
+  "generatedNote": "Post–data-runtime migration snapshot. Regenerate when shared boundaries change. CI enforces critical items via npm run check:shared-portable.",
+  "supabaseSingletonImporters": [],
+  "processEnvSupabaseReadsInShared": [],
+  "domHeavyUiHomes": {
+    "webClientAppUi": "packages/web-client/src/app-ui (TS path @shared/app/ui/*)",
+    "remainingSharedDom": "Many packages/shared/src files still use window/document/localStorage; long-term eviction per docs/PORTABLE_SHARED.md."
+  },
+  "compositionRoot": {
+    "bootstrap": "@shared/lib/bootstrap/initializeHavenDataFromClient",
+    "runtime": "@shared/runtime/havenDataRuntime + havenRuntimeRegistry",
+    "clientFactory": "@shared/lib/createHavenSupabaseClient"
+  },
+  "classification": {
+    "portableDataLayer": "Backends created via createHavenDataRuntime(client); get*Backend() reads requireHavenDataRuntime().",
+    "hostWiring": "apps/web, apps/electron renderer, apps/mobile App.tsx, tooling/test-support/setup/supabaseLocal — initialize before shared trees render.",
+    "ciGuardrail": "npm run check:shared-portable — blocks @shared/lib/supabase, packages/shared/src/lib/supabase.ts, process.env SUPABASE_* in packages/shared/src."
+  }
+}

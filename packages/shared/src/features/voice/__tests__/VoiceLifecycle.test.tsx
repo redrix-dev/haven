@@ -116,13 +116,19 @@ const voiceMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@shared/lib/supabase", () => ({
-  supabase: {
-    channel: (topic: string, options?: { config?: unknown }) =>
-      voiceMocks.createChannel(topic, { config: options?.config }),
-    getChannels: () => voiceMocks.channels,
-    removeChannel: voiceMocks.removeChannel,
-  },
+vi.mock("@shared/runtime/havenRuntimeRegistry", () => ({
+  requireHavenDataRuntime: () => ({
+    client: {
+      channel: (topic: string, options?: { config?: unknown }) =>
+        voiceMocks.createChannel(topic, { config: options?.config }),
+      getChannels: () => voiceMocks.channels,
+      removeChannel: voiceMocks.removeChannel,
+    },
+    publicConfig: {
+      supabaseUrl: "http://localhost",
+      supabaseAnonKey: "test-anon-key",
+    },
+  }),
 }));
 
 vi.mock("@shared/lib/voice/ice", () => ({

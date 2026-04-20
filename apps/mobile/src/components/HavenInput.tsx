@@ -7,7 +7,7 @@ interface HavenInputProps extends TextInputProps {
 
 export function HavenInput({ className, ...props }: HavenInputProps) {
   const [focused, setFocused] = useState(false);
-
+  /* placeholderTextColor: shared globals --muted-foreground (#a9b8cf); RN needs a string. */
   return (
     <TextInput
       className={`rounded-xl px-4 py-3 text-foreground bg-input ${

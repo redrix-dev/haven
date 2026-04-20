@@ -41,7 +41,7 @@ export function MobileLogin() {
             autoCorrect={false}
             keyboardType="email-address"
             placeholder="you@example.com"
-            placeholderTextColor="muted-foreground"
+            placeholderTextColor="#a9b8cf"
             value={email}
             onChangeText={setEmail}
           />
@@ -50,12 +50,12 @@ export function MobileLogin() {
             className="mb-6 rounded-xl border border-border bg-card px-4 py-3 text-foreground"
             secureTextEntry
             placeholder="••••••••"
-            placeholderTextColor="muted-foreground"
+            placeholderTextColor="#a9b8cf"
             value={password}
             onChangeText={setPassword}
           />
           {error ? (
-            <Text className="mb-4 text-center text-sm text-red-400">{error}</Text>
+            <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
           ) : null}
           <Pressable
             className={`rounded-xl bg-primary py-4 ${loading ? "opacity-60" : ""}`}

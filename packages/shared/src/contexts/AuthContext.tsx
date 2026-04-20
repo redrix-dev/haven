@@ -6,7 +6,9 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { supabase } from "@shared/lib/supabase";
+import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
+
+const havenAuthClient = () => requireHavenDataRuntime().client;
 import { getAppHost } from "@shared/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
@@ -90,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         if (accessToken && refreshToken) {
-          const { error: setSessionError } = await supabase.auth.setSession({
+          const { error: setSessionError } = await havenAuthClient().auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
@@ -102,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (tokenHash && otpType && SUPPORTED_EMAIL_OTP_TYPES.has(otpType)) {
-          const { error: verifyError } = await supabase.auth.verifyOtp({
+          const { error: verifyError } = await havenAuthClient().auth.verifyOtp({
             token_hash: tokenHash,
             type: otpType,
           });
@@ -137,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const {
           data: { session },
           error,
-        } = await supabase.auth.getSession();
+        } = await havenAuthClient().auth.getSession();
 
         if (error) throw error;
         if (!isMounted) return;
@@ -164,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = havenAuthClient().auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
       const nextUser = session?.user ?? null;
       const currentUserId = useAuthStore.getState().user?.id ?? null;
@@ -285,7 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { error } = await havenAuthClient().auth.signUp({
       email,
       password,
       options: {
@@ -300,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await havenAuthClient().auth.signInWithPassword({
       email,
       password,
     });
@@ -309,7 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const requestPasswordReset = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    const { error } = await havenAuthClient().auth.resetPasswordForEmail(email.trim(), {
       redirectTo: getPlatformAuthConfirmRedirectUrl(),
     });
 
@@ -317,7 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const completePasswordRecovery = async (password: string) => {
-    const { error } = await supabase.auth.updateUser({
+    const { error } = await havenAuthClient().auth.updateUser({
       password,
     });
 
@@ -329,17 +331,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await havenAuthClient().auth.signOut();
     setPasswordRecoveryRequired(false);
   };
 
   const deleteAccount = async () => {
-    const { error: deleteError } = await supabase.rpc(
+    const { error: deleteError } = await havenAuthClient().rpc(
       "delete_own_account" as never,
     );
     if (deleteError) throw deleteError;
 
-    const { error: signOutError } = await supabase.auth.signOut();
+    const { error: signOutError } = await havenAuthClient().auth.signOut();
     if (signOutError) {
       console.warn("Failed to sign out after account deletion:", signOutError);
     }

@@ -4,6 +4,7 @@ import { ActivityIndicator, View } from "react-native";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { useMobileExpoPushRegistration } from "../hooks/useMobileExpoPushRegistration";
 import { CreatePlaceholderScreen } from "../screens/CreatePlaceholderScreen";
+import { CommunityScreen } from "../screens/CommunityScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { JoinPlaceholderScreen } from "../screens/JoinPlaceholderScreen";
 import { SettingsPlaceholderScreen } from "../screens/SettingsPlaceholderScreen";
@@ -83,8 +84,8 @@ export function RootNavigator() {
 
   if (session === undefined) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-950">
-        <ActivityIndicator color="#f8fafc" size="large" />
+      <View className="flex-1 items-center justify-center bg-surface-app">
+        <ActivityIndicator color="#e6edf7" size="large" />
       </View>
     );
   }
@@ -106,6 +107,10 @@ export function RootNavigator() {
               ) : (
                 <>
                   <Stack.Screen name="Home" component={HomeScreen} />
+                  <Stack.Screen
+                    name="Community"
+                    component={CommunityScreen}
+                  />
                   <Stack.Screen
                     name="SettingsPlaceholder"
                     component={SettingsPlaceholderScreen}

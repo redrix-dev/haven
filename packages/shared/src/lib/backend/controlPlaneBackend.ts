@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import { listUserCommunitiesWithClient } from '@shared/lib/listUserCommunitiesWithClient';
-import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
 import type {
   BanEligibleServer,
@@ -26,20 +26,6 @@ const PROFILE_AVATAR_BUCKET = 'profile-avatars';
 const PROFILE_AVATAR_FILE_SIZE_LIMIT = 5 * 1024 * 1024;
 const PROFILE_AVATAR_PUBLIC_PATH_SEGMENT = `/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/`;
 
-const requireAuthenticatedUserId = async (): Promise<string> => {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error) throw error;
-  if (!user?.id) {
-    throw new Error('Not authenticated.');
-  }
-
-  return user.id;
-};
-
 const getProfileAvatarObjectPathFromUrl = (avatarUrl: string): string | null => {
   try {
     const parsed = new URL(avatarUrl);
@@ -59,13 +45,13 @@ export interface ControlPlaneBackend {
   fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
   subscribeToProfileIdentities(onChange: (payload?: unknown) => void): RealtimeChannel;
   listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
-  uploadAvatar(file: File): Promise<string>;
+  uploadAvatar(file: Blob): Promise<string>;
   deleteAvatar(avatarUrl: string): Promise<void>;
   updateUserProfile(input: {
     userId: string;
     username: string;
     avatarUrl: string | null;
-    avatarFile?: File | null;
+    avatarFile?: Blob | null;
   }): Promise<UserProfileInfo>;
   listUserCommunities(userId: string): Promise<ServerSummary[]>;
   renameCommunity(input: { communityId: string; name: string }): Promise<void>;
@@ -117,9 +103,24 @@ const mapInvite = (invite: InviteRecord): ServerInvite => ({
   isActive: invite.is_active,
 });
 
-export const centralControlPlaneBackend: ControlPlaneBackend = {
+export function createControlPlaneBackend(client: HavenSupabaseClient): ControlPlaneBackend {
+  const requireAuthenticatedUserId = async (): Promise<string> => {
+    const {
+      data: { user },
+      error,
+    } = await client.auth.getUser();
+
+    if (error) throw error;
+    if (!user?.id) {
+      throw new Error('Not authenticated.');
+    }
+
+    return user.id;
+  };
+
+  const backend: ControlPlaneBackend = {
   async fetchUserProfile(userId) {
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('profiles')
       .select('username, avatar_url')
       .eq('id', userId)
@@ -134,7 +135,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async fetchPlatformStaff(userId) {
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('platform_staff')
       .select('is_active, can_post_haven_dev, display_prefix')
       .eq('user_id', userId)
@@ -150,7 +151,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   subscribeToProfileIdentities(onChange) {
-    return supabase
+    return client
       .channel('profile_identities')
       .on(
         'postgres_changes',
@@ -165,7 +166,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async listMyFeatureFlags() {
-    const { data, error } = await supabase.rpc('list_my_feature_flags' as never);
+    const { data, error } = await client.rpc('list_my_feature_flags' as never);
     if (error) throw error;
 
     const snapshot: FeatureFlagsSnapshot = {};
@@ -183,7 +184,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
 
     const userId = await requireAuthenticatedUserId();
     const objectPath = `${userId}/${Date.now()}.webp`;
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await client.storage
       .from(PROFILE_AVATAR_BUCKET)
       .upload(objectPath, file, {
         cacheControl: '3600',
@@ -193,7 +194,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
 
     if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage.from(PROFILE_AVATAR_BUCKET).getPublicUrl(objectPath);
+    const { data } = client.storage.from(PROFILE_AVATAR_BUCKET).getPublicUrl(objectPath);
     if (!data.publicUrl) {
       throw new Error('Failed to resolve avatar URL.');
     }
@@ -206,14 +207,14 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
     if (!objectPath) return;
 
     try {
-      await supabase.storage.from(PROFILE_AVATAR_BUCKET).remove([objectPath]);
+      await client.storage.from(PROFILE_AVATAR_BUCKET).remove([objectPath]);
     } catch {
       // Intentionally ignore avatar cleanup failures during profile updates.
     }
   },
 
   async updateUserProfile({ userId, username, avatarUrl, avatarFile = null }) {
-    const { data: existingProfile, error: existingProfileError } = await supabase
+    const { data: existingProfile, error: existingProfileError } = await client
       .from('profiles')
       .select('avatar_url')
       .eq('id', userId)
@@ -226,14 +227,14 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
 
     if (avatarFile) {
       if (existingAvatarUrl) {
-        await centralControlPlaneBackend.deleteAvatar(existingAvatarUrl);
+        await backend.deleteAvatar(existingAvatarUrl);
       }
-      nextAvatarUrl = await centralControlPlaneBackend.uploadAvatar(avatarFile);
+      nextAvatarUrl = await backend.uploadAvatar(avatarFile);
     } else if (avatarUrl === null && existingAvatarUrl) {
-      await centralControlPlaneBackend.deleteAvatar(existingAvatarUrl);
+      await backend.deleteAvatar(existingAvatarUrl);
     }
 
-    const { error } = await supabase
+    const { error } = await client
       .from('profiles')
       .update({
         username,
@@ -250,7 +251,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async listUserCommunities(userId) {
-    return listUserCommunitiesWithClient(supabase, userId);
+    return listUserCommunitiesWithClient(client, userId);
   },
 
   async renameCommunity({ communityId, name }) {
@@ -259,7 +260,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
       throw new Error('Server name is required.');
     }
 
-    const { error } = await supabase
+    const { error } = await client
       .from('communities')
       .update({ name: normalizedName })
       .eq('id', communityId);
@@ -267,7 +268,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async deleteCommunity(communityId) {
-    const { error } = await supabase.from('communities').delete().eq('id', communityId);
+    const { error } = await client.from('communities').delete().eq('id', communityId);
     if (error) throw error;
   },
 
@@ -275,11 +276,11 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await client.auth.getUser();
     if (authError) throw authError;
     if (!user?.id) throw new Error('Not authenticated.');
 
-    const { data: membership, error: membershipError } = await supabase
+    const { data: membership, error: membershipError } = await client
       .from('community_members')
       .select('is_owner')
       .eq('community_id', communityId)
@@ -291,7 +292,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
       throw new Error('Owners cannot leave a server. Delete the server instead.');
     }
 
-    const { error } = await supabase
+    const { error } = await client
       .from('community_members')
       .delete()
       .eq('community_id', communityId)
@@ -300,7 +301,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   subscribeToUserCommunities(userId, onChange) {
-    return supabase
+    return client
       .channel(`community_members_changes:${userId}`)
       .on(
         'postgres_changes',
@@ -316,7 +317,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async createCommunity(name) {
-    const { data, error } = await supabase.rpc('create_community', {
+    const { data, error } = await client.rpc('create_community', {
       p_name: name,
       // Supabase generated RPC types use `undefined` for optional args.
       p_description: undefined,
@@ -331,7 +332,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async createCommunityInvite({ communityId, maxUses, expiresInHours }) {
-    const { data, error } = await supabase.rpc('create_community_invite', {
+    const { data, error } = await client.rpc('create_community_invite', {
       p_community_id: communityId,
       p_max_uses: maxUses ?? undefined,
       p_expires_in_hours: expiresInHours ?? undefined,
@@ -343,7 +344,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async redeemCommunityInvite(code) {
-    const { data, error } = await supabase.rpc('redeem_community_invite', {
+    const { data, error } = await client.rpc('redeem_community_invite', {
       p_code: code,
     });
 
@@ -363,7 +364,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
 
   async listBanEligibleServersForUser(targetUserId) {
     if (!targetUserId) return [];
-    const { data, error } = await supabase.rpc('list_bannable_shared_communities', {
+    const { data, error } = await client.rpc('list_bannable_shared_communities', {
       p_target_user_id: targetUserId,
     });
     if (error) throw error;
@@ -374,7 +375,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async listActiveCommunityInvites(communityId) {
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('invites')
       .select('id, code, current_uses, max_uses, expires_at, is_active')
       .eq('community_id', communityId)
@@ -387,7 +388,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
   },
 
   async revokeCommunityInvite(communityId, inviteId) {
-    const { error } = await supabase
+    const { error } = await client
       .from('invites')
       .update({ is_active: false })
       .eq('community_id', communityId)
@@ -396,3 +397,7 @@ export const centralControlPlaneBackend: ControlPlaneBackend = {
     if (error) throw error;
   },
 };
+
+  return backend;
+}
+

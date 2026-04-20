@@ -1,6 +1,6 @@
 import React from 'react';
 import { getCommunityDataBackend } from '@shared/lib/backend';
-import { supabase } from '@shared/lib/supabase';
+import { requireHavenDataRuntime } from '@shared/runtime/havenRuntimeRegistry';
 import type { Channel, ChannelGroupState } from '@shared/lib/backend/types';
 import { stableOnActiveChannelAccessLost } from '@shared/app/chat-app/realtime/communityAccessBroadcastBridge';
 
@@ -127,7 +127,7 @@ export function useChannelGroups({
 
     void loadChannelGroups();
 
-    const groupSubscription = supabase
+    const groupSubscription = requireHavenDataRuntime().client
       .channel(`channel_groups:${currentServerId}`)
       .on(
         'postgres_changes',

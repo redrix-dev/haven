@@ -1,5 +1,5 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@shared/lib/supabase';
+import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import type {
   NotificationCounts,
   NotificationDeliveryTraceRecord,
@@ -321,9 +321,10 @@ const mapWebPushDispatchQueueHealthDiagnostics = (
   doneLast10mCount: normalizeNonNegativeInt(row.done_last_10m_count),
 });
 
-export const centralNotificationBackend: NotificationBackend = {
+export function createNotificationBackend(client: HavenSupabaseClient): NotificationBackend {
+  return {
   async listNotifications(input) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'list_my_notifications' as never,
       {
         p_limit: input?.limit ?? 50,
@@ -336,7 +337,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async listSoundNotifications(input) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'list_my_sound_notifications' as never,
       {
         p_limit: input?.limit ?? 50,
@@ -349,7 +350,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async listWebPushSubscriptions() {
-    const { data, error } = await supabase.rpc('list_my_web_push_subscriptions' as never);
+    const { data, error } = await client.rpc('list_my_web_push_subscriptions' as never);
     if (error) throw error;
     return ((data ?? []) as WebPushSubscriptionRow[]).map(mapWebPushSubscriptionRecord);
   },
@@ -363,7 +364,7 @@ export const centralNotificationBackend: NotificationBackend = {
     if (!p256dhKey) throw new Error('Web push subscription p256dh key is required.');
     if (!authKey) throw new Error('Web push subscription auth key is required.');
 
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'upsert_my_web_push_subscription' as never,
       {
         p_endpoint: endpoint,
@@ -390,7 +391,7 @@ export const centralNotificationBackend: NotificationBackend = {
     const normalizedEndpoint = endpoint?.trim();
     if (!normalizedEndpoint) return false;
 
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'delete_my_web_push_subscription' as never,
       {
         p_endpoint: normalizedEndpoint,
@@ -401,7 +402,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async listExpoPushSubscriptions() {
-    const { data, error } = await supabase.rpc('list_my_expo_push_subscriptions' as never);
+    const { data, error } = await client.rpc('list_my_expo_push_subscriptions' as never);
     if (error) throw error;
     return ((data ?? []) as ExpoPushSubscriptionRow[]).map(mapExpoPushSubscriptionRecord);
   },
@@ -412,7 +413,7 @@ export const centralNotificationBackend: NotificationBackend = {
 
     const platform = input.platform ?? 'unknown';
 
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'upsert_my_expo_push_subscription' as never,
       {
         p_expo_push_token: token,
@@ -434,7 +435,7 @@ export const centralNotificationBackend: NotificationBackend = {
     const normalized = expoPushToken?.trim();
     if (!normalized) return false;
 
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'delete_my_expo_push_subscription' as never,
       {
         p_expo_push_token: normalized,
@@ -445,7 +446,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async listNotificationDeliveryTraces(input) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'list_my_notification_delivery_traces' as never,
       {
         p_limit: input?.limit ?? 50,
@@ -457,7 +458,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async getWebPushDispatchWakeupDiagnostics() {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'get_web_push_dispatch_wakeup_diagnostics' as never
     );
     if (error) throw error;
@@ -466,7 +467,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async getWebPushDispatchQueueHealthDiagnostics() {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'get_web_push_dispatch_queue_health_diagnostics' as never
     );
     if (error) throw error;
@@ -479,7 +480,7 @@ export const centralNotificationBackend: NotificationBackend = {
       typeof input.minIntervalSeconds === 'number' && Number.isFinite(input.minIntervalSeconds)
         ? Math.trunc(input.minIntervalSeconds)
         : null;
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'update_web_push_dispatch_wakeup_config' as never,
       {
         p_enabled: typeof input.enabled === 'boolean' ? input.enabled : null,
@@ -496,7 +497,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async getNotificationCounts() {
-    const { data, error } = await supabase.rpc('get_my_notification_counts' as never);
+    const { data, error } = await client.rpc('get_my_notification_counts' as never);
     if (error) throw error;
     const row = (Array.isArray(data) ? data[0] : null) as NotificationCountsRow | null;
     return {
@@ -508,7 +509,7 @@ export const centralNotificationBackend: NotificationBackend = {
   async markNotificationsSeen(recipientIds) {
     const uniqueIds = Array.from(new Set(recipientIds.filter(Boolean)));
     if (uniqueIds.length === 0) return 0;
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'mark_notifications_seen' as never,
       {
         p_recipient_ids: uniqueIds,
@@ -521,7 +522,7 @@ export const centralNotificationBackend: NotificationBackend = {
   async markNotificationsRead(recipientIds) {
     const uniqueIds = Array.from(new Set(recipientIds.filter(Boolean)));
     if (uniqueIds.length === 0) return 0;
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'mark_notifications_read' as never,
       {
         p_recipient_ids: uniqueIds,
@@ -532,7 +533,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async markAllNotificationsSeen() {
-    const { data, error } = await supabase.rpc('mark_all_notifications_seen' as never);
+    const { data, error } = await client.rpc('mark_all_notifications_seen' as never);
     if (error) throw error;
     return typeof data === 'number' ? data : 0;
   },
@@ -540,7 +541,7 @@ export const centralNotificationBackend: NotificationBackend = {
   async dismissNotifications(recipientIds) {
     const uniqueIds = Array.from(new Set(recipientIds.filter(Boolean)));
     if (uniqueIds.length === 0) return 0;
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'dismiss_notifications' as never,
       {
         p_recipient_ids: uniqueIds,
@@ -551,7 +552,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async getNotificationPreferences() {
-    const { data, error } = await supabase.rpc('get_my_notification_preferences' as never);
+    const { data, error } = await client.rpc('get_my_notification_preferences' as never);
     if (error) throw error;
     const row = (Array.isArray(data) ? data[0] : null) as NotificationPreferencesRow | null;
     if (!row) {
@@ -561,7 +562,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   async updateNotificationPreferences(input) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'update_my_notification_preferences' as never,
       {
         p_friend_request_in_app_enabled: input.friendRequestInAppEnabled,
@@ -584,7 +585,7 @@ export const centralNotificationBackend: NotificationBackend = {
   },
 
   subscribeToNotificationInbox(userId, onChange) {
-    return supabase
+    return client
       .channel(`notification_inbox:${userId}`)
       .on(
         'postgres_changes',
@@ -599,3 +600,5 @@ export const centralNotificationBackend: NotificationBackend = {
       .subscribe();
   },
 };
+}
+

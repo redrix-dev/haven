@@ -1,6 +1,5 @@
 import { describe, beforeAll, beforeEach, afterAll, expect, it } from 'vitest';
-import { centralNotificationBackend } from '@shared/lib/backend/notificationBackend';
-import { centralSocialBackend } from '@shared/lib/backend/socialBackend';
+import { getNotificationBackend, getSocialBackend } from '@shared/lib/backend';
 import { loadBootstrappedTestUsers } from '@test-support/fixtures/users';
 import { resetFixtureDomainState, signInAsTestUser, signOutTestUser } from '@test-support/setup/supabaseLocal';
 
@@ -21,12 +20,12 @@ describe.sequential('SocialBackend (contract)', () => {
   });
 
   it('searches by exact username and can send/accept a friend request', async () => {
-    const searchResults = await centralSocialBackend.searchUsersForFriendAdd(users.member_b.username);
+    const searchResults = await getSocialBackend().searchUsersForFriendAdd(users.member_b.username);
     expect(searchResults.some((row) => row.userId === users.member_b.id)).toBe(true);
 
     let requestId: string | null = null;
     try {
-      requestId = await centralSocialBackend.sendFriendRequest(users.member_b.username);
+      requestId = await getSocialBackend().sendFriendRequest(users.member_b.username);
     } catch (error) {
       const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
       if (!message.includes('already') && !message.includes('this user already sent you')) {
@@ -35,24 +34,24 @@ describe.sequential('SocialBackend (contract)', () => {
     }
 
     await signInAsTestUser('member_b');
-    const requests = await centralSocialBackend.listFriendRequests();
+    const requests = await getSocialBackend().listFriendRequests();
     const incoming = requests.find((request) => request.senderUserId === users.member_a.id && request.direction === 'incoming');
     expect(incoming).toBeTruthy();
 
     if (incoming) {
-      await centralSocialBackend.acceptFriendRequest(incoming.requestId);
+      await getSocialBackend().acceptFriendRequest(incoming.requestId);
     } else if (requestId) {
-      await centralSocialBackend.acceptFriendRequest(requestId);
+      await getSocialBackend().acceptFriendRequest(requestId);
     }
 
-    const friendList = await centralSocialBackend.listFriends();
+    const friendList = await getSocialBackend().listFriends();
     expect(friendList.some((friend) => friend.friendUserId === users.member_a.id)).toBe(true);
 
-    const recipientNotifications = await centralNotificationBackend.listNotifications({ limit: 20 });
+    const recipientNotifications = await getNotificationBackend().listNotifications({ limit: 20 });
     expect(recipientNotifications.some((notification) => notification.kind === 'friend_request_received')).toBe(false);
 
     await signInAsTestUser('member_a');
-    const senderNotifications = await centralNotificationBackend.listNotifications({ limit: 20 });
+    const senderNotifications = await getNotificationBackend().listNotifications({ limit: 20 });
     expect(senderNotifications.some((notification) => notification.kind === 'friend_request_accepted')).toBe(true);
   });
 });

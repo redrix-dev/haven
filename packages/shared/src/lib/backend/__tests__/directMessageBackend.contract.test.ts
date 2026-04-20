@@ -1,6 +1,5 @@
 import { describe, beforeAll, beforeEach, afterAll, expect, it } from 'vitest';
-import { centralDirectMessageBackend } from '@shared/lib/backend/directMessageBackend';
-import { centralSocialBackend } from '@shared/lib/backend/socialBackend';
+import { getDirectMessageBackend, getSocialBackend } from '@shared/lib/backend';
 import { loadBootstrappedTestUsers } from '@test-support/fixtures/users';
 import { resetFixtureDomainState, signInAsTestUser, signOutTestUser } from '@test-support/setup/supabaseLocal';
 
@@ -11,7 +10,7 @@ const createTestImageFile = () =>
 
 async function ensureFriendship(memberBUsername: string) {
   try {
-    await centralSocialBackend.sendFriendRequest(memberBUsername);
+    await getSocialBackend().sendFriendRequest(memberBUsername);
   } catch (error) {
     const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
     if (!message.includes('already') && !message.includes('friends')) {
@@ -40,22 +39,22 @@ describe.sequential('DirectMessageBackend (contract)', () => {
     await ensureFriendship(users.member_b.username);
 
     await signInAsTestUser('member_b');
-    const inboundRequests = await centralSocialBackend.listFriendRequests();
+    const inboundRequests = await getSocialBackend().listFriendRequests();
     const pending = inboundRequests.find(
       (request) => request.direction === 'incoming' && request.senderUserId === users.member_a.id
     );
     if (pending) {
-      await centralSocialBackend.acceptFriendRequest(pending.requestId);
+      await getSocialBackend().acceptFriendRequest(pending.requestId);
     }
 
-    const conversationId = await centralDirectMessageBackend.getOrCreateDirectConversation(users.member_a.id);
+    const conversationId = await getDirectMessageBackend().getOrCreateDirectConversation(users.member_a.id);
     expect(conversationId).toBeTruthy();
 
     await signInAsTestUser('member_a');
-    const conversationIdFromA = await centralDirectMessageBackend.getOrCreateDirectConversation(users.member_b.id);
+    const conversationIdFromA = await getDirectMessageBackend().getOrCreateDirectConversation(users.member_b.id);
     expect(conversationIdFromA).toBe(conversationId);
 
-    const sent = await centralDirectMessageBackend.sendMessage({
+    const sent = await getDirectMessageBackend().sendMessage({
       conversationId,
       content: 'Backend contract test DM',
       metadata: {},
@@ -63,40 +62,37 @@ describe.sequential('DirectMessageBackend (contract)', () => {
     expect(sent.conversationId).toBe(conversationId);
     expect(sent.attachments).toEqual([]);
 
-    const sentImage = await centralDirectMessageBackend.sendMessage({
+    const sentImage = await getDirectMessageBackend().sendMessage({
       conversationId,
       content: '',
       metadata: {},
-      imageUpload: {
-        file: createTestImageFile(),
-        expiresInHours: 24,
-      },
+      imageUpload: { body: createTestImageFile(), filename: 'test.png', expiresInHours: 24 },
     });
     expect(sentImage.attachments).toHaveLength(1);
     expect(sentImage.attachments[0]?.mediaKind).toBe('image');
     expect(sentImage.attachments[0]?.signedUrl).toBeTruthy();
 
     await signInAsTestUser('member_b');
-    const messages = await centralDirectMessageBackend.listMessages({ conversationId, limit: 20 });
+    const messages = await getDirectMessageBackend().listMessages({ conversationId, limit: 20 });
     expect(messages.some((message) => message.messageId === sent.messageId)).toBe(true);
     const listedImage = messages.find((message) => message.messageId === sentImage.messageId);
     expect(listedImage?.attachments).toHaveLength(1);
     expect(listedImage?.attachments[0]?.mimeType).toBe('image/png');
     expect(listedImage?.attachments[0]?.signedUrl).toBeTruthy();
 
-    const conversations = await centralDirectMessageBackend.listConversations();
+    const conversations = await getDirectMessageBackend().listConversations();
     const listedConversation = conversations.find(
       (conversation) => conversation.conversationId === conversationId
     );
     expect(listedConversation?.lastMessagePreview).toBe('Sent an image');
 
-    const read = await centralDirectMessageBackend.markConversationRead(conversationId);
+    const read = await getDirectMessageBackend().markConversationRead(conversationId);
     expect(read).toBe(true);
 
-    const muted = await centralDirectMessageBackend.setConversationMuted({ conversationId, muted: true });
+    const muted = await getDirectMessageBackend().setConversationMuted({ conversationId, muted: true });
     expect(muted).toBe(true);
 
-    const reportId = await centralDirectMessageBackend.reportMessage({
+    const reportId = await getDirectMessageBackend().reportMessage({
       messageId: sent.messageId,
       kind: 'bug',
       comment: 'Contract test report',
@@ -107,18 +103,18 @@ describe.sequential('DirectMessageBackend (contract)', () => {
   it('rejects non-member DM access', async () => {
     await ensureFriendship(users.member_b.username);
     await signInAsTestUser('member_b');
-    const inboundRequests = await centralSocialBackend.listFriendRequests();
+    const inboundRequests = await getSocialBackend().listFriendRequests();
     const pending = inboundRequests.find(
       (request) => request.direction === 'incoming' && request.senderUserId === users.member_a.id
     );
     if (pending) {
-      await centralSocialBackend.acceptFriendRequest(pending.requestId);
+      await getSocialBackend().acceptFriendRequest(pending.requestId);
     }
-    const conversationId = await centralDirectMessageBackend.getOrCreateDirectConversation(users.member_a.id);
+    const conversationId = await getDirectMessageBackend().getOrCreateDirectConversation(users.member_a.id);
 
     await signInAsTestUser('non_member');
     await expect(
-      centralDirectMessageBackend.listMessages({ conversationId, limit: 10 })
+      getDirectMessageBackend().listMessages({ conversationId, limit: 10 })
     ).rejects.toThrow(/access/i);
   });
 });

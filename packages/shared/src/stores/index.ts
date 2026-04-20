@@ -20,7 +20,10 @@ export { useNavigationStore } from "./navigationStore";
 export type { NavigationStoreState } from "./navigationStore";
 
 export { usePermissionsStore } from "./permissionsStore";
-export type { PermissionsStoreState } from "./permissionsStore";
+export type {
+  CommunityElevationSource,
+  PermissionsStoreState,
+} from "./permissionsStore";
 
 export { useUserStatusStore } from "./userStatusStore";
 export type { UserStatusStoreState } from "./userStatusStore";

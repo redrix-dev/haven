@@ -1,6 +1,8 @@
 import React from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { supabase } from "@shared/lib/supabase";
+import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
+
+const voiceRt = () => requireHavenDataRuntime().client;
 import { fetchIceConfig } from "@shared/lib/voice/ice";
 import { matchesVoicePushToTalkBinding } from "@shared/lib/voice/pushToTalk";
 import { useVoiceMemberVolumes } from "@shared/features/voice/hooks/useVoiceMemberVolumes";
@@ -1143,7 +1145,7 @@ export function useVoiceSessionController({
       } catch {
         // no-op
       }
-      await supabase.removeChannel(channel);
+      await voiceRt().removeChannel(channel);
     }
   }, [
     closePeerConnection,
@@ -1206,7 +1208,7 @@ export function useVoiceSessionController({
 
       await refreshAudioDevices();
 
-      const voiceChannel = supabase.channel(
+      const voiceChannel = voiceRt().channel(
         `voice:presence:${targetChannel.communityId}:${targetChannel.channelId}`,
         {
           config: {

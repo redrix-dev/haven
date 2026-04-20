@@ -1,37 +1,49 @@
-import { supabase } from '@shared/lib/supabase';
+import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 
 export interface MessageObjectStore {
   uploadMessageAttachment(input: {
     bucketName: string;
     objectPath: string;
-    file: File;
+    body: Blob;
     contentType: string;
     cacheControl?: string;
   }): Promise<void>;
   removeObjects(bucketName: string, objectPaths: string[]): Promise<void>;
-  createSignedUrls(bucketName: string, objectPaths: string[], expiresInSeconds: number): Promise<Record<string, string>>;
-  createSignedImageUrl(bucketName: string, objectPath: string, expiresInSeconds: number): Promise<string | null>;
+  createSignedUrls(
+    bucketName: string,
+    objectPaths: string[],
+    expiresInSeconds: number,
+  ): Promise<Record<string, string>>;
+  createSignedImageUrl(
+    bucketName: string,
+    objectPath: string,
+    expiresInSeconds: number,
+  ): Promise<string | null>;
 }
 
 class SupabaseMessageObjectStore implements MessageObjectStore {
+  constructor(private readonly client: HavenSupabaseClient) {}
+
   async uploadMessageAttachment(input: {
     bucketName: string;
     objectPath: string;
-    file: File;
+    body: Blob;
     contentType: string;
     cacheControl?: string;
   }): Promise<void> {
-    const { error } = await supabase.storage.from(input.bucketName).upload(input.objectPath, input.file, {
-      cacheControl: input.cacheControl ?? '3600',
-      contentType: input.contentType,
-      upsert: false,
-    });
+    const { error } = await this.client.storage
+      .from(input.bucketName)
+      .upload(input.objectPath, input.body, {
+        cacheControl: input.cacheControl ?? "3600",
+        contentType: input.contentType,
+        upsert: false,
+      });
     if (error) throw error;
   }
 
   async removeObjects(bucketName: string, objectPaths: string[]): Promise<void> {
     if (objectPaths.length === 0) return;
-    const { error } = await supabase.storage.from(bucketName).remove(objectPaths);
+    const { error } = await this.client.storage.from(bucketName).remove(objectPaths);
     if (error) throw error;
   }
 
@@ -42,7 +54,9 @@ class SupabaseMessageObjectStore implements MessageObjectStore {
   ): Promise<Record<string, string>> {
     if (objectPaths.length === 0) return {};
 
-    const { data, error } = await supabase.storage.from(bucketName).createSignedUrls(objectPaths, expiresInSeconds);
+    const { data, error } = await this.client.storage
+      .from(bucketName)
+      .createSignedUrls(objectPaths, expiresInSeconds);
     if (error) throw error;
 
     const byPath: Record<string, string> = {};
@@ -58,7 +72,7 @@ class SupabaseMessageObjectStore implements MessageObjectStore {
     objectPath: string,
     expiresInSeconds: number,
   ): Promise<string | null> {
-    const { data, error } = await supabase.storage
+    const { data, error } = await this.client.storage
       .from(bucketName)
       .createSignedUrl(objectPath, expiresInSeconds);
     if (error) throw error;
@@ -66,4 +80,6 @@ class SupabaseMessageObjectStore implements MessageObjectStore {
   }
 }
 
-export const messageObjectStore: MessageObjectStore = new SupabaseMessageObjectStore();
+export function createMessageObjectStore(client: HavenSupabaseClient): MessageObjectStore {
+  return new SupabaseMessageObjectStore(client);
+}

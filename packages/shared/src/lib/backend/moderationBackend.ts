@@ -1,8 +1,9 @@
-import { supabase } from '@shared/lib/supabase';
+import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
+import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
 import {
   mapDirectMessageAttachmentRowsWithSignedUrls,
   parseDirectMessageAttachmentRows,
-} from './directMessageAttachmentUtils';
+} from "./directMessageAttachmentUtils";
 import type {
   DmMessageReportAction,
   DmMessageReportContextMessage,
@@ -128,12 +129,6 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
-const callBooleanRpc = async (functionName: string, args: Record<string, unknown>): Promise<boolean> => {
-  const { data, error } = await supabase.rpc(functionName as never, args as never);
-  if (error) throw error;
-  return Boolean(data);
-};
-
 const mapSummary = (row: DmMessageReportSummaryRow): DmMessageReportSummary => ({
   reportId: row.report_id,
   conversationId: row.conversation_id,
@@ -157,9 +152,13 @@ const mapSummary = (row: DmMessageReportSummaryRow): DmMessageReportSummary => (
   messagePreview: row.message_preview ?? null,
 });
 
-const mapDetail = async (row: DmMessageReportDetailRow): Promise<DmMessageReportDetail> => {
+const mapDetail = async (
+  row: DmMessageReportDetailRow,
+  createSignedUrlMap: MediaAttachmentHelpers["createSignedUrlMap"],
+): Promise<DmMessageReportDetail> => {
   const messageAttachments = await mapDirectMessageAttachmentRowsWithSignedUrls(
-    parseDirectMessageAttachmentRows(row.message_attachments)
+    parseDirectMessageAttachmentRows(row.message_attachments),
+    createSignedUrlMap,
   );
 
   return {
@@ -206,10 +205,14 @@ const mapAction = (row: DmMessageReportActionRow): DmMessageReportAction => ({
 });
 
 const mapContextMessages = async (
-  rows: DmMessageContextRow[]
+  rows: DmMessageContextRow[],
+  createSignedUrlMap: MediaAttachmentHelpers["createSignedUrlMap"],
 ): Promise<DmMessageReportContextMessage[]> => {
   const allAttachmentRows = rows.flatMap((row) => parseDirectMessageAttachmentRows(row.attachments));
-  const signedAttachments = await mapDirectMessageAttachmentRowsWithSignedUrls(allAttachmentRows);
+  const signedAttachments = await mapDirectMessageAttachmentRowsWithSignedUrls(
+    allAttachmentRows,
+    createSignedUrlMap,
+  );
   const attachmentsByMessageId = new Map<string, DmMessageReportContextMessage['attachments']>();
 
   for (const attachment of signedAttachments) {
@@ -234,9 +237,22 @@ const mapContextMessages = async (
   }));
 };
 
-export const centralModerationBackend: ModerationBackend = {
+export function createModerationBackend(
+  client: HavenSupabaseClient,
+  media: MediaAttachmentHelpers,
+): ModerationBackend {
+  const callBooleanRpc = async (
+    functionName: string,
+    args: Record<string, unknown>,
+  ): Promise<boolean> => {
+    const { data, error } = await client.rpc(functionName as never, args as never);
+    if (error) throw error;
+    return Boolean(data);
+  };
+
+  return {
   async listDmMessageReportsForReview(input) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'list_dm_message_reports_for_review' as never,
       {
         p_statuses: input?.statuses?.length ? input.statuses : undefined,
@@ -250,17 +266,17 @@ export const centralModerationBackend: ModerationBackend = {
   },
 
   async getDmMessageReportDetail(reportId) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'get_dm_message_report_detail' as never,
       { p_report_id: reportId } as never
     );
     if (error) throw error;
     const row = (Array.isArray(data) ? data[0] : null) as DmMessageReportDetailRow | null;
-    return row ? await mapDetail(row) : null;
+    return row ? await mapDetail(row, media.createSignedUrlMap) : null;
   },
 
   async listDmMessageReportActions(reportId) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'list_dm_message_report_actions' as never,
       { p_report_id: reportId } as never
     );
@@ -269,7 +285,7 @@ export const centralModerationBackend: ModerationBackend = {
   },
 
   async listDmMessageContext(input) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'list_dm_message_context' as never,
       {
         p_message_id: input.messageId,
@@ -278,7 +294,7 @@ export const centralModerationBackend: ModerationBackend = {
       } as never
     );
     if (error) throw error;
-    return await mapContextMessages((data ?? []) as DmMessageContextRow[]);
+    return await mapContextMessages((data ?? []) as DmMessageContextRow[], media.createSignedUrlMap);
   },
 
   async assignDmMessageReport(input) {
@@ -298,7 +314,7 @@ export const centralModerationBackend: ModerationBackend = {
   },
 
   async addDmMessageReportAction(input) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'add_dm_message_report_action' as never,
       {
         p_report_id: input.reportId,
@@ -315,3 +331,4 @@ export const centralModerationBackend: ModerationBackend = {
     return actionId;
   },
 };
+}

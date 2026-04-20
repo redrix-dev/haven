@@ -36,8 +36,6 @@ type Props = {
   currentUserDisplayName: string;
 };
 
-const moderationBackend = getModerationBackend();
-
 const STATUS_OPTIONS: Array<{ value: DmMessageReportStatus; label: string }> = [
   { value: 'open', label: 'Open' },
   { value: 'triaged', label: 'Triaged' },
@@ -98,6 +96,7 @@ export function DmReportReviewPanel({
   const [statusDraft, setStatusDraft] = React.useState<DmMessageReportStatus>('open');
   const [statusNote, setStatusNote] = React.useState('');
   const [internalNote, setInternalNote] = React.useState('');
+  const moderationBackend = React.useMemo(() => getModerationBackend(), []);
 
   const refreshReports = React.useCallback(async () => {
     if (!open) return;
@@ -114,7 +113,7 @@ export function DmReportReviewPanel({
     } finally {
       setLoadingReports(false);
     }
-  }, [filter, open]);
+  }, [filter, open, moderationBackend]);
 
   const refreshDetail = React.useCallback(
     async (reportId: string) => {
@@ -145,7 +144,7 @@ export function DmReportReviewPanel({
         setLoadingDetail(false);
       }
     },
-    [open]
+    [open, moderationBackend]
   );
 
   React.useEffect(() => {

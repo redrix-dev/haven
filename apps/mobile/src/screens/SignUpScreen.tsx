@@ -74,7 +74,7 @@ export function SignUpScreen() {
         }}
       >
         <View
-          className="w-full max-w-sm self-center rounded-3xl border border-border bg-card p-6 shadow-xl shadow-black/30"
+          className="w-full max-w-sm self-center rounded-3xl border border-border bg-card p-6 shadow-xl shadow-background/40"
           style={Platform.OS === "android" ? { elevation: 8 } : undefined}
         >
           <Text className="mb-1 text-center text-2xl font-semibold text-foreground">
@@ -196,7 +196,7 @@ export function SignUpScreen() {
               </View>
 
               {error ? (
-                <Text className="mb-4 text-center text-sm text-red-400">{error}</Text>
+                <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
               ) : null}
 
               <Pressable

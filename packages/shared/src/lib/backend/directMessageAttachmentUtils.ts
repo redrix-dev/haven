@@ -1,4 +1,5 @@
-import { createSignedUrlMap, getSignedUrlMapKey } from './mediaAttachmentUtils';
+import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
+import { getSignedUrlMapKey } from "./mediaAttachmentUtils";
 import type { DirectMessageAttachment } from './types';
 
 export type DirectMessageAttachmentRow = {
@@ -94,7 +95,8 @@ export const parseDirectMessageAttachmentRows = (value: unknown): DirectMessageA
 };
 
 export const mapDirectMessageAttachmentRowsWithSignedUrls = async (
-  attachmentRows: DirectMessageAttachmentRow[]
+  attachmentRows: DirectMessageAttachmentRow[],
+  createSignedUrlMap: MediaAttachmentHelpers["createSignedUrlMap"],
 ): Promise<DirectMessageAttachment[]> => {
   if (attachmentRows.length === 0) return [];
 

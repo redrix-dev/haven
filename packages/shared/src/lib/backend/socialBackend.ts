@@ -1,5 +1,5 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@shared/lib/supabase';
+import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import type {
   BlockedUserSummary,
   FriendRequestSummary,
@@ -126,53 +126,57 @@ const mapFriendSearchResult = (row: FriendSearchRow): FriendSearchResult => ({
   mutualCommunityNames: Array.isArray(row.mutual_community_names) ? row.mutual_community_names : [],
 });
 
-const getAuthenticatedUserId = async (): Promise<string> => {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error) throw error;
-  if (!user?.id) {
-    throw new Error('Not authenticated.');
-  }
-  return user.id;
-};
+export function createSocialBackend(client: HavenSupabaseClient): SocialBackend {
+  const getAuthenticatedUserId = async (): Promise<string> => {
+    const {
+      data: { user },
+      error,
+    } = await client.auth.getUser();
+    if (error) throw error;
+    if (!user?.id) {
+      throw new Error('Not authenticated.');
+    }
+    return user.id;
+  };
 
-const callBooleanRpc = async (functionName: string, args: Record<string, unknown>): Promise<boolean> => {
-  const { data, error } = await supabase.rpc(functionName as never, args as never);
-  if (error) throw error;
-  return Boolean(data);
-};
+  const callBooleanRpc = async (
+    functionName: string,
+    args: Record<string, unknown>,
+  ): Promise<boolean> => {
+    const { data, error } = await client.rpc(functionName as never, args as never);
+    if (error) throw error;
+    return Boolean(data);
+  };
 
-export const centralSocialBackend: SocialBackend = {
+  return {
   async getSocialCounts() {
-    const { data, error } = await supabase.rpc('get_my_social_counts' as never);
+    const { data, error } = await client.rpc('get_my_social_counts' as never);
     if (error) throw error;
     const row = (Array.isArray(data) ? data[0] : null) as SocialCountsRow | null;
     return mapSocialCounts(row);
   },
 
   async listFriends() {
-    const { data, error } = await supabase.rpc('list_my_friends' as never);
+    const { data, error } = await client.rpc('list_my_friends' as never);
     if (error) throw error;
     return ((data ?? []) as FriendRow[]).map(mapFriend);
   },
 
   async listFriendRequests() {
-    const { data, error } = await supabase.rpc('list_my_friend_requests' as never);
+    const { data, error } = await client.rpc('list_my_friend_requests' as never);
     if (error) throw error;
     return ((data ?? []) as FriendRequestRow[]).map(mapFriendRequest);
   },
 
   async listBlockedUsers() {
-    const { data, error } = await supabase.rpc('list_my_blocked_users' as never);
+    const { data, error } = await client.rpc('list_my_blocked_users' as never);
     if (error) throw error;
     return ((data ?? []) as BlockedUserRow[]).map(mapBlockedUser);
   },
 
   async listMyBlocks() {
     const userId = await getAuthenticatedUserId();
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('user_blocks' as never)
       .select('blocked_user_id')
       .eq('blocker_user_id', userId);
@@ -188,7 +192,7 @@ export const centralSocialBackend: SocialBackend = {
   },
 
   async listUsersBlockingMe() {
-    const { data, error } = await supabase.rpc('list_users_blocking_me' as never);
+    const { data, error } = await client.rpc('list_users_blocking_me' as never);
     if (error) throw error;
     return Array.from(
       new Set(
@@ -202,7 +206,7 @@ export const centralSocialBackend: SocialBackend = {
   async searchUsersForFriendAdd(query) {
     const trimmedQuery = query.trim();
     if (trimmedQuery.length < 2) return [];
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'search_users_for_friend_add' as never,
       { p_query: trimmedQuery } as never
     );
@@ -211,7 +215,7 @@ export const centralSocialBackend: SocialBackend = {
   },
 
   async sendFriendRequest(username) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'send_friend_request' as never,
       { p_username: username } as never
     );
@@ -224,7 +228,7 @@ export const centralSocialBackend: SocialBackend = {
   },
 
   async acceptFriendRequest(requestId) {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await client.rpc(
       'accept_friend_request' as never,
       { p_request_id: requestId } as never
     );
@@ -249,7 +253,7 @@ export const centralSocialBackend: SocialBackend = {
   },
 
   async blockUser(targetUserId) {
-    const { error } = await supabase.rpc(
+    const { error } = await client.rpc(
       'block_user' as never,
       { p_target_user_id: targetUserId } as never
     );
@@ -258,7 +262,7 @@ export const centralSocialBackend: SocialBackend = {
   },
 
   async unblockUser(targetUserId) {
-    const { error } = await supabase.rpc(
+    const { error } = await client.rpc(
       'unblock_user' as never,
       { p_target_user_id: targetUserId } as never
     );
@@ -267,7 +271,7 @@ export const centralSocialBackend: SocialBackend = {
   },
 
   subscribeToSocialGraph(userId, onChange) {
-    return supabase
+    return client
       .channel(`social_graph:${userId}`)
       .on(
         'postgres_changes',
@@ -332,3 +336,5 @@ export const centralSocialBackend: SocialBackend = {
       .subscribe();
   },
 };
+}
+

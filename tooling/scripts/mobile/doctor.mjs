@@ -23,6 +23,7 @@ function run(name, command, args, options = {}) {
 }
 
 run("Preflight checks", "node", ["tooling/scripts/mobile/preflight.mjs"]);
+run("Shared portable boundary", "node", ["tooling/scripts/check-shared-portable.mjs"]);
 run("Dependency ownership checks", "node", ["tooling/scripts/mobile/check-dependency-ownership.mjs"]);
 run("Expo config resolution", "npx", ["expo", "config", "--type", "public"], { cwd: mobileRoot });
 

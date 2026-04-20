@@ -505,7 +505,11 @@ export function useMessages({
           isElevatedInServer:
             await usePermissionsStore
               .getState()
-              .ensureElevatedInServer(serverId, currentUserId),
+              .ensureElevatedInServer(
+                serverId,
+                currentUserId,
+                getCommunityDataBackend(serverId),
+              ),
         });
         // Only write if not already populated — avoid clobbering an active channel load
         if (!messageBundleByChannelCacheRef.current[cacheKey]) {
@@ -642,7 +646,8 @@ export function useMessages({
         replyToMessageId: options?.replyToMessageId,
         mediaUpload: options?.mediaFile
           ? {
-              file: options.mediaFile,
+              body: options.mediaFile,
+              filename: options.mediaFile.name,
               expiresInHours: options.mediaExpiresInHours,
             }
           : undefined,
@@ -985,7 +990,11 @@ export function useMessages({
         isElevatedInServer:
           await usePermissionsStore
             .getState()
-            .ensureElevatedInServer(currentServerId, currentUserId),
+            .ensureElevatedInServer(
+              currentServerId,
+              currentUserId,
+              getCommunityDataBackend(currentServerId),
+            ),
       });
 
       return {
@@ -1066,7 +1075,11 @@ export function useMessages({
         isElevatedInServer:
           await usePermissionsStore
             .getState()
-            .ensureElevatedInServer(currentServerId, currentUserId),
+            .ensureElevatedInServer(
+              currentServerId,
+              currentUserId,
+              getCommunityDataBackend(currentServerId),
+            ),
       });
 
       return {

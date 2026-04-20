@@ -1,6 +1,6 @@
 # Haven Mobile (Expo + dev client + NativeWind)
 
-Native UI lives here. Shared **business** logic targets `packages/shared`; see `docs/shared-package-inventory.md` before importing.
+Native UI lives here. Shared **business** logic targets `packages/shared`; read [`docs/PORTABLE_SHARED.md`](../../docs/PORTABLE_SHARED.md) for composition-root rules, then `docs/shared-package-inventory.md` for a granular import audit.
 
 ## Prerequisites (macOS for iOS)
 
@@ -23,7 +23,7 @@ npm run setup:mobile
 
 ## Environment (Supabase, later phases)
 
-Expo exposes public vars as `EXPO_PUBLIC_*`. The web app uses `SUPABASE_URL` / `SUPABASE_ANON_KEY` via bundlers; `@shared/lib/supabase` expects those today. For RN you will either map env in `app.config.js` or introduce a shared `createSupabaseClient` — see the inventory doc.
+Expo exposes public vars as `EXPO_PUBLIC_*`. Host apps (web, Electron, mobile) read URL + anon key from their own config, build a client with `createHavenSupabaseClient`, then call `initializeHavenDataFromClient` so `@shared/lib/backend` resolves against that runtime — map keys in `app.config.js` `extra` (see `getMobileSupabase.ts`).
 
 Copy `.env.example` to `.env` when you add keys (`.env` is gitignored at repo root; use `apps/mobile/.env` for local Expo).
 

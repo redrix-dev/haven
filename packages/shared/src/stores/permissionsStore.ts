@@ -1,6 +1,12 @@
 import { create } from "zustand";
-import { getCommunityDataBackend } from "@shared/lib/backend";
+import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type { ServerPermissions } from "@shared/lib/backend/types";
+
+/** Narrow dependency so the store never resolves backends from globals. */
+export type CommunityElevationSource = Pick<
+  CommunityDataBackend,
+  "isElevatedInServer"
+>;
 
 const EMPTY_SERVER_PERMISSIONS: ServerPermissions = {
   isOwner: false,
@@ -33,11 +39,13 @@ export type PermissionsStoreState = {
   getPermissions: (serverId: string) => ServerPermissions;
   /**
    * Resolves whether the current user is elevated (mod/admin) in the community,
-   * with a per-community cache. Pass `userId` from the active session.
+   * with a per-community cache. Pass `userId` from the active session and the
+   * community backend from the Haven data runtime (composition root).
    */
   ensureElevatedInServer: (
     communityId: string,
     userId: string | null | undefined,
+    communityBackend: CommunityElevationSource,
   ) => Promise<boolean>;
   invalidateElevatedForServer: (serverId: string) => void;
   invalidateAllElevated: () => void;
@@ -64,12 +72,11 @@ export const usePermissionsStore = create<PermissionsStoreState>()(
       }),
     getPermissions: (serverId) =>
       get().permissionsByServerId[serverId] ?? EMPTY_SERVER_PERMISSIONS,
-    ensureElevatedInServer: async (communityId, userId) => {
+    ensureElevatedInServer: async (communityId, userId, communityBackend) => {
       if (!communityId || !userId) return false;
       const cached = get().elevatedCache[communityId];
       if (typeof cached === "boolean") return cached;
       try {
-        const communityBackend = getCommunityDataBackend(communityId);
         const nextValue = await communityBackend.isElevatedInServer(
           communityId,
         );

@@ -11,7 +11,8 @@ import { getErrorMessage } from '@platform/lib/errors';
 type RefreshDmConversationsOptions = { suppressLoadingState?: boolean };
 type RefreshDmMessagesOptions = { suppressLoadingState?: boolean; markRead?: boolean };
 type SendDirectMessageOptions = {
-  imageFile?: File;
+  imageBody?: Blob;
+  imageFilename?: string;
   imageExpiresInHours?: number;
 };
 
@@ -415,9 +416,10 @@ export function useDirectMessages({
         await directMessageBackend.sendMessage({
           conversationId: selectedDmConversationId,
           content,
-          imageUpload: options?.imageFile
+          imageUpload: options?.imageBody
             ? {
-                file: options.imageFile,
+                body: options.imageBody,
+                filename: options.imageFilename,
                 expiresInHours: options.imageExpiresInHours,
               }
             : undefined,

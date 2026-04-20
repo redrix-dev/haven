@@ -1,6 +1,7 @@
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
+  Community: { communityId: string };
   SettingsPlaceholder: undefined;
   CreatePlaceholder: undefined;
   JoinPlaceholder: undefined;

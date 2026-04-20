@@ -63,8 +63,6 @@ type FriendsConfirmState =
   | { kind: "removeFriend"; friendUserId: string; username: string }
   | { kind: "blockUser"; userId: string; username: string };
 
-const socialBackend = getSocialBackend();
-
 const DEFAULT_SOCIAL_COUNTS: SocialCounts = {
   friendsCount: 0,
   incomingPendingRequestCount: 0,
@@ -122,6 +120,7 @@ export function FriendsModal({
   const [pendingConfirm, setPendingConfirm] =
     React.useState<FriendsConfirmState | null>(null);
   const searchRequestIdRef = React.useRef(0);
+  const socialBackend = React.useMemo(() => getSocialBackend(), []);
 
   const incomingRequests = requests.filter(
     (request) => request.direction === "incoming",
@@ -162,7 +161,7 @@ export function FriendsModal({
         setRefreshing(false);
       }
     },
-    [currentUserId, open],
+    [currentUserId, open, socialBackend],
   );
 
   React.useEffect(() => {
@@ -195,7 +194,7 @@ export function FriendsModal({
     return () => {
       void subscription.unsubscribe();
     };
-  }, [currentUserId, open, refreshData]);
+  }, [currentUserId, open, refreshData, socialBackend]);
 
   React.useEffect(() => {
     if (!open || activeTab !== "add") return;
@@ -234,7 +233,7 @@ export function FriendsModal({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [activeTab, open, searchQuery]);
+  }, [activeTab, open, searchQuery, socialBackend]);
 
   const runMutation = async (
     actionKey: string,
