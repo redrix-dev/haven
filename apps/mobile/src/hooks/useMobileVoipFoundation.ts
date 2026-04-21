@@ -2,45 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect } from "react";
 import { Platform } from "react-native";
 import type { Session } from "@supabase/supabase-js";
+import RNCallKeep from "react-native-callkeep";
+import RNVoipPushNotification from "react-native-voip-push-notification";
 
 const LAST_VOIP_TOKEN_KEY = "haven:lastVoipPushToken";
-
-type CallKeepStatic = {
-  setup: (options: Record<string, unknown>) => Promise<boolean> | void;
-  setAvailable: (available: boolean) => void;
-  addEventListener: (
-    eventName: string,
-    handler: (...args: unknown[]) => void,
-  ) => { remove: () => void } | (() => void);
-};
-
-type VoipPushStatic = {
-  registerVoipToken: () => void;
-  addEventListener: (
-    eventName: string,
-    handler: (...args: unknown[]) => void,
-  ) => { remove: () => void } | (() => void);
-};
-
-function resolveModule<T>(id: string): T | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require(id) as T;
-  } catch {
-    return null;
-  }
-}
-
-function removeSubscription(
-  sub: { remove: () => void } | (() => void) | null,
-): void {
-  if (!sub) return;
-  if (typeof sub === "function") {
-    sub();
-    return;
-  }
-  sub.remove();
-}
 
 /**
  * Boots minimal VoIP + CallKeep native foundations.
@@ -52,16 +17,8 @@ export function useMobileVoipFoundation(
   useEffect(() => {
     if (Platform.OS !== "ios") return;
 
-    const callKeep = resolveModule<CallKeepStatic>("react-native-callkeep");
-    const voipPush = resolveModule<VoipPushStatic>(
-      "react-native-voip-push-notification",
-    );
-    if (!callKeep || !voipPush) return;
-
-    let disposed = false;
-
     void Promise.resolve(
-      callKeep.setup({
+      RNCallKeep.setup({
         ios: {
           appName: "Haven",
           supportsVideo: true,
@@ -69,45 +26,54 @@ export function useMobileVoipFoundation(
           maximumCallGroups: "1",
           maximumCallsPerCallGroup: "1",
         },
+        android: {
+          alertTitle: "Permissions Required",
+          alertDescription: "This app needs phone account permissions",
+          cancelButton: "Cancel",
+          okButton: "OK",
+          additionalPermissions: [],
+        },
       }),
     ).catch((error) => {
       console.warn("[voip] CallKeep setup failed.", error);
     });
 
-    callKeep.setAvailable(true);
-    voipPush.registerVoipToken();
+    RNCallKeep.setAvailable(true);
+    RNVoipPushNotification.registerVoipToken();
 
-    const registerSub = voipPush.addEventListener(
-      "register",
-      (voipToken: unknown) => {
-        if (typeof voipToken !== "string" || !voipToken.trim()) return;
-        void AsyncStorage.setItem(LAST_VOIP_TOKEN_KEY, voipToken.trim());
-      },
-    );
+    function handleVoipRegister(voipToken: string): void {
+      if (!voipToken.trim()) return;
+      void AsyncStorage.setItem(LAST_VOIP_TOKEN_KEY, voipToken.trim());
+    }
 
-    const notificationSub = voipPush.addEventListener(
-      "notification",
-      (_payload: unknown) => {
-        // Foundation only: keep event subscribed so native ingress is verified.
-      },
-    );
+    function handleVoipNotification(_payload: unknown): void {
+      // Foundation only: keep event subscribed so native ingress is verified.
+    }
 
-    const answerSub = callKeep.addEventListener("answerCall", () => {
+    function handleAnswerCall(): void {
       // Foundation only: call handling will be connected to voice runtime later.
-    });
+    }
 
-    const endSub = callKeep.addEventListener("endCall", () => {
+    function handleEndCall(): void {
       // Foundation only: call handling will be connected to voice runtime later.
-    });
+    }
+
+    RNVoipPushNotification.addEventListener("register", handleVoipRegister);
+    RNVoipPushNotification.addEventListener("notification", handleVoipNotification);
+    const answerCallSubscription = RNCallKeep.addEventListener(
+      "answerCall",
+      handleAnswerCall,
+    );
+    const endCallSubscription = RNCallKeep.addEventListener(
+      "endCall",
+      handleEndCall,
+    );
 
     return () => {
-      disposed = true;
-      if (disposed) {
-        removeSubscription(registerSub);
-        removeSubscription(notificationSub);
-        removeSubscription(answerSub);
-        removeSubscription(endSub);
-      }
+      RNVoipPushNotification.removeEventListener("register");
+      RNVoipPushNotification.removeEventListener("notification");
+      answerCallSubscription.remove();
+      endCallSubscription.remove();
     };
   }, [session?.user?.id]);
 }
