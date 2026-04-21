@@ -1,3 +1,15 @@
+/**
+ * Runs a command with cwd = apps/mobile (so Metro, Expo, and EAS resolve paths correctly).
+ *
+ * Repo-root wrappers (see root package.json `mobile:*`):
+ * - mobile:dev:metro / mobile:start — JS only: Expo dev server (dev client). Does not reinstall the app.
+ * - mobile:dev:metro:clear / mobile:start:clear — same, clears Metro/JS cache (--clear).
+ * - mobile:run:ios:simulator / mobile:ios — native compile + install on iOS Simulator.
+ * - mobile:run:ios:device / mobile:ios:device — native compile + install on a USB/paired iPhone.
+ * - mobile:run:android / mobile:android — native compile + run Android.
+ * - mobile:native:prebuild / mobile:prebuild — regenerate ios/ and android/ from Expo config (no device install).
+ * - mobile:eas:* — cloud EAS builds (artifact you install separately).
+ */
 import { spawn } from "node:child_process";
 import path from "node:path";
 import process from "node:process";

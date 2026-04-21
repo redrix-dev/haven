@@ -47,6 +47,11 @@
         "NSPhotoLibraryUsageDescription": "Allow Haven to access your photo library to upload media attachments.",
         "NSPhotoLibraryAddUsageDescription": "Allow Haven to save shared media to your photo library.",
         "NSFaceIDUsageDescription": "Allow Haven to use Face ID for secure app access.",
+        "NSLocalNetworkUsageDescription": "Haven uses your local network so this development build can find and connect to the Metro bundler on your computer.",
+        "NSBonjourServices": [
+          "_expo._tcp",
+          "_http._tcp"
+        ],
         "UIBackgroundModes": [
           "audio",
           "voip",
