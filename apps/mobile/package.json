@@ -5,12 +5,12 @@
   "main": "expo/AppEntry.js",
   "scripts": {
     "preflight": "node ../../tooling/scripts/mobile/preflight.mjs --strict",
-    "start": "npm run preflight && expo start --dev-client",
-    "start:clear": "npm run preflight && expo start --dev-client --clear",
-    "android": "npm run preflight && expo run:android",
-    "ios": "npm run preflight && expo run:ios",
-    "ios:device": "npm run preflight && expo run:ios --device",
-    "prebuild": "npm run preflight && expo prebuild",
+    "dev:metro": "npm run preflight && expo start --dev-client",
+    "dev:metro:clear": "npm run preflight && expo start --dev-client --clear",
+    "run:ios:simulator": "npm run preflight && expo run:ios",
+    "run:ios:device": "npm run preflight && expo run:ios --device",
+    "run:android": "npm run preflight && expo run:android",
+    "native:prebuild": "npm run preflight && expo prebuild",
     "eas:build": "npm run preflight && eas build",
     "eas:build:dev": "npm run eas:build -- --profile development",
     "eas:build:dev:ios": "npm run eas:build -- --profile development --platform ios",
@@ -24,7 +24,13 @@
     "eas:submit": "npm run preflight && eas submit",
     "eas:credentials": "npm run preflight && eas credentials",
     "typecheck": "tsc --noEmit",
-    "doctor": "node ../../tooling/scripts/mobile/doctor.mjs"
+    "doctor": "node ../../tooling/scripts/mobile/doctor.mjs",
+    "start": "npm run dev:metro",
+    "start:clear": "npm run dev:metro:clear",
+    "ios": "npm run run:ios:simulator",
+    "ios:device": "npm run run:ios:device",
+    "android": "npm run run:android",
+    "prebuild": "npm run native:prebuild"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",
