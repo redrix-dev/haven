@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -12,10 +11,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ServerSummary } from "@shared/lib/backend/types";
-import { listUserCommunitiesWithClient } from "@shared/lib/listUserCommunitiesWithClient";
-import { getErrorMessage } from "@shared/platform/lib/errors";
+import { useServers } from "@shared/features/community/hooks/useServers";
 import type { RootStackParamList } from "../navigation/types";
-import { getMobileSupabase } from "../supabase/getMobileSupabase";
 
 type GridItem =
   | { kind: "server"; server: ServerSummary }
@@ -38,45 +35,12 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList, "Home">>();
-  const [servers, setServers] = useState<ServerSummary[]>([]);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { servers, status, error: loadError, refreshServers } = useServers();
 
   const width = Dimensions.get("window").width;
   const cell = (width - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
   const tile = Math.max(cell - 24, 56);
   
-
-  const refresh = useCallback(async () => {
-    setLoadError(null);
-    setRefreshing(true);
-    try {
-      const supabase = getMobileSupabase();
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user?.id) {
-        setServers([]);
-        return;
-      }
-      const list = await listUserCommunitiesWithClient(supabase, user.id);
-      setServers(list);
-    } catch (e) {
-      setLoadError(getErrorMessage(e));
-    } finally {
-      setInitialLoad(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh]),
-  );
 
   const items = buildGridItems(servers);
 
@@ -93,7 +57,7 @@ export function HomeScreen() {
     </Pressable>
   );
 
-  if (initialLoad && servers.length === 0) {
+  if (status === "loading" && servers.length === 0) {
     return (
       <View className="flex-1 bg-surface-modal">
         <View
@@ -167,8 +131,8 @@ export function HomeScreen() {
           item.kind === "server" ? item.server.id : `${item.kind}-${index}`
         }
         numColumns={COLS}
-        refreshing={refreshing}
-        onRefresh={() => void refresh()}
+        refreshing={status === "loading"}
+        onRefresh={() => void refreshServers()}
         renderItem={({ item }) => {
           if (item.kind === "server") {
             const initial = item.server.name.trim().charAt(0).toUpperCase() || "?";

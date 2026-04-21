@@ -1,4 +1,5 @@
 import React from 'react';
+import { getAppHost } from '@shared/platform/appHost';
 
 const STORAGE_KEY = 'haven:voice:member-volumes:v1';
 const DEFAULT_MEMBER_VOLUME = 100;
@@ -23,10 +24,11 @@ const coerceVolume = (value: number) => {
 };
 
 const readStoredVolumes = (now: number): StoredVolumeMap => {
-  if (typeof window === 'undefined') return {};
+  const browserRuntime = getAppHost().browserRuntime;
+  if (!browserRuntime) return {};
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = browserRuntime.storageGetItem(STORAGE_KEY);
     if (!raw) return {};
 
     const parsed = JSON.parse(raw) as unknown;
@@ -54,10 +56,11 @@ const readStoredVolumes = (now: number): StoredVolumeMap => {
 };
 
 const writeStoredVolumes = (entries: StoredVolumeMap) => {
-  if (typeof window === 'undefined') return;
+  const browserRuntime = getAppHost().browserRuntime;
+  if (!browserRuntime) return;
 
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    browserRuntime.storageSetItem(STORAGE_KEY, JSON.stringify(entries));
   } catch {
     // Ignore storage failures and keep settings in-memory.
   }

@@ -13,6 +13,7 @@ import {
 } from "@shared/app/utils";
 import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
 import { useVoiceStore } from "@shared/stores/voiceStore";
+import { getAppHost } from "@shared/platform/appHost";
 import {
   createInitialVoiceSessionStoreState,
   reduceVoiceSessionStoreState,
@@ -282,10 +283,9 @@ export function useVoice({
       setVoiceHardwareDebugPanelOpen((prev) => !prev);
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    return (
+      getAppHost().voiceRuntime?.addKeyDownListener(handleKeyDown) ?? (() => {})
+    );
   }, [currentUserId, voiceHardwareDebugPanelEnabled]);
 
   React.useEffect(() => {

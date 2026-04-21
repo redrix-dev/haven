@@ -14,6 +14,21 @@ const bannedSingletonFile = path.join("packages", "shared", "src", "lib", "supab
 const importSupabaseRe = /@shared\/lib\/supabase\b/;
 const envSupabaseRe =
   /process\.env\.(?:SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)\b/;
+const browserGlobalRe =
+  /\b(?:window\.|document\.|navigator\.|history\.|localStorage\.|sessionStorage\.)/;
+const webOnlyImportRe =
+  /\b(?:sonner|react-dom|react-markdown|@radix-ui\/|@tiptap\/|lucide-react|cmdk)\b/;
+
+const portablePathChecks = [
+  /^packages\/shared\/src\/contexts\/.+\.(?:ts|tsx)$/,
+  /^packages\/shared\/src\/app\/hooks\/.+\.(?:ts|tsx)$/,
+  /^packages\/shared\/src\/features\/.+\/hooks\/.+\.(?:ts|tsx)$/,
+  /^packages\/shared\/src\/lib\/deepLinks\.ts$/,
+  /^packages\/shared\/src\/platform\/urls\.ts$/,
+];
+const portablePathExclusions = [
+  /^packages\/shared\/src\/app\/hooks\/useDesktopSettings\.ts$/,
+];
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -42,6 +57,9 @@ if (fs.existsSync(bannedSingletonFile)) {
 
 for (const file of walk(sharedRoot)) {
   const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
+  const shouldCheckPortablePath = portablePathChecks.some((pattern) =>
+    pattern.test(rel),
+  ) && !portablePathExclusions.some((pattern) => pattern.test(rel));
   const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((rawLine, i) => {
     const line = stripComments(rawLine);
@@ -51,6 +69,16 @@ for (const file of walk(sharedRoot)) {
     if (envSupabaseRe.test(line)) {
       violations.push(
         `${rel}:${i + 1}: direct process.env Supabase read in portable shared (use host wiring + createHavenSupabaseClient)`,
+      );
+    }
+    if (shouldCheckPortablePath && browserGlobalRe.test(line)) {
+      violations.push(
+        `${rel}:${i + 1}: browser global usage in portable shared logic`,
+      );
+    }
+    if (shouldCheckPortablePath && webOnlyImportRe.test(line)) {
+      violations.push(
+        `${rel}:${i + 1}: web-only dependency usage in portable shared logic`,
       );
     }
   });

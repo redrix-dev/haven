@@ -1,7 +1,18 @@
 import React from 'react';
-import { toast } from 'sonner';
 import type { SocialBackend } from '@shared/lib/backend/socialBackend';
 import { getErrorMessage } from '@platform/lib/errors';
+
+type DirectMessageNotifier = (
+  level: "error" | "success",
+  message: string,
+  options?: {
+    id?: string;
+    action?: {
+      label: string;
+      onClick: () => void;
+    };
+  },
+) => void;
 
 type UseDirectMessageInteractionsInput = {
   currentUserId: string | null | undefined;
@@ -14,6 +25,7 @@ type UseDirectMessageInteractionsInput = {
   onOpenDmWorkspace: () => void;
   onEnterDmWorkspace: () => void;
   onOpenFriendsAddPanel: () => void;
+  notify?: DirectMessageNotifier;
 };
 
 export function useDirectMessageInteractions({
@@ -27,6 +39,7 @@ export function useDirectMessageInteractions({
   onOpenDmWorkspace,
   onEnterDmWorkspace,
   onOpenFriendsAddPanel,
+  notify,
 }: UseDirectMessageInteractionsInput) {
   const openDirectMessagesWorkspace = React.useCallback(() => {
     onOpenDmWorkspace();
@@ -36,9 +49,9 @@ export function useDirectMessageInteractions({
       const message = getErrorMessage(error, 'Failed to load direct messages.');
       console.error('Failed to open direct messages workspace:', error);
       setDmConversationsError(message);
-      toast.error(message, { id: 'dm-workspace-open-error' });
+      notify?.("error", message, { id: 'dm-workspace-open-error' });
     });
-  }, [onOpenDmWorkspace, refreshDmConversations, setDmConversationsError]);
+  }, [notify, onOpenDmWorkspace, refreshDmConversations, setDmConversationsError]);
 
   const directMessageUser = React.useCallback(
     (targetUserId: string) => {
@@ -47,14 +60,14 @@ export function useDirectMessageInteractions({
       if (!targetUserId) {
         const message = 'Invalid DM target.';
         setDmConversationsError(message);
-        toast.error(message, { id: 'dm-open-invalid-target' });
+        notify?.("error", message, { id: 'dm-open-invalid-target' });
         return;
       }
 
       if (currentUserId && targetUserId === currentUserId) {
         const message = 'You cannot direct message yourself.';
         setDmConversationsError(message);
-        toast.error(message, { id: 'dm-open-self' });
+        notify?.("error", message, { id: 'dm-open-self' });
         return;
       }
 
@@ -73,7 +86,7 @@ export function useDirectMessageInteractions({
         setDmConversationsError(message);
 
         if (errorCode === 'P0001' && message.includes('friends list')) {
-          toast.error(message, {
+          notify?.("error", message, {
             id: 'dm-open-friends-only',
             action: {
               label: 'Open Friends',
@@ -83,7 +96,7 @@ export function useDirectMessageInteractions({
           return;
         }
 
-        toast.error(message, { id: 'dm-open-error' });
+        notify?.("error", message, { id: 'dm-open-error' });
       });
     },
     [
@@ -92,6 +105,7 @@ export function useDirectMessageInteractions({
       onOpenFriendsAddPanel,
       openDirectMessageWithUser,
       setDmConversationsError,
+      notify,
     ]
   );
 

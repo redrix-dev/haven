@@ -1,6 +1,7 @@
 import { 
     asRecord,
     getRecordString } from '@platform/lib/records';
+import { getAppHost } from '@shared/platform/appHost';
 
 
 
@@ -112,7 +113,9 @@ const parseNotificationTargetFromUrl = (parsed: URL): WebAppDeepLinkTarget | nul
 const parseWebAppDeepLinkUrl = (url: string): WebAppDeepLinkTarget | null => {
   if (!url) return null;
   try {
-    const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    const baseOrigin =
+      getAppHost().browserRuntime?.getLocationOrigin() ?? 'http://localhost';
+    const parsed = new URL(url, baseOrigin);
     return parseNotificationTargetFromUrl(parsed);
   } catch {
     return null;

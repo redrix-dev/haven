@@ -30,6 +30,27 @@ Stores keep **cache and UI state**. They must **not** import backend singletons 
 - **Reusable DOM UI** extracted from the old `@shared/app/ui/*` tree lives in **`packages/web-client/src/app-ui/`**. TypeScript path `@shared/app/ui/*` may still alias there for incremental migration of import strings.
 - **Product-specific web surfaces** stay in `apps/web` and `apps/electron` as appropriate.
 
+## Portable logic vs platform UI
+
+Every module in `packages/shared/src` must be classified as one of:
+
+- **portable-logic**: safe to import and execute in web, Electron renderer, React Native, and Vitest without host polyfills.
+- **platform-ui**: web/desktop rendering code that is intentionally non-portable.
+
+Rules:
+
+1. Hooks, stores, orchestration, domain logic, backend accessors, and helpers that mobile imports are `portable-logic`.
+2. `portable-logic` must not reference browser globals (`window`, `document`, `navigator`, `history`, `localStorage`, etc.) or web-only UI libraries.
+3. Platform-specific behavior for `portable-logic` is provided by host-level runtime wiring, not per-feature wrappers.
+4. React components under feature/app component folders may remain platform-specific when they are not imported by mobile.
+5. If a module cannot meet `portable-logic` constraints, move it to a platform UI location or split out the portable core.
+
+Anti-patterns:
+
+- Adding `if (typeof window !== "undefined")` branches inside shared portable hooks to compensate for missing runtime support.
+- Creating parallel mobile copies of logic-heavy hooks that already exist in shared.
+- Introducing adapter/wrapper stacks per feature instead of one host composition root wiring surface.
+
 ## Machine-readable inventory
 
 `tooling/inventories/shared-portable-inventory.json` captures periodic audits (importers, DOM-heavy files, etc.). When in doubt, extend that inventory and tighten `check:shared-portable` rather than relying on tribal knowledge.

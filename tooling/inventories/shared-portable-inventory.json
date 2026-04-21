@@ -11,6 +11,28 @@
     "runtime": "@shared/runtime/havenDataRuntime + havenRuntimeRegistry",
     "clientFactory": "@shared/lib/createHavenSupabaseClient"
   },
+  "surfacePolicy": {
+    "portableLogic": "Hooks, stores, backends, orchestration, domain logic, and helpers imported by more than one host app. Must be importable/executable in web/electron/mobile/vitest without browser globals.",
+    "platformUi": "Web/Electron rendering components and DOM bindings that are not imported by mobile. Keep in platform UI folders.",
+    "forbiddenInPortableLogic": [
+      "window.*",
+      "document.*",
+      "navigator.*",
+      "history.*",
+      "localStorage",
+      "sessionStorage",
+      "web-only UI deps (sonner, radix, react-dom, etc.)"
+    ]
+  },
+  "priorityPortableRefactors": [
+    "packages/shared/src/features/community/hooks/useServerOrder.ts",
+    "packages/shared/src/app/hooks/useDeepLinks.ts",
+    "packages/shared/src/contexts/AuthContext.tsx",
+    "packages/shared/src/features/messaging/hooks/useMessages.ts",
+    "packages/shared/src/features/voice/hooks/useVoice.ts",
+    "packages/shared/src/features/voice/hooks/useVoiceSessionController.ts",
+    "packages/shared/src/features/voice/hooks/useVoiceMemberVolumes.ts"
+  ],
   "classification": {
     "portableDataLayer": "Backends created via createHavenDataRuntime(client); get*Backend() reads requireHavenDataRuntime().",
     "hostWiring": "apps/web, apps/electron renderer, apps/mobile App.tsx, tooling/test-support/setup/supabaseLocal — initialize before shared trees render.",

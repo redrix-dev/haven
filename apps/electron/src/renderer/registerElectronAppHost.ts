@@ -12,6 +12,19 @@ export function registerElectronAppHost(): void {
 
   const host: AppHost = {
     isDesktopApp: () => desktopClient.isAvailable(),
+    browserRuntime: {
+      getVisibilityState: () => null,
+      addVisibilityChangeListener: () => () => {},
+      addFocusListener: () => () => {},
+      addBlurListener: () => () => {},
+      getLocationHref: () => null,
+      getLocationOrigin: () => null,
+      replaceHistoryUrl: () => {},
+      getDocumentTitle: () => "",
+      storageGetItem: () => null,
+      storageSetItem: () => {},
+      storageRemoveItem: () => {},
+    },
     openExternalUrl: (url) => desktopClient.openExternalUrl(url),
     saveFileFromUrl: ({ url, suggestedName }) =>
       desktopClient.saveFileFromUrl({ url, suggestedName }),

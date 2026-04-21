@@ -11,6 +11,7 @@ import { playVoicePresenceSound } from "@shared/lib/notifications/sound";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useVoiceStore } from "@shared/stores/voiceStore";
 import { useSocialStore } from "@shared/stores/socialStore";
+import { getAppHost } from "@shared/platform/appHost";
 import type {
   NotificationAudioSettings,
   VoiceSettings,
@@ -123,6 +124,8 @@ export function useVoiceSessionController({
   state: VoiceSessionControllerState;
   actions: VoiceSessionControllerActions;
 } {
+  const voiceRuntime = getAppHost().voiceRuntime;
+  const browserRuntime = getAppHost().browserRuntime;
   const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
   const joined = useVoiceStore((state) => state.joined);
   const [joining, setJoining] = React.useState(false);
@@ -327,10 +330,8 @@ export function useVoiceSessionController({
   );
 
   const refreshAudioDevices = React.useCallback(async () => {
-    if (!navigator.mediaDevices?.enumerateDevices) return;
-
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
+      const devices = (await voiceRuntime?.enumerateDevices()) ?? [];
       const audioInputs = devices.filter(
         (device) => isAudioInput(device) && hasSelectableDeviceId(device),
       );
@@ -368,12 +369,12 @@ export function useVoiceSessionController({
     } catch (deviceError) {
       console.error("Failed to enumerate audio devices:", deviceError);
     }
-  }, [selectedInputDeviceId, selectedOutputDeviceId]);
+  }, [selectedInputDeviceId, selectedOutputDeviceId, voiceRuntime]);
 
   const stopLocalInputMonitor = React.useCallback(async () => {
     localInputMonitorActiveRef.current = false;
     if (localInputMonitorRafIdRef.current != null) {
-      window.cancelAnimationFrame(localInputMonitorRafIdRef.current);
+      voiceRuntime?.cancelAnimationFrame(localInputMonitorRafIdRef.current);
       localInputMonitorRafIdRef.current = null;
     }
 
@@ -397,7 +398,7 @@ export function useVoiceSessionController({
 
     setLocalInputLevel(0);
     setVoiceActivityGateOpen(false);
-  }, []);
+  }, [voiceRuntime]);
 
   const startLocalInputMonitor = React.useCallback(
     async (stream: MediaStream | null) => {
@@ -407,14 +408,10 @@ export function useVoiceSessionController({
       const track = stream.getAudioTracks()[0];
       if (!track) return;
 
-      const AudioContextCtor =
-        window.AudioContext ??
-        (window as Window & { webkitAudioContext?: typeof AudioContext })
-          .webkitAudioContext;
-      if (!AudioContextCtor) return;
+      const audioContext = voiceRuntime?.createAudioContext() ?? null;
+      if (!audioContext) return;
 
       try {
-        const audioContext = new AudioContextCtor();
         await audioContext.resume();
 
         const source = audioContext.createMediaStreamSource(stream);
@@ -480,10 +477,11 @@ export function useVoiceSessionController({
           );
 
           localInputMonitorRafIdRef.current =
-            window.requestAnimationFrame(frame);
+            voiceRuntime?.requestAnimationFrame(frame) ?? null;
         };
 
-        localInputMonitorRafIdRef.current = window.requestAnimationFrame(frame);
+        localInputMonitorRafIdRef.current =
+          voiceRuntime?.requestAnimationFrame(frame) ?? null;
       } catch (monitorError) {
         console.warn(
           "Failed to start local input monitor for voice activity gating:",
@@ -492,7 +490,7 @@ export function useVoiceSessionController({
         void stopLocalInputMonitor();
       }
     },
-    [stopLocalInputMonitor],
+    [stopLocalInputMonitor, voiceRuntime],
   );
 
   const closePeerConnection = React.useCallback((remoteUserId: string) => {
@@ -1038,9 +1036,12 @@ export function useVoiceSessionController({
         constraints.deviceId = { exact: deviceId };
       }
 
-      return navigator.mediaDevices.getUserMedia({ audio: constraints });
+      if (!voiceRuntime) {
+        throw new Error("Voice runtime is unavailable for getUserMedia.");
+      }
+      return voiceRuntime.getUserMedia({ audio: constraints });
     },
-    [],
+    [voiceRuntime],
   );
 
   const applyLocalTrackState = React.useCallback(() => {
@@ -1235,23 +1236,23 @@ export function useVoiceSessionController({
 
       try {
         await new Promise<void>((resolve, reject) => {
-          const timeoutId = window.setTimeout(() => {
+          const timeoutId = setTimeout(() => {
             reject(new Error("Timed out connecting to voice."));
           }, 12000);
 
           voiceChannel.subscribe(async (status) => {
             if (status === "SUBSCRIBED") {
-              window.clearTimeout(timeoutId);
+              clearTimeout(timeoutId);
               setStoredJoined(true);
               playDebouncedVoicePresenceSound("voice_presence_join"); // CHECKPOINT 4 COMPLETE
               skipNextPresenceSyncRef.current = true;
               await trackPresenceState();
               resolve();
             } else if (status === "CHANNEL_ERROR") {
-              window.clearTimeout(timeoutId);
+              clearTimeout(timeoutId);
               reject(new Error("Voice channel connection failed."));
             } else if (status === "TIMED_OUT") {
-              window.clearTimeout(timeoutId);
+              clearTimeout(timeoutId);
               reject(new Error("Voice channel connection timed out."));
             }
           });
@@ -1446,18 +1447,12 @@ export function useVoiceSessionController({
     );
     void refreshAudioDevices();
 
-    const mediaDevices = navigator.mediaDevices;
-    if (!mediaDevices?.addEventListener) return;
-
     const handleDeviceChange = () => {
       void refreshAudioDevices();
     };
 
-    mediaDevices.addEventListener("devicechange", handleDeviceChange);
-    return () => {
-      mediaDevices.removeEventListener("devicechange", handleDeviceChange);
-    };
-  }, [refreshAudioDevices]);
+    return voiceRuntime?.addDeviceChangeListener(handleDeviceChange);
+  }, [refreshAudioDevices, voiceRuntime]);
 
   React.useEffect(() => {
     const nextInputId = voiceSettings.preferredInputDeviceId || "default";
@@ -1535,18 +1530,26 @@ export function useVoiceSessionController({
       setPushToTalkPressed(false);
     };
 
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("keyup", handleKeyUp, true);
-    window.addEventListener("blur", clearPressed);
-    document.addEventListener("visibilitychange", clearPressed);
+    const removeKeyDown =
+      voiceRuntime?.addKeyDownListener(handleKeyDown, true) ?? (() => {});
+    const removeKeyUp =
+      voiceRuntime?.addKeyUpListener(handleKeyUp, true) ?? (() => {});
+    const removeBlur = browserRuntime?.addBlurListener(clearPressed) ?? (() => {});
+    const removeVisibility =
+      browserRuntime?.addVisibilityChangeListener(clearPressed) ?? (() => {});
     return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("keyup", handleKeyUp, true);
-      window.removeEventListener("blur", clearPressed);
-      document.removeEventListener("visibilitychange", clearPressed);
+      removeKeyDown();
+      removeKeyUp();
+      removeBlur();
+      removeVisibility();
       clearPressed();
     };
-  }, [voiceSettings.pushToTalkBinding, voiceSettings.transmissionMode]);
+  }, [
+    browserRuntime,
+    voiceRuntime,
+    voiceSettings.pushToTalkBinding,
+    voiceSettings.transmissionMode,
+  ]);
 
   React.useEffect(() => {
     for (const [remoteUserId, audioElement] of Object.entries(
@@ -1608,12 +1611,12 @@ export function useVoiceSessionController({
     if (!joined) return;
 
     void refreshVoiceDiagnostics();
-    const intervalId = window.setInterval(() => {
+    const intervalId = setInterval(() => {
       void refreshVoiceDiagnostics();
     }, 3000);
 
     return () => {
-      window.clearInterval(intervalId);
+      clearInterval(intervalId);
     };
   }, [joined, participants, refreshVoiceDiagnostics, showDiagnostics]);
 

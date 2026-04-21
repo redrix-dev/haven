@@ -1,5 +1,5 @@
 /**
- * useServerOrder — client-side server ordering persisted to localStorage.
+ * useServerOrder — client-side server ordering persisted to host storage.
  *
  * The order is stored as a JSON array of server IDs keyed per user so that
  * multiple accounts on the same device stay independent.
@@ -8,6 +8,7 @@
  *   const { orderedServers, setOrder, resetOrder } = useServerOrder(userId, servers);
  */
 import React from 'react';
+import { getAppHost } from '@shared/platform/appHost';
 
 function storageKey(userId: string) {
   return `haven:user-${userId}:server-order`;
@@ -21,7 +22,7 @@ function hasSameIdSequence(left: readonly string[] | null, right: readonly strin
 
 function readOrder(userId: string): string[] | null {
   try {
-    const raw = window.localStorage.getItem(storageKey(userId));
+    const raw = getAppHost().browserRuntime?.storageGetItem(storageKey(userId)) ?? null;
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
@@ -33,7 +34,7 @@ function readOrder(userId: string): string[] | null {
 
 function writeOrder(userId: string, ids: string[]) {
   try {
-    window.localStorage.setItem(storageKey(userId), JSON.stringify(ids));
+    getAppHost().browserRuntime?.storageSetItem(storageKey(userId), JSON.stringify(ids));
   } catch {
     // localStorage may be unavailable in some contexts — fail silently.
   }
@@ -49,7 +50,7 @@ export function useServerOrder<T extends ServerLike>(userId: string | null, serv
     return readOrder(userId);
   });
 
-  // When the user changes (sign in/out), re-read from localStorage.
+  // When the user changes (sign in/out), re-read from host storage.
   React.useEffect(() => {
     if (!userId) {
       setSavedOrder(null);
@@ -98,7 +99,7 @@ export function useServerOrder<T extends ServerLike>(userId: string | null, serv
     setSavedOrder(null);
     if (userId) {
       try {
-        window.localStorage.removeItem(storageKey(userId));
+        getAppHost().browserRuntime?.storageRemoveItem(storageKey(userId));
       } catch {
         // ignore
       }

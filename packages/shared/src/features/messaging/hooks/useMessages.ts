@@ -21,6 +21,7 @@ import type {
 import { asRecord } from "@platform/lib/records";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
+import { getAppHost } from "@shared/platform/appHost";
 
 const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000;
 
@@ -177,7 +178,10 @@ export function useMessages({
   const loadedRevokedUserIdsByChannelRef = React.useRef<
     Record<string, boolean>
   >({});
-  const cleanupIntervalRef = useRef<number | null>(null);
+  const cleanupIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const unsubscribeVisibilityListenerRef = useRef<(() => void) | null>(null);
+  const unsubscribeFocusListenerRef = useRef<(() => void) | null>(null);
+  const unsubscribeBlurListenerRef = useRef<(() => void) | null>(null);
   const lastFreshMessageLoadAtRef = React.useRef(0);
 
   const setStoredMessages = React.useCallback((messages: Message[]) => {
@@ -1327,8 +1331,10 @@ export function useMessages({
 
   const createIncrementalRelatedRefreshQueues = React.useCallback(
     (input: IncrementalRelatedRefreshQueuesInput) => {
-      let pendingAttachmentRefreshTimerId: number | null = null;
-      let pendingLinkPreviewRefreshTimerId: number | null = null;
+      let pendingAttachmentRefreshTimerId: ReturnType<typeof setTimeout> | null =
+        null;
+      let pendingLinkPreviewRefreshTimerId: ReturnType<typeof setTimeout> | null =
+        null;
       let attachmentRefreshInFlight = false;
       let linkPreviewRefreshInFlight = false;
       const pendingAttachmentRefreshMessageIds = new Set<string>();
@@ -1389,7 +1395,7 @@ export function useMessages({
               pendingAttachmentRefreshMessageIds.size > 0 &&
               pendingAttachmentRefreshTimerId === null
             ) {
-              pendingAttachmentRefreshTimerId = window.setTimeout(() => {
+              pendingAttachmentRefreshTimerId = setTimeout(() => {
                 pendingAttachmentRefreshTimerId = null;
                 flushAttachmentRefreshQueue();
               }, 25);
@@ -1401,7 +1407,7 @@ export function useMessages({
         if (!messageId) return;
         pendingAttachmentRefreshMessageIds.add(messageId);
         if (pendingAttachmentRefreshTimerId !== null) return;
-        pendingAttachmentRefreshTimerId = window.setTimeout(() => {
+        pendingAttachmentRefreshTimerId = setTimeout(() => {
           pendingAttachmentRefreshTimerId = null;
           flushAttachmentRefreshQueue();
         }, 25);
@@ -1462,7 +1468,7 @@ export function useMessages({
               pendingLinkPreviewRefreshMessageIds.size > 0 &&
               pendingLinkPreviewRefreshTimerId === null
             ) {
-              pendingLinkPreviewRefreshTimerId = window.setTimeout(() => {
+              pendingLinkPreviewRefreshTimerId = setTimeout(() => {
                 pendingLinkPreviewRefreshTimerId = null;
                 flushLinkPreviewRefreshQueue();
               }, 25);
@@ -1474,7 +1480,7 @@ export function useMessages({
         if (!messageId) return;
         pendingLinkPreviewRefreshMessageIds.add(messageId);
         if (pendingLinkPreviewRefreshTimerId !== null) return;
-        pendingLinkPreviewRefreshTimerId = window.setTimeout(() => {
+        pendingLinkPreviewRefreshTimerId = setTimeout(() => {
           pendingLinkPreviewRefreshTimerId = null;
           flushLinkPreviewRefreshQueue();
         }, 25);
@@ -1482,10 +1488,10 @@ export function useMessages({
 
       const cleanup = () => {
         if (pendingAttachmentRefreshTimerId !== null) {
-          window.clearTimeout(pendingAttachmentRefreshTimerId);
+          clearTimeout(pendingAttachmentRefreshTimerId);
         }
         if (pendingLinkPreviewRefreshTimerId !== null) {
-          window.clearTimeout(pendingLinkPreviewRefreshTimerId);
+          clearTimeout(pendingLinkPreviewRefreshTimerId);
         }
         pendingAttachmentRefreshTimerId = null;
         pendingLinkPreviewRefreshTimerId = null;
@@ -1607,7 +1613,7 @@ export function useMessages({
   const createMessageReloadScheduler = React.useCallback(
     (input: MessageReloadSchedulerInput) => {
       let activeLoadPromise: Promise<void> | null = null;
-      let scheduledReloadTimerId: number | null = null;
+      let scheduledReloadTimerId: ReturnType<typeof setTimeout> | null = null;
       const pendingReloadReasons = new Set<string>();
 
       const flushScheduledMessageReload = () => {
@@ -1626,7 +1632,7 @@ export function useMessages({
             pendingReloadReasons.size > 0 &&
             scheduledReloadTimerId === null
           ) {
-            scheduledReloadTimerId = window.setTimeout(() => {
+            scheduledReloadTimerId = setTimeout(() => {
               scheduledReloadTimerId = null;
               flushScheduledMessageReload();
             }, 40);
@@ -1649,7 +1655,7 @@ export function useMessages({
           return;
         }
 
-        scheduledReloadTimerId = window.setTimeout(
+        scheduledReloadTimerId = setTimeout(
           () => {
             scheduledReloadTimerId = null;
             flushScheduledMessageReload();
@@ -1661,7 +1667,7 @@ export function useMessages({
       const cleanup = () => {
         pendingReloadReasons.clear();
         if (scheduledReloadTimerId !== null) {
-          window.clearTimeout(scheduledReloadTimerId);
+          clearTimeout(scheduledReloadTimerId);
         }
         scheduledReloadTimerId = null;
       };
@@ -1698,8 +1704,9 @@ export function useMessages({
         }
       };
 
+      const browserRuntime = getAppHost().browserRuntime;
       const handleVisibilityChange = () => {
-        const visibility = document.visibilityState;
+        const visibility = browserRuntime?.getVisibilityState() ?? "visible";
         input.onLogReload("visibility", { state: visibility });
         if (visibility === "visible") {
           if (areMessagesFresh()) {
@@ -1731,25 +1738,29 @@ export function useMessages({
 
       const start = () => {
         void runMessageMediaMaintenanceForLifecycle();
-        cleanupIntervalRef.current = window.setInterval(() => {
+        cleanupIntervalRef.current = setInterval(() => {
           void runMessageMediaMaintenanceForLifecycle();
         }, maintenanceIntervalMs);
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        window.addEventListener("focus", handleWindowFocus);
-        window.addEventListener("blur", handleWindowBlur);
+        unsubscribeVisibilityListenerRef.current =
+          browserRuntime?.addVisibilityChangeListener(handleVisibilityChange) ??
+          null;
+        unsubscribeFocusListenerRef.current =
+          browserRuntime?.addFocusListener(handleWindowFocus) ?? null;
+        unsubscribeBlurListenerRef.current =
+          browserRuntime?.addBlurListener(handleWindowBlur) ?? null;
       };
 
       const cleanup = () => {
         if (cleanupIntervalRef.current !== null) {
-          window.clearInterval(cleanupIntervalRef.current);
+          clearInterval(cleanupIntervalRef.current);
         }
         cleanupIntervalRef.current = null;
-        document.removeEventListener(
-          "visibilitychange",
-          handleVisibilityChange,
-        );
-        window.removeEventListener("focus", handleWindowFocus);
-        window.removeEventListener("blur", handleWindowBlur);
+        unsubscribeVisibilityListenerRef.current?.();
+        unsubscribeFocusListenerRef.current?.();
+        unsubscribeBlurListenerRef.current?.();
+        unsubscribeVisibilityListenerRef.current = null;
+        unsubscribeFocusListenerRef.current = null;
+        unsubscribeBlurListenerRef.current = null;
       };
 
       return {

@@ -9,9 +9,14 @@ import {
 } from "@shared/lib/deepLinks";
 import { getAppHost } from "@shared/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
-import { toast } from "sonner";
 import type { FriendsPanelTab } from "@shared/app/types";
 import { useNavigationStore } from "@shared/stores/navigationStore";
+
+type DeepLinkNotifier = (
+  level: "success" | "error",
+  message: string,
+  options?: { id?: string },
+) => void;
 interface UseDeepLinksOptions {
   user: { id: string } | null;
   joinServerByInvite: (
@@ -24,6 +29,7 @@ interface UseDeepLinksOptions {
   setFriendsPanelHighlightedRequestId: (id: string | null) => void;
   setCurrentServerId: (id: string) => void;
   setCurrentChannelId: (id: string) => void;
+  notify?: DeepLinkNotifier;
 }
 
 export function useDeepLinks({
@@ -36,6 +42,7 @@ export function useDeepLinks({
   setFriendsPanelHighlightedRequestId,
   setCurrentServerId,
   setCurrentChannelId,
+  notify,
 }: UseDeepLinksOptions) {
   const setWorkspaceMode = useNavigationStore(
     (state) => state.setWorkspaceMode,
@@ -48,9 +55,12 @@ export function useDeepLinks({
   } | null>(null);
 
   const clearBrowserDeepLinkUrl = React.useCallback(() => {
-    if (typeof window === "undefined") return;
+    const browserRuntime = getAppHost().browserRuntime;
+    if (!browserRuntime) return;
     try {
-      const parsed = new URL(window.location.href);
+      const currentUrl = browserRuntime.getLocationHref();
+      if (!currentUrl) return;
+      const parsed = new URL(currentUrl);
       if (normalizeDeepLinkPathname(parsed.pathname) === "/") {
         const params = getMergedUrlParams(parsed);
         const hasDeepLinkParams =
@@ -66,7 +76,7 @@ export function useDeepLinks({
           params.has("code");
         if (!hasDeepLinkParams) return;
       }
-      window.history.replaceState({}, document.title, "/");
+      browserRuntime.replaceHistoryUrl("/");
     } catch (historyError) {
       console.warn("Failed to clear web deep-link URL:", historyError);
     }
@@ -115,11 +125,11 @@ export function useDeepLinks({
         switch (target.kind) {
           case "invite": {
             const result = await joinServerByInvite(target.inviteCode);
-            toast.success(
+            notify?.(
+              "success",
               result.joined
                 ? `Joined ${result.communityName}`
                 : `Opened ${result.communityName}`,
-              { id: "web-deep-link-invite" },
             );
             break;
           }
@@ -162,7 +172,7 @@ export function useDeepLinks({
         }
         return true;
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to open link."), {
+        notify?.("error", getErrorMessage(error, "Failed to open link."), {
           id: "web-deep-link-open-error",
         });
         return false;
@@ -180,15 +190,16 @@ export function useDeepLinks({
       setNotificationsPanelOpen,
       setWorkspaceMode,
       user,
+      notify,
     ],
   );
 
   // Handle deep link in the initial page URL for the browser client.
   useEffect(() => {
     if (getAppHost().isDesktopApp()) return;
-    if (typeof window === "undefined") return;
+    const currentUrl = getAppHost().browserRuntime?.getLocationHref();
+    if (!currentUrl) return;
 
-    const currentUrl = window.location.href;
     const target = parseWebAppDeepLinkUrl(currentUrl);
     if (!target) return;
 

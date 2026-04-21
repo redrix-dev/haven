@@ -242,12 +242,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (getAppHost().isDesktopApp() && getAppHost().desktopAuth) return;
-    if (typeof window === "undefined") return;
+    const browserRuntime = getAppHost().browserRuntime;
+    if (!browserRuntime) return;
 
     let disposed = false;
 
     const consumeBrowserAuthConfirmUrl = async () => {
-      const currentUrl = window.location.href;
+      const currentUrl = browserRuntime.getLocationHref();
+      if (!currentUrl) return;
       const didProcess = await consumeAuthConfirmUrl(currentUrl);
       if (!didProcess || disposed) return;
 
@@ -256,7 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
 
       try {
-        window.history.replaceState({}, document.title, "/");
+        browserRuntime.replaceHistoryUrl("/");
       } catch (historyError) {
         if (!disposed) {
           console.warn(

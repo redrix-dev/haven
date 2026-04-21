@@ -6,14 +6,7 @@ export const HAVEN_TERMS_URL = 'https://projects.haven.redrixx.com/terms';
 export const HAVEN_PRIVACY_URL = 'https://projects.haven.redrixx.com/privacy';
 
 const getBrowserOrigin = (): string | null => {
-  if (typeof window === 'undefined') return null;
-
-  const origin = window.location?.origin;
-  if (typeof origin !== 'string' || !origin || origin === 'null') {
-    return null;
-  }
-
-  return origin;
+  return getAppHost().browserRuntime?.getLocationOrigin() ?? null;
 };
 
 export const getPlatformAuthConfirmRedirectUrl = (): string => {

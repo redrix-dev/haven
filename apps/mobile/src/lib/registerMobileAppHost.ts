@@ -8,6 +8,19 @@ import { setAppHost, type AppHost } from "@shared/platform/appHost";
 export function registerMobileAppHost(): void {
   const host: AppHost = {
     isDesktopApp: () => false,
+    browserRuntime: {
+      getVisibilityState: () => null,
+      addVisibilityChangeListener: () => () => {},
+      addFocusListener: () => () => {},
+      addBlurListener: () => () => {},
+      getLocationHref: () => null,
+      getLocationOrigin: () => null,
+      replaceHistoryUrl: () => {},
+      getDocumentTitle: () => "",
+      storageGetItem: () => null,
+      storageSetItem: () => {},
+      storageRemoveItem: () => {},
+    },
     openExternalUrl: async (url: string) => {
       try {
         await Linking.openURL(url);
