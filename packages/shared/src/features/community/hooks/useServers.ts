@@ -103,18 +103,7 @@ export function useServers({
       return;
     }
     void loadServers();
-
-    const subscription = controlPlaneBackend.subscribeToUserCommunities(
-      user.id,
-      () => {
-        void loadServers();
-      },
-    );
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [user, loadServers, resetStoredServers, controlPlaneBackend]);
+  }, [user, loadServers, resetStoredServers]);
 
   async function createServer(name: string) {
     if (!user) throw new Error("Not authenticated");

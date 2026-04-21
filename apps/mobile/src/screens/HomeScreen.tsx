@@ -1,17 +1,17 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  Pressable,
   Text,
   View,
+  Pressable,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { useServers } from "@shared/features/community/hooks/useServers";
+import { HavenNavbar } from "../components/HavenNavbar";
 import type { RootStackParamList } from "../navigation/types";
 
 type GridItem =
@@ -44,44 +44,10 @@ export function HomeScreen() {
 
   const items = buildGridItems(servers);
 
-  const iconBtn = (
-    name: keyof typeof Ionicons.glyphMap,
-    onPress: () => void,
-  ) => (
-    <Pressable
-      accessibilityRole="button"
-      className="h-11 w-11 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
-      onPress={onPress}
-    >
-      <Ionicons name={name} size={22} color="#e6edf7" />
-    </Pressable>
-  );
-
   if (status === "loading" && servers.length === 0) {
     return (
       <View className="flex-1 bg-surface-modal">
-        <View
-          className="border-b border-border-panel bg-surface-modal"
-          style={{ paddingTop: insets.top + 8 }}
-        >
-          <View className="flex-row items-center justify-between px-3 pb-3">
-            <View className="z-10 flex-row gap-2">
-              {iconBtn("chevron-back", () => undefined)}
-              {iconBtn("home", () => undefined)}
-              {iconBtn("people", () => undefined)}
-            </View>
-            <Text className="absolute left-0 right-0 text-center text-lg font-semibold text-foreground">
-              Haven
-            </Text>
-            <View className="z-10 flex-row gap-2">
-              {iconBtn("notifications-outline", () => undefined)}
-              {iconBtn("chatbubble-outline", () => undefined)}
-              {iconBtn("cog-outline", () =>
-                navigation.navigate("SettingsPlaceholder"),
-              )}
-            </View>
-          </View>
-        </View>
+        <HavenNavbar />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#e6edf7" size="large" />
         </View>
@@ -91,28 +57,7 @@ export function HomeScreen() {
 
   return (
     <View className="flex-1 bg-surface-modal">
-      <View
-        className="border-b border-border-panel bg-surface-modal"
-        style={{ paddingTop: insets.top + 8 }}
-      >
-        <View className="flex-row items-center justify-between px-3 pb-3">
-          <View className="z-10 flex-row gap-2">
-            {iconBtn("chevron-back", () => undefined)}
-            {iconBtn("home", () => undefined)}
-            {iconBtn("people", () => undefined)}
-          </View>
-          <Text className="absolute left-0 right-0 text-center text-lg font-semibold text-foreground">
-            Haven
-          </Text>
-          <View className="z-10 flex-row gap-2">
-            {iconBtn("notifications-outline", () => undefined)}
-            {iconBtn("chatbubble-outline", () => undefined)}
-            {iconBtn("cog-outline", () =>
-              navigation.navigate("SettingsPlaceholder"),
-            )}
-          </View>
-        </View>
-      </View>
+      <HavenNavbar />
 
       {loadError ? (
         <Text className="px-4 pt-4 text-center text-sm text-destructive">{loadError}</Text>

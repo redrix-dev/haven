@@ -15,7 +15,25 @@
     ],
     "plugins": [
       "expo-dev-client",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Haven to access your camera for profile images, media sharing, and call features."
+        }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Haven to use Face ID to unlock your account securely."
+        }
+      ]
     ],
     "web": {
       "bundler": "metro"
@@ -23,12 +41,41 @@
     "ios": {
       "bundleIdentifier": "com.redrix.haven.mobile",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Allow Haven to access your camera for media sharing and call features.",
+        "NSMicrophoneUsageDescription": "Allow Haven to access your microphone for voice sessions and calls.",
+        "NSPhotoLibraryUsageDescription": "Allow Haven to access your photo library to upload media attachments.",
+        "NSPhotoLibraryAddUsageDescription": "Allow Haven to save shared media to your photo library.",
+        "NSFaceIDUsageDescription": "Allow Haven to use Face ID for secure app access.",
+        "UIBackgroundModes": [
+          "audio",
+          "voip",
+          "remote-notification"
+        ]
       }
     },
     "android": {
-      "package": "com.redrix.haven.mobile"
+      "package": "com.redrix.haven.mobile",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "READ_MEDIA_AUDIO",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MICROPHONE",
+        "VIBRATE",
+        "USE_BIOMETRIC"
+      ]
     },
+    "updates": {
+      "enabled": true,
+      "url": "https://uapurngoeceliiwxygdn.supabase.co/functions/v1/update-manifest",
+      "requestHeaders": {
+        "expo-channel-name": "production",
+      }
+    },
+    "runtimeVersion": "1.0.0",
     "extra": {
       "supabaseUrl": "",
       "supabaseAnonKey": "",
