@@ -1,6 +1,5 @@
-import type { RouteProp } from "@react-navigation/native";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,12 +14,13 @@ import type {
   MessageAttachment,
   MessageLinkPreview,
 } from "@shared/lib/backend/types";
-import type { RootStackParamList } from "../navigation/types";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommunityWorkspace";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useMessages } from "@shared/features/messaging/hooks/useMessages";
+import { useLiveProfiles } from "@shared/features/profile/hooks/useLiveProfiles";
+import { getControlPlaneBackend } from "@shared/lib/backend";
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { HavenNavbar } from "../components/HavenNavbar";
 import { CommunityChannelBar } from "../components/community/CommunityChannelBar";
@@ -39,10 +39,17 @@ import {
  */
 export function CommunityScreen() {
   const navigation = useNavigation();
-  const route = useRoute<RouteProp<RootStackParamList, "Community">>();
-  const { communityId } = route.params;
+  const communityId = useNavigationStore((state) => state.currentServerId) ?? "";
+  if (!communityId) {
+    return (
+      <View className="flex-1 items-center justify-center bg-surface-app">
+        <Text className="text-sm text-muted-foreground">Select a community to get started.</Text>
+      </View>
+    );
+  }
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(132);
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
   const setCurrentChannelId = useNavigationStore((state) => state.setCurrentChannelId);
@@ -55,14 +62,6 @@ export function CommunityScreen() {
     servers,
     currentUserId,
   });
-
-  useEffect(() => {
-    useNavigationStore.getState().setCurrentServerId(communityId);
-    return () => {
-      useNavigationStore.getState().setCurrentServerId(null);
-      useNavigationStore.getState().setCurrentChannelId(null);
-    };
-  }, [communityId]);
 
   const community = servers.find((entry) => entry.id === communityId) ?? null;
   const phase: "loading" | "ready" | "missing" | "error" =
@@ -109,6 +108,36 @@ export function CommunityScreen() {
     isCurrentUserElevatedInServer: false,
     debugChannelReloads: false,
     channels,
+  });
+
+  const prefetchChannelMessagesRef = useRef(
+    messaging.actions.prefetchChannelMessages,
+  );
+  prefetchChannelMessagesRef.current = messaging.actions.prefetchChannelMessages;
+
+  const textChannelIdsKey = useMemo(
+    () =>
+      textChannels
+        .map((channel) => channel.id)
+        .sort()
+        .join(","),
+    [textChannels],
+  );
+
+  useEffect(() => {
+    if (!textChannelIdsKey) return;
+    const ids = textChannelIdsKey.split(",").filter(Boolean);
+    const maxPrefetch = 10;
+    void Promise.allSettled(
+      ids.slice(0, maxPrefetch).map((channelId) =>
+        prefetchChannelMessagesRef.current(communityId, channelId),
+      ),
+    );
+  }, [communityId, textChannelIdsKey]);
+
+  useLiveProfiles({
+    controlPlaneBackend: getControlPlaneBackend(),
+    userId: currentUserId,
   });
 
   useEffect(() => {
@@ -183,7 +212,6 @@ export function CommunityScreen() {
   const canCompose = Boolean(currentRenderableChannel && currentRenderableChannel.kind === "text");
   const hasActiveVoiceSession = false;
   const onReturnToVoiceChannel = () => undefined;
-  const HEADER_STACK_OFFSET = 132;
   const handleReplyMessage = useCallback((messageId: string) => {
     Alert.alert("Reply", `Reply flow for ${messageId} will open next.`);
   }, []);
@@ -217,20 +245,25 @@ export function CommunityScreen() {
 
   return (
     <View className="flex-1 bg-surface-app">
-      <HavenNavbar />
-
-      <CommunityChannelBar
-        communityName={title}
-        selectedChannelName={selectedChannelTitle}
-        onPressCommunity={handleOpenCommunitySettings}
-        onPressSelectedChannel={handleOpenSwitcher}
-        onPressCreateChannel={handleCreateChannel}
-      />
+      <View
+        onLayout={(e) => {
+          setHeaderHeight(e.nativeEvent.layout.height);
+        }}
+      >
+        <HavenNavbar />
+        <CommunityChannelBar
+          communityName={title}
+          selectedChannelName={selectedChannelTitle}
+          onPressCommunity={handleOpenCommunitySettings}
+          onPressSelectedChannel={handleOpenSwitcher}
+          onPressCreateChannel={handleCreateChannel}
+        />
+      </View>
 
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={HEADER_STACK_OFFSET}
+        keyboardVerticalOffset={headerHeight}
       >
       <View className="flex-1 px-4">
         {hasActiveVoiceSession ? (

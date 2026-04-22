@@ -1,5 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { ActivityIndicator, View } from "react-native";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { useMobileExpoPushRegistration } from "../hooks/useMobileExpoPushRegistration";
@@ -20,6 +21,18 @@ import { useEffect, useRef, useState } from "react";
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { consumeAuthConfirmUrl } from "@/auth/mobileAuthService";
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator();
+
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Community" component={CommunityScreen} />
+    </Tab.Navigator>
+  );
+}
 
 export function RootNavigator() {
   const session = useAuthSession();
@@ -110,11 +123,7 @@ export function RootNavigator() {
                 />
               ) : (
                 <>
-                  <Stack.Screen name="Home" component={HomeScreen} />
-                  <Stack.Screen
-                    name="Community"
-                    component={CommunityScreen}
-                  />
+                  <Stack.Screen name="Main" component={MainTabs} />
                   <Stack.Screen
                     name="SettingsPlaceholder"
                     component={SettingsPlaceholderScreen}

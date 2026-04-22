@@ -1,4 +1,5 @@
 import React from 'react';
+import { CHANNEL_BUNDLE_STALE_MS } from '@shared/app/constants';
 import type { DirectMessageBackend } from '@shared/lib/backend/directMessageBackend';
 import { useDmStore } from '@shared/stores/dmStore';
 import type {
@@ -9,7 +10,12 @@ import type {
 import { getErrorMessage } from '@platform/lib/errors';
 
 type RefreshDmConversationsOptions = { suppressLoadingState?: boolean };
-type RefreshDmMessagesOptions = { suppressLoadingState?: boolean; markRead?: boolean };
+type RefreshDmMessagesOptions = {
+  suppressLoadingState?: boolean;
+  markRead?: boolean;
+  /** When true, only run mark-read side effects (no listMessages network call). */
+  skipNetwork?: boolean;
+};
 type SendDirectMessageOptions = {
   imageBody?: Blob;
   imageFilename?: string;
@@ -55,6 +61,7 @@ export function useDirectMessages({
   const dmLastReadMarkAtRef = React.useRef<Record<string, number>>({});
   const selectedDmConversationIdRef = React.useRef<string | null>(null);
   const dmMessagesCacheRef = React.useRef<Record<string, DirectMessage[]>>({});
+  const dmLastSuccessfulFetchAtRef = React.useRef<Record<string, number>>({});
 
   const setStoredConversations = React.useCallback((conversations: DirectMessageConversationSummary[]) => {
     useDmStore.getState().setConversations(conversations);
@@ -147,6 +154,7 @@ export function useDirectMessages({
     dmReadMarkInFlightRef.current = {};
     dmLastReadMarkAtRef.current = {};
     dmMessagesCacheRef.current = {};
+    dmLastSuccessfulFetchAtRef.current = {};
   }, [resetStoredDirectMessages, setSelectedDmConversationId]);
 
   const clearSelectedDmConversation = React.useCallback(() => {
@@ -210,6 +218,28 @@ export function useDirectMessages({
       setDmMessagesError(null);
 
       try {
+        if (options?.skipNetwork) {
+          if (selectedDmConversationIdRef.current !== conversationId) {
+            return;
+          }
+          if (options?.markRead !== false) {
+            const now = Date.now();
+            const lastMarkedAt = dmLastReadMarkAtRef.current[conversationId] ?? 0;
+            const recentlyMarked = now - lastMarkedAt < 1500;
+            const inFlight = Boolean(dmReadMarkInFlightRef.current[conversationId]);
+            if (!recentlyMarked && !inFlight) {
+              dmReadMarkInFlightRef.current[conversationId] = true;
+              try {
+                await directMessageBackend.markConversationRead(conversationId);
+                dmLastReadMarkAtRef.current[conversationId] = Date.now();
+              } finally {
+                dmReadMarkInFlightRef.current[conversationId] = false;
+              }
+            }
+          }
+          return;
+        }
+
         const messages = await directMessageBackend.listMessages({
           conversationId,
           limit: 100,
@@ -220,6 +250,7 @@ export function useDirectMessages({
           return;
         }
         setDmMessages(messages);
+        dmLastSuccessfulFetchAtRef.current[conversationId] = Date.now();
 
         if (options?.markRead !== false) {
           const now = Date.now();
@@ -317,6 +348,13 @@ export function useDirectMessages({
     }
 
     const hasCachedMessages = applyCachedDmMessages(selectedDmConversationId);
+    const lastFetch = dmLastSuccessfulFetchAtRef.current[selectedDmConversationId] ?? 0;
+    const isFresh =
+      lastFetch > 0 && Date.now() - lastFetch < CHANNEL_BUNDLE_STALE_MS;
+
+    if (hasCachedMessages && isFresh) {
+      return;
+    }
 
     void refreshDmMessages(selectedDmConversationId, {
       suppressLoadingState: hasCachedMessages,
@@ -360,12 +398,26 @@ export function useDirectMessages({
 
       setSelectedDmConversationId(conversationId);
       const hasCachedMessages = applyCachedDmMessages(conversationId);
+      const lastFetch = dmLastSuccessfulFetchAtRef.current[conversationId] ?? 0;
+      const isFresh =
+        lastFetch > 0 && Date.now() - lastFetch < CHANNEL_BUNDLE_STALE_MS;
+
       if (!hasCachedMessages) {
         setDmMessages([]);
         setDmMessagesLoading(true);
         setDmMessagesRefreshing(false);
         setDmMessagesError(null);
       }
+
+      if (hasCachedMessages && isFresh) {
+        await refreshDmMessages(conversationId, {
+          suppressLoadingState: true,
+          markRead: true,
+          skipNetwork: true,
+        });
+        return;
+      }
+
       void refreshDmMessages(conversationId, {
         suppressLoadingState: hasCachedMessages,
         markRead: true,

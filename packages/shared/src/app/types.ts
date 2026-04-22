@@ -20,12 +20,21 @@ export type VoicePresenceStateRow = {
   joined_at?: string | null;
 };
 
+export type ChannelMessageBundleSyncMetadata = {
+  /** ISO timestamp of last successful HTTP sync for this bundle. */
+  lastSuccessfulSyncAt: string;
+  /** Newest message in the merged timeline (ascending list tail). */
+  newestMessageCursor: { createdAt: string; id: string } | null;
+};
+
 export type ChannelMessageBundleCacheEntry = {
   messages: Message[];
   reactions: MessageReaction[];
   attachments: MessageAttachment[];
   linkPreviews: MessageLinkPreview[];
   hasOlderMessages: boolean;
+  /** Present after a successful load / prefetch / soft revalidate. */
+  syncMetadata?: ChannelMessageBundleSyncMetadata;
 };
 
 export type FriendsPanelTab = 'friends' | 'add' | 'requests' | 'blocked';

@@ -93,6 +93,29 @@ export function useCommunityWorkspace({
     [],
   );
 
+  const PREFETCH_TEXT_CHANNELS_PER_SERVER = 8;
+
+  const prefetchMessageCachesForServers = React.useCallback(
+    async (
+      serverIds: string[],
+      prefetchChannelMessages: (
+        serverId: string,
+        channelId: string,
+      ) => Promise<void>,
+    ) => {
+      await Promise.allSettled(
+        serverIds.flatMap((serverId) => {
+          const channelList = channelsByServerCacheRef.current[serverId] ?? [];
+          return channelList
+            .filter((channel) => channel.kind === "text")
+            .slice(0, PREFETCH_TEXT_CHANNELS_PER_SERVER)
+            .map((channel) => prefetchChannelMessages(serverId, channel.id));
+        }),
+      );
+    },
+    [],
+  );
+
   const getDefaultChannelIdForServer = React.useCallback(
     (serverId: string, lastVisitedChannelId?: string | null): string | null => {
       const cached = channelsByServerCacheRef.current[serverId];
@@ -317,6 +340,7 @@ export function useCommunityWorkspace({
       resetChannelsWorkspace,
       setChannels,
       prefetchServersChannels,
+      prefetchMessageCachesForServers,
       getDefaultChannelIdForServer,
     },
   };

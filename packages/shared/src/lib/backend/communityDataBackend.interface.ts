@@ -119,6 +119,8 @@ export interface CommunityDataBackend {
     communityId: string;
     channelId: string;
     beforeCursor?: MessagePageCursor | null;
+    /** When set (without beforeCursor), returns messages strictly newer than this cursor, ascending after reverse. */
+    afterCursor?: MessagePageCursor | null;
     limit?: number;
   }): Promise<MessagePageResult>;
   subscribeToMessages(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;

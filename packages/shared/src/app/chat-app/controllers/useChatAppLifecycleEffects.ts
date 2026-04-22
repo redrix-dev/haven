@@ -9,7 +9,6 @@ type UseChatAppLifecycleEffectsInput = {
   serverModmailEnabled: boolean;
   currentServerId: string | null;
   userId: string | undefined;
-  currentServerIdForPrefetch: string | null;
   servers: { id: string }[];
   setNotificationsPanelOpen: (open: boolean) => void;
   setFriendsPanelOpen: (open: boolean) => void;
@@ -18,6 +17,7 @@ type UseChatAppLifecycleEffectsInput = {
   resetVoiceState: () => void;
   resetMessageState: () => void;
   clearAuthorProfileCache: () => void;
+  clearCrossSessionMessagingCaches: () => void;
   resetFeatureFlags: () => void;
   resetNotifications: () => void;
   resetSocialWorkspace: () => void;
@@ -31,10 +31,10 @@ type UseChatAppLifecycleEffectsInput = {
   resetMembersModal: () => void;
   resetCommunityBans: () => void;
   prefetchServersChannels: (serverIds: string[]) => Promise<void>;
-  getDefaultChannelIdForServer: (
-    serverId: string,
-    lastVisited?: string | null,
-  ) => string | null;
+  prefetchMessageCachesForServers: (
+    serverIds: string[],
+    prefetchChannelMessages: (serverId: string, channelId: string) => Promise<void>,
+  ) => Promise<void>;
   prefetchChannelMessages: (
     serverId: string,
     channelId: string,
@@ -46,7 +46,6 @@ export function useChatAppLifecycleEffects({
   serverModmailEnabled,
   currentServerId,
   userId,
-  currentServerIdForPrefetch,
   servers,
   setNotificationsPanelOpen,
   setFriendsPanelOpen,
@@ -55,6 +54,7 @@ export function useChatAppLifecycleEffects({
   resetVoiceState,
   resetMessageState,
   clearAuthorProfileCache,
+  clearCrossSessionMessagingCaches,
   resetFeatureFlags,
   resetNotifications,
   resetSocialWorkspace,
@@ -68,7 +68,7 @@ export function useChatAppLifecycleEffects({
   resetMembersModal,
   resetCommunityBans,
   prefetchServersChannels,
-  getDefaultChannelIdForServer,
+  prefetchMessageCachesForServers,
   prefetchChannelMessages,
 }: UseChatAppLifecycleEffectsInput) {
   useEffect(() => {
@@ -91,6 +91,7 @@ export function useChatAppLifecycleEffects({
     setWorkspaceMode("community");
     resetMessageState();
     clearAuthorProfileCache();
+    clearCrossSessionMessagingCaches();
     resetFeatureFlags();
     resetNotifications();
     resetSocialWorkspace();
@@ -106,6 +107,7 @@ export function useChatAppLifecycleEffects({
     resetCommunityBans();
   }, [
     clearAuthorProfileCache,
+    clearCrossSessionMessagingCaches,
     resetChannelGroups,
     resetChannelsWorkspace,
     resetChannelPermissionsState,
@@ -166,22 +168,13 @@ export function useChatAppLifecycleEffects({
     const serverIds = servers.map((s) => s.id);
     void (async () => {
       await prefetchServersChannels(serverIds);
-      await Promise.allSettled(
-        serverIds
-          .filter((id) => id !== currentServerIdForPrefetch)
-          .map((id) => {
-            const defaultChannelId = getDefaultChannelIdForServer(id);
-            if (!defaultChannelId) return Promise.resolve();
-            return prefetchChannelMessages(id, defaultChannelId);
-          }),
-      );
+      await prefetchMessageCachesForServers(serverIds, prefetchChannelMessages);
     })();
   }, [
     servers,
     userId,
-    currentServerIdForPrefetch,
     prefetchServersChannels,
-    getDefaultChannelIdForServer,
+    prefetchMessageCachesForServers,
     prefetchChannelMessages,
   ]);
 }

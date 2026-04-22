@@ -1,50 +1,55 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+/**
+ * Per-channel scroll restore for community message lists (mobile only).
+ *
+ * Rules:
+ * - Session-only (in-memory). No AsyncStorage — avoids stale anchors across days,
+ *   async write races, and "never forgets" bugs from overlapping saves.
+ * - We only restore when the user leaves a channel while scrolled away from the bottom.
+ * - Leaving at the bottom clears any restore hint so the next visit starts at newest.
+ */
 
-const COMMUNITY_TIMELINE_KEY_PREFIX = "haven.community.timeline.";
-
-export type CommunityTimelineAnchor = {
-  anchorMessageId: string | null;
+export type ChannelScrollExit = {
   wasNearBottom: boolean;
-  savedAt: string;
+  anchorMessageId: string | null;
+  anchorOffsetY?: number;
 };
 
-function getStorageKey(communityId: string, channelId: string): string {
-  return `${COMMUNITY_TIMELINE_KEY_PREFIX}${communityId}.${channelId}`;
+const sessionExitByChannel = new Map<string, ChannelScrollExit>();
+
+function channelKey(communityId: string, channelId: string): string {
+  return `${communityId}\u0000${channelId}`;
 }
 
-export async function getCommunityTimelineAnchor(
+/** Read restore hint for the current app session (sync). */
+export function peekChannelScrollExit(
   communityId: string,
   channelId: string,
-): Promise<CommunityTimelineAnchor | null> {
-  try {
-    const raw = await AsyncStorage.getItem(getStorageKey(communityId, channelId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<CommunityTimelineAnchor>;
-    return {
-      anchorMessageId:
-        typeof parsed.anchorMessageId === "string" ? parsed.anchorMessageId : null,
-      wasNearBottom: Boolean(parsed.wasNearBottom),
-      savedAt:
-        typeof parsed.savedAt === "string"
-          ? parsed.savedAt
-          : new Date(0).toISOString(),
-    };
-  } catch {
-    return null;
-  }
+): ChannelScrollExit | null {
+  const hit = sessionExitByChannel.get(channelKey(communityId, channelId));
+  return hit ? { ...hit } : null;
 }
 
-export async function setCommunityTimelineAnchor(
+/**
+ * Record how the user left a channel. When they left at the bottom, the entry is removed
+ * so the next open always uses "newest first" without a stale mid-list anchor.
+ */
+export function commitChannelScrollExit(
   communityId: string,
   channelId: string,
-  anchor: CommunityTimelineAnchor,
-): Promise<void> {
-  try {
-    await AsyncStorage.setItem(
-      getStorageKey(communityId, channelId),
-      JSON.stringify(anchor),
-    );
-  } catch {
-    // Best effort persistence only.
+  exit: ChannelScrollExit,
+): void {
+  const key = channelKey(communityId, channelId);
+  if (exit.wasNearBottom) {
+    sessionExitByChannel.delete(key);
+    return;
   }
+  sessionExitByChannel.set(key, {
+    wasNearBottom: false,
+    anchorMessageId: exit.anchorMessageId,
+    anchorOffsetY: typeof exit.anchorOffsetY === "number" ? exit.anchorOffsetY : undefined,
+  });
+}
+
+export function clearAllChannelScrollExits(): void {
+  sessionExitByChannel.clear();
 }

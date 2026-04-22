@@ -1,11 +1,21 @@
 import React, { useRef } from "react";
 import { getCommunityDataBackend } from "@shared/lib/backend";
-import { MESSAGE_PAGE_SIZE } from "@shared/app/constants";
+import { CHANNEL_BUNDLE_STALE_MS, MESSAGE_PAGE_SIZE } from "@shared/app/constants";
 import type { ChannelMessageBundleCacheEntry } from "@shared/app/types";
 import {
   applyChannelAccessVisibilityToMessageBundle,
   filterBlockedUserContent,
 } from "@shared/features/messaging/lib/banVisibility";
+import {
+  compareMessagesAsc,
+  computeNewestMessageCursor,
+  mergeAttachmentsById,
+  mergeLinkPreviewsById,
+  mergeMessagesById,
+  mergeReactionsById,
+  messageReloadReasonsRequireFullLoad,
+  parseMessageReloadReasons,
+} from "@shared/features/messaging/lib/mergeMessageBundle";
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useSocialStore } from "@shared/stores/socialStore";
 import type {
@@ -24,6 +34,38 @@ import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { getAppHost } from "@shared/platform/appHost";
 
 const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000;
+
+/**
+ * Message bundle + revocation + author caches shared across all `useMessages`
+ * hook instances so navigation that unmounts the host screen (e.g. mobile Home
+ * ↔ Community) does not discard warm channel data.
+ */
+const crossSessionMessageBundleByChannel: Record<
+  string,
+  ChannelMessageBundleCacheEntry
+> = Object.create(null);
+const crossSessionRevokedUserIdsByChannel: Record<string, string[]> =
+  Object.create(null);
+const crossSessionLoadedRevokedUserIdsByChannel: Record<string, boolean> =
+  Object.create(null);
+const crossSessionAuthorProfileCache: Record<string, AuthorProfile> =
+  Object.create(null);
+
+/** Clears cross-session caches; call on sign-out or account switch. */
+export function clearCrossSessionMessagingCaches(): void {
+  for (const key of Object.keys(crossSessionMessageBundleByChannel)) {
+    delete crossSessionMessageBundleByChannel[key];
+  }
+  for (const key of Object.keys(crossSessionRevokedUserIdsByChannel)) {
+    delete crossSessionRevokedUserIdsByChannel[key];
+  }
+  for (const key of Object.keys(crossSessionLoadedRevokedUserIdsByChannel)) {
+    delete crossSessionLoadedRevokedUserIdsByChannel[key];
+  }
+  for (const key of Object.keys(crossSessionAuthorProfileCache)) {
+    delete crossSessionAuthorProfileCache[key];
+  }
+}
 
 const getStringField = (value: unknown, key: string): string | null => {
   const record = asRecord(value);
@@ -60,14 +102,6 @@ const getRealtimeNewRow = (payload: unknown): Record<string, unknown> | null =>
 
 const getRealtimeOldRow = (payload: unknown): Record<string, unknown> | null =>
   asRecord(asRecord(payload)?.old);
-
-const compareMessagesAsc = (left: Message, right: Message): number => {
-  if (left.created_at < right.created_at) return -1;
-  if (left.created_at > right.created_at) return 1;
-  if (left.id < right.id) return -1;
-  if (left.id > right.id) return 1;
-  return 0;
-};
 
 const parseReactionFromRow = (
   row: Record<string, unknown> | null,
@@ -159,10 +193,10 @@ export function useMessages({
   const requestOlderMessagesRef = React.useRef<(() => Promise<void>) | null>(
     null,
   );
-  const authorProfileCacheRef = React.useRef<Record<string, AuthorProfile>>({});
-  const messageBundleByChannelCacheRef = React.useRef<
-    Record<string, ChannelMessageBundleCacheEntry>
-  >({});
+  const authorProfileCacheRef = React.useRef(crossSessionAuthorProfileCache);
+  const messageBundleByChannelCacheRef = React.useRef(
+    crossSessionMessageBundleByChannel,
+  );
   const latestLoadIdRef = React.useRef(0);
   const olderLoadInFlightRef = React.useRef(false);
   const currentHasOlderMessagesRef = React.useRef(false);
@@ -174,10 +208,12 @@ export function useMessages({
   const currentReactionListRef = React.useRef<MessageReaction[]>([]);
   const currentAttachmentListRef = React.useRef<MessageAttachment[]>([]);
   const currentLinkPreviewListRef = React.useRef<MessageLinkPreview[]>([]);
-  const revokedUserIdsByChannelRef = React.useRef<Record<string, string[]>>({});
-  const loadedRevokedUserIdsByChannelRef = React.useRef<
-    Record<string, boolean>
-  >({});
+  const revokedUserIdsByChannelRef = React.useRef(
+    crossSessionRevokedUserIdsByChannel,
+  );
+  const loadedRevokedUserIdsByChannelRef = React.useRef(
+    crossSessionLoadedRevokedUserIdsByChannel,
+  );
   const cleanupIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const unsubscribeVisibilityListenerRef = useRef<(() => void) | null>(null);
   const unsubscribeFocusListenerRef = useRef<(() => void) | null>(null);
@@ -264,7 +300,12 @@ export function useMessages({
       bundle: ChannelMessageBundleCacheEntry,
     ) => {
       const cacheKey = getChannelBundleCacheKey(communityId, channelId);
-      messageBundleByChannelCacheRef.current[cacheKey] = bundle;
+      const prev = messageBundleByChannelCacheRef.current[cacheKey];
+      const syncMetadata = bundle.syncMetadata ?? prev?.syncMetadata;
+      messageBundleByChannelCacheRef.current[cacheKey] = {
+        ...bundle,
+        syncMetadata,
+      };
     },
     [getChannelBundleCacheKey],
   );
@@ -517,13 +558,19 @@ export function useMessages({
         });
         // Only write if not already populated — avoid clobbering an active channel load
         if (!messageBundleByChannelCacheRef.current[cacheKey]) {
-          messageBundleByChannelCacheRef.current[cacheKey] = {
+          cacheChannelBundle(serverId, channelId, {
             messages: filteredBundle.messages,
             reactions: filteredBundle.reactions,
             attachments: filteredBundle.attachments,
             linkPreviews: filteredBundle.linkPreviews,
             hasOlderMessages: page.hasMore,
-          };
+            syncMetadata: {
+              lastSuccessfulSyncAt: new Date().toISOString(),
+              newestMessageCursor: computeNewestMessageCursor(
+                filteredBundle.messages,
+              ),
+            },
+          });
         }
       } catch {
         // silent — prefetch failures are non-fatal
@@ -532,6 +579,7 @@ export function useMessages({
     [
       applyBlockVisibility,
       applyChannelAccessVisibility,
+      cacheChannelBundle,
       currentUserId,
       ensureChannelRevokedUserIdsLoaded,
       getChannelBundleCacheKey,
@@ -609,7 +657,9 @@ export function useMessages({
   );
 
   const clearAuthorProfileCache = React.useCallback(() => {
-    authorProfileCacheRef.current = {};
+    for (const key of Object.keys(authorProfileCacheRef.current)) {
+      delete authorProfileCacheRef.current[key];
+    }
   }, []);
 
   const resetMessageState = React.useCallback(() => {
@@ -1773,14 +1823,33 @@ export function useMessages({
 
   const createMessageBundleController = React.useCallback(
     (input: MessageBundleControllerInput) => {
-      const persistCurrentChannelBundleCache = () => {
+      const persistCurrentChannelBundleCache = (
+        syncTouch: "http_success" | "realtime",
+      ) => {
         if (!currentServerId || !currentChannelId) return;
+        const messages = currentMessageListRef.current;
+        const newest = computeNewestMessageCursor(messages);
+        const prev = getCachedChannelBundle(currentServerId, currentChannelId);
+        const prevSync = prev?.syncMetadata;
+        const syncMetadata =
+          syncTouch === "http_success"
+            ? {
+                lastSuccessfulSyncAt: new Date().toISOString(),
+                newestMessageCursor: newest,
+              }
+            : prevSync
+              ? { ...prevSync, newestMessageCursor: newest }
+              : {
+                  lastSuccessfulSyncAt: new Date(0).toISOString(),
+                  newestMessageCursor: newest,
+                };
         cacheChannelBundle(currentServerId, currentChannelId, {
-          messages: currentMessageListRef.current,
+          messages,
           reactions: currentReactionListRef.current,
           attachments: currentAttachmentListRef.current,
           linkPreviews: currentLinkPreviewListRef.current,
           hasOlderMessages: currentHasOlderMessagesRef.current,
+          syncMetadata,
         });
       };
 
@@ -1810,7 +1879,7 @@ export function useMessages({
           markMessagesFresh();
         }
 
-        persistCurrentChannelBundleCache();
+        persistCurrentChannelBundleCache("http_success");
       };
 
       const hydrateFromCache = () => {
@@ -1847,7 +1916,7 @@ export function useMessages({
       const commitMessages = (nextMessages: Message[], reason: string) => {
         currentMessageListRef.current = nextMessages;
         syncOldestLoadedCursor(nextMessages);
-        persistCurrentChannelBundleCache();
+        persistCurrentChannelBundleCache("realtime");
         if (!input.isMounted()) return;
         setStoredMessages(nextMessages);
         markMessagesFresh();
@@ -1856,7 +1925,7 @@ export function useMessages({
 
       const commitReactions = (nextReactions: MessageReaction[]) => {
         currentReactionListRef.current = nextReactions;
-        persistCurrentChannelBundleCache();
+        persistCurrentChannelBundleCache("realtime");
         if (!input.isMounted()) return;
         setStoredReactions(nextReactions);
         markMessagesFresh();
@@ -1864,7 +1933,7 @@ export function useMessages({
 
       const commitAttachments = (nextAttachments: MessageAttachment[]) => {
         currentAttachmentListRef.current = nextAttachments;
-        persistCurrentChannelBundleCache();
+        persistCurrentChannelBundleCache("realtime");
         if (!input.isMounted()) return;
         setStoredAttachments(nextAttachments);
         markMessagesFresh();
@@ -1872,7 +1941,7 @@ export function useMessages({
 
       const commitLinkPreviews = (nextLinkPreviews: MessageLinkPreview[]) => {
         currentLinkPreviewListRef.current = nextLinkPreviews;
-        persistCurrentChannelBundleCache();
+        persistCurrentChannelBundleCache("realtime");
         if (!input.isMounted()) return;
         setStoredLinkPreviews(nextLinkPreviews);
         markMessagesFresh();
@@ -1960,10 +2029,7 @@ export function useMessages({
           currentServerId,
           missingAuthorIds,
         );
-        authorProfileCacheRef.current = {
-          ...authorProfileCacheRef.current,
-          ...fetchedProfiles,
-        };
+        Object.assign(authorProfileCacheRef.current, fetchedProfiles);
       }
 
       const profileMap: Record<string, AuthorProfile> = {};
@@ -2067,7 +2133,106 @@ export function useMessages({
     const commitAttachments = messageBundleController.commitAttachments;
     const commitLinkPreviews = messageBundleController.commitLinkPreviews;
 
-    const loadMessages = async (reason: string) => {
+    const softRevalidateChannelMessages = async (reasonLabel: string) => {
+      const loadId = createNextMessageLoadId();
+      const startedAt = Date.now();
+      logReload("load:soft_start", { reason: reasonLabel, loadId });
+      try {
+        if (!currentServerId || !currentChannelId) return;
+
+        const communityBackend = getCommunityDataBackend(currentServerId);
+        const currentList = messageBundleController.getCurrentMessageList();
+        const tail = computeNewestMessageCursor(currentList);
+        if (!tail) return;
+
+        const page = await communityBackend.listMessagesPage({
+          communityId: currentServerId,
+          channelId: currentChannelId,
+          afterCursor: tail,
+          limit: MESSAGE_PAGE_SIZE,
+        });
+        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+
+        const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(
+          currentServerId,
+          currentChannelId,
+        );
+        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+
+        const mergedMessages = mergeMessagesById(currentList, page.messages);
+        const { reactionList, attachmentList, linkPreviewList } =
+          await fetchRelatedForMessages(page.messages);
+        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+
+        const mergedReactions = mergeReactionsById(
+          messageBundleController.getCurrentReactionList(),
+          reactionList,
+        );
+        const mergedAttachments = mergeAttachmentsById(
+          messageBundleController.getCurrentAttachmentList(),
+          attachmentList,
+        );
+        const mergedLinkPreviews = mergeLinkPreviewsById(
+          messageBundleController.getCurrentLinkPreviewList(),
+          linkPreviewList,
+        );
+
+        const moderationFilteredBundle = applyChannelAccessVisibility({
+          communityId: currentServerId,
+          channelId: currentChannelId,
+          messages: mergedMessages,
+          reactions: mergedReactions,
+          attachments: mergedAttachments,
+          linkPreviews: mergedLinkPreviews,
+          revokedUserIds,
+        });
+        const filteredBundle = applyBlockVisibility({
+          ...moderationFilteredBundle,
+          isElevatedInServer:
+            await usePermissionsStore
+              .getState()
+              .ensureElevatedInServer(
+                currentServerId,
+                currentUserId,
+                getCommunityDataBackend(currentServerId),
+              ),
+        });
+
+        const hasOlder = currentHasOlderMessagesRef.current;
+
+        await updateMessageBundleState({
+          reason: reasonLabel,
+          loadId,
+          startedAt,
+          messageList: filteredBundle.messages,
+          reactionList: filteredBundle.reactions,
+          attachmentList: filteredBundle.attachments,
+          linkPreviewList: filteredBundle.linkPreviews,
+          hasOlder,
+        });
+      } catch (error) {
+        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+        console.error("Error soft-revalidating messages:", error);
+        logReload("load:soft_error", {
+          reason: reasonLabel,
+          loadId,
+          durationMs: Date.now() - startedAt,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    const loadMessages = async (reasonLabel: string) => {
+      const reasons = parseMessageReloadReasons(reasonLabel);
+      const localCount = messageBundleController.getCurrentMessageList().length;
+      const needsFull =
+        messageReloadReasonsRequireFullLoad(reasons) || localCount === 0;
+
+      if (!needsFull) {
+        await softRevalidateChannelMessages(reasonLabel);
+        return;
+      }
+
       let loadId: number | null = null;
       let startedAt = Date.now();
       try {
@@ -2076,10 +2241,10 @@ export function useMessages({
         );
         loadId = loadedBundle.loadId;
         startedAt = loadedBundle.startedAt;
-        logReload("load:start", { reason, loadId });
+        logReload("load:start", { reason: reasonLabel, loadId });
 
         await updateMessageBundleState({
-          reason,
+          reason: reasonLabel,
           loadId: loadedBundle.loadId,
           startedAt: loadedBundle.startedAt,
           messageList: loadedBundle.messageList,
@@ -2098,7 +2263,7 @@ export function useMessages({
         if (!isMounted || !isCurrentMessageLoad(loadId)) return;
         console.error("Error loading messages:", error);
         logReload("load:error", {
-          reason,
+          reason: reasonLabel,
           loadId,
           durationMs: Date.now() - startedAt,
           error: error instanceof Error ? error.message : String(error),
@@ -2237,7 +2402,26 @@ export function useMessages({
       });
     }
     messageReloadLifecycle.start();
-    messageReloadScheduler.scheduleMessageReload("initial", 0);
+
+    if (!hydratedBundle || hydratedBundle.messages.length === 0) {
+      messageReloadScheduler.scheduleMessageReload("initial", 0);
+    } else {
+      const meta = hydratedBundle.syncMetadata;
+      const lastAt = meta ? Date.parse(meta.lastSuccessfulSyncAt) : NaN;
+      const stale =
+        !meta ||
+        Number.isNaN(lastAt) ||
+        Date.now() - lastAt >= CHANNEL_BUNDLE_STALE_MS;
+
+      if (!stale) {
+        messageReloadScheduler.scheduleMessageReload(
+          "deferred_soft_revalidate",
+          2500,
+        );
+      } else {
+        messageReloadScheduler.scheduleMessageReload("soft_revalidate", 0);
+      }
+    }
 
     const cleanupRealtimeMessageStreams = subscribeToMessageRealtimeStreams({
       onMessagePayload: (payload) => {
@@ -2332,6 +2516,10 @@ export function useMessages({
     finishOlderMessagesLoad,
     setRequestOlderMessagesLoader,
     clearRequestOlderMessagesLoader,
+    ensureChannelRevokedUserIdsLoaded,
+    fetchRelatedForMessages,
+    applyChannelAccessVisibility,
+    applyBlockVisibility,
   ]);
 
   const messagesStoreState = useMessagesStore.getState();
@@ -2345,6 +2533,7 @@ export function useMessages({
     actions: {
       resetMessageState,
       clearAuthorProfileCache,
+      clearCrossSessionMessagingCaches,
       requestOlderMessages,
       sendMessage,
       toggleMessageReaction,

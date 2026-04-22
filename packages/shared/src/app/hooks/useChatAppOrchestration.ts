@@ -179,6 +179,7 @@ export function useChatAppOrchestration() {
       resetChannelsWorkspace,
       setChannels,
       prefetchServersChannels,
+      prefetchMessageCachesForServers,
       getDefaultChannelIdForServer,
     },
   } = useCommunityWorkspace({
@@ -369,6 +370,7 @@ export function useChatAppOrchestration() {
     actions: {
       resetMessageState,
       clearAuthorProfileCache,
+      clearCrossSessionMessagingCaches,
       requestOlderMessages,
       sendMessage,
       toggleMessageReaction,
@@ -634,7 +636,6 @@ export function useChatAppOrchestration() {
     serverModmailEnabled,
     currentServerId,
     userId: user?.id,
-    currentServerIdForPrefetch: currentServerId,
     servers,
     setNotificationsPanelOpen,
     setFriendsPanelOpen,
@@ -643,6 +644,7 @@ export function useChatAppOrchestration() {
     resetVoiceState,
     resetMessageState,
     clearAuthorProfileCache,
+    clearCrossSessionMessagingCaches,
     resetFeatureFlags,
     resetNotifications,
     resetSocialWorkspace,
@@ -656,7 +658,7 @@ export function useChatAppOrchestration() {
     resetMembersModal,
     resetCommunityBans,
     prefetchServersChannels,
-    getDefaultChannelIdForServer,
+    prefetchMessageCachesForServers,
     prefetchChannelMessages,
   });
 

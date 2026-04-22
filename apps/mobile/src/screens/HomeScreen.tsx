@@ -1,5 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import {
   ActivityIndicator,
   Dimensions,
@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { useServers } from "@shared/features/community/hooks/useServers";
+import { useNavigationStore } from "@shared/stores/navigationStore";
 import { HavenNavbar } from "../components/HavenNavbar";
 import type { RootStackParamList } from "../navigation/types";
 
@@ -34,12 +35,11 @@ function buildGridItems(servers: ServerSummary[]): GridItem[] {
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList, "Home">>();
+    useNavigation<BottomTabNavigationProp<RootStackParamList, "Home">>();
   const { servers, status, error: loadError, refreshServers } = useServers();
 
   const width = Dimensions.get("window").width;
   const cell = (width - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
-  const tile = Math.max(cell - 24, 56);
   
 
   const items = buildGridItems(servers);
@@ -86,11 +86,10 @@ export function HomeScreen() {
                 <Pressable
                   style={{ height: cell }}
                   className="items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
-                  onPress={() =>
-                    navigation.navigate("Community", {
-                      communityId: item.server.id,
-                    })
-                  }
+                  onPress={() => {
+                    useNavigationStore.getState().setCurrentServerId(item.server.id);
+                    navigation.navigate("Community");
+                  }}
                 >
                   <Text className="text-3xl font-bold text-foreground">{initial}</Text>
                 </Pressable>

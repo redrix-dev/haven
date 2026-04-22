@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getMobileSupabase } from "../supabase/getMobileSupabase";
+import { clearAllChannelScrollExits } from "../storage/communityTimelinePrefs";
+import { clearCrossSessionMessagingCaches } from "@shared/features/messaging/hooks/useMessages";
 import { useAuthStore } from "@shared/stores/authStore";
+import { useMessagesStore } from "@shared/stores/messagesStore";
 
 /** `undefined` while hydrating from AsyncStorage; `null` when signed out. */
 export function useAuthSession(): Session | null | undefined {
@@ -15,6 +18,11 @@ export function useAuthSession(): Session | null | undefined {
 
       void supabase.auth.getSession().then(({ data }) => {
         const nextSession = data.session ?? null;
+        if (!nextSession?.user) {
+          useMessagesStore.getState().reset();
+          clearCrossSessionMessagingCaches();
+          clearAllChannelScrollExits();
+        }
         setSession(nextSession);
         useAuthStore.getState().setSession(nextSession);
         useAuthStore.getState().setUser(nextSession?.user ?? null);
@@ -24,6 +32,17 @@ export function useAuthSession(): Session | null | undefined {
       const {
         data: { subscription: sub },
       } = supabase.auth.onAuthStateChange((_event, next) => {
+        const prevUserId = useAuthStore.getState().user?.id ?? null;
+        const nextUserId = next?.user?.id ?? null;
+        if (!nextUserId) {
+          useMessagesStore.getState().reset();
+          clearCrossSessionMessagingCaches();
+          clearAllChannelScrollExits();
+        } else if (prevUserId && prevUserId !== nextUserId) {
+          useMessagesStore.getState().reset();
+          clearCrossSessionMessagingCaches();
+          clearAllChannelScrollExits();
+        }
         setSession(next);
         useAuthStore.getState().setSession(next);
         useAuthStore.getState().setUser(next?.user ?? null);

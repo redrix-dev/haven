@@ -1323,7 +1323,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return data ?? [];
   },
 
-  async listMessagesPage({ communityId, channelId, beforeCursor, limit = 60 }) {
+  async listMessagesPage({ communityId, channelId, beforeCursor, afterCursor, limit = 60 }) {
     const boundedLimit = Number.isFinite(limit)
       ? Math.min(Math.max(Math.floor(limit), 1), 100)
       : 60;
@@ -1334,7 +1334,14 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .eq('channel_id', channelId)
       .is('deleted_at', null);
 
-    if (beforeCursor?.createdAt && beforeCursor?.id) {
+    if (afterCursor?.createdAt && afterCursor?.id) {
+      if (beforeCursor?.createdAt && beforeCursor?.id) {
+        throw new Error('listMessagesPage: beforeCursor and afterCursor cannot both be set.');
+      }
+      query = query.or(
+        `created_at.gt.${afterCursor.createdAt},and(created_at.eq.${afterCursor.createdAt},id.gt.${afterCursor.id})`,
+      );
+    } else if (beforeCursor?.createdAt && beforeCursor?.id) {
       query = query.or(
         `created_at.lt.${beforeCursor.createdAt},and(created_at.eq.${beforeCursor.createdAt},id.lt.${beforeCursor.id})`
       );
