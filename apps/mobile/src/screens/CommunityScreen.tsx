@@ -365,7 +365,7 @@ export function CommunityScreen() {
 
       {showChatComposer ? (
         <KeyboardStickyView
-          offset={{ closed: 0, opened: 0 }}
+          offset={{ closed: 0, opened: -8 }}
           style={{ backgroundColor: "#0F1728" }}
         >
           <HavenComposer
