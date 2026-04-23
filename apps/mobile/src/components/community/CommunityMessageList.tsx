@@ -24,7 +24,6 @@ import {
   Pressable,
   Text,
   View,
-  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type ViewToken,
@@ -547,24 +546,14 @@ export function CommunityMessageList({
 
   if (!channel || channel.kind !== "text") {
     return (
-      <View
-        className="flex-1 items-center justify-center px-4"
-        onLayout={(e: LayoutChangeEvent) => {
-          console.log("[Layout] CommunityMessageList root", e.nativeEvent.layout.height);
-        }}
-      >
+      <View className="flex-1 items-center justify-center px-4">
         <Text className="text-center text-sm text-muted-foreground">{emptyCopy}</Text>
       </View>
     );
   }
 
   return (
-    <View
-      className="flex-1 px-4 pt-2"
-      onLayout={(e: LayoutChangeEvent) => {
-        console.log("[Layout] CommunityMessageList root", e.nativeEvent.layout.height);
-      }}
-    >
+    <View className="flex-1 px-4 pt-2">
       {hasMore ? (
         <Pressable
           onPress={() => void onLoadOlder()}
