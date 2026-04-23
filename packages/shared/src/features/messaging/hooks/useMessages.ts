@@ -6,6 +6,7 @@ import {
   applyChannelAccessVisibilityToMessageBundle,
   filterBlockedUserContent,
 } from "@shared/features/messaging/lib/banVisibility";
+import { getReplyToMessageId } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import {
   compareMessagesAsc,
   computeNewestMessageCursor,
@@ -2007,13 +2008,21 @@ export function useMessages({
     };
 
     const updateAuthorProfilesForMessages = async (messageList: Message[]) => {
-      const authorIds = Array.from(
-        new Set(
-          messageList
-            .map((message) => message.author_user_id)
-            .filter((authorId): authorId is string => Boolean(authorId)),
-        ),
-      );
+      const byMessageId = new Map(messageList.map((m) => [m.id, m]));
+      const authorIdSet = new Set<string>();
+      for (const message of messageList) {
+        if (message.author_user_id) {
+          authorIdSet.add(message.author_user_id);
+        }
+        const replyToId = getReplyToMessageId(message);
+        if (replyToId) {
+          const parent = byMessageId.get(replyToId);
+          if (parent?.author_user_id) {
+            authorIdSet.add(parent.author_user_id);
+          }
+        }
+      }
+      const authorIds = Array.from(authorIdSet);
 
       if (authorIds.length === 0) {
         if (!isMounted) return { authorCount: 0, fetchedAuthorCount: 0 };

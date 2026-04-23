@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import * as ImagePicker from "expo-image-picker";
 import { Pressable, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HavenInput } from "../HavenInput";
 
 type HavenComposerProps = {
@@ -20,6 +21,7 @@ function resolveMimeType(asset: ImagePicker.ImagePickerAsset): string {
 }
 
 export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProps) {
+  const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState("");
   const [pendingAttachment, setPendingAttachment] = useState<{
     uri: string;
@@ -57,7 +59,10 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
   };
 
   return (
-    <View className="border-t border-border-panel bg-surface-modal px-3 pb-3 pt-2">
+    <View
+      className="border-t border-border-panel px-3 pt-2"
+      style={{ backgroundColor: "#0F1728", paddingBottom: insets.bottom || 16 }}
+    >
       <View className="mb-2 flex-row items-center gap-2">
         <Pressable
           accessibilityRole="button"

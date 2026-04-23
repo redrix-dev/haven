@@ -3,12 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   Text,
   View,
 } from "react-native";
+import { KeyboardStickyView, useKeyboardHandler } from "react-native-keyboard-controller";
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import type {
   Channel,
   MessageAttachment,
@@ -49,7 +49,6 @@ export function CommunityScreen() {
   }
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [headerHeight, setHeaderHeight] = useState(132);
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
   const setCurrentChannelId = useNavigationStore((state) => state.setCurrentChannelId);
@@ -243,13 +242,38 @@ export function CommunityScreen() {
     [messaging.actions],
   );
 
+  const showChatComposer =
+    phase === "ready" &&
+    !(channelsLoading && channels.length === 0) &&
+    !(channelsError && channels.length === 0);
+
+  const keyboardHeight = useSharedValue(0);
+
+  useKeyboardHandler(
+    {
+      onMove: (e) => {
+        "worklet";
+        keyboardHeight.value = e.height;
+      },
+      onEnd: (e) => {
+        "worklet";
+        keyboardHeight.value = e.height;
+      },
+    },
+    [],
+  );
+
+  const listAnimatedStyle = useAnimatedStyle(
+    () => ({
+      flex: 1,
+      paddingBottom: keyboardHeight.value,
+    }),
+    [],
+  );
+
   return (
     <View className="flex-1 bg-surface-app">
-      <View
-        onLayout={(e) => {
-          setHeaderHeight(e.nativeEvent.layout.height);
-        }}
-      >
+      <View>
         <HavenNavbar />
         <CommunityChannelBar
           communityName={title}
@@ -260,12 +284,7 @@ export function CommunityScreen() {
         />
       </View>
 
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={headerHeight}
-      >
-      <View className="flex-1 px-4">
+      <View className="px-4" style={{ flex: 1 }}>
         {hasActiveVoiceSession ? (
           <Pressable onPress={onReturnToVoiceChannel}>
             <Text className="pb-2 text-center text-xs text-muted-foreground">
@@ -297,7 +316,7 @@ export function CommunityScreen() {
                 </Pressable>
               </View>
             ) : (
-              <>
+              <Animated.View style={listAnimatedStyle}>
                 <CommunityMessageList
                   communityId={communityId}
                   channel={currentRenderableChannel as Channel | null}
@@ -312,12 +331,7 @@ export function CommunityScreen() {
                   onReply={handleReplyMessage}
                   onReport={handleReportMessage}
                 />
-                <HavenComposer
-                  disabled={!canCompose}
-                  isSending={isSendingMessage}
-                  onSend={handleSendMessage}
-                />
-              </>
+              </Animated.View>
             )}
           </View>
         ) : null}
@@ -347,12 +361,20 @@ export function CommunityScreen() {
             </Pressable>
           </View>
         ) : null}
-  
-        <Text className="pb-4 text-center text-xs text-muted-foreground opacity-80" selectable>
-          id: {communityId}
-        </Text>
       </View>
-      </KeyboardAvoidingView>
+
+      {showChatComposer ? (
+        <KeyboardStickyView
+          offset={{ closed: 0, opened: 0 }}
+          style={{ backgroundColor: "#0F1728" }}
+        >
+          <HavenComposer
+            disabled={!canCompose}
+            isSending={isSendingMessage}
+            onSend={handleSendMessage}
+          />
+        </KeyboardStickyView>
+      ) : null}
 
       <ChannelSwitcherModal
         visible={isSwitcherOpen}

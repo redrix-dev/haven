@@ -26,7 +26,10 @@ const Tab = createBottomTabNavigator();
 function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { display: "none", height: 0 },
+      }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Community" component={CommunityScreen} />
@@ -123,7 +126,11 @@ export function RootNavigator() {
                 />
               ) : (
                 <>
-                  <Stack.Screen name="Main" component={MainTabs} />
+                  <Stack.Screen
+                    name="Main"
+                    component={MainTabs}
+                    options={{ keyboardHandlingEnabled: false }}
+                  />
                   <Stack.Screen
                     name="SettingsPlaceholder"
                     component={SettingsPlaceholderScreen}

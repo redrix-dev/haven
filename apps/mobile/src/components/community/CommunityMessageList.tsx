@@ -18,11 +18,13 @@ import {
   ActionSheetIOS,
   FlatList,
   Image,
+  Keyboard,
   Linking,
   Platform,
   Pressable,
   Text,
   View,
+  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type ViewToken,
@@ -55,6 +57,25 @@ function formatTime(timestamp: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function getReplyTargetLabel(
+  replyToId: string | null,
+  messageById: Map<string, Message>,
+  profiles: Record<string, AuthorProfile>,
+): string | null {
+  if (!replyToId) return null;
+  const parent = messageById.get(replyToId);
+  if (!parent) return "a message";
+  if (parent.author_type === "haven_dev") return "Haven Moderation Team";
+  if (parent.author_type === "system") return "System";
+  const uid = parent.author_user_id;
+  if (!uid) return "a message";
+  const p = profiles[uid];
+  if (p?.username) {
+    return p.username;
+  }
+  return uid.slice(0, 12);
 }
 
 const MESSAGE_JUMP_THRESHOLD = 220;
@@ -91,6 +112,10 @@ export function CommunityMessageList({
     channel && channel.kind === "text" ? channel.id : null;
 
   const orderedMessages = useMemo(() => [...messages].reverse(), [messages]);
+  const messageById = useMemo(
+    () => new Map(messages.map((m) => [m.id, m] as const)),
+    [messages],
+  );
 
   const exitPeek = useMemo(() => {
     if (!textChannelId) return null;
@@ -379,12 +404,20 @@ export function CommunityMessageList({
         item.author_user_id?.slice(0, 12) ??
         "Unknown User";
       const replyToMessageId = getReplyToMessageId(item);
+      const replyTargetLabel = getReplyTargetLabel(
+        replyToMessageId,
+        messageById,
+        profiles,
+      );
       const initial = authorName.trim().charAt(0).toUpperCase() || "U";
+      const showAuthorStaffBadge =
+        item.author_type === "user" && Boolean(cachedProfile?.isPlatformStaff);
 
       return (
         <Pressable
           accessibilityRole="button"
           className="border-b border-border-panel/60 py-3"
+          onPress={() => Keyboard.dismiss()}
           onLongPress={() => handleLongPressMessage(item.id)}
         >
           <View className="mb-1 flex-row items-center">
@@ -404,17 +437,63 @@ export function CommunityMessageList({
                 </View>
               )}
             </View>
-            <Text className="mr-2 text-sm font-semibold text-foreground">{authorName}</Text>
-            <Text className="text-xs text-muted-foreground">{formatTime(item.created_at)}</Text>
+            <View className="mr-2 min-w-0 flex-1 flex-row flex-wrap items-center gap-1.5">
+              <Text
+                className="shrink text-sm font-semibold text-foreground"
+                numberOfLines={1}
+              >
+                {authorName}
+              </Text>
+              {showAuthorStaffBadge ? (
+                <View
+                  className="rounded px-1.5 py-0.5"
+                  style={{ backgroundColor: "rgba(63, 121, 216, 0.2)" }}
+                >
+                  <Text
+                    className="text-[10px] font-semibold uppercase"
+                    style={{ color: "#3F79D8", letterSpacing: 0.5 }}
+                  >
+                    Staff
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <Text className="shrink-0 text-xs text-muted-foreground">
+              {formatTime(item.created_at)}
+            </Text>
           </View>
-          {replyToMessageId ? (
+          {replyTargetLabel ? (
             <Text className="mb-1 text-xs text-muted-foreground">
-              Replying to {replyToMessageId}
+              Replying to {replyTargetLabel}
             </Text>
           ) : null}
           <Markdown
             style={{
               body: { color: "#e6edf7", fontSize: 14, lineHeight: 20 },
+              heading1: {
+                fontSize: 22,
+                fontWeight: "700",
+                color: "#e6edf7",
+                marginTop: 4,
+                marginBottom: 4,
+                lineHeight: 28,
+              },
+              heading2: {
+                fontSize: 18,
+                fontWeight: "700",
+                color: "#e6edf7",
+                marginTop: 4,
+                marginBottom: 4,
+                lineHeight: 24,
+              },
+              heading3: {
+                fontSize: 16,
+                fontWeight: "600",
+                color: "#e6edf7",
+                marginTop: 4,
+                marginBottom: 2,
+                lineHeight: 22,
+              },
               strong: { fontWeight: "700" },
               em: { fontStyle: "italic" },
               code_inline: {
@@ -457,6 +536,7 @@ export function CommunityMessageList({
     [
       profiles,
       liveProfiles,
+      messageById,
       attachmentsByMessageId,
       linkPreviewsByMessageId,
       handleLongPressMessage,
@@ -467,14 +547,24 @@ export function CommunityMessageList({
 
   if (!channel || channel.kind !== "text") {
     return (
-      <View className="flex-1 items-center justify-center px-4">
+      <View
+        className="flex-1 items-center justify-center px-4"
+        onLayout={(e: LayoutChangeEvent) => {
+          console.log("[Layout] CommunityMessageList root", e.nativeEvent.layout.height);
+        }}
+      >
         <Text className="text-center text-sm text-muted-foreground">{emptyCopy}</Text>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 pt-2">
+    <View
+      className="flex-1 px-4 pt-2"
+      onLayout={(e: LayoutChangeEvent) => {
+        console.log("[Layout] CommunityMessageList root", e.nativeEvent.layout.height);
+      }}
+    >
       {hasMore ? (
         <Pressable
           onPress={() => void onLoadOlder()}
@@ -487,13 +577,15 @@ export function CommunityMessageList({
       ) : null}
       <FlatList
         className="flex-1"
+        style={{ backgroundColor: "transparent" }}
+        contentContainerStyle={{ paddingBottom: 100 }}
         inverted
         key={textChannelId ?? "no-channel"}
         ref={listRef}
         data={orderedMessages}
         extraData={[profiles, liveProfiles, attachmentsByMessageId, linkPreviewsByMessageId]}
         keyExtractor={(message) => message.id}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
         contentOffset={initialContentOffset}
         maintainVisibleContentPosition={{ minIndexForVisible: 1, autoscrollToTopThreshold: 10 }}
         onScroll={handleScroll}
