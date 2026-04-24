@@ -1,0 +1,58 @@
+diff --git a/node_modules/react-native-enriched-markdown/ios/input/EnrichedMarkdownTextInput+ContextMenu.mm b/node_modules/react-native-enriched-markdown/ios/input/EnrichedMarkdownTextInput+ContextMenu.mm
+index ced1c17..0aa5420 100644
+--- a/node_modules/react-native-enriched-markdown/ios/input/EnrichedMarkdownTextInput+ContextMenu.mm
++++ b/node_modules/react-native-enriched-markdown/ios/input/EnrichedMarkdownTextInput+ContextMenu.mm
+@@ -71,7 +71,8 @@
+ 
+   NSArray<NSString *> *customItemTexts = [self contextMenuItemTexts];
+   NSArray<NSString *> *customItemIcons = [self contextMenuItemIcons];
+-  NSMutableArray<UIMenuElement *> *allActions = [NSMutableArray arrayWithCapacity:customItemTexts.count];
++  NSMutableArray<UIMenuElement *> *allActions = [NSMutableArray array];
++
+   [customItemTexts enumerateObjectsUsingBlock:^(NSString *itemText, NSUInteger index, BOOL *_) {
+     NSString *iconName = index < customItemIcons.count ? customItemIcons[index] : nil;
+     UIImage *image = iconName.length > 0 ? [UIImage systemImageNamed:iconName] : nil;
+@@ -83,17 +84,32 @@
+     [allActions addObject:customAction];
+   }];
+ 
+-  NSUInteger insertIndex = suggestedActions.count;
+-  NSMutableArray *systemActions = [suggestedActions mutableCopy];
+-  for (NSUInteger i = 0; i < systemActions.count; i++) {
+-    if ([systemActions[i] isKindOfClass:[UIMenu class]]) {
+-      insertIndex = i + 1;
+-      break;
+-    }
+-  }
+-  [systemActions insertObject:formatMenu atIndex:insertIndex];
+-  [systemActions insertObject:copyMarkdownAction atIndex:insertIndex + 1];
+-  [allActions addObjectsFromArray:systemActions];
++  // Do not append UIKit's full suggestedActions (Look Up, Translate, Share, …) — the combined
++  // menu is very tall and covers custom toolbars next to the keyboard.
++  [allActions addObject:formatMenu];
++  [allActions addObject:copyMarkdownAction];
++
++  UIAction *copyPlainAction = [UIAction
++      actionWithTitle:@"Copy"
++                image:[UIImage systemImageNamed:@"doc.on.doc"]
++           identifier:@"com.enrichedmarkdown.copyPlain"
++              handler:^(__kindof UIAction *_) { [textView copy:nil]; }];
++
++  UIAction *pasteAction = [UIAction
++      actionWithTitle:@"Paste"
++                image:[UIImage systemImageNamed:@"doc.on.clipboard"]
++           identifier:@"com.enrichedmarkdown.paste"
++              handler:^(__kindof UIAction *_) { [textView paste:nil]; }];
++
++  UIAction *selectAllAction = [UIAction
++      actionWithTitle:@"Select All"
++                image:[UIImage systemImageNamed:@"cursorarrow.rectangle"]
++           identifier:@"com.enrichedmarkdown.selectAll"
++              handler:^(__kindof UIAction *_) { [textView selectAll:nil]; }];
++
++  [allActions addObject:copyPlainAction];
++  [allActions addObject:pasteAction];
++  [allActions addObject:selectAllAction];
+ 
+   return [UIMenu menuWithChildren:allActions];
+ }

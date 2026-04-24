@@ -124,6 +124,12 @@ npx expo start --dev-client --clear
 npm run typecheck
 ```
 
+## Rich markdown (Software Mansion)
+
+The text channel composer uses [`react-native-enriched-markdown`](https://github.com/software-mansion-labs/react-native-enriched-markdown) (`EnrichedMarkdownTextInput`), which **requires the New Architecture** and a **development / prebuild** build (not Expo Go). The `react-native-enriched-markdown` config plugin is listed in `app.json`. After adding or upgrading it, run `expo prebuild` and rebuild the dev client. Message bodies in the list may still use `react-native-markdown-display` until migrated to `EnrichedMarkdownText`.
+
+**iOS pods / Reanimated:** The root `ios/Podfile` sets `ENV['RCT_NEW_ARCH_ENABLED']` from `ios/Podfile.properties.json`. If that file has `"newArchEnabled": "false"`, `pod install` fails inside `react-native-reanimated`’s podspec. This repo includes a small config plugin `withNewArchPodfileProperties` that forces `"true"` on each prebuild, and the checked-in `Podfile.properties.json` should stay `"true"`. Also **unset** any shell `RCT_NEW_ARCH_ENABLED=0` (e.g. in `~/.zshrc`) so it cannot override the build.
+
 ## Generated artifact policy
 
 `apps/mobile/ios` and `apps/mobile/.expo` are treated as generated local artifacts in this repo and are gitignored. Regenerate native files with:
@@ -131,6 +137,34 @@ npm run typecheck
 ```bash
 npm run mobile:native:prebuild
 ```
+
+## EAS, prebuild, and the `withHavenIOSNative` plugin
+
+- **Prebuild** (`npm run mobile:native:prebuild` or `expo prebuild`) generates `ios/` and `android/` from `app.json` and config plugins. Committed `ios`/`android` in other setups are optional; here, `ios/` is gitignored and reproduced locally or on CI.
+- **EAS** commands use **`npx eas-cli`** (EAS is not a direct npm dependency) so we avoid a second copy of Expo tooling and keep `npx expo-doctor`’s “global CLI in package.json” check clean.
+- **`./plugins/withHavenIOSNative`** (listed last in `app.json` `plugins`) re-applies Swift `AppDelegate`, VoIP bridge, and Xcode settings from `plugins/haven-ios-native-templates/` after prebuild. Edit the **templates**, not only the generated `ios/` copy, or your changes are lost on the next prebuild.
+
+### dev-client crash postmortem (ordering contract)
+
+`expo-dev-launcher` requires **`autoSetupPrepare`** to run before **`autoSetupStart`**. The prepare step happens when the **Expo React Native factory** creates the root view. An older Objective-C delegate that only called `super` never ran the factory + `startReactNative` *before* `super`, so `ExpoAppDelegate`’s subscribers (dev-launcher) ran `autoSetupStart` too early and `EXDevLauncherController` could throw. The **supported fix** (aligned with the Expo SDK 55 bare template) is: create `ExpoReactNativeFactory`, call `startReactNative` **then** `super.application(...)` (Expo SDK 55 removed the old `bindReactNativeFactory` hook), which is what the template `AppDelegate.swift` and plugin enforce.
+
+**Build iOS** with **`HavenMobile.xcworkspace`** (CocoaPods), not the raw `.xcodeproj`, when running `xcodebuild` locally or in CI.
+
+## Post-prebuild: verify iOS delegate + templates
+
+From repo root:
+
+```bash
+node tooling/scripts/mobile/revalidate-ios-delegate.mjs
+```
+
+This checks that the `withHavenIOSNative` template files and expected symbols exist (and optionally that `HavenMobile.xcworkspace` builds, if the `ios` folder is present). Run it after any `expo prebuild` or when upgrading the Expo SDK.
+
+## SDK upgrades and voice / WebRTC
+
+Upgrade **one major SDK at a time** (`npx expo install expo@~<next> --fix` from `apps/mobile`, then `npx expo-doctor`, prebuild, pods, rebuild the dev client). Native stacks that are not part of the Expo SDK—**`react-native-webrtc`**, **`react-native-callkeep`**, **`react-native-voip-push-notification`**—may need a manual compatibility check for each new React Native or New Architecture line; re-test iOS (CallKit + PushKit) and Android after each hop. `expo.doctor` in `package.json` narrows React Native Directory noise for our chosen voice deps, but it does not replace a real device/simulator test.
+
+To **temporarily disable** iOS CallKit + VoIP registration (e.g. during a risky native upgrade), set `EXPO_PUBLIC_HAVEN_VOIP_FOUNDATION=0` in the environment for Metro / EAS (see [Expo environment variables](https://docs.expo.dev/guides/environment-variables/)).
 
 ## Diagnostics and troubleshooting
 

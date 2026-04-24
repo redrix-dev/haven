@@ -146,6 +146,7 @@ release/
 
 # Expo mobile generated artifacts (apps/mobile is prebuild-regenerated)
 apps/mobile/.expo/
+apps/mobile/.tmp-expo-export/
 apps/mobile/ios/
 
 # Local planning docs

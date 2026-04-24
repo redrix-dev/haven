@@ -7,11 +7,15 @@
     "strict": true,
     "types": [
       "react",
-      "nativewind/types"
+      "nativewind/types",
+      "node"
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["../../packages/shared/src/*"]
+      "@shared/*": ["../../packages/shared/src/*"],
+      "@shared/app/ui/*": ["../../packages/web-client/src/app-ui/*"],
+      "@client/app/*": ["../../packages/shared/src/app/*"],
+      "@platform/*": ["../../packages/shared/src/platform/*"]
     }
   },
   "include": [

@@ -96,13 +96,19 @@ export function useMobileExpoPushRegistration(session: Session | null | undefine
           });
         }
 
-        const { status: existing } = await Notifications.getPermissionsAsync();
-        let finalStatus = existing;
-        if (existing !== "granted") {
-          const ask = await Notifications.requestPermissionsAsync();
-          finalStatus = ask.status;
+        // `expo-notifications` types extend `PermissionResponse` from `expo-modules-core`; the
+        // mobile package may not resolve that peer for `tsc`, so we narrow explicitly.
+        const existing = (await Notifications.getPermissionsAsync()) as {
+          status: "granted" | "denied" | "undetermined";
+        };
+        let canNotify = existing.status === "granted";
+        if (!canNotify) {
+          const ask = (await Notifications.requestPermissionsAsync()) as {
+            status: "granted" | "denied" | "undetermined";
+          };
+          canNotify = ask.status === "granted";
         }
-        if (finalStatus !== "granted") {
+        if (!canNotify) {
           return;
         }
 

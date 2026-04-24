@@ -5,12 +5,12 @@ import type {
   MessageAttachment,
   MessageLinkPreview,
 } from "@shared/lib/backend/types";
-import { Video, ResizeMode } from "expo-av";
 import {
   isAuthorProfileTombstone,
   getFallbackEmbedUrl,
   getReplyToMessageId,
 } from "@shared/features/messaging/components/message-list/messageListContentUtils";
+import { CommunityAttachmentVideo } from "./CommunityAttachmentVideo";
 import { resolveLiveAvatarUrl } from "@shared/lib/liveProfiles";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import {
@@ -321,13 +321,10 @@ export function CommunityMessageList({
         }
         if (attachment.mediaKind === "video") {
           return (
-            <Video
+            <CommunityAttachmentVideo
               key={attachment.id}
-              source={{ uri: attachment.signedUrl }}
+              uri={attachment.signedUrl}
               style={{ width: "100%", height: 220, borderRadius: 12, marginTop: 8 }}
-              useNativeControls
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={false}
             />
           );
         }

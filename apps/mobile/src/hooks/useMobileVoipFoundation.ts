@@ -11,10 +11,18 @@ const LAST_VOIP_TOKEN_KEY = "haven:lastVoipPushToken";
  * Boots minimal VoIP + CallKeep native foundations.
  * This intentionally wires registration/events only; full call UX is implemented later.
  */
+const voipFoundationEnabled =
+  process.env.EXPO_PUBLIC_HAVEN_VOIP_FOUNDATION !== "0";
+
+/**
+ * Set `EXPO_PUBLIC_HAVEN_VOIP_FOUNDATION=0` to skip CallKit / PushKit registration (e.g. while
+ * validating an SDK upgrade when native call deps are temporarily broken).
+ */
 export function useMobileVoipFoundation(
   session: Session | null | undefined,
 ): void {
   useEffect(() => {
+    if (!voipFoundationEnabled) return;
     if (Platform.OS !== "ios") return;
 
     void Promise.resolve(

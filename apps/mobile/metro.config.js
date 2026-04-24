@@ -15,7 +15,9 @@ const mobileSrcRoot = path.join(projectRoot, "src");
 const config = getDefaultConfig(projectRoot);
 
 config.watchFolders = [sharedPackageRoot, webClientPackageRoot];
-config.resolver.disableHierarchicalLookup = true;
+// Rely on explicit `nodeModulesPaths` + `extraNodeModules` for the monorepo. Keeping the
+// default `disableHierarchicalLookup: false` matches expo-doctor and Expo’s baseline;
+// the explicit resolver paths still pin React/RN/Expo to `apps/mobile/node_modules`.
 config.resolver.nodeModulesPaths = [
   mobileNodeModules,
   path.resolve(monorepoRoot, "node_modules"),
