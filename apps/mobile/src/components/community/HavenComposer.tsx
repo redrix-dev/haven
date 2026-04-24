@@ -75,27 +75,6 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
     setTimeout(fn, 0);
   };
 
-  const wrapSelection = useCallback(
-    async (before: string, after: string = before) => {
-      const inst = inputRef.current;
-      if (!inst) return;
-      const md = await inst.getMarkdown();
-      const { start, end } = selection;
-      const selected = md.substring(start, end);
-      const newText = `${md.substring(0, start)}${before}${selected}${after}${md.substring(end)}`;
-      inst.setValue(newText);
-      setDraft(newText);
-      const openLen = before.length;
-      const newStart = start + openLen;
-      const newEnd = newStart + selected.length;
-      runAfterNative(() => {
-        inst.setSelection(newStart, newEnd);
-        inst.focus();
-      });
-    },
-    [selection],
-  );
-
   const insertLinePrefix = useCallback(async (prefix: string) => {
     const inst = inputRef.current;
     if (!inst) return;
@@ -111,25 +90,6 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
       inst.focus();
     });
   }, [selection.start]);
-
-  const applyInlineCode = useCallback(async () => {
-    const inst = inputRef.current;
-    if (!inst) return;
-    const md = await inst.getMarkdown();
-    const { start, end } = selection;
-    if (start === end) {
-      const newText = `${md.substring(0, start)}\`\`${md.substring(start)}`;
-      inst.setValue(newText);
-      setDraft(newText);
-      const cursor = start + 1;
-      runAfterNative(() => {
-        inst.setSelection(cursor, cursor);
-        inst.focus();
-      });
-      return;
-    }
-    await wrapSelection("`", "`");
-  }, [selection, wrapSelection]);
 
   const openLinkModal = useCallback(() => {
     setLinkUrlDraft("https://");
@@ -242,6 +202,8 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
           multiline
           editable={!disabled && !isSending}
           scrollEnabled
+          autoCorrect={false}
+          spellCheck={false}
           defaultValue=""
           onChangeMarkdown={setDraft}
           onChangeSelection={setSelection}
@@ -352,9 +314,6 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
             style={chip(styleState.spoiler.isActive)}
           >
             <Ionicons name="eye-off-outline" size={16} color="#e6edf7" />
-          </Pressable>
-          <Pressable onPress={() => void applyInlineCode()} style={chip(false)}>
-            <Text style={{ color: "#e6edf7", fontFamily: "Menlo", fontSize: 13 }}>&lt;&gt;</Text>
           </Pressable>
           <Pressable onPress={() => void insertLinePrefix("> ")} style={chip(false)}>
             <Ionicons name="chatbox-ellipses-outline" size={16} color="#e6edf7" />

@@ -28,7 +28,7 @@ import {
   type NativeSyntheticEvent,
   type ViewToken,
 } from "react-native";
-import Markdown from "react-native-markdown-display";
+import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   commitChannelScrollExit,
@@ -463,10 +463,11 @@ export function CommunityMessageList({
               Replying to {replyTargetLabel}
             </Text>
           ) : null}
-          <Markdown
-            style={{
-              body: { color: "#e6edf7", fontSize: 14, lineHeight: 20 },
-              heading1: {
+          <EnrichedMarkdownText
+            markdown={item.content}
+            markdownStyle={{
+              paragraph: { color: "#e6edf7", fontSize: 14, lineHeight: 20 },
+              h1: {
                 fontSize: 22,
                 fontWeight: "700",
                 color: "#e6edf7",
@@ -474,7 +475,7 @@ export function CommunityMessageList({
                 marginBottom: 4,
                 lineHeight: 28,
               },
-              heading2: {
+              h2: {
                 fontSize: 18,
                 fontWeight: "700",
                 color: "#e6edf7",
@@ -482,7 +483,7 @@ export function CommunityMessageList({
                 marginBottom: 4,
                 lineHeight: 24,
               },
-              heading3: {
+              h3: {
                 fontSize: 16,
                 fontWeight: "600",
                 color: "#e6edf7",
@@ -490,40 +491,41 @@ export function CommunityMessageList({
                 marginBottom: 2,
                 lineHeight: 22,
               },
-              strong: { fontWeight: "700" },
-              em: { fontStyle: "italic" },
-              code_inline: {
+              strong: { color: "#e6edf7" },
+              em: { color: "#e6edf7" },
+              code: {
                 fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
                 fontSize: 13,
                 backgroundColor: "#1a2235",
                 color: "#e6edf7",
-                paddingHorizontal: 4,
-                borderRadius: 3,
+                borderColor: "#1a2235",
               },
-              fence: {
+              codeBlock: {
                 fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
                 fontSize: 13,
                 backgroundColor: "#1a2235",
                 color: "#e6edf7",
                 padding: 10,
                 borderRadius: 6,
-                marginVertical: 4,
+                marginTop: 4,
+                marginBottom: 4,
               },
               blockquote: {
                 backgroundColor: "#1a2235",
-                borderLeftColor: "#3F79D8",
-                borderLeftWidth: 3,
-                paddingHorizontal: 10,
-                marginVertical: 2,
+                borderColor: "#3F79D8",
+                borderWidth: 3,
+                gapWidth: 10,
+                marginTop: 2,
+                marginBottom: 2,
               },
-              s: { textDecorationLine: "line-through" },
-              bullet_list: { marginVertical: 2 },
-              ordered_list: { marginVertical: 2 },
-              link: { color: "#3F79D8" },
+              strikethrough: { color: "#e6edf7" },
+              list: { marginTop: 2, marginBottom: 2 },
+              link: { color: "#3F79D8", underline: true },
             }}
-          >
-            {item.content}
-          </Markdown>
+            onLinkPress={({ url }) => {
+              handleOpenUrl(url);
+            }}
+          />
           {renderAttachments(item.id)}
           {renderLinkPreview(item.id)}
         </Pressable>
