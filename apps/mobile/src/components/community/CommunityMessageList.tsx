@@ -465,6 +465,7 @@ export function CommunityMessageList({
           ) : null}
           <EnrichedMarkdownText
             markdown={item.content}
+            md4cFlags={{ underline: true }}
             markdownStyle={{
               paragraph: { color: "#e6edf7", fontSize: 14, lineHeight: 20 },
               h1: {

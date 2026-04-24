@@ -28,12 +28,13 @@ const walkMarkdownTree = (node: MarkdownNode, visit: (value: MarkdownNode) => vo
 
 const createUnderlineRemarkPlugin = (source: string) => () => (tree: MarkdownNode) => {
   walkMarkdownTree(tree, (node) => {
-    if (node.type !== 'strong') return;
+    if (node.type !== 'emphasis') return;
     const start = node.position?.start?.offset;
     const end = node.position?.end?.offset;
     if (typeof start !== 'number' || typeof end !== 'number') return;
     const raw = source.slice(start, end);
-    if (!raw.startsWith('__') || !raw.endsWith('__')) return;
+    if (!raw.startsWith('_') || !raw.endsWith('_')) return;
+    if (raw.startsWith('__') && raw.endsWith('__')) return;
     node.data = {
       ...(node.data ?? {}),
       hName: 'u',

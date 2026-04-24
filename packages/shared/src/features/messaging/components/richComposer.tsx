@@ -44,11 +44,11 @@ const TURNDOWN = new TurndownService({
   strongDelimiter: "**",
 });
 
-// Haven markdown uses `__text__` for underline (not GFM strikethrough). Preprocess sends `<u>` into marked; turndown maps `<u>` back.
+// Haven markdown uses `_text_` for underline to match md4c underline mode on mobile.
 TURNDOWN.addRule("havenUnderline", {
   filter: ["u"],
   replacement(content: string) {
-    return `__${content}__`;
+    return `_${content}_`;
   },
 });
 
@@ -58,7 +58,7 @@ const normalizeMarkdown = (value: string) =>
 const markdownToHtml = (markdown: string) => {
   if (!markdown.trim()) return "<p></p>";
   const withUnderlineHtml = markdown.replace(
-    /__(?=\S)([\s\S]*?\S)__/g,
+    /_(?=\S)([\s\S]*?\S)_/g,
     "<u>$1</u>",
   );
   return marked.parse(withUnderlineHtml, {

@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "scheme": "haven",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/haven-app-icon.png",
     "platforms": [
       "ios",
       "android"
@@ -47,6 +48,7 @@
       "bundler": "metro"
     },
     "ios": {
+      "icon": "./assets/haven-app-icon.png",
       "bundleIdentifier": "com.redrix.haven.mobile",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

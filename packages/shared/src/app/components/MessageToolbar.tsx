@@ -189,7 +189,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
         }
         if (key === 'u') {
           event.preventDefault();
-          applyWrappedFormat('__');
+          applyWrappedFormat('_');
           return true;
         }
 
@@ -238,7 +238,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
           onSelect={() =>
             richActions
               ? richActions.toggleUnderline()
-              : applyWrappedFormat('__')
+              : applyWrappedFormat('_')
           }
         >
           Underline
@@ -408,7 +408,7 @@ export const MessageToolbar = React.forwardRef<MessageToolbarHandle, MessageTool
           onClick={() =>
             richActions
               ? richActions.toggleUnderline()
-              : applyWrappedFormat('__')
+              : applyWrappedFormat('_')
           }
         >
           U

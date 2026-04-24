@@ -9,7 +9,7 @@ describe('MarkdownText', () => {
     render(
       <MarkdownText
         content={[
-          '__under__ **bold** *italic* ~~strike~~ `code` https://example.com',
+          '_under_ **bold** *italic* ~~strike~~ `code` https://example.com',
           '',
           '> quote',
           '',
