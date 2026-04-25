@@ -567,14 +567,14 @@ export function CommunityMessageList({
       <FlatList
         className="flex-1"
         style={{ backgroundColor: "transparent" }}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
         inverted
         key={textChannelId ?? "no-channel"}
         ref={listRef}
         data={orderedMessages}
         extraData={[profiles, liveProfiles, attachmentsByMessageId, linkPreviewsByMessageId]}
         keyExtractor={(message) => message.id}
-        keyboardShouldPersistTaps="always"
+        keyboardShouldPersistTaps="handled"
         contentOffset={initialContentOffset}
         maintainVisibleContentPosition={{ minIndexForVisible: 1, autoscrollToTopThreshold: 10 }}
         onScroll={handleScroll}

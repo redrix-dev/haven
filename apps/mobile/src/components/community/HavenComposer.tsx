@@ -6,6 +6,8 @@ import {
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import {
   ActionSheetIOS,
   Alert,
@@ -31,6 +33,18 @@ function resolveMimeType(asset: ImagePicker.ImagePickerAsset): string {
 
 export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProps) {
   const insets = useSafeAreaInsets();
+  const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
+  const safeBottom = insets.bottom || 0;
+
+  // Reanimated `height` is negative while the keyboard is open (negated in KeyboardProvider).
+  const shellStyle = useAnimatedStyle(() => {
+    "worklet";
+    return {
+      backgroundColor: "#0F1728",
+      paddingBottom: keyboardHeight.value < 0 ? 0 : safeBottom,
+    };
+  }, [safeBottom]);
+
   const inputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
   const [draft, setDraft] = useState("");
   const [pendingAttachment, setPendingAttachment] = useState<{
@@ -96,12 +110,7 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
 
 
   return (
-    <View
-      style={{
-        backgroundColor: "#0F1728",
-        paddingBottom: insets.bottom || 0,
-      }}
-    >
+    <Animated.View style={shellStyle}>
       <View
         style={{
           flexDirection: "row",
@@ -128,8 +137,6 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
           multiline
           editable={!disabled && !isSending}
           scrollEnabled
-          autoCorrect={false}
-          spellCheck={false}
           defaultValue=""
           onChangeMarkdown={handleChangeMarkdown}
           placeholder={
@@ -165,6 +172,6 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
           <Ionicons name="arrow-up-circle" size={28} color={sendIconColor} />
         </Pressable>
       </View>
-    </View>
+    </Animated.View>
   );
 }
