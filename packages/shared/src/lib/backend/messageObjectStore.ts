@@ -21,6 +21,30 @@ export interface MessageObjectStore {
   ): Promise<string | null>;
 }
 
+const blobToArrayBuffer = async (blob: Blob): Promise<ArrayBuffer> => {
+  const candidate = blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> };
+  if (typeof candidate.arrayBuffer === "function") {
+    return await candidate.arrayBuffer();
+  }
+  if (typeof FileReader === "undefined") {
+    throw new Error("Blob.arrayBuffer and FileReader are unavailable in this runtime.");
+  }
+  return await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Failed to read blob as ArrayBuffer."));
+    reader.onload = () => {
+      const result = reader.result;
+      if (result instanceof ArrayBuffer) {
+        resolve(result);
+        return;
+      }
+      reject(new Error("FileReader did not return an ArrayBuffer."));
+    };
+    reader.readAsArrayBuffer(blob);
+  });
+};
+
 class SupabaseMessageObjectStore implements MessageObjectStore {
   constructor(private readonly client: HavenSupabaseClient) {}
 
@@ -39,7 +63,7 @@ class SupabaseMessageObjectStore implements MessageObjectStore {
       contentType: input.contentType,
       cacheControl: input.cacheControl ?? "3600",
     });
-    const payload = await input.body.arrayBuffer();
+    const payload = await blobToArrayBuffer(input.body);
     console.log("[MessageObjectStore][upload] payload", {
       objectPath: input.objectPath,
       arrayBufferByteLength: payload.byteLength,
