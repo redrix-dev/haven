@@ -666,14 +666,18 @@ export function CommunityScreen() {
       } else {
         const response = await fetch(pendingAttachment.uri);
         const blob = await response.blob();
-        const file = new File([blob], pendingAttachment.fileName, {
-          type: pendingAttachment.mimeType,
-        });
         await messaging.actions.sendMessage(
           text,
           replyToMessageId
-            ? { replyToMessageId, mediaFile: file }
-            : { mediaFile: file },
+            ? {
+                replyToMessageId,
+                mediaFile: blob,
+                mediaFilename: pendingAttachment.fileName,
+              }
+            : {
+                mediaFile: blob,
+                mediaFilename: pendingAttachment.fileName,
+              },
         );
       }
       setDraft("");

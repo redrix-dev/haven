@@ -682,7 +682,8 @@ export function useMessages({
       content: string,
       options?: {
         replyToMessageId?: string;
-        mediaFile?: File;
+        mediaFile?: Blob | File;
+        mediaFilename?: string;
         mediaExpiresInHours?: number;
       },
     ) => {
@@ -693,6 +694,12 @@ export function useMessages({
       if (!currentUserId || !currentChannelId || !currentServerId) return;
 
       const communityBackend = getCommunityDataBackend(currentServerId);
+      const inferredMediaFilename =
+        options?.mediaFilename ??
+        (options?.mediaFile && "name" in options.mediaFile
+          ? String(options.mediaFile.name)
+          : undefined) ??
+        `upload-${Date.now()}`;
       await communityBackend.sendUserMessage({
         communityId: currentServerId,
         channelId: currentChannelId,
@@ -702,7 +709,7 @@ export function useMessages({
         mediaUpload: options?.mediaFile
           ? {
               body: options.mediaFile,
-              filename: options.mediaFile.name,
+              filename: inferredMediaFilename,
               expiresInHours: options.mediaExpiresInHours,
             }
           : undefined,
