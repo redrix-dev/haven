@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   messageBubble: {
-    maxWidth: "85%",
+    alignSelf: "stretch",
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,
