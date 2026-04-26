@@ -5,6 +5,8 @@ import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } 
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -27,6 +29,7 @@ import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import type { Channel, Message } from "@shared/lib/backend/types";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
+import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import { useSharedValue, withTiming } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { RootStackParamList } from "../navigation/types";
@@ -69,7 +72,70 @@ function Message({ text }: ChatMessage) {
   return (
     <View style={styles.messageRow}>
       <View style={styles.messageBubble}>
-        <Text style={styles.messageText}>{text}</Text>
+        <EnrichedMarkdownText
+          markdown={text}
+          md4cFlags={{ underline: true }}
+          markdownStyle={{
+            paragraph: { color: "#e6edf7", fontSize: 14, lineHeight: 20 },
+            h1: {
+              fontSize: 22,
+              fontWeight: "700",
+              color: "#e6edf7",
+              marginTop: 4,
+              marginBottom: 4,
+              lineHeight: 28,
+            },
+            h2: {
+              fontSize: 18,
+              fontWeight: "700",
+              color: "#e6edf7",
+              marginTop: 4,
+              marginBottom: 4,
+              lineHeight: 24,
+            },
+            h3: {
+              fontSize: 16,
+              fontWeight: "600",
+              color: "#e6edf7",
+              marginTop: 4,
+              marginBottom: 2,
+              lineHeight: 22,
+            },
+            strong: { color: "#e6edf7" },
+            em: { color: "#e6edf7" },
+            code: {
+              fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+              fontSize: 13,
+              backgroundColor: "#1a2235",
+              color: "#e6edf7",
+              borderColor: "#1a2235",
+            },
+            codeBlock: {
+              fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+              fontSize: 13,
+              backgroundColor: "#1a2235",
+              color: "#e6edf7",
+              padding: 10,
+              borderRadius: 6,
+              marginTop: 4,
+              marginBottom: 4,
+            },
+            blockquote: {
+              backgroundColor: "#1a2235",
+              borderColor: "#3F79D8",
+              borderWidth: 3,
+              gapWidth: 10,
+              marginTop: 2,
+              marginBottom: 2,
+            },
+            strikethrough: { color: "#e6edf7" },
+            list: { marginTop: 2, marginBottom: 2 },
+            link: { color: "#3F79D8", underline: true },
+          }}
+          onLinkPress={({ url }) => {
+            void Linking.openURL(url);
+          }}
+        />
       </View>
     </View>
   );
