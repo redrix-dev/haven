@@ -117,6 +117,12 @@ function getReplyTargetLabel(
   if (profile?.username) return profile.username;
   return uid.slice(0, 12);
 }
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim().length > 0) return error.message;
+  if (typeof error === "string" && error.trim().length > 0) return error;
+  return fallback;
+}
 // EDIT END: local message model/constants for standalone in-line screen
 
 // EDIT START: wrapper for virtualized list keyboard behavior
@@ -572,6 +578,10 @@ export function CommunityScreen() {
         : null,
     [messageById, pendingReplyToMessageId, profiles],
   );
+  const reportTargetStillExists = useMemo(
+    () => (reportDialogMessageId ? messageById.has(reportDialogMessageId) : false),
+    [messageById, reportDialogMessageId],
+  );
   const textChannelId = currentRenderableChannel?.kind === "text" ? currentRenderableChannel.id : null;
   const scrollExitPeek = useMemo(() => {
     if (!communityId || !textChannelId) return null;
@@ -914,6 +924,15 @@ export function CommunityScreen() {
 
   const handleSubmitMessageReport = useCallback(async () => {
     if (!reportDialogMessageId || reportSubmitting) return;
+    if (!messageById.has(reportDialogMessageId)) {
+      setReportDialogMessageId(null);
+      setReportTarget("haven_staff");
+      setReportKind("content_abuse");
+      setReportComment("");
+      setReportSubmitting(false);
+      setReportError(null);
+      return;
+    }
     try {
       setReportSubmitting(true);
       setReportError(null);
@@ -926,12 +945,12 @@ export function CommunityScreen() {
       setReportDialogMessageId(null);
       setReportComment("");
     } catch (error) {
-      const fallback = "Failed to submit message report.";
-      setReportError(error instanceof Error ? error.message : fallback);
+      setReportError(getErrorMessage(error, "Failed to submit message report."));
     } finally {
       setReportSubmitting(false);
     }
   }, [
+    messageById,
     messaging.actions,
     reportComment,
     reportDialogMessageId,
@@ -1291,6 +1310,7 @@ export function CommunityScreen() {
             <Text style={styles.reportFieldLabel}>Who should the report go to?</Text>
             <View style={styles.reportChoiceGroup}>
               <Pressable
+                disabled={reportSubmitting}
                 onPress={() => setReportTarget("haven_staff")}
                 style={[
                   styles.reportChoice,
@@ -1300,6 +1320,7 @@ export function CommunityScreen() {
                 <Text style={styles.reportChoiceText}>Haven Moderation</Text>
               </Pressable>
               <Pressable
+                disabled={reportSubmitting}
                 onPress={() => setReportTarget("server_admins")}
                 style={[
                   styles.reportChoice,
@@ -1311,6 +1332,7 @@ export function CommunityScreen() {
                 </Text>
               </Pressable>
               <Pressable
+                disabled={reportSubmitting}
                 onPress={() => setReportTarget("both")}
                 style={[
                   styles.reportChoice,
@@ -1324,6 +1346,7 @@ export function CommunityScreen() {
             <Text style={styles.reportFieldLabel}>Type</Text>
             <View style={styles.reportChoiceGroup}>
               <Pressable
+                disabled={reportSubmitting}
                 onPress={() => setReportKind("content_abuse")}
                 style={[
                   styles.reportChoice,
@@ -1333,6 +1356,7 @@ export function CommunityScreen() {
                 <Text style={styles.reportChoiceText}>Report Content Abuse</Text>
               </Pressable>
               <Pressable
+                disabled={reportSubmitting}
                 onPress={() => setReportKind("bug")}
                 style={[
                   styles.reportChoice,
@@ -1369,10 +1393,11 @@ export function CommunityScreen() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => void handleSubmitMessageReport()}
-                disabled={reportSubmitting}
+                disabled={reportSubmitting || !reportDialogMessageId || !reportTargetStillExists}
                 style={[
                   styles.reportSubmitButton,
-                  reportSubmitting && styles.reportSubmitButtonDisabled,
+                  (reportSubmitting || !reportDialogMessageId || !reportTargetStillExists) &&
+                    styles.reportSubmitButtonDisabled,
                 ]}
               >
                 <Text style={styles.reportSubmitButtonText}>
