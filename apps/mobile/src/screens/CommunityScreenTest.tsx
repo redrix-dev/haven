@@ -38,8 +38,8 @@ type Ref = React.ElementRef<typeof KeyboardChatScrollView>;
 const MARGIN = 8;
 const INPUT_HEIGHT = 42;
 const INITIAL_MESSAGES: ChatMessage[] = [];
-const DEV_CHANNEL_BAR_HEIGHT = 44;
-const DEV_CHANNEL_BAR_MARGIN = 8;
+const TOP_CHROME_ROW_HEIGHT = 44;
+const TOP_CHROME_MARGIN = 8;
 const DEV_LIST_VISUAL_TOP_BREATHING = 8;
 // EDIT END: local message model/constants for standalone in-line screen
 
@@ -125,6 +125,9 @@ export function CommunityScreen() {
     [channels],
   );
   const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState(false);
+  // EDIT START: slice 6 measured top chrome footprint for viewport boundary
+  const [topChromeHeight, setTopChromeHeight] = useState(0);
+  // EDIT END: slice 6 measured top chrome footprint for viewport boundary
 
   useEffect(() => {
     let cancelled = false;
@@ -191,11 +194,11 @@ export function CommunityScreen() {
   }, [localMessages, storedMessages]);
   // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom, top } = useSafeAreaInsets();
-  // EDIT START: align dev top bar + list padding with safe-area notch
-  const devBarTopInset = top + DEV_CHANNEL_BAR_MARGIN;
-  const devBarOccupiedHeight = top + DEV_CHANNEL_BAR_MARGIN + DEV_CHANNEL_BAR_HEIGHT;
+  // EDIT START: align top chrome + list padding with safe-area notch
+  const topChromeTopInset = top;
+  const topChromeOccupiedHeight = topChromeHeight > 0 ? topChromeHeight : top + TOP_CHROME_ROW_HEIGHT;
   const devVisualTopPaddingBottom = __DEV__ ? DEV_LIST_VISUAL_TOP_BREATHING : 0;
-  // EDIT END: align dev top bar + list padding with safe-area notch
+  // EDIT END: align top chrome + list padding with safe-area notch
   const extraContentPadding = useSharedValue(0);
 
   const renderScrollComponent = useCallback(
@@ -281,7 +284,7 @@ export function CommunityScreen() {
         <View
           style={[
             styles.listViewport,
-            { top: __DEV__ ? devBarOccupiedHeight : 0 },
+            { top: topChromeOccupiedHeight },
           ]}
         >
           <FlatList
@@ -332,42 +335,55 @@ export function CommunityScreen() {
           </KeyboardStickyView>
         </View>
         {/* EDIT END: strict list viewport boundary under dev bar */}
-        {/* EDIT START: slice 4 minimal dev-only channel dropdown */}
-        {__DEV__ ? (
-          <View style={[styles.devChannelBarContainer, { top: devBarTopInset }]}>
-            <Pressable
-              onPress={() => setIsChannelDropdownOpen((prev) => !prev)}
-              style={styles.devChannelTrigger}
-            >
-              <Text style={styles.devChannelTriggerText}>
-                {currentRenderableChannel?.name ?? "Select channel"} v
-              </Text>
+        {/* EDIT START: slice 6 inline top chrome parity for haven + channel controls */}
+        <View
+          style={[styles.topChromeContainer, { paddingTop: topChromeTopInset }]}
+          onLayout={(event) => {
+            const measuredHeight = event.nativeEvent.layout.height;
+            if (measuredHeight !== topChromeHeight) {
+              setTopChromeHeight(measuredHeight);
+            }
+          }}
+        >
+          <View style={styles.topChromePrimaryRow}>
+            <Text style={styles.topChromeCommunityTitle}>{community?.name ?? "Community"}</Text>
+            <Pressable style={styles.topChromePrimaryAction}>
+              <Text style={styles.topChromePrimaryActionText}>Settings</Text>
             </Pressable>
-            {isChannelDropdownOpen ? (
-              <View style={styles.devChannelDropdown}>
-                {textChannels.map((channel) => (
-                  <Pressable
-                    key={channel.id}
-                    onPress={() => {
-                      void handleSelectChannel(channel);
-                    }}
-                    style={styles.devChannelOption}
-                  >
-                    <Text
-                      style={[
-                        styles.devChannelOptionText,
-                        currentRenderableChannel?.id === channel.id && styles.devChannelOptionTextActive,
-                      ]}
-                    >
-                      {channel.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
           </View>
-        ) : null}
-        {/* EDIT END: slice 4 minimal dev-only channel dropdown */}
+          <Pressable
+            onPress={() => setIsChannelDropdownOpen((prev) => !prev)}
+            style={styles.topChromeChannelTrigger}
+          >
+            <Text style={styles.topChromeChannelTriggerText}>
+              {currentRenderableChannel?.name ?? "Select channel"} v
+            </Text>
+          </Pressable>
+          {isChannelDropdownOpen ? (
+            <View style={styles.topChromeChannelDropdown}>
+              {textChannels.map((channel) => (
+                <Pressable
+                  key={channel.id}
+                  onPress={() => {
+                    void handleSelectChannel(channel);
+                  }}
+                  style={styles.topChromeChannelOption}
+                >
+                  <Text
+                    style={[
+                      styles.topChromeChannelOptionText,
+                      currentRenderableChannel?.id === channel.id &&
+                        styles.topChromeChannelOptionTextActive,
+                    ]}
+                  >
+                    {channel.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </View>
+        {/* EDIT END: slice 6 inline top chrome parity for haven + channel controls */}
       </KeyboardGestureArea>
     </SafeAreaView>
   );
@@ -448,14 +464,41 @@ const styles = StyleSheet.create({
     bottom: 0,
     overflow: "hidden",
   },
-  devChannelBarContainer: {
+  topChromeContainer: {
     position: "absolute",
-    left: DEV_CHANNEL_BAR_MARGIN,
-    right: DEV_CHANNEL_BAR_MARGIN,
+    left: TOP_CHROME_MARGIN,
+    right: TOP_CHROME_MARGIN,
+    top: 0,
     zIndex: 20,
   },
-  devChannelTrigger: {
-    height: DEV_CHANNEL_BAR_HEIGHT,
+  topChromePrimaryRow: {
+    height: TOP_CHROME_ROW_HEIGHT,
+    borderRadius: 10,
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#374151",
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  topChromeCommunityTitle: {
+    color: "#E5E7EB",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  topChromePrimaryAction: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  topChromePrimaryActionText: {
+    color: "#D1D5DB",
+    fontWeight: "600",
+    fontSize: 12,
+  },
+  topChromeChannelTrigger: {
+    marginTop: 6,
+    height: TOP_CHROME_ROW_HEIGHT,
     borderRadius: 10,
     backgroundColor: "#111827",
     borderWidth: 1,
@@ -463,11 +506,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 12,
   },
-  devChannelTriggerText: {
+  topChromeChannelTriggerText: {
     color: "#E5E7EB",
     fontWeight: "600",
   },
-  devChannelDropdown: {
+  topChromeChannelDropdown: {
     marginTop: 6,
     borderRadius: 10,
     backgroundColor: "#111827",
@@ -475,14 +518,14 @@ const styles = StyleSheet.create({
     borderColor: "#374151",
     overflow: "hidden",
   },
-  devChannelOption: {
+  topChromeChannelOption: {
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  devChannelOptionText: {
+  topChromeChannelOptionText: {
     color: "#D1D5DB",
   },
-  devChannelOptionTextActive: {
+  topChromeChannelOptionTextActive: {
     color: "#FFFFFF",
     fontWeight: "700",
   },
