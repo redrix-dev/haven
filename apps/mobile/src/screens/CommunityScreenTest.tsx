@@ -1675,12 +1675,12 @@ const styles = StyleSheet.create({
   },
   messageStaffBadge: {
     borderRadius: 4,
-    backgroundColor: "rgba(63, 121, 216, 0.2)",
+    backgroundColor: "rgba(69, 121, 205, 0.18)",
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   messageStaffBadgeText: {
-    color: "#3F79D8",
+    color: "#3f79d8",
     fontSize: 10,
     fontWeight: "600",
     letterSpacing: 0.5,
@@ -1764,7 +1764,7 @@ const styles = StyleSheet.create({
     marginHorizontal: MARGIN,
     marginBottom: MARGIN,
     borderRadius: 12,
-    backgroundColor: "#354869",
+    backgroundColor: "#1F2D42",
     padding: 8,
     gap: 8,
   },
@@ -1826,7 +1826,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: INPUT_HEIGHT,
     maxHeight: 120,
-    color: "#1F2D42",
+    color: "#354869",
     paddingHorizontal: 6,
     paddingTop: 10,
     paddingBottom: 10,
@@ -1838,7 +1838,7 @@ const styles = StyleSheet.create({
   inputShell: {
     flex: 1,
     borderRadius: 10,
-    backgroundColor: "#1F2D42",
+    backgroundColor: "#354869",
     paddingHorizontal: 6,
   },
   sendButton: {
