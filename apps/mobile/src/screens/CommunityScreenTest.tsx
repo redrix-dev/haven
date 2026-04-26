@@ -81,7 +81,9 @@ export function CommunityScreen() {
   const setCurrentChannelId = useNavigationStore((state) => state.setCurrentChannelId);
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
-  const { servers } = useServers();
+  // EDIT START: slice 5 reliability state inputs from server loading lifecycle
+  const { servers, status: serversStatus, error: serversError, refreshServers } = useServers();
+  // EDIT END: slice 5 reliability state inputs from server loading lifecycle
   const {
     state: { channels },
     derived: { currentRenderableChannel },
@@ -101,6 +103,21 @@ export function CommunityScreen() {
   // EDIT END: slice 2 keep hook handle for send action
   const storedMessages = useMessagesStore((state) => state.messages);
   // EDIT END: slice 1 real message source context from production hooks
+
+  // EDIT START: slice 5 derive simple reliability phase gates
+  const community = useMemo(
+    () => (communityId ? servers.find((entry) => entry.id === communityId) ?? null : null),
+    [communityId, servers],
+  );
+  const phase: "loading" | "ready" | "missing" | "error" =
+    serversStatus === "loading" && servers.length === 0
+      ? "loading"
+      : serversStatus === "error"
+        ? "error"
+        : community
+          ? "ready"
+          : "missing";
+  // EDIT END: slice 5 derive simple reliability phase gates
 
   // EDIT START: slice 4 channel context resolution and dev-only dropdown state
   const textChannels = useMemo(
@@ -213,6 +230,44 @@ export function CommunityScreen() {
     },
     [extraContentPadding],
   );
+
+  // EDIT START: slice 5 lightweight reliability wrappers
+  if (phase === "loading") {
+    return (
+      <SafeAreaView edges={["bottom"]} style={styles.container}>
+        <View style={styles.stateContainer}>
+          <ActivityIndicator color="#e6edf7" size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (phase === "error") {
+    return (
+      <SafeAreaView edges={["bottom"]} style={styles.container}>
+        <View style={styles.stateContainer}>
+          <Text style={styles.stateText}>{serversError ?? "Unable to load community data."}</Text>
+          <Pressable onPress={() => void refreshServers()} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (phase === "missing") {
+    return (
+      <SafeAreaView edges={["bottom"]} style={styles.container}>
+        <View style={styles.stateContainer}>
+          <Text style={styles.stateText}>Community not available.</Text>
+          <Pressable onPress={() => void refreshServers()} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  // EDIT END: slice 5 lightweight reliability wrappers
 
   return (
     <SafeAreaView edges={["bottom"]} style={styles.container}>
@@ -432,5 +487,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   // EDIT END: slice 4 dev-only top dropdown styles
+  // EDIT START: slice 5 reliability state styles
+  stateContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  stateText: {
+    color: "#E5E7EB",
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 10,
+    borderRadius: 8,
+    backgroundColor: "#1F2937",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  retryButtonText: {
+    color: "#F9FAFB",
+    fontWeight: "600",
+  },
+  // EDIT END: slice 5 reliability state styles
 });
 // EDIT END: local styles for fully in-line chat screen
