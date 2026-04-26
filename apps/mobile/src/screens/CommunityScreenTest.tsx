@@ -31,10 +31,7 @@ type Ref = React.ElementRef<typeof KeyboardChatScrollView>;
 
 const MARGIN = 8;
 const INPUT_HEIGHT = 42;
-const INITIAL_MESSAGES: ChatMessage[] = [
-  { id: "1", text: "Welcome to the chat test screen." },
-  { id: "2", text: "Send a message to verify keyboard + composer flow." },
-];
+const INITIAL_MESSAGES: ChatMessage[] = [];
 // EDIT END: local message model/constants for standalone in-line screen
 
 // EDIT START: wrapper for virtualized list keyboard behavior
@@ -98,11 +95,15 @@ export function CommunityScreen() {
   // EDIT START: keep local send behavior while hydrating list from real store
   const [localMessages, setLocalMessages] = useState(INITIAL_MESSAGES);
   const messages = useMemo<ChatMessage[]>(() => {
-    const hydratedMessages = storedMessages.map((message: Message) => ({
-      id: message.id,
-      text: message.content,
-    }));
-    return [...localMessages, ...hydratedMessages];
+    const localIds = new Set(localMessages.map((message) => message.id));
+    const hydratedMessagesNewestFirst = [...storedMessages]
+      .reverse()
+      .map((message: Message) => ({
+        id: message.id,
+        text: message.content,
+      }))
+      .filter((message) => !localIds.has(message.id));
+    return [...localMessages, ...hydratedMessagesNewestFirst];
   }, [localMessages, storedMessages]);
   // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom } = useSafeAreaInsets();
