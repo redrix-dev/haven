@@ -7,7 +7,9 @@ import { useMobileExpoPushRegistration } from "../hooks/useMobileExpoPushRegistr
 import { useMobileVoipFoundation } from "../hooks/useMobileVoipFoundation";
 import { useServersRealtimeBootstrap } from "../hooks/useServersRealtimeBootstrap";
 import { CreatePlaceholderScreen } from "../screens/CreatePlaceholderScreen";
-import { CommunityScreen } from "../screens/CommunityScreen";
+// EDIT START: temporarily wire Community tab to test boilerplate screen
+import { CommunityScreen } from "../screens/CommunityScreenTest";
+// EDIT END: temporarily wire Community tab to test boilerplate screen
 import { HomeScreen } from "../screens/HomeScreen";
 import { JoinPlaceholderScreen } from "../screens/JoinPlaceholderScreen";
 import { SettingsPlaceholderScreen } from "../screens/SettingsPlaceholderScreen";
