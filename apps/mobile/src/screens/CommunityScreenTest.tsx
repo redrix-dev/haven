@@ -71,9 +71,9 @@ const ChatScrollView = forwardRef<Ref, ScrollViewProps & KeyboardChatScrollViewP
 // EDIT END: wrapper for virtualized list keyboard behavior
 
 // EDIT START: local in-line message bubble renderer
-function Message({ text }: ChatMessage) {
+function Message({ text, onPress }: ChatMessage & { onPress?: () => void }) {
   return (
-    <View style={styles.messageRow}>
+    <Pressable style={styles.messageRow} onPress={onPress}>
       <View style={styles.messageBubble}>
         <EnrichedMarkdownText
           markdown={text}
@@ -140,7 +140,7 @@ function Message({ text }: ChatMessage) {
           }}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 // EDIT END: local in-line message bubble renderer
@@ -373,6 +373,7 @@ export function CommunityScreen() {
           <FlatList
             data={messages}
             inverted
+            keyboardShouldPersistTaps="handled"
             // EDIT START: add bottom spacing so top dev bar doesn't clip oldest message access
             contentContainerStyle={{
               paddingTop: 10,
@@ -380,7 +381,14 @@ export function CommunityScreen() {
             }}
             // EDIT END: add bottom spacing so top dev bar doesn't clip oldest message access
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <Message {...item} />}
+            renderItem={({ item }) => (
+              <Message
+                {...item}
+                onPress={() => {
+                  composerInputRef.current?.blur();
+                }}
+              />
+            )}
             renderScrollComponent={renderScrollComponent}
             // EDIT START: slice 3 older-message pagination using messaging state/actions
             onEndReachedThreshold={0.3}
