@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useRef, useState } from "react";
+import React, { forwardRef, useCallback, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -14,6 +14,13 @@ import {
   KeyboardGestureArea,
   KeyboardStickyView,
 } from "react-native-keyboard-controller";
+import { useAuthStore } from "@shared/stores/authStore";
+import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommunityWorkspace";
+import { useMessages } from "@shared/features/messaging/hooks/useMessages";
+import { useMessagesStore } from "@shared/stores/messagesStore";
+import { useNavigationStore } from "@shared/stores/navigationStore";
+import { useServers } from "@shared/features/community/hooks/useServers";
+import type { Message } from "@shared/lib/backend/types";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import { useSharedValue, withTiming } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -63,9 +70,41 @@ function Message({ text }: ChatMessage) {
 
 // EDIT START: export as CommunityScreen to wire directly in navigation
 export function CommunityScreen() {
+  // EDIT START: slice 1 real message source context from production hooks
+  const communityId = useNavigationStore((state) => state.currentServerId) ?? null;
+  const user = useAuthStore((state) => state.user);
+  const currentUserId = user?.id ?? null;
+  const { servers } = useServers();
+  const {
+    state: { channels },
+    derived: { currentRenderableChannel },
+  } = useCommunityWorkspace({
+    servers,
+    currentUserId,
+  });
+  useMessages({
+    currentServerId: communityId,
+    currentChannelId: currentRenderableChannel?.id ?? null,
+    currentUserId,
+    isCurrentUserElevatedInServer: false,
+    debugChannelReloads: false,
+    channels,
+  });
+  const storedMessages = useMessagesStore((state) => state.messages);
+  // EDIT END: slice 1 real message source context from production hooks
+
   const textInputRef = useRef<TextInput>(null);
   const textRef = useRef("");
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  // EDIT START: keep local send behavior while hydrating list from real store
+  const [localMessages, setLocalMessages] = useState(INITIAL_MESSAGES);
+  const messages = useMemo<ChatMessage[]>(() => {
+    const hydratedMessages = storedMessages.map((message: Message) => ({
+      id: message.id,
+      text: message.content,
+    }));
+    return [...localMessages, ...hydratedMessages];
+  }, [localMessages, storedMessages]);
+  // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom } = useSafeAreaInsets();
   const extraContentPadding = useSharedValue(0);
 
@@ -80,7 +119,7 @@ export function CommunityScreen() {
     const text = textRef.current.trim();
     if (!text) return;
 
-    setMessages((prev) => [{ id: String(Date.now()), text }, ...prev]);
+    setLocalMessages((prev) => [{ id: String(Date.now()), text }, ...prev]);
     textInputRef.current?.clear();
     textRef.current = "";
   }, []);
