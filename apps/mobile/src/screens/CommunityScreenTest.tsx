@@ -6,15 +6,20 @@ import {
   ActivityIndicator,
   ActionSheetIOS,
   Alert,
+  Animated,
+  Easing,
   FlatList,
   Image,
   Linking,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  ViewToken,
   View,
   type LayoutChangeEvent,
   type ScrollViewProps,
@@ -59,6 +64,7 @@ import {
   getLastTextChannelIdForCommunity,
   setLastTextChannelIdForCommunity,
 } from "../storage/communityChannelPrefs";
+import { commitChannelScrollExit, peekChannelScrollExit } from "../storage/communityTimelinePrefs";
 
 // EDIT START: add local message model/constants for standalone in-line screen
 type ChatMessage = {
@@ -78,6 +84,7 @@ const MARGIN = 8;
 const INPUT_HEIGHT = 42;
 const INITIAL_MESSAGES: ChatMessage[] = [];
 const DEV_LIST_VISUAL_TOP_BREATHING = 8;
+const MESSAGE_JUMP_THRESHOLD = 220;
 
 function resolveMimeType(asset: ImagePicker.ImagePickerAsset): string {
   if (asset.mimeType) return asset.mimeType;
@@ -459,6 +466,7 @@ export function CommunityScreen() {
   // EDIT END: slice 4 channel context resolution and dev-only dropdown state
 
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
+  const listRef = useRef<FlatList<ChatMessage> | null>(null);
   const [draft, setDraft] = useState("");
   // EDIT START: slice 2 minimal send-loading state for real send pipeline
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -480,6 +488,16 @@ export function CommunityScreen() {
   const [pendingReplyToMessageId, setPendingReplyToMessageId] = useState<string | null>(
     null,
   );
+  const [showJumpToNewest, setShowJumpToNewest] = useState(false);
+  const nearBottomRef = useRef(true);
+  const mountedNearBottomRef = useRef(true);
+  const topVisibleMessageIdRef = useRef<string | null>(null);
+  const scrollOffsetYRef = useRef(0);
+  const scrollIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoreAppliedChannelKeyRef = useRef<string | null>(null);
+  const jumpHintPlayedRef = useRef<string | null>(null);
+  const jumpOpacity = useRef(new Animated.Value(0)).current;
+  const jumpScale = useRef(new Animated.Value(1)).current;
   // EDIT END: composer media affordance pending attachment state
   // EDIT START: keep local send behavior while hydrating list from real store
   const [localMessages, setLocalMessages] = useState(INITIAL_MESSAGES);
@@ -547,6 +565,23 @@ export function CommunityScreen() {
         : null,
     [messageById, pendingReplyToMessageId, profiles],
   );
+  const textChannelId = currentRenderableChannel?.kind === "text" ? currentRenderableChannel.id : null;
+  const scrollExitPeek = useMemo(() => {
+    if (!communityId || !textChannelId) return null;
+    return peekChannelScrollExit(communityId, textChannelId);
+  }, [communityId, textChannelId]);
+  const jumpHintFromExit = useMemo(() => {
+    if (!textChannelId || messages.length === 0) return false;
+    if (
+      !scrollExitPeek ||
+      scrollExitPeek.wasNearBottom !== false ||
+      !scrollExitPeek.anchorMessageId ||
+      scrollExitPeek.anchorMessageId.trim().length === 0
+    ) {
+      return false;
+    }
+    return messages.some((entry) => entry.id === scrollExitPeek.anchorMessageId);
+  }, [messages, scrollExitPeek, textChannelId]);
   // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom, top } = useSafeAreaInsets();
   // EDIT START: align top chrome + list padding with safe-area notch
@@ -555,6 +590,30 @@ export function CommunityScreen() {
   const devVisualTopPaddingBottom = __DEV__ ? DEV_LIST_VISUAL_TOP_BREATHING : 0;
   // EDIT END: align top chrome + list padding with safe-area notch
   const extraContentPadding = useSharedValue(0);
+
+  const setJumpFullyVisible = useCallback(() => {
+    Animated.timing(jumpOpacity, {
+      toValue: 1,
+      duration: 120,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [jumpOpacity]);
+
+  const fadeJumpToIdle = useCallback(() => {
+    Animated.timing(jumpOpacity, {
+      toValue: 0.45,
+      duration: 220,
+      easing: Easing.inOut(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [jumpOpacity]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollIdleTimeoutRef.current) clearTimeout(scrollIdleTimeoutRef.current);
+    };
+  }, []);
 
   const renderScrollComponent = useCallback(
     (props: ScrollViewProps) => (
@@ -612,6 +671,151 @@ export function CommunityScreen() {
     },
     [extraContentPadding],
   );
+
+  useEffect(() => {
+    nearBottomRef.current = true;
+    mountedNearBottomRef.current = true;
+    topVisibleMessageIdRef.current = null;
+    scrollOffsetYRef.current = 0;
+    restoreAppliedChannelKeyRef.current = null;
+    if (!textChannelId) return;
+    return () => {
+      if (!communityId || !textChannelId) return;
+      if (mountedNearBottomRef.current) {
+        commitChannelScrollExit(communityId, textChannelId, {
+          wasNearBottom: true,
+          anchorMessageId: null,
+          anchorOffsetY: 0,
+        });
+        return;
+      }
+      const anchorMessageId = topVisibleMessageIdRef.current;
+      if (!anchorMessageId) {
+        commitChannelScrollExit(communityId, textChannelId, {
+          wasNearBottom: true,
+          anchorMessageId: null,
+          anchorOffsetY: 0,
+        });
+        return;
+      }
+      commitChannelScrollExit(communityId, textChannelId, {
+        wasNearBottom: false,
+        anchorMessageId,
+        anchorOffsetY: scrollOffsetYRef.current,
+      });
+    };
+  }, [communityId, textChannelId]);
+
+  useEffect(() => {
+    const channelKey = communityId && textChannelId ? `${communityId}:${textChannelId}` : null;
+    if (!channelKey || !listRef.current || messages.length === 0) return;
+    if (restoreAppliedChannelKeyRef.current === channelKey) return;
+    restoreAppliedChannelKeyRef.current = channelKey;
+
+    const canRestore =
+      scrollExitPeek &&
+      scrollExitPeek.wasNearBottom === false &&
+      typeof scrollExitPeek.anchorOffsetY === "number" &&
+      Number.isFinite(scrollExitPeek.anchorOffsetY) &&
+      scrollExitPeek.anchorOffsetY > 0;
+
+    if (canRestore) {
+      listRef.current.scrollToOffset({ offset: scrollExitPeek.anchorOffsetY ?? 0, animated: false });
+      nearBottomRef.current = false;
+      mountedNearBottomRef.current = false;
+      setShowJumpToNewest(true);
+      return;
+    }
+
+    listRef.current.scrollToOffset({ offset: 0, animated: false });
+    nearBottomRef.current = true;
+    mountedNearBottomRef.current = true;
+    setShowJumpToNewest(false);
+  }, [communityId, messages, scrollExitPeek, textChannelId]);
+
+  useEffect(() => {
+    if (!textChannelId) return;
+    setShowJumpToNewest(jumpHintFromExit);
+  }, [jumpHintFromExit, textChannelId]);
+
+  useEffect(() => {
+    if (!showJumpToNewest || !textChannelId) return;
+    const key = `${communityId ?? "none"}:${textChannelId}`;
+    if (jumpHintPlayedRef.current === key) return;
+    jumpHintPlayedRef.current = key;
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(jumpOpacity, {
+          toValue: 1,
+          duration: 140,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(jumpScale, {
+            toValue: 1.08,
+            duration: 140,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(jumpScale, {
+            toValue: 1,
+            duration: 120,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+      Animated.timing(jumpOpacity, {
+        toValue: 0.45,
+        duration: 260,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [communityId, jumpOpacity, jumpScale, showJumpToNewest, textChannelId]);
+
+  const handleScrollMessages = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetY = event.nativeEvent.contentOffset.y;
+      scrollOffsetYRef.current = offsetY;
+      const nearBottom = offsetY <= MESSAGE_JUMP_THRESHOLD;
+      nearBottomRef.current = nearBottom;
+      mountedNearBottomRef.current = nearBottom;
+      setShowJumpToNewest(!nearBottom);
+      if (!nearBottom) {
+        setJumpFullyVisible();
+        if (scrollIdleTimeoutRef.current) clearTimeout(scrollIdleTimeoutRef.current);
+        scrollIdleTimeoutRef.current = setTimeout(() => {
+          fadeJumpToIdle();
+          scrollIdleTimeoutRef.current = null;
+        }, 280);
+      }
+    },
+    [fadeJumpToIdle, setJumpFullyVisible],
+  );
+
+  const onViewableItemsChanged = useRef(
+    (info: { viewableItems: Array<ViewToken<ChatMessage>> }) => {
+      const firstVisible = info.viewableItems.find((entry) => entry.isViewable && entry.item);
+      if (firstVisible?.item?.id) topVisibleMessageIdRef.current = firstVisible.item.id;
+    },
+  );
+
+  const viewabilityConfig = useMemo(
+    () => ({
+      itemVisiblePercentThreshold: 10,
+      minimumViewTime: 80,
+    }),
+    [],
+  );
+
+  const handleJumpToNewest = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    nearBottomRef.current = true;
+    mountedNearBottomRef.current = true;
+    setShowJumpToNewest(false);
+  }, []);
 
   // EDIT START: slice 6 inline parity top chrome action handlers
   const handleOpenCommunitySettings = useCallback(() => {
@@ -804,9 +1008,14 @@ export function CommunityScreen() {
           ]}
         >
           <FlatList
+            ref={listRef}
             data={messages}
             inverted
             keyboardShouldPersistTaps="handled"
+            onScroll={handleScrollMessages}
+            scrollEventThrottle={16}
+            onViewableItemsChanged={onViewableItemsChanged.current}
+            viewabilityConfig={viewabilityConfig}
             // EDIT START: add bottom spacing so top dev bar doesn't clip oldest message access
             contentContainerStyle={{
               paddingTop: 10,
@@ -845,6 +1054,22 @@ export function CommunityScreen() {
             // EDIT END: slice 3 older-message pagination using messaging state/actions
           />
           <KeyboardStickyView offset={{ opened: bottom - MARGIN }} style={styles.composer}>
+            {showJumpToNewest ? (
+              <Animated.View
+                style={[
+                  styles.jumpToNewestWrapper,
+                  { opacity: jumpOpacity, transform: [{ scale: jumpScale }] },
+                ]}
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleJumpToNewest}
+                  style={styles.jumpToNewestButton}
+                >
+                  <Text style={styles.jumpToNewestText}>Jump to latest</Text>
+                </Pressable>
+              </Animated.View>
+            ) : null}
             {pendingReplyToMessageId ? (
               <View style={styles.replyBanner}>
                 <Text style={styles.replyBannerText}>
@@ -1594,6 +1819,23 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "600",
+  },
+  jumpToNewestWrapper: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  jumpToNewestButton: {
+    borderRadius: 999,
+    backgroundColor: "rgba(17, 24, 39, 0.95)",
+    borderWidth: 1,
+    borderColor: "#374151",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  jumpToNewestText: {
+    color: "#e6edf7",
+    fontSize: 12,
+    fontWeight: "700",
   },
   // EDIT END: slice 5 reliability state styles
 });
