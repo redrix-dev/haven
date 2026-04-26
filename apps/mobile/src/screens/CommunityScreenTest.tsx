@@ -5,6 +5,7 @@ import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } 
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -27,6 +28,8 @@ import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import type { Channel, Message } from "@shared/lib/backend/types";
+import type { MessageLinkPreview } from "@shared/lib/backend/types";
+import { getFallbackEmbedUrl } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import {
   EnrichedMarkdownText,
@@ -71,7 +74,20 @@ const ChatScrollView = forwardRef<Ref, ScrollViewProps & KeyboardChatScrollViewP
 // EDIT END: wrapper for virtualized list keyboard behavior
 
 // EDIT START: local in-line message bubble renderer
-function Message({ text, onPress }: ChatMessage & { onPress?: () => void }) {
+function Message({
+  id,
+  text,
+  onPress,
+  linkPreview,
+}: ChatMessage & { onPress?: () => void; linkPreview?: MessageLinkPreview | null }) {
+  // EDIT START: inline link preview parity computations
+  const embedUrl = linkPreview ? getFallbackEmbedUrl(linkPreview) : null;
+  const sourceUrl = linkPreview?.sourceUrl ?? linkPreview?.snapshot?.sourceUrl ?? "";
+  const title = linkPreview?.snapshot?.title ?? sourceUrl;
+  const siteName = linkPreview?.snapshot?.siteName ?? "Link preview";
+  const thumbnailUrl = linkPreview?.snapshot?.thumbnail?.signedUrl ?? null;
+  // EDIT END: inline link preview parity computations
+
   return (
     <Pressable style={styles.messageRow} onPress={onPress}>
       <View style={styles.messageBubble}>
@@ -139,6 +155,32 @@ function Message({ text, onPress }: ChatMessage & { onPress?: () => void }) {
             void Linking.openURL(url);
           }}
         />
+        {/* EDIT START: inline preview card under markdown body */}
+        {linkPreview ? (
+          <Pressable
+            key={`${id}-preview`}
+            onPress={() => {
+              if (sourceUrl) {
+                void Linking.openURL(sourceUrl);
+              }
+            }}
+            style={styles.linkPreviewCard}
+          >
+            <Text style={styles.linkPreviewSite}>{siteName}</Text>
+            <Text style={styles.linkPreviewTitle}>{title}</Text>
+            {thumbnailUrl ? (
+              <Image
+                source={{ uri: thumbnailUrl }}
+                style={styles.linkPreviewImage}
+                resizeMode="cover"
+              />
+            ) : null}
+            {embedUrl ? (
+              <Text style={styles.linkPreviewHint}>Video preview available - tap to open.</Text>
+            ) : null}
+          </Pressable>
+        ) : null}
+        {/* EDIT END: inline preview card under markdown body */}
       </View>
     </Pressable>
   );
@@ -174,7 +216,18 @@ export function CommunityScreen() {
   });
   // EDIT END: slice 2 keep hook handle for send action
   const storedMessages = useMessagesStore((state) => state.messages);
+  const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
   // EDIT END: slice 1 real message source context from production hooks
+
+  // EDIT START: derive link previews by message id for inline rendering
+  const linkPreviewsByMessageId = useMemo(() => {
+    const grouped: Record<string, MessageLinkPreview | null> = {};
+    for (const preview of Object.values(linkPreviewRecord)) {
+      grouped[preview.messageId] = preview;
+    }
+    return grouped;
+  }, [linkPreviewRecord]);
+  // EDIT END: derive link previews by message id for inline rendering
 
   // EDIT START: slice 5 derive simple reliability phase gates
   const community = useMemo(
@@ -384,6 +437,7 @@ export function CommunityScreen() {
             renderItem={({ item }) => (
               <Message
                 {...item}
+                linkPreview={linkPreviewsByMessageId[item.id] ?? null}
                 onPress={() => {
                   composerInputRef.current?.blur();
                 }}
@@ -572,6 +626,35 @@ const styles = StyleSheet.create({
     color: "#E5E7EB",
     fontSize: 14,
     lineHeight: 20,
+  },
+  linkPreviewCard: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2b3648",
+    backgroundColor: "#101722",
+    padding: 12,
+  },
+  linkPreviewSite: {
+    fontSize: 12,
+    color: "#9ba9bf",
+  },
+  linkPreviewTitle: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#e6edf7",
+  },
+  linkPreviewImage: {
+    width: "100%",
+    height: 150,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  linkPreviewHint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#3F79D8",
   },
   composer: {
     marginHorizontal: MARGIN,
