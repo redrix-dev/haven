@@ -1528,7 +1528,7 @@ export function CommunityScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: "#243350",
   },
   messageRow: {
     paddingHorizontal: 12,
@@ -1540,7 +1540,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: "#1F2937",
+    backgroundColor: "#3A4E6A",
   },
   messageMetaRow: {
     marginBottom: 6,
@@ -1617,7 +1617,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#2b3648",
-    backgroundColor: "#101722",
+    backgroundColor: "#22355D",
     padding: 12,
   },
   linkPreviewSite: {
@@ -1639,7 +1639,7 @@ const styles = StyleSheet.create({
   linkPreviewHint: {
     marginTop: 8,
     fontSize: 12,
-    color: "#3F79D8",
+    color: "#3E78D5",
   },
   attachmentUnavailableText: {
     marginTop: 8,
@@ -1674,7 +1674,7 @@ const styles = StyleSheet.create({
     marginHorizontal: MARGIN,
     marginBottom: MARGIN,
     borderRadius: 12,
-    backgroundColor: "#111827",
+    backgroundColor: "#354869",
     padding: 8,
     gap: 8,
   },
@@ -1736,7 +1736,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: INPUT_HEIGHT,
     maxHeight: 120,
-    color: "#F9FAFB",
+    color: "#1F2D42",
     paddingHorizontal: 6,
     paddingTop: 10,
     paddingBottom: 10,
@@ -1748,7 +1748,7 @@ const styles = StyleSheet.create({
   inputShell: {
     flex: 1,
     borderRadius: 10,
-    backgroundColor: "#1F2937",
+    backgroundColor: "#1F2D42",
     paddingHorizontal: 6,
   },
   sendButton: {
@@ -1787,11 +1787,12 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     zIndex: 20,
+    backgroundColor: "#1A2840",
   },
   havenNavbarShell: {
     borderBottomWidth: 1,
-    borderBottomColor: "#2b3648",
-    backgroundColor: "#101722",
+    borderBottomColor: "#2E4060",
+    backgroundColor: "#1A2840",
   },
   havenNavbarRow: {
     flexDirection: "row",
@@ -1831,8 +1832,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#2b3648",
-    backgroundColor: "#101722",
+    borderBottomColor: "#2E4060",
+    backgroundColor: "#1A2840",
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
