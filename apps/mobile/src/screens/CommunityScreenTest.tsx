@@ -139,8 +139,13 @@ function Message({
   replyTargetLabel,
   attachments,
   onPress,
+  onLongPress,
   linkPreview,
-}: ChatMessage & { onPress?: () => void; linkPreview?: MessageLinkPreview | null }) {
+}: ChatMessage & {
+  onPress?: () => void;
+  onLongPress?: () => void;
+  linkPreview?: MessageLinkPreview | null;
+}) {
   // EDIT START: inline link preview parity computations
   const embedUrl = linkPreview ? getFallbackEmbedUrl(linkPreview) : null;
   const sourceUrl = linkPreview?.sourceUrl ?? linkPreview?.snapshot?.sourceUrl ?? "";
@@ -150,7 +155,7 @@ function Message({
   // EDIT END: inline link preview parity computations
 
   return (
-    <Pressable style={styles.messageRow} onPress={onPress}>
+    <Pressable style={styles.messageRow} onPress={onPress} onLongPress={onLongPress}>
       <View style={styles.messageBubble}>
         <View style={styles.messageMetaRow}>
           <View style={styles.messageAvatarShell}>
@@ -461,6 +466,7 @@ export function CommunityScreen() {
     fileName: string;
     mimeType: string;
   } | null>(null);
+  const [, setPendingReplyToMessageId] = useState<string | null>(null);
   // EDIT END: composer media affordance pending attachment state
   // EDIT START: keep local send behavior while hydrating list from real store
   const [localMessages, setLocalMessages] = useState(INITIAL_MESSAGES);
@@ -614,6 +620,44 @@ export function CommunityScreen() {
   }, [handleAttach, isSendingMessage]);
   // EDIT END: composer media action affordance parity handlers
 
+  // EDIT START: long-press message actions parity handlers
+  const handleReplyToMessage = useCallback((messageId: string) => {
+    setPendingReplyToMessageId(messageId);
+  }, []);
+
+  const handleReportMessage = useCallback((messageId: string) => {
+    // TODO: wire backend report action in a dedicated reporting slice.
+    Alert.alert("Message reported", `Thanks. We will review message ${messageId.slice(0, 8)}.`, [
+      { text: "OK" },
+    ]);
+  }, []);
+
+  const handleLongPressMessage = useCallback(
+    (messageId: string) => {
+      if (Platform.OS !== "ios") {
+        Alert.alert("Message actions", "Choose an action for this message.", [
+          { text: "Reply", onPress: () => handleReplyToMessage(messageId) },
+          { text: "Report", onPress: () => handleReportMessage(messageId) },
+          { text: "Cancel", style: "cancel" },
+        ]);
+        return;
+      }
+      const actions = ["Reply", "Report", "Cancel"];
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: actions,
+          cancelButtonIndex: 2,
+        },
+        (index) => {
+          if (index === 0) handleReplyToMessage(messageId);
+          if (index === 1) handleReportMessage(messageId);
+        },
+      );
+    },
+    [handleReplyToMessage, handleReportMessage],
+  );
+  // EDIT END: long-press message actions parity handlers
+
   // EDIT START: slice 5 lightweight reliability wrappers
   if (phase === "loading") {
     return (
@@ -685,6 +729,9 @@ export function CommunityScreen() {
                 linkPreview={linkPreviewsByMessageId[item.id] ?? null}
                 onPress={() => {
                   composerInputRef.current?.blur();
+                }}
+                onLongPress={() => {
+                  handleLongPressMessage(item.id);
                 }}
               />
             )}
