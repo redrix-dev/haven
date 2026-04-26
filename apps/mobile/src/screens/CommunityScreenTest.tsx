@@ -10,7 +10,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   type LayoutChangeEvent,
@@ -29,7 +28,11 @@ import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import type { Channel, Message } from "@shared/lib/backend/types";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
-import { EnrichedMarkdownText } from "react-native-enriched-markdown";
+import {
+  EnrichedMarkdownText,
+  EnrichedMarkdownTextInput,
+  type EnrichedMarkdownTextInputInstance,
+} from "react-native-enriched-markdown";
 import { useSharedValue, withTiming } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { RootStackParamList } from "../navigation/types";
@@ -243,8 +246,8 @@ export function CommunityScreen() {
   );
   // EDIT END: slice 4 channel context resolution and dev-only dropdown state
 
-  const textInputRef = useRef<TextInput>(null);
-  const textRef = useRef("");
+  const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
+  const [draft, setDraft] = useState("");
   // EDIT START: slice 2 minimal send-loading state for real send pipeline
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   // EDIT END: slice 2 minimal send-loading state for real send pipeline
@@ -279,18 +282,19 @@ export function CommunityScreen() {
 
   // EDIT START: slice 2 swap local append send to real messaging send action
   const onSend = useCallback(async () => {
-    const text = textRef.current.trim();
+    const fromInput = composerInputRef.current ? await composerInputRef.current.getMarkdown() : draft;
+    const text = fromInput.trim();
     if (!text) return;
 
     try {
       setIsSendingMessage(true);
       await messaging.actions.sendMessage(text);
-      textInputRef.current?.clear();
-      textRef.current = "";
+      setDraft("");
+      composerInputRef.current?.setValue("");
     } finally {
       setIsSendingMessage(false);
     }
-  }, [messaging.actions]);
+  }, [draft, messaging.actions]);
   // EDIT END: slice 2 swap local append send to real messaging send action
 
   const onInputLayout = useCallback(
@@ -395,15 +399,27 @@ export function CommunityScreen() {
             // EDIT END: slice 3 older-message pagination using messaging state/actions
           />
           <KeyboardStickyView offset={{ opened: bottom - MARGIN }} style={styles.composer}>
-            <TextInput
-              ref={textInputRef}
-              multiline
-              nativeID="chat-input"
-              placeholder="Type a message..."
-              style={styles.input}
-              onChangeText={(text) => (textRef.current = text)}
-              onLayout={onInputLayout}
-            />
+            <View style={styles.inputShell} onLayout={onInputLayout}>
+              <EnrichedMarkdownTextInput
+                ref={composerInputRef}
+                multiline
+                editable={!isSendingMessage}
+                scrollEnabled
+                defaultValue=""
+                onChangeMarkdown={setDraft}
+                placeholder="Type a message..."
+                placeholderTextColor="#a9b8cf"
+                cursorColor="#e6edf7"
+                selectionColor="rgba(63, 121, 216, 0.4)"
+                markdownStyle={{
+                  strong: { color: "#e6edf7" },
+                  em: { color: "#e6edf7" },
+                  link: { color: "#3F79D8", underline: true },
+                  spoiler: { color: "#a9b8cf", backgroundColor: "rgba(0,0,0,0.2)" },
+                }}
+                style={styles.input}
+              />
+            </View>
             <TouchableOpacity
               onPress={() => void onSend()}
               style={[styles.sendButton, isSendingMessage && styles.sendButtonDisabled]}
@@ -564,11 +580,19 @@ const styles = StyleSheet.create({
     minHeight: INPUT_HEIGHT,
     maxHeight: 120,
     color: "#F9FAFB",
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
     paddingTop: 10,
     paddingBottom: 10,
     borderRadius: 10,
+    backgroundColor: "transparent",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  inputShell: {
+    flex: 1,
+    borderRadius: 10,
     backgroundColor: "#1F2937",
+    paddingHorizontal: 6,
   },
   sendButton: {
     height: INPUT_HEIGHT,
