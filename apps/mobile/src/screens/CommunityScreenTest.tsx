@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ActionSheetIOS,
@@ -10,6 +10,7 @@ import {
   Easing,
   FlatList,
   Image,
+  Keyboard,
   Linking,
   Modal,
   NativeScrollEvent,
@@ -514,6 +515,10 @@ export function CommunityScreen() {
     null,
   );
   const [showJumpToNewest, setShowJumpToNewest] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [composerBlockHeight, setComposerBlockHeight] = useState(0);
+  const [jumpPillMounted, setJumpPillMounted] = useState(false);
+  const [jumpPillTappable, setJumpPillTappable] = useState(true);
   const nearBottomRef = useRef(true);
   const mountedNearBottomRef = useRef(true);
   const topVisibleMessageIdRef = useRef<string | null>(null);
@@ -521,6 +526,9 @@ export function CommunityScreen() {
   const scrollIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoreAppliedChannelKeyRef = useRef<string | null>(null);
   const jumpHintPlayedRef = useRef<string | null>(null);
+  const wasJumpPillMountedRef = useRef(false);
+  const jumpExitSubRef = useRef<{ stop: () => void } | null>(null);
+  const jumpEligibilityRef = useRef(false);
   const jumpOpacity = useRef(new Animated.Value(0)).current;
   const jumpScale = useRef(new Animated.Value(1)).current;
   // EDIT END: composer media affordance pending attachment state
@@ -595,6 +603,11 @@ export function CommunityScreen() {
     () => (reportDialogMessageId ? messageById.has(reportDialogMessageId) : false),
     [messageById, reportDialogMessageId],
   );
+  const jumpUiEligible = useMemo(
+    () => showJumpToNewest && !isKeyboardOpen && !reportDialogMessageId,
+    [isKeyboardOpen, reportDialogMessageId, showJumpToNewest],
+  );
+  jumpEligibilityRef.current = jumpUiEligible;
   const textChannelId = currentRenderableChannel?.kind === "text" ? currentRenderableChannel.id : null;
   const scrollExitPeek = useMemo(() => {
     if (!communityId || !textChannelId) return null;
@@ -642,6 +655,21 @@ export function CommunityScreen() {
   useEffect(() => {
     return () => {
       if (scrollIdleTimeoutRef.current) clearTimeout(scrollIdleTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setIsKeyboardOpen(true),
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setIsKeyboardOpen(false),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
     };
   }, []);
 
@@ -773,7 +801,7 @@ export function CommunityScreen() {
   }, [jumpHintFromExit, textChannelId]);
 
   useEffect(() => {
-    if (!showJumpToNewest || !textChannelId) return;
+    if (!jumpUiEligible || !jumpPillMounted || !textChannelId) return;
     const key = `${communityId ?? "none"}:${textChannelId}`;
     if (jumpHintPlayedRef.current === key) return;
     jumpHintPlayedRef.current = key;
@@ -807,7 +835,45 @@ export function CommunityScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [communityId, jumpOpacity, jumpScale, showJumpToNewest, textChannelId]);
+  }, [communityId, jumpOpacity, jumpPillMounted, jumpScale, jumpUiEligible, textChannelId]);
+
+  useEffect(() => {
+    if (jumpUiEligible) {
+      const hadExit = jumpExitSubRef.current != null;
+      jumpExitSubRef.current?.stop();
+      jumpExitSubRef.current = null;
+      setJumpPillTappable(true);
+      if (!jumpPillMounted) {
+        setJumpPillMounted(true);
+      } else if (hadExit) {
+        setJumpFullyVisible();
+      }
+      return;
+    }
+    if (!jumpPillMounted) return;
+    setJumpPillTappable(false);
+    const sub = Animated.timing(jumpOpacity, {
+      toValue: 0,
+      duration: isKeyboardOpen ? 0 : 150,
+      useNativeDriver: true,
+    });
+    jumpExitSubRef.current = sub;
+    sub.start((result) => {
+      if (!result.finished) return;
+      if (jumpEligibilityRef.current) return;
+      setJumpPillMounted(false);
+    });
+    return () => {
+      sub.stop();
+    };
+  }, [isKeyboardOpen, jumpOpacity, jumpPillMounted, jumpUiEligible, setJumpFullyVisible]);
+
+  useLayoutEffect(() => {
+    if (jumpPillMounted && !wasJumpPillMountedRef.current) {
+      setJumpFullyVisible();
+    }
+    wasJumpPillMountedRef.current = jumpPillMounted;
+  }, [jumpPillMounted, setJumpFullyVisible]);
 
   const handleScrollMessages = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -1170,23 +1236,14 @@ export function CommunityScreen() {
             }
             // EDIT END: slice 3 older-message pagination using messaging state/actions
           />
-          <KeyboardStickyView offset={{ opened: bottom - MARGIN }} style={styles.composer}>
-            {showJumpToNewest ? (
-              <Animated.View
-                style={[
-                  styles.jumpToNewestWrapper,
-                  { opacity: jumpOpacity, transform: [{ scale: jumpScale }] },
-                ]}
-              >
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={handleJumpToNewest}
-                  style={styles.jumpToNewestButton}
-                >
-                  <Text style={styles.jumpToNewestText}>Jump to latest</Text>
-                </Pressable>
-              </Animated.View>
-            ) : null}
+          <KeyboardStickyView
+            offset={{ opened: bottom - MARGIN }}
+            style={styles.composer}
+            onLayout={(event) => {
+              const nextHeight = event.nativeEvent.layout.height;
+              if (nextHeight !== composerBlockHeight) setComposerBlockHeight(nextHeight);
+            }}
+          >
             {pendingReplyToMessageId ? (
               <View style={styles.replyBanner}>
                 <Text style={styles.replyBannerText}>
@@ -1260,6 +1317,38 @@ export function CommunityScreen() {
               </TouchableOpacity>
             </View>
           </KeyboardStickyView>
+          {jumpPillMounted ? (
+            <View
+              pointerEvents="box-none"
+              style={[
+                styles.jumpPillOverlay,
+                {
+                  bottom: (composerBlockHeight > 0 ? composerBlockHeight : 100) + MARGIN,
+                },
+              ]}
+            >
+              <Animated.View
+                style={[
+                  styles.jumpToNewestWrapper,
+                  {
+                    opacity: jumpOpacity,
+                    transform: [{ scale: jumpScale }],
+                  },
+                ]}
+                pointerEvents={jumpPillTappable ? "box-none" : "none"}
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={!jumpPillTappable}
+                  onPress={handleJumpToNewest}
+                  pointerEvents={jumpPillTappable ? "auto" : "none"}
+                  style={styles.jumpToNewestButton}
+                >
+                  <Text style={styles.jumpToNewestText}>Jump to latest</Text>
+                </Pressable>
+              </Animated.View>
+            </View>
+          ) : null}
         </View>
         {/* EDIT END: strict list viewport boundary under dev bar */}
         {/* EDIT START: slice 6 inline top chrome parity for haven + channel controls */}
@@ -1671,6 +1760,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   composer: {
+    zIndex: 10,
     marginHorizontal: MARGIN,
     marginBottom: MARGIN,
     borderRadius: 12,
@@ -2074,9 +2164,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
+  jumpPillOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 30,
+    alignItems: "center",
+  },
   jumpToNewestWrapper: {
     alignItems: "center",
-    marginBottom: 8,
   },
   jumpToNewestButton: {
     borderRadius: 999,
