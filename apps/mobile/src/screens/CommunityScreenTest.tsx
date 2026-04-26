@@ -4,6 +4,8 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  ActionSheetIOS,
+  Alert,
   FlatList,
   Image,
   Linking,
@@ -16,6 +18,7 @@ import {
   type LayoutChangeEvent,
   type ScrollViewProps,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import {
   KeyboardChatScrollView,
   KeyboardGestureArea,
@@ -62,6 +65,12 @@ const MARGIN = 8;
 const INPUT_HEIGHT = 42;
 const INITIAL_MESSAGES: ChatMessage[] = [];
 const DEV_LIST_VISUAL_TOP_BREATHING = 8;
+
+function resolveMimeType(asset: ImagePicker.ImagePickerAsset): string {
+  if (asset.mimeType) return asset.mimeType;
+  if (asset.type === "video") return "video/mp4";
+  return "image/jpeg";
+}
 
 function formatTime(timestamp: string): string {
   const value = new Date(timestamp);
@@ -376,6 +385,13 @@ export function CommunityScreen() {
   // EDIT START: slice 2 minimal send-loading state for real send pipeline
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   // EDIT END: slice 2 minimal send-loading state for real send pipeline
+  // EDIT START: composer media affordance pending attachment state
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    uri: string;
+    fileName: string;
+    mimeType: string;
+  } | null>(null);
+  // EDIT END: composer media affordance pending attachment state
   // EDIT START: keep local send behavior while hydrating list from real store
   const [localMessages, setLocalMessages] = useState(INITIAL_MESSAGES);
   const messageById = useMemo(
@@ -432,17 +448,27 @@ export function CommunityScreen() {
   const onSend = useCallback(async () => {
     const fromInput = composerInputRef.current ? await composerInputRef.current.getMarkdown() : draft;
     const text = fromInput.trim();
-    if (!text) return;
+    if (!text && !pendingAttachment) return;
 
     try {
       setIsSendingMessage(true);
-      await messaging.actions.sendMessage(text);
+      if (!pendingAttachment) {
+        await messaging.actions.sendMessage(text);
+      } else {
+        const response = await fetch(pendingAttachment.uri);
+        const blob = await response.blob();
+        const file = new File([blob], pendingAttachment.fileName, {
+          type: pendingAttachment.mimeType,
+        });
+        await messaging.actions.sendMessage(text, { mediaFile: file });
+      }
       setDraft("");
       composerInputRef.current?.setValue("");
+      setPendingAttachment(null);
     } finally {
       setIsSendingMessage(false);
     }
-  }, [draft, messaging.actions]);
+  }, [draft, messaging.actions, pendingAttachment]);
   // EDIT END: slice 2 swap local append send to real messaging send action
 
   const onInputLayout = useCallback(
@@ -464,6 +490,42 @@ export function CommunityScreen() {
     return;
   }, []);
   // EDIT END: slice 6 inline parity top chrome action handlers
+
+  // EDIT START: composer media action affordance parity handlers
+  const handleAttach = useCallback(async () => {
+    if (isSendingMessage) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: false,
+      quality: 0.9,
+    });
+    if (result.canceled) return;
+    const first = result.assets[0];
+    if (!first?.uri) return;
+    setPendingAttachment({
+      uri: first.uri,
+      fileName: first.fileName ?? `upload-${Date.now()}`,
+      mimeType: resolveMimeType(first),
+    });
+  }, [isSendingMessage]);
+
+  const showComposerActionSheet = useCallback(() => {
+    if (isSendingMessage) return;
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ["Cancel", "Add media"], cancelButtonIndex: 0 },
+        (buttonIndex) => {
+          if (buttonIndex === 1) void handleAttach();
+        },
+      );
+      return;
+    }
+    Alert.alert("", undefined, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Add media", onPress: () => void handleAttach() },
+    ]);
+  }, [handleAttach, isSendingMessage]);
+  // EDIT END: composer media action affordance parity handlers
 
   // EDIT START: slice 5 lightweight reliability wrappers
   if (phase === "loading") {
@@ -556,6 +618,16 @@ export function CommunityScreen() {
             // EDIT END: slice 3 older-message pagination using messaging state/actions
           />
           <KeyboardStickyView offset={{ opened: bottom - MARGIN }} style={styles.composer}>
+            <Pressable
+              accessibilityLabel="Message options"
+              accessibilityRole="button"
+              hitSlop={8}
+              disabled={isSendingMessage}
+              onPress={showComposerActionSheet}
+              style={styles.composerOptionsButton}
+            >
+              <Ionicons name="ellipsis-horizontal" size={22} color="#a9b8cf" />
+            </Pressable>
             <View style={styles.inputShell} onLayout={onInputLayout}>
               <EnrichedMarkdownTextInput
                 ref={composerInputRef}
@@ -825,6 +897,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
+  },
+  composerOptionsButton: {
+    alignSelf: "center",
   },
   input: {
     flex: 1,
