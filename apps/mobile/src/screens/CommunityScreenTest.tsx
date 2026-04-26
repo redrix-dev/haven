@@ -257,6 +257,24 @@ export function CommunityScreen() {
             }
             // EDIT END: slice 3 older-message pagination using messaging state/actions
           />
+          <KeyboardStickyView offset={{ opened: bottom - MARGIN }} style={styles.composer}>
+            <TextInput
+              ref={textInputRef}
+              multiline
+              nativeID="chat-input"
+              placeholder="Type a message..."
+              style={styles.input}
+              onChangeText={(text) => (textRef.current = text)}
+              onLayout={onInputLayout}
+            />
+            <TouchableOpacity
+              onPress={() => void onSend()}
+              style={[styles.sendButton, isSendingMessage && styles.sendButtonDisabled]}
+              disabled={isSendingMessage}
+            >
+              <Text style={styles.sendButtonText}>{isSendingMessage ? "..." : "Send"}</Text>
+            </TouchableOpacity>
+          </KeyboardStickyView>
         </View>
         {/* EDIT END: strict list viewport boundary under dev bar */}
         {/* EDIT START: slice 4 minimal dev-only channel dropdown */}
@@ -295,24 +313,6 @@ export function CommunityScreen() {
           </View>
         ) : null}
         {/* EDIT END: slice 4 minimal dev-only channel dropdown */}
-        <KeyboardStickyView offset={{ opened: bottom - MARGIN }} style={styles.composer}>
-          <TextInput
-            ref={textInputRef}
-            multiline
-            nativeID="chat-input"
-            placeholder="Type a message..."
-            style={styles.input}
-            onChangeText={(text) => (textRef.current = text)}
-            onLayout={onInputLayout}
-          />
-          <TouchableOpacity
-            onPress={() => void onSend()}
-            style={[styles.sendButton, isSendingMessage && styles.sendButtonDisabled]}
-            disabled={isSendingMessage}
-          >
-            <Text style={styles.sendButtonText}>{isSendingMessage ? "..." : "Send"}</Text>
-          </TouchableOpacity>
-        </KeyboardStickyView>
       </KeyboardGestureArea>
     </SafeAreaView>
   );
