@@ -13,6 +13,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   type LayoutChangeEvent,
@@ -36,6 +37,8 @@ import type {
   Channel,
   Message,
   MessageAttachment,
+  MessageReportKind,
+  MessageReportTarget,
 } from "@shared/lib/backend/types";
 import type { MessageLinkPreview } from "@shared/lib/backend/types";
 import { getFallbackEmbedUrl } from "@shared/features/messaging/components/message-list/messageListContentUtils";
@@ -466,6 +469,14 @@ export function CommunityScreen() {
     fileName: string;
     mimeType: string;
   } | null>(null);
+  const [reportDialogMessageId, setReportDialogMessageId] = useState<string | null>(
+    null,
+  );
+  const [reportTarget, setReportTarget] = useState<MessageReportTarget>("haven_staff");
+  const [reportKind, setReportKind] = useState<MessageReportKind>("content_abuse");
+  const [reportComment, setReportComment] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [pendingReplyToMessageId, setPendingReplyToMessageId] = useState<string | null>(
     null,
   );
@@ -493,7 +504,13 @@ export function CommunityScreen() {
               )
             : (cachedProfile?.avatarUrl ?? null);
         const authorName =
-          cachedProfile?.username ?? message.author_user_id?.slice(0, 12) ?? "Unknown User";
+          message.author_type === "haven_dev"
+            ? "Haven Moderation Team"
+            : message.author_type === "system"
+              ? "System"
+              : (cachedProfile?.username ??
+                message.author_user_id?.slice(0, 12) ??
+                "Unknown User");
 
         return {
           id: message.id,
@@ -651,10 +668,11 @@ export function CommunityScreen() {
   }, []);
 
   const handleReportMessage = useCallback((messageId: string) => {
-    // TODO: wire backend report action in a dedicated reporting slice.
-    Alert.alert("Message reported", `Thanks. We will review message ${messageId.slice(0, 8)}.`, [
-      { text: "OK" },
-    ]);
+    setReportDialogMessageId(messageId);
+    setReportTarget("haven_staff");
+    setReportKind("content_abuse");
+    setReportComment("");
+    setReportError(null);
   }, []);
 
   const handleLongPressMessage = useCallback(
@@ -683,11 +701,54 @@ export function CommunityScreen() {
   );
   // EDIT END: long-press message actions parity handlers
 
+  const handleSubmitMessageReport = useCallback(async () => {
+    if (!reportDialogMessageId || reportSubmitting) return;
+    try {
+      setReportSubmitting(true);
+      setReportError(null);
+      await messaging.actions.reportMessage({
+        messageId: reportDialogMessageId,
+        target: reportTarget,
+        kind: reportKind,
+        comment: reportComment.trim(),
+      });
+      setReportDialogMessageId(null);
+      setReportComment("");
+    } catch (error) {
+      const fallback = "Failed to submit message report.";
+      setReportError(error instanceof Error ? error.message : fallback);
+    } finally {
+      setReportSubmitting(false);
+    }
+  }, [
+    messaging.actions,
+    reportComment,
+    reportDialogMessageId,
+    reportKind,
+    reportSubmitting,
+    reportTarget,
+  ]);
+
+  const handleCloseMessageReport = useCallback(() => {
+    setReportDialogMessageId(null);
+    setReportTarget("haven_staff");
+    setReportKind("content_abuse");
+    setReportComment("");
+    setReportSubmitting(false);
+    setReportError(null);
+  }, []);
+
   useEffect(() => {
     if (!pendingReplyToMessageId) return;
     if (messageById.has(pendingReplyToMessageId)) return;
     setPendingReplyToMessageId(null);
   }, [messageById, pendingReplyToMessageId]);
+
+  useEffect(() => {
+    if (!reportDialogMessageId) return;
+    if (messageById.has(reportDialogMessageId)) return;
+    handleCloseMessageReport();
+  }, [handleCloseMessageReport, messageById, reportDialogMessageId]);
 
   // EDIT START: slice 5 lightweight reliability wrappers
   if (phase === "loading") {
@@ -947,6 +1008,115 @@ export function CommunityScreen() {
           ) : null}
         </View>
         {/* EDIT END: slice 6 inline top chrome parity for haven + channel controls */}
+        {reportDialogMessageId ? (
+          <View style={styles.reportOverlay}>
+            <Pressable
+              style={styles.reportOverlayBackdrop}
+              onPress={handleCloseMessageReport}
+            />
+            <KeyboardStickyView offset={{ opened: bottom + 8, closed: 0 }}>
+              <View style={styles.reportCard}>
+            <Text style={styles.reportTitle}>Report Message</Text>
+            <Text style={styles.reportSubtitle}>
+              Route this report to moderators with the same metadata used on desktop.
+            </Text>
+
+            <Text style={styles.reportFieldLabel}>Who should the report go to?</Text>
+            <View style={styles.reportChoiceGroup}>
+              <Pressable
+                onPress={() => setReportTarget("haven_staff")}
+                style={[
+                  styles.reportChoice,
+                  reportTarget === "haven_staff" && styles.reportChoiceActive,
+                ]}
+              >
+                <Text style={styles.reportChoiceText}>Haven Moderation</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setReportTarget("server_admins")}
+                style={[
+                  styles.reportChoice,
+                  reportTarget === "server_admins" && styles.reportChoiceActive,
+                ]}
+              >
+                <Text style={styles.reportChoiceText}>
+                  Report to {community?.name ?? "Community"}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setReportTarget("both")}
+                style={[
+                  styles.reportChoice,
+                  reportTarget === "both" && styles.reportChoiceActive,
+                ]}
+              >
+                <Text style={styles.reportChoiceText}>Both</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.reportFieldLabel}>Type</Text>
+            <View style={styles.reportChoiceGroup}>
+              <Pressable
+                onPress={() => setReportKind("content_abuse")}
+                style={[
+                  styles.reportChoice,
+                  reportKind === "content_abuse" && styles.reportChoiceActive,
+                ]}
+              >
+                <Text style={styles.reportChoiceText}>Report Content Abuse</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setReportKind("bug")}
+                style={[
+                  styles.reportChoice,
+                  reportKind === "bug" && styles.reportChoiceActive,
+                ]}
+              >
+                <Text style={styles.reportChoiceText}>Report Bug</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.reportFieldLabel}>Comment</Text>
+            <TextInput
+              value={reportComment}
+              onChangeText={setReportComment}
+              maxLength={1000}
+              multiline
+              placeholder="Add context for moderators (optional)."
+              placeholderTextColor="#9ba9bf"
+              style={styles.reportCommentInput}
+              editable={!reportSubmitting}
+            />
+
+            {reportError ? <Text style={styles.reportErrorText}>{reportError}</Text> : null}
+
+            <View style={styles.reportActionsRow}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={handleCloseMessageReport}
+                disabled={reportSubmitting}
+                style={styles.reportCancelButton}
+              >
+                <Text style={styles.reportCancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void handleSubmitMessageReport()}
+                disabled={reportSubmitting}
+                style={[
+                  styles.reportSubmitButton,
+                  reportSubmitting && styles.reportSubmitButtonDisabled,
+                ]}
+              >
+                <Text style={styles.reportSubmitButtonText}>
+                  {reportSubmitting ? "Submitting..." : "Submit report"}
+                </Text>
+              </Pressable>
+            </View>
+              </View>
+            </KeyboardStickyView>
+          </View>
+        ) : null}
       </KeyboardGestureArea>
     </SafeAreaView>
   );
@@ -1319,6 +1489,110 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: "#F9FAFB",
+    fontWeight: "600",
+  },
+  reportOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  reportOverlayBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(2, 6, 23, 0.7)",
+  },
+  reportCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2b3648",
+    backgroundColor: "#101722",
+    padding: 14,
+    gap: 8,
+  },
+  reportTitle: {
+    color: "#e6edf7",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  reportSubtitle: {
+    color: "#9ba9bf",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  reportFieldLabel: {
+    marginTop: 4,
+    color: "#9ba9bf",
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "uppercase",
+  },
+  reportChoiceGroup: {
+    gap: 6,
+  },
+  reportChoice: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2b3648",
+    backgroundColor: "#111827",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  reportChoiceActive: {
+    borderColor: "#3F79D8",
+    backgroundColor: "#1a2235",
+  },
+  reportChoiceText: {
+    color: "#e6edf7",
+    fontSize: 14,
+  },
+  reportCommentInput: {
+    minHeight: 86,
+    maxHeight: 170,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2b3648",
+    backgroundColor: "#111827",
+    color: "#e6edf7",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    textAlignVertical: "top",
+    fontSize: 14,
+  },
+  reportErrorText: {
+    color: "#fca5a5",
+    fontSize: 12,
+  },
+  reportActionsRow: {
+    marginTop: 4,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  reportCancelButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2b3648",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  reportCancelButtonText: {
+    color: "#d1d5db",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  reportSubmitButton: {
+    borderRadius: 8,
+    backgroundColor: "#2563EB",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  reportSubmitButtonDisabled: {
+    opacity: 0.55,
+  },
+  reportSubmitButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "600",
   },
   // EDIT END: slice 5 reliability state styles
