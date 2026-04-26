@@ -79,7 +79,8 @@ export function CommunityScreen() {
     servers,
     currentUserId,
   });
-  useMessages({
+  // EDIT START: slice 2 keep hook handle for send action
+  const messaging = useMessages({
     currentServerId: communityId,
     currentChannelId: currentRenderableChannel?.id ?? null,
     currentUserId,
@@ -87,11 +88,15 @@ export function CommunityScreen() {
     debugChannelReloads: false,
     channels,
   });
+  // EDIT END: slice 2 keep hook handle for send action
   const storedMessages = useMessagesStore((state) => state.messages);
   // EDIT END: slice 1 real message source context from production hooks
 
   const textInputRef = useRef<TextInput>(null);
   const textRef = useRef("");
+  // EDIT START: slice 2 minimal send-loading state for real send pipeline
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  // EDIT END: slice 2 minimal send-loading state for real send pipeline
   // EDIT START: keep local send behavior while hydrating list from real store
   const [localMessages, setLocalMessages] = useState(INITIAL_MESSAGES);
   const messages = useMemo<ChatMessage[]>(() => {
@@ -116,14 +121,21 @@ export function CommunityScreen() {
     [extraContentPadding],
   );
 
-  const onSend = useCallback(() => {
+  // EDIT START: slice 2 swap local append send to real messaging send action
+  const onSend = useCallback(async () => {
     const text = textRef.current.trim();
     if (!text) return;
 
-    setLocalMessages((prev) => [{ id: String(Date.now()), text }, ...prev]);
-    textInputRef.current?.clear();
-    textRef.current = "";
-  }, []);
+    try {
+      setIsSendingMessage(true);
+      await messaging.actions.sendMessage(text);
+      textInputRef.current?.clear();
+      textRef.current = "";
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }, [messaging.actions]);
+  // EDIT END: slice 2 swap local append send to real messaging send action
 
   const onInputLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -161,8 +173,12 @@ export function CommunityScreen() {
             onChangeText={(text) => (textRef.current = text)}
             onLayout={onInputLayout}
           />
-          <TouchableOpacity onPress={onSend} style={styles.sendButton}>
-            <Text style={styles.sendButtonText}>Send</Text>
+          <TouchableOpacity
+            onPress={() => void onSend()}
+            style={[styles.sendButton, isSendingMessage && styles.sendButtonDisabled]}
+            disabled={isSendingMessage}
+          >
+            <Text style={styles.sendButtonText}>{isSendingMessage ? "..." : "Send"}</Text>
           </TouchableOpacity>
         </KeyboardStickyView>
       </KeyboardGestureArea>
@@ -227,5 +243,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "600",
   },
+  // EDIT START: slice 2 disabled send button style while sending
+  sendButtonDisabled: {
+    opacity: 0.55,
+  },
+  // EDIT END: slice 2 disabled send button style while sending
 });
 // EDIT END: local styles for fully in-line chat screen
