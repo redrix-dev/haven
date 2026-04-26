@@ -175,8 +175,8 @@ export function CommunityScreen() {
   // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom, top } = useSafeAreaInsets();
   // EDIT START: align dev top bar + list padding with safe-area notch
+  const devBarTopInset = top + DEV_CHANNEL_BAR_MARGIN;
   const devBarOccupiedHeight = top + DEV_CHANNEL_BAR_MARGIN + DEV_CHANNEL_BAR_HEIGHT;
-  const devTopSpacerHeight = __DEV__ ? devBarOccupiedHeight : 0;
   const devVisualTopPaddingBottom = __DEV__ ? DEV_LIST_VISUAL_TOP_BREATHING : 0;
   // EDIT END: align dev top bar + list padding with safe-area notch
   const extraContentPadding = useSharedValue(0);
@@ -222,42 +222,46 @@ export function CommunityScreen() {
         style={styles.container}
         textInputNativeID="chat-input"
       >
-        <FlatList
-          data={messages}
-          inverted
-          // EDIT START: add bottom spacing so top dev bar doesn't clip oldest message access
-          contentContainerStyle={{
-            paddingTop: 10,
-            paddingBottom: devVisualTopPaddingBottom,
-          }}
-          // EDIT END: add bottom spacing so top dev bar doesn't clip oldest message access
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <Message {...item} />}
-          renderScrollComponent={renderScrollComponent}
-          // EDIT START: slice 3 older-message pagination using messaging state/actions
-          onEndReachedThreshold={0.3}
-          onEndReached={() => {
-            if (messaging.state.hasOlderMessages && !messaging.state.isLoadingOlderMessages) {
-              void messaging.actions.requestOlderMessages();
-            }
-          }}
-          ListFooterComponent={
-            // EDIT START: use explicit inverted-flow spacer for notch/dev bar clearance
-            <View>
-              <View style={{ height: devTopSpacerHeight }} />
-              {messaging.state.isLoadingOlderMessages ? (
+        {/* EDIT START: strict list viewport boundary under dev bar */}
+        <View
+          style={[
+            styles.listViewport,
+            { top: __DEV__ ? devBarOccupiedHeight : 0 },
+          ]}
+        >
+          <FlatList
+            data={messages}
+            inverted
+            // EDIT START: add bottom spacing so top dev bar doesn't clip oldest message access
+            contentContainerStyle={{
+              paddingTop: 10,
+              paddingBottom: devVisualTopPaddingBottom,
+            }}
+            // EDIT END: add bottom spacing so top dev bar doesn't clip oldest message access
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => <Message {...item} />}
+            renderScrollComponent={renderScrollComponent}
+            // EDIT START: slice 3 older-message pagination using messaging state/actions
+            onEndReachedThreshold={0.3}
+            onEndReached={() => {
+              if (messaging.state.hasOlderMessages && !messaging.state.isLoadingOlderMessages) {
+                void messaging.actions.requestOlderMessages();
+              }
+            }}
+            ListFooterComponent={
+              messaging.state.isLoadingOlderMessages ? (
                 <View style={styles.paginationFooter}>
                   <ActivityIndicator color="#e6edf7" />
                 </View>
-              ) : null}
-            </View>
-            // EDIT END: use explicit inverted-flow spacer for notch/dev bar clearance
-          }
-          // EDIT END: slice 3 older-message pagination using messaging state/actions
-        />
+              ) : null
+            }
+            // EDIT END: slice 3 older-message pagination using messaging state/actions
+          />
+        </View>
+        {/* EDIT END: strict list viewport boundary under dev bar */}
         {/* EDIT START: slice 4 minimal dev-only channel dropdown */}
         {__DEV__ ? (
-          <View style={[styles.devChannelBarContainer, { top: top + DEV_CHANNEL_BAR_MARGIN }]}>
+          <View style={[styles.devChannelBarContainer, { top: devBarTopInset }]}>
             <Pressable
               onPress={() => setIsChannelDropdownOpen((prev) => !prev)}
               style={styles.devChannelTrigger}
@@ -382,6 +386,13 @@ const styles = StyleSheet.create({
   },
   // EDIT END: slice 3 pagination loading indicator spacing
   // EDIT START: slice 4 dev-only top dropdown styles
+  listViewport: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: "hidden",
+  },
   devChannelBarContainer: {
     position: "absolute",
     left: DEV_CHANNEL_BAR_MARGIN,
