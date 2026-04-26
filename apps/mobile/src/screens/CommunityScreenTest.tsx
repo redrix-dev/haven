@@ -1,3 +1,6 @@
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -26,6 +29,7 @@ import type { Channel, Message } from "@shared/lib/backend/types";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import { useSharedValue, withTiming } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import type { RootStackParamList } from "../navigation/types";
 import {
   getLastTextChannelIdForCommunity,
   setLastTextChannelIdForCommunity,
@@ -38,8 +42,6 @@ type Ref = React.ElementRef<typeof KeyboardChatScrollView>;
 const MARGIN = 8;
 const INPUT_HEIGHT = 42;
 const INITIAL_MESSAGES: ChatMessage[] = [];
-const TOP_CHROME_ROW_HEIGHT = 44;
-const TOP_CHROME_MARGIN = 8;
 const DEV_LIST_VISUAL_TOP_BREATHING = 8;
 // EDIT END: local message model/constants for standalone in-line screen
 
@@ -77,6 +79,7 @@ function Message({ text }: ChatMessage) {
 // EDIT START: export as CommunityScreen to wire directly in navigation
 export function CommunityScreen() {
   // EDIT START: slice 1 real message source context from production hooks
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, "Home">>();
   const communityId = useNavigationStore((state) => state.currentServerId) ?? null;
   const setCurrentChannelId = useNavigationStore((state) => state.setCurrentChannelId);
   const user = useAuthStore((state) => state.user);
@@ -195,8 +198,8 @@ export function CommunityScreen() {
   // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom, top } = useSafeAreaInsets();
   // EDIT START: align top chrome + list padding with safe-area notch
-  const topChromeTopInset = top;
-  const topChromeOccupiedHeight = topChromeHeight > 0 ? topChromeHeight : top + TOP_CHROME_ROW_HEIGHT;
+  const topChromeTopInset = top + 8;
+  const topChromeOccupiedHeight = topChromeHeight > 0 ? topChromeHeight : top + 108;
   const devVisualTopPaddingBottom = __DEV__ ? DEV_LIST_VISUAL_TOP_BREATHING : 0;
   // EDIT END: align top chrome + list padding with safe-area notch
   const extraContentPadding = useSharedValue(0);
@@ -233,6 +236,16 @@ export function CommunityScreen() {
     },
     [extraContentPadding],
   );
+
+  // EDIT START: slice 6 inline parity top chrome action handlers
+  const handleOpenCommunitySettings = useCallback(() => {
+    navigation.navigate("SettingsPlaceholder");
+  }, [navigation]);
+
+  const handleOpenCreateChannel = useCallback(() => {
+    return;
+  }, []);
+  // EDIT END: slice 6 inline parity top chrome action handlers
 
   // EDIT START: slice 5 lightweight reliability wrappers
   if (phase === "loading") {
@@ -345,20 +358,77 @@ export function CommunityScreen() {
             }
           }}
         >
-          <View style={styles.topChromePrimaryRow}>
-            <Text style={styles.topChromeCommunityTitle}>{community?.name ?? "Community"}</Text>
-            <Pressable style={styles.topChromePrimaryAction}>
-              <Text style={styles.topChromePrimaryActionText}>Settings</Text>
+          <View style={styles.havenNavbarShell}>
+            <View style={styles.havenNavbarRow}>
+              <View style={styles.havenNavbarActionsLeft}>
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.havenIconButton}
+                  onPress={() => {
+                    if (navigation.canGoBack()) navigation.goBack();
+                  }}
+                >
+                  <Ionicons name="chevron-back" size={22} color="#e6edf7" />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.havenIconButton}
+                  onPress={() => navigation.navigate("Home")}
+                >
+                  <Ionicons name="home" size={22} color="#e6edf7" />
+                </Pressable>
+                <Pressable accessibilityRole="button" style={styles.havenIconButton} onPress={() => undefined}>
+                  <Ionicons name="people" size={22} color="#e6edf7" />
+                </Pressable>
+              </View>
+              <Text style={styles.havenNavbarTitle}>Haven</Text>
+              <View style={styles.havenNavbarActionsRight}>
+                <Pressable accessibilityRole="button" style={styles.havenIconButton} onPress={() => undefined}>
+                  <Ionicons name="notifications-outline" size={22} color="#e6edf7" />
+                </Pressable>
+                <Pressable accessibilityRole="button" style={styles.havenIconButton} onPress={() => undefined}>
+                  <Ionicons name="chatbubble-outline" size={22} color="#e6edf7" />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.havenIconButton}
+                  onPress={handleOpenCommunitySettings}
+                >
+                  <Ionicons name="cog-outline" size={22} color="#e6edf7" />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.channelBarShell}>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.channelBarCommunityPressable}
+              onPress={handleOpenCommunitySettings}
+            >
+              <Text style={styles.channelBarCommunityText} numberOfLines={1}>
+                {community?.name ?? "Community"}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.channelBarSelectedChannelPressable}
+              onPress={() => setIsChannelDropdownOpen((prev) => !prev)}
+            >
+              <Text style={styles.channelBarHash}>#</Text>
+              <Text style={styles.channelBarSelectedChannelText} numberOfLines={1}>
+                {currentRenderableChannel?.name ?? "Select channel"}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#a9b8cf" />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.channelBarCreateButton}
+              onPress={handleOpenCreateChannel}
+            >
+              <Ionicons name="add" size={18} color="#e6edf7" />
             </Pressable>
           </View>
-          <Pressable
-            onPress={() => setIsChannelDropdownOpen((prev) => !prev)}
-            style={styles.topChromeChannelTrigger}
-          >
-            <Text style={styles.topChromeChannelTriggerText}>
-              {currentRenderableChannel?.name ?? "Select channel"} v
-            </Text>
-          </Pressable>
           {isChannelDropdownOpen ? (
             <View style={styles.topChromeChannelDropdown}>
               {textChannels.map((channel) => (
@@ -466,51 +536,100 @@ const styles = StyleSheet.create({
   },
   topChromeContainer: {
     position: "absolute",
-    left: TOP_CHROME_MARGIN,
-    right: TOP_CHROME_MARGIN,
+    left: 0,
+    right: 0,
     top: 0,
     zIndex: 20,
   },
-  topChromePrimaryRow: {
-    height: TOP_CHROME_ROW_HEIGHT,
-    borderRadius: 10,
-    backgroundColor: "#111827",
-    borderWidth: 1,
-    borderColor: "#374151",
-    paddingHorizontal: 12,
+  havenNavbarShell: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#2b3648",
+    backgroundColor: "#101722",
+  },
+  havenNavbarRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  topChromeCommunityTitle: {
-    color: "#E5E7EB",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  topChromePrimaryAction: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  topChromePrimaryActionText: {
-    color: "#D1D5DB",
-    fontWeight: "600",
-    fontSize: 12,
-  },
-  topChromeChannelTrigger: {
-    marginTop: 6,
-    height: TOP_CHROME_ROW_HEIGHT,
-    borderRadius: 10,
-    backgroundColor: "#111827",
-    borderWidth: 1,
-    borderColor: "#374151",
-    justifyContent: "center",
     paddingHorizontal: 12,
+    paddingBottom: 12,
   },
-  topChromeChannelTriggerText: {
-    color: "#E5E7EB",
+  havenNavbarActionsLeft: {
+    zIndex: 10,
+    flexDirection: "row",
+    gap: 8,
+  },
+  havenNavbarActionsRight: {
+    zIndex: 10,
+    flexDirection: "row",
+    gap: 8,
+  },
+  havenIconButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#182334",
+  },
+  havenNavbarTitle: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    fontSize: 18,
     fontWeight: "600",
+    color: "#e6edf7",
+  },
+  channelBarShell: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#2b3648",
+    backgroundColor: "#101722",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  channelBarCommunityPressable: {
+    maxWidth: "38%",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  channelBarCommunityText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#e6edf7",
+  },
+  channelBarSelectedChannelPressable: {
+    marginHorizontal: 8,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  channelBarHash: {
+    marginRight: 4,
+    fontSize: 14,
+    color: "#a9b8cf",
+  },
+  channelBarSelectedChannelText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#e6edf7",
+  },
+  channelBarCreateButton: {
+    height: 36,
+    width: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    backgroundColor: "#182334",
   },
   topChromeChannelDropdown: {
+    marginHorizontal: 12,
     marginTop: 6,
     borderRadius: 10,
     backgroundColor: "#111827",
