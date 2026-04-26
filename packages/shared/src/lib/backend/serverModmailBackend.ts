@@ -12,7 +12,7 @@ import type {
   SupportReportSnapshot,
   SupportReportStatus,
 } from './types';
-import { createPortableUuid } from './runtime/uuid';
+import { createPortableUuid } from '../runtime/uuid';
 
 type SupportReportRow = Pick<
   Database['public']['Tables']['support_reports']['Row'],

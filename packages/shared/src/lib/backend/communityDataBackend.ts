@@ -4,7 +4,7 @@ import type { Database } from '@shared/types/database';
 import type { MessageObjectStore } from "./messageObjectStore";
 import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
 import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from "./mediaAttachmentUtils";
-import { createPortableUuid } from "./runtime/uuid";
+import { createPortableUuid } from "../runtime/uuid";
 import type {
   AuthorProfile,
   BanCommunityMemberResult,
