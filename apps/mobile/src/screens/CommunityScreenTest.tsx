@@ -31,12 +31,18 @@ import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
-import type { AuthorProfile, Channel, Message } from "@shared/lib/backend/types";
+import type {
+  AuthorProfile,
+  Channel,
+  Message,
+  MessageAttachment,
+} from "@shared/lib/backend/types";
 import type { MessageLinkPreview } from "@shared/lib/backend/types";
 import { getFallbackEmbedUrl } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import { getReplyToMessageId } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import { isAuthorProfileTombstone } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import { resolveLiveAvatarUrl } from "@shared/lib/liveProfiles";
+import { CommunityAttachmentVideo } from "../components/community/CommunityAttachmentVideo";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import {
   EnrichedMarkdownText,
@@ -61,6 +67,7 @@ type ChatMessage = {
   isAuthorStaff?: boolean;
   timestampLabel?: string;
   replyTargetLabel?: string | null;
+  attachments?: MessageAttachment[];
 };
 type Ref = React.ElementRef<typeof KeyboardChatScrollView>;
 
@@ -130,6 +137,7 @@ function Message({
   isAuthorStaff,
   timestampLabel,
   replyTargetLabel,
+  attachments,
   onPress,
   linkPreview,
 }: ChatMessage & { onPress?: () => void; linkPreview?: MessageLinkPreview | null }) {
@@ -238,6 +246,51 @@ function Message({
             void Linking.openURL(url);
           }}
         />
+        {/* EDIT START: inline attachment rendering parity after markdown body */}
+        {attachments?.map((attachment) => {
+          if (!attachment.signedUrl) {
+            return (
+              <Text key={attachment.id} style={styles.attachmentUnavailableText}>
+                Attachment unavailable.
+              </Text>
+            );
+          }
+          if (attachment.mediaKind === "image") {
+            return (
+              <Image
+                key={attachment.id}
+                source={{ uri: attachment.signedUrl }}
+                style={styles.attachmentImage}
+                resizeMode="cover"
+              />
+            );
+          }
+          if (attachment.mediaKind === "video") {
+            return (
+              <CommunityAttachmentVideo
+                key={attachment.id}
+                uri={attachment.signedUrl}
+                style={styles.attachmentVideo}
+              />
+            );
+          }
+          return (
+            <Pressable
+              key={attachment.id}
+              onPress={() => {
+                if (attachment.signedUrl) {
+                  void Linking.openURL(attachment.signedUrl);
+                }
+              }}
+              style={styles.attachmentFileRow}
+            >
+              <Text style={styles.attachmentFileLabel}>
+                {attachment.originalFilename ?? "Open attachment"}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {/* EDIT END: inline attachment rendering parity after markdown body */}
         {/* EDIT START: inline preview card under markdown body */}
         {linkPreview ? (
           <Pressable
@@ -301,8 +354,21 @@ export function CommunityScreen() {
   const storedMessages = useMessagesStore((state) => state.messages);
   const profiles = useMessagesStore((state) => state.profiles);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const attachmentRecord = useMessagesStore((state) => state.attachments);
   const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
   // EDIT END: slice 1 real message source context from production hooks
+
+  // EDIT START: derive attachments by message id for inline rendering
+  const attachmentsByMessageId = useMemo(() => {
+    const grouped: Record<string, MessageAttachment[]> = {};
+    for (const attachment of Object.values(attachmentRecord)) {
+      const list = grouped[attachment.messageId] ?? [];
+      list.push(attachment);
+      grouped[attachment.messageId] = list;
+    }
+    return grouped;
+  }, [attachmentRecord]);
+  // EDIT END: derive attachments by message id for inline rendering
 
   // EDIT START: derive link previews by message id for inline rendering
   const linkPreviewsByMessageId = useMemo(() => {
@@ -436,11 +502,19 @@ export function CommunityScreen() {
             messageById,
             profiles,
           ),
+          attachments: attachmentsByMessageId[message.id] ?? [],
         };
       })
       .filter((message) => !localIds.has(message.id));
     return [...localMessages, ...hydratedMessagesNewestFirst];
-  }, [liveProfiles, localMessages, messageById, profiles, storedMessages]);
+  }, [
+    attachmentsByMessageId,
+    liveProfiles,
+    localMessages,
+    messageById,
+    profiles,
+    storedMessages,
+  ]);
   // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom, top } = useSafeAreaInsets();
   // EDIT START: align top chrome + list padding with safe-area notch
@@ -607,6 +681,7 @@ export function CommunityScreen() {
             renderItem={({ item }) => (
               <Message
                 {...item}
+                attachments={item.attachments ?? []}
                 linkPreview={linkPreviewsByMessageId[item.id] ?? null}
                 onPress={() => {
                   composerInputRef.current?.blur();
@@ -900,6 +975,35 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 12,
     color: "#3F79D8",
+  },
+  attachmentUnavailableText: {
+    marginTop: 8,
+    color: "#9ba9bf",
+    fontSize: 12,
+  },
+  attachmentImage: {
+    width: "100%",
+    height: 220,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  attachmentVideo: {
+    width: "100%",
+    height: 220,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  attachmentFileRow: {
+    marginTop: 8,
+    borderRadius: 10,
+    backgroundColor: "#1a2235",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  attachmentFileLabel: {
+    color: "#3F79D8",
+    fontSize: 14,
+    fontWeight: "500",
   },
   composer: {
     marginHorizontal: MARGIN,
