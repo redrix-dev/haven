@@ -10,6 +10,7 @@ import { isEditableKeyboardTarget } from "@shared/app/utils";
 import { playVoicePresenceSound } from "@shared/lib/notifications/sound";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useVoiceStore } from "@shared/stores/voiceStore";
+import { createPortableUuid } from "@shared/lib/runtime/uuid";
 import { useSocialStore } from "@shared/stores/socialStore";
 import { getAppHost } from "@shared/platform/appHost";
 import type {
@@ -1168,7 +1169,7 @@ export function useVoiceSessionController({
       setNotice(null);
       setStoredIsMuted(false);
       setStoredIsDeafened(false);
-      signalingSessionIdRef.current = crypto.randomUUID();
+      signalingSessionIdRef.current = createPortableUuid();
 
       const iceConfig = await fetchIceConfig({
         communityId: targetChannel.communityId,

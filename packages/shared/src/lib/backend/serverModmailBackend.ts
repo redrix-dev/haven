@@ -12,6 +12,7 @@ import type {
   SupportReportSnapshot,
   SupportReportStatus,
 } from './types';
+import { createPortableUuid } from './runtime/uuid';
 
 type SupportReportRow = Pick<
   Database['public']['Tables']['support_reports']['Row'],
@@ -434,7 +435,7 @@ export function createServerModmailBackend(
     const nextInternalNotes = [
       ...existingNotes,
       {
-        id: crypto.randomUUID(),
+        id: createPortableUuid(),
         authorUserId: user.id,
         authorDisplayName: profile?.username ?? null,
         body: trimmedBody,
@@ -494,7 +495,7 @@ export function createServerModmailBackend(
 
     const escalationContext = await loadEscalationContext(client, reportRow.community_id, user.id);
     const escalatedAt = new Date().toISOString();
-    const escalatedReportId = crypto.randomUUID();
+    const escalatedReportId = createPortableUuid();
 
     const escalationNotes = {
       type: 'escalated_report',

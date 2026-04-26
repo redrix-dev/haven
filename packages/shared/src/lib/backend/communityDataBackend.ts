@@ -4,6 +4,7 @@ import type { Database } from '@shared/types/database';
 import type { MessageObjectStore } from "./messageObjectStore";
 import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
 import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from "./mediaAttachmentUtils";
+import { createPortableUuid } from "./runtime/uuid";
 import type {
   AuthorProfile,
   BanCommunityMemberResult,
@@ -852,7 +853,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       console.warn('Failed to capture support report profile snapshot:', snapshotError);
     }
 
-    const reportId = crypto.randomUUID();
+    const reportId = createPortableUuid();
     const reportTitle = 'User Report: Profile';
     const reportNotes = JSON.stringify({
       type: 'user_report',
@@ -2625,7 +2626,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       console.warn('Failed to capture support report message snapshot:', snapshotError);
     }
 
-    const reportId = crypto.randomUUID();
+    const reportId = createPortableUuid();
 
     const { error: reportError } = await havenCommunitySb().from('support_reports')
       .insert({

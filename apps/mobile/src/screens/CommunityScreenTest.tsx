@@ -859,7 +859,7 @@ export function CommunityScreen() {
   const handleAttach = useCallback(async () => {
     if (isSendingMessage) return;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: [ImagePicker.MediaType.images, ImagePicker.MediaType.videos],
       allowsEditing: false,
       quality: 0.9,
     });

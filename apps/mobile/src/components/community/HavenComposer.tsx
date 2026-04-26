@@ -60,7 +60,7 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
   const handleAttach = async () => {
     if (disabled || isSending) return;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: [ImagePicker.MediaType.images, ImagePicker.MediaType.videos],
       allowsEditing: false,
       quality: 0.9,
     });

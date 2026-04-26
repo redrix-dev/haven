@@ -1,4 +1,5 @@
 import type { MessageObjectStore } from "./messageObjectStore";
+import { createPortableUuid } from "../runtime/uuid";
 
 export type AttachmentMediaKind = "image" | "video" | "file";
 
@@ -84,7 +85,7 @@ export function createMediaAttachmentHelpers(store: MessageObjectStore): MediaAt
     const originalFilename = sanitizeAttachmentFileName(
       input.mediaUpload.filename || "media",
     );
-    const objectPath = `${input.objectPathPrefix}/${crypto.randomUUID()}-${originalFilename}`;
+    const objectPath = `${input.objectPathPrefix}/${createPortableUuid()}-${originalFilename}`;
     const mimeType = body.type?.trim() || "application/octet-stream";
     const mediaKind = resolveAttachmentMediaKind(mimeType);
     const allowedMediaKinds = input.allowedMediaKinds ?? DEFAULT_ALLOWED_MEDIA_KINDS;
