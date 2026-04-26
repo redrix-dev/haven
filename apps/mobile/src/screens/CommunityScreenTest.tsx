@@ -11,6 +11,7 @@ import {
   FlatList,
   Image,
   Linking,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
@@ -463,6 +464,12 @@ export function CommunityScreen() {
     },
     [communityId, setCurrentChannelId],
   );
+  const handleCloseChannelDropdown = useCallback(() => {
+    setIsChannelDropdownOpen(false);
+  }, []);
+  const handleOpenChannelDropdown = useCallback(() => {
+    setIsChannelDropdownOpen(true);
+  }, []);
   // EDIT END: slice 4 channel context resolution and dev-only dropdown state
 
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
@@ -1192,7 +1199,7 @@ export function CommunityScreen() {
             <Pressable
               accessibilityRole="button"
               style={styles.channelBarSelectedChannelPressable}
-              onPress={() => setIsChannelDropdownOpen((prev) => !prev)}
+              onPress={handleOpenChannelDropdown}
             >
               <Text style={styles.channelBarHash}>#</Text>
               <Text style={styles.channelBarSelectedChannelText} numberOfLines={1}>
@@ -1208,31 +1215,66 @@ export function CommunityScreen() {
               <Ionicons name="add" size={18} color="#e6edf7" />
             </Pressable>
           </View>
-          {isChannelDropdownOpen ? (
-            <View style={styles.topChromeChannelDropdown}>
-              {textChannels.map((channel) => (
-                <Pressable
-                  key={channel.id}
-                  onPress={() => {
-                    void handleSelectChannel(channel);
-                  }}
-                  style={styles.topChromeChannelOption}
-                >
-                  <Text
-                    style={[
-                      styles.topChromeChannelOptionText,
-                      currentRenderableChannel?.id === channel.id &&
-                        styles.topChromeChannelOptionTextActive,
-                    ]}
-                  >
-                    {channel.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
         </View>
         {/* EDIT END: slice 6 inline top chrome parity for haven + channel controls */}
+        <Modal
+          visible={isChannelDropdownOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={handleCloseChannelDropdown}
+        >
+          <View style={styles.channelModalOverlay}>
+            <Pressable
+              style={styles.channelModalBackdrop}
+              onPress={handleCloseChannelDropdown}
+            />
+            <View style={styles.channelModalCard}>
+              <View style={styles.channelModalHeader}>
+                <Text style={styles.channelModalTitle}>Select channel</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleCloseChannelDropdown}
+                  hitSlop={8}
+                >
+                  <Text style={styles.channelModalCloseText}>Close</Text>
+                </Pressable>
+              </View>
+              <View style={styles.channelModalOptions}>
+                {textChannels.map((channel) => (
+                  <Pressable
+                    key={channel.id}
+                    onPress={() => {
+                      void handleSelectChannel(channel);
+                    }}
+                    style={styles.channelModalOption}
+                  >
+                    <Text
+                      style={[
+                        styles.channelModalOptionText,
+                        currentRenderableChannel?.id === channel.id &&
+                          styles.channelModalOptionTextActive,
+                      ]}
+                    >
+                      # {channel.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.channelModalActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.channelModalCreateButton}
+                  onPress={() => {
+                    handleCloseChannelDropdown();
+                    handleOpenCreateChannel();
+                  }}
+                >
+                  <Text style={styles.channelModalCreateButtonText}>Create channel</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
         {reportDialogMessageId ? (
           <View style={styles.reportOverlay}>
             <Pressable
@@ -1673,25 +1715,76 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#182334",
   },
-  topChromeChannelDropdown: {
-    marginHorizontal: 12,
-    marginTop: 6,
+  channelModalOverlay: {
+    flex: 1,
+    justifyContent: "flex-start",
+    paddingTop: 96,
+    paddingHorizontal: 12,
+  },
+  channelModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(2, 6, 23, 0.58)",
+  },
+  channelModalCard: {
     borderRadius: 10,
     backgroundColor: "#111827",
     borderWidth: 1,
     borderColor: "#374151",
     overflow: "hidden",
   },
-  topChromeChannelOption: {
+  channelModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#374151",
+  },
+  channelModalTitle: {
+    color: "#F3F4F6",
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  channelModalCloseText: {
+    color: "#a9b8cf",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  channelModalOptions: {
+    maxHeight: 260,
+  },
+  channelModalOption: {
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  topChromeChannelOptionText: {
+  channelModalOptionText: {
     color: "#D1D5DB",
   },
-  topChromeChannelOptionTextActive: {
+  channelModalOptionTextActive: {
     color: "#FFFFFF",
     fontWeight: "700",
+  },
+  channelModalActions: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#374151",
+    padding: 10,
+  },
+  channelModalCreateButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2b3648",
+    backgroundColor: "#182334",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  channelModalCreateButtonText: {
+    color: "#e6edf7",
+    fontSize: 13,
+    fontWeight: "600",
   },
   // EDIT END: slice 4 dev-only top dropdown styles
   // EDIT START: slice 5 reliability state styles
