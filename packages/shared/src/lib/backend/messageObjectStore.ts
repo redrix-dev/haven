@@ -55,19 +55,7 @@ class SupabaseMessageObjectStore implements MessageObjectStore {
     contentType: string;
     cacheControl?: string;
   }): Promise<void> {
-    console.log("[MessageObjectStore][upload] input", {
-      bucketName: input.bucketName,
-      objectPath: input.objectPath,
-      blobSize: input.body.size,
-      blobType: input.body.type,
-      contentType: input.contentType,
-      cacheControl: input.cacheControl ?? "3600",
-    });
     const payload = await blobToArrayBuffer(input.body);
-    console.log("[MessageObjectStore][upload] payload", {
-      objectPath: input.objectPath,
-      arrayBufferByteLength: payload.byteLength,
-    });
     const { error } = await this.client.storage
       .from(input.bucketName)
       .upload(input.objectPath, payload, {

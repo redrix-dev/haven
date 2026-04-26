@@ -37,6 +37,7 @@ import { useMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import type {
   AuthorProfile,
@@ -71,6 +72,7 @@ import { commitChannelScrollExit, peekChannelScrollExit } from "../storage/commu
 type ChatMessage = {
   id: string;
   text: string;
+  authorUserId?: string | null;
   authorName?: string;
   authorInitial?: string;
   authorAvatarUrl?: string | null;
@@ -383,6 +385,9 @@ export function CommunityScreen() {
   const storedMessages = useMessagesStore((state) => state.messages);
   const profiles = useMessagesStore((state) => state.profiles);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const serverPermissions = usePermissionsStore((state) =>
+    state.getPermissions(communityId ?? ""),
+  );
   const attachmentRecord = useMessagesStore((state) => state.attachments);
   const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
   // EDIT END: slice 1 real message source context from production hooks
@@ -553,6 +558,7 @@ export function CommunityScreen() {
         return {
           id: message.id,
           text: message.content,
+          authorUserId: message.author_user_id ?? null,
           authorName,
           authorInitial: authorName.trim().charAt(0).toUpperCase() || "U",
           authorAvatarUrl: liveAvatar,
@@ -859,7 +865,7 @@ export function CommunityScreen() {
   const handleAttach = useCallback(async () => {
     if (isSendingMessage) return;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: [ImagePicker.MediaType.images, ImagePicker.MediaType.videos],
+      mediaTypes: ["images", "videos"],
       allowsEditing: false,
       quality: 0.9,
     });
@@ -921,29 +927,89 @@ export function CommunityScreen() {
     setReportError(null);
   }, []);
 
+  const canDeleteMessage = useCallback(
+    (messageId: string) => {
+      const target = messageById.get(messageId);
+      if (!target) return false;
+      if (target.author_user_id && target.author_user_id === currentUserId) return true;
+      return serverPermissions.canManageMessages;
+    },
+    [currentUserId, messageById, serverPermissions.canManageMessages],
+  );
+
+  const handleDeleteMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        await messaging.actions.deleteMessage(messageId);
+      } catch (error) {
+        Alert.alert("Delete failed", getErrorMessage(error, "Unable to delete message right now."));
+      }
+    },
+    [messaging.actions],
+  );
+
   const handleLongPressMessage = useCallback(
     (messageId: string) => {
+      const includeDelete = canDeleteMessage(messageId);
       if (Platform.OS !== "ios") {
-        Alert.alert("Message actions", "Choose an action for this message.", [
+        const options: Array<{
+          text: string;
+          style?: "default" | "cancel" | "destructive";
+          onPress?: () => void;
+        }> = [
           { text: "Reply", onPress: () => handleReplyToMessage(messageId) },
           { text: "Report", onPress: () => handleReportMessage(messageId) },
+          ...(includeDelete
+            ? [
+                {
+                  text: "Delete",
+                  style: "destructive" as const,
+                  onPress: () => {
+                    Alert.alert("Delete message?", "This action cannot be undone.", [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Delete",
+                        style: "destructive",
+                        onPress: () => void handleDeleteMessage(messageId),
+                      },
+                    ]);
+                  },
+                },
+              ]
+            : []),
           { text: "Cancel", style: "cancel" },
-        ]);
+        ];
+        Alert.alert("Message actions", "Choose an action for this message.", options);
         return;
       }
-      const actions = ["Reply", "Report", "Cancel"];
+      const actions = includeDelete
+        ? ["Reply", "Report", "Delete", "Cancel"]
+        : ["Reply", "Report", "Cancel"];
+      const cancelButtonIndex = actions.length - 1;
+      const deleteIndex = includeDelete ? 2 : -1;
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options: actions,
-          cancelButtonIndex: 2,
+          cancelButtonIndex,
+          destructiveButtonIndex: includeDelete ? deleteIndex : undefined,
         },
         (index) => {
           if (index === 0) handleReplyToMessage(messageId);
           if (index === 1) handleReportMessage(messageId);
+          if (includeDelete && index === deleteIndex) {
+            Alert.alert("Delete message?", "This action cannot be undone.", [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: () => void handleDeleteMessage(messageId),
+              },
+            ]);
+          }
         },
       );
     },
-    [handleReplyToMessage, handleReportMessage],
+    [canDeleteMessage, handleDeleteMessage, handleReplyToMessage, handleReportMessage],
   );
   // EDIT END: long-press message actions parity handlers
 
