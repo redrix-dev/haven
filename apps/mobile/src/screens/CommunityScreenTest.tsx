@@ -29,11 +29,14 @@ import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommu
 import { useMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
+import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import type { AuthorProfile, Channel, Message } from "@shared/lib/backend/types";
 import type { MessageLinkPreview } from "@shared/lib/backend/types";
 import { getFallbackEmbedUrl } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import { getReplyToMessageId } from "@shared/features/messaging/components/message-list/messageListContentUtils";
+import { isAuthorProfileTombstone } from "@shared/features/messaging/components/message-list/messageListContentUtils";
+import { resolveLiveAvatarUrl } from "@shared/lib/liveProfiles";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import {
   EnrichedMarkdownText,
@@ -297,6 +300,7 @@ export function CommunityScreen() {
   // EDIT END: slice 2 keep hook handle for send action
   const storedMessages = useMessagesStore((state) => state.messages);
   const profiles = useMessagesStore((state) => state.profiles);
+  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
   // EDIT END: slice 1 real message source context from production hooks
 
@@ -402,32 +406,41 @@ export function CommunityScreen() {
     const localIds = new Set(localMessages.map((message) => message.id));
     const hydratedMessagesNewestFirst = [...storedMessages]
       .reverse()
-      .map((message: Message) => ({
-        id: message.id,
-        text: message.content,
-        authorName: profiles[message.author_user_id ?? ""]?.username ?? message.author_user_id?.slice(0, 12) ?? "Unknown User",
-        authorInitial:
-          (profiles[message.author_user_id ?? ""]?.username ??
-            message.author_user_id?.slice(0, 12) ??
-            "Unknown User")
-            .trim()
-            .charAt(0)
-            .toUpperCase() || "U",
-        authorAvatarUrl: profiles[message.author_user_id ?? ""]?.avatarUrl ?? null,
-        isAuthorStaff: Boolean(
-          message.author_type === "user" &&
-            profiles[message.author_user_id ?? ""]?.isPlatformStaff,
-        ),
-        timestampLabel: formatTime(message.created_at),
-        replyTargetLabel: getReplyTargetLabel(
-          getReplyToMessageId(message),
-          messageById,
-          profiles,
-        ),
-      }))
+      .map((message: Message) => {
+        const cachedProfile =
+          message.author_user_id != null ? (profiles[message.author_user_id] ?? null) : null;
+        const preserveTombstone = isAuthorProfileTombstone(cachedProfile ?? undefined);
+        const liveAvatar =
+          message.author_user_id != null && !preserveTombstone
+            ? resolveLiveAvatarUrl(
+                liveProfiles,
+                message.author_user_id,
+                cachedProfile?.avatarUrl ?? null,
+              )
+            : (cachedProfile?.avatarUrl ?? null);
+        const authorName =
+          cachedProfile?.username ?? message.author_user_id?.slice(0, 12) ?? "Unknown User";
+
+        return {
+          id: message.id,
+          text: message.content,
+          authorName,
+          authorInitial: authorName.trim().charAt(0).toUpperCase() || "U",
+          authorAvatarUrl: liveAvatar,
+          isAuthorStaff: Boolean(
+            message.author_type === "user" && cachedProfile?.isPlatformStaff,
+          ),
+          timestampLabel: formatTime(message.created_at),
+          replyTargetLabel: getReplyTargetLabel(
+            getReplyToMessageId(message),
+            messageById,
+            profiles,
+          ),
+        };
+      })
       .filter((message) => !localIds.has(message.id));
     return [...localMessages, ...hydratedMessagesNewestFirst];
-  }, [localMessages, messageById, profiles, storedMessages]);
+  }, [liveProfiles, localMessages, messageById, profiles, storedMessages]);
   // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom, top } = useSafeAreaInsets();
   // EDIT START: align top chrome + list padding with safe-area notch
