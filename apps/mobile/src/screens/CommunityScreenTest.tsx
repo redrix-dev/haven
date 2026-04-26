@@ -1,5 +1,6 @@
 import React, { forwardRef, useCallback, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
@@ -162,6 +163,21 @@ export function CommunityScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <Message {...item} />}
           renderScrollComponent={renderScrollComponent}
+          // EDIT START: slice 3 older-message pagination using messaging state/actions
+          onEndReachedThreshold={0.3}
+          onEndReached={() => {
+            if (messaging.state.hasOlderMessages && !messaging.state.isLoadingOlderMessages) {
+              void messaging.actions.requestOlderMessages();
+            }
+          }}
+          ListFooterComponent={
+            messaging.state.isLoadingOlderMessages ? (
+              <View style={styles.paginationFooter}>
+                <ActivityIndicator color="#e6edf7" />
+              </View>
+            ) : null
+          }
+          // EDIT END: slice 3 older-message pagination using messaging state/actions
         />
         <KeyboardStickyView offset={{ opened: bottom - MARGIN }} style={styles.composer}>
           <TextInput
@@ -248,5 +264,10 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   // EDIT END: slice 2 disabled send button style while sending
+  // EDIT START: slice 3 pagination loading indicator spacing
+  paginationFooter: {
+    paddingVertical: 10,
+  },
+  // EDIT END: slice 3 pagination loading indicator spacing
 });
 // EDIT END: local styles for fully in-line chat screen
