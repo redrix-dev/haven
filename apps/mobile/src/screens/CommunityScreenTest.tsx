@@ -123,6 +123,13 @@ function getErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === "string" && error.trim().length > 0) return error;
   return fallback;
 }
+
+function getPendingAttachmentLabel(fileName: string): string {
+  const trimmed = fileName.trim();
+  if (trimmed.length === 0) return "Attachment selected";
+  if (trimmed.length <= 38) return trimmed;
+  return `${trimmed.slice(0, 35)}...`;
+}
 // EDIT END: local message model/constants for standalone in-line screen
 
 // EDIT START: wrapper for virtualized list keyboard behavior
@@ -865,19 +872,33 @@ export function CommunityScreen() {
   const showComposerActionSheet = useCallback(() => {
     if (isSendingMessage) return;
     if (Platform.OS === "ios") {
+      const options = pendingAttachment
+        ? ["Cancel", "Replace media", "Remove media"]
+        : ["Cancel", "Add media"];
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ["Cancel", "Add media"], cancelButtonIndex: 0 },
+        {
+          options,
+          cancelButtonIndex: 0,
+          destructiveButtonIndex: pendingAttachment ? 2 : undefined,
+        },
         (buttonIndex) => {
           if (buttonIndex === 1) void handleAttach();
+          if (pendingAttachment && buttonIndex === 2) setPendingAttachment(null);
         },
       );
       return;
     }
-    Alert.alert("", undefined, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Add media", onPress: () => void handleAttach() },
-    ]);
-  }, [handleAttach, isSendingMessage]);
+    Alert.alert("", undefined, pendingAttachment
+      ? [
+          { text: "Cancel", style: "cancel" },
+          { text: "Replace media", onPress: () => void handleAttach() },
+          { text: "Remove media", style: "destructive", onPress: () => setPendingAttachment(null) },
+        ]
+      : [
+          { text: "Cancel", style: "cancel" },
+          { text: "Add media", onPress: () => void handleAttach() },
+        ]);
+  }, [handleAttach, isSendingMessage, pendingAttachment]);
   // EDIT END: composer media action affordance parity handlers
 
   // EDIT START: long-press message actions parity handlers
@@ -1107,6 +1128,24 @@ export function CommunityScreen() {
                   onPress={() => setPendingReplyToMessageId(null)}
                 >
                   <Text style={styles.replyBannerCancel}>Cancel</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            {pendingAttachment ? (
+              <View style={styles.pendingAttachmentBanner}>
+                <View style={styles.pendingAttachmentInfo}>
+                  <Ionicons name="attach" size={14} color="#a9b8cf" />
+                  <Text style={styles.pendingAttachmentText} numberOfLines={1}>
+                    {getPendingAttachmentLabel(pendingAttachment.fileName)}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => setPendingAttachment(null)}
+                  disabled={isSendingMessage}
+                >
+                  <Text style={styles.pendingAttachmentRemove}>Remove</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -1593,6 +1632,32 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   replyBannerCancel: {
+    color: "#3F79D8",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  pendingAttachmentBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 8,
+    backgroundColor: "#1a2235",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  pendingAttachmentInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  pendingAttachmentText: {
+    color: "#D1D5DB",
+    fontSize: 12,
+    flex: 1,
+  },
+  pendingAttachmentRemove: {
     color: "#3F79D8",
     fontSize: 12,
     fontWeight: "600",
