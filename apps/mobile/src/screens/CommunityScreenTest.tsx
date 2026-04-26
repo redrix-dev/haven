@@ -466,7 +466,9 @@ export function CommunityScreen() {
     fileName: string;
     mimeType: string;
   } | null>(null);
-  const [, setPendingReplyToMessageId] = useState<string | null>(null);
+  const [pendingReplyToMessageId, setPendingReplyToMessageId] = useState<string | null>(
+    null,
+  );
   // EDIT END: composer media affordance pending attachment state
   // EDIT START: keep local send behavior while hydrating list from real store
   const [localMessages, setLocalMessages] = useState(INITIAL_MESSAGES);
@@ -521,6 +523,13 @@ export function CommunityScreen() {
     profiles,
     storedMessages,
   ]);
+  const pendingReplyTargetLabel = useMemo(
+    () =>
+      pendingReplyToMessageId
+        ? getReplyTargetLabel(pendingReplyToMessageId, messageById, profiles)
+        : null,
+    [messageById, pendingReplyToMessageId, profiles],
+  );
   // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom, top } = useSafeAreaInsets();
   // EDIT START: align top chrome + list padding with safe-area notch
@@ -542,26 +551,39 @@ export function CommunityScreen() {
     const fromInput = composerInputRef.current ? await composerInputRef.current.getMarkdown() : draft;
     const text = fromInput.trim();
     if (!text && !pendingAttachment) return;
+    const replyToMessageId =
+      pendingReplyToMessageId && messageById.has(pendingReplyToMessageId)
+        ? pendingReplyToMessageId
+        : undefined;
 
     try {
       setIsSendingMessage(true);
       if (!pendingAttachment) {
-        await messaging.actions.sendMessage(text);
+        await messaging.actions.sendMessage(
+          text,
+          replyToMessageId ? { replyToMessageId } : undefined,
+        );
       } else {
         const response = await fetch(pendingAttachment.uri);
         const blob = await response.blob();
         const file = new File([blob], pendingAttachment.fileName, {
           type: pendingAttachment.mimeType,
         });
-        await messaging.actions.sendMessage(text, { mediaFile: file });
+        await messaging.actions.sendMessage(
+          text,
+          replyToMessageId
+            ? { replyToMessageId, mediaFile: file }
+            : { mediaFile: file },
+        );
       }
       setDraft("");
       composerInputRef.current?.setValue("");
       setPendingAttachment(null);
+      setPendingReplyToMessageId(null);
     } finally {
       setIsSendingMessage(false);
     }
-  }, [draft, messaging.actions, pendingAttachment]);
+  }, [draft, messageById, messaging.actions, pendingAttachment, pendingReplyToMessageId]);
   // EDIT END: slice 2 swap local append send to real messaging send action
 
   const onInputLayout = useCallback(
@@ -623,6 +645,9 @@ export function CommunityScreen() {
   // EDIT START: long-press message actions parity handlers
   const handleReplyToMessage = useCallback((messageId: string) => {
     setPendingReplyToMessageId(messageId);
+    (
+      composerInputRef.current as unknown as { focus?: () => void } | null
+    )?.focus?.();
   }, []);
 
   const handleReportMessage = useCallback((messageId: string) => {
@@ -657,6 +682,12 @@ export function CommunityScreen() {
     [handleReplyToMessage, handleReportMessage],
   );
   // EDIT END: long-press message actions parity handlers
+
+  useEffect(() => {
+    if (!pendingReplyToMessageId) return;
+    if (messageById.has(pendingReplyToMessageId)) return;
+    setPendingReplyToMessageId(null);
+  }, [messageById, pendingReplyToMessageId]);
 
   // EDIT START: slice 5 lightweight reliability wrappers
   if (phase === "loading") {
@@ -753,44 +784,60 @@ export function CommunityScreen() {
             // EDIT END: slice 3 older-message pagination using messaging state/actions
           />
           <KeyboardStickyView offset={{ opened: bottom - MARGIN }} style={styles.composer}>
-            <Pressable
-              accessibilityLabel="Message options"
-              accessibilityRole="button"
-              hitSlop={8}
-              disabled={isSendingMessage}
-              onPress={showComposerActionSheet}
-              style={styles.composerOptionsButton}
-            >
-              <Ionicons name="ellipsis-horizontal" size={22} color="#a9b8cf" />
-            </Pressable>
-            <View style={styles.inputShell} onLayout={onInputLayout}>
-              <EnrichedMarkdownTextInput
-                ref={composerInputRef}
-                multiline
-                editable={!isSendingMessage}
-                scrollEnabled
-                defaultValue=""
-                onChangeMarkdown={setDraft}
-                placeholder="Type a message..."
-                placeholderTextColor="#a9b8cf"
-                cursorColor="#e6edf7"
-                selectionColor="rgba(63, 121, 216, 0.4)"
-                markdownStyle={{
-                  strong: { color: "#e6edf7" },
-                  em: { color: "#e6edf7" },
-                  link: { color: "#3F79D8", underline: true },
-                  spoiler: { color: "#a9b8cf", backgroundColor: "rgba(0,0,0,0.2)" },
-                }}
-                style={styles.input}
-              />
+            {pendingReplyToMessageId ? (
+              <View style={styles.replyBanner}>
+                <Text style={styles.replyBannerText}>
+                  Replying to {pendingReplyTargetLabel ?? "a message"}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => setPendingReplyToMessageId(null)}
+                >
+                  <Text style={styles.replyBannerCancel}>Cancel</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            <View style={styles.composerInputRow}>
+              <Pressable
+                accessibilityLabel="Message options"
+                accessibilityRole="button"
+                hitSlop={8}
+                disabled={isSendingMessage}
+                onPress={showComposerActionSheet}
+                style={styles.composerOptionsButton}
+              >
+                <Ionicons name="ellipsis-horizontal" size={22} color="#a9b8cf" />
+              </Pressable>
+              <View style={styles.inputShell} onLayout={onInputLayout}>
+                <EnrichedMarkdownTextInput
+                  ref={composerInputRef}
+                  multiline
+                  editable={!isSendingMessage}
+                  scrollEnabled
+                  defaultValue=""
+                  onChangeMarkdown={setDraft}
+                  placeholder="Type a message..."
+                  placeholderTextColor="#a9b8cf"
+                  cursorColor="#e6edf7"
+                  selectionColor="rgba(63, 121, 216, 0.4)"
+                  markdownStyle={{
+                    strong: { color: "#e6edf7" },
+                    em: { color: "#e6edf7" },
+                    link: { color: "#3F79D8", underline: true },
+                    spoiler: { color: "#a9b8cf", backgroundColor: "rgba(0,0,0,0.2)" },
+                  }}
+                  style={styles.input}
+                />
+              </View>
+              <TouchableOpacity
+                onPress={() => void onSend()}
+                style={[styles.sendButton, isSendingMessage && styles.sendButtonDisabled]}
+                disabled={isSendingMessage}
+              >
+                <Text style={styles.sendButtonText}>{isSendingMessage ? "..." : "Send"}</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              onPress={() => void onSend()}
-              style={[styles.sendButton, isSendingMessage && styles.sendButtonDisabled]}
-              disabled={isSendingMessage}
-            >
-              <Text style={styles.sendButtonText}>{isSendingMessage ? "..." : "Send"}</Text>
-            </TouchableOpacity>
           </KeyboardStickyView>
         </View>
         {/* EDIT END: strict list viewport boundary under dev bar */}
@@ -1058,12 +1105,35 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#111827",
     padding: 8,
+    gap: 8,
+  },
+  composerInputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
   },
   composerOptionsButton: {
     alignSelf: "center",
+  },
+  replyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 8,
+    backgroundColor: "#1a2235",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  replyBannerText: {
+    color: "#D1D5DB",
+    fontSize: 12,
+    flexShrink: 1,
+    marginRight: 10,
+  },
+  replyBannerCancel: {
+    color: "#3F79D8",
+    fontSize: 12,
+    fontWeight: "600",
   },
   input: {
     flex: 1,
