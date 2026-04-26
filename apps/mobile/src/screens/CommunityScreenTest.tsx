@@ -27,9 +27,10 @@ import { useMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
-import type { Channel, Message } from "@shared/lib/backend/types";
+import type { AuthorProfile, Channel, Message } from "@shared/lib/backend/types";
 import type { MessageLinkPreview } from "@shared/lib/backend/types";
 import { getFallbackEmbedUrl } from "@shared/features/messaging/components/message-list/messageListContentUtils";
+import { getReplyToMessageId } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import {
   EnrichedMarkdownText,
@@ -45,13 +46,47 @@ import {
 } from "../storage/communityChannelPrefs";
 
 // EDIT START: add local message model/constants for standalone in-line screen
-type ChatMessage = { id: string; text: string };
+type ChatMessage = {
+  id: string;
+  text: string;
+  authorName?: string;
+  authorInitial?: string;
+  authorAvatarUrl?: string | null;
+  isAuthorStaff?: boolean;
+  timestampLabel?: string;
+  replyTargetLabel?: string | null;
+};
 type Ref = React.ElementRef<typeof KeyboardChatScrollView>;
 
 const MARGIN = 8;
 const INPUT_HEIGHT = 42;
 const INITIAL_MESSAGES: ChatMessage[] = [];
 const DEV_LIST_VISUAL_TOP_BREATHING = 8;
+
+function formatTime(timestamp: string): string {
+  const value = new Date(timestamp);
+  return value.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getReplyTargetLabel(
+  replyToId: string | null,
+  messageById: Map<string, Message>,
+  profiles: Record<string, AuthorProfile>,
+): string | null {
+  if (!replyToId) return null;
+  const parent = messageById.get(replyToId);
+  if (!parent) return "a message";
+  if (parent.author_type === "haven_dev") return "Haven Moderation Team";
+  if (parent.author_type === "system") return "System";
+  const uid = parent.author_user_id;
+  if (!uid) return "a message";
+  const profile = profiles[uid];
+  if (profile?.username) return profile.username;
+  return uid.slice(0, 12);
+}
 // EDIT END: local message model/constants for standalone in-line screen
 
 // EDIT START: wrapper for virtualized list keyboard behavior
@@ -77,6 +112,12 @@ const ChatScrollView = forwardRef<Ref, ScrollViewProps & KeyboardChatScrollViewP
 function Message({
   id,
   text,
+  authorName,
+  authorInitial,
+  authorAvatarUrl,
+  isAuthorStaff,
+  timestampLabel,
+  replyTargetLabel,
   onPress,
   linkPreview,
 }: ChatMessage & { onPress?: () => void; linkPreview?: MessageLinkPreview | null }) {
@@ -91,6 +132,36 @@ function Message({
   return (
     <Pressable style={styles.messageRow} onPress={onPress}>
       <View style={styles.messageBubble}>
+        <View style={styles.messageMetaRow}>
+          <View style={styles.messageAvatarShell}>
+            {authorAvatarUrl ? (
+              <Image
+                source={{ uri: authorAvatarUrl }}
+                style={styles.messageAvatarImage}
+                resizeMode="cover"
+                accessibilityLabel={`${authorName ?? "User"} avatar`}
+              />
+            ) : (
+              <View style={styles.messageAvatarFallback}>
+                <Text style={styles.messageAvatarFallbackText}>{authorInitial ?? "U"}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.messageMetaNameRow}>
+            <Text style={styles.messageAuthorName} numberOfLines={1}>
+              {authorName ?? "Unknown User"}
+            </Text>
+            {isAuthorStaff ? (
+              <View style={styles.messageStaffBadge}>
+                <Text style={styles.messageStaffBadgeText}>Staff</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.messageTimestamp}>{timestampLabel ?? ""}</Text>
+        </View>
+        {replyTargetLabel ? (
+          <Text style={styles.messageReplyLabel}>Replying to {replyTargetLabel}</Text>
+        ) : null}
         <EnrichedMarkdownText
           markdown={text}
           md4cFlags={{ underline: true }}
@@ -216,6 +287,7 @@ export function CommunityScreen() {
   });
   // EDIT END: slice 2 keep hook handle for send action
   const storedMessages = useMessagesStore((state) => state.messages);
+  const profiles = useMessagesStore((state) => state.profiles);
   const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
   // EDIT END: slice 1 real message source context from production hooks
 
@@ -306,6 +378,10 @@ export function CommunityScreen() {
   // EDIT END: slice 2 minimal send-loading state for real send pipeline
   // EDIT START: keep local send behavior while hydrating list from real store
   const [localMessages, setLocalMessages] = useState(INITIAL_MESSAGES);
+  const messageById = useMemo(
+    () => new Map(storedMessages.map((message) => [message.id, message] as const)),
+    [storedMessages],
+  );
   const messages = useMemo<ChatMessage[]>(() => {
     const localIds = new Set(localMessages.map((message) => message.id));
     const hydratedMessagesNewestFirst = [...storedMessages]
@@ -313,10 +389,29 @@ export function CommunityScreen() {
       .map((message: Message) => ({
         id: message.id,
         text: message.content,
+        authorName: profiles[message.author_user_id ?? ""]?.username ?? message.author_user_id?.slice(0, 12) ?? "Unknown User",
+        authorInitial:
+          (profiles[message.author_user_id ?? ""]?.username ??
+            message.author_user_id?.slice(0, 12) ??
+            "Unknown User")
+            .trim()
+            .charAt(0)
+            .toUpperCase() || "U",
+        authorAvatarUrl: profiles[message.author_user_id ?? ""]?.avatarUrl ?? null,
+        isAuthorStaff: Boolean(
+          message.author_type === "user" &&
+            profiles[message.author_user_id ?? ""]?.isPlatformStaff,
+        ),
+        timestampLabel: formatTime(message.created_at),
+        replyTargetLabel: getReplyTargetLabel(
+          getReplyToMessageId(message),
+          messageById,
+          profiles,
+        ),
       }))
       .filter((message) => !localIds.has(message.id));
     return [...localMessages, ...hydratedMessagesNewestFirst];
-  }, [localMessages, storedMessages]);
+  }, [localMessages, messageById, profiles, storedMessages]);
   // EDIT END: keep local send behavior while hydrating list from real store
   const { bottom, top } = useSafeAreaInsets();
   // EDIT START: align top chrome + list padding with safe-area notch
@@ -621,6 +716,71 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: "#1F2937",
+  },
+  messageMetaRow: {
+    marginBottom: 6,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  messageAvatarShell: {
+    marginRight: 8,
+    height: 24,
+    width: 24,
+    overflow: "hidden",
+    borderRadius: 999,
+    backgroundColor: "#111827",
+  },
+  messageAvatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  messageAvatarFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  messageAvatarFallbackText: {
+    color: "#E5E7EB",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  messageMetaNameRow: {
+    marginRight: 6,
+    minWidth: 0,
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+  },
+  messageAuthorName: {
+    flexShrink: 1,
+    color: "#E5E7EB",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  messageStaffBadge: {
+    borderRadius: 4,
+    backgroundColor: "rgba(63, 121, 216, 0.2)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  messageStaffBadgeText: {
+    color: "#3F79D8",
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  messageTimestamp: {
+    flexShrink: 0,
+    color: "#9ba9bf",
+    fontSize: 11,
+  },
+  messageReplyLabel: {
+    marginBottom: 6,
+    color: "#9ba9bf",
+    fontSize: 12,
   },
   messageText: {
     color: "#E5E7EB",
