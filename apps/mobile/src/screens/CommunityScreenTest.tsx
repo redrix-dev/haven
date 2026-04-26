@@ -1,7 +1,8 @@
-import React, { forwardRef, useCallback, useMemo, useRef, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -21,10 +22,14 @@ import { useMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
-import type { Message } from "@shared/lib/backend/types";
+import type { Channel, Message } from "@shared/lib/backend/types";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import { useSharedValue, withTiming } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  getLastTextChannelIdForCommunity,
+  setLastTextChannelIdForCommunity,
+} from "../storage/communityChannelPrefs";
 
 // EDIT START: add local message model/constants for standalone in-line screen
 type ChatMessage = { id: string; text: string };
@@ -33,6 +38,9 @@ type Ref = React.ElementRef<typeof KeyboardChatScrollView>;
 const MARGIN = 8;
 const INPUT_HEIGHT = 42;
 const INITIAL_MESSAGES: ChatMessage[] = [];
+const DEV_CHANNEL_BAR_HEIGHT = 44;
+const DEV_CHANNEL_BAR_MARGIN = 8;
+const DEV_LIST_VISUAL_TOP_BREATHING = 8;
 // EDIT END: local message model/constants for standalone in-line screen
 
 // EDIT START: wrapper for virtualized list keyboard behavior
@@ -70,6 +78,7 @@ function Message({ text }: ChatMessage) {
 export function CommunityScreen() {
   // EDIT START: slice 1 real message source context from production hooks
   const communityId = useNavigationStore((state) => state.currentServerId) ?? null;
+  const setCurrentChannelId = useNavigationStore((state) => state.setCurrentChannelId);
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
   const { servers } = useServers();
@@ -93,6 +102,58 @@ export function CommunityScreen() {
   const storedMessages = useMessagesStore((state) => state.messages);
   // EDIT END: slice 1 real message source context from production hooks
 
+  // EDIT START: slice 4 channel context resolution and dev-only dropdown state
+  const textChannels = useMemo(
+    () => channels.filter((channel) => channel.kind === "text"),
+    [channels],
+  );
+  const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!communityId) return;
+
+    const resolveInitialTextChannel = async () => {
+      const activeTextChannel =
+        currentRenderableChannel && currentRenderableChannel.kind === "text"
+          ? currentRenderableChannel
+          : null;
+      if (activeTextChannel) {
+        await setLastTextChannelIdForCommunity(communityId, activeTextChannel.id);
+        return;
+      }
+
+      if (textChannels.length === 0) {
+        setCurrentChannelId(null);
+        await setLastTextChannelIdForCommunity(communityId, null);
+        return;
+      }
+
+      const storedChannelId = await getLastTextChannelIdForCommunity(communityId);
+      const storedChannel = textChannels.find((channel) => channel.id === storedChannelId);
+      const nextChannel = storedChannel ?? textChannels[0];
+      if (cancelled) return;
+      setCurrentChannelId(nextChannel.id);
+      await setLastTextChannelIdForCommunity(communityId, nextChannel.id);
+    };
+
+    void resolveInitialTextChannel();
+    return () => {
+      cancelled = true;
+    };
+  }, [communityId, currentRenderableChannel, setCurrentChannelId, textChannels]);
+
+  const handleSelectChannel = useCallback(
+    async (channel: Channel) => {
+      if (!communityId) return;
+      setCurrentChannelId(channel.id);
+      await setLastTextChannelIdForCommunity(communityId, channel.id);
+      setIsChannelDropdownOpen(false);
+    },
+    [communityId, setCurrentChannelId],
+  );
+  // EDIT END: slice 4 channel context resolution and dev-only dropdown state
+
   const textInputRef = useRef<TextInput>(null);
   const textRef = useRef("");
   // EDIT START: slice 2 minimal send-loading state for real send pipeline
@@ -112,7 +173,12 @@ export function CommunityScreen() {
     return [...localMessages, ...hydratedMessagesNewestFirst];
   }, [localMessages, storedMessages]);
   // EDIT END: keep local send behavior while hydrating list from real store
-  const { bottom } = useSafeAreaInsets();
+  const { bottom, top } = useSafeAreaInsets();
+  // EDIT START: align dev top bar + list padding with safe-area notch
+  const devBarOccupiedHeight = top + DEV_CHANNEL_BAR_MARGIN + DEV_CHANNEL_BAR_HEIGHT;
+  const devTopSpacerHeight = __DEV__ ? devBarOccupiedHeight : 0;
+  const devVisualTopPaddingBottom = __DEV__ ? DEV_LIST_VISUAL_TOP_BREATHING : 0;
+  // EDIT END: align dev top bar + list padding with safe-area notch
   const extraContentPadding = useSharedValue(0);
 
   const renderScrollComponent = useCallback(
@@ -159,7 +225,12 @@ export function CommunityScreen() {
         <FlatList
           data={messages}
           inverted
-          contentContainerStyle={{ paddingTop: 10 }}
+          // EDIT START: add bottom spacing so top dev bar doesn't clip oldest message access
+          contentContainerStyle={{
+            paddingTop: 10,
+            paddingBottom: devVisualTopPaddingBottom,
+          }}
+          // EDIT END: add bottom spacing so top dev bar doesn't clip oldest message access
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <Message {...item} />}
           renderScrollComponent={renderScrollComponent}
@@ -171,14 +242,55 @@ export function CommunityScreen() {
             }
           }}
           ListFooterComponent={
-            messaging.state.isLoadingOlderMessages ? (
-              <View style={styles.paginationFooter}>
-                <ActivityIndicator color="#e6edf7" />
-              </View>
-            ) : null
+            // EDIT START: use explicit inverted-flow spacer for notch/dev bar clearance
+            <View>
+              <View style={{ height: devTopSpacerHeight }} />
+              {messaging.state.isLoadingOlderMessages ? (
+                <View style={styles.paginationFooter}>
+                  <ActivityIndicator color="#e6edf7" />
+                </View>
+              ) : null}
+            </View>
+            // EDIT END: use explicit inverted-flow spacer for notch/dev bar clearance
           }
           // EDIT END: slice 3 older-message pagination using messaging state/actions
         />
+        {/* EDIT START: slice 4 minimal dev-only channel dropdown */}
+        {__DEV__ ? (
+          <View style={[styles.devChannelBarContainer, { top: top + DEV_CHANNEL_BAR_MARGIN }]}>
+            <Pressable
+              onPress={() => setIsChannelDropdownOpen((prev) => !prev)}
+              style={styles.devChannelTrigger}
+            >
+              <Text style={styles.devChannelTriggerText}>
+                {currentRenderableChannel?.name ?? "Select channel"} v
+              </Text>
+            </Pressable>
+            {isChannelDropdownOpen ? (
+              <View style={styles.devChannelDropdown}>
+                {textChannels.map((channel) => (
+                  <Pressable
+                    key={channel.id}
+                    onPress={() => {
+                      void handleSelectChannel(channel);
+                    }}
+                    style={styles.devChannelOption}
+                  >
+                    <Text
+                      style={[
+                        styles.devChannelOptionText,
+                        currentRenderableChannel?.id === channel.id && styles.devChannelOptionTextActive,
+                      ]}
+                    >
+                      {channel.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+        {/* EDIT END: slice 4 minimal dev-only channel dropdown */}
         <KeyboardStickyView offset={{ opened: bottom - MARGIN }} style={styles.composer}>
           <TextInput
             ref={textInputRef}
@@ -269,5 +381,45 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   // EDIT END: slice 3 pagination loading indicator spacing
+  // EDIT START: slice 4 dev-only top dropdown styles
+  devChannelBarContainer: {
+    position: "absolute",
+    left: DEV_CHANNEL_BAR_MARGIN,
+    right: DEV_CHANNEL_BAR_MARGIN,
+    zIndex: 20,
+  },
+  devChannelTrigger: {
+    height: DEV_CHANNEL_BAR_HEIGHT,
+    borderRadius: 10,
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#374151",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  devChannelTriggerText: {
+    color: "#E5E7EB",
+    fontWeight: "600",
+  },
+  devChannelDropdown: {
+    marginTop: 6,
+    borderRadius: 10,
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#374151",
+    overflow: "hidden",
+  },
+  devChannelOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  devChannelOptionText: {
+    color: "#D1D5DB",
+  },
+  devChannelOptionTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  // EDIT END: slice 4 dev-only top dropdown styles
 });
 // EDIT END: local styles for fully in-line chat screen
