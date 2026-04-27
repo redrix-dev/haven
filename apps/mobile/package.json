@@ -71,7 +71,7 @@
     "react-native-callkeep": "^4.3.16",
     "react-native-enriched-markdown": "^0.5.0",
     "react-native-gesture-handler": "~2.30.0",
-    "react-native-keyboard-controller": "1.20.7",
+    "react-native-keyboard-controller": "1.21.0",
     "react-native-reanimated": "4.2.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.23.0",
@@ -89,9 +89,12 @@
     "babel-preset-expo": "~55.0.0",
     "expo-doctor": "^1.18.0",
     "patch-package": "^8.0.1",
-    "typescript": "~5.9.2"
+    "typescript": "^6.0.2"
   },
   "expo": {
+    "install": {
+      "exclude": ["react-native-keyboard-controller"]
+    },
     "doctor": {
       "appConfigFieldsNotSyncedCheck": {
         "enabled": false
@@ -101,6 +104,7 @@
         "exclude": [
           "react-native-callkeep",
           "react-native-voip-push-notification",
+          "react-native-keyboard-controller",
           "react-native-webrtc"
         ],
         "listUnknownPackages": false
