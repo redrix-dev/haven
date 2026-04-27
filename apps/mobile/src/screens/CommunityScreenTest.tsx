@@ -73,6 +73,7 @@ import { commitChannelScrollExit, peekChannelScrollExit } from "../storage/commu
 type ChatMessage = {
   id: string;
   text: string;
+  createdAt?: string;
   authorUserId?: string | null;
   authorName?: string;
   authorInitial?: string;
@@ -82,6 +83,9 @@ type ChatMessage = {
   replyTargetLabel?: string | null;
   attachments?: MessageAttachment[];
 };
+type ChatListItem =
+  | { kind: "message"; message: ChatMessage; isCondensed: boolean }
+  | { kind: "divider"; id: string; label: string };
 type Ref = React.ElementRef<typeof KeyboardChatScrollView>;
 
 const MARGIN = 8;
@@ -89,6 +93,27 @@ const INPUT_HEIGHT = 42;
 const INITIAL_MESSAGES: ChatMessage[] = [];
 const DEV_LIST_VISUAL_TOP_BREATHING = 8;
 const MESSAGE_JUMP_THRESHOLD = 220;
+const AVATAR_SIZE = 40;
+const AVATAR_LEFT_INSET = 16;
+const AVATAR_GUTTER = 16;
+const CONTENT_RIGHT_PADDING = 24;
+const CONTENT_LANE_LEFT = AVATAR_LEFT_INSET + AVATAR_SIZE + AVATAR_GUTTER;
+const GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+function formatDateDividerLabel(timestamp: string): string {
+  return new Date(timestamp).toLocaleDateString([], {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function dayBucket(timestamp: string | undefined): string | null {
+  if (!timestamp) return null;
+  const value = new Date(timestamp);
+  if (Number.isNaN(value.getTime())) return null;
+  return `${value.getFullYear()}-${value.getMonth() + 1}-${value.getDate()}`;
+}
 
 function resolveMimeType(asset: ImagePicker.ImagePickerAsset): string {
   if (asset.mimeType) return asset.mimeType;
@@ -165,10 +190,13 @@ function Message({
   timestampLabel,
   replyTargetLabel,
   attachments,
+  createdAt,
+  isCondensed,
   onPress,
   onLongPress,
   linkPreview,
 }: ChatMessage & {
+  isCondensed?: boolean;
   onPress?: () => void;
   onLongPress?: () => void;
   linkPreview?: MessageLinkPreview | null;
@@ -179,38 +207,50 @@ function Message({
   const title = linkPreview?.snapshot?.title ?? sourceUrl;
   const siteName = linkPreview?.snapshot?.siteName ?? "Link preview";
   const thumbnailUrl = linkPreview?.snapshot?.thumbnail?.signedUrl ?? null;
+  const showHeader = !isCondensed;
+  const compactTimestamp = isCondensed ? formatTime(createdAt ?? "") : null;
   // EDIT END: inline link preview parity computations
 
   return (
-    <Pressable style={styles.messageRow} onPress={onPress} onLongPress={onLongPress}>
-      <View style={styles.messageBubble}>
-        <View style={styles.messageMetaRow}>
-          <View style={styles.messageAvatarShell}>
-            {authorAvatarUrl ? (
-              <Image
-                source={{ uri: authorAvatarUrl }}
-                style={styles.messageAvatarImage}
-                resizeMode="cover"
-                accessibilityLabel={`${authorName ?? "User"} avatar`}
-              />
-            ) : (
-              <View style={styles.messageAvatarFallback}>
-                <Text style={styles.messageAvatarFallbackText}>{authorInitial ?? "U"}</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.messageMetaNameRow}>
-            <Text style={styles.messageAuthorName} numberOfLines={1}>
-              {authorName ?? "Unknown User"}
-            </Text>
-            {isAuthorStaff ? (
-              <View style={styles.messageStaffBadge}>
-                <Text style={styles.messageStaffBadgeText}>Staff</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.messageTimestamp}>{timestampLabel ?? ""}</Text>
+    <Pressable
+      style={[styles.messageRow, isCondensed ? styles.messageRowCondensed : styles.messageRowGroupStart]}
+      onPress={onPress}
+      onLongPress={onLongPress}
+    >
+      {showHeader ? (
+        <View style={styles.messageAvatarShell}>
+          {authorAvatarUrl ? (
+            <Image
+              source={{ uri: authorAvatarUrl }}
+              style={styles.messageAvatarImage}
+              resizeMode="cover"
+              accessibilityLabel={`${authorName ?? "User"} avatar`}
+            />
+          ) : (
+            <View style={styles.messageAvatarFallback}>
+              <Text style={styles.messageAvatarFallbackText}>{authorInitial ?? "U"}</Text>
+            </View>
+          )}
         </View>
+      ) : (
+        <Text style={styles.messageCompactTimestamp}>{compactTimestamp ?? ""}</Text>
+      )}
+      <View style={styles.messageBody}>
+        {showHeader ? (
+          <View style={styles.messageMetaRow}>
+            <View style={styles.messageMetaNameRow}>
+              <Text style={styles.messageAuthorName} numberOfLines={1}>
+                {authorName ?? "Unknown User"}
+              </Text>
+              {isAuthorStaff ? (
+                <View style={styles.messageStaffBadge}>
+                  <Text style={styles.messageStaffBadgeText}>Staff</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.messageTimestamp}>{timestampLabel ?? ""}</Text>
+          </View>
+        ) : null}
         {replyTargetLabel ? (
           <Text style={styles.messageReplyLabel}>Replying to {replyTargetLabel}</Text>
         ) : null}
@@ -355,6 +395,15 @@ function Message({
 }
 // EDIT END: local in-line message bubble renderer
 
+function MessageDateDivider({ label }: { label: string }) {
+  return (
+    <View accessibilityRole="none" style={styles.messageDateDivider}>
+      <View style={styles.messageDateDividerLine} />
+      <Text style={styles.messageDateDividerText}>{label}</Text>
+    </View>
+  );
+}
+
 // EDIT START: export as CommunityScreen to wire directly in navigation
 export function CommunityScreen() {
   // EDIT START: slice 1 real message source context from production hooks
@@ -492,7 +541,7 @@ export function CommunityScreen() {
   // EDIT END: slice 4 channel context resolution and dev-only dropdown state
 
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
-  const listRef = useRef<FlatList<ChatMessage> | null>(null);
+  const listRef = useRef<FlatList<ChatListItem> | null>(null);
   const [draft, setDraft] = useState("");
   // EDIT START: slice 2 minimal send-loading state for real send pipeline
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -566,6 +615,7 @@ export function CommunityScreen() {
         return {
           id: message.id,
           text: message.content,
+          createdAt: message.created_at,
           authorUserId: message.author_user_id ?? null,
           authorName,
           authorInitial: authorName.trim().charAt(0).toUpperCase() || "U",
@@ -599,6 +649,41 @@ export function CommunityScreen() {
         : null,
     [messageById, pendingReplyToMessageId, profiles],
   );
+  const chatListItems = useMemo<ChatListItem[]>(() => {
+    const items: ChatListItem[] = [];
+    for (let index = 0; index < messages.length; index += 1) {
+      const message = messages[index];
+      const previousMessage = messages[index + 1];
+      const currentBucket = dayBucket(message.createdAt);
+      const previousBucket = dayBucket(previousMessage?.createdAt);
+      const shouldInsertDivider = currentBucket !== previousBucket;
+      if (shouldInsertDivider) {
+        items.push({
+          kind: "divider",
+          id: `divider-${message.id}`,
+          label: formatDateDividerLabel(message.createdAt ?? new Date().toISOString()),
+        });
+      }
+      const isSameAuthor =
+        Boolean(message.authorUserId) &&
+        message.authorUserId === previousMessage?.authorUserId;
+      const currentTimestamp = message.createdAt ? Date.parse(message.createdAt) : NaN;
+      const previousTimestamp = previousMessage?.createdAt
+        ? Date.parse(previousMessage.createdAt)
+        : NaN;
+      const hasValidTimestamps =
+        Number.isFinite(currentTimestamp) && Number.isFinite(previousTimestamp);
+      const isCloseInTime = hasValidTimestamps
+        ? Math.abs(currentTimestamp - previousTimestamp) <= GROUP_WINDOW_MS
+        : false;
+      items.push({
+        kind: "message",
+        message,
+        isCondensed: isSameAuthor && isCloseInTime,
+      });
+    }
+    return items;
+  }, [messages]);
   const reportTargetStillExists = useMemo(
     () => (reportDialogMessageId ? messageById.has(reportDialogMessageId) : false),
     [messageById, reportDialogMessageId],
@@ -896,9 +981,11 @@ export function CommunityScreen() {
   );
 
   const onViewableItemsChanged = useRef(
-    (info: { viewableItems: Array<ViewToken<ChatMessage>> }) => {
+    (info: { viewableItems: Array<ViewToken<ChatListItem>> }) => {
       const firstVisible = info.viewableItems.find((entry) => entry.isViewable && entry.item);
-      if (firstVisible?.item?.id) topVisibleMessageIdRef.current = firstVisible.item.id;
+      if (firstVisible?.item?.kind === "message") {
+        topVisibleMessageIdRef.current = firstVisible.item.message.id;
+      }
     },
   );
 
@@ -1192,7 +1279,7 @@ export function CommunityScreen() {
         >
           <FlatList
             ref={listRef}
-            data={messages}
+            data={chatListItems}
             inverted
             keyboardShouldPersistTaps="handled"
             onScroll={handleScrollMessages}
@@ -1205,20 +1292,26 @@ export function CommunityScreen() {
               paddingBottom: devVisualTopPaddingBottom,
             }}
             // EDIT END: add bottom spacing so top dev bar doesn't clip oldest message access
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <Message
-                {...item}
-                attachments={item.attachments ?? []}
-                linkPreview={linkPreviewsByMessageId[item.id] ?? null}
-                onPress={() => {
-                  composerInputRef.current?.blur();
-                }}
-                onLongPress={() => {
-                  handleLongPressMessage(item.id);
-                }}
-              />
-            )}
+            keyExtractor={(item) => (item.kind === "message" ? item.message.id : item.id)}
+            renderItem={({ item }) => {
+              if (item.kind === "divider") {
+                return <MessageDateDivider label={item.label} />;
+              }
+              return (
+                <Message
+                  {...item.message}
+                  attachments={item.message.attachments ?? []}
+                  isCondensed={item.isCondensed}
+                  linkPreview={linkPreviewsByMessageId[item.message.id] ?? null}
+                  onPress={() => {
+                    composerInputRef.current?.blur();
+                  }}
+                  onLongPress={() => {
+                    handleLongPressMessage(item.message.id);
+                  }}
+                />
+              );
+            }}
             renderScrollComponent={renderScrollComponent}
             // EDIT START: slice 3 older-message pagination using messaging state/actions
             onEndReachedThreshold={0.3}
@@ -1620,26 +1713,36 @@ const styles = StyleSheet.create({
     backgroundColor: "#243350",
   },
   messageRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    alignItems: "flex-start",
+    paddingLeft: CONTENT_LANE_LEFT,
+    paddingRight: CONTENT_RIGHT_PADDING,
+    position: "relative",
+  },
+  messageRowGroupStart: {
+    paddingTop: 16,
+    paddingBottom: 2,
+    minHeight: 44,
+  },
+  messageRowCondensed: {
+    paddingTop: 2,
+    paddingBottom: 2,
   },
   messageBubble: {
     alignSelf: "stretch",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: "#3A4E6A",
+  },
+  messageBody: {
+    alignSelf: "stretch",
   },
   messageMetaRow: {
-    marginBottom: 6,
+    marginBottom: 2,
     flexDirection: "row",
     alignItems: "center",
   },
   messageAvatarShell: {
-    marginRight: 8,
-    height: 24,
-    width: 24,
+    position: "absolute",
+    left: AVATAR_LEFT_INSET,
+    top: 18,
+    height: AVATAR_SIZE,
+    width: AVATAR_SIZE,
     overflow: "hidden",
     borderRadius: 999,
     backgroundColor: "#111827",
@@ -1659,9 +1762,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   messageMetaNameRow: {
-    marginRight: 6,
+    marginRight: 4,
     minWidth: 0,
-    flex: 1,
+    flexShrink: 1,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
@@ -1669,9 +1772,9 @@ const styles = StyleSheet.create({
   },
   messageAuthorName: {
     flexShrink: 1,
-    color: "#E5E7EB",
-    fontSize: 13,
-    fontWeight: "600",
+    color: "#F2F3F5",
+    fontSize: 16,
+    fontWeight: "500",
   },
   messageStaffBadge: {
     borderRadius: 4,
@@ -1688,13 +1791,48 @@ const styles = StyleSheet.create({
   },
   messageTimestamp: {
     flexShrink: 0,
-    color: "#9ba9bf",
+    marginLeft: 4,
+    color: "#A5A9B0",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  messageCompactTimestamp: {
+    position: "absolute",
+    left: AVATAR_LEFT_INSET,
+    top: 5,
+    color: "#A5A9B0",
     fontSize: 11,
+    width: AVATAR_SIZE,
+    textAlign: "center",
   },
   messageReplyLabel: {
-    marginBottom: 6,
+    marginBottom: 2,
     color: "#9ba9bf",
     fontSize: 12,
+  },
+  messageDateDivider: {
+    position: "relative",
+    marginTop: 24,
+    marginBottom: 8,
+    marginLeft: AVATAR_LEFT_INSET,
+    marginRight: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 1,
+  },
+  messageDateDividerLine: {
+    ...StyleSheet.absoluteFillObject,
+    top: 0,
+    bottom: 0,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(176, 184, 199, 0.44)",
+  },
+  messageDateDividerText: {
+    paddingHorizontal: 10,
+    backgroundColor: "#243350",
+    color: "#B6BCC8",
+    fontSize: 12,
+    fontWeight: "600",
   },
   messageText: {
     color: "#E5E7EB",
