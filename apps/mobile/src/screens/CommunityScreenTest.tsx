@@ -208,7 +208,6 @@ function Message({
   const siteName = linkPreview?.snapshot?.siteName ?? "Link preview";
   const thumbnailUrl = linkPreview?.snapshot?.thumbnail?.signedUrl ?? null;
   const showHeader = !isCondensed;
-  const compactTimestamp = isCondensed ? formatTime(createdAt ?? "") : null;
   // EDIT END: inline link preview parity computations
 
   return (
@@ -233,7 +232,7 @@ function Message({
           )}
         </View>
       ) : (
-        <Text style={styles.messageCompactTimestamp}>{compactTimestamp ?? ""}</Text>
+        <View style={styles.messageCompactTimestampSpacer} />
       )}
       <View style={styles.messageBody}>
         {showHeader ? (
@@ -657,13 +656,7 @@ export function CommunityScreen() {
       const currentBucket = dayBucket(message.createdAt);
       const previousBucket = dayBucket(previousMessage?.createdAt);
       const shouldInsertDivider = currentBucket !== previousBucket;
-      if (shouldInsertDivider) {
-        items.push({
-          kind: "divider",
-          id: `divider-${message.id}`,
-          label: formatDateDividerLabel(message.createdAt ?? new Date().toISOString()),
-        });
-      }
+      const isSameDayAsPrevious = Boolean(currentBucket) && currentBucket === previousBucket;
       const isSameAuthor =
         Boolean(message.authorUserId) &&
         message.authorUserId === previousMessage?.authorUserId;
@@ -679,8 +672,15 @@ export function CommunityScreen() {
       items.push({
         kind: "message",
         message,
-        isCondensed: isSameAuthor && isCloseInTime,
+        isCondensed: isSameAuthor && isCloseInTime && isSameDayAsPrevious,
       });
+      if (shouldInsertDivider) {
+        items.push({
+          kind: "divider",
+          id: `divider-${message.id}`,
+          label: formatDateDividerLabel(message.createdAt ?? new Date().toISOString()),
+        });
+      }
     }
     return items;
   }, [messages]);
@@ -1796,14 +1796,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
-  messageCompactTimestamp: {
+  messageCompactTimestampSpacer: {
     position: "absolute",
     left: AVATAR_LEFT_INSET,
     top: 5,
-    color: "#A5A9B0",
-    fontSize: 11,
     width: AVATAR_SIZE,
-    textAlign: "center",
+    height: AVATAR_SIZE,
   },
   messageReplyLabel: {
     marginBottom: 2,
@@ -1818,19 +1816,19 @@ const styles = StyleSheet.create({
     marginRight: 14,
     alignItems: "center",
     justifyContent: "center",
-    height: 1,
+    height: 24,
   },
   messageDateDividerLine: {
     ...StyleSheet.absoluteFillObject,
-    top: 0,
-    bottom: 0,
+    top: 12,
+    bottom: undefined,
     borderTopWidth: 1,
     borderTopColor: "rgba(176, 184, 199, 0.44)",
   },
   messageDateDividerText: {
     paddingHorizontal: 10,
     backgroundColor: "#243350",
-    color: "#B6BCC8",
+    color: "#e6edf7",
     fontSize: 12,
     fontWeight: "600",
   },
@@ -1964,7 +1962,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: INPUT_HEIGHT,
     maxHeight: 120,
-    color: "#354869",
+    color: "#e6edf7",
     paddingHorizontal: 6,
     paddingTop: 10,
     paddingBottom: 10,
