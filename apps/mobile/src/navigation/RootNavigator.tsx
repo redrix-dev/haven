@@ -1,6 +1,5 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { ActivityIndicator, View } from "react-native";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { useMobileExpoPushRegistration } from "../hooks/useMobileExpoPushRegistration";
@@ -22,19 +21,19 @@ import * as Linking from "expo-linking";
 import { useEffect, useRef, useState } from "react";
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { consumeAuthConfirmUrl } from "@/auth/mobileAuthService";
+import { CommunityScreenTestTwo } from "../screens/CommunityScreenTestTwo";
+import { createNavigatorTest } from "./NavigatorTest";
+
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator();
+
+const Tab = createNavigatorTest();
 
 function MainTabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { display: "none", height: 0 },
-      }}
-    >
+    <Tab.Navigator screenOptions={{ detachInactiveScreens: false}}>
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Community" component={CommunityScreen} />
+      <Tab.Screen name="CommunityTestTwo" component={CommunityScreenTestTwo} />
     </Tab.Navigator>
   );
 }

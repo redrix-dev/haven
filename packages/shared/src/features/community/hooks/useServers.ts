@@ -18,7 +18,9 @@ export function useServers({
 }: UseServersInput = {}) {
   const controlPlaneBackend = useMemo(() => getControlPlaneBackend(), []);
   const user = useAuthStore((state) => state.user);
-  const [status, setStatus] = useState<ServersStatus>("idle");
+  const [status, setStatus] = useState<ServersStatus>(() =>
+    useServersStore.getState().servers.length > 0 ? "success" : "idle"
+  );
   const [error, setError] = useState<string | null>(null);
   const servers = useServersStore((state) => state.servers);
   const loading = useServersStore((state) => state.isLoading);

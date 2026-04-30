@@ -1,5 +1,4 @@
-import { useNavigation } from "@react-navigation/native";
-import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useNavigation, CommonActions } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Dimensions,
@@ -12,8 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import { useNavigationStore } from "@shared/stores/navigationStore";
-import { HavenNavbar } from "../components/HavenNavbar";
-import type { RootStackParamList } from "../navigation/types";
+import { useEffect } from "react";
 
 type GridItem =
   | { kind: "server"; server: ServerSummary }
@@ -32,33 +30,31 @@ function buildGridItems(servers: ServerSummary[]): GridItem[] {
   ];
 }
 
+
 export function HomeScreen() {
+  useEffect(() => {
+    console.log("HomeScreen mounted");
+    return () => console.log("HomeScreen unmounted");
+  }, []);
   const insets = useSafeAreaInsets();
-  const navigation =
-    useNavigation<BottomTabNavigationProp<RootStackParamList, "Home">>();
+  const navigation = useNavigation<any>();
   const { servers, status, error: loadError, refreshServers } = useServers();
 
   const width = Dimensions.get("window").width;
   const cell = (width - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
-  
 
   const items = buildGridItems(servers);
 
   if (status === "loading" && servers.length === 0) {
     return (
-      <View className="flex-1 bg-surface-modal">
-        <HavenNavbar />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#e6edf7" size="large" />
-        </View>
+      <View className="flex-1 items-center justify-center bg-surface-modal">
+        <ActivityIndicator color="#e6edf7" size="large" />
       </View>
     );
   }
 
   return (
     <View className="flex-1 bg-surface-modal">
-      <HavenNavbar />
-
       {loadError ? (
         <Text className="px-4 pt-4 text-center text-sm text-destructive">{loadError}</Text>
       ) : null}
@@ -76,7 +72,7 @@ export function HomeScreen() {
           item.kind === "server" ? item.server.id : `${item.kind}-${index}`
         }
         numColumns={COLS}
-        refreshing={status === "loading"}
+        refreshing={status === "loading" && servers.length > 0}
         onRefresh={() => void refreshServers()}
         renderItem={({ item }) => {
           if (item.kind === "server") {
@@ -88,7 +84,9 @@ export function HomeScreen() {
                   className="items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
                   onPress={() => {
                     useNavigationStore.getState().setCurrentServerId(item.server.id);
-                    navigation.navigate("Community");
+                    navigation.dispatch(
+                      CommonActions.navigate({ name: "Main", params: { screen: "CommunityTestTwo" } })
+                    );
                   }}
                 >
                   <Text className="text-3xl font-bold text-foreground">{initial}</Text>

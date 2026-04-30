@@ -1,18 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import {
-  Pressable,
-  Text,
-  View,
-} from "react-native";
+import { CommonActions, useNavigation } from "@react-navigation/native";
+import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { RootStackParamList } from "../navigation/types";
+
+const goHome = (navigation: any) =>
+  navigation.dispatch(
+    CommonActions.navigate({ name: "Main", params: { screen: "Home" } }),
+  );
 
 export function HavenNavbar() {
   const insets = useSafeAreaInsets();
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList, "Home">>();
+  const navigation = useNavigation<any>();
 
   const iconBtn = (
     name: keyof typeof Ionicons.glyphMap,
@@ -36,8 +34,9 @@ export function HavenNavbar() {
         <View className="z-10 flex-row gap-2">
           {iconBtn("chevron-back", () => {
             if (navigation.canGoBack()) navigation.goBack();
+            else goHome(navigation);
           })}
-          {iconBtn("home", () => navigation.navigate("Home"))}
+          {iconBtn("home", () => goHome(navigation))}
           {iconBtn("people", () => undefined)}
         </View>
         <Text className="absolute left-0 right-0 text-center text-lg font-semibold text-foreground">
