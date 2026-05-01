@@ -1,11 +1,13 @@
 import { useCallback, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 export type PickedAvatarAsset = {
   uri: string;
   fileName: string;
   mimeType: string;
+  /** Present when picker is launched with `base64: true` (recommended for reliable uploads). */
+  base64?: string | null;
 };
 
 type UseProfileAvatarPickerOptions = {
@@ -40,6 +42,14 @@ export function useProfileAvatarPicker(options: UseProfileAvatarPickerOptions = 
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.9,
+        // Embed bytes in the result so we never rely on fragile `fetch(uri)` / Blob streaming into Supabase.
+        base64: true,
+        ...(Platform.OS === "ios"
+          ? {
+                preferredAssetRepresentationMode:
+                    ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+            }
+          : {}),
       });
 
       if (result.canceled) return;
@@ -50,6 +60,7 @@ export function useProfileAvatarPicker(options: UseProfileAvatarPickerOptions = 
         uri: asset.uri,
         fileName: asset.fileName ?? `avatar-${Date.now()}.jpg`,
         mimeType: resolveMimeType(asset),
+        base64: asset.base64 ?? null,
       };
 
       await onPicked?.(picked);

@@ -6,7 +6,7 @@ import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import UserAccountCard from "@/features/user-profile/UserAccountCard";
 import UserSettingsCard from "@/features/user-profile/UserSettingsCard";
 import { useCurrentUserIdentity } from "@/features/user-profile/useCurrentUserIdentity";
-import { pickedAssetToAvatarBlob } from "@/features/user-profile/pickedAssetToAvatarBlob";
+import { loadPickedAvatarBlob } from "@/features/user-profile/loadPickedAvatarBlob";
 import {
   useProfileAvatarPicker,
   type PickedAvatarAsset,
@@ -59,7 +59,10 @@ export default function UserSettingsContainer({
       setPendingAvatarPreviewUri(asset.uri);
 
       try {
-        const avatarFile = pickedAssetToAvatarBlob(asset.uri, asset.mimeType);
+        const avatarFile = await loadPickedAvatarBlob(asset);
+        if (avatarFile.size <= 0) {
+          throw new Error("Prepared image is empty; try another photo.");
+        }
 
         const backend = getControlPlaneBackend();
         const result = await backend.updateUserProfile({
