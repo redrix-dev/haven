@@ -1,4 +1,4 @@
-import { RootStackParamList } from "@/navigation/types";
+import type { RootStackParamList } from "@/navigation/types";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getErrorMessage } from "@shared/platform/lib/errors";

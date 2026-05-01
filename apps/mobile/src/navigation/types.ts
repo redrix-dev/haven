@@ -1,11 +1,13 @@
+import type { NavigatorScreenParams } from "@react-navigation/native";
+
+export type MainTabParamList = {
+  Home: undefined;
+  Community: undefined;
+};
+
 export type RootStackParamList = {
   Login: undefined;
-  Home: undefined;
-  Main: undefined;
-  Community: undefined;
-  SettingsPlaceholder: undefined;
-  CreatePlaceholder: undefined;
-  JoinPlaceholder: undefined;
+  Main: NavigatorScreenParams<MainTabParamList> | undefined;
   PasswordRecovery: { flow?: "requestReset" | "setNewPassword" } | undefined;
   SignUp: undefined;
 };

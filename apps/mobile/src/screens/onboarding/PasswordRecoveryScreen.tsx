@@ -11,8 +11,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getErrorMessage } from "@shared/platform/lib/errors";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { useState } from "react";
-import type { RootStackParamList } from "../navigation/types";
-import { usePasswordRecoveryGate } from "../navigation/PasswordRecoveryGateContext";
+import type { RootStackParamList } from "@/navigation/types";
+import { usePasswordRecoveryGate } from "@/navigation/PasswordRecoveryGateContext";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   completePasswordRecovery,

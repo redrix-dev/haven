@@ -1,4 +1,5 @@
-import { useNavigation, CommonActions } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   ActivityIndicator,
   Dimensions,
@@ -11,7 +12,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import { useNavigationStore } from "@shared/stores/navigationStore";
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { HavenModalShell } from "@/components/HavenModalShell";
+import type { RootStackParamList } from "@/navigation/types";
 
 type GridItem =
   | { kind: "server"; server: ServerSummary }
@@ -37,13 +40,24 @@ export function HomeScreen() {
     return () => console.log("HomeScreen unmounted");
   }, []);
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { servers, status, error: loadError, refreshServers } = useServers();
+
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [joinModalOpen, setJoinModalOpen] = useState(false);
 
   const width = Dimensions.get("window").width;
   const cell = (width - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
 
   const items = buildGridItems(servers);
+
+  const openCommunityForServer = useCallback(
+    (serverId: string) => {
+      useNavigationStore.getState().setCurrentServerId(serverId);
+      navigation.navigate("Main", { screen: "Community" });
+    },
+    [navigation],
+  );
 
   if (status === "loading" && servers.length === 0) {
     return (
@@ -82,12 +96,7 @@ export function HomeScreen() {
                 <Pressable
                   style={{ height: cell }}
                   className="items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
-                  onPress={() => {
-                    useNavigationStore.getState().setCurrentServerId(item.server.id);
-                    navigation.dispatch(
-                      CommonActions.navigate({ name: "Main", params: { screen: "CommunityTestTwo" } })
-                    );
-                  }}
+                  onPress={() => openCommunityForServer(item.server.id)}
                 >
                   <Text className="text-3xl font-bold text-foreground">{initial}</Text>
                 </Pressable>
@@ -106,7 +115,7 @@ export function HomeScreen() {
                 <Pressable
                   style={{ height: cell }}
                   className="items-center justify-center rounded-2xl border-2 border-dashed border-border-control bg-transparent active:bg-surface-embedded"
-                  onPress={() => navigation.navigate("CreatePlaceholder")}
+                  onPress={() => setCreateModalOpen(true)}
                 >
                   <Text className="text-3xl font-light text-foreground">+</Text>
                 </Pressable>
@@ -124,7 +133,7 @@ export function HomeScreen() {
               <Pressable
                 style={{ height: cell }}
                 className="items-center justify-center rounded-2xl border-2 border-dashed border-border-control bg-transparent active:bg-surface-embedded"
-                onPress={() => navigation.navigate("JoinPlaceholder")}
+                onPress={() => setJoinModalOpen(true)}
               >
                 <Text className="text-3xl font-light text-foreground">#</Text>
               </Pressable>
@@ -138,6 +147,31 @@ export function HomeScreen() {
           );
         }}
       />
+
+      <HavenModalShell
+        variant="settings"
+        visible={createModalOpen}
+        onDismiss={() => setCreateModalOpen(false)}
+        title="Create community"
+      >
+        <View className="mt-4 gap-3">
+          <Text className="text-sm text-muted-foreground">
+            Community creation will live here.
+          </Text>
+        </View>
+      </HavenModalShell>
+      <HavenModalShell
+        variant="settings"
+        visible={joinModalOpen}
+        onDismiss={() => setJoinModalOpen(false)}
+        title="Join community"
+      >
+        <View className="mt-4 gap-3">
+          <Text className="text-sm text-muted-foreground">
+            Join-by-code or invite flow will live here.
+          </Text>
+        </View>
+      </HavenModalShell>
     </View>
   );
 }

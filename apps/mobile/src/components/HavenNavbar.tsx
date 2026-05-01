@@ -1,20 +1,30 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CommonActions, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { RootStackParamList } from "@/navigation/types";
 
 type HavenNavbarProps = {
   onPressSettings?: () => void;
+  onPressNotifications?: () => void;
+  onPressDirectMessages?: () => void;
+  onPressFriends?: () => void;
 };
 
-const goHome = (navigation: any) =>
+const goHome = (navigation: NativeStackNavigationProp<RootStackParamList>) =>
   navigation.dispatch(
     CommonActions.navigate({ name: "Main", params: { screen: "Home" } }),
   );
 
-export function HavenNavbar({ onPressSettings }: HavenNavbarProps) {
+export function HavenNavbar({
+  onPressSettings,
+  onPressNotifications,
+  onPressDirectMessages,
+  onPressFriends,
+}: HavenNavbarProps) {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const iconBtn = (
     name: keyof typeof Ionicons.glyphMap,
@@ -41,15 +51,15 @@ export function HavenNavbar({ onPressSettings }: HavenNavbarProps) {
             else goHome(navigation);
           })}
           {iconBtn("home", () => goHome(navigation))}
-          {iconBtn("people", () => undefined)}
+          {iconBtn("people", onPressFriends ?? (() => undefined))}
         </View>
         <Text className="absolute left-0 right-0 text-center text-lg font-semibold text-foreground">
           Haven
         </Text>
         <View className="z-10 flex-row gap-2">
-          {iconBtn("notifications-outline", () => undefined)}
-          {iconBtn("chatbubble-outline", () => undefined)}
-          {iconBtn("cog-outline", onPressSettings ?? (() => navigation.navigate("SettingsPlaceholder")))}
+          {iconBtn("notifications-outline", onPressNotifications ?? (() => undefined))}
+          {iconBtn("chatbubble-outline", onPressDirectMessages ?? (() => undefined))}
+          {iconBtn("cog-outline", onPressSettings ?? (() => undefined))}
         </View>
       </View>
     </View>

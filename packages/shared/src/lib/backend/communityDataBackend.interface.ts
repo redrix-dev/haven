@@ -77,6 +77,22 @@ export interface CommunityDataBackend {
       onReportStatusUpdated?: (payload: ReportStatusUpdatedBroadcastPayload) => void;
     }
   ): RealtimeChannel;
+  /** Member row id and assigned role ids for tight realtime permission invalidation. */
+  fetchMyMemberRoleAssignmentForRealtime(
+    communityId: string,
+    userId: string,
+  ): Promise<{ memberId: string; roleIds: string[] } | null>;
+  /**
+   * Subscribe to postgres changes that affect `fetchServerPermissions` for this member:
+   * `member_roles` (assignments), `role_permissions` (definitions for assigned roles),
+   * and `community_members` (e.g. `is_owner`).
+   */
+  subscribeToMyServerPermissionsChanges(
+    communityId: string,
+    memberId: string,
+    roleIds: string[],
+    onInvalidate: () => void,
+  ): RealtimeChannel;
   broadcastMemberBanned(input: MemberBannedBroadcastPayload): Promise<void>;
   broadcastMemberChannelAccessRevoked(
     input: MemberChannelAccessRevokedBroadcastPayload

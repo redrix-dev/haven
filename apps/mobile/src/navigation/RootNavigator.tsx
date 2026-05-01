@@ -1,39 +1,33 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
-import { useAuthSession } from "../hooks/useAuthSession";
-import { useMobileExpoPushRegistration } from "../hooks/useMobileExpoPushRegistration";
-import { useMobileVoipFoundation } from "../hooks/useMobileVoipFoundation";
-import { useServersRealtimeBootstrap } from "../hooks/useServersRealtimeBootstrap";
-import { CreatePlaceholderScreen } from "../screens/CreatePlaceholderScreen";
-// EDIT START: temporarily wire Community tab to test boilerplate screen
-import { CommunityScreen } from "../screens/CommunityScreenTest";
-// EDIT END: temporarily wire Community tab to test boilerplate screen
-import { HomeScreen } from "../screens/HomeScreen";
-import { JoinPlaceholderScreen } from "../screens/JoinPlaceholderScreen";
-import { SettingsPlaceholderScreen } from "../screens/SettingsPlaceholderScreen";
+import { useAuthSession } from "@/hooks/useAuthSession";
+import { useMobileExpoPushRegistration } from "@/hooks/useMobileExpoPushRegistration";
+import { useMobileVoipFoundation } from "@/hooks/useMobileVoipFoundation";
+import { useServersRealtimeBootstrap } from "@/hooks/useServersRealtimeBootstrap";
+import { HomeScreen } from "@/screens/main/HomeScreen";
 import type { RootStackParamList } from "./types";
 import { PasswordRecoveryGateProvider } from "./PasswordRecoveryGateContext";
-import { MobileLogin } from "../screens/MobileLogin";
-import { PasswordRecoveryScreen } from "../screens/PasswordRecoveryScreen";
-import { SignUpScreen } from "../screens/SignUpScreen";
+import { MobileLogin } from "@/screens/entry/MobileLogin";
+import { PasswordRecoveryScreen } from "@/screens/onboarding/PasswordRecoveryScreen";
+import { SignUpScreen } from "@/screens/onboarding/SignUpScreen";
 import * as Linking from "expo-linking";
 import { useEffect, useRef, useState } from "react";
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { consumeAuthConfirmUrl } from "@/auth/mobileAuthService";
-import { CommunityScreenTestTwo } from "../screens/CommunityScreenTestTwo";
-import { createNavigatorTest } from "./NavigatorTest";
+import { CommunityScreen } from "@/screens/main/CommunityScreen";
+import { createHavenTabNavigator } from "@/navigation/HavenTabNavigator";
 
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const Tab = createNavigatorTest();
+const Tab = createHavenTabNavigator();
 
 function MainTabs() {
   return (
     <Tab.Navigator screenOptions={{ detachInactiveScreens: false}}>
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="CommunityTestTwo" component={CommunityScreenTestTwo} />
+      <Tab.Screen name="Community" component={CommunityScreen} />
     </Tab.Navigator>
   );
 }
@@ -131,18 +125,6 @@ export function RootNavigator() {
                     name="Main"
                     component={MainTabs}
                     options={{ keyboardHandlingEnabled: false }}
-                  />
-                  <Stack.Screen
-                    name="SettingsPlaceholder"
-                    component={SettingsPlaceholderScreen}
-                  />
-                  <Stack.Screen
-                    name="CreatePlaceholder"
-                    component={CreatePlaceholderScreen}
-                  />
-                  <Stack.Screen
-                    name="JoinPlaceholder"
-                    component={JoinPlaceholderScreen}
                   />
                 </>
               )}

@@ -26,9 +26,9 @@ import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import { getReplyToMessageId, isAuthorProfileTombstone } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import { resolveLiveAvatarUrl } from "@shared/lib/liveProfiles";
-import { setLastTextChannelIdForCommunity } from "../storage/communityChannelPrefs";
-import { CommunityChannelBar } from "../components/community/CommunityChannelBar";
-import { ChatScrollView } from "../components/community/ChatScrollView";
+import { setLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
+import { CommunityChannelBar } from "@/features/community/CommunityChannelBar";
+import { ChatScrollView } from "@/features/community/ChatScrollView";
 import {
   CommunityMessageBubble,
   MessageDateDivider,
@@ -38,10 +38,10 @@ import {
   GROUP_WINDOW_MS,
   type ChatListItem,
   type ChatMessage,
-} from "../components/community/CommunityMessageBubble";
+} from "@/features/community/CommunityMessageBubble";
 import type { AuthorProfile } from "@shared/lib/backend/types";
-import { ChannelSwitcherModal } from "@/components/community/ChannelSwitcherModal";
-import { CommunityPhaseGate } from "@/components/community/CommunityPhaseGate";
+import { ChannelSwitcherModal } from "@/features/community/ChannelSwitcherModal";
+import { CommunityPhaseGate } from "@/features/community/CommunityPhaseGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MARGIN = 8;
@@ -64,7 +64,7 @@ function getReplyTargetLabel(
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export function CommunityScreenTestTwo() {
+export function CommunityScreen() {
   const { bottom } = useSafeAreaInsets();
   const composerHeight = useSharedValue(0);
   const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);

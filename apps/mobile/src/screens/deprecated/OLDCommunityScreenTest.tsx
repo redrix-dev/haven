@@ -53,7 +53,7 @@ import { getFallbackEmbedUrl } from "@shared/features/messaging/components/messa
 import { getReplyToMessageId } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import { isAuthorProfileTombstone } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import { resolveLiveAvatarUrl } from "@shared/lib/liveProfiles";
-import { CommunityAttachmentVideo } from "../components/community/CommunityAttachmentVideo";
+import { CommunityAttachmentVideo } from "../../features/community/CommunityAttachmentVideo";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import {
   EnrichedMarkdownText,
@@ -62,12 +62,12 @@ import {
 } from "react-native-enriched-markdown";
 import { useSharedValue, withTiming } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import type { RootStackParamList } from "../navigation/types";
+import type { RootStackParamList } from "../../navigation/types";
 import {
   getLastTextChannelIdForCommunity,
   setLastTextChannelIdForCommunity,
-} from "../storage/communityChannelPrefs";
-import { commitChannelScrollExit, peekChannelScrollExit } from "../storage/communityTimelinePrefs";
+} from "../../storage/communityChannelPrefs";
+import { commitChannelScrollExit, peekChannelScrollExit } from "../../storage/communityTimelinePrefs";
 
 // EDIT START: add local message model/constants for standalone in-line screen
 type ChatMessage = {

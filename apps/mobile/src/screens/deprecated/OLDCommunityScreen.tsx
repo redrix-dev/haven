@@ -22,15 +22,15 @@ import { useMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useLiveProfiles } from "@shared/features/profile/hooks/useLiveProfiles";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { useMessagesStore } from "@shared/stores/messagesStore";
-import { HavenNavbar } from "../components/HavenNavbar";
-import { CommunityChannelBar } from "../components/community/CommunityChannelBar";
-import { ChannelSwitcherModal } from "../components/community/ChannelSwitcherModal";
-import { CommunityMessageList } from "../components/community/CommunityMessageList";
-import { HavenComposer } from "../components/community/HavenComposer";
+import { HavenNavbar } from "../../components/HavenNavbar";
+import { CommunityChannelBar } from "../../features/community/CommunityChannelBar";
+import { ChannelSwitcherModal } from "../../features/community/ChannelSwitcherModal";
+import { CommunityMessageList } from "../../features/community/CommunityMessageList";
+import { HavenComposer } from "../../components/HavenComposer";
 import {
   getLastTextChannelIdForCommunity,
   setLastTextChannelIdForCommunity,
-} from "../storage/communityChannelPrefs";
+} from "../../storage/communityChannelPrefs";
 
 /**
  * Mobile community workspace entry: keeps navigationStore in sync with the

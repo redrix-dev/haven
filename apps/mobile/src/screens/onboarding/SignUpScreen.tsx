@@ -18,7 +18,7 @@ import { useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { signUpWithPassword } from "@/auth/mobileAuthService";
-import type { RootStackParamList } from "../navigation/types";
+import type { RootStackParamList } from "@/navigation/types";
 
 const PLACEHOLDER_MUTED = "#a9b8cf";
 
