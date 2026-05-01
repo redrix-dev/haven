@@ -1,17 +1,21 @@
 /**
- * Produces a plain JS `Blob` with real bytes for Supabase Storage uploads.
+ * Prepares an `ArrayBuffer` + MIME type for `updateUserProfile` / Supabase Storage.
  *
- * React Native + Supabase often uploads **0-byte objects** when the body is an Expo `File`/`Blob`
- * subclass or from `fetch(fileUri).blob()` — the storage client reads the stream incorrectly.
- *
- * Preferred path (Expo): request `base64: true` from `launchImageLibraryAsync` and decode here.
- * Fallback: `expo-file-system` `File.arrayBuffer()`, then legacy `readAsStringAsync` base64.
+ * React Native (Hermes) often throws:
+ * "Creating blobs from 'ArrayBuffer' and 'ArrayBufferView' are not supported"
+ * when using `new Blob([...])`. Supabase documents uploading **`ArrayBuffer`** from decoded
+ * base64 for React Native instead of Blob/File/FormData.
  */
 import { File as ExpoFsFile } from "expo-file-system";
 import * as LegacyFs from "expo-file-system/legacy";
 import { EncodingType } from "expo-file-system/legacy";
 
 import type { PickedAvatarAsset } from "@/features/user-profile/useProfileAvatarPicker";
+
+export type PickedAvatarUpload = {
+    body: ArrayBuffer;
+    contentType: string;
+};
 
 function base64ToUint8Array(b64: string): Uint8Array {
     const withoutPrefix = b64.includes(",") ? (b64.split(",").pop() ?? "") : b64;
@@ -25,8 +29,14 @@ function base64ToUint8Array(b64: string): Uint8Array {
     return bytes;
 }
 
-export async function loadPickedAvatarBlob(asset: PickedAvatarAsset): Promise<Blob> {
-    const mime =
+function uint8ArrayToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+    const out = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(out).set(bytes);
+    return out;
+}
+
+export async function loadPickedAvatarForUpload(asset: PickedAvatarAsset): Promise<PickedAvatarUpload> {
+    const contentType =
         asset.mimeType.trim().length > 0 ? asset.mimeType : "image/jpeg";
 
     if (asset.base64 && asset.base64.length > 0) {
@@ -34,7 +44,10 @@ export async function loadPickedAvatarBlob(asset: PickedAvatarAsset): Promise<Bl
         if (bytes.byteLength === 0) {
             throw new Error("Image data was empty after decoding.");
         }
-        return new Blob([bytes as BlobPart], { type: mime });
+        return {
+            body: uint8ArrayToArrayBuffer(bytes),
+            contentType,
+        };
     }
 
     const file = new ExpoFsFile(asset.uri);
@@ -45,12 +58,12 @@ export async function loadPickedAvatarBlob(asset: PickedAvatarAsset): Promise<Bl
         throw new Error("The selected image file is empty.");
     }
 
-    const resolvedMime =
-        typeof file.type === "string" && file.type.trim().length > 0 ? file.type : mime;
+    const resolvedContentType =
+        typeof file.type === "string" && file.type.trim().length > 0 ? file.type : contentType;
 
     const buffer = await file.arrayBuffer();
     if (buffer.byteLength > 0) {
-        return new Blob([buffer], { type: resolvedMime });
+        return { body: buffer, contentType: resolvedContentType };
     }
 
     const legacyB64 = await LegacyFs.readAsStringAsync(asset.uri, {
@@ -60,5 +73,8 @@ export async function loadPickedAvatarBlob(asset: PickedAvatarAsset): Promise<Bl
     if (bytes.byteLength === 0) {
         throw new Error("Could not read image bytes from the selected file.");
     }
-    return new Blob([bytes as BlobPart], { type: resolvedMime });
+    return {
+        body: uint8ArrayToArrayBuffer(bytes),
+        contentType: resolvedContentType,
+    };
 }

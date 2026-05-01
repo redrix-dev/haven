@@ -6,7 +6,7 @@ import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import UserAccountCard from "@/features/user-profile/UserAccountCard";
 import UserSettingsCard from "@/features/user-profile/UserSettingsCard";
 import { useCurrentUserIdentity } from "@/features/user-profile/useCurrentUserIdentity";
-import { loadPickedAvatarBlob } from "@/features/user-profile/loadPickedAvatarBlob";
+import { loadPickedAvatarForUpload } from "@/features/user-profile/loadPickedAvatarForUpload";
 import {
   useProfileAvatarPicker,
   type PickedAvatarAsset,
@@ -59,8 +59,8 @@ export default function UserSettingsContainer({
       setPendingAvatarPreviewUri(asset.uri);
 
       try {
-        const avatarFile = await loadPickedAvatarBlob(asset);
-        if (avatarFile.size <= 0) {
+        const { body, contentType } = await loadPickedAvatarForUpload(asset);
+        if (body.byteLength <= 0) {
           throw new Error("Prepared image is empty; try another photo.");
         }
 
@@ -69,7 +69,8 @@ export default function UserSettingsContainer({
           userId,
           username,
           avatarUrl: identity.avatarUrl,
-          avatarFile,
+          avatarFile: body,
+          avatarContentType: contentType,
         });
 
         useLiveProfilesStore.getState().upsertProfile({

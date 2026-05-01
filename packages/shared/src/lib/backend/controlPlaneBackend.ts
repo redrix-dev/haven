@@ -45,13 +45,19 @@ export interface ControlPlaneBackend {
   fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
   subscribeToProfileIdentities(onChange: (payload?: unknown) => void): RealtimeChannel;
   listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
-  uploadAvatar(file: Blob): Promise<string>;
+  /** Pass `ArrayBuffer` on React Native; `Blob`/`File` on web (see Supabase RN upload guidance). */
+  uploadAvatar(
+    file: Blob | ArrayBuffer,
+    options?: { contentType?: string },
+  ): Promise<string>;
   deleteAvatar(avatarUrl: string): Promise<void>;
   updateUserProfile(input: {
     userId: string;
     username: string;
     avatarUrl: string | null;
-    avatarFile?: Blob | null;
+    avatarFile?: Blob | ArrayBuffer | null;
+    /** Required when `avatarFile` is an `ArrayBuffer` (e.g. mobile); ignored for `Blob`. */
+    avatarContentType?: string;
   }): Promise<UserProfileInfo>;
   listUserCommunities(userId: string): Promise<ServerSummary[]>;
   renameCommunity(input: { communityId: string; name: string }): Promise<void>;
@@ -177,10 +183,15 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     return snapshot;
   },
 
-  async uploadAvatar(file) {
-    if (file.size > PROFILE_AVATAR_FILE_SIZE_LIMIT) {
+  async uploadAvatar(file, options) {
+    const byteLength = file instanceof ArrayBuffer ? file.byteLength : file.size;
+    if (byteLength > PROFILE_AVATAR_FILE_SIZE_LIMIT) {
       throw new Error('Avatar images must be 5MB or smaller.');
     }
+
+    const contentType =
+      options?.contentType ??
+      (file instanceof Blob ? file.type || 'image/webp' : 'image/jpeg');
 
     const userId = await requireAuthenticatedUserId();
     const objectPath = `${userId}/${Date.now()}.webp`;
@@ -188,7 +199,7 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       .from(PROFILE_AVATAR_BUCKET)
       .upload(objectPath, file, {
         cacheControl: '3600',
-        contentType: file.type || 'image/webp',
+        contentType,
         upsert: false,
       });
 
@@ -213,7 +224,13 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     }
   },
 
-  async updateUserProfile({ userId, username, avatarUrl, avatarFile = null }) {
+  async updateUserProfile({
+    userId,
+    username,
+    avatarUrl,
+    avatarFile = null,
+    avatarContentType,
+  }) {
     const { data: existingProfile, error: existingProfileError } = await client
       .from('profiles')
       .select('avatar_url')
@@ -229,7 +246,11 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       if (existingAvatarUrl) {
         await backend.deleteAvatar(existingAvatarUrl);
       }
-      nextAvatarUrl = await backend.uploadAvatar(avatarFile);
+      const uploadOpts =
+        avatarFile instanceof ArrayBuffer
+          ? { contentType: avatarContentType ?? 'image/jpeg' }
+          : undefined;
+      nextAvatarUrl = await backend.uploadAvatar(avatarFile, uploadOpts);
     } else if (avatarUrl === null && existingAvatarUrl) {
       await backend.deleteAvatar(existingAvatarUrl);
     }
