@@ -1,12 +1,13 @@
-import { Modal, View, Text, Pressable, ScrollView } from "react-native";
+import { Modal, View, Text, Pressable, ScrollView, Keyboard, Platform, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withTiming,
-    runOnJS,
 } from "react-native-reanimated";
-import { useEffect, useState } from "react";
+import { KeyboardController } from "react-native-keyboard-controller";
+import { useEffect, useRef, useState } from "react";
+import { scheduleOnRN } from "react-native-worklets";
 
 interface HavenModalShellProps {
     variant: "settings" | "inbox";
@@ -18,28 +19,87 @@ interface HavenModalShellProps {
 
 const SLIDE_DURATION = 320;
 const FADE_DURATION = 220;
+/** Extra px so the sheet clears the viewport on all devices (fixed values like 600 lag before unmount). */
+const OFFSCREEN_BUFFER_PX = 24;
 
 export function HavenModalShell({ variant, visible, onDismiss, title, children }: HavenModalShellProps) {
     const insets = useSafeAreaInsets();
+    const { height: windowHeight } = useWindowDimensions();
+    const isSettingsVariant = variant === "settings";
+
+    const offscreenTranslateY = windowHeight + insets.bottom + OFFSCREEN_BUFFER_PX;
 
     // Keep modal mounted during exit animation
     const [modalVisible, setModalVisible] = useState(visible);
+    const [keyboardInset, setKeyboardInset] = useState(0);
+    const isClosingRef = useRef(false);
 
     const scrimOpacity = useSharedValue(0);
-    const cardTranslateY = useSharedValue(600);
+    const cardTranslateY = useSharedValue(offscreenTranslateY);
+
+    const completeClose = (notifyParent: boolean) => {
+        isClosingRef.current = false;
+        if (notifyParent) {
+            onDismiss();
+        }
+        setModalVisible(false);
+    };
+
+    const startCloseAnimation = (notifyParent: boolean) => {
+        if (isClosingRef.current) return;
+        isClosingRef.current = true;
+        scrimOpacity.value = withTiming(0, { duration: FADE_DURATION });
+        cardTranslateY.value = withTiming(offscreenTranslateY, { duration: SLIDE_DURATION }, (finished) => {
+            if (finished) scheduleOnRN(completeClose, notifyParent);
+        });
+    };
+
+    useEffect(() => {
+        if (!visible && !modalVisible) {
+            cardTranslateY.value = offscreenTranslateY;
+        }
+    }, [offscreenTranslateY, visible, modalVisible]);
 
     useEffect(() => {
         if (visible) {
+            isClosingRef.current = false;
             setModalVisible(true);
+            cardTranslateY.value = offscreenTranslateY;
             scrimOpacity.value = withTiming(1, { duration: FADE_DURATION });
             cardTranslateY.value = withTiming(0, { duration: SLIDE_DURATION });
-        } else {
-            scrimOpacity.value = withTiming(0, { duration: FADE_DURATION });
-            cardTranslateY.value = withTiming(600, { duration: SLIDE_DURATION }, (finished) => {
-                if (finished) runOnJS(setModalVisible)(false);
-            });
+            return;
+        }
+
+        // External close requests (parent toggled visible=false) still animate out,
+        // but should not call onDismiss again.
+        if (!isClosingRef.current) {
+            startCloseAnimation(false);
         }
     }, [visible]);
+
+    useEffect(() => {
+        if (!isSettingsVariant || !modalVisible) {
+            setKeyboardInset(0);
+            return;
+        }
+
+        const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+        const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+        const showSub = Keyboard.addListener(showEvent, (event) => {
+            const height = event.endCoordinates?.height ?? 0;
+            setKeyboardInset(height);
+        });
+
+        const hideSub = Keyboard.addListener(hideEvent, () => {
+            setKeyboardInset(0);
+        });
+
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, [isSettingsVariant, modalVisible]);
 
     const scrimStyle = useAnimatedStyle(() => ({
         opacity: scrimOpacity.value,
@@ -49,13 +109,21 @@ export function HavenModalShell({ variant, visible, onDismiss, title, children }
         transform: [{ translateY: cardTranslateY.value }],
     }));
 
+    const handleScrimPress = () => {
+        if (isSettingsVariant && KeyboardController.isVisible()) {
+            void KeyboardController.dismiss();
+            return;
+        }
+        startCloseAnimation(true);
+    };
+
     return (
         <Modal
             visible={modalVisible}
             animationType="none"
             presentationStyle="overFullScreen"
             transparent
-            onRequestClose={onDismiss}
+            onRequestClose={() => startCloseAnimation(true)}
         >
             <View className="flex-1 justify-end">
                 {/* Scrim — fades independently */}
@@ -66,24 +134,40 @@ export function HavenModalShell({ variant, visible, onDismiss, title, children }
                 />
 
                 {/* Tap scrim to dismiss */}
-                <Pressable className="absolute inset-0" onPress={onDismiss} />
+                <Pressable className="absolute inset-0" onPress={handleScrimPress} />
 
                 {/* Card — slides independently */}
                 <Animated.View
-                    className="max-h-[90%] rounded-t-3xl border-t border-border bg-card px-6 pt-6"
+                    className={`rounded-t-3xl border-t border-border bg-card px-6 pt-6 ${
+                        isSettingsVariant ? "h-[92%]" : "max-h-[90%]"
+                    }`}
                     style={[cardStyle, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}
                 >
                     {title && (
                         <View className="mb-4 flex-row items-center justify-between">
                             <Text className="text-lg font-semibold text-foreground">{title}</Text>
-                            <Pressable onPress={onDismiss} hitSlop={12}>
+                            <Pressable onPress={() => startCloseAnimation(true)} hitSlop={12}>
                                 <Text className="text-lg text-muted-foreground">✕</Text>
                             </Pressable>
                         </View>
                     )}
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
-                        {children}
-                    </ScrollView>
+                    {isSettingsVariant ? (
+                        <ScrollView
+                            className="flex-1"
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                            keyboardDismissMode="interactive"
+                            contentContainerStyle={{
+                                paddingBottom: 8 + Math.max(0, keyboardInset - insets.bottom),
+                            }}
+                        >
+                            {children}
+                        </ScrollView>
+                    ) : (
+                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+                            {children}
+                        </ScrollView>
+                    )}
                 </Animated.View>
             </View>
         </Modal>

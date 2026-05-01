@@ -8,6 +8,7 @@ import { StyleSheet, Text, View } from "react-native";
 import type { BottomTabNavigatorProps } from "@react-navigation/bottom-tabs";
 import { HavenModalShell } from "@/components/HavenModalShell";
 import { HavenNavbar } from "@/components/HavenNavbar";
+import UserSettingsContainer from "@/features/user-profile/UserSettingsContainer";
 
 function HavenTabNavigator({
   id,
@@ -105,11 +106,17 @@ function HavenTabNavigator({
         onDismiss={handleCloseSettings}
         title="Settings"
       >
-        <View className="mt-4 gap-3">
-          <Text className="text-sm text-muted-foreground">
-            Account and settings management will live here.
-          </Text>
-        </View>
+        <UserSettingsContainer
+          onOpenVoiceSettings={() => {
+            // TODO: open voice settings modal
+          }}
+          onSignOut={() => {
+            // TODO: sign out
+          }}
+          onDeleteAccount={() => {
+            // TODO: delete account
+          }}
+        />
       </HavenModalShell>
       <HavenModalShell
         variant="inbox"
