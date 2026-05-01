@@ -411,5 +411,6 @@ return (
       onCreateChannel={() => undefined}
     />
   </SafeAreaView>
+  
   );
 };

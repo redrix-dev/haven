@@ -3,12 +3,16 @@ import { CommonActions, useNavigation } from "@react-navigation/native";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+type HavenNavbarProps = {
+  onPressSettings?: () => void;
+};
+
 const goHome = (navigation: any) =>
   navigation.dispatch(
     CommonActions.navigate({ name: "Main", params: { screen: "Home" } }),
   );
 
-export function HavenNavbar() {
+export function HavenNavbar({ onPressSettings }: HavenNavbarProps) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
 
@@ -45,7 +49,7 @@ export function HavenNavbar() {
         <View className="z-10 flex-row gap-2">
           {iconBtn("notifications-outline", () => undefined)}
           {iconBtn("chatbubble-outline", () => undefined)}
-          {iconBtn("cog-outline", () => navigation.navigate("SettingsPlaceholder"))}
+          {iconBtn("cog-outline", onPressSettings ?? (() => navigation.navigate("SettingsPlaceholder")))}
         </View>
       </View>
     </View>
