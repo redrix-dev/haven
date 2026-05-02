@@ -14,6 +14,8 @@ interface HavenModalShellProps {
     visible: boolean;
     onDismiss: () => void;
     title?: string;
+    /** When false, inbox body is a plain flex container (use for nested FlatList). */
+    bodyScrollable?: boolean;
     children: React.ReactNode;
 }
 
@@ -22,7 +24,14 @@ const FADE_DURATION = 220;
 /** Extra px so the sheet clears the viewport on all devices (fixed values like 600 lag before unmount). */
 const OFFSCREEN_BUFFER_PX = 24;
 
-export function HavenModalShell({ variant, visible, onDismiss, title, children }: HavenModalShellProps) {
+export function HavenModalShell({
+    variant,
+    visible,
+    onDismiss,
+    title,
+    bodyScrollable = true,
+    children,
+}: HavenModalShellProps) {
     const insets = useSafeAreaInsets();
     const { height: windowHeight } = useWindowDimensions();
     const isSettingsVariant = variant === "settings";
@@ -139,7 +148,11 @@ export function HavenModalShell({ variant, visible, onDismiss, title, children }
                 {/* Card — slides independently */}
                 <Animated.View
                     className={`rounded-t-3xl border-t border-border bg-card px-6 pt-6 ${
-                        isSettingsVariant ? "h-[92%]" : "max-h-[90%]"
+                        isSettingsVariant
+                            ? "h-[92%]"
+                            : bodyScrollable
+                              ? "max-h-[90%]"
+                              : "max-h-[90%] flex-1"
                     }`}
                     style={[cardStyle, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}
                 >
@@ -163,10 +176,12 @@ export function HavenModalShell({ variant, visible, onDismiss, title, children }
                         >
                             {children}
                         </ScrollView>
-                    ) : (
+                    ) : bodyScrollable ? (
                         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
                             {children}
                         </ScrollView>
+                    ) : (
+                        <View className="min-h-0 flex-1">{children}</View>
                     )}
                 </Animated.View>
             </View>

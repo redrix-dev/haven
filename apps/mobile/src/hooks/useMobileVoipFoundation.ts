@@ -47,7 +47,6 @@ export function useMobileVoipFoundation(
     });
 
     RNCallKeep.setAvailable(true);
-    RNVoipPushNotification.registerVoipToken();
 
     function handleVoipRegister(voipToken: string): void {
       if (!voipToken.trim()) return;
@@ -66,8 +65,11 @@ export function useMobileVoipFoundation(
       // Foundation only: call handling will be connected to voice runtime later.
     }
 
+    // Register listeners before requesting the token, or PushKit can emit
+    // `RNVoipPushRemoteNotificationsRegisteredEvent` before JS subscribes (startup race / warning).
     RNVoipPushNotification.addEventListener("register", handleVoipRegister);
     RNVoipPushNotification.addEventListener("notification", handleVoipNotification);
+    RNVoipPushNotification.registerVoipToken();
     const answerCallSubscription = RNCallKeep.addEventListener(
       "answerCall",
       handleAnswerCall,

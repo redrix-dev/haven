@@ -46,6 +46,7 @@ import type {
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useSocialGraphRealtimeStore } from "@shared/stores/socialGraphRealtimeStore";
 import { RefreshCcw, UserPlus, Users } from "lucide-react";
 
 type FriendsModalProps = {
@@ -120,6 +121,8 @@ export function FriendsModal({
   const [pendingConfirm, setPendingConfirm] =
     React.useState<FriendsConfirmState | null>(null);
   const searchRequestIdRef = React.useRef(0);
+  const lastProcessedSocialGraphRevisionRef = React.useRef<number | null>(null);
+  const socialGraphRevision = useSocialGraphRealtimeStore((s) => s.revision);
   const socialBackend = React.useMemo(() => getSocialBackend(), []);
 
   const incomingRequests = requests.filter(
@@ -166,6 +169,7 @@ export function FriendsModal({
 
   React.useEffect(() => {
     if (!open) {
+      lastProcessedSocialGraphRevisionRef.current = null;
       setActionError(null);
       setSearchError(null);
       setSearchLoading(false);
@@ -184,17 +188,16 @@ export function FriendsModal({
   React.useEffect(() => {
     if (!open || !currentUserId) return;
 
-    const subscription = socialBackend.subscribeToSocialGraph(
-      currentUserId,
-      () => {
-        void refreshData({ suppressLoadingState: true });
-      },
-    );
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [currentUserId, open, refreshData, socialBackend]);
+    if (lastProcessedSocialGraphRevisionRef.current === null) {
+      lastProcessedSocialGraphRevisionRef.current = socialGraphRevision;
+      return;
+    }
+    if (lastProcessedSocialGraphRevisionRef.current === socialGraphRevision) {
+      return;
+    }
+    lastProcessedSocialGraphRevisionRef.current = socialGraphRevision;
+    void refreshData({ suppressLoadingState: true });
+  }, [currentUserId, open, refreshData, socialGraphRevision]);
 
   React.useEffect(() => {
     if (!open || activeTab !== "add") return;

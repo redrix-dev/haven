@@ -24,6 +24,11 @@ import type {
   NotificationPreferences,
   NotificationPreferenceUpdate,
 } from "@shared/lib/backend/types";
+import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
+import {
+  getNotificationSummary,
+  getNotificationTitle,
+} from "@shared/features/notifications/notificationCopy";
 import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
@@ -73,50 +78,6 @@ const formatTimestamp = (value: string) => {
   return date.toLocaleString();
 };
 
-const getNotificationTitle = (notification: NotificationItem) => {
-  switch (notification.kind) {
-    case "friend_request_received":
-      return "Friend request received";
-    case "friend_request_accepted":
-      return "Friend request accepted";
-    case "dm_message":
-      return "Direct message";
-    case "channel_mention":
-      return "Mention";
-    case "system":
-    default:
-      return "Notification";
-  }
-};
-
-const getNotificationSummary = (notification: NotificationItem) => {
-  const titleFromPayload =
-    typeof notification.payload.title === "string"
-      ? notification.payload.title.trim()
-      : "";
-  const messageFromPayload =
-    typeof notification.payload.message === "string"
-      ? notification.payload.message.trim()
-      : "";
-
-  if (messageFromPayload) return messageFromPayload;
-  if (titleFromPayload) return titleFromPayload;
-
-  switch (notification.kind) {
-    case "friend_request_received":
-      return "A user sent you a friend request.";
-    case "friend_request_accepted":
-      return "A user accepted your friend request.";
-    case "dm_message":
-      return "You received a new direct message.";
-    case "channel_mention":
-      return "You were mentioned in a channel.";
-    case "system":
-    default:
-      return "A new notification was added to your inbox.";
-  }
-};
-
 const rowIsUnread = (notification: NotificationItem) => !notification.readAt;
 
 const getFriendRequestIdFromNotification = (
@@ -156,10 +117,8 @@ export function NotificationCenterModal({
   const loading = useNotificationsStore((state) => state.isLoading);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const [showSettings, setShowSettings] = React.useState(false);
-  // dm_message notifications are handled by the DM panel, not surfaced here
-  const visibleNotifications = notifications.filter(
-    (notification) => notification.kind !== "dm_message",
-  );
+  // DMs, friend requests, and accepted-FR toasts are owned by other surfaces; see inbox filter helper.
+  const visibleNotifications = filterNotificationsForInbox(notifications);
   const visibleUnreadCount = visibleNotifications.filter(
     (notification) => notification.readAt == null,
   ).length;
@@ -444,7 +403,7 @@ export function NotificationCenterModal({
                         No notifications yet.
                       </p>
                       <p className="mt-1 text-xs text-auxiliary">
-                        Friend requests will appear here.
+                        Open Friends for requests; this inbox shows mentions and other updates.
                       </p>
                     </div>
                   ) : (

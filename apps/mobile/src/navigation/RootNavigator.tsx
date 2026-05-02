@@ -17,6 +17,9 @@ import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { consumeAuthConfirmUrl } from "@/auth/mobileAuthService";
 import { CommunityScreen } from "@/screens/main/CommunityScreen";
 import { createHavenTabNavigator } from "@/navigation/HavenTabNavigator";
+import { MobileNotificationsProvider } from "@/contexts/MobileNotificationsContext";
+import { MobileSocialWorkspaceProvider } from "@/contexts/MobileSocialWorkspaceContext";
+import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesContext";
 
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -24,11 +27,27 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createHavenTabNavigator();
 
 function MainTabs() {
+  const session = useAuthSession();
+  const userId = session?.user?.id;
+  if (!userId) {
+    return (
+      <View className="flex-1 items-center justify-center bg-surface-app">
+        <ActivityIndicator color="#e6edf7" size="large" />
+      </View>
+    );
+  }
+
   return (
-    <Tab.Navigator screenOptions={{ detachInactiveScreens: false}}>
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Community" component={CommunityScreen} />
-    </Tab.Navigator>
+    <MobileNotificationsProvider userId={userId}>
+      <MobileSocialWorkspaceProvider userId={userId}>
+        <MobileDirectMessagesProvider userId={userId}>
+          <Tab.Navigator screenOptions={{ detachInactiveScreens: false}}>
+            <Tab.Screen name="Home" component={HomeScreen} />
+            <Tab.Screen name="Community" component={CommunityScreen} />
+          </Tab.Navigator>
+        </MobileDirectMessagesProvider>
+      </MobileSocialWorkspaceProvider>
+    </MobileNotificationsProvider>
   );
 }
 

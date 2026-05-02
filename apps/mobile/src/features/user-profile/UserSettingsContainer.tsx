@@ -2,8 +2,10 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { Alert, View } from "react-native";
 import { getControlPlaneBackend } from "@shared/lib/backend";
+import { getErrorMessage } from "@platform/lib/errors";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import UserAccountCard from "@/features/user-profile/UserAccountCard";
+import DeleteAccountConfirmationModal from "@/features/user-profile/DeleteAccountConfirmationModal";
 import UserSettingsCard from "@/features/user-profile/UserSettingsCard";
 import { useCurrentUserIdentity } from "@/features/user-profile/useCurrentUserIdentity";
 import { loadPickedAvatarForUpload } from "@/features/user-profile/loadPickedAvatarForUpload";
@@ -33,6 +35,7 @@ export default function UserSettingsContainer({
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountModalVisible, setDeleteAccountModalVisible] = useState(false);
 
   useEffect(() => {
     if (!isUsernameDirty) {
@@ -121,30 +124,34 @@ export default function UserSettingsContainer({
     setIsSigningOut(true);
     try {
       await onSignOut();
+    } catch (error) {
+      Alert.alert(
+        "Sign out failed",
+        getErrorMessage(error, "Something went wrong while signing out. Try again."),
+      );
     } finally {
       setIsSigningOut(false);
     }
   }, [onSignOut]);
 
-  const handleDeleteAccount = useCallback(async () => {
+  const openDeleteAccountModal = useCallback(() => {
+    setDeleteAccountModalVisible(true);
+  }, []);
+
+  const confirmDeleteAccount = useCallback(async () => {
     if (!onDeleteAccount) return;
-    Alert.alert("Delete account?", "This action cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            setIsDeletingAccount(true);
-            try {
-              await onDeleteAccount();
-            } finally {
-              setIsDeletingAccount(false);
-            }
-          })();
-        },
-      },
-    ]);
+    setIsDeletingAccount(true);
+    try {
+      await onDeleteAccount();
+      setDeleteAccountModalVisible(false);
+    } catch (error) {
+      Alert.alert(
+        "Delete failed",
+        getErrorMessage(error, "Could not delete your account. Try again later."),
+      );
+    } finally {
+      setIsDeletingAccount(false);
+    }
   }, [onDeleteAccount]);
 
   const settingsRows = useMemo(
@@ -170,12 +177,12 @@ export default function UserSettingsContainer({
         subtitle: "Permanently remove your account",
         icon: "trash-outline" as const,
         danger: true,
-        onPress: handleDeleteAccount,
+        onPress: openDeleteAccountModal,
         disabled: isDeletingAccount || !onDeleteAccount,
       },
     ],
     [
-      handleDeleteAccount,
+      openDeleteAccountModal,
       handleSignOut,
       isDeletingAccount,
       isSigningOut,
@@ -216,6 +223,12 @@ export default function UserSettingsContainer({
       />
       <View className="gap-3 mt-3"/>
       <UserSettingsCard rows={settingsRows} />
+      <DeleteAccountConfirmationModal
+        visible={deleteAccountModalVisible}
+        onDismiss={() => setDeleteAccountModalVisible(false)}
+        onConfirmDelete={confirmDeleteAccount}
+        isDeleting={isDeletingAccount}
+      />
     </View>
   );
 }

@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Device from "expo-device";
-import * as Linking from "expo-linking";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
@@ -19,39 +18,12 @@ async function getOrCreateInstallationId(): Promise<string> {
   return created;
 }
 
-function openNotificationDeepLink(data: Record<string, unknown> | undefined): void {
-  const url = data && typeof data.url === "string" ? data.url.trim() : "";
-  if (!url) return;
-  const path = url.startsWith("/") ? url : `/${url}`;
-  void Linking.openURL(`haven:${path}`).catch(() => {
-    /* best-effort until navigation is wired to notification payloads */
-  });
-}
-
 /**
- * Registers the device Expo push token with Supabase after sign-in, removes it on sign-out,
- * and attaches lightweight notification response handlers (deep link via `haven:` scheme).
+ * Registers the device Expo push token with Supabase after sign-in and removes it on sign-out.
+ * Notification tap routing lives in `useMobilePushNotificationRouting` (handlers from tab shell).
  */
 export function useMobileExpoPushRegistration(session: Session | null | undefined): void {
   const registeringRef = useRef(false);
-
-  useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      openNotificationDeepLink(
-        response.notification.request.content.data as Record<string, unknown> | undefined
-      );
-    });
-    return () => sub.remove();
-  }, []);
-
-  useEffect(() => {
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (!response) return;
-      openNotificationDeepLink(
-        response.notification.request.content.data as Record<string, unknown> | undefined
-      );
-    });
-  }, []);
 
   useEffect(() => {
     if (session !== null) return undefined;

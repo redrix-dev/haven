@@ -43,6 +43,7 @@ export interface NotificationBackend {
   ): Promise<WebPushDispatchWakeupDiagnostics>;
   getNotificationCounts(): Promise<NotificationCounts>;
   markNotificationsSeen(recipientIds: string[]): Promise<number>;
+  /** No matching “mark unread” RPC exists yet; clients should not expose unread toggles until one lands. */
   markNotificationsRead(recipientIds: string[]): Promise<number>;
   markAllNotificationsSeen(): Promise<number>;
   dismissNotifications(recipientIds: string[]): Promise<number>;

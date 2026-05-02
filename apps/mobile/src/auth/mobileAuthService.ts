@@ -86,6 +86,18 @@ export const signOutFromAuth = async (): Promise<void> => {
   await getMobileSupabase().auth.signOut();
 };
 
+/** Matches web `AuthContext.deleteAccount`: RPC then sign out so session listeners clear state. */
+export const deleteOwnAccount = async (): Promise<void> => {
+  const supabase = getMobileSupabase();
+  const { error: deleteError } = await supabase.rpc("delete_own_account");
+  if (deleteError) throw deleteError;
+
+  const { error: signOutError } = await supabase.auth.signOut();
+  if (signOutError) {
+    console.warn("Failed to sign out after account deletion:", signOutError);
+  }
+};
+
 export const consumeAuthConfirmUrl = async (
   candidateUrl: string | null | undefined,
 ): Promise<{ didProcess: boolean; requiresPasswordRecovery: boolean }> => {

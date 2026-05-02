@@ -33,5 +33,7 @@ export { useLiveProfilesStore } from "./liveProfilesStore";
 export { useSocialStore } from "./socialStore";
 export type { SocialStoreState } from "./socialStore";
 
+export { useSocialGraphRealtimeStore } from "./socialGraphRealtimeStore";
+
 export { useUiStore } from "./uiStore";
 export type { UiStoreState } from "./uiStore";

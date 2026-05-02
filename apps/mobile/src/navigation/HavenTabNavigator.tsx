@@ -3,12 +3,26 @@ import {
   TabRouter,
   useNavigationBuilder,
 } from "@react-navigation/native";
-import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
 import type { BottomTabNavigatorProps } from "@react-navigation/bottom-tabs";
+import type { FriendsPanelTab } from "@shared/app/types";
+import { countFilteredUnreadInInbox } from "@shared/features/notifications/inboxNotificationFilter";
+import { useNotificationsStore } from "@shared/stores/notificationsStore";
+import { useNavigationStore } from "@shared/stores/navigationStore";
+import { useAuthStore } from "@shared/stores/authStore";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import { HavenModalShell } from "@/components/HavenModalShell";
 import { HavenNavbar } from "@/components/HavenNavbar";
+import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
+import { useMobileNotifications } from "@/contexts/MobileNotificationsContext";
+import { useMobileSocialWorkspace } from "@/contexts/MobileSocialWorkspaceContext";
+import { DirectMessagesContainer } from "@/features/direct-messages/DirectMessagesContainer";
+import { FriendsModalContainer } from "@/features/friends/FriendsModalContainer";
+import NotificationsContainer from "@/features/notifications/NotificationsContainer";
+import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
 import UserSettingsContainer from "@/features/user-profile/UserSettingsContainer";
+import { useMobilePushNotificationRouting } from "@/hooks/useMobilePushNotificationRouting";
+import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
 
 function HavenTabNavigator({
   id,
@@ -22,10 +36,16 @@ function HavenTabNavigator({
   screenLayout,
   UNSTABLE_router,
 }: BottomTabNavigatorProps) {
+  const userId = useAuthStore((s) => s.user?.id ?? null);
+  const setWorkspaceMode = useNavigationStore((s) => s.setWorkspaceMode);
+  const setCurrentServerId = useNavigationStore((s) => s.setCurrentServerId);
+  const setCurrentChannelId = useNavigationStore((s) => s.setCurrentChannelId);
+
   const {
     state,
     descriptors,
     NavigationContent,
+    navigation: tabNavigation,
   } = useNavigationBuilder(TabRouter, {
     id,
     initialRouteName,
@@ -38,6 +58,27 @@ function HavenTabNavigator({
     screenLayout,
     UNSTABLE_router,
   });
+
+  const {
+    actions: { refreshNotificationInbox },
+  } = useMobileNotifications();
+
+  const {
+    state: { socialCounts },
+    actions: { refreshSocialCounts },
+  } = useMobileSocialWorkspace();
+
+  const {
+    state: { dmConversations },
+    actions: {
+      refreshDmConversations,
+      openDirectMessageConversation,
+      openDirectMessageWithUser,
+    },
+  } = useMobileDirectMessages();
+
+  useMobilePushNotificationRouting();
+
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const handleOpenSettings = useCallback(() => {
     setIsSettingsModalOpen(true);
@@ -47,6 +88,9 @@ function HavenTabNavigator({
   }, []);
 
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [notificationsSubScreen, setNotificationsSubScreen] = useState<"list" | "preferences">(
+    "list",
+  );
   const handleOpenNotifications = useCallback(() => {
     setIsNotificationsModalOpen(true);
   }, []);
@@ -54,21 +98,107 @@ function HavenTabNavigator({
     setIsNotificationsModalOpen(false);
   }, []);
 
+  useEffect(() => {
+    useNotificationsStore.getState().setIsPanelOpen(isNotificationsModalOpen);
+    return () => {
+      useNotificationsStore.getState().setIsPanelOpen(false);
+    };
+  }, [isNotificationsModalOpen]);
+
+  const notificationRows = useNotificationsStore((s) => s.notifications);
+  const filteredNotificationsUnread = useMemo(
+    () => countFilteredUnreadInInbox(notificationRows),
+    [notificationRows],
+  );
+
+  const dmUnreadTotal = useMemo(
+    () => dmConversations.reduce((acc, c) => acc + c.unreadCount, 0),
+    [dmConversations],
+  );
+
   const [isDirectMessagesModalOpen, setIsDirectMessagesModalOpen] = useState(false);
   const handleOpenDirectMessages = useCallback(() => {
+    setWorkspaceMode("dm");
     setIsDirectMessagesModalOpen(true);
-  }, []);
+  }, [setWorkspaceMode]);
   const handleCloseDirectMessages = useCallback(() => {
     setIsDirectMessagesModalOpen(false);
-  }, []);
+    setWorkspaceMode("community");
+  }, [setWorkspaceMode]);
 
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+  const [friendsInitialTab, setFriendsInitialTab] = useState<FriendsPanelTab>("friends");
+  const [friendsHighlightedRequestId, setFriendsHighlightedRequestId] = useState<string | null>(
+    null,
+  );
   const handleOpenFriends = useCallback(() => {
+    setFriendsInitialTab("friends");
+    setFriendsHighlightedRequestId(null);
     setIsFriendsModalOpen(true);
   }, []);
   const handleCloseFriends = useCallback(() => {
     setIsFriendsModalOpen(false);
   }, []);
+
+  const handleOpenFriendsFromNotification = useCallback(
+    (input: { tab: "requests" | "friends"; highlightedRequestId: string | null }) => {
+      setFriendsInitialTab(input.tab === "requests" ? "requests" : "friends");
+      setFriendsHighlightedRequestId(input.highlightedRequestId);
+      setIsFriendsModalOpen(true);
+    },
+    [],
+  );
+
+  const handleStartDmFromFriend = useCallback(
+    (friendUserId: string) => {
+      setIsFriendsModalOpen(false);
+      setWorkspaceMode("dm");
+      setIsDirectMessagesModalOpen(true);
+      void openDirectMessageWithUser(friendUserId);
+    },
+    [openDirectMessageWithUser, setWorkspaceMode],
+  );
+
+  useEffect(() => {
+    useMobilePushNavigationStore.getState().setHandlers({
+      openDm: (conversationId) => {
+        setWorkspaceMode("dm");
+        setIsDirectMessagesModalOpen(true);
+        void openDirectMessageConversation(conversationId);
+      },
+      openFriends: (input) => {
+        handleOpenFriendsFromNotification(input);
+      },
+      openMention: (communityId, channelId) => {
+        setWorkspaceMode("community");
+        setCurrentServerId(communityId);
+        setCurrentChannelId(channelId);
+        tabNavigation.navigate("Community");
+      },
+      openNotifications: () => {
+        setIsNotificationsModalOpen(true);
+      },
+      refreshUrgentSurfaces: () => {
+        void refreshDmConversations({ suppressLoadingState: true });
+        void refreshSocialCounts();
+        void refreshNotificationInbox({ playSoundsForNew: false });
+      },
+    });
+
+    return () => {
+      useMobilePushNavigationStore.getState().setHandlers(null);
+    };
+  }, [
+    handleOpenFriendsFromNotification,
+    openDirectMessageConversation,
+    refreshDmConversations,
+    refreshNotificationInbox,
+    refreshSocialCounts,
+    setCurrentChannelId,
+    setCurrentServerId,
+    setWorkspaceMode,
+    tabNavigation,
+  ]);
 
   return (
     <>
@@ -77,6 +207,9 @@ function HavenTabNavigator({
           <HavenNavbar
             onPressSettings={handleOpenSettings}
             onPressNotifications={handleOpenNotifications}
+            notificationsUnreadCount={filteredNotificationsUnread}
+            dmUnreadCount={dmUnreadTotal}
+            friendRequestCount={socialCounts.incomingPendingRequestCount}
             onPressDirectMessages={handleOpenDirectMessages}
             onPressFriends={handleOpenFriends}
           />
@@ -110,11 +243,13 @@ function HavenTabNavigator({
           onOpenVoiceSettings={() => {
             // TODO: open voice settings modal
           }}
-          onSignOut={() => {
-            // TODO: sign out
+          onSignOut={async () => {
+            await signOutFromAuth();
+            handleCloseSettings();
           }}
-          onDeleteAccount={() => {
-            // TODO: delete account
+          onDeleteAccount={async () => {
+            await deleteOwnAccount();
+            handleCloseSettings();
           }}
         />
       </HavenModalShell>
@@ -122,37 +257,40 @@ function HavenTabNavigator({
         variant="inbox"
         visible={isNotificationsModalOpen}
         onDismiss={handleCloseNotifications}
-        title="Notifications"
+        bodyScrollable={false}
       >
-        <View className="mt-4 gap-3">
-          <Text className="text-sm text-muted-foreground">
-            Notification center will live here.
-          </Text>
-        </View>
+        <NotificationsContainer
+          subScreen={notificationsSubScreen}
+          onSubScreenChange={setNotificationsSubScreen}
+          modalVisible={isNotificationsModalOpen}
+          onCloseModal={handleCloseNotifications}
+          onOpenFriendsPanel={handleOpenFriendsFromNotification}
+          onOpenDirectMessages={handleOpenDirectMessages}
+        />
       </HavenModalShell>
       <HavenModalShell
         variant="inbox"
         visible={isDirectMessagesModalOpen}
         onDismiss={handleCloseDirectMessages}
         title="Direct messages"
+        bodyScrollable={false}
       >
-        <View className="mt-4 gap-3">
-          <Text className="text-sm text-muted-foreground">
-            Direct messages and conversations will live here.
-          </Text>
-        </View>
+        <DirectMessagesContainer />
       </HavenModalShell>
       <HavenModalShell
         variant="inbox"
         visible={isFriendsModalOpen}
         onDismiss={handleCloseFriends}
         title="Friends"
+        bodyScrollable={false}
       >
-        <View className="mt-4 gap-3">
-          <Text className="text-sm text-muted-foreground">
-            Your friends list will live here.
-          </Text>
-        </View>
+        <FriendsModalContainer
+          visible={isFriendsModalOpen}
+          userId={userId}
+          initialTab={friendsInitialTab}
+          highlightedRequestId={friendsHighlightedRequestId}
+          onStartDirectMessage={handleStartDmFromFriend}
+        />
       </HavenModalShell>
     </>
   );

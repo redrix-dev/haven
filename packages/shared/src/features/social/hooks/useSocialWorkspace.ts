@@ -4,6 +4,7 @@ import type { SocialCounts } from '@shared/lib/backend/types';
 import type { FriendsPanelTab } from '@shared/app/types';
 import { DEFAULT_SOCIAL_COUNTS } from '@shared/app/constants';
 import { useSocialStore } from '@shared/stores/socialStore';
+import { useSocialGraphRealtimeStore } from '@shared/stores/socialGraphRealtimeStore';
 
 type UseSocialWorkspaceInput = {
   socialBackend: Pick<
@@ -133,6 +134,8 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
     if (!userId || !enabled) return;
 
     const subscription = socialBackend.subscribeToSocialGraph(userId, (payload) => {
+      useSocialGraphRealtimeStore.getState().bump();
+
       if (getRealtimeTableName(payload) === 'user_blocks') {
         const eventType = getRealtimeEventType(payload);
         const nextRow = getRealtimeNewRow(payload);
