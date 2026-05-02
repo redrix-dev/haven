@@ -5,14 +5,19 @@ import {
   Dimensions,
   FlatList,
   Text,
+  TextInput,
   View,
   Pressable,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { normalizeInviteCode } from "@shared/app/chat-app/inviteCode";
 import type { ServerSummary } from "@shared/lib/backend/types";
+import { getControlPlaneBackend } from "@shared/lib/backend";
+import { getPlatformInviteInputPlaceholder } from "@shared/platform/urls";
+import { getErrorMessage } from "@platform/lib/errors";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import { useNavigationStore } from "@shared/stores/navigationStore";
-import { useEffect, useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { HavenModalShell } from "@/components/HavenModalShell";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -35,16 +40,19 @@ function buildGridItems(servers: ServerSummary[]): GridItem[] {
 
 
 export function HomeScreen() {
-  useEffect(() => {
-    console.log("HomeScreen mounted");
-    return () => console.log("HomeScreen unmounted");
-  }, []);
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { servers, status, error: loadError, refreshServers } = useServers();
+  const { servers, status, error: loadError, refreshServers, createServer } = useServers();
+  const controlPlaneBackend = useMemo(() => getControlPlaneBackend(), []);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [joinInvite, setJoinInvite] = useState("");
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   const width = Dimensions.get("window").width;
   const cell = (width - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
@@ -58,6 +66,46 @@ export function HomeScreen() {
     },
     [navigation],
   );
+
+  const handleCreateCommunity = useCallback(async () => {
+    const name = createName.trim();
+    if (!name) return;
+    setCreateLoading(true);
+    setCreateError(null);
+    try {
+      const { id } = await createServer(name);
+      setCreateModalOpen(false);
+      setCreateName("");
+      useNavigationStore.getState().setCurrentServerId(id);
+      navigation.navigate("Main", { screen: "Community" });
+    } catch (err) {
+      setCreateError(getErrorMessage(err, "Could not create community."));
+    } finally {
+      setCreateLoading(false);
+    }
+  }, [createName, createServer, navigation]);
+
+  const handleJoinCommunity = useCallback(async () => {
+    const code = normalizeInviteCode(joinInvite);
+    if (!code) {
+      setJoinError("Enter an invite code or paste an invite link.");
+      return;
+    }
+    setJoinLoading(true);
+    setJoinError(null);
+    try {
+      const redeemed = await controlPlaneBackend.redeemCommunityInvite(code);
+      await refreshServers();
+      setJoinModalOpen(false);
+      setJoinInvite("");
+      useNavigationStore.getState().setCurrentServerId(redeemed.communityId);
+      navigation.navigate("Main", { screen: "Community" });
+    } catch (err) {
+      setJoinError(getErrorMessage(err, "Failed to join from invite."));
+    } finally {
+      setJoinLoading(false);
+    }
+  }, [controlPlaneBackend, joinInvite, navigation, refreshServers]);
 
   if (status === "loading" && servers.length === 0) {
     return (
@@ -151,25 +199,106 @@ export function HomeScreen() {
       <HavenModalShell
         variant="settings"
         visible={createModalOpen}
-        onDismiss={() => setCreateModalOpen(false)}
+        onDismiss={() => {
+          setCreateModalOpen(false);
+          setCreateError(null);
+        }}
         title="Create community"
       >
-        <View className="mt-4 gap-3">
+        <View className="mt-2 gap-4">
           <Text className="text-sm text-muted-foreground">
-            Community creation will live here.
+            Give your community a name. You can change it later in settings.
           </Text>
+          <View>
+            <Text className="mb-1.5 text-xs font-semibold uppercase text-muted-foreground">
+              Community name
+            </Text>
+            <TextInput
+              value={createName}
+              onChangeText={setCreateName}
+              placeholder="My community"
+              placeholderTextColor="#8e8e93"
+              editable={!createLoading}
+              className="rounded-xl border border-border bg-surface-panel px-3 py-3 text-base text-foreground"
+              autoCapitalize="words"
+            />
+          </View>
+          {createError ? (
+            <Text className="text-sm text-red-400">{createError}</Text>
+          ) : null}
+          <View className="flex-row justify-end gap-3">
+            <Pressable
+              onPress={() => {
+                setCreateModalOpen(false);
+                setCreateError(null);
+              }}
+              disabled={createLoading}
+              className="py-2 active:opacity-80"
+            >
+              <Text className="text-base text-muted-foreground">Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void handleCreateCommunity()}
+              disabled={createLoading || !createName.trim()}
+              className={`rounded-xl bg-primary px-5 py-2.5 ${createLoading || !createName.trim() ? "opacity-45" : ""}`}
+            >
+              <Text className="text-center font-semibold text-white">
+                {createLoading ? "Creating…" : "Create"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </HavenModalShell>
       <HavenModalShell
         variant="settings"
         visible={joinModalOpen}
-        onDismiss={() => setJoinModalOpen(false)}
+        onDismiss={() => {
+          setJoinModalOpen(false);
+          setJoinError(null);
+        }}
         title="Join community"
       >
-        <View className="mt-4 gap-3">
+        <View className="mt-2 gap-4">
           <Text className="text-sm text-muted-foreground">
-            Join-by-code or invite flow will live here.
+            Paste an invite code or invite link to join.
           </Text>
+          <View>
+            <Text className="mb-1.5 text-xs font-semibold uppercase text-muted-foreground">
+              Invite
+            </Text>
+            <TextInput
+              value={joinInvite}
+              onChangeText={setJoinInvite}
+              placeholder={getPlatformInviteInputPlaceholder()}
+              placeholderTextColor="#8e8e93"
+              editable={!joinLoading}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              className="rounded-xl border border-border bg-surface-panel px-3 py-3 text-base text-foreground"
+            />
+          </View>
+          {joinError ? <Text className="text-sm text-red-400">{joinError}</Text> : null}
+          <View className="flex-row justify-end gap-3">
+            <Pressable
+              onPress={() => {
+                setJoinModalOpen(false);
+                setJoinError(null);
+              }}
+              disabled={joinLoading}
+              className="py-2 active:opacity-80"
+            >
+              <Text className="text-base text-muted-foreground">Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void handleJoinCommunity()}
+              disabled={joinLoading || !joinInvite.trim()}
+              className={`rounded-xl bg-primary px-5 py-2.5 ${joinLoading || !joinInvite.trim() ? "opacity-45" : ""}`}
+            >
+              <Text className="text-center font-semibold text-white">
+                {joinLoading ? "Joining…" : "Join"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </HavenModalShell>
     </View>

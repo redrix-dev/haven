@@ -15,13 +15,11 @@ import {
 } from "@/features/user-profile/useProfileAvatarPicker";
 
 type UserSettingsContainerProps = {
-  onOpenVoiceSettings?: () => void;
   onSignOut?: () => Promise<void> | void;
   onDeleteAccount?: () => Promise<void> | void;
 };
 
 export default function UserSettingsContainer({
-  onOpenVoiceSettings,
   onSignOut,
   onDeleteAccount,
 }: UserSettingsContainerProps) {
@@ -106,18 +104,45 @@ export default function UserSettingsContainer({
       return;
     }
 
-    setIsSavingAccount(true);
-    try {
-      // TODO: wire username change to backend (updateUserProfile without avatarFile).
-      Alert.alert("Saved", "Account settings saved (stub).");
+    const userId = identity.userId;
+    if (!userId) {
+      Alert.alert("Not signed in", "Sign in to save your profile.");
+      return;
+    }
+
+    if (nextUsername === identity.username.trim()) {
       setIsUsernameDirty(false);
       setIsEditingName(false);
-    } catch {
-      Alert.alert("Save failed", "Could not save account settings.");
+      return;
+    }
+
+    setIsSavingAccount(true);
+    try {
+      const backend = getControlPlaneBackend();
+      const result = await backend.updateUserProfile({
+        userId,
+        username: nextUsername,
+        avatarUrl: identity.avatarUrl,
+      });
+
+      useLiveProfilesStore.getState().upsertProfile({
+        userId,
+        username: result.username,
+        avatarUrl: result.avatarUrl,
+        updatedAt: new Date().toISOString(),
+      });
+
+      setIsUsernameDirty(false);
+      setIsEditingName(false);
+    } catch (error) {
+      Alert.alert(
+        "Save failed",
+        getErrorMessage(error, "Could not save account settings."),
+      );
     } finally {
       setIsSavingAccount(false);
     }
-  }, [draftUsername]);
+  }, [draftUsername, identity.avatarUrl, identity.userId, identity.username]);
 
   const handleSignOut = useCallback(async () => {
     if (!onSignOut) return;
@@ -157,14 +182,6 @@ export default function UserSettingsContainer({
   const settingsRows = useMemo(
     () => [
       {
-        id: "voice",
-        label: "Voice Settings",
-        subtitle: "Input/output and voice behavior",
-        icon: "volume-high-outline" as const,
-        onPress: onOpenVoiceSettings,
-        disabled: !onOpenVoiceSettings,
-      },
-      {
         id: "signout",
         label: isSigningOut ? "Signing Out..." : "Sign Out",
         icon: "log-out-outline" as const,
@@ -187,7 +204,6 @@ export default function UserSettingsContainer({
       isDeletingAccount,
       isSigningOut,
       onDeleteAccount,
-      onOpenVoiceSettings,
       onSignOut,
     ],
   );

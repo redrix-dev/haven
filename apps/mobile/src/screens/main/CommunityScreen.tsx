@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   Text,
@@ -22,8 +23,10 @@ import { useMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
+import { useCurrentServerPermissionUi } from "@shared/features/community/hooks/useCurrentServerPermissionUi";
+import { getCommunityDataBackend } from "@shared/lib/backend";
+import { getErrorMessage } from "@platform/lib/errors";
 import { getReplyToMessageId, isAuthorProfileTombstone } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import { resolveLiveAvatarUrl } from "@shared/lib/liveProfiles";
 import { setLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
@@ -42,6 +45,14 @@ import {
 import type { AuthorProfile } from "@shared/lib/backend/types";
 import { ChannelSwitcherModal } from "@/features/community/ChannelSwitcherModal";
 import { CommunityPhaseGate } from "@/features/community/CommunityPhaseGate";
+import {
+  MessageActionsSheet,
+  type MessageActionTarget,
+} from "@/features/community/MessageActionsSheet";
+import { CommunityReportMessageModal } from "@/features/community/CommunityReportMessageModal";
+import { BanUserModal } from "@/features/community/BanUserModal";
+import { MobileServerSettingsModal } from "@/features/community/settings/MobileServerSettingsModal";
+import { MobileChannelSettingsModal } from "@/features/community/settings/MobileChannelSettingsModal";
 import { SafeAreaView } from "react-native-safe-area-context";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MARGIN = 8;
@@ -77,6 +88,10 @@ export function CommunityScreen() {
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
 
+  const { serverPermissions, canOpenServerSettings } = useCurrentServerPermissionUi(communityId);
+  const canOpenChannelSettings =
+    serverPermissions.canManageChannelStructure || serverPermissions.canManageChannelPermissions;
+
   // ── Servers + workspace ──
   const { servers, status: serversStatus, error: serversError, refreshServers } = useServers();
   const {
@@ -100,7 +115,6 @@ export function CommunityScreen() {
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const attachmentRecord = useMessagesStore((state) => state.attachments);
   const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
-  usePermissionsStore((state) => state.getPermissions(communityId ?? ""));
 
   // ── Derived data ──
   const community = useMemo(
@@ -199,6 +213,12 @@ export function CommunityScreen() {
 
   // ── Channel resolution ──
   const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState(false);
+  const [messageActionsTarget, setMessageActionsTarget] = useState<MessageActionTarget | null>(null);
+  const [showMessageActions, setShowMessageActions] = useState(false);
+  const [reportMessageId, setReportMessageId] = useState<string | null>(null);
+  const [banTarget, setBanTarget] = useState<{ userId: string; username: string } | null>(null);
+  const [serverSettingsOpen, setServerSettingsOpen] = useState(false);
+  const [channelSettingsChannel, setChannelSettingsChannel] = useState<Channel | null>(null);
 
   const handleSelectChannel = useCallback(
     async (channel: Channel) => {
@@ -251,6 +271,54 @@ export function CommunityScreen() {
     (composerInputRef.current as unknown as { focus?: () => void } | null)?.focus?.();
   }, []);
 
+  const openMessageActions = useCallback((message: ChatMessage) => {
+    setMessageActionsTarget({
+      messageId: message.id,
+      authorUserId: message.authorUserId ?? null,
+      authorName: message.authorName ?? "Unknown",
+    });
+    setShowMessageActions(true);
+  }, []);
+
+  const handleKickFromMessageActions = useCallback(() => {
+    if (!communityId || !messageActionsTarget?.authorUserId) return;
+    const uid = messageActionsTarget.authorUserId;
+    const name = messageActionsTarget.authorName;
+    Alert.alert("Kick user", `Remove ${name} from this community?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Kick",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            try {
+              await getCommunityDataBackend(communityId).kickCommunityMember({
+                communityId,
+                targetUserId: uid,
+              });
+              Alert.alert("Done", "User was removed from the community.");
+            } catch (e) {
+              Alert.alert("Failed", getErrorMessage(e, "Could not kick user."));
+            }
+          })();
+        },
+      },
+    ]);
+  }, [communityId, messageActionsTarget]);
+
+  const confirmBanUser = useCallback(
+    async (reason: string) => {
+      if (!communityId || !banTarget) return;
+      await getCommunityDataBackend(communityId).banCommunityMember({
+        communityId,
+        targetUserId: banTarget.userId,
+        reason,
+      });
+      Alert.alert("Banned", "User has been banned from this community.");
+    },
+    [banTarget, communityId],
+  );
+
   // ── renderScrollComponent ──
   const renderScrollComponent = useCallback(
     (props: ScrollViewProps) => (
@@ -263,7 +331,7 @@ export function CommunityScreen() {
     if (item.kind === "divider") {
       return <MessageDateDivider label={item.label} />;
     }
-    
+
     return (
       <CommunityMessageBubble
         {...item.message}
@@ -271,10 +339,10 @@ export function CommunityScreen() {
         isCondensed={item.isCondensed}
         linkPreview={linkPreviewsByMessageId[item.message.id] ?? null}
         onPress={() => composerInputRef.current?.blur()}
-        onLongPress={() => handleReplyToMessage(item.message.id)}
+        onLongPress={() => openMessageActions(item.message)}
       />
     );
-  }, [linkPreviewsByMessageId, composerInputRef, handleReplyToMessage]);
+  }, [linkPreviewsByMessageId, composerInputRef, openMessageActions]);
 
   const phase: "loading" | "ready" | "missing" | "error" =
     serversStatus === "loading" && servers.length === 0
@@ -287,9 +355,16 @@ export function CommunityScreen() {
   const phaseGate = <CommunityPhaseGate phase={phase} error={serversError} onRetry={refreshServers} />;
   if (phase !== "ready") return phaseGate;
 
-  
+  const authorUid = messageActionsTarget?.authorUserId ?? null;
+  const canReportOthers =
+    Boolean(authorUid) && authorUid !== currentUserId;
+  const canKick =
+    serverPermissions.canManageMembers &&
+    Boolean(authorUid) &&
+    authorUid !== currentUserId;
+  const canBan =
+    serverPermissions.canManageBans && Boolean(authorUid) && authorUid !== currentUserId;
 
-  
   // ─── Render ───────────────────────────────────────────────────────────────
 
 return (
@@ -297,9 +372,10 @@ return (
     <CommunityChannelBar
       communityName={community?.name ?? "Community"}
       selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
-      onPressCommunity={() => undefined}
+      onPressCommunity={() => {
+        if (canOpenServerSettings) setServerSettingsOpen(true);
+      }}
       onPressSelectedChannel={() => setIsChannelDropdownOpen(true)}
-      onPressCreateChannel={() => undefined}
     />
 
     <FlatList
@@ -403,12 +479,91 @@ return (
       communityName={community?.name ?? "Community"}
       channels={channels}
       selectedChannelId={currentRenderableChannel?.id ?? null}
-      onSelectChannel={channelId => {
-        const channel = channels.find(c => c.id === channelId);
-        if (channel) void handleSelectChannel(channel);
+      onSelectTextChannel={(channelId) => {
+        const ch = channels.find((c) => c.id === channelId);
+        if (ch && ch.kind === "text") void handleSelectChannel(ch);
       }}
       onRequestClose={() => setIsChannelDropdownOpen(false)}
-      onCreateChannel={() => undefined}
+      onOpenChannelSettings={
+        canOpenChannelSettings
+          ? (channelId) => {
+              const ch = channels.find((c) => c.id === channelId) ?? null;
+              if (ch?.kind === "text") {
+                setChannelSettingsChannel(ch);
+                setIsChannelDropdownOpen(false);
+              }
+            }
+          : undefined
+      }
+    />
+
+    <MessageActionsSheet
+      visible={showMessageActions}
+      onClose={() => setShowMessageActions(false)}
+      target={messageActionsTarget}
+      communityName={community?.name ?? "Community"}
+      canReport={canReportOthers}
+      canKick={canKick}
+      canBan={canBan}
+      onReply={() => {
+        if (messageActionsTarget) handleReplyToMessage(messageActionsTarget.messageId);
+      }}
+      onReport={() => {
+        if (messageActionsTarget) setReportMessageId(messageActionsTarget.messageId);
+      }}
+      onKick={handleKickFromMessageActions}
+      onBan={() => {
+        if (messageActionsTarget?.authorUserId) {
+          setBanTarget({
+            userId: messageActionsTarget.authorUserId,
+            username: messageActionsTarget.authorName,
+          });
+        }
+      }}
+    />
+
+    <CommunityReportMessageModal
+      visible={Boolean(reportMessageId)}
+      onDismiss={() => setReportMessageId(null)}
+      communityName={community?.name ?? "Community"}
+      onSubmit={async (input) => {
+        if (!reportMessageId) return;
+        await messaging.actions.reportMessage({
+          messageId: reportMessageId,
+          ...input,
+        });
+      }}
+    />
+
+    <BanUserModal
+      visible={Boolean(banTarget)}
+      username={banTarget?.username ?? ""}
+      onDismiss={() => setBanTarget(null)}
+      onConfirm={confirmBanUser}
+    />
+
+    <MobileServerSettingsModal
+      visible={serverSettingsOpen}
+      onDismiss={() => setServerSettingsOpen(false)}
+      communityId={communityId}
+      communityName={community?.name ?? "Community"}
+      currentUserId={currentUserId}
+      canManageServer={serverPermissions.canManageServer}
+      canManageRoles={serverPermissions.canManageRoles}
+      canManageMembers={serverPermissions.canManageMembers}
+      canManageBans={serverPermissions.canManageBans}
+      canManageInvites={serverPermissions.canManageInvites}
+      refreshServers={refreshServers}
+    />
+
+    <MobileChannelSettingsModal
+      visible={Boolean(channelSettingsChannel)}
+      onDismiss={() => setChannelSettingsChannel(null)}
+      communityId={communityId}
+      channel={channelSettingsChannel}
+      currentUserId={currentUserId}
+      canManageChannelStructure={serverPermissions.canManageChannelStructure}
+      canManageChannelPermissions={serverPermissions.canManageChannelPermissions}
     />
   </SafeAreaView>
   

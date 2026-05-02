@@ -1,15 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { Channel } from "@shared/lib/backend/types";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 type ChannelSwitcherModalProps = {
   visible: boolean;
   communityName: string;
   channels: Channel[];
   selectedChannelId: string | null;
-  onSelectChannel: (channelId: string) => void;
+  onSelectTextChannel: (channelId: string) => void;
   onRequestClose: () => void;
-  onCreateChannel: () => void;
+  /** Opens mobile channel settings for a text channel (gear icon). */
+  onOpenChannelSettings?: (channelId: string) => void;
 };
 
 export function ChannelSwitcherModal({
@@ -17,9 +18,9 @@ export function ChannelSwitcherModal({
   communityName,
   channels,
   selectedChannelId,
-  onSelectChannel,
+  onSelectTextChannel,
   onRequestClose,
-  onCreateChannel,
+  onOpenChannelSettings,
 }: ChannelSwitcherModalProps) {
   return (
     <Modal
@@ -59,25 +60,41 @@ export function ChannelSwitcherModal({
                     className={`mb-2 flex-row items-center justify-between rounded-xl px-3 py-3 ${
                       active ? "bg-surface-panel" : "bg-surface-embedded"
                     }`}
-                    onPress={() => onSelectChannel(channel.id)}
+                    onPress={() => {
+                      if (channel.kind === "voice") {
+                        Alert.alert(
+                          "Voice on mobile",
+                          "We're not there yet, but soon enough you'll be voice chatting on mobile! We appreciate your patience.",
+                          [{ text: "OK" }],
+                        );
+                        return;
+                      }
+                      onSelectTextChannel(channel.id);
+                      onRequestClose();
+                    }}
                   >
                     <Text className={active ? "text-foreground" : "text-muted-foreground"}>
                       {channel.kind === "voice" ? "🔊 " : "# "}
                       {channel.name}
                     </Text>
-                    {active ? <Ionicons name="checkmark" size={18} color="#e6edf7" /> : null}
+                    <View className="flex-row items-center gap-2">
+                      {channel.kind === "text" && onOpenChannelSettings ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Channel settings"
+                          hitSlop={8}
+                          onPress={() => onOpenChannelSettings(channel.id)}
+                        >
+                          <Ionicons name="settings-outline" size={18} color="#a9b8cf" />
+                        </Pressable>
+                      ) : null}
+                      {active ? <Ionicons name="checkmark" size={18} color="#e6edf7" /> : null}
+                    </View>
                   </Pressable>
                 );
               })
             )}
           </ScrollView>
-          <Pressable
-            accessibilityRole="button"
-            className="mt-3 rounded-xl border border-border-control px-3 py-3 active:bg-surface-hover"
-            onPress={onCreateChannel}
-          >
-            <Text className="text-center font-medium text-foreground">Create channel (WIP)</Text>
-          </Pressable>
         </View>
       </View>
     </Modal>

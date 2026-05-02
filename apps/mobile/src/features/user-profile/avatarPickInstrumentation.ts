@@ -1,8 +1,7 @@
 /**
  * Optional: granular timing + stacks for avatar tap → ImagePicker open.
  *
- * **Enable:** set `AVATAR_PICK_DEBUG` to `true` below (or in release, set
- * `AVATAR_PICK_LOG_IN_RELEASE` to `true` for TestFlight-style captures).
+ * **Enable:** set `AVATAR_PICK_DEBUG` to `true` below (development builds only).
  *
  * **Remove entirely:** delete this file and remove imports + `avatarPick*` calls from
  * `useProfileAvatarPicker.tsx` (search: `AvatarPickTiming` / `avatarPickInstrumentation`).
@@ -11,12 +10,9 @@
 /** Set to `true` when investigating picker latency; keep `false` for quiet dev consoles. */
 const AVATAR_PICK_DEBUG = false;
 
-/** Also log in production/TestFlight builds (very noisy). */
-const AVATAR_PICK_LOG_IN_RELEASE = false;
-
+/** Logs only run in `__DEV__` builds when `AVATAR_PICK_DEBUG` is true — never in release/TestFlight. */
 export const AVATAR_PICK_INSTRUMENTATION_ENABLED =
-    AVATAR_PICK_DEBUG ||
-    AVATAR_PICK_LOG_IN_RELEASE;
+    typeof __DEV__ !== "undefined" && __DEV__ && AVATAR_PICK_DEBUG;
 
 const PREFIX = "[AvatarPickTiming]";
 

@@ -20,6 +20,7 @@ import { createHavenTabNavigator } from "@/navigation/HavenTabNavigator";
 import { MobileNotificationsProvider } from "@/contexts/MobileNotificationsContext";
 import { MobileSocialWorkspaceProvider } from "@/contexts/MobileSocialWorkspaceContext";
 import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesContext";
+import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
 
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -29,6 +30,8 @@ const Tab = createHavenTabNavigator();
 function MainTabs() {
   const session = useAuthSession();
   const userId = session?.user?.id;
+  useMobileCommunityPermissionsHydration(userId);
+
   if (!userId) {
     return (
       <View className="flex-1 items-center justify-center bg-surface-app">

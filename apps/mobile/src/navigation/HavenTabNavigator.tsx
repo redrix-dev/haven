@@ -88,13 +88,14 @@ function HavenTabNavigator({
   }, []);
 
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
-  const [notificationsSubScreen, setNotificationsSubScreen] = useState<"list" | "preferences">(
-    "list",
-  );
+  const [notificationsSubScreen, setNotificationsSubScreen] = useState<
+    "list" | "preferences" | "modmail"
+  >("list");
   const handleOpenNotifications = useCallback(() => {
     setIsNotificationsModalOpen(true);
   }, []);
   const handleCloseNotifications = useCallback(() => {
+    setNotificationsSubScreen("list");
     setIsNotificationsModalOpen(false);
   }, []);
 
@@ -240,9 +241,6 @@ function HavenTabNavigator({
         title="Settings"
       >
         <UserSettingsContainer
-          onOpenVoiceSettings={() => {
-            // TODO: open voice settings modal
-          }}
           onSignOut={async () => {
             await signOutFromAuth();
             handleCloseSettings();

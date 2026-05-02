@@ -69,6 +69,7 @@
     "react": "19.2.0",
     "react-native": "0.83.6",
     "react-native-callkeep": "^4.3.16",
+    "react-native-draggable-flatlist": "^4.0.3",
     "react-native-enriched-markdown": "^0.5.0",
     "react-native-gesture-handler": "~2.30.0",
     "react-native-keyboard-controller": "1.21.0",
@@ -93,7 +94,9 @@
   },
   "expo": {
     "install": {
-      "exclude": ["react-native-keyboard-controller"]
+      "exclude": [
+        "react-native-keyboard-controller"
+      ]
     },
     "doctor": {
       "appConfigFieldsNotSyncedCheck": {

@@ -54,7 +54,6 @@ export function HavenComposer({ disabled, isSending, onSend }: HavenComposerProp
   } | null>(null);
   const handleChangeMarkdown = (markdown: string) => {
     setDraft(markdown);
-    console.log("[HavenComposer] markdown payload", markdown);
   };
 
   const handleAttach = async () => {

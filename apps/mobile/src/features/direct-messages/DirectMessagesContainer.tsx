@@ -23,6 +23,7 @@ import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
+import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
 
 const MARGIN = 8;
 
@@ -40,6 +41,7 @@ export function DirectMessagesContainer() {
   const composerHeight = useSharedValue(0);
   const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);
   const composerInputRef = useRef<TextInput | null>(null);
+  const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(null);
 
   const {
     state: {
@@ -60,6 +62,7 @@ export function DirectMessagesContainer() {
       sendDirectMessage,
       refreshDmConversations,
       toggleSelectedDmConversationMuted,
+      reportDirectMessage,
     },
   } = useMobileDirectMessages();
 
@@ -123,6 +126,13 @@ export function DirectMessagesContainer() {
       return (
         <Pressable
           onPress={() => composerInputRef.current?.blur()}
+          onLongPress={
+            !isSelf
+              ? () => {
+                  setDmReportTarget(item);
+                }
+              : undefined
+          }
           className={`mb-2 max-w-[85%] ${isSelf ? "self-end" : "self-start"}`}
         >
           <View
@@ -265,6 +275,20 @@ export function DirectMessagesContainer() {
           </Pressable>
         </View>
       </KeyboardStickyView>
+
+      <DmReportSheet
+        visible={dmReportTarget !== null}
+        onClose={() => setDmReportTarget(null)}
+        authorUsername={dmReportTarget?.authorUsername?.trim() || "User"}
+        messagePreview={dmReportTarget?.content ?? ""}
+        onSubmit={async (input) => {
+          if (!dmReportTarget) return;
+          await reportDirectMessage({
+            messageId: dmReportTarget.messageId,
+            ...input,
+          });
+        }}
+      />
     </SafeAreaView>
   );
 }
