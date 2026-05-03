@@ -5,6 +5,7 @@ import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import UserAccountCard from "@/features/user-profile/UserAccountCard";
+import AppUpdatesCard from "@/features/user-profile/AppUpdatesCard";
 import DeleteAccountConfirmationModal from "@/features/user-profile/DeleteAccountConfirmationModal";
 import UserSettingsCard from "@/features/user-profile/UserSettingsCard";
 import { useCurrentUserIdentity } from "@/features/user-profile/useCurrentUserIdentity";
@@ -237,8 +238,10 @@ export default function UserSettingsContainer({
           setDraftUsername(next);
         }}
       />
-      <View className="gap-3 mt-3"/>
-      <UserSettingsCard rows={settingsRows} />
+      <View className="gap-3 mt-3">
+        <AppUpdatesCard />
+        <UserSettingsCard rows={settingsRows} />
+      </View>
       <DeleteAccountConfirmationModal
         visible={deleteAccountModalVisible}
         onDismiss={() => setDeleteAccountModalVisible(false)}

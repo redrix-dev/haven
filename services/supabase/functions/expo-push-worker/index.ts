@@ -20,7 +20,7 @@ import {
 } from '../_shared/common.ts';
 
 type WorkerRequest = {
-  mode?: 'cron' | 'manual';
+  mode?: 'cron' | 'manual' | 'wakeup';
   maxJobs?: number;
 };
 
@@ -275,6 +275,7 @@ const requireExpoAccessToken = (): string => {
 
 type WorkerStats = {
   mode: 'cron' | 'manual';
+  wakeSource: 'cron' | 'manual' | 'wakeup';
   claimedJobs: number;
   sent: number;
   skipped: number;
@@ -332,11 +333,15 @@ Deno.serve(async (req) => {
   }
 
   const body = (await parseJsonBody<WorkerRequest>(req)) ?? {};
-  const maxJobs = clampInt(body.maxJobs, 1, isCron ? 200 : 50, isCron ? 50 : 15);
+  const requestedMode = typeof body.mode === 'string' ? body.mode : null;
+  const wakeSource: WorkerStats['wakeSource'] =
+    isCron && requestedMode === 'wakeup' ? 'wakeup' : isCron ? 'cron' : 'manual';
+  const maxJobs = clampInt(body.maxJobs, 1, isCron ? 200 : 50, wakeSource === 'wakeup' ? 20 : isCron ? 50 : 15);
   const supabaseAdmin = createServiceClient(env.supabaseUrl, env.serviceRoleKey);
 
   const stats: WorkerStats = {
     mode: isCron ? 'cron' : 'manual',
+    wakeSource,
     claimedJobs: 0,
     sent: 0,
     skipped: 0,
@@ -347,7 +352,7 @@ Deno.serve(async (req) => {
 
   const { data: claimRows, error: claimError } = await supabaseAdmin.rpc('claim_expo_push_notification_jobs', {
     p_limit: maxJobs,
-    p_lease_seconds: isCron ? 180 : 120,
+    p_lease_seconds: wakeSource === 'wakeup' ? 120 : isCron ? 180 : 120,
   });
 
   if (claimError) {

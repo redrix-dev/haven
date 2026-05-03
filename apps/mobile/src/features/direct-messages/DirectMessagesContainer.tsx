@@ -1,7 +1,9 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
+  Platform,
   Pressable,
   Switch,
   Text,
@@ -10,6 +12,7 @@ import {
   type ListRenderItem,
   type ScrollViewProps,
 } from "react-native";
+import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useDerivedValue, useSharedValue } from "react-native-reanimated";
@@ -66,6 +69,8 @@ export function DirectMessagesContainer() {
     },
   } = useMobileDirectMessages();
 
+  const orderedDmMessages = useMemo(() => [...dmMessages].reverse(), [dmMessages]);
+
   const otherLabel = useCallback(
     (c: DirectMessageConversationSummary) => {
       const uid = c.otherUserId;
@@ -121,8 +126,12 @@ export function DirectMessagesContainer() {
 
   const renderMessage: ListRenderItem<DirectMessage> = useCallback(
     ({ item }) => {
-      const isSelf =
-        currentUserId != null && item.authorUserId === currentUserId;
+      const isSelf = currentUserId != null && item.authorUserId === currentUserId;
+      const textColor = isSelf ? "#ffffff" : "#e6edf7";
+      const mutedTextColor = isSelf ? "rgba(255,255,255,0.8)" : "#8b9cbb";
+      const blockSurfaceColor = isSelf ? "rgba(12, 20, 34, 0.35)" : "#1a2235";
+      const blockquoteBorderColor = isSelf ? "rgba(255,255,255,0.65)" : "#3F79D8";
+      const linkColor = isSelf ? "#ffffff" : "#3F79D8";
       return (
         <Pressable
           onPress={() => composerInputRef.current?.blur()}
@@ -140,11 +149,53 @@ export function DirectMessagesContainer() {
               isSelf ? "bg-accent-slider" : "bg-surface-panel"
             }`}
           >
-            <Text className={`text-sm ${isSelf ? "text-white" : "text-foreground"}`}>
-              {item.content}
-            </Text>
+            <EnrichedMarkdownText
+              markdown={item.content}
+              flavor="github"
+              md4cFlags={{ underline: true }}
+              markdownStyle={{
+                paragraph: { color: textColor, fontSize: 14, lineHeight: 20 },
+                h1: { fontSize: 22, fontWeight: "700", color: textColor, marginTop: 4, marginBottom: 4, lineHeight: 28 },
+                h2: { fontSize: 18, fontWeight: "700", color: textColor, marginTop: 4, marginBottom: 4, lineHeight: 24 },
+                h3: { fontSize: 16, fontWeight: "600", color: textColor, marginTop: 4, marginBottom: 2, lineHeight: 22 },
+                strong: { color: textColor },
+                em: { color: textColor },
+                code: {
+                  fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+                  fontSize: 13,
+                  backgroundColor: blockSurfaceColor,
+                  color: textColor,
+                  borderColor: blockSurfaceColor,
+                },
+                codeBlock: {
+                  fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+                  fontSize: 13,
+                  backgroundColor: blockSurfaceColor,
+                  color: textColor,
+                  padding: 10,
+                  borderRadius: 6,
+                  marginTop: 4,
+                  marginBottom: 4,
+                },
+                blockquote: {
+                  backgroundColor: blockSurfaceColor,
+                  borderColor: blockquoteBorderColor,
+                  borderWidth: 3,
+                  gapWidth: 10,
+                  marginTop: 2,
+                  marginBottom: 2,
+                },
+                strikethrough: { color: textColor },
+                list: { marginTop: 2, marginBottom: 2 },
+                link: { color: linkColor, underline: true },
+              }}
+              onLinkPress={({ url }) => {
+                void Linking.openURL(url);
+              }}
+            />
             <Text
-              className={`mt-1 text-[10px] ${isSelf ? "text-white/80" : "text-muted-foreground"}`}
+              className="mt-1 text-[10px]"
+              style={{ color: mutedTextColor }}
             >
               {formatDmTime(item.createdAt)}
             </Text>
@@ -232,7 +283,7 @@ export function DirectMessagesContainer() {
       ) : (
         <FlatList
           className="flex-1"
-          data={dmMessages}
+          data={orderedDmMessages}
           keyExtractor={(m) => m.messageId}
           renderItem={renderMessage}
           inverted

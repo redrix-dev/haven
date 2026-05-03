@@ -7,21 +7,18 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import Constants from "expo-constants";
 import { initializeHavenDataFromClient } from "@shared/lib/bootstrap/initializeHavenDataFromClient";
 import { registerMobileAppHost } from "@/lib/registerMobileAppHost";
-import { getMobileSupabase } from "@/supabase/getMobileSupabase";
+import { getMobileSupabase, resolveMobileSupabaseConfig } from "@/supabase/getMobileSupabase";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
 registerMobileAppHost();
 
-const mobileExtra = Constants.expoConfig?.extra as
-  | { supabaseUrl?: string; supabaseAnonKey?: string }
-  | undefined;
 const mobileClient = getMobileSupabase();
+const mobileConfig = resolveMobileSupabaseConfig();
 initializeHavenDataFromClient(mobileClient, {
-  supabaseUrl: mobileExtra?.supabaseUrl?.trim() ?? "",
-  supabaseAnonKey: mobileExtra?.supabaseAnonKey?.trim() ?? "",
+  supabaseUrl: mobileConfig.supabaseUrl,
+  supabaseAnonKey: mobileConfig.supabaseAnonKey,
 });
 
 Notifications.setNotificationHandler({
