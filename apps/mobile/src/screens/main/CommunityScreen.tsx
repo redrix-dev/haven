@@ -385,7 +385,7 @@ return (
       inverted
       keyboardShouldPersistTaps="handled"
       scrollEventThrottle={16}
-      contentContainerStyle={{ paddingTop: 8 }}
+      contentContainerStyle={{ paddingTop: 32 }}
       keyExtractor={(item) => (item.kind === "message" ? item.message.id : item.id)}
       renderItem={renderChatItem}
       renderScrollComponent={renderScrollComponent}
@@ -413,6 +413,11 @@ return (
       offset={{ opened: bottom - MARGIN }}
       onLayout={(e) => {
         composerHeight.value = e.nativeEvent.layout.height;
+      }}
+      style={{
+        position: 'absolute',
+        width: '100%',
+        bottom: bottom - MARGIN,
       }}
     >
       {pendingReplyToMessageId ? (
