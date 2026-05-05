@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Haven — UI Kit · Chat App</title>
+<link rel="stylesheet" href="../../colors_and_type.css" />
+<style>
+  html, body, #root { height: 100%; margin: 0; }
+  body { background: #0d1626; color: #e6edf7; font-family: var(--font-sans); overflow: hidden; }
+  /* status-breathe (lifted from packages/shared/src/styles/globals.css) */
+  @keyframes havenBreathe {
+    0%, 100% { box-shadow: inset 0 0 0 0 rgba(63,121,216,0); }
+    50% { box-shadow: inset 0 0 20px rgba(63,121,216,0.30); }
+  }
+  /* Custom scrollbars to match the app's dark surfaces */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #233753; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #304867; background-clip: padding-box; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <!-- Reuse from site kit -->
+  <script type="text/babel" src="../site/Icon.jsx"></script>
+  <script type="text/babel" src="../site/Button.jsx"></script>
+
+  <!-- App-specific -->
+  <script type="text/babel" src="Avatar.jsx"></script>
+  <script type="text/babel" src="TitleBar.jsx"></script>
+  <script type="text/babel" src="ServerRail.jsx"></script>
+  <script type="text/babel" src="ChannelSidebar.jsx"></script>
+  <script type="text/babel" src="ChatArea.jsx"></script>
+  <script type="text/babel" src="MemberList.jsx"></script>
+
+  <script type="text/babel" data-presets="env,react">
+    const SEED_CHANNELS = [
+      { id: "announcements", kind: "text", name: "announcements", unread: 0 },
+      { id: "general", kind: "text", name: "general", unread: 3 },
+      { id: "off-topic", kind: "text", name: "off-topic", unread: 0 },
+      { id: "lounge", kind: "voice", name: "Lounge", voicePresence: [{ name: "moss" }, { name: "jay.kim", muted: true }] },
+      { id: "music", kind: "voice", name: "Music" },
+    ];
+
+    const SEED_MESSAGES = {
+      "announcements": [
+        { author: "redrixx", color: "linear-gradient(135deg,#9a5b20,#d08d3f)", staff: true, time: "Today at 09:14",
+          body: "Haven 1.7.1 is shipping later today. Moderation infrastructure, routed reports, avatar uploads, markdown tools." },
+        { author: "redrixx", color: "linear-gradient(135deg,#9a5b20,#d08d3f)", staff: true, time: "Today at 09:15", continued: true,
+          body: "Patch notes will land in #general once the build's signed.", reactions: [{ emoji: "👍", count: 4 }, { emoji: "🦉", count: 7 }] },
+      ],
+      "general": [
+        { author: "ada.lovelace", color: "linear-gradient(135deg,#325fae,#59b7ff)", staff: true, time: "Yesterday at 17:42",
+          body: "Pushed a fix for the voice channel reconnect loop — let me know if it persists." },
+        { author: "moss", color: "linear-gradient(135deg,#1d3f2a,#6bb48b)", time: "Yesterday at 18:01",
+          body: "Confirmed fixed on Windows. Thanks!" },
+        { author: "jay.kim", color: "linear-gradient(135deg,#2a1d3f,#7e57c2)", time: "Today at 08:22",
+          body: "Anyone tried the new markdown tools? **bold**, *italic*, and `inline code` shortcuts work as expected.",
+          reactions: [{ emoji: "✨", count: 2 }] },
+        { author: "ren", color: "linear-gradient(135deg,#4a1f2c,#b74a56)", time: "Today at 08:30",
+          body: "Ctrl+B / Ctrl+I / Ctrl+U all wired up. Nice." },
+      ],
+      "off-topic": [
+        { author: "moss", color: "linear-gradient(135deg,#1d3f2a,#6bb48b)", time: "Today at 11:42",
+          body: "Found a horned owl on a fence post this morning. Felt very on-brand." },
+      ],
+    };
+
+    function App() {
+      const [activeServer, setActiveServer] = React.useState("haven");
+      const [activeChannelId, setActiveChannelId] = React.useState("general");
+      const [messages, setMessages] = React.useState(SEED_MESSAGES);
+      const channel = SEED_CHANNELS.find(c => c.id === activeChannelId);
+
+      const handleSend = (text) => {
+        setMessages(prev => ({
+          ...prev,
+          [activeChannelId]: [
+            ...(prev[activeChannelId] || []),
+            { author: "you.dev", color: "linear-gradient(135deg,#325fae,#59b7ff)", time: "now", body: text },
+          ],
+        }));
+      };
+
+      const list = messages[activeChannelId] || [];
+
+      return (
+        <>
+          <window.TitleBar />
+          <div style={{ position: "fixed", inset: 0, paddingTop: 32, display: "flex", minHeight: 0 }}>
+            <window.ServerRail activeId={activeServer} onSelect={setActiveServer} />
+            <window.ChannelSidebar
+              channels={SEED_CHANNELS}
+              activeId={activeChannelId}
+              onSelect={setActiveChannelId}
+              communityName="Haven HQ"
+            />
+            <window.ChatArea channel={channel} messages={list} onSend={handleSend} />
+            <window.MemberList />
+          </div>
+        </>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

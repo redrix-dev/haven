@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Haven — Type: Display</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; background: var(--bg-app); color: var(--fg2); font-family: var(--font-sans); }
+  .wrap { width: 700px; padding: 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; }
+  .item { display: flex; flex-direction: column; gap: 6px; padding-bottom: 14px; border-bottom: 1px solid var(--border-default); }
+  .item:last-child { border-bottom: 0; padding-bottom: 0; }
+  .meta { font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted); }
+  .h-display .accent { color: var(--haven-blue); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="item">
+      <div class="h-display">Find your <span class="accent">Haven</span>.</div>
+      <div class="meta">.h-display · clamp 40 → 68px · Geist 800 · −0.05em · line-height 1</div>
+    </div>
+    <div class="item">
+      <div class="h1">Communities, on your terms.</div>
+      <div class="meta">.h1 · 30px · Geist 700 · −0.02em · 1.15</div>
+    </div>
+    <div class="item">
+      <div class="h2">Voice channels that just work.</div>
+      <div class="meta">.h2 · 24px · Geist 700 · 1.25</div>
+    </div>
+    <div class="item">
+      <div class="h3">Owl-eyed moderation tools</div>
+      <div class="meta">.h3 · 18px · Geist 600 · 1.3</div>
+    </div>
+  </div>
+</body>
+</html>

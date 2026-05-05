@@ -12,7 +12,7 @@ import {
   type ListRenderItem,
   type ScrollViewProps,
 } from "react-native";
-import { EnrichedMarkdownText } from "react-native-enriched-markdown";
+import { EnrichedMarkdownText, EnrichedMarkdownTextInput, type EnrichedMarkdownTextInputInstance } from "react-native-enriched-markdown";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useDerivedValue, useSharedValue } from "react-native-reanimated";
@@ -43,7 +43,7 @@ export function DirectMessagesContainer() {
   const { bottom } = useSafeAreaInsets();
   const composerHeight = useSharedValue(0);
   const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);
-  const composerInputRef = useRef<TextInput | null>(null);
+  const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
   const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(null);
 
   const {
@@ -210,6 +210,7 @@ export function DirectMessagesContainer() {
     const text = draft.trim();
     if (!text || dmMessageSendPending) return;
     setDraft("");
+    composerInputRef.current?.setValue("");
     void sendDirectMessage(text).catch(() => {
       setDraft(text);
     });
@@ -305,26 +306,52 @@ export function DirectMessagesContainer() {
           composerHeight.value = e.nativeEvent.layout.height;
         }}
       >
-        <View className="flex-row items-end gap-2 bg-transparent pt-2.5 pb-1">
-          <TextInput
-            ref={composerInputRef}
-            className="max-h-28 min-h-11 flex-1 rounded-xl border border-border bg-surface-panel px-3 py-2 text-foreground"
-            placeholder="Message"
-            placeholderTextColor="#8b9cbb"
-            value={draft}
-            onChangeText={setDraft}
-            multiline
-            editable={!dmMessageSendPending}
-          />
-          <Pressable
-            accessibilityRole="button"
-            disabled={dmMessageSendPending || !draft.trim()}
-            onPress={handleSend}
-            className="rounded-xl bg-accent-slider px-4 py-3 disabled:opacity-50"
-          >
-            <Text className="font-semibold text-white">Send</Text>
+        <View className="flex-row items-end gap-2 bg-transparent px-3 pt-2.5 pb-3 gap-2">
+          <Pressable className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5">
+            <Ionicons name="add" size={20} color="#fff" />
           </Pressable>
-        </View>
+          
+          <View className="flex-1 flex-row items-end rounded-[18px] border border-white/10 bg-white/[0.08] pr-1">
+            <EnrichedMarkdownTextInput
+              ref={composerInputRef}
+              multiline
+              editable={!dmMessageSendPending}
+              scrollEnabled
+              defaultValue=""
+              onChangeMarkdown={setDraft}
+              placeholder="Message"
+              placeholderTextColor="#8b9cbb"
+              cursorColor="#e6edf7"
+              selectionColor="rgba(63, 121, 216, 0.4)"
+              markdownStyle={{
+                strong: { color: "#e6edf7" },
+                em: { color: "#e6edf7" },
+                link: { color: "#3F79D8", underline: true },
+                spoiler: { color: "#a9b8cf", backgroundColor: "rgba(0,0,0,0.2)" },
+              }}
+              style={{
+                flex: 1,
+                minHeight: 36,
+                maxHeight: 120,
+                color: "#e6edf7",
+                paddingHorizontal: 14,
+                paddingTop: 8,
+                paddingBottom: 8,
+                fontSize: 16,
+                backgroundColor: "transparent",
+              }}
+            />
+            {draft.trim().length > 0 ? (
+              <Pressable
+                onPress={() => void handleSend()}
+                disabled={dmMessageSendPending}
+                className="w-7 h-7 rounded-full bg-accent-slider items-center justify-center mb-1"
+              >
+                <Ionicons name="arrow-up" size={18} color="#fff" />
+              </Pressable>
+            ) : null}
+            </View>
+          </View>
       </KeyboardStickyView>
 
       <DmReportSheet

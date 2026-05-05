@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Haven — Logo & Wordmark</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; background: var(--bg-app); color: var(--fg2); font-family: var(--font-sans); }
+  .wrap { width: 700px; padding: 28px; box-sizing: border-box; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .panel { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 22px; display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+  .panel.light { background: #f3f5f9; color: #0d1626; border-color: #d8dde6; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .mark { width: 56px; height: 56px; border-radius: var(--radius-2xl); }
+  .word { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .light .word { color: #0d1626; }
+  .meta { font-family: var(--font-mono); font-size: 10px; color: var(--fg-muted); }
+  .light .meta { color: #5b6577; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: .18em; color: var(--fg-eyebrow); }
+  .light .label { color: #5b6577; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <span class="label">On dark · primary</span>
+      <div class="row">
+        <img class="mark" src="../assets/haven-owl-192.png" alt="Haven owl" />
+        <span class="word" style="color: var(--fg1);">Haven</span>
+      </div>
+      <div class="meta">bg #0F1728 · mark @ 56px · radius 16px</div>
+    </div>
+    <div class="panel light">
+      <span class="label">On light</span>
+      <div class="row">
+        <img class="mark" src="../assets/haven-owl-192.png" alt="Haven owl" style="background:#0d1626;" />
+        <span class="word">Haven</span>
+      </div>
+      <div class="meta">bg #F3F5F9 · mark on dark tile</div>
+    </div>
+  </div>
+</body>
+</html>

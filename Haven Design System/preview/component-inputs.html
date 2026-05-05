@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Haven — Inputs</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; background: var(--bg-app); color: var(--fg2); font-family: var(--font-sans); }
+  .wrap { width: 700px; padding: 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: .18em; color: var(--fg-eyebrow); }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .input {
+    background: var(--bg-input); border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg); color: var(--fg1);
+    font: 500 14px/1 var(--font-sans); padding: 11px 14px;
+  }
+  .input::placeholder { color: var(--fg-placeholder); }
+  .input:focus { outline: 0; border-color: var(--haven-blue); box-shadow: 0 0 0 3px rgba(63,121,216,.25); }
+  .composer {
+    background: var(--bg-input); border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl); padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .composer .ph { flex: 1; color: var(--fg-placeholder); font-size: 14px; }
+  .icon-btn { width: 28px; height: 28px; display: grid; place-items: center; color: var(--fg-dim); border-radius: 6px; }
+  .icon-btn:hover { color: var(--fg1); background: var(--bg-muted); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <div class="field">
+        <span class="label">Email</span>
+        <input class="input" placeholder="you@example.com" value="ada@haven.chat" />
+      </div>
+      <div class="field">
+        <span class="label">Search</span>
+        <input class="input" placeholder="Search Haven…" />
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="label">Composer · #general</span>
+      <div class="composer">
+        <span class="icon-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span class="ph">Message #general</span>
+        <span class="icon-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 1 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+        <span class="icon-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg></span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

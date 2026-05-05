@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Haven — Cards & Surfaces</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; background: var(--bg-app); color: var(--fg2); font-family: var(--font-sans); }
+  .wrap { width: 700px; padding: 28px; box-sizing: border-box; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .card-mkt {
+    background: linear-gradient(180deg, #16233a 0%, #111a2b 100%);
+    border: 1px solid var(--border-default); border-radius: var(--radius-card-marketing);
+    padding: 22px; box-shadow: var(--shadow-hero);
+    position: relative; overflow: hidden;
+  }
+  .card-mkt::after { content:""; position:absolute; inset:-30% -30% auto auto; width:240px; height:200px; background: radial-gradient(circle, rgba(63,121,216,.35), transparent 65%); pointer-events:none; }
+  .card-mkt h3 { margin: 0 0 6px; font-size: 18px; color: var(--fg1); font-weight: 700; letter-spacing: -0.01em; }
+  .card-mkt p { margin: 0; font-size: 13px; color: var(--fg-muted); line-height: 1.55; }
+  .card-mkt .eyebrow { margin-bottom: 10px; }
+
+  .card-app {
+    background: var(--bg-card); border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg); padding: 16px;
+    box-shadow: var(--shadow-card);
+  }
+  .card-app .row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .card-app .av { width: 32px; height: 32px; border-radius: 999px; background: linear-gradient(135deg, #325fae, #59b7ff); }
+  .card-app .name { font-size: 13px; font-weight: 600; color: var(--fg1); }
+  .card-app .meta { font-size: 11px; color: var(--fg-muted); }
+  .card-app p { margin: 0; font-size: 14px; color: var(--fg2); line-height: 1.5; }
+  .card-app .react { margin-top: 10px; display: flex; gap: 6px; }
+  .react .r { font-size: 11px; padding: 3px 8px; background: var(--bg-muted); border: 1px solid var(--border-default); border-radius: var(--radius-pill); color: var(--fg2); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card-mkt">
+      <div class="eyebrow">Release · 0.4.0</div>
+      <h3>Voice rooms with spatial audio</h3>
+      <p>A new audio engine, a redesigned room list, and one-tap whispers across any community.</p>
+    </div>
+
+    <div class="card-app">
+      <div class="row">
+        <div class="av"></div>
+        <div>
+          <div class="name">ada.lovelace</div>
+          <div class="meta">#general · 11:42</div>
+        </div>
+      </div>
+      <p>Pushed a fix for the voice channel reconnect loop — let me know if it persists.</p>
+      <div class="react">
+        <span class="r">👍 4</span>
+        <span class="r">🦉 2</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

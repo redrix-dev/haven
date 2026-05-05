@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Haven — Badges & Status</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; background: var(--bg-app); color: var(--fg2); font-family: var(--font-sans); }
+  .wrap { width: 700px; padding: 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: .18em; color: var(--fg-eyebrow); margin-bottom: 8px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .pill { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 600; }
+  .pip { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--notification-pip); color: #fff; font-size: 11px; font-weight: 700; }
+  .dot { width: 9px; height: 9px; border-radius: 999px; box-shadow: 0 0 0 2px var(--bg-card); }
+
+  .user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--border-default); }
+  .avatar { width: 28px; height: 28px; border-radius: 999px; background: linear-gradient(135deg, #325fae, #59b7ff); position: relative; flex-shrink: 0; }
+  .avatar .dot { position: absolute; right: -2px; bottom: -2px; }
+  .name { font-size: 13px; font-weight: 600; color: var(--fg1); }
+  .role { font-size: 11px; color: var(--fg-muted); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <div class="label">Badges</div>
+      <div class="row">
+        <span class="pill" style="background: var(--accent-staff-bg); color: var(--accent-staff); border: 1px solid rgba(63,121,216,.3);">STAFF</span>
+        <span class="pill" style="background: rgba(31,58,102,1); color: #8ec1ff; border: 1px solid rgba(63,121,216,.45);">BETA</span>
+        <span class="pill" style="background: var(--danger-bg); color: var(--danger-text); border: 1px solid rgba(183,74,86,.5);">DESTRUCTIVE</span>
+        <span class="pill" style="background: rgba(107,180,139,.16); color: var(--success);">VERIFIED</span>
+        <span class="pip">12</span>
+        <span class="pip" style="background: var(--haven-blue);">@</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="label">Presence</div>
+      <div class="row">
+        <div class="user"><div class="avatar"><span class="dot" style="background: var(--success-strong);"></span></div><div><div class="name">ada.lovelace</div><div class="role">Online</div></div></div>
+        <div class="user"><div class="avatar" style="background: linear-gradient(135deg,#9a5b20,#d08d3f);"><span class="dot" style="background: var(--warning-strong);"></span></div><div><div class="name">redrixx</div><div class="role">Away</div></div></div>
+        <div class="user"><div class="avatar" style="background: linear-gradient(135deg,#4a1f2c,#b74a56);"><span class="dot" style="background: var(--danger-strong);"></span></div><div><div class="name">moderator</div><div class="role">Do Not Disturb</div></div></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

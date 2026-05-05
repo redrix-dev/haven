@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Haven — UI Kit · Mobile</title>
+<link rel="stylesheet" href="../../colors_and_type.css" />
+<style>
+  html, body { margin: 0; background: #0b1322; color: #e6edf7; font-family: var(--font-sans); }
+  body { padding: 56px 32px 96px; }
+  .canvas-head {
+    max-width: 1180px; margin: 0 auto 48px;
+  }
+  .canvas-head .eyebrow {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.18em;
+    text-transform: uppercase; color: #7f90ac; margin-bottom: 16px;
+  }
+  .canvas-head .eyebrow .rule { display: inline-block; width: 32px; height: 1px; background: #3F79D8; }
+  .canvas-head h1 {
+    margin: 0 0 12px; font-size: 36px; font-weight: 800;
+    letter-spacing: -0.03em; color: #ffffff; line-height: 1.05;
+  }
+  .canvas-head h1 .accent { color: #3F79D8; }
+  .canvas-head p {
+    margin: 0; font-size: 16px; line-height: 1.6; color: #a9b8cf;
+    max-width: 720px;
+  }
+  .canvas-grid {
+    max-width: 1320px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 56px 40px;
+    align-items: start; justify-items: center;
+  }
+  .frame-wrap { display: flex; flex-direction: column; align-items: stretch; max-width: 380px; }
+  .frame-wrap .label-block {
+    margin-bottom: 18px; padding-left: 4px;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas-head">
+    <div class="eyebrow">
+      <span>Haven</span>
+      <span class="rule"></span>
+      <span>UI Kit · Mobile (React Native + NativeWind)</span>
+    </div>
+    <h1>Haven on <span class="accent">phones.</span></h1>
+    <p>
+      The mobile app uses the same dark navy palette and Geist type stack as the desktop client and
+      marketing site, mapped through NativeWind tokens (<code>bg-background</code>, <code>bg-card</code>,
+      <code>text-muted-foreground</code>, etc). These frames mirror the screens currently on
+      <code>feat/react-native-base</code>: auth flow, server picker, and community chat.
+    </p>
+  </div>
+
+  <div id="root" class="canvas-grid"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="MobileTokens.jsx"></script>
+  <script type="text/babel" src="MobileChrome.jsx"></script>
+  <script type="text/babel" src="AuthScreens.jsx"></script>
+  <script type="text/babel" src="HomeScreen.jsx"></script>
+  <script type="text/babel" src="CommunityScreen.jsx"></script>
+
+  <script type="text/babel" data-presets="env,react">
+    const FRAME_W = 360;
+    const FRAME_H = 780;
+
+    function Frame({ index, title, note, children }) {
+      return (
+        <div className="frame-wrap">
+          <div className="label-block">
+            <window.ScreenLabel index={index} title={title} note={note} />
+          </div>
+          <window.IOSDevice width={FRAME_W} height={FRAME_H} dark={true}>
+            <window.MobileScreen>
+              {/* status-bar safe area — IOSDevice's status bar overlays the top ~52px */}
+              <div style={{ height: 52, flexShrink: 0 }} />
+              {children}
+            </window.MobileScreen>
+          </window.IOSDevice>
+        </div>
+      );
+    }
+
+    function CommunityFrame({ index, title, note, draft, replyingTo }) {
+      return (
+        <div className="frame-wrap">
+          <div className="label-block">
+            <window.ScreenLabel index={index} title={title} note={note} />
+          </div>
+          <window.IOSDevice width={FRAME_W} height={FRAME_H} dark={true}>
+            <window.MobileScreen>
+              <div style={{ height: 52, flexShrink: 0 }} />
+              <window.CommunityScreenView draft={draft} replyingTo={replyingTo} />
+            </window.MobileScreen>
+          </window.IOSDevice>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <>
+          <Frame
+            index={1}
+            title="Sign in"
+            note="MobileLogin.tsx — centered card, bg-card on bg-background, no border. Sentence-case field labels.">
+            <window.LoginScreen />
+          </Frame>
+
+          <Frame
+            index={2}
+            title="Sign in · loading"
+            note="Disabled primary button at 60% opacity while signInWithPassword runs.">
+            <window.LoginLoadingScreen />
+          </Frame>
+
+          <Frame
+            index={3}
+            title="Sign up"
+            note="SignUpScreen.tsx — bordered card on bg-muted fields, uppercase eyebrow labels, legal-acceptance checkbox.">
+            <window.SignUpScreenView />
+          </Frame>
+
+          <Frame
+            index={4}
+            title="Password recovery · request"
+            note="PasswordRecoveryScreen.tsx (flow=requestReset). Single email field; Back to login · Sign up footer.">
+            <window.PasswordRecoveryRequest />
+          </Frame>
+
+          <Frame
+            index={5}
+            title="Password recovery · sent"
+            note="Success state after reset link is sent. Email shown back in foreground color for confirmation.">
+            <window.PasswordRecoverySuccess />
+          </Frame>
+
+          <Frame
+            index={6}
+            title="Home — server picker"
+            note="HomeScreen.tsx — 4-col grid on bg-surface-modal. Server tiles use bg-surface-panel; Create/Join are dashed-border placeholders.">
+            <window.HomeScreenView width={FRAME_W} />
+          </Frame>
+
+          <CommunityFrame
+            index={7}
+            title="Community chat"
+            note="CommunityScreenTestTwo.tsx — channel bar, inverted message list with date dividers, composer with + button and send arrow."
+          />
+
+          <CommunityFrame
+            index={8}
+            title="Chat · composing reply"
+            note="Reply pill above composer (long-press a bubble); send button activates once draft has content."
+            draft="Confirmed on macOS too — voice reconnect feels solid now."
+            replyingTo="ada.lovelace"
+          />
+        </>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
