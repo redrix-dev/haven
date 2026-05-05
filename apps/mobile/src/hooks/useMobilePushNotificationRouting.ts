@@ -1,7 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { parseExpoPushNotificationData } from "@shared/features/mobile/push/parseExpoPushNotificationData";
-import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
+import { useMobilePushNavigationStore, dispatchParsedPayload } from "@/stores/mobilePushNavigationStore";
 
 function notificationDedupeKey(
   response: Notifications.NotificationResponse,
@@ -18,38 +18,16 @@ function routeNotificationResponse(response: Notifications.NotificationResponse)
   const parsed = parseExpoPushNotificationData(response.notification.request.content.data);
   if (!parsed) return;
 
-  const handlers = useMobilePushNavigationStore.getState().handlers;
-  if (!handlers) return;
-
-  switch (parsed.kind) {
-    case "dm_message":
-      if (parsed.conversationId) {
-        handlers.openDm(parsed.conversationId);
-      } else {
-        handlers.refreshUrgentSurfaces();
-      }
-      break;
-    case "friend_request_received":
-      handlers.openFriends({
-        tab: "requests",
-        highlightedRequestId: parsed.friendRequestId,
-      });
-      break;
-    case "friend_request_accepted":
-      handlers.openFriends({ tab: "friends", highlightedRequestId: null });
-      break;
-    case "channel_mention":
-      if (parsed.communityId && parsed.channelId) {
-        handlers.openMention(parsed.communityId, parsed.channelId);
-      } else {
-        handlers.refreshUrgentSurfaces();
-      }
-      break;
-    case "system":
-    default:
-      handlers.openNotifications();
-      break;
+  const { handlers, setPendingParsedPayload } = useMobilePushNavigationStore.getState();
+  if (!handlers) {
+    // Handlers aren't registered yet (e.g. cold-start race). Store the payload so
+    // it's dispatched as soon as setHandlers is called in HavenTabNavigator.
+    setPendingParsedPayload(parsed);
+    return;
   }
+
+  setPendingParsedPayload(null);
+  dispatchParsedPayload(handlers, parsed);
 }
 
 /**

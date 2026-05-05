@@ -42,11 +42,19 @@ export function HavenModalShell({
     const [modalVisible, setModalVisible] = useState(visible);
     const [keyboardInset, setKeyboardInset] = useState(0);
     const isClosingRef = useRef(false);
+    const closeCompletedRef = useRef(false);
+    const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const scrimOpacity = useSharedValue(0);
     const cardTranslateY = useSharedValue(offscreenTranslateY);
 
     const completeClose = (notifyParent: boolean) => {
+        if (closeCompletedRef.current) return;
+        closeCompletedRef.current = true;
+        if (closeTimeoutRef.current !== null) {
+            clearTimeout(closeTimeoutRef.current);
+            closeTimeoutRef.current = null;
+        }
         isClosingRef.current = false;
         if (notifyParent) {
             onDismiss();
@@ -57,10 +65,15 @@ export function HavenModalShell({
     const startCloseAnimation = (notifyParent: boolean) => {
         if (isClosingRef.current) return;
         isClosingRef.current = true;
+        closeCompletedRef.current = false;
         scrimOpacity.value = withTiming(0, { duration: FADE_DURATION });
         cardTranslateY.value = withTiming(offscreenTranslateY, { duration: SLIDE_DURATION }, (finished) => {
             if (finished) scheduleOnRN(completeClose, notifyParent);
         });
+        // Safety fallback: if the animation worklet callback never fires (e.g. app
+        // backgrounded mid-animation), force-complete the close so the modal doesn't
+        // stay mounted as an invisible touch-blocking overlay.
+        closeTimeoutRef.current = setTimeout(() => completeClose(notifyParent), SLIDE_DURATION + 150);
     };
 
     useEffect(() => {
@@ -71,6 +84,12 @@ export function HavenModalShell({
 
     useEffect(() => {
         if (visible) {
+            // Cancel any pending close-safety timeout so it can't close a freshly-opened modal.
+            if (closeTimeoutRef.current !== null) {
+                clearTimeout(closeTimeoutRef.current);
+                closeTimeoutRef.current = null;
+            }
+            closeCompletedRef.current = true; // prevent any in-flight close callback from firing
             isClosingRef.current = false;
             setModalVisible(true);
             cardTranslateY.value = offscreenTranslateY;
