@@ -252,9 +252,11 @@ export interface CommunityDataBackend {
     content: string;
     replyToMessageId?: string;
     mediaUpload?: {
-      body: Blob;
+      body: Blob | ArrayBuffer;
       filename?: string;
       expiresInHours?: number;
+      /** Required when `body` is an `ArrayBuffer` (e.g. React Native). */
+      contentType?: string;
     };
   }): Promise<void>;
   editUserMessage(input: {

@@ -18,6 +18,9 @@ type RefreshDmMessagesOptions = {
 };
 type SendDirectMessageOptions = {
   imageBody?: Blob;
+  /** Mobile / Hermes: prefer `imageArrayBuffer` + `imageContentType` over `imageBody`. */
+  imageArrayBuffer?: ArrayBuffer;
+  imageContentType?: string;
   imageFilename?: string;
   imageExpiresInHours?: number;
 };
@@ -465,16 +468,38 @@ export function useDirectMessages({
       setDmMessageSendPending(true);
       setDmMessagesError(null);
       try {
+        const hasBlob = options?.imageBody != null;
+        const hasBuffer = options?.imageArrayBuffer != null;
+        if (hasBlob && hasBuffer) {
+          throw new Error('Cannot send both imageBody and imageArrayBuffer.');
+        }
+        if (hasBuffer && !options.imageContentType?.trim()) {
+          throw new Error('imageContentType is required when sending imageArrayBuffer.');
+        }
+        const inferredFilename =
+          options?.imageFilename ??
+          (options?.imageBody && 'name' in options.imageBody
+            ? String(options.imageBody.name)
+            : undefined) ??
+          `upload-${Date.now()}`;
+
         await directMessageBackend.sendMessage({
           conversationId: selectedDmConversationId,
           content,
-          imageUpload: options?.imageBody
+          imageUpload: hasBuffer
             ? {
-                body: options.imageBody,
-                filename: options.imageFilename,
+                body: options.imageArrayBuffer as ArrayBuffer,
+                filename: inferredFilename,
                 expiresInHours: options.imageExpiresInHours,
+                contentType: options.imageContentType?.trim(),
               }
-            : undefined,
+            : hasBlob
+              ? {
+                  body: options.imageBody as Blob,
+                  filename: inferredFilename,
+                  expiresInHours: options.imageExpiresInHours,
+                }
+              : undefined,
         });
         await Promise.all([
           refreshDmMessages(selectedDmConversationId, { suppressLoadingState: true, markRead: false }),

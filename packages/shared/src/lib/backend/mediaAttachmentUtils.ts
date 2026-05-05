@@ -43,15 +43,19 @@ export const resolveAttachmentMediaKind = (mimeType: string): AttachmentMediaKin
 export const getSignedUrlMapKey = (bucketName: string, objectPath: string): string =>
   `${bucketName}/${objectPath}`;
 
+export type MessageMediaUploadBody = {
+  body: Blob | ArrayBuffer;
+  filename?: string;
+  expiresInHours?: number;
+  /** Required when `body` is an `ArrayBuffer` (e.g. React Native Hermes). Ignored for `Blob`. */
+  contentType?: string;
+};
+
 export type MediaAttachmentHelpers = {
   uploadMediaToObjectStore: (input: {
     bucketName: string;
     objectPathPrefix: string;
-    mediaUpload?: {
-      body: Blob;
-      filename?: string;
-      expiresInHours?: number;
-    };
+    mediaUpload?: MessageMediaUploadBody;
     allowedMediaKinds?: AttachmentMediaKind[];
   }) => Promise<UploadedMessageMedia | null>;
   removeUploadedMediaObject: (
@@ -67,11 +71,7 @@ export function createMediaAttachmentHelpers(store: MessageObjectStore): MediaAt
   const uploadMediaToObjectStore = async (input: {
     bucketName: string;
     objectPathPrefix: string;
-    mediaUpload?: {
-      body: Blob;
-      filename?: string;
-      expiresInHours?: number;
-    };
+    mediaUpload?: MessageMediaUploadBody;
     allowedMediaKinds?: AttachmentMediaKind[];
   }): Promise<UploadedMessageMedia | null> => {
     if (!input.mediaUpload?.body) return null;
@@ -86,13 +86,24 @@ export function createMediaAttachmentHelpers(store: MessageObjectStore): MediaAt
       input.mediaUpload.filename || "media",
     );
     const objectPath = `${input.objectPathPrefix}/${createPortableUuid()}-${originalFilename}`;
-    const mimeType = body.type?.trim() || "application/octet-stream";
+    if (!(body instanceof Blob)) {
+      const ct = input.mediaUpload.contentType?.trim();
+      if (!ct) {
+        throw new Error("contentType is required when uploading message media from an ArrayBuffer.");
+      }
+    }
+    const mimeType =
+      body instanceof Blob
+        ? body.type?.trim() || "application/octet-stream"
+        : (input.mediaUpload.contentType ?? "").trim() || "application/octet-stream";
     const mediaKind = resolveAttachmentMediaKind(mimeType);
     const allowedMediaKinds = input.allowedMediaKinds ?? DEFAULT_ALLOWED_MEDIA_KINDS;
 
     if (!allowedMediaKinds.includes(mediaKind)) {
       throw new Error("Unsupported media type for this message.");
     }
+
+    const sizeBytes = body instanceof Blob ? body.size : body.byteLength;
 
     await store.uploadMessageAttachment({
       bucketName: input.bucketName,
@@ -108,7 +119,7 @@ export function createMediaAttachmentHelpers(store: MessageObjectStore): MediaAt
       originalFilename,
       mimeType,
       mediaKind,
-      sizeBytes: body.size,
+      sizeBytes,
       expiresAt: new Date(Date.now() + boundedExpiresInHours * 60 * 60 * 1000).toISOString(),
       expiresInHours: boundedExpiresInHours,
     };

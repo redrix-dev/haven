@@ -592,9 +592,10 @@ const uploadMessageMediaToObjectStore = async (input: {
   communityId: string;
   channelId: string;
   mediaUpload?: {
-    body: Blob;
+    body: Blob | ArrayBuffer;
     filename?: string;
     expiresInHours?: number;
+    contentType?: string;
   };
 }) =>
   havenCommunityMediaHelpers().uploadMediaToObjectStore({
@@ -2590,6 +2591,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
             body: mediaUpload.body,
             filename: mediaUpload.filename,
             expiresInHours: mediaUpload.expiresInHours,
+            contentType: mediaUpload.contentType,
           }
         : undefined,
     });

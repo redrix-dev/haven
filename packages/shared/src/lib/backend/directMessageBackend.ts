@@ -25,9 +25,11 @@ export interface DirectMessageBackend {
     content: string;
     metadata?: Record<string, unknown>;
     imageUpload?: {
-      body: Blob;
+      body: Blob | ArrayBuffer;
       filename?: string;
       expiresInHours?: number;
+      /** Required when `body` is an `ArrayBuffer` (e.g. React Native Hermes). */
+      contentType?: string;
     };
   }): Promise<DirectMessage>;
   markConversationRead(conversationId: string): Promise<boolean>;
@@ -178,6 +180,7 @@ export function createDirectMessageBackend(
               body: input.imageUpload.body,
               filename: input.imageUpload.filename,
               expiresInHours: input.imageUpload.expiresInHours,
+              contentType: input.imageUpload.contentType,
             }
           : undefined,
         allowedMediaKinds: ["image"],

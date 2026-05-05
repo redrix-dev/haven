@@ -683,6 +683,9 @@ export function useMessages({
       options?: {
         replyToMessageId?: string;
         mediaFile?: Blob | File;
+        /** Mobile / Hermes: prefer ArrayBuffer + mediaContentType over Blob. */
+        mediaArrayBuffer?: ArrayBuffer;
+        mediaContentType?: string;
         mediaFilename?: string;
         mediaExpiresInHours?: number;
       },
@@ -693,6 +696,15 @@ export function useMessages({
       }
       if (!currentUserId || !currentChannelId || !currentServerId) return;
 
+      const hasBlob = options?.mediaFile != null;
+      const hasBuffer = options?.mediaArrayBuffer != null;
+      if (hasBlob && hasBuffer) {
+        throw new Error("Cannot send both mediaFile and mediaArrayBuffer.");
+      }
+      if (hasBuffer && !options.mediaContentType?.trim()) {
+        throw new Error("mediaContentType is required when sending mediaArrayBuffer.");
+      }
+
       const communityBackend = getCommunityDataBackend(currentServerId);
       const inferredMediaFilename =
         options?.mediaFilename ??
@@ -700,19 +712,30 @@ export function useMessages({
           ? String(options.mediaFile.name)
           : undefined) ??
         `upload-${Date.now()}`;
+
+      const mediaUpload =
+        hasBuffer
+          ? {
+              body: options.mediaArrayBuffer as ArrayBuffer,
+              filename: inferredMediaFilename,
+              expiresInHours: options.mediaExpiresInHours,
+              contentType: options.mediaContentType?.trim(),
+            }
+          : hasBlob
+            ? {
+                body: options.mediaFile as Blob,
+                filename: inferredMediaFilename,
+                expiresInHours: options.mediaExpiresInHours,
+              }
+            : undefined;
+
       await communityBackend.sendUserMessage({
         communityId: currentServerId,
         channelId: currentChannelId,
         userId: currentUserId,
         content,
         replyToMessageId: options?.replyToMessageId,
-        mediaUpload: options?.mediaFile
-          ? {
-              body: options.mediaFile,
-              filename: inferredMediaFilename,
-              expiresInHours: options.mediaExpiresInHours,
-            }
-          : undefined,
+        mediaUpload,
       });
     },
     [currentChannelId, currentServerId, currentUserId, setRainbowMode],

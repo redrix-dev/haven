@@ -3,11 +3,13 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   Pressable,
   Text,
   View,
   type ScrollViewProps,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from "react-native-reanimated";
@@ -53,6 +55,10 @@ import { CommunityReportMessageModal } from "@/features/community/CommunityRepor
 import { BanUserModal } from "@/features/community/BanUserModal";
 import { MobileServerSettingsModal } from "@/features/community/settings/MobileServerSettingsModal";
 import { MobileChannelSettingsModal } from "@/features/community/settings/MobileChannelSettingsModal";
+import {
+  loadPickedCommunityMediaForUpload,
+  type CommunityMediaUploadPayload,
+} from "@/features/community/loadPickedCommunityMediaForUpload";
 import { SafeAreaView } from "react-native-safe-area-context";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MARGIN = 8;
@@ -274,6 +280,10 @@ export function CommunityScreen() {
   // ── Composer state ──
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isPickingCommunityMedia, setIsPickingCommunityMedia] = useState(false);
+  const [pendingCommunityMedia, setPendingCommunityMedia] = useState<CommunityMediaUploadPayload | null>(
+    null,
+  );
   const [pendingReplyToMessageId, setPendingReplyToMessageId] = useState<string | null>(null);
 
   const pendingReplyTargetLabel = useMemo(
@@ -283,29 +293,72 @@ export function CommunityScreen() {
     [messageById, pendingReplyToMessageId, profiles],
   );
 
+  const handlePickCommunityMedia = useCallback(async () => {
+    if (isSending || isPickingCommunityMedia) return;
+    setIsPickingCommunityMedia(true);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Permission needed", "Allow Photos access to attach images or videos.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images", "videos"],
+        allowsEditing: false,
+        quality: 0.85,
+        base64: false,
+        ...(Platform.OS === "ios"
+          ? {
+              preferredAssetRepresentationMode:
+                ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+            }
+          : {}),
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset?.uri) return;
+      const payload = await loadPickedCommunityMediaForUpload(asset);
+      setPendingCommunityMedia(payload);
+    } catch (e) {
+      Alert.alert("Could not add media", getErrorMessage(e, "Choose a different file."));
+    } finally {
+      setIsPickingCommunityMedia(false);
+    }
+  }, [isPickingCommunityMedia, isSending]);
+
   const handleSend = useCallback(async () => {
     const fromInput = composerInputRef.current
       ? await composerInputRef.current.getMarkdown()
       : draft;
     const text = fromInput.trim();
-    if (!text) return;
+    if (!text && !pendingCommunityMedia) return;
     const replyToMessageId =
       pendingReplyToMessageId && messageById.has(pendingReplyToMessageId)
         ? pendingReplyToMessageId
         : undefined;
+    const media = pendingCommunityMedia;
     try {
       setIsSending(true);
-      await messaging.actions.sendMessage(
-        text,
-        replyToMessageId ? { replyToMessageId } : undefined,
-      );
+      await messaging.actions.sendMessage(text, {
+        ...(replyToMessageId ? { replyToMessageId } : {}),
+        ...(media
+          ? {
+              mediaArrayBuffer: media.body,
+              mediaContentType: media.contentType,
+              mediaFilename: media.fileName,
+            }
+          : {}),
+      });
       setDraft("");
       composerInputRef.current?.setValue("");
+      setPendingCommunityMedia(null);
       setPendingReplyToMessageId(null);
+    } catch (e) {
+      Alert.alert("Send failed", getErrorMessage(e, "Could not send message."));
     } finally {
       setIsSending(false);
     }
-  }, [draft, messageById, messaging.actions, pendingReplyToMessageId]);
+  }, [draft, messageById, messaging.actions, pendingCommunityMedia, pendingReplyToMessageId]);
 
   const handleReplyToMessage = useCallback((messageId: string) => {
     setPendingReplyToMessageId(messageId);
@@ -488,9 +541,32 @@ return (
         </View>
       ) : null}
 
+      {pendingCommunityMedia ? (
+        <View className="flex-row items-center gap-2 border-t border-white/[0.08] bg-surface-modal/90 px-3 py-2">
+          <Ionicons name="attach" size={16} color="#8b9cbb" />
+          <Text className="min-w-0 flex-1 text-xs text-foreground/90" numberOfLines={1}>
+            {pendingCommunityMedia.fileName}
+          </Text>
+          <Pressable
+            hitSlop={8}
+            disabled={isSending}
+            onPress={() => setPendingCommunityMedia(null)}
+            className="shrink-0"
+          >
+            <Text className="text-xs font-semibold text-primary">Remove</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <View className="flex-row items-end bg-transparent px-3 pt-2.5 pb-3 gap-2">
         <Animated.View style={composerChromeAnimatedStyle}>
-          <Pressable className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add media"
+            disabled={isSending || isPickingCommunityMedia}
+            onPress={() => void handlePickCommunityMedia()}
+            className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5 disabled:opacity-50"
+          >
             <Ionicons name="add" size={20} color="#fff" />
           </Pressable>
         </Animated.View>
@@ -528,7 +604,7 @@ return (
                 backgroundColor: "transparent",
               }}
             />
-            {draft.trim().length > 0 ? (
+            {draft.trim().length > 0 || pendingCommunityMedia != null ? (
               <Pressable
                 onPress={() => void handleSend()}
                 disabled={isSending}

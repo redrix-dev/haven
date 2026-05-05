@@ -4,7 +4,7 @@ export interface MessageObjectStore {
   uploadMessageAttachment(input: {
     bucketName: string;
     objectPath: string;
-    body: Blob;
+    body: Blob | ArrayBuffer;
     contentType: string;
     cacheControl?: string;
   }): Promise<void>;
@@ -21,16 +21,30 @@ export interface MessageObjectStore {
   ): Promise<string | null>;
 }
 
+type GlobalFileReader = new () => {
+  result: string | ArrayBuffer | null;
+  error: DOMException | null;
+  onerror: (() => void) | null;
+  onload: (() => void) | null;
+  readAsArrayBuffer: (blob: Blob) => void;
+};
+
+function getGlobalFileReader(): GlobalFileReader | undefined {
+  const ctor = (globalThis as unknown as { FileReader?: GlobalFileReader }).FileReader;
+  return typeof ctor === "function" ? ctor : undefined;
+}
+
 const blobToArrayBuffer = async (blob: Blob): Promise<ArrayBuffer> => {
   const candidate = blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> };
   if (typeof candidate.arrayBuffer === "function") {
     return await candidate.arrayBuffer();
   }
-  if (typeof FileReader === "undefined") {
+  const FileReaderCtor = getGlobalFileReader();
+  if (!FileReaderCtor) {
     throw new Error("Blob.arrayBuffer and FileReader are unavailable in this runtime.");
   }
   return await new Promise<ArrayBuffer>((resolve, reject) => {
-    const reader = new FileReader();
+    const reader = new FileReaderCtor();
     reader.onerror = () =>
       reject(reader.error ?? new Error("Failed to read blob as ArrayBuffer."));
     reader.onload = () => {
@@ -51,11 +65,12 @@ class SupabaseMessageObjectStore implements MessageObjectStore {
   async uploadMessageAttachment(input: {
     bucketName: string;
     objectPath: string;
-    body: Blob;
+    body: Blob | ArrayBuffer;
     contentType: string;
     cacheControl?: string;
   }): Promise<void> {
-    const payload = await blobToArrayBuffer(input.body);
+    const payload =
+      input.body instanceof ArrayBuffer ? input.body : await blobToArrayBuffer(input.body);
     const { error } = await this.client.storage
       .from(input.bucketName)
       .upload(input.objectPath, payload, {
