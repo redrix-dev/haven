@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
-import { useDerivedValue, useSharedValue } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from "react-native-reanimated";
 import {
   EnrichedMarkdownTextInput,
   type EnrichedMarkdownTextInputInstance,
@@ -56,6 +56,11 @@ import { MobileChannelSettingsModal } from "@/features/community/settings/Mobile
 import { SafeAreaView } from "react-native-safe-area-context";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MARGIN = 8;
+const COMPOSER_CHROME_IMMERSIVE_OPACITY = 0.38;
+const COMPOSER_CHROME_REST_OPACITY = 1;
+const COMPOSER_CHROME_IMMERSIVE_MS = 140;
+const COMPOSER_CHROME_REST_MS = 280;
+const COMPOSER_CHROME_SETTLE_MS = 200;
 function getReplyTargetLabel(
   replyToId: string | null,
   messageById: Map<string, Message>,
@@ -79,8 +84,44 @@ export function CommunityScreen() {
   const { bottom } = useSafeAreaInsets();
   const composerHeight = useSharedValue(0);
   const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);
+  const composerChromeOpacity = useSharedValue(COMPOSER_CHROME_REST_OPACITY);
+  const listDragRef = useRef(false);
+  const listMomentumRef = useRef(false);
+  const composerSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
   const listRef = useRef<FlatList<ChatListItem> | null>(null);
+
+  const clearComposerSettleTimer = useCallback(() => {
+    if (composerSettleTimerRef.current != null) {
+      clearTimeout(composerSettleTimerRef.current);
+      composerSettleTimerRef.current = null;
+    }
+  }, []);
+
+  const goComposerChromeImmersive = useCallback(() => {
+    clearComposerSettleTimer();
+    composerChromeOpacity.value = withTiming(COMPOSER_CHROME_IMMERSIVE_OPACITY, {
+      duration: COMPOSER_CHROME_IMMERSIVE_MS,
+    });
+  }, [clearComposerSettleTimer]);
+
+  const scheduleComposerChromeRest = useCallback(() => {
+    clearComposerSettleTimer();
+    composerSettleTimerRef.current = setTimeout(() => {
+      composerSettleTimerRef.current = null;
+      if (!listDragRef.current && !listMomentumRef.current) {
+        composerChromeOpacity.value = withTiming(COMPOSER_CHROME_REST_OPACITY, {
+          duration: COMPOSER_CHROME_REST_MS,
+        });
+      }
+    }, COMPOSER_CHROME_SETTLE_MS);
+  }, [clearComposerSettleTimer]);
+
+  useEffect(() => () => clearComposerSettleTimer(), [clearComposerSettleTimer]);
+
+  const composerChromeAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: composerChromeOpacity.value,
+  }));
 
   // ── Auth + navigation store ──
   const communityId = useNavigationStore((state) => state.currentServerId) ?? null;
@@ -385,6 +426,22 @@ return (
       inverted
       keyboardShouldPersistTaps="handled"
       scrollEventThrottle={16}
+      onScrollBeginDrag={() => {
+        listDragRef.current = true;
+        goComposerChromeImmersive();
+      }}
+      onScrollEndDrag={() => {
+        listDragRef.current = false;
+        scheduleComposerChromeRest();
+      }}
+      onMomentumScrollBegin={() => {
+        listMomentumRef.current = true;
+        goComposerChromeImmersive();
+      }}
+      onMomentumScrollEnd={() => {
+        listMomentumRef.current = false;
+        scheduleComposerChromeRest();
+      }}
       contentContainerStyle={{ paddingTop: 32 }}
       keyExtractor={(item) => (item.kind === "message" ? item.message.id : item.id)}
       renderItem={renderChatItem}
@@ -432,50 +489,56 @@ return (
       ) : null}
 
       <View className="flex-row items-end bg-transparent px-3 pt-2.5 pb-3 gap-2">
-        <Pressable className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5">
-          <Ionicons name="add" size={20} color="#fff" />
-        </Pressable>
+        <Animated.View style={composerChromeAnimatedStyle}>
+          <Pressable className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5">
+            <Ionicons name="add" size={20} color="#fff" />
+          </Pressable>
+        </Animated.View>
 
-        <View className="flex-1 flex-row items-end rounded-[18px] border border-white/10 bg-white/[0.08] pr-1">
-          <EnrichedMarkdownTextInput
-            ref={composerInputRef}
-            multiline
-            editable={!isSending}
-            scrollEnabled
-            defaultValue=""
-            onChangeMarkdown={setDraft}
-            placeholder="Type a message..."
-            placeholderTextColor="#8e8e93"
-            cursorColor="#e6edf7"
-            selectionColor="rgba(63, 121, 216, 0.4)"
-            markdownStyle={{
-              strong: { color: "#e6edf7" },
-              em: { color: "#e6edf7" },
-              link: { color: "#3F79D8", underline: true },
-              spoiler: { color: "#a9b8cf", backgroundColor: "rgba(0,0,0,0.2)" },
-            }}
-            style={{
-              flex: 1,
-              minHeight: 36,
-              maxHeight: 120,
-              color: "#e6edf7",
-              paddingHorizontal: 14,
-              paddingTop: 8,
-              paddingBottom: 8,
-              fontSize: 16,
-              backgroundColor: "transparent",
-            }}
-          />
-          {draft.trim().length > 0 ? (
-            <Pressable
-              onPress={() => void handleSend()}
-              disabled={isSending}
-              className={`w-7 h-7 rounded-full bg-primary items-center justify-center mb-1 ${isSending ? "opacity-55" : ""}`}
-            >
-              <Ionicons name="arrow-up" size={18} color="#fff" />
-            </Pressable>
-          ) : null}
-        </View>
+        <Animated.View
+          style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
+        >
+          <View className="flex-1 flex-row items-end rounded-[18px] border border-white/10 bg-white/[0.08] pr-1">
+            <EnrichedMarkdownTextInput
+              ref={composerInputRef}
+              multiline
+              editable={!isSending}
+              scrollEnabled
+              defaultValue=""
+              onChangeMarkdown={setDraft}
+              placeholder="Type a message..."
+              placeholderTextColor="#8e8e93"
+              cursorColor="#e6edf7"
+              selectionColor="rgba(63, 121, 216, 0.4)"
+              markdownStyle={{
+                strong: { color: "#e6edf7" },
+                em: { color: "#e6edf7" },
+                link: { color: "#3F79D8", underline: true },
+                spoiler: { color: "#a9b8cf", backgroundColor: "rgba(0,0,0,0.2)" },
+              }}
+              style={{
+                flex: 1,
+                minHeight: 36,
+                maxHeight: 120,
+                color: "#e6edf7",
+                paddingHorizontal: 14,
+                paddingTop: 8,
+                paddingBottom: 8,
+                fontSize: 16,
+                backgroundColor: "transparent",
+              }}
+            />
+            {draft.trim().length > 0 ? (
+              <Pressable
+                onPress={() => void handleSend()}
+                disabled={isSending}
+                className={`w-7 h-7 rounded-full bg-primary items-center justify-center mb-1 ${isSending ? "opacity-55" : ""}`}
+              >
+                <Ionicons name="arrow-up" size={18} color="#fff" />
+              </Pressable>
+            ) : null}
+          </View>
+        </Animated.View>
       </View>
     </KeyboardStickyView>
 
