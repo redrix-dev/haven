@@ -163,7 +163,7 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
           if (blockedUserId === userId && blockerUserId) {
             removeStoredUserBlockingMeId(blockerUserId);
           }
-        } // CHECKPOINT 3 COMPLETE
+        }
       }
 
       void refreshSocialCounts().catch((error) => {

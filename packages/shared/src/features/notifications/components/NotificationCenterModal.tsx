@@ -21,8 +21,6 @@ import { Switch } from "@shared/app/ui/switch";
 import type {
   NotificationCounts,
   NotificationItem,
-  NotificationPreferences,
-  NotificationPreferenceUpdate,
 } from "@shared/lib/backend/types";
 import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
 import {
@@ -61,11 +59,6 @@ type NotificationCenterModalProps = {
     recipientId: string;
     friendRequestId: string;
   }) => void;
-  preferences: NotificationPreferences | null;
-  preferencesLoading: boolean;
-  preferencesSaving: boolean;
-  preferencesError?: string | null;
-  onUpdatePreferences: (next: NotificationPreferenceUpdate) => void;
   localAudioSettings: NotificationAudioSettings;
   localAudioSaving: boolean;
   localAudioError?: string | null;
@@ -103,11 +96,6 @@ export function NotificationCenterModal({
   onAcceptFriendRequestNotification,
   onDeclineFriendRequestNotification,
   onDismissFriendRequestNotification,
-  preferences,
-  preferencesLoading,
-  preferencesSaving,
-  preferencesError,
-  onUpdatePreferences,
   localAudioSettings,
   localAudioSaving,
   localAudioError,
@@ -122,14 +110,6 @@ export function NotificationCenterModal({
   const visibleUnreadCount = visibleNotifications.filter(
     (notification) => notification.readAt == null,
   ).length;
-  // Retain these props until the dedicated notification settings surface is wired.
-  void [
-    preferences,
-    preferencesLoading,
-    preferencesSaving,
-    preferencesError,
-    onUpdatePreferences,
-  ];
 
   const updateLocalAudioSettings = React.useCallback(
     (patch: Partial<NotificationAudioSettings>) => {

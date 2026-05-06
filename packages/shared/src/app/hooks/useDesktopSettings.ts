@@ -86,7 +86,6 @@ const writeWebNotificationAudioSettings = (values: NotificationAudioSettings) =>
   try {
     window.localStorage.setItem(WEB_NOTIFICATION_AUDIO_SETTINGS_STORAGE_KEY, JSON.stringify(values));
   } catch {
-    // Ignore storage failures (quota/private mode) and keep in-memory settings.
   }
 };
 
@@ -163,7 +162,6 @@ const writeWebVoiceSettings = (values: VoiceSettings) => {
   try {
     window.localStorage.setItem(WEB_VOICE_SETTINGS_STORAGE_KEY, JSON.stringify(values));
   } catch {
-    // Ignore storage failures (quota/private mode) and keep in-memory settings.
   }
 };
 

@@ -159,6 +159,7 @@ mvp-roadmap/
 docs/internal/
 !docs/internal/operations/web-push-cutover-runbook.md
 docs/reference/
+local_archives/
 
 # Local test run reports (generated)
 test-reports/

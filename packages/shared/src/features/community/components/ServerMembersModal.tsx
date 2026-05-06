@@ -142,7 +142,7 @@ export function ServerMembersModal({
         (typeof liveUsername === "string" && liveUsername.includes(normalized))
       );
     });
-  }, [blockedUserIds, isElevatedViewer, liveProfiles, members, search]); // CHECKPOINT 8 COMPLETE
+  }, [blockedUserIds, isElevatedViewer, liveProfiles, members, search]);
 
   const membersByUserId = React.useMemo(
     () => new Map(members.map((member) => [member.userId, member])),

@@ -323,7 +323,7 @@ export function DirectMessageArea({
 
   if (!conversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-surface-app text-muted-foreground">
+      <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center bg-surface-app text-muted-foreground">
         <div className="rounded-md border border-dashed border-border bg-surface-panel/60 p-6 max-w-md text-center">
           <p className="text-white font-semibold">Select a direct message</p>
           <p className="mt-2 text-sm">
@@ -345,9 +345,9 @@ export function DirectMessageArea({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-surface-app">
-      <div className="h-16 px-4 border-b border-surface-hover bg-surface-panel flex items-center">
-        <div className="flex items-center justify-between gap-3 w-full">
-          <div className="flex items-center gap-3 min-w-0">
+      <div className="flex h-16 shrink-0 items-center border-b border-surface-hover bg-surface-panel px-4">
+        <div className="flex w-full min-w-0 items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Avatar className="size-10 rounded-xl border border-border bg-surface-skeleton">
               {otherAvatarUrl && (
                 <AvatarImage src={otherAvatarUrl} alt={title} />
@@ -374,7 +374,7 @@ export function DirectMessageArea({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
               size="sm"
@@ -425,9 +425,9 @@ export function DirectMessageArea({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1">
-        <ScrollArea ref={scrollAreaRootRef} className="h-full">
-          <div className="p-4 space-y-3">
+      <div className="min-h-0 min-w-0 flex-1">
+        <ScrollArea ref={scrollAreaRootRef} className="h-full min-h-0 min-w-0">
+          <div className="min-w-0 space-y-3 p-4">
             {loading ? (
               Array.from({ length: 4 }, (_, index) => (
                 <div
@@ -489,13 +489,13 @@ export function DirectMessageArea({
                 return (
                   <div
                     key={message.messageId}
-                    className={`rounded-md border px-3 py-3 ${
+                    className={`max-w-full min-w-0 rounded-md border px-3 py-3 ${
                       isSelf
                         ? "border-border-dm-selected bg-surface-row-active"
                         : "border-border bg-surface-panel"
                     }`}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
                       <Avatar className="size-9 rounded-xl border border-border bg-surface-skeleton">
                         {authorAvatarUrl && (
                           <AvatarImage
@@ -509,13 +509,13 @@ export function DirectMessageArea({
                       </Avatar>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-white">
+                        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+                          <p className="min-w-0 max-w-full truncate text-sm font-semibold text-white">
                             {isSelf
                               ? `${currentUserDisplayName} (You)`
                               : authorUsername}
                           </p>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="shrink-0 text-xs text-muted-foreground">
                             {formatTimestamp(message.createdAt)}
                           </span>
                           {message.editedAt && (
@@ -528,7 +528,7 @@ export function DirectMessageArea({
                           )}
                         </div>
                         {visibleText && (
-                          <div className="mt-1 text-sm text-banner">
+                          <div className="mt-1 min-w-0 max-w-full text-sm text-banner">
                             <MarkdownText content={visibleText} />
                           </div>
                         )}
@@ -547,7 +547,7 @@ export function DirectMessageArea({
                                     <img
                                       src={attachment.signedUrl}
                                       alt={attachmentLabel}
-                                      className="max-h-80 rounded-md border border-border bg-surface-desktop-shell object-contain"
+                                      className="max-h-80 max-w-full rounded-md border border-border bg-surface-desktop-shell object-contain"
                                     />
                                   ) : (
                                     <div className="rounded-md border border-dashed border-border bg-surface-desktop-shell px-3 py-2 text-xs text-muted-foreground">
@@ -594,7 +594,7 @@ export function DirectMessageArea({
         </ScrollArea>
       </div>
 
-      <div className="border-t border-surface-hover bg-surface-panel p-3">
+      <div className="shrink-0 border-t border-surface-hover bg-surface-panel p-3">
         <div className="space-y-2">
           {messagingUnavailable ? (
             <div className="rounded-md border border-border bg-surface-app px-3 py-3 text-sm text-muted-foreground">
@@ -703,8 +703,6 @@ export function DirectMessageArea({
               </div>
             </>
           )}
-          {/* CHECKPOINT 5 COMPLETE */}
-          {/* CHECKPOINT 6 COMPLETE */}
           {actionNotice && (
             <p className="text-sm text-notice-success">{actionNotice}</p>
           )}

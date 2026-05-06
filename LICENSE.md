@@ -28,8 +28,8 @@ Parameters
 Licensor:             Cody Magnuson / Redrixx
 Licensed Work:        Haven
 Additional Use Grant: See above
-Change Date:          To be determined
-Change License:       To be determined
+Change Date:          2030-01-01
+Change License:       MIT
 
 Notice
 

@@ -1323,8 +1323,6 @@ export function MessageList({
 
       try {
         const url = new URL(embed.embedUrl);
-        // Prefer the privacy-enhanced embed host. We validate the path below and fall back to a
-        // reconstructed embed URL if cached rows contain malformed values.
         if (
           embed.provider === "youtube" &&
           url.hostname.toLowerCase() === "www.youtube.com"
@@ -1392,7 +1390,6 @@ export function MessageList({
       repliesByParentId.set(parentId, existing);
     }
 
-    // Guard against malformed reply graphs that would otherwise render nothing.
     if (rootMessages.length === 0 && visibleMessages.length > 0) {
       return {
         rootMessages: visibleMessages,
@@ -2046,7 +2043,7 @@ export function MessageList({
               Route this report to server staff, the Haven Moderation Team, or
               both while preserving a snapshot of the current context.
             </DialogDescription>
-            {/* CHECKPOINT 6 COMPLETE */}
+
           </DialogHeader>
 
           <div className="space-y-3">
@@ -2065,7 +2062,7 @@ export function MessageList({
                 <option value="server_admins">Server Staff</option>
                 <option value="both">Both</option>
               </select>
-              {/* CHECKPOINT 3 COMPLETE */}
+
             </div>
 
             <div className="space-y-1">

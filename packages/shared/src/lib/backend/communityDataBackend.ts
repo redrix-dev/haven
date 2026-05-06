@@ -806,7 +806,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       canManageBans: owner || Boolean(canManageBans),
       canViewBanHidden: owner || Boolean(canViewBanHidden),
       canCreateReports: owner || Boolean(canCreateReports),
-      canManageReports: owner || Boolean(canManageReports), // CHECKPOINT 1 COMPLETE
+      canManageReports: owner || Boolean(canManageReports),
       canRefreshLinkPreviews: owner || Boolean(canRefreshLinkPreviews),
       canManageInvites: owner || Boolean(canManageInvites),
     };
@@ -849,7 +849,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     let snapshot: SupportReportProfileSnapshot | null = null;
     try {
-      snapshot = await fetchSupportReportProfileSnapshot(targetUserId); // CHECKPOINT 4 COMPLETE
+      snapshot = await fetchSupportReportProfileSnapshot(targetUserId);
     } catch (snapshotError) {
       console.warn('Failed to capture support report profile snapshot:', snapshotError);
     }
@@ -958,7 +958,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return {
       kickedUserId,
       communityId: returnedCommunityId,
-    }; // CHECKPOINT 5 COMPLETE
+    };
   },
 
   async unbanCommunityMember({ communityId, targetUserId, reason }) {
@@ -1191,7 +1191,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           revokedUserId,
           channelId,
           communityId: payloadCommunityId,
-        }); // CHECKPOINT 3 COMPLETE
+        });
       })
       .on('broadcast', { event: 'report_status_updated' }, ({ payload }) => {
         const payloadRecord = asObjectRecord(payload);
@@ -1221,13 +1221,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           status,
           communityId: payloadCommunityId,
           updatedBy,
-        }); // CHECKPOINT 4 COMPLETE
+        });
       });
 
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         activeCommunityChannelsById.set(communityId, channel);
-      } // CHECKPOINT 4 COMPLETE
+      }
     });
 
     const originalUnsubscribe = channel.unsubscribe.bind(channel);
@@ -1983,7 +1983,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       (role) =>
         role.is_system === true &&
         (role.name === 'Admin' || role.name === 'Moderator')
-    ); // CHECKPOINT 4 COMPLETE
+    );
   },
 
   async canSendInChannel(channelId) {
@@ -2035,7 +2035,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       })
       .eq('community_id', communityId);
     if (communitySettingsError) throw communitySettingsError;
-    // CHECKPOINT 2 COMPLETE
   },
 
   async fetchServerRoleManagement(communityId) {
@@ -2552,7 +2551,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           .map((row) => row.user_id)
           .filter((userId): userId is string => Boolean(userId))
       )
-    ); // CHECKPOINT 4 COMPLETE
+    );
   },
 
   async updateChannel({ communityId, channelId, name, topic }) {
@@ -2709,7 +2708,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         communityId,
         channelId,
         messageId,
-      }); // CHECKPOINT 4 COMPLETE
+      });
     } catch (snapshotError) {
       console.warn('Failed to capture support report message snapshot:', snapshotError);
     }
@@ -2720,7 +2719,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       .insert({
         id: reportId,
         community_id: communityId,
-        destination: target, // CHECKPOINT 3 COMPLETE
+        destination: target,
         reporter_user_id: reporterUserId,
         title: reportTitle,
         notes: reportNotes,
@@ -2744,5 +2743,4 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (messageLinkError) throw messageLinkError;
   },
 
-  // CHECKPOINT 5 COMPLETE
 };

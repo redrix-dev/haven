@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { MarkdownText } from '@shared/app/ui/MarkdownText';
 
@@ -37,5 +38,30 @@ describe('MarkdownText', () => {
     expect(screen.getByText('quote').closest('blockquote')).toBeTruthy();
     expect(screen.getByText('const value = 1;').closest('pre')).toBeTruthy();
     expect(screen.getByRole('table')).toBeTruthy();
+  });
+
+  it('renders Discord-style spoilers as reveal controls', async () => {
+    const user = userEvent.setup();
+    render(<MarkdownText content="||spoiler||" />);
+
+    const spoiler = screen.getByRole('button', { name: /spoiler, click to reveal/i });
+    expect(spoiler.getAttribute('aria-pressed')).toBe('false');
+
+    await user.click(spoiler);
+    expect(spoiler.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('spoiler')).toBeTruthy();
+  });
+
+  it('renders GFM task list items', () => {
+    render(
+      <MarkdownText
+        content={['- [ ] Todo', '- [x] Done'].join('\n')}
+      />
+    );
+
+    const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    expect(checkboxes).toHaveLength(2);
+    expect(checkboxes[0].checked).toBe(false);
+    expect(checkboxes[1].checked).toBe(true);
   });
 });

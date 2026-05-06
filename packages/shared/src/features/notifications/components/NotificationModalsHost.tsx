@@ -63,11 +63,6 @@ export function NotificationModalsHost({
           friendRequestId,
         });
       }}
-      preferences={app.notificationPreferences}
-      preferencesLoading={app.notificationPreferencesLoading}
-      preferencesSaving={app.notificationPreferencesSaving}
-      preferencesError={app.notificationPreferencesError}
-      onUpdatePreferences={(next) => void app.saveNotificationPreferences(next)}
       localAudioSettings={app.appSettings.notifications}
       localAudioSaving={app.notificationAudioSettingsSaving}
       localAudioError={app.notificationAudioSettingsError}

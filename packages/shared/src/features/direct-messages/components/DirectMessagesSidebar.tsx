@@ -140,7 +140,7 @@ export function DirectMessagesSidebar({
   return (
     <div
       ref={sidebarRef}
-      className={`relative shrink-0 border-r border-surface-hover bg-surface-toast flex flex-col ${
+      className={`relative flex shrink-0 flex-col overflow-x-hidden border-r border-surface-hover bg-surface-toast ${
         isResizing ? "select-none" : ""
       }`}
       style={{
@@ -178,8 +178,8 @@ export function DirectMessagesSidebar({
         </div>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="p-3 space-y-2">
+      <ScrollArea className="min-h-0 min-w-0 flex-1 [&_[data-slot=scroll-area-viewport]]:max-w-full [&_[data-slot=scroll-area-viewport]]:min-w-0 [&_[data-slot=scroll-area-viewport]]:overflow-x-hidden">
+        <div className="box-border min-w-0 max-w-full space-y-2 p-3">
           {loading ? (
             Array.from({ length: 4 }, (_, index) => (
               <div
@@ -235,53 +235,58 @@ export function DirectMessagesSidebar({
                   onClick={() =>
                     onSelectConversation(conversation.conversationId)
                   }
-                  className={`w-full rounded-md border px-3 py-3 text-left transition-colors ${
+                  className={`min-w-0 max-w-full overflow-x-hidden rounded-md border px-3 py-3 text-left transition-colors ${
                     isSelected
                       ? "border-border-notification bg-surface-row-active"
                       : "border-border bg-surface-panel hover:bg-surface-dm-row-hover"
-                  }`}
+                  } w-full`}
                 >
-                  <div className="flex items-start gap-3">
-                    <Avatar className="size-10 rounded-xl border border-border bg-surface-skeleton">
+                  <div className="flex min-w-0 max-w-full items-start gap-3">
+                    <Avatar className="size-10 shrink-0 rounded-xl border border-border bg-surface-skeleton">
                       {avatarUrl && <AvatarImage src={avatarUrl} alt={title} />}
                       <AvatarFallback className="rounded-xl bg-surface-skeleton text-white text-xs">
                         {getInitial(title)}
                       </AvatarFallback>
                     </Avatar>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-white truncate">
+                    <div className="min-w-0 max-w-full flex-1 overflow-hidden">
+                      <div className="grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                        <p className="min-w-0 truncate text-sm font-semibold text-white">
                           {title}
                         </p>
-                        {conversation.isMuted && (
-                          <VolumeX className="size-3.5 text-meta shrink-0" />
-                        )}
-                        {(unreadCounts[conversation.conversationId] ??
-                          conversation.unreadCount) > 0 && (
-                          <Badge
-                            variant="default"
-                            className="bg-primary text-white ml-auto"
-                          >
-                            {(unreadCounts[conversation.conversationId] ??
-                              conversation.unreadCount) > 99
-                              ? "99+"
-                              : (unreadCounts[conversation.conversationId] ??
-                                conversation.unreadCount)}
-                          </Badge>
-                        )}
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {conversation.isMuted && (
+                            <VolumeX className="size-3.5 shrink-0 text-meta" />
+                          )}
+                          {(unreadCounts[conversation.conversationId] ??
+                            conversation.unreadCount) > 0 && (
+                            <Badge variant="default" className="bg-primary text-white">
+                              {(unreadCounts[conversation.conversationId] ??
+                                conversation.unreadCount) > 99
+                                ? "99+"
+                                : (unreadCounts[conversation.conversationId] ??
+                                  conversation.unreadCount)}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="mt-1 flex items-center gap-2">
-                        <MessageCircle className="size-3 text-muted-foreground shrink-0" />
-                        <p className="text-xs text-muted-foreground truncate">
+                      <div
+                        className={`mt-1 grid min-w-0 max-w-full items-center gap-x-2 ${
+                          conversation.lastMessageCreatedAt
+                            ? "grid-cols-[auto_minmax(0,1fr)_auto]"
+                            : "grid-cols-[auto_minmax(0,1fr)]"
+                        }`}
+                      >
+                        <MessageCircle className="size-3 shrink-0 text-muted-foreground" />
+                        <p className="min-w-0 truncate text-xs text-muted-foreground">
                           {preview}
                         </p>
-                        {conversation.lastMessageCreatedAt && (
-                          <span className="ml-auto shrink-0 text-[11px] text-dm-meta">
+                        {conversation.lastMessageCreatedAt ? (
+                          <span className="shrink-0 text-right text-[11px] text-dm-meta tabular-nums">
                             {formatTimestamp(conversation.lastMessageCreatedAt)}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>

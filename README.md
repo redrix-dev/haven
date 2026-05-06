@@ -1,162 +1,119 @@
 # Haven
+**Community chat for people who give a damn.**
 
-Haven is a community chat app with a primary Electron desktop client and a browser-based web client.
+Haven is a real-time community chat platform across Electron desktop, web, and iOS. It exists because community chat stopped feeling like it was built for communities — and proving that it could be done differently was worth the effort.
 
-The goal is simple. Keep the parts people actually love about community chat, cut the bloat, and keep the system understandable enough that anyone can inspect how it works.
+![Haven chat interface](docs/assets/screenshot-chat.png)
 
-## Why this exists
+---
 
-I wanted a Discord-like app that feels focused again.
+## What it is
 
-- Fast text chat
-- Server scoped roles and permissions
-- Clear ownership and moderation controls
-- Voice channels that work in a practical MVP setup
+Haven gives streamers and their communities a space that works the way they'd expect — without the algorithmic feeds, ad targeting, or identity verification schemes that have crept into the platforms people used to love.
 
-This project started as a personal build to prove that a modern chat app can still be clean, predictable, and user respectful. Given the latest information about Discords plan for age verification and identity tracking. I chose to prove to myself mainly, that an alternative could be built.
+- Invite-only community spaces with server-scoped roles and permissions
+- Real-time text channels with full markdown composition and rendering
+- Voice channels via WebRTC
+- Direct messages, friends, notifications, and push notifications
+- Media upload and community management tools
+- A moderation system enforced at the database level, not the client
+- A permission model that's readable, versioned, and verifiable
 
-## Why I built it this way
+## Platforms
 
-- SQL first schema design so behavior is explicit and reviewable
-- Role and permission model scoped to each server
-- RLS policies as the core access control layer
-- Realtime where it matters, not everywhere
-- P2P voice first for MVP, with a clear path to SFU later
+**Electron desktop** is the primary production target. **Web** runs as a Vite client. **iOS** is in active TestFlight distribution.
 
-I care more about correctness and trust than fancy abstractions.
+The iOS client runs on a custom OTA update pipeline built on top of Expo Updates — asset hashing, bundle generation, and manifest serving are handled by a local toolchain that publishes to a Supabase-backed Edge Function. This replaces EAS Update entirely and keeps the update infrastructure under the same roof as the rest of the backend. Everything outside of voice works on mobile: DMs, reports, modmail, push notifications, community creation, invites, friends, media upload, and full rich text composition and rendering via [`react-native-enriched-markdown`](https://github.com/software-mansion-labs/react-native-enriched-markdown).
+
+---
+
+## Why it's built this way
+
+### Security lives in the database, not the UI
+
+Most chat platforms treat access control as a presentation problem — hide things from users who shouldn't see them. Haven treats it as a data problem. Every permission check is a Postgres RLS policy or a security-definer RPC. The client reflects what the database says. It does not decide.
+
+This matters because a client can lie. A user can bypass UI guards with devtools. A Postgres row-level security policy enforced at the query level cannot be bypassed from the client regardless of what the frontend does. Moderation visibility, ban enforcement, channel access — all of it bottoms out at the database.
+
+### The anon key being public is intentional
+
+Haven uses Supabase's publishable anon key on the client. This is the correct approach, not a shortcut. The anon key cannot do anything the RLS policies do not permit. The service role key never ships in the renderer. Voice relay credentials live in Edge Function secrets and are only returned after the function validates the requesting user's JWT and confirms channel membership before responding.
+
+### The source is public for the same reason
+
+The schema, RLS policies, migration history, and voice relay function are all readable in this repo. If the security model works, it should hold up to inspection. If it doesn't, hiding it wouldn't make it safer.
+
+### The monorepo is structured around a stable shared core
+
+Business logic, types, and hooks live in `packages/shared` and are platform-agnostic. Platform-specific behavior is isolated to each app target through a registration pattern rather than leaking into shared code. The Electron client, the web client, and the iOS client all run against the same tested core.
+
+---
 
 ## Stack
 
-- Electron Forge
-- Vite (web entry)
-- React + TypeScript
-- Tailwind + shadcn/ui components
-- Supabase (Auth, Postgres, Realtime, Edge Functions)
-- WebRTC for voice transport
-- Xirsys TURN for relay support when direct P2P is not possible
+| Layer | Technology |
+|---|---|
+| Desktop | Electron Forge + Webpack |
+| Web | Vite + React |
+| iOS | React Native + Expo (dev client, TestFlight) |
+| Language | TypeScript |
+| UI | Tailwind CSS + shadcn/ui (desktop/web), NativeWind (iOS) |
+| Backend | Supabase (Auth, Postgres, Realtime, Edge Functions) |
+| OTA Updates (iOS) | Custom Expo Updates-compatible pipeline via Supabase Edge Function |
+| Voice | WebRTC + Xirsys TURN relay |
+| State | Zustand with precise per-selector isolation |
+| Monorepo | `packages/shared` across all platforms |
 
-## Safety and trust model
+---
 
-No app is "trust me" safe by default, so Haven is built to be inspectable.
+## Architecture
 
-- Client uses Supabase publishable key only
-- Service role key is not shipped in the renderer
-- RLS policies are defined in SQL migrations and versioned in this repo
-- Voice relay secrets stay in Supabase Edge Function secrets, not in client code
-- Schema, permission logic, and migrations are committed and readable
+Haven is a monorepo with three app targets:
 
-## How to verify it yourself
+- `apps/electron` — primary production target
+- `apps/web` — Vite web client
+- `apps/mobile` — React Native + Expo, actively distributed via TestFlight
+- `packages/shared` — types, hooks, and business logic shared across all platforms
 
-1. Review client auth/data usage in `packages/shared/src/lib/supabase.ts` and backend seam files in `packages/shared/src/lib/backend/`.
-2. Review access control logic in `services/supabase/migrations/`.
-3. Review voice secret handling in `services/supabase/functions/voice-ice/index.ts`.
-4. Run the app against your own Supabase project and inspect network calls in devtools.
+State is managed with Zustand. Stores use precise selectors to isolate renders — components subscribe only to the slice of state they need, which produces real and measurable render isolation rather than theoretical benefits. The chat interface went through a full Zustand refactor to remove prop drilling and the performance difference in production was noticeable.
 
-## Current status
+The Electron client uses a custom title bar with IPC-wired window controls and a CI/CD pipeline with branch protection, conventional commits, and a GitHub Actions publish flow gated on human approval. Auto-updates are handled by Electron Forge's update mechanism against GitHub Releases, with a version attestation table in Supabase as a secondary verification layer — requiring an attacker to compromise both GitHub and Supabase simultaneously to serve a malicious update.
 
-Haven is early and actively evolving. Current focus is a clean desktop and web experience, permission correctness,
-and stable desktop updates.
+The iOS OTA pipeline is a custom implementation of the Expo Updates protocol. A local toolchain handles asset fingerprinting, bundle generation, and manifest construction. The manifest is served by a Supabase Edge Function and the client fetches and applies updates at launch without going through EAS. This gives full control over the update cadence and keeps update infrastructure consolidated with the rest of the backend.
 
-## Local development
+---
 
-Haven supports three practical local workflows:
+## Verifying the security model
 
-1. Code + UI work (no hosted backend access required)
-2. Full backend/runtime work with a compatible Supabase project and required secrets
-3. Web validation (Vite + browser smoke testing)
+1. Client auth and data access — `packages/shared/src/lib/supabase.ts`
+2. RLS policies and schema — `services/supabase/migrations/`
+3. Voice secret handling — `services/supabase/functions/voice-ice/index.ts`
 
-If you do not have a shared backend setup, you can still:
-- run packaged builds
-- run the local Supabase-backed test harness (for DB/RLS/backend tests)
+Run the app against your own Supabase project and inspect network calls in devtools. Nothing load-bearing is hidden.
 
-See:
-- `docs/internal/contributor/collaborator-setup.md` (small-team collaborator setup + secrets guidance)
-- `docs/internal/contributor/haven-workflow.md` (end-to-end dev and release workflow)
+---
 
-## Local testing (Phase 5 hardening pass)
+## Testing
 
-Haven now includes a local Supabase-backed regression harness for SQL/RLS and backend seam tests.
-
-Quick prerequisites (details in docs):
-- Docker Desktop running (Windows: WSL2 required)
-- `psql` installed (PostgreSQL client)
-- `npm ci`
-- `npx supabase start`
-
-Setup/help docs:
-- `docs/internal/contributor/collaborator-setup.md` (collaborator-focused setup + secrets handling)
-- `docs/internal/testing/rls-and-hardening-runbook.md` (operational runbook)
-- `docs/internal/testing/test-suite-breakdown.md` (how the suite works end-to-end)
-
-Core commands:
+Haven includes a local Supabase-backed regression harness covering SQL, RLS policies, and backend seam contracts.
 
 ```bash
-npm run test:db
-npm run test:backend
-npm run test:unit
-npm run build:web
+npm run test:db        # SQL + RLS regression suite via psql against local Supabase
+npm run test:backend   # Backend seam contract and integration tests
+npm run test:unit      # Renderer and component tests
+npm run test:report    # Human-readable proof report with full logs
 ```
 
-Coverage summary:
-- `test:db` -> SQL RLS/RPC regression suites via `psql` against local Supabase
-- `test:backend` -> backend seam contract/integration tests against local Supabase
-- `test:unit` -> minimal renderer/component tests for notification/DM UX flows
+---
 
-Additional testing docs:
-- `docs/internal/testing/rls-and-hardening-runbook.md`
+## Status
 
-You can also generate a local proof report (with logs + a human-readable learning breakdown):
+Haven is in active production use across desktop, web, and iOS. Current focus is voice on mobile and continued hardening across all three platforms.
 
-```bash
-npm run test:report
-```
-
-Outputs are written to git-ignored `test-reports/*.local/`.
-
-For release/canary validation signoff (timestamp + command table + signatures):
-
-```bash
-npm run test:signoff -- --release-label <label> --environment <env> --test-author "<name>" --run-by "<name>"
-```
-
-## Build Outputs and Runtime Assets
-
-The repo now uses the default Forge renderer entry flow for Electron, plus one shared runtime audio helper for
-notification and voice sounds.
-
-Authoritative output folders:
-- `.webpack/` for Electron intermediates
-- `out/` for packaged Electron builds and `npm run make`
-- `dist/web/` for the web production build
-
-Architecture doc:
-- `docs/internal/architecture/electron-build-paths-and-runtime-assets.md`
-
-## Documentation map
-
-Use this repo as a doc hub, not just a README.
-
-- `docs/internal/contributor/haven-workflow.md`
-  - End-to-end daily dev + release workflow (branches, commits, versioning, publish, hotfixes)
-- `docs/internal/contributor/collaborator-setup.md`
-  - Small-team collaborator setup, prerequisites, and secrets/environment handling
-- `docs/internal/contributor/AGENTS.md`
-  - Repo-wide engineering and safety rules
-- `docs/internal/operations/auto-updates.md`
-  - Auto-update behavior and publish notes
-- `docs/internal/testing/rls-and-hardening-runbook.md`
-  - Operational runbook for local Supabase-backed DB/RLS/backend tests
-- `docs/internal/testing/test-suite-breakdown.md`
-  - How the test stack works and how to read generated test reports
-- `docs/users/web-install.md`
-  - User-facing web access guide
+---
 
 ## License
 
-Haven is source-available software, not open source. The source is 
-inspectable and contributions are welcome, but commercial use, competing 
-platforms, and hosted clones are not permitted without a commercial license.
+Haven is source-available under the [Business Source License 1.1](./LICENSE.md). The source is inspectable but commercial use, competing platforms, and hosted clones require a separate license.
 
-See [LICENSE.md](./LICENSE.md) for full terms.
-
-For licensing inquiries: legal@redrixx.com
+Change Date: 2030-01-01 · Change License: MIT · Inquiries: legal@redrixx.com

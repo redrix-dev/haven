@@ -44,4 +44,29 @@ describe('MessageInput', () => {
       });
     });
   });
+
+  it('normalizes community markdown before sending', async () => {
+    const user = userEvent.setup();
+    const onSendMessage = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <MessageInput
+        onSendMessage={onSendMessage}
+        channelId="channel-1"
+        channelName="general"
+      />
+    );
+
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
+    await user.type(textarea, '|| spoiler ||   ');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(onSendMessage).toHaveBeenCalledWith('||spoiler||', {
+        replyToMessageId: undefined,
+        mediaFile: undefined,
+        mediaExpiresInHours: undefined,
+      });
+    });
+  });
 });

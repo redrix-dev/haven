@@ -19,7 +19,7 @@ export function ChatAppDmWorkspace({ app, user }: ChatAppDmWorkspaceProps) {
       blockedUserIds.has(app.selectedDmConversation.otherUserId),
   );
   return (
-    <>
+    <div className="flex min-h-0 min-w-0 flex-1">
       <DirectMessagesSidebar
         currentUserDisplayName={app.userDisplayName}
         refreshing={app.dmConversationsRefreshing}
@@ -59,6 +59,6 @@ export function ChatAppDmWorkspace({ app, user }: ChatAppDmWorkspaceProps) {
         onReportMessage={app.reportDirectMessage}
         enableRichComposer={app.richComposerEnabled}
       />
-    </>
+    </div>
   );
 }

@@ -8,26 +8,10 @@ import { useNotificationsStore } from "@shared/stores/notificationsStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import type {
   NotificationItem,
-  NotificationPreferences,
 } from "@shared/lib/backend/types";
 import type { NotificationAudioSettings } from "@shared/app/types/settings";
 
 const nowIso = new Date().toISOString();
-
-const basePreferences: NotificationPreferences = {
-  userId: "user-1",
-  friendRequestInAppEnabled: true,
-  friendRequestSoundEnabled: true,
-  friendRequestPushEnabled: true,
-  dmInAppEnabled: true,
-  dmSoundEnabled: true,
-  dmPushEnabled: true,
-  mentionInAppEnabled: true,
-  mentionSoundEnabled: true,
-  mentionPushEnabled: true,
-  createdAt: nowIso,
-  updatedAt: nowIso,
-};
 
 const baseLocalAudioSettings: NotificationAudioSettings = {
   masterSoundEnabled: true,
@@ -101,10 +85,6 @@ describe("NotificationCenterModal", () => {
         onMarkNotificationRead={() => {}}
         onDismissNotification={() => {}}
         onOpenNotificationItem={onOpenNotificationItem}
-        preferences={basePreferences}
-        preferencesLoading={false}
-        preferencesSaving={false}
-        onUpdatePreferences={() => {}}
         localAudioSettings={baseLocalAudioSettings}
         localAudioSaving={false}
         onUpdateLocalAudioSettings={() => {}}
@@ -138,10 +118,6 @@ describe("NotificationCenterModal", () => {
         onDismissAll={() => {}}
         onMarkNotificationRead={() => {}}
         onDismissNotification={() => {}}
-        preferences={basePreferences}
-        preferencesLoading={false}
-        preferencesSaving={false}
-        onUpdatePreferences={() => {}}
         localAudioSettings={baseLocalAudioSettings}
         localAudioSaving={false}
         onUpdateLocalAudioSettings={() => {}}
@@ -186,10 +162,6 @@ describe("NotificationCenterModal", () => {
         onDismissAll={() => {}}
         onMarkNotificationRead={() => {}}
         onDismissNotification={() => {}}
-        preferences={basePreferences}
-        preferencesLoading={false}
-        preferencesSaving={false}
-        onUpdatePreferences={() => {}}
         localAudioSettings={baseLocalAudioSettings}
         localAudioSaving={false}
         onUpdateLocalAudioSettings={() => {}}
@@ -231,10 +203,6 @@ describe("NotificationCenterModal", () => {
         onDismissAll={onDismissAll}
         onMarkNotificationRead={() => {}}
         onDismissNotification={() => {}}
-        preferences={basePreferences}
-        preferencesLoading={false}
-        preferencesSaving={false}
-        onUpdatePreferences={() => {}}
         localAudioSettings={baseLocalAudioSettings}
         localAudioSaving={false}
         onUpdateLocalAudioSettings={onUpdateLocalAudioSettings}
@@ -284,10 +252,6 @@ describe("NotificationCenterModal", () => {
         onDismissAll={() => {}}
         onMarkNotificationRead={() => {}}
         onDismissNotification={() => {}}
-        preferences={basePreferences}
-        preferencesLoading={false}
-        preferencesSaving={false}
-        onUpdatePreferences={() => {}}
         localAudioSettings={{
           ...baseLocalAudioSettings,
           voicePresenceSoundEnabled: false,
@@ -336,10 +300,6 @@ describe("NotificationCenterModal", () => {
         onAcceptFriendRequestNotification={() => {}}
         onDeclineFriendRequestNotification={() => {}}
         onDismissFriendRequestNotification={onDismissFriendRequestNotification}
-        preferences={basePreferences}
-        preferencesLoading={false}
-        preferencesSaving={false}
-        onUpdatePreferences={() => {}}
         localAudioSettings={baseLocalAudioSettings}
         localAudioSaving={false}
         onUpdateLocalAudioSettings={() => {}}

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
+import { splitCommunitySpoilerSegments } from '@shared/lib/markdown/communityMarkdownParity';
 import { cn } from '@shared/lib/utils';
 
 type MarkdownParent = {
@@ -208,20 +209,62 @@ interface MarkdownTextProps {
   className?: string;
 }
 
+function SpoilerInline({ children }: { children: React.ReactNode }) {
+  const [revealed, setRevealed] = React.useState(false);
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-pressed={revealed}
+      aria-label={revealed ? 'Spoiler revealed' : 'Spoiler, click to reveal'}
+      className={cn(
+        'inline cursor-pointer rounded px-0.5 align-baseline transition-[filter]',
+        revealed ? '' : 'select-none blur-md hover:blur-none',
+      )}
+      onClick={() => setRevealed(true)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setRevealed(true);
+        }
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 export const MarkdownText = React.memo(function MarkdownText({
   content,
   className,
 }: MarkdownTextProps) {
-  const remarkPlugins = React.useMemo(
-    () => [remarkGfm, remarkBreaks, createUnderlineRemarkPlugin(content)],
-    [content]
-  );
+  const segments = React.useMemo(() => splitCommunitySpoilerSegments(content), [content]);
 
   return (
     <span className={cn('break-words leading-relaxed', className)}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
-        {content}
-      </ReactMarkdown>
+      {segments.map((segment, index) => {
+        const remarkPlugins = [
+          remarkGfm,
+          remarkBreaks,
+          createUnderlineRemarkPlugin(segment.value),
+        ];
+        return segment.kind === 'markdown' ? (
+          <ReactMarkdown
+            key={index}
+            remarkPlugins={remarkPlugins}
+            components={markdownComponents}
+          >
+            {segment.value}
+          </ReactMarkdown>
+        ) : (
+          <SpoilerInline key={index}>
+            <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+              {segment.value}
+            </ReactMarkdown>
+          </SpoilerInline>
+        );
+      })}
     </span>
   );
 });

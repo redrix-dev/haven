@@ -5,6 +5,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TurndownService from "turndown";
 import { marked } from "marked";
 import { cn } from "@shared/lib/utils";
+import { normalizeCommunityMarkdown } from "@shared/lib/markdown/communityMarkdownParity";
 
 type RichComposerConfig = {
   markdown: string;
@@ -52,9 +53,6 @@ TURNDOWN.addRule("havenUnderline", {
   },
 });
 
-const normalizeMarkdown = (value: string) =>
-  value.replace(/\r\n/g, "\n").replace(/\s+$/g, "");
-
 const markdownToHtml = (markdown: string) => {
   if (!markdown.trim()) return "<p></p>";
   const withUnderlineHtml = markdown.replace(
@@ -70,7 +68,7 @@ const markdownToHtml = (markdown: string) => {
 const htmlToMarkdown = (html: string) => {
   if (!html.trim()) return "";
   const markdown = TURNDOWN.turndown(html);
-  return normalizeMarkdown(markdown);
+  return normalizeCommunityMarkdown(markdown);
 };
 
 const isEmptyDoc = (editor: Editor) => editor.state.doc.textContent.length === 0;
@@ -82,7 +80,7 @@ export function useRichComposer({
   onSubmit,
   disabled = false,
 }: RichComposerConfig) {
-  const lastMarkdownRef = React.useRef(normalizeMarkdown(markdown));
+  const lastMarkdownRef = React.useRef(normalizeCommunityMarkdown(markdown));
   const skipNextUpdateRef = React.useRef(false);
 
   const editor = useEditor({
@@ -137,7 +135,7 @@ export function useRichComposer({
   // Run before paint so the composer does not flash previous text after send (parent clears to "").
   React.useLayoutEffect(() => {
     if (!editor) return;
-    const normalized = normalizeMarkdown(markdown);
+    const normalized = normalizeCommunityMarkdown(markdown);
     const editorHasText = !isEmptyDoc(editor);
     // Parent cleared but refs already agreed on "" while the doc is stale (e.g. setOptions vs onUpdate ordering).
     const mustForceEmpty = normalized === "" && editorHasText;

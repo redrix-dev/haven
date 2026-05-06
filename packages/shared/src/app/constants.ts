@@ -8,7 +8,6 @@ export const ENABLE_CHANNEL_RELOAD_DIAGNOSTICS =
   typeof process !== 'undefined' && process.env.HAVEN_DEBUG_CHANNEL_RELOADS === '1';
 
 export const MESSAGE_PAGE_SIZE = 75;
-/** Max age of a channel bundle HTTP sync before soft/full network revalidate on revisit. */
 export const CHANNEL_BUNDLE_STALE_MS = 60_000;
 export const DM_REPORT_REVIEW_PANEL_FLAG = 'dm_report_review_v1';
 export const VOICE_HARDWARE_DEBUG_PANEL_FLAG = 'debug_voice_hardware_panel';

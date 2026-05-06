@@ -1139,7 +1139,7 @@ export function useVoiceSessionController({
     hasPresenceSyncedOnceRef.current = false;
 
     if (wasJoined) {
-      playDebouncedVoicePresenceSound("voice_presence_leave"); // CHECKPOINT 4 COMPLETE
+      playDebouncedVoicePresenceSound("voice_presence_leave");
     }
     if (channel) {
       try {
@@ -1245,7 +1245,7 @@ export function useVoiceSessionController({
             if (status === "SUBSCRIBED") {
               clearTimeout(timeoutId);
               setStoredJoined(true);
-              playDebouncedVoicePresenceSound("voice_presence_join"); // CHECKPOINT 4 COMPLETE
+              playDebouncedVoicePresenceSound("voice_presence_join");
               skipNextPresenceSyncRef.current = true;
               await trackPresenceState();
               resolve();
@@ -1371,7 +1371,6 @@ export function useVoiceSessionController({
         throw new Error("Voice channel mismatch.");
       }
 
-      // CHECKPOINT 4 COMPLETE
       const sendStatus = await channel.send({
         type: "broadcast",
         event: "voice_kick",
@@ -1409,7 +1408,7 @@ export function useVoiceSessionController({
 
       const nextRemoteStream = remoteStreams[userId] ?? null;
       element.srcObject = nextRemoteStream;
-      applyAudioElementPlaybackState(userId, element); // CHECKPOINT 7 COMPLETE
+      applyAudioElementPlaybackState(userId, element);
       void applySinkId(element);
 
       if (nextRemoteStream) {

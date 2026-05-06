@@ -55,6 +55,7 @@ function createRendererBundleConfig(tsconfigFile) {
   const envFromFile = readEnvFile(path.resolve(__dirname, '.env'));
   const supabaseUrl = process.env.SUPABASE_URL || envFromFile.SUPABASE_URL || '';
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || envFromFile.SUPABASE_ANON_KEY || '';
+  const nodeEnv = process.env.NODE_ENV || envFromFile.NODE_ENV || 'development';
   const havenBackendMode =
     process.env.HAVEN_BACKEND_MODE || envFromFile.HAVEN_BACKEND_MODE || 'central_supabase';
 
@@ -67,6 +68,7 @@ function createRendererBundleConfig(tsconfigFile) {
       new webpack.DefinePlugin({
         'process.env.SUPABASE_URL': JSON.stringify(supabaseUrl),
         'process.env.SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
+        'process.env.NODE_ENV': JSON.stringify(nodeEnv),
         'process.env.HAVEN_BACKEND_MODE': JSON.stringify(havenBackendMode),
       }),
     ],

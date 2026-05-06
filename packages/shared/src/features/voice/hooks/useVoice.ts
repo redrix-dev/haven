@@ -240,7 +240,6 @@ export function useVoice({
   const forceDisconnectVoice = React.useCallback(
     async (reason: ForceDisconnectVoiceReason) => {
       void reason;
-      // CHECKPOINT 1 COMPLETE
       await disconnectVoiceSession();
     },
     [disconnectVoiceSession],

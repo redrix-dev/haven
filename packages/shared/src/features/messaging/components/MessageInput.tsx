@@ -17,6 +17,7 @@ import {
   RichComposerInput,
   useRichComposer,
 } from "@shared/features/messaging/components/richComposer";
+import { normalizeCommunityMarkdown } from "@shared/lib/markdown/communityMarkdownParity";
 
 interface MessageInputProps {
   onSendMessage: (
@@ -59,7 +60,8 @@ export function MessageInput({
   const [sendError, setSendError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
-    const content = input.trim();
+    const normalized = normalizeCommunityMarkdown(input);
+    const content = normalized.trim();
     if ((!content && !mediaFile) || sending) return;
 
     setSending(true);
