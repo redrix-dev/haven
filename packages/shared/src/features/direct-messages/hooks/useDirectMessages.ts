@@ -9,6 +9,12 @@ import type {
 } from '@shared/lib/backend/types';
 import { getErrorMessage } from '@platform/lib/errors';
 
+function previewFromDmContent(content: string, max = 140): string {
+  const collapsed = content.replace(/\s+/g, ' ').trim();
+  if (collapsed.length <= max) return collapsed;
+  return `${collapsed.slice(0, Math.max(0, max - 1))}…`;
+}
+
 type RefreshDmConversationsOptions = { suppressLoadingState?: boolean };
 type RefreshDmMessagesOptions = {
   suppressLoadingState?: boolean;
@@ -65,6 +71,7 @@ export function useDirectMessages({
   const selectedDmConversationIdRef = React.useRef<string | null>(null);
   const dmMessagesCacheRef = React.useRef<Record<string, DirectMessage[]>>({});
   const dmLastSuccessfulFetchAtRef = React.useRef<Record<string, number>>({});
+  const dmSendInFlightRef = React.useRef(false);
 
   const setStoredConversations = React.useCallback((conversations: DirectMessageConversationSummary[]) => {
     useDmStore.getState().setConversations(conversations);
@@ -282,6 +289,43 @@ export function useDirectMessages({
     [directMessageBackend, enabled, userId]
   );
 
+  const mergeSentDmIntoThread = React.useCallback((conversationId: string, sent: DirectMessage) => {
+    setDmMessages((prev) => {
+      if (selectedDmConversationIdRef.current !== conversationId) return prev;
+      if (prev.some((m) => m.messageId === sent.messageId)) return prev;
+      const next = [...prev, sent];
+      dmMessagesCacheRef.current[conversationId] = next;
+      return next;
+    });
+  }, []);
+
+  const patchDmConversationAfterLocalSend = React.useCallback((conversationId: string, sent: DirectMessage) => {
+    const isActiveThread = selectedDmConversationIdRef.current === conversationId;
+    useDmStore.setState((s) => ({
+      conversations: s.conversations.map((c) =>
+        c.conversationId !== conversationId
+          ? c
+          : {
+              ...c,
+              lastMessageAt: sent.createdAt,
+              lastMessageId: sent.messageId,
+              lastMessageAuthorUserId: sent.authorUserId,
+              lastMessagePreview: previewFromDmContent(sent.content),
+              lastMessageCreatedAt: sent.createdAt,
+              ...(isActiveThread ? { unreadCount: 0 } : {}),
+            },
+      ),
+    }));
+    const { conversations, currentConversationId } = useDmStore.getState();
+    if (currentConversationId) {
+      useDmStore
+        .getState()
+        .setCurrentConversation(
+          conversations.find((c) => c.conversationId === currentConversationId) ?? null,
+        );
+    }
+  }, []);
+
   React.useEffect(() => {
     let isMounted = true;
 
@@ -464,7 +508,12 @@ export function useDirectMessages({
       if (!selectedDmConversationId) {
         throw new Error('No direct message conversation selected.');
       }
+      if (dmSendInFlightRef.current) {
+        return;
+      }
 
+      const conversationId = selectedDmConversationId;
+      dmSendInFlightRef.current = true;
       setDmMessageSendPending(true);
       setDmMessagesError(null);
       try {
@@ -483,8 +532,8 @@ export function useDirectMessages({
             : undefined) ??
           `upload-${Date.now()}`;
 
-        await directMessageBackend.sendMessage({
-          conversationId: selectedDmConversationId,
+        const sent = await directMessageBackend.sendMessage({
+          conversationId,
           content,
           imageUpload: hasBuffer
             ? {
@@ -501,20 +550,34 @@ export function useDirectMessages({
                 }
               : undefined,
         });
-        await Promise.all([
-          refreshDmMessages(selectedDmConversationId, { suppressLoadingState: true, markRead: false }),
-          refreshDmConversations({ suppressLoadingState: true }),
-        ]);
+
+        mergeSentDmIntoThread(conversationId, sent);
+        patchDmConversationAfterLocalSend(conversationId, sent);
+
+        void refreshDmMessages(conversationId, { suppressLoadingState: true, markRead: false }).catch((error) => {
+          console.error('Failed to refresh DM messages after send (reconciliation):', error);
+        });
+        void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
+          console.error('Failed to refresh DM conversations after send (reconciliation):', error);
+        });
       } catch (error) {
         const message = getErrorMessage(error, 'Failed to send direct message.');
         console.error('Failed to send direct message:', error);
         setDmMessagesError(message);
         throw new Error(message);
       } finally {
+        dmSendInFlightRef.current = false;
         setDmMessageSendPending(false);
       }
     },
-    [directMessageBackend, refreshDmConversations, refreshDmMessages, selectedDmConversationId]
+    [
+      directMessageBackend,
+      mergeSentDmIntoThread,
+      patchDmConversationAfterLocalSend,
+      refreshDmConversations,
+      refreshDmMessages,
+      selectedDmConversationId,
+    ]
   );
 
   const toggleSelectedDmConversationMuted = React.useCallback(

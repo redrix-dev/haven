@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  useWindowDimensions,
   View,
   type ListRenderItem,
   type ScrollViewProps,
@@ -57,6 +58,7 @@ function formatDmTime(iso: string): string {
 }
 
 export function DirectMessagesContainer() {
+  const { width: windowWidth } = useWindowDimensions();
   const liveProfiles = useLiveProfilesStore((s) => s.profiles);
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
   const [draft, setDraft] = useState("");
@@ -83,7 +85,6 @@ export function DirectMessagesContainer() {
       dmMessages,
       dmMessagesLoading,
       dmMessagesError,
-      dmMessageSendPending,
     },
     derived: { selectedDmConversation },
     actions: {
@@ -190,6 +191,12 @@ export function DirectMessagesContainer() {
   const renderMessage: ListRenderItem<DirectMessage> = useCallback(
     ({ item }) => {
       const isSelf = currentUserId != null && item.authorUserId === currentUserId;
+      const hasRenderableImage =
+        item.attachments?.some((a) => a.mediaKind === "image" && a.signedUrl) ?? false;
+      /** Avoid a narrow bubble (text-only width) forcing wide photos into a thin cropped strip. */
+      const bubbleMinWidth = hasRenderableImage
+        ? Math.min(windowWidth * 0.72, 360)
+        : undefined;
       const textColor = isSelf ? "#ffffff" : "#e6edf7";
       const mutedTextColor = isSelf ? "rgba(255,255,255,0.8)" : "#8b9cbb";
       const blockSurfaceColor = isSelf ? "rgba(12, 20, 34, 0.35)" : "#1a2235";
@@ -205,6 +212,7 @@ export function DirectMessagesContainer() {
                 }
               : undefined
           }
+          style={bubbleMinWidth != null ? { minWidth: bubbleMinWidth } : undefined}
           className={`mb-2 max-w-[85%] ${isSelf ? "self-end" : "self-start"}`}
         >
           <View
@@ -270,7 +278,7 @@ export function DirectMessagesContainer() {
                     key={attachment.id}
                     source={{ uri: attachment.signedUrl }}
                     style={styles.dmAttachmentImage}
-                    resizeMode="cover"
+                    resizeMode="contain"
                   />
                 );
               }
@@ -286,11 +294,11 @@ export function DirectMessagesContainer() {
         </Pressable>
       );
     },
-    [currentUserId],
+    [currentUserId, windowWidth],
   );
 
   const handlePickDmMedia = useCallback(async () => {
-    if (dmMessageSendPending || isPickingDmMedia) return;
+    if (isPickingDmMedia) return;
     setIsPickingDmMedia(true);
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -324,7 +332,7 @@ export function DirectMessagesContainer() {
     } finally {
       setIsPickingDmMedia(false);
     }
-  }, [dmMessageSendPending, isPickingDmMedia]);
+  }, [isPickingDmMedia]);
 
   const handleSend = useCallback(async () => {
     const fromInput = composerInputRef.current
@@ -333,6 +341,9 @@ export function DirectMessagesContainer() {
     const text = fromInput.trim();
     if (!text && !pendingDmMedia) return;
     const media = pendingDmMedia;
+    setDraft("");
+    composerInputRef.current?.setValue("");
+    setPendingDmMedia(null);
     try {
       await sendDirectMessage(text, {
         ...(media
@@ -343,10 +354,10 @@ export function DirectMessagesContainer() {
             }
           : {}),
       });
-      setDraft("");
-      composerInputRef.current?.setValue("");
-      setPendingDmMedia(null);
     } catch (e) {
+      setDraft(text);
+      composerInputRef.current?.setValue(text);
+      if (media) setPendingDmMedia(media);
       Alert.alert("Send failed", getErrorMessage(e, "Could not send message."));
     }
   }, [draft, pendingDmMedia, sendDirectMessage]);
@@ -473,7 +484,6 @@ export function DirectMessagesContainer() {
               </Text>
               <Pressable
                 hitSlop={8}
-                disabled={dmMessageSendPending}
                 onPress={() => setPendingDmMedia(null)}
                 className="shrink-0"
               >
@@ -487,18 +497,19 @@ export function DirectMessagesContainer() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Add image"
-                disabled={dmMessageSendPending || isPickingDmMedia}
+                disabled={isPickingDmMedia}
                 onPress={() => void handlePickDmMedia()}
-                className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5 disabled:opacity-50"
+                className="w-10 h-10 rounded-full bg-white/10 items-center justify-center mb-0.5 disabled:opacity-50"
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               >
-                <Ionicons name="add" size={20} color="#fff" />
+                <Ionicons name="add" size={22} color="#fff" />
               </Pressable>
             </Animated.View>
 
             <Animated.View
               style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
             >
-              <View className="flex-1 flex-row items-end rounded-[18px] border border-white/10 bg-white/[0.08] pr-1">
+              <View className="flex-1 flex-row items-end rounded-[18px] border border-white/10 bg-white/[0.08] pr-1.5">
                 <View
                   collapsable={Platform.OS === "android" ? false : undefined}
                   className="min-w-0 flex-1"
@@ -511,7 +522,6 @@ export function DirectMessagesContainer() {
                   <EnrichedMarkdownTextInput
                     ref={composerInputRef}
                     multiline
-                    editable={!dmMessageSendPending}
                     scrollEnabled={dmComposerInputScrollEnabled}
                     defaultValue=""
                     onChangeMarkdown={setDraft}
@@ -541,10 +551,12 @@ export function DirectMessagesContainer() {
                 {draft.trim().length > 0 || pendingDmMedia != null ? (
                   <Pressable
                     onPress={() => void handleSend()}
-                    disabled={dmMessageSendPending}
-                    className={`w-7 h-7 rounded-full bg-primary items-center justify-center mb-1 ${dmMessageSendPending ? "opacity-55" : ""}`}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send message"
+                    hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                    className="w-10 h-10 rounded-full bg-primary items-center justify-center mb-0.5"
                   >
-                    <Ionicons name="arrow-up" size={18} color="#fff" />
+                    <Ionicons name="arrow-up" size={22} color="#fff" />
                   </Pressable>
                 ) : null}
               </View>
@@ -581,5 +593,6 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 12,
     marginTop: 8,
+    backgroundColor: "rgba(0,0,0,0.22)",
   },
 });

@@ -141,16 +141,15 @@ const buildClickUrl = (job: ExpoPushDispatchJobRow): string => {
 };
 
 const getDefaultTitle = (job: ExpoPushDispatchJobRow): string => {
-  const actor = job.actor_username ?? 'Someone';
   switch (job.kind) {
     case 'friend_request_received':
-      return '${actor} sent you a friend request';
+      return 'Friend request received';
     case 'friend_request_accepted':
-      return '${actor} accepted your friend request';
+      return 'Friend request accepted';
     case 'dm_message':
-      return '${actor} sent you a message';
+      return 'Direct message';
     case 'channel_mention':
-      return '${actor} mentioned you';
+      return 'Mention';
     case 'system':
     default:
       return 'Notification';
@@ -160,13 +159,13 @@ const getDefaultTitle = (job: ExpoPushDispatchJobRow): string => {
 const getDefaultBody = (job: ExpoPushDispatchJobRow): string => {
   switch (job.kind) {
     case 'friend_request_received':
-      return `Tap to view their profile.`;
+      return `${job.actor_username ?? 'Someone'} sent you a friend request.`;
     case 'friend_request_accepted':
-      return `You are now friends on Haven.`;
+      return `${job.actor_username ?? 'Someone'} accepted your friend request.`;
     case 'dm_message':
-      return 'Sent you a message.';
+      return 'You received a new direct message.';
     case 'channel_mention':
-      return 'Tap to view.';
+      return 'You were mentioned in a channel.';
     case 'system':
     default:
       return 'You have a new notification in Haven.';
