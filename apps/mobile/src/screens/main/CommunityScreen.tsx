@@ -458,6 +458,8 @@ export function CommunityScreen() {
     authorUid !== currentUserId;
   const canBan =
     serverPermissions.canManageBans && Boolean(authorUid) && authorUid !== currentUserId;
+  const canSendCommunityMessage =
+    draft.trim().length > 0 || pendingCommunityMedia != null;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -574,7 +576,7 @@ return (
         <Animated.View
           style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
         >
-          <View className="flex-1 flex-row items-end rounded-[18px] border border-white/10 bg-white/[0.08] pr-1">
+          <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/[0.08] pr-1">
             <EnrichedMarkdownTextInput
               ref={composerInputRef}
               multiline
@@ -604,15 +606,17 @@ return (
                 backgroundColor: "transparent",
               }}
             />
-            {draft.trim().length > 0 || pendingCommunityMedia != null ? (
-              <Pressable
-                onPress={() => void handleSend()}
-                disabled={isSending}
-                className={`w-7 h-7 rounded-full bg-primary items-center justify-center mb-1 ${isSending ? "opacity-55" : ""}`}
-              >
-                <Ionicons name="arrow-up" size={18} color="#fff" />
-              </Pressable>
-            ) : null}
+            <Pressable
+              onPress={() => void handleSend()}
+              disabled={isSending || !canSendCommunityMessage}
+              style={{
+                opacity: canSendCommunityMessage ? (isSending ? 0.55 : 1) : 0,
+                pointerEvents: canSendCommunityMessage ? "auto" : "none",
+              }}
+              className="w-7 h-7 shrink-0 rounded-full bg-primary items-center justify-center"
+            >
+              <Ionicons name="arrow-up" size={18} color="#fff" />
+            </Pressable>
           </View>
         </Animated.View>
       </View>
