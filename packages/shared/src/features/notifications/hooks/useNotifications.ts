@@ -9,7 +9,7 @@ import type {
   NotificationPreferenceUpdate,
   NotificationPreferences,
 } from '@shared/lib/backend/types';
-import type { NotificationAudioSettings } from '@platform/desktop/types';
+import type { NotificationAudioSettings } from '@shared/app/types/settings';
 import { getErrorMessage } from '@platform/lib/errors';
 import { DEFAULT_NOTIFICATION_COUNTS } from '@shared/app/constants';
 

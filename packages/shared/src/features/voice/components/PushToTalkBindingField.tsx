@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@shared/app/ui/button';
-import type { VoicePushToTalkBinding } from '@platform/desktop/types';
+import type { VoicePushToTalkBinding } from '@shared/app/types/settings';
 import { isEditableKeyboardTarget } from '@shared/app/utils';
 import {
   createVoicePushToTalkBindingFromKeyboardEvent,

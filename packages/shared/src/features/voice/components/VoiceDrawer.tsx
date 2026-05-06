@@ -14,9 +14,9 @@ import {
 } from "@shared/app/ui/select";
 import { Slider } from "@shared/app/ui/slider";
 import type {
-  VoicePopoutDeviceOption,
   VoiceSettings,
-} from "@platform/desktop/types";
+} from "@shared/app/types/settings";
+import type { VoicePopoutDeviceOption } from "@shared/platform/desktop/types";
 import { useVoiceStore } from "@shared/stores/voiceStore";
 import {
   ExternalLink,

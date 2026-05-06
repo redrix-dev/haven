@@ -49,7 +49,7 @@ export function avatarPickSessionStart(): AvatarPickSession {
         stack = "(stack capture failed)";
     }
     try {
-        // eslint-disable-next-line no-console -- intentional debug instrumentation
+
         console.log(
             PREFIX,
             JSON.stringify({
@@ -73,7 +73,6 @@ export function avatarPickLog(
     if (!AVATAR_PICK_INSTRUMENTATION_ENABLED || session.id < 0) return;
     const dt = nowMs() - session.t0;
     try {
-        // eslint-disable-next-line no-console -- intentional debug instrumentation
         console.log(
             PREFIX,
             JSON.stringify({

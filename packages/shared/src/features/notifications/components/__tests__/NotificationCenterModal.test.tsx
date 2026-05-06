@@ -10,7 +10,7 @@ import type {
   NotificationItem,
   NotificationPreferences,
 } from "@shared/lib/backend/types";
-import type { NotificationAudioSettings } from "@platform/desktop/types";
+import type { NotificationAudioSettings } from "@shared/app/types/settings";
 
 const nowIso = new Date().toISOString();
 
@@ -304,7 +304,7 @@ describe("NotificationCenterModal", () => {
     expect(screen.getAllByRole("slider")).toHaveLength(1);
   });
 
-  it("renders friend request notification actions including dismiss", async () => {
+  it("does not render friend request actions in the notification center modal", async () => {
     const user = userEvent.setup();
     const onDismissFriendRequestNotification = vi.fn();
     useNotificationsStore.getState().setNotifications([
@@ -346,14 +346,8 @@ describe("NotificationCenterModal", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /accept/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /decline/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^dismiss$/i })).toBeTruthy();
-
-    await user.click(screen.getByRole("button", { name: /^dismiss$/i }));
-    expect(onDismissFriendRequestNotification).toHaveBeenCalledWith({
-      recipientId: "recipient-fr-1",
-      friendRequestId: "fr-1",
-    });
+    expect(screen.queryByRole("button", { name: /accept/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /decline/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^dismiss$/i })).toBeNull();
   });
 });

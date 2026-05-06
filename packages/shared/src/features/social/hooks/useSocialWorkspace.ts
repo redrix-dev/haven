@@ -1,7 +1,7 @@
 import React from 'react';
 import type { SocialBackend } from '@shared/lib/backend/socialBackend';
 import type { SocialCounts } from '@shared/lib/backend/types';
-import type { FriendsPanelTab } from '@shared/app/types';
+import type { FriendsPanelTab } from '@shared/app/types/types';
 import { DEFAULT_SOCIAL_COUNTS } from '@shared/app/constants';
 import { useSocialStore } from '@shared/stores/socialStore';
 import { useSocialGraphRealtimeStore } from '@shared/stores/socialGraphRealtimeStore';

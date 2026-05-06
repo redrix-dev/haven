@@ -1,4 +1,4 @@
-import type { PendingUiConfirmation } from '@shared/app/types';
+import type { PendingUiConfirmation } from '@shared/app/types/types';
 
 export function getPendingUiConfirmationCopy(pendingUiConfirmation: PendingUiConfirmation | null) {
   const title =

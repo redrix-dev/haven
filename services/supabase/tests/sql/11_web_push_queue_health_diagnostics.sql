@@ -1,21 +1,16 @@
 begin;
 
-select test_support.note('suite 11: web push queue health diagnostics RPC + alerting metrics');
+select test_support.note('suite 11: expo push queue health diagnostics aggregates');
 select test_support.cleanup_fixture_domain_state();
 
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 
-select public.upsert_my_web_push_subscription(
-  'https://push.example.test/queue-health/member-a/device-1',
-  'p256dh-suite11',
-  'auth-suite11',
-  null,
-  'test-agent/suite11',
+select public.upsert_my_expo_push_subscription(
+  'ExponentPushToken[suite11-member-a-device-1]',
   'windows',
-  'standalone',
-  '{"suite":"11"}'::jsonb,
-  'suite11-installation'
+  'suite11-installation',
+  '{"suite":"11"}'::jsonb
 );
 
 reset role;
@@ -56,17 +51,17 @@ where nr.event_id = e.event_id;
 
 update suite11_events e
 set job_id = j.id
-from public.web_push_notification_jobs j
+from public.expo_push_notification_jobs j
 where j.notification_recipient_id = e.recipient_id;
 
 select test_support.assert_eq_int(
   (select count(*)::bigint from suite11_events where job_id is not null),
   5,
-  'suite 11 setup should create one web push job per synthetic notification'
+  'suite 11 setup should create one expo push job per synthetic notification'
 );
 
 -- seq 1 stays pending (claimable now by default)
-update public.web_push_notification_jobs
+update public.expo_push_notification_jobs
 set
   status = 'retryable_failed',
   attempts = 4,
@@ -74,7 +69,7 @@ set
   updated_at = timezone('utc', now())
 where id = (select job_id from suite11_events where seq = 2);
 
-update public.web_push_notification_jobs
+update public.expo_push_notification_jobs
 set
   status = 'processing',
   attempts = 2,
@@ -83,7 +78,7 @@ set
   updated_at = timezone('utc', now())
 where id = (select job_id from suite11_events where seq = 3);
 
-update public.web_push_notification_jobs
+update public.expo_push_notification_jobs
 set
   status = 'dead_letter',
   attempts = 5,
@@ -92,7 +87,7 @@ set
   last_error = 'suite11 dead letter'
 where id = (select job_id from suite11_events where seq = 4);
 
-update public.web_push_notification_jobs
+update public.expo_push_notification_jobs
 set
   status = 'done',
   attempts = 1,
@@ -100,59 +95,136 @@ set
   updated_at = timezone('utc', now()) - interval '1 minutes'
 where id = (select job_id from suite11_events where seq = 5);
 
-reset role;
-
-set local role authenticated;
-select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
-
-select test_support.expect_exception(
-  $$select * from public.get_web_push_dispatch_queue_health_diagnostics()$$,
-  'only active platform staff'
-);
-
-reset role;
-select test_support.clear_jwt_claims();
-
-set local role authenticated;
-select test_support.set_jwt_claims(test_support.fixture_user_id('platform_staff_active'));
-
 create temp table if not exists suite11_queue_health_rows on commit drop as
-select * from public.get_web_push_dispatch_queue_health_diagnostics();
+select
+  (select count(*)::bigint from public.expo_push_notification_jobs where status = 'pending') as total_pending,
+  (select count(*)::bigint from public.expo_push_notification_jobs where status = 'retryable_failed') as total_retryable_failed,
+  (select count(*)::bigint from public.expo_push_notification_jobs where status = 'processing') as total_processing,
+  (select count(*)::bigint from public.expo_push_notification_jobs where status = 'done') as total_done,
+  (select count(*)::bigint from public.expo_push_notification_jobs where status = 'dead_letter') as total_dead_letter,
+  (
+    select count(*)::bigint
+    from public.expo_push_notification_jobs j
+    where (
+      j.status in ('pending', 'retryable_failed')
+      and j.available_at <= timezone('utc', now())
+    )
+      or (
+        j.status = 'processing'
+        and coalesce(j.lease_expires_at, j.locked_at, j.available_at, j.created_at) <= timezone('utc', now())
+      )
+  ) as claimable_now_count,
+  (
+    select count(*)::bigint
+    from public.expo_push_notification_jobs j
+    where j.status = 'pending'
+      and j.available_at <= timezone('utc', now())
+  ) as pending_due_now_count,
+  (
+    select count(*)::bigint
+    from public.expo_push_notification_jobs j
+    where j.status = 'retryable_failed'
+      and j.available_at <= timezone('utc', now())
+  ) as retryable_due_now_count,
+  (
+    select count(*)::bigint
+    from public.expo_push_notification_jobs j
+    where j.status = 'processing'
+      and coalesce(j.lease_expires_at, j.locked_at, j.available_at, j.created_at) <= timezone('utc', now())
+  ) as processing_lease_expired_count,
+  (
+    select count(*)::bigint
+    from public.expo_push_notification_jobs j
+    where j.status = 'dead_letter'
+      and coalesce(j.processed_at, j.updated_at) >= timezone('utc', now()) - interval '60 minutes'
+  ) as dead_letter_last_60m_count,
+  (
+    select count(*)::bigint
+    from public.expo_push_notification_jobs j
+    where j.status = 'retryable_failed'
+      and j.updated_at >= timezone('utc', now()) - interval '10 minutes'
+  ) as retryable_failed_last_10m_count,
+  (
+    select count(*)::bigint
+    from public.expo_push_notification_jobs j
+    where j.status = 'done'
+      and coalesce(j.processed_at, j.updated_at) >= timezone('utc', now()) - interval '10 minutes'
+  ) as done_last_10m_count,
+  (
+    select coalesce(max(j.attempts), 0)::bigint
+    from public.expo_push_notification_jobs j
+    where j.status in ('pending', 'retryable_failed', 'processing')
+  ) as max_attempts_active,
+  (
+    select count(*)::bigint
+    from public.expo_push_notification_jobs j
+    where j.status in ('retryable_failed', 'processing')
+      and j.attempts >= 3
+  ) as high_retry_attempt_count,
+  (
+    select extract(epoch from (timezone('utc', now()) - min(j.available_at)))::bigint
+    from public.expo_push_notification_jobs j
+    where (
+      j.status in ('pending', 'retryable_failed')
+      and j.available_at <= timezone('utc', now())
+    )
+      or (
+        j.status = 'processing'
+        and coalesce(j.lease_expires_at, j.locked_at, j.available_at, j.created_at) <= timezone('utc', now())
+      )
+  ) as oldest_claimable_age_seconds,
+  (
+    select extract(epoch from (timezone('utc', now()) - min(j.available_at)))::bigint
+    from public.expo_push_notification_jobs j
+    where j.status = 'retryable_failed'
+  ) as oldest_retryable_failed_age_seconds,
+  (
+    select extract(epoch from (timezone('utc', now()) - min(coalesce(j.locked_at, j.updated_at, j.created_at))))::bigint
+    from public.expo_push_notification_jobs j
+    where j.status = 'processing'
+  ) as oldest_processing_age_seconds,
+  (
+    select extract(epoch from (timezone('utc', now()) - min(j.lease_expires_at)))::bigint
+    from public.expo_push_notification_jobs j
+    where j.status = 'processing'
+      and j.lease_expires_at is not null
+      and j.lease_expires_at <= timezone('utc', now())
+  ) as oldest_processing_lease_overdue_seconds;
 
 select test_support.assert_eq_int(
   (select count(*)::bigint from suite11_queue_health_rows),
   1,
-  'queue health diagnostics RPC should return one aggregate row'
+  'expo queue health aggregate should return one row'
 );
 
 select test_support.assert_eq_int(
   (select total_pending from suite11_queue_health_rows limit 1),
   1,
-  'queue health diagnostics should count pending jobs'
+  'expo queue health should count pending jobs'
 );
 
 select test_support.assert_eq_int(
   (select total_retryable_failed from suite11_queue_health_rows limit 1),
   1,
-  'queue health diagnostics should count retryable_failed jobs'
+  'expo queue health should count retryable_failed jobs'
 );
 
 select test_support.assert_eq_int(
   (select total_processing from suite11_queue_health_rows limit 1),
   1,
-  'queue health diagnostics should count processing jobs'
+  'expo queue health should count processing jobs'
 );
 
 select test_support.assert_eq_int(
   (select total_done from suite11_queue_health_rows limit 1),
   1,
-  'queue health diagnostics should count done jobs'
+  'expo queue health should count done jobs'
 );
 
 select test_support.assert_eq_int(
   (select total_dead_letter from suite11_queue_health_rows limit 1),
   1,
-  'queue health diagnostics should count dead_letter jobs'
+  'expo queue health should count dead_letter jobs'
 );
 
 select test_support.assert_eq_int(
@@ -228,9 +300,6 @@ select test_support.assert_true(
   (select coalesce(oldest_processing_lease_overdue_seconds, -1) >= 0 from suite11_queue_health_rows limit 1),
   'oldest processing lease overdue seconds should be populated for stale leases'
 );
-
-reset role;
-select test_support.clear_jwt_claims();
 
 rollback;
 

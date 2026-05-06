@@ -1,12 +1,9 @@
 import type {
-  AppSettings,
   NotificationAudioSettings,
-  SaveFileFromUrlResult,
-  UpdaterStatus,
-  VoicePopoutControlAction,
-  VoicePopoutState,
   VoiceSettings,
-} from "./desktop/types";
+  AppSettings,
+} from "@shared/app/types/settings";
+import type { UpdaterStatus, SaveFileFromUrlResult, VoicePopoutControlAction, VoicePopoutState } from "@shared/platform/desktop/types";
 
 export type DesktopSettingsBridge = {
   getAppSettings: () => Promise<AppSettings>;

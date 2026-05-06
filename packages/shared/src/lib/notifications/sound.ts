@@ -1,5 +1,5 @@
 import { RUNTIME_AUDIO_URLS } from "@platform/assets/runtimeAudio";
-import type { NotificationAudioSettings } from "@platform/desktop/types";
+import type { NotificationAudioSettings } from "@shared/app/types/settings";
 import type { NotificationKind } from "@shared/lib/backend/types";
 import type { NotificationDeliveryReasonCode } from "@shared/lib/notifications/routePolicy";
 type NotificationSoundRequest = {

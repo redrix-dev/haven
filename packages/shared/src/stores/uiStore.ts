@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PendingUiConfirmation } from "@shared/app/types";
+import type { PendingUiConfirmation } from "@shared/app/types/types";
 
 export type RenameServerDraft = {
   serverId: string;

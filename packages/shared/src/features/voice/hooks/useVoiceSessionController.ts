@@ -16,7 +16,7 @@ import { getAppHost } from "@shared/platform/appHost";
 import type {
   NotificationAudioSettings,
   VoiceSettings,
-} from "@platform/desktop/types";
+} from "@shared/app/types/settings";
 import type {
   VoiceControllerChannel,
   VoiceParticipant,

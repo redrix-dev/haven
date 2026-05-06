@@ -12,7 +12,7 @@ import {
   ENABLE_CHANNEL_RELOAD_DIAGNOSTICS,
   VOICE_HARDWARE_DEBUG_PANEL_FLAG,
 } from "@shared/app/constants";
-import type { FriendsPanelTab } from "@shared/app/types";
+import type { FriendsPanelTab } from "@shared/app/types/types";
 import { useDesktopSettings } from "@shared/app/hooks/useDesktopSettings";
 import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommunityWorkspace";
 import { useServerAdmin } from "@shared/features/community/hooks/useServerAdmin";

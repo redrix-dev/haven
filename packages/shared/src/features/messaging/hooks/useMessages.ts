@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import { CHANNEL_BUNDLE_STALE_MS, MESSAGE_PAGE_SIZE } from "@shared/app/constants";
-import type { ChannelMessageBundleCacheEntry } from "@shared/app/types";
+import type { ChannelMessageBundleCacheEntry } from "@shared/app/types/types";
 import {
   applyChannelAccessVisibilityToMessageBundle,
   filterBlockedUserContent,

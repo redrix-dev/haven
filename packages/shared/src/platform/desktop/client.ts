@@ -1,13 +1,9 @@
 import type {
-  AppSettings,
-  DesktopAPI,
   NotificationAudioSettings,
-  SaveFileFromUrlResult,
-  UpdaterStatus,
-  VoicePopoutControlAction,
-  VoicePopoutState,
   VoiceSettings,
-} from './types';
+  AppSettings,
+} from '@shared/app/types/settings';
+import type { UpdaterStatus, SaveFileFromUrlResult, VoicePopoutControlAction, VoicePopoutState, DesktopAPI } from '@shared/platform/desktop/types';
 
 const DESKTOP_BRIDGE_UNAVAILABLE_ERROR = 'Desktop bridge unavailable.';
 

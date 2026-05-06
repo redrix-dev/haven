@@ -9,7 +9,7 @@ import {
 } from "@shared/lib/deepLinks";
 import { getAppHost } from "@shared/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
-import type { FriendsPanelTab } from "@shared/app/types";
+import type { FriendsPanelTab } from "@shared/app/types/types";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 
 type DeepLinkNotifier = (

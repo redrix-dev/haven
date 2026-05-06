@@ -3,9 +3,9 @@ import { getAppHost } from '@shared/platform/appHost';
 import type {
   AppSettings,
   NotificationAudioSettings,
-  UpdaterStatus,
   VoiceSettings,
-} from '@platform/desktop/types';
+} from '@shared/app/types/settings';
+import type { UpdaterStatus } from '@shared/platform/desktop/types';
 import { getErrorMessage } from '@platform/lib/errors';
 import { DEFAULT_APP_SETTINGS, DEFAULT_VOICE_SETTINGS } from '@shared/app/constants';
 

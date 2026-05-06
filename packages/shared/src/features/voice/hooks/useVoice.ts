@@ -6,7 +6,7 @@ import type { Channel } from "@shared/lib/backend/types";
 import type {
   VoicePresenceStateRow,
   VoiceSidebarParticipant,
-} from "@shared/app/types";
+} from "@shared/app/types/types";
 import {
   areVoiceParticipantListsEqual,
   isEditableKeyboardTarget,

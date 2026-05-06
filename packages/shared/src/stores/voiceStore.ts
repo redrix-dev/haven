@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { VoiceSidebarParticipant } from "@client/app/types";
+import type { VoiceSidebarParticipant } from "@shared/app/types/types";
 
 type VoiceSessionSnapshot = {
   joined: boolean;
