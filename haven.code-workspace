@@ -7,6 +7,10 @@
   "settings": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "files.eol": "\n",
+    "files.associations": {
+      "*.css": "tailwindcss"
+    },
     "typescript.tsdk": "node_modules/typescript/lib",
   },
 }
+

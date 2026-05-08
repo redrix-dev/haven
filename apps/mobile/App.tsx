@@ -11,6 +11,8 @@ import { initializeHavenDataFromClient } from "@shared/lib/bootstrap/initializeH
 import { registerMobileAppHost } from "@/lib/registerMobileAppHost";
 import { getMobileSupabase, resolveMobileSupabaseConfig } from "@/supabase/getMobileSupabase";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import { buildNativeThemeVars } from "./src/lib/theme";
+import { getTheme } from '@shared/themes';
 
 registerMobileAppHost();
 
@@ -30,10 +32,10 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-
+const themeVars = buildNativeThemeVars(getTheme('halloween').tokens);
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={[{ flex: 1 }, themeVars ]}>
       <SafeAreaProvider>
         <KeyboardProvider>
           <RootNavigator />

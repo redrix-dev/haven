@@ -7,8 +7,11 @@ import { Toaster as SonnerToaster } from 'sonner';
 import { registerElectronAppHost } from './registerElectronAppHost';
 import { AppRoot } from '@shared/app/AppRoot';
 import '@shared/styles/globals.css';
+import { applyThemeWeb } from './lib/theme';
+import { getTheme } from '@shared/themes';
 
 registerElectronAppHost();
+applyThemeWeb(getTheme('default').tokens);
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
