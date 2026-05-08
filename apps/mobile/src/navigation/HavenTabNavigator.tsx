@@ -4,7 +4,7 @@ import {
   useNavigationBuilder,
 } from "@react-navigation/native";
 import type { BottomTabNavigatorProps } from "@react-navigation/bottom-tabs";
-import type { FriendsPanelTab } from "@shared/app/types";
+import type { FriendsPanelTab } from "@shared/app/types/types";
 import { countFilteredUnreadInInbox } from "@shared/features/notifications/inboxNotificationFilter";
 import { useNotificationsStore } from "@shared/stores/notificationsStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";

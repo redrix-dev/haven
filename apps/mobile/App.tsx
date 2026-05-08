@@ -32,7 +32,7 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-const themeVars = buildNativeThemeVars(getTheme('halloween').tokens);
+const themeVars = buildNativeThemeVars(getTheme('winter').tokens);
 export default function App() {
   return (
     <GestureHandlerRootView style={[{ flex: 1 }, themeVars ]}>

@@ -19,8 +19,10 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { signUpWithPassword } from "@/auth/mobileAuthService";
 import type { RootStackParamList } from "@/navigation/types";
+import { getTheme, resolveColorProp } from "@shared/themes";
 
-const PLACEHOLDER_MUTED = "#a9b8cf";
+const THEME_TOKENS = getTheme("default").tokens;
+const PLACEHOLDER_MUTED = resolveColorProp(THEME_TOKENS, "text-muted") ?? "#a9b8cf";
 
 const inputClassName =
   "mb-4 rounded-lg border border-border bg-muted px-4 py-3 text-foreground";

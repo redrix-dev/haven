@@ -11,7 +11,7 @@ import {
   View,
   type ListRenderItem,
 } from "react-native";
-import type { FriendsPanelTab } from "@shared/app/types";
+import type { FriendsPanelTab } from "@shared/app/types/types";
 import type {
   BlockedUserSummary,
   FriendRequestSummary,

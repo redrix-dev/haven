@@ -60,6 +60,7 @@ import {
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getTheme, resolveColorProp } from "@shared/themes";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MARGIN = 8;
 const COMPOSER_CHROME_IMMERSIVE_OPACITY = 0.38;
@@ -67,6 +68,16 @@ const COMPOSER_CHROME_REST_OPACITY = 1;
 const COMPOSER_CHROME_IMMERSIVE_MS = 140;
 const COMPOSER_CHROME_REST_MS = 280;
 const COMPOSER_CHROME_SETTLE_MS = 200;
+const THEME_TOKENS = getTheme("default").tokens;
+const SPINNER_FG = resolveColorProp(THEME_TOKENS, "foreground") ?? "#e6edf7";
+const ICON_MUTED = resolveColorProp(THEME_TOKENS, "text-dim") ?? "#8b9cbb";
+const ICON_ON_PRIMARY = resolveColorProp(THEME_TOKENS, "primary-foreground") ?? "#ffffff";
+const COMPOSER_PLACEHOLDER = resolveColorProp(THEME_TOKENS, "text-dim") ?? "#8e8e93";
+const COMPOSER_CURSOR = resolveColorProp(THEME_TOKENS, "foreground") ?? "#e6edf7";
+const COMPOSER_SELECTION = "rgba(63, 121, 216, 0.4)";
+const COMPOSER_LINK = resolveColorProp(THEME_TOKENS, "primary") ?? "#3F79D8";
+const COMPOSER_SPOILER_FG = resolveColorProp(THEME_TOKENS, "text-muted") ?? "#a9b8cf";
+const COMPOSER_TEXT = resolveColorProp(THEME_TOKENS, "foreground") ?? "#e6edf7";
 function getReplyTargetLabel(
   replyToId: string | null,
   messageById: Map<string, Message>,
@@ -515,7 +526,7 @@ return (
       ListFooterComponent={
         messaging.state.isLoadingOlderMessages ? (
           <View className="py-2.5">
-            <ActivityIndicator color="#e6edf7" />
+            <ActivityIndicator color={SPINNER_FG} />
           </View>
         ) : null
       }
@@ -533,7 +544,7 @@ return (
       }}
     >
       {pendingReplyToMessageId ? (
-        <View className="flex-row items-center justify-between bg-surface-modal px-3 py-2 border-t border-white/[0.08]">
+        <View className="flex-row items-center justify-between bg-surface-modal px-3 py-2 border-t border-white/8">
           <Text className="text-foreground/80 text-xs shrink mr-2.5">
             Replying to {pendingReplyTargetLabel ?? "a message"}
           </Text>
@@ -544,8 +555,8 @@ return (
       ) : null}
 
       {pendingCommunityMedia ? (
-        <View className="flex-row items-center gap-2 border-t border-white/[0.08] bg-surface-modal/90 px-3 py-2">
-          <Ionicons name="attach" size={16} color="#8b9cbb" />
+        <View className="flex-row items-center gap-2 border-t border-white/8 bg-surface-modal/90 px-3 py-2">
+          <Ionicons name="attach" size={16} color={ICON_MUTED} />
           <Text className="min-w-0 flex-1 text-xs text-foreground/90" numberOfLines={1}>
             {pendingCommunityMedia.fileName}
           </Text>
@@ -569,14 +580,14 @@ return (
             onPress={() => void handlePickCommunityMedia()}
             className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5 disabled:opacity-50"
           >
-            <Ionicons name="add" size={20} color="#fff" />
+            <Ionicons name="add" size={20} color={ICON_ON_PRIMARY} />
           </Pressable>
         </Animated.View>
 
         <Animated.View
           style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
         >
-          <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/[0.08] pr-1">
+          <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/8 pr-1">
             <EnrichedMarkdownTextInput
               ref={composerInputRef}
               multiline
@@ -585,20 +596,20 @@ return (
               defaultValue=""
               onChangeMarkdown={setDraft}
               placeholder="Type a message..."
-              placeholderTextColor="#8e8e93"
-              cursorColor="#e6edf7"
-              selectionColor="rgba(63, 121, 216, 0.4)"
+              placeholderTextColor={COMPOSER_PLACEHOLDER}
+              cursorColor={COMPOSER_CURSOR}
+              selectionColor={COMPOSER_SELECTION}
               markdownStyle={{
-                strong: { color: "#e6edf7" },
-                em: { color: "#e6edf7" },
-                link: { color: "#3F79D8", underline: true },
-                spoiler: { color: "#a9b8cf", backgroundColor: "rgba(0,0,0,0.2)" },
+                strong: { color: COMPOSER_TEXT },
+                em: { color: COMPOSER_TEXT },
+                link: { color: COMPOSER_LINK, underline: true },
+                spoiler: { color: COMPOSER_SPOILER_FG, backgroundColor: "rgba(0,0,0,0.2)" },
               }}
               style={{
                 flex: 1,
                 minHeight: 36,
                 maxHeight: 120,
-                color: "#e6edf7",
+                color: COMPOSER_TEXT,
                 paddingHorizontal: 14,
                 paddingTop: 8,
                 paddingBottom: 8,
@@ -615,7 +626,7 @@ return (
               }}
               className="w-7 h-7 shrink-0 rounded-full bg-primary items-center justify-center"
             >
-              <Ionicons name="arrow-up" size={18} color="#fff" />
+              <Ionicons name="arrow-up" size={18} color={ICON_ON_PRIMARY} />
             </Pressable>
           </View>
         </Animated.View>

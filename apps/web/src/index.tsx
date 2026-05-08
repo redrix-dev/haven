@@ -7,9 +7,11 @@ import { Toaster as SonnerToaster } from 'sonner';
 import { AppRoot } from '@shared/app/AppRoot';
 import '@shared/styles/globals.css';
 import { applyThemeWeb } from './lib/theme';
-import { getTheme } from '@shared/themes';
+import { getTheme, resolveSemanticEntries } from '@shared/themes';
 
-applyThemeWeb(getTheme('default').tokens);
+
+console.log(resolveSemanticEntries(getTheme('halloween').tokens));
+applyThemeWeb(getTheme('winter').tokens);
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -54,12 +56,12 @@ root.render(
           },
           actionButtonStyle: {
             background: 'var(--primary)',
-            color: '#ffffff',
+            color: 'var(--primary-foreground)',
             border: '1px solid var(--primary-hover)',
           },
           cancelButtonStyle: {
             background: 'var(--muted)',
-            color: '#ffffff',
+            color: 'var(--foreground)',
             border: '1px solid var(--border)',
           },
           style: {

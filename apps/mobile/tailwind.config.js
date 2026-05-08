@@ -1,33 +1,3 @@
-const fs = require("fs");
-const path = require("path");
-
-const sharedGlobalsPath = path.resolve(
-  __dirname,
-  "../../packages/shared/src/styles/globals.css",
-);
-
-const parseSharedColorTokens = () => {
-  try {
-    const source = fs.readFileSync(sharedGlobalsPath, "utf8");
-    const tokens = {};
-    const tokenPattern = /--([a-z0-9-]+)\s*:\s*([^;]+);/gi;
-    let match = tokenPattern.exec(source);
-    while (match) {
-      const key = match[1]?.trim();
-      const value = match[2]?.trim();
-      if (key && value && value.startsWith("#")) {
-        tokens[key] = value;
-      }
-      match = tokenPattern.exec(source);
-    }
-    return tokens;
-  } catch {
-    return {};
-  }
-};
-
-const sharedColors = parseSharedColorTokens();
-
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -42,7 +12,122 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        ...sharedColors,
+        /* GENERATED:theme-bridge:start */
+        "surface-0": "var(--surface-0)",
+        "surface-1": "var(--surface-1)",
+        "surface-2": "var(--surface-2)",
+        "surface-3": "var(--surface-3)",
+        "surface-3b": "var(--surface-3b)",
+        "surface-4": "var(--surface-4)",
+        "surface-5": "var(--surface-5)",
+        "surface-destructive-soft": "var(--surface-destructive-soft)",
+        "surface-destructive-panel": "var(--surface-destructive-panel)",
+        "border-subtle": "var(--border-subtle)",
+        "border-default": "var(--border-default)",
+        "text-primary": "var(--text-primary)",
+        "text-secondary": "var(--text-secondary)",
+        "text-tertiary": "var(--text-tertiary)",
+        "text-muted": "var(--text-muted)",
+        "text-dim": "var(--text-dim)",
+        "text-success": "var(--text-success)",
+        "background": "var(--background)",
+        "foreground": "var(--foreground)",
+        "card": "var(--card)",
+        "card-foreground": "var(--card-foreground)",
+        "popover": "var(--popover)",
+        "popover-foreground": "var(--popover-foreground)",
+        "primary": "var(--primary)",
+        "primary-foreground": "var(--primary-foreground)",
+        "primary-hover": "var(--primary-hover)",
+        "secondary": "var(--secondary)",
+        "secondary-foreground": "var(--secondary-foreground)",
+        "muted": "var(--muted)",
+        "muted-foreground": "var(--muted-foreground)",
+        "accent": "var(--accent)",
+        "accent-foreground": "var(--accent-foreground)",
+        "destructive": "var(--destructive)",
+        "destructive-hover": "var(--destructive-hover)",
+        "destructive-foreground": "var(--destructive-foreground)",
+        "border": "var(--border)",
+        "input": "var(--input)",
+        "ring": "var(--ring)",
+        "ring-focus": "var(--ring-focus)",
+        "link": "var(--link)",
+        "link-hover": "var(--link-hover)",
+        "surface-app": "var(--surface-app)",
+        "surface-modal": "var(--surface-modal)",
+        "surface-input": "var(--surface-input)",
+        "surface-legal": "var(--surface-legal)",
+        "surface-desktop-shell": "var(--surface-desktop-shell)",
+        "surface-toast": "var(--surface-toast)",
+        "surface-info": "var(--surface-info)",
+        "surface-panel": "var(--surface-panel)",
+        "surface-hover": "var(--surface-hover)",
+        "surface-inset": "var(--surface-inset)",
+        "surface-embedded": "var(--surface-embedded)",
+        "surface-card-deep": "var(--surface-card-deep)",
+        "surface-peek": "var(--surface-peek)",
+        "surface-skeleton": "var(--surface-skeleton)",
+        "surface-voice-scrim": "var(--surface-voice-scrim)",
+        "surface-message-row": "var(--surface-message-row)",
+        "surface-message-row-hover": "var(--surface-message-row-hover)",
+        "surface-list-hover": "var(--surface-list-hover)",
+        "surface-dm-row-hover": "var(--surface-dm-row-hover)",
+        "surface-role-hover": "var(--surface-role-hover)",
+        "surface-row-selected": "var(--surface-row-selected)",
+        "surface-footer-bar": "var(--surface-footer-bar)",
+        "surface-embed-hover": "var(--surface-embed-hover)",
+        "surface-attachment-hover": "var(--surface-attachment-hover)",
+        "surface-embed-chip": "var(--surface-embed-chip)",
+        "surface-row-active": "var(--surface-row-active)",
+        "body-soft": "var(--body-soft)",
+        "info": "var(--info)",
+        "destructive-soft": "var(--destructive-soft)",
+        "destructive-surface": "var(--destructive-surface)",
+        "border-row": "var(--border-row)",
+        "border-titlebar": "var(--border-titlebar)",
+        "border-dialog": "var(--border-dialog)",
+        "border-inset-panel": "var(--border-inset-panel)",
+        "border-modmail": "var(--border-modmail)",
+        "border-control": "var(--border-control)",
+        "border-selected": "var(--border-selected)",
+        "border-message-row": "var(--border-message-row)",
+        "border-message-row-hover": "var(--border-message-row-hover)",
+        "border-reply-thread": "var(--border-reply-thread)",
+        "border-notification": "var(--border-notification)",
+        "sidebar": "var(--sidebar)",
+        "sidebar-foreground": "var(--sidebar-foreground)",
+        "sidebar-primary": "var(--sidebar-primary)",
+        "sidebar-primary-foreground": "var(--sidebar-primary-foreground)",
+        "sidebar-accent": "var(--sidebar-accent)",
+        "sidebar-accent-foreground": "var(--sidebar-accent-foreground)",
+        "sidebar-border": "var(--sidebar-border)",
+        "sidebar-ring": "var(--sidebar-ring)",
+        "scrollbar-track": "var(--scrollbar-track)",
+        "scrollbar-thumb": "var(--scrollbar-thumb)",
+        "scrollbar-thumb-hover": "var(--scrollbar-thumb-hover)",
+        "gradient-voice-0": "var(--gradient-voice-0)",
+        "gradient-voice-1": "var(--gradient-voice-1)",
+        "destructive-banner": "var(--destructive-banner)",
+        "avatar-fallback": "var(--avatar-fallback)",
+        "link-bright": "var(--link-bright)",
+        "link-soft": "var(--link-soft)",
+        "attachment-label": "var(--attachment-label)",
+        "form-label": "var(--form-label)",
+        "chip-muted": "var(--chip-muted)",
+        "notification-link": "var(--notification-link)",
+        "notification-soft": "var(--notification-soft)",
+        "send-error": "var(--send-error)",
+        "hub-warm": "var(--hub-warm)",
+        "embed-chip": "var(--embed-chip)",
+        "status-online": "var(--status-online)",
+        "status-away": "var(--status-away)",
+        "status-dnd": "var(--status-dnd)",
+        "discord-blurple": "var(--discord-blurple)",
+        "accent-amber": "var(--accent-amber)",
+        "accent-slider": "var(--accent-slider)",
+        "accent-success": "var(--accent-success)",
+/* GENERATED:theme-bridge:end */
       },
     },
   },

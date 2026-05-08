@@ -11,6 +11,11 @@
       "*.css": "tailwindcss"
     },
     "typescript.tsdk": "node_modules/typescript/lib",
+    "tailwindCSS.experimental.configFile": {
+      "apps/mobile/**": "apps/mobile/tailwind.config.js",
+      "apps/web/**": "../../packages/web-client/tailwind.config.js",
+      "apps/electron/**": "../../packages/electron/tailwind.config.js",
+    },
   },
 }
 

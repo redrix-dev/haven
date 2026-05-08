@@ -20,6 +20,7 @@ import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useMemo, useState, useCallback } from "react";
 import { HavenModalShell } from "@/components/HavenModalShell";
 import type { RootStackParamList } from "@/navigation/types";
+import { getTheme, resolveColorProp } from "@shared/themes";
 
 type GridItem =
   | { kind: "server"; server: ServerSummary }
@@ -29,6 +30,9 @@ type GridItem =
 const COLS = 4;
 const H_PAD = 16;
 const GAP = 8;
+const THEME_TOKENS = getTheme("default").tokens;
+const PLACEHOLDER_MUTED = resolveColorProp(THEME_TOKENS, "text-dim") ?? "#8e8e93";
+const SPINNER_FG = resolveColorProp(THEME_TOKENS, "foreground") ?? "#e6edf7";
 
 function buildGridItems(servers: ServerSummary[]): GridItem[] {
   return [
@@ -110,7 +114,7 @@ export function HomeScreen() {
   if (status === "loading" && servers.length === 0) {
     return (
       <View className="flex-1 items-center justify-center bg-surface-modal">
-        <ActivityIndicator color="#e6edf7" size="large" />
+        <ActivityIndicator color={SPINNER_FG} size="large" />
       </View>
     );
   }
@@ -217,15 +221,13 @@ export function HomeScreen() {
               value={createName}
               onChangeText={setCreateName}
               placeholder="My community"
-              placeholderTextColor="#8e8e93"
+              placeholderTextColor={PLACEHOLDER_MUTED}
               editable={!createLoading}
               className="rounded-xl border border-border bg-surface-panel px-3 py-3 text-base text-foreground"
               autoCapitalize="words"
             />
           </View>
-          {createError ? (
-            <Text className="text-sm text-red-400">{createError}</Text>
-          ) : null}
+          {createError ? <Text className="text-sm text-destructive">{createError}</Text> : null}
           <View className="flex-row justify-end gap-3">
             <Pressable
               onPress={() => {
@@ -242,7 +244,7 @@ export function HomeScreen() {
               disabled={createLoading || !createName.trim()}
               className={`rounded-xl bg-primary px-5 py-2.5 ${createLoading || !createName.trim() ? "opacity-45" : ""}`}
             >
-              <Text className="text-center font-semibold text-white">
+              <Text className="text-center font-semibold text-primary-foreground">
                 {createLoading ? "Creating…" : "Create"}
               </Text>
             </Pressable>
@@ -270,14 +272,14 @@ export function HomeScreen() {
               value={joinInvite}
               onChangeText={setJoinInvite}
               placeholder={getPlatformInviteInputPlaceholder()}
-              placeholderTextColor="#8e8e93"
+              placeholderTextColor={PLACEHOLDER_MUTED}
               editable={!joinLoading}
               autoCapitalize="characters"
               autoCorrect={false}
               className="rounded-xl border border-border bg-surface-panel px-3 py-3 text-base text-foreground"
             />
           </View>
-          {joinError ? <Text className="text-sm text-red-400">{joinError}</Text> : null}
+          {joinError ? <Text className="text-sm text-destructive">{joinError}</Text> : null}
           <View className="flex-row justify-end gap-3">
             <Pressable
               onPress={() => {
@@ -294,7 +296,7 @@ export function HomeScreen() {
               disabled={joinLoading || !joinInvite.trim()}
               className={`rounded-xl bg-primary px-5 py-2.5 ${joinLoading || !joinInvite.trim() ? "opacity-45" : ""}`}
             >
-              <Text className="text-center font-semibold text-white">
+              <Text className="text-center font-semibold text-primary-foreground">
                 {joinLoading ? "Joining…" : "Join"}
               </Text>
             </Pressable>

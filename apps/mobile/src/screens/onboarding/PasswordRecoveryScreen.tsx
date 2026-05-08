@@ -19,8 +19,10 @@ import {
   requestPasswordReset,
   signOutFromAuth,
 } from "@/auth/mobileAuthService";
+import { getTheme, resolveColorProp } from "@shared/themes";
 
-const PLACEHOLDER_MUTED = "#a9b8cf";
+const THEME_TOKENS = getTheme("default").tokens;
+const PLACEHOLDER_MUTED = resolveColorProp(THEME_TOKENS, "text-muted") ?? "#a9b8cf";
 
 const inputClassName =
   "mb-4 rounded-lg border border-border bg-muted px-4 py-3 text-foreground";
