@@ -10,9 +10,12 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { initializeHavenDataFromClient } from "@shared/lib/bootstrap/initializeHavenDataFromClient";
 import { registerMobileAppHost } from "@/lib/registerMobileAppHost";
 import { getMobileSupabase, resolveMobileSupabaseConfig } from "@/supabase/getMobileSupabase";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { buildNativeThemeVars } from "./src/lib/theme";
-import { getTheme } from '@shared/themes';
+import { getTheme } from "@shared/themes";
+import { loadPersistedThemeId } from "./src/storage/mobileThemePreferenceStorage";
+import { useMobileThemePreferenceStore } from "./src/stores/mobileThemePreferenceStore";
 
 registerMobileAppHost();
 
@@ -32,10 +35,38 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-const themeVars = buildNativeThemeVars(getTheme('winter').tokens);
-export default function App() {
+function App() {
+  const selectedThemeId = useMobileThemePreferenceStore((s) => s.selectedThemeId);
+  const [themeStorageReady, setThemeStorageReady] = useState(false);
+
+  useLayoutEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const raw = await loadPersistedThemeId();
+        if (!cancelled && raw) {
+          useMobileThemePreferenceStore.getState().setSelectedThemeId(raw);
+        }
+      } finally {
+        if (!cancelled) setThemeStorageReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const themeVars = useMemo(
+    () => buildNativeThemeVars(getTheme(selectedThemeId).tokens),
+    [selectedThemeId],
+  );
+
+  if (!themeStorageReady) {
+    return null;
+  }
+
   return (
-    <GestureHandlerRootView style={[{ flex: 1 }, themeVars ]}>
+    <GestureHandlerRootView style={[{ flex: 1 }, themeVars]}>
       <SafeAreaProvider>
         <KeyboardProvider>
           <RootNavigator />
@@ -45,3 +76,5 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
+
+export default App;

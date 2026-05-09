@@ -21,6 +21,7 @@ import { MobileNotificationsProvider } from "@/contexts/MobileNotificationsConte
 import { MobileSocialWorkspaceProvider } from "@/contexts/MobileSocialWorkspaceContext";
 import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesContext";
 import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
+import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
 
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -31,6 +32,7 @@ function MainTabs() {
   const session = useAuthSession();
   const userId = session?.user?.id;
   useMobileCommunityPermissionsHydration(userId);
+  useHydrateMobileThemeFromProfile(userId);
 
   if (!userId) {
     return (

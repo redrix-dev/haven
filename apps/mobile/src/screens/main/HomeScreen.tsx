@@ -20,7 +20,8 @@ import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useMemo, useState, useCallback } from "react";
 import { HavenModalShell } from "@/components/HavenModalShell";
 import type { RootStackParamList } from "@/navigation/types";
-import { getTheme, resolveColorProp } from "@shared/themes";
+import { resolveColorProp } from "@shared/themes";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 
 type GridItem =
   | { kind: "server"; server: ServerSummary }
@@ -30,10 +31,6 @@ type GridItem =
 const COLS = 4;
 const H_PAD = 16;
 const GAP = 8;
-const THEME_TOKENS = getTheme("default").tokens;
-const PLACEHOLDER_MUTED = resolveColorProp(THEME_TOKENS, "text-dim") ?? "#8e8e93";
-const SPINNER_FG = resolveColorProp(THEME_TOKENS, "foreground") ?? "#e6edf7";
-
 function buildGridItems(servers: ServerSummary[]): GridItem[] {
   return [
     ...servers.map((server) => ({ kind: "server" as const, server })),
@@ -48,6 +45,14 @@ export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { servers, status, error: loadError, refreshServers, createServer } = useServers();
   const controlPlaneBackend = useMemo(() => getControlPlaneBackend(), []);
+  const themeTokens = useMobileThemeTokens();
+  const { placeholderMuted, spinnerFg } = useMemo(
+    () => ({
+      placeholderMuted: resolveColorProp(themeTokens, "text-dim") ?? "#8e8e93",
+      spinnerFg: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+    }),
+    [themeTokens],
+  );
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
@@ -114,7 +119,7 @@ export function HomeScreen() {
   if (status === "loading" && servers.length === 0) {
     return (
       <View className="flex-1 items-center justify-center bg-surface-modal">
-        <ActivityIndicator color={SPINNER_FG} size="large" />
+        <ActivityIndicator color={spinnerFg} size="large" />
       </View>
     );
   }
@@ -221,7 +226,7 @@ export function HomeScreen() {
               value={createName}
               onChangeText={setCreateName}
               placeholder="My community"
-              placeholderTextColor={PLACEHOLDER_MUTED}
+              placeholderTextColor={placeholderMuted}
               editable={!createLoading}
               className="rounded-xl border border-border bg-surface-panel px-3 py-3 text-base text-foreground"
               autoCapitalize="words"
@@ -272,7 +277,7 @@ export function HomeScreen() {
               value={joinInvite}
               onChangeText={setJoinInvite}
               placeholder={getPlatformInviteInputPlaceholder()}
-              placeholderTextColor={PLACEHOLDER_MUTED}
+              placeholderTextColor={placeholderMuted}
               editable={!joinLoading}
               autoCapitalize="characters"
               autoCorrect={false}

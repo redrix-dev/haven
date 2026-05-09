@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Keyboard,
   Linking,
   Platform,
   Pressable,
@@ -35,21 +36,21 @@ import type {
   DirectMessageConversationSummary,
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 
 const MARGIN = 8;
-/** DM composer: keep internal scrolling off until native layout hits max height so the pill grows every line. */
-const DM_COMPOSER_INPUT_MIN_HEIGHT = 36;
-const DM_COMPOSER_INPUT_MAX_HEIGHT = 120;
 const COMPOSER_CHROME_IMMERSIVE_OPACITY = 0.38;
 const COMPOSER_CHROME_REST_OPACITY = 1;
 const COMPOSER_CHROME_IMMERSIVE_MS = 140;
 const COMPOSER_CHROME_REST_MS = 280;
 const COMPOSER_CHROME_SETTLE_MS = 200;
+const COMPOSER_SELECTION = "rgba(63, 121, 216, 0.4)";
 
 function formatDmTime(iso: string): string {
   const d = new Date(iso);
@@ -58,11 +59,34 @@ function formatDmTime(iso: string): string {
 }
 
 export function DirectMessagesContainer() {
+  const themeTokens = useMobileThemeTokens();
+  const {
+    ICON_MUTED,
+    ICON_ON_PRIMARY,
+    COMPOSER_PLACEHOLDER,
+    COMPOSER_CURSOR,
+    COMPOSER_LINK,
+    COMPOSER_SPOILER_FG,
+    COMPOSER_TEXT,
+  } = useMemo(
+    () => ({
+      ICON_MUTED: resolveColorProp(themeTokens, "text-dim") ?? "#8b9cbb",
+      ICON_ON_PRIMARY: resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff",
+      COMPOSER_PLACEHOLDER: resolveColorProp(themeTokens, "text-dim") ?? "#8e8e93",
+      COMPOSER_CURSOR: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+      COMPOSER_LINK: resolveColorProp(themeTokens, "primary") ?? "#3F79D8",
+      COMPOSER_SPOILER_FG: resolveColorProp(themeTokens, "text-muted") ?? "#a9b8cf",
+      COMPOSER_TEXT: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+    }),
+    [themeTokens],
+  );
+
   const { width: windowWidth } = useWindowDimensions();
   const liveProfiles = useLiveProfilesStore((s) => s.profiles);
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
   const [draft, setDraft] = useState("");
   const [isPickingDmMedia, setIsPickingDmMedia] = useState(false);
+  const [isSendingDm, setIsSendingDm] = useState(false);
   const [pendingDmMedia, setPendingDmMedia] = useState<CommunityMediaUploadPayload | null>(null);
   const { bottom } = useSafeAreaInsets();
   /** Full composer stack height; passed as KeyboardChatScrollView `extraContentPadding` so inset + scroll track growth (see library docs). */
@@ -73,7 +97,6 @@ export function DirectMessagesContainer() {
   const composerSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
   const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(null);
-  const [dmComposerInputScrollEnabled, setDmComposerInputScrollEnabled] = useState(false);
 
   const {
     state: {
@@ -96,10 +119,6 @@ export function DirectMessagesContainer() {
       reportDirectMessage,
     },
   } = useMobileDirectMessages();
-
-  useEffect(() => {
-    setDmComposerInputScrollEnabled(false);
-  }, [selectedDmConversationId]);
 
   const clearComposerSettleTimer = useCallback(() => {
     if (composerSettleTimerRef.current != null) {
@@ -132,6 +151,11 @@ export function DirectMessagesContainer() {
   const composerChromeAnimatedStyle = useAnimatedStyle(() => ({
     opacity: composerChromeOpacity.value,
   }));
+
+  const dismissDmComposerKeyboard = useCallback(() => {
+    composerInputRef.current?.blur();
+    Keyboard.dismiss();
+  }, []);
 
   const orderedDmMessages = useMemo(() => [...dmMessages].reverse(), [dmMessages]);
 
@@ -171,8 +195,8 @@ export function DirectMessagesContainer() {
             </Text>
           </View>
           {unread ? (
-            <View className="min-w-[22px] rounded-full bg-accent-slider px-2 py-0.5">
-              <Text className="text-center text-xs font-bold text-white">{item.unreadCount}</Text>
+            <View className="min-w-[22px] rounded-full bg-primary px-2 py-0.5">
+              <Text className="text-center text-xs font-bold text-primary-foreground">{item.unreadCount}</Text>
             </View>
           ) : null}
         </Pressable>
@@ -204,7 +228,7 @@ export function DirectMessagesContainer() {
       const linkColor = isSelf ? "#ffffff" : "#3F79D8";
       return (
         <Pressable
-          onPress={() => composerInputRef.current?.blur()}
+          onPress={dismissDmComposerKeyboard}
           onLongPress={
             !isSelf
               ? () => {
@@ -217,7 +241,7 @@ export function DirectMessagesContainer() {
         >
           <View
             className={`rounded-2xl px-3 py-2 ${
-              isSelf ? "bg-accent-slider" : "bg-surface-panel"
+              isSelf ? "bg-primary" : "bg-surface-panel"
             }`}
           >
             <EnrichedMarkdownText
@@ -294,7 +318,7 @@ export function DirectMessagesContainer() {
         </Pressable>
       );
     },
-    [currentUserId, windowWidth],
+    [currentUserId, dismissDmComposerKeyboard, windowWidth],
   );
 
   const handlePickDmMedia = useCallback(async () => {
@@ -344,6 +368,7 @@ export function DirectMessagesContainer() {
     setDraft("");
     composerInputRef.current?.setValue("");
     setPendingDmMedia(null);
+    setIsSendingDm(true);
     try {
       await sendDirectMessage(text, {
         ...(media
@@ -359,6 +384,8 @@ export function DirectMessagesContainer() {
       composerInputRef.current?.setValue(text);
       if (media) setPendingDmMedia(media);
       Alert.alert("Send failed", getErrorMessage(e, "Could not send message."));
+    } finally {
+      setIsSendingDm(false);
     }
   }, [draft, pendingDmMedia, sendDirectMessage]);
 
@@ -389,6 +416,8 @@ export function DirectMessagesContainer() {
   }
 
   const threadTitle = selectedDmConversation ? otherLabel(selectedDmConversation) : "Chat";
+
+  const canSendDmMessage = draft.trim().length > 0 || pendingDmMedia != null;
 
   return (
     <SafeAreaView edges={["bottom"]} className="min-h-0 flex-1 bg-card">
@@ -453,11 +482,14 @@ export function DirectMessagesContainer() {
             scheduleComposerChromeRest();
           }}
           renderScrollComponent={renderScrollComponent}
-          contentContainerStyle={{ paddingTop: 32 }}
+          contentContainerStyle={{ paddingTop: 32, flexGrow: 1 }}
           ListEmptyComponent={
-            <View className="items-center pt-8">
+            <Pressable
+              onPress={dismissDmComposerKeyboard}
+              className="min-h-[320px] flex-1 items-center justify-center pt-8"
+            >
               <Text className="text-muted-foreground text-[13px]">No messages yet.</Text>
-            </View>
+            </Pressable>
           }
         />
       )}
@@ -477,13 +509,14 @@ export function DirectMessagesContainer() {
           }}
         >
           {pendingDmMedia ? (
-            <View className="flex-row items-center gap-2 border-t border-white/[0.08] bg-surface-modal/90 px-3 py-2">
-              <Ionicons name="attach" size={16} color="#8b9cbb" />
+            <View className="flex-row items-center gap-2 border-t border-white/8 bg-surface-modal/90 px-3 py-2">
+              <Ionicons name="attach" size={16} color={ICON_MUTED} />
               <Text className="min-w-0 flex-1 text-xs text-foreground/90" numberOfLines={1}>
                 {pendingDmMedia.fileName}
               </Text>
               <Pressable
                 hitSlop={8}
+                disabled={isSendingDm}
                 onPress={() => setPendingDmMedia(null)}
                 className="shrink-0"
               >
@@ -496,69 +529,61 @@ export function DirectMessagesContainer() {
             <Animated.View style={composerChromeAnimatedStyle}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Add image"
-                disabled={isPickingDmMedia}
+                accessibilityLabel="Add media"
+                disabled={isSendingDm || isPickingDmMedia}
                 onPress={() => void handlePickDmMedia()}
-                className="w-10 h-10 rounded-full bg-white/10 items-center justify-center mb-0.5 disabled:opacity-50"
-                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5 disabled:opacity-50"
               >
-                <Ionicons name="add" size={22} color="#fff" />
+                <Ionicons name="add" size={20} color={ICON_ON_PRIMARY} />
               </Pressable>
             </Animated.View>
 
             <Animated.View
               style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
             >
-              <View className="flex-1 flex-row items-end rounded-[18px] border border-white/10 bg-white/[0.08] pr-1.5">
-                <View
-                  collapsable={Platform.OS === "android" ? false : undefined}
-                  className="min-w-0 flex-1"
-                  onLayout={(e) => {
-                    const h = e.nativeEvent.layout.height;
-                    const nextScroll = h >= DM_COMPOSER_INPUT_MAX_HEIGHT - 0.5;
-                    setDmComposerInputScrollEnabled((prev) => (prev === nextScroll ? prev : nextScroll));
+              <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/8 pr-1">
+                <EnrichedMarkdownTextInput
+                  ref={composerInputRef}
+                  multiline
+                  editable={!isSendingDm}
+                  scrollEnabled
+                  defaultValue=""
+                  onChangeMarkdown={setDraft}
+                  placeholder="Type a message..."
+                  placeholderTextColor={COMPOSER_PLACEHOLDER}
+                  cursorColor={COMPOSER_CURSOR}
+                  selectionColor={COMPOSER_SELECTION}
+                  markdownStyle={{
+                    strong: { color: COMPOSER_TEXT },
+                    em: { color: COMPOSER_TEXT },
+                    link: { color: COMPOSER_LINK, underline: true },
+                    spoiler: { color: COMPOSER_SPOILER_FG, backgroundColor: "rgba(0,0,0,0.2)" },
                   }}
+                  style={{
+                    flex: 1,
+                    minHeight: 36,
+                    maxHeight: 120,
+                    color: COMPOSER_TEXT,
+                    paddingHorizontal: 14,
+                    paddingTop: 8,
+                    paddingBottom: 8,
+                    fontSize: 16,
+                    backgroundColor: "transparent",
+                  }}
+                />
+                <Pressable
+                  onPress={() => void handleSend()}
+                  disabled={isSendingDm || !canSendDmMessage}
+                  style={{
+                    opacity: canSendDmMessage ? (isSendingDm ? 0.55 : 1) : 0,
+                    pointerEvents: canSendDmMessage ? "auto" : "none",
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send message"
+                  className="w-7 h-7 shrink-0 rounded-full bg-primary items-center justify-center"
                 >
-                  <EnrichedMarkdownTextInput
-                    ref={composerInputRef}
-                    multiline
-                    scrollEnabled={dmComposerInputScrollEnabled}
-                    defaultValue=""
-                    onChangeMarkdown={setDraft}
-                    placeholder="Message"
-                    placeholderTextColor="#8e8e93"
-                    cursorColor="#e6edf7"
-                    selectionColor="rgba(63, 121, 216, 0.4)"
-                    markdownStyle={{
-                      strong: { color: "#e6edf7" },
-                      em: { color: "#e6edf7" },
-                      link: { color: "#3F79D8", underline: true },
-                      spoiler: { color: "#a9b8cf", backgroundColor: "rgba(0,0,0,0.2)" },
-                    }}
-                    style={{
-                      width: "100%",
-                      minHeight: DM_COMPOSER_INPUT_MIN_HEIGHT,
-                      maxHeight: DM_COMPOSER_INPUT_MAX_HEIGHT,
-                      color: "#e6edf7",
-                      paddingHorizontal: 14,
-                      paddingTop: 8,
-                      paddingBottom: 8,
-                      fontSize: 16,
-                      backgroundColor: "transparent",
-                    }}
-                  />
-                </View>
-                {draft.trim().length > 0 || pendingDmMedia != null ? (
-                  <Pressable
-                    onPress={() => void handleSend()}
-                    accessibilityRole="button"
-                    accessibilityLabel="Send message"
-                    hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-                    className="w-10 h-10 rounded-full bg-primary items-center justify-center mb-0.5"
-                  >
-                    <Ionicons name="arrow-up" size={22} color="#fff" />
-                  </Pressable>
-                ) : null}
+                  <Ionicons name="arrow-up" size={18} color={ICON_ON_PRIMARY} />
+                </Pressable>
               </View>
             </Animated.View>
           </View>

@@ -2,6 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import { listUserCommunitiesWithClient } from '@shared/lib/listUserCommunitiesWithClient';
 import type { Database } from '@shared/types/database';
+import { getTheme } from '@shared/themes/registry';
 import type {
   BanEligibleServer,
   FeatureFlagsSnapshot,
@@ -20,6 +21,8 @@ export type PlatformStaffInfo = {
 export type UserProfileInfo = {
   username: string;
   avatarUrl: string | null;
+  /** Normalized theme id (see `getTheme`). */
+  theme: string;
 };
 
 const PROFILE_AVATAR_BUCKET = 'profile-avatars';
@@ -58,6 +61,8 @@ export interface ControlPlaneBackend {
     avatarFile?: Blob | ArrayBuffer | null;
     /** Required when `avatarFile` is an `ArrayBuffer` (e.g. mobile); ignored for `Blob`. */
     avatarContentType?: string;
+    /** When set, updates `profiles.theme` (normalized via `getTheme`). */
+    theme?: string;
   }): Promise<UserProfileInfo>;
   listUserCommunities(userId: string): Promise<ServerSummary[]>;
   renameCommunity(input: { communityId: string; name: string }): Promise<void>;
@@ -128,7 +133,7 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
   async fetchUserProfile(userId) {
     const { data, error } = await client
       .from('profiles')
-      .select('username, avatar_url')
+      .select('username, avatar_url, theme')
       .eq('id', userId)
       .maybeSingle();
 
@@ -137,6 +142,7 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     return {
       username: data.username,
       avatarUrl: data.avatar_url,
+      theme: getTheme(data.theme ?? 'default').id,
     };
   },
 
@@ -230,14 +236,17 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     avatarUrl,
     avatarFile = null,
     avatarContentType,
+    theme,
   }) {
     const { data: existingProfile, error: existingProfileError } = await client
       .from('profiles')
-      .select('avatar_url')
+      .select('avatar_url, theme')
       .eq('id', userId)
       .maybeSingle();
 
     if (existingProfileError) throw existingProfileError;
+
+    const priorThemeId = getTheme(existingProfile?.theme ?? 'default').id;
 
     const existingAvatarUrl = existingProfile?.avatar_url ?? null;
     let nextAvatarUrl = avatarUrl;
@@ -255,19 +264,28 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       await backend.deleteAvatar(existingAvatarUrl);
     }
 
-    const { error } = await client
-      .from('profiles')
-      .update({
-        username,
-        avatar_url: nextAvatarUrl,
-      })
-      .eq('id', userId);
+    const updatePayload: {
+      username: string;
+      avatar_url: string | null;
+      theme?: string;
+    } = {
+      username,
+      avatar_url: nextAvatarUrl,
+    };
+    if (theme !== undefined) {
+      updatePayload.theme = getTheme(theme).id;
+    }
+
+    const { error } = await client.from('profiles').update(updatePayload).eq('id', userId);
 
     if (error) throw error;
+
+    const effectiveThemeId = theme !== undefined ? getTheme(theme).id : priorThemeId;
 
     return {
       username,
       avatarUrl: nextAvatarUrl,
+      theme: effectiveThemeId,
     };
   },
 

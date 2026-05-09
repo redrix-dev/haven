@@ -34,7 +34,6 @@ export const builtinThemes: HavenThemeRegistry = {
         primary: '#e06c00',
         'primary-hover': '#c45e00',
       },
-      status: 'preview',
   }),
   winter: createTheme({
     id: 'winter',

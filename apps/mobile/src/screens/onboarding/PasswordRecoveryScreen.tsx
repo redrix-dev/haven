@@ -10,7 +10,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getErrorMessage } from "@shared/platform/lib/errors";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { RootStackParamList } from "@/navigation/types";
 import { usePasswordRecoveryGate } from "@/navigation/PasswordRecoveryGateContext";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -19,15 +19,18 @@ import {
   requestPasswordReset,
   signOutFromAuth,
 } from "@/auth/mobileAuthService";
-import { getTheme, resolveColorProp } from "@shared/themes";
-
-const THEME_TOKENS = getTheme("default").tokens;
-const PLACEHOLDER_MUTED = resolveColorProp(THEME_TOKENS, "text-muted") ?? "#a9b8cf";
+import { resolveColorProp } from "@shared/themes";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 
 const inputClassName =
   "mb-4 rounded-lg border border-border bg-muted px-4 py-3 text-foreground";
 
 export function PasswordRecoveryScreen() {
+  const themeTokens = useMobileThemeTokens();
+  const placeholderMuted = useMemo(
+    () => resolveColorProp(themeTokens, "text-muted") ?? "#a9b8cf",
+    [themeTokens],
+  );
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, "PasswordRecovery">>();
@@ -125,7 +128,7 @@ export function PasswordRecoveryScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               placeholder="••••••••"
-              placeholderTextColor={PLACEHOLDER_MUTED}
+              placeholderTextColor={placeholderMuted}
               value={newPassword}
               onChangeText={setNewPassword}
             />
@@ -139,7 +142,7 @@ export function PasswordRecoveryScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               placeholder="••••••••"
-              placeholderTextColor={PLACEHOLDER_MUTED}
+              placeholderTextColor={placeholderMuted}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
             />
@@ -220,7 +223,7 @@ export function PasswordRecoveryScreen() {
                 autoCorrect={false}
                 keyboardType="email-address"
                 placeholder="you@example.com"
-                placeholderTextColor={PLACEHOLDER_MUTED}
+                placeholderTextColor={placeholderMuted}
                 value={email}
                 onChangeText={setEmail}
               />

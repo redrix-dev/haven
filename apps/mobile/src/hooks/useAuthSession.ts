@@ -5,6 +5,7 @@ import { clearAllChannelScrollExits } from "../storage/communityTimelinePrefs";
 import { clearCrossSessionMessagingCaches } from "@shared/features/messaging/hooks/useMessages";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useMessagesStore } from "@shared/stores/messagesStore";
+import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
 
 /** `undefined` while hydrating from AsyncStorage; `null` when signed out. */
 export function useAuthSession(): Session | null | undefined {
@@ -22,6 +23,7 @@ export function useAuthSession(): Session | null | undefined {
           useMessagesStore.getState().reset();
           clearCrossSessionMessagingCaches();
           clearAllChannelScrollExits();
+          useMobileThemePreferenceStore.getState().resetToDefault();
         }
         setSession(nextSession);
         useAuthStore.getState().setSession(nextSession);
@@ -38,10 +40,12 @@ export function useAuthSession(): Session | null | undefined {
           useMessagesStore.getState().reset();
           clearCrossSessionMessagingCaches();
           clearAllChannelScrollExits();
+          useMobileThemePreferenceStore.getState().resetToDefault();
         } else if (prevUserId && prevUserId !== nextUserId) {
           useMessagesStore.getState().reset();
           clearCrossSessionMessagingCaches();
           clearAllChannelScrollExits();
+          useMobileThemePreferenceStore.getState().resetToDefault();
         }
         setSession(next);
         useAuthStore.getState().setSession(next);

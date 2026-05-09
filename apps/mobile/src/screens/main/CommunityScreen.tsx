@@ -60,7 +60,8 @@ import {
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getTheme, resolveColorProp } from "@shared/themes";
+import { resolveColorProp } from "@shared/themes";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MARGIN = 8;
 const COMPOSER_CHROME_IMMERSIVE_OPACITY = 0.38;
@@ -68,16 +69,7 @@ const COMPOSER_CHROME_REST_OPACITY = 1;
 const COMPOSER_CHROME_IMMERSIVE_MS = 140;
 const COMPOSER_CHROME_REST_MS = 280;
 const COMPOSER_CHROME_SETTLE_MS = 200;
-const THEME_TOKENS = getTheme("default").tokens;
-const SPINNER_FG = resolveColorProp(THEME_TOKENS, "foreground") ?? "#e6edf7";
-const ICON_MUTED = resolveColorProp(THEME_TOKENS, "text-dim") ?? "#8b9cbb";
-const ICON_ON_PRIMARY = resolveColorProp(THEME_TOKENS, "primary-foreground") ?? "#ffffff";
-const COMPOSER_PLACEHOLDER = resolveColorProp(THEME_TOKENS, "text-dim") ?? "#8e8e93";
-const COMPOSER_CURSOR = resolveColorProp(THEME_TOKENS, "foreground") ?? "#e6edf7";
 const COMPOSER_SELECTION = "rgba(63, 121, 216, 0.4)";
-const COMPOSER_LINK = resolveColorProp(THEME_TOKENS, "primary") ?? "#3F79D8";
-const COMPOSER_SPOILER_FG = resolveColorProp(THEME_TOKENS, "text-muted") ?? "#a9b8cf";
-const COMPOSER_TEXT = resolveColorProp(THEME_TOKENS, "foreground") ?? "#e6edf7";
 function getReplyTargetLabel(
   replyToId: string | null,
   messageById: Map<string, Message>,
@@ -98,6 +90,29 @@ function getReplyTargetLabel(
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function CommunityScreen() {
+  const themeTokens = useMobileThemeTokens();
+  const {
+    SPINNER_FG,
+    ICON_MUTED,
+    ICON_ON_PRIMARY,
+    COMPOSER_PLACEHOLDER,
+    COMPOSER_CURSOR,
+    COMPOSER_LINK,
+    COMPOSER_SPOILER_FG,
+    COMPOSER_TEXT,
+  } = useMemo(
+    () => ({
+      SPINNER_FG: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+      ICON_MUTED: resolveColorProp(themeTokens, "text-dim") ?? "#8b9cbb",
+      ICON_ON_PRIMARY: resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff",
+      COMPOSER_PLACEHOLDER: resolveColorProp(themeTokens, "text-dim") ?? "#8e8e93",
+      COMPOSER_CURSOR: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+      COMPOSER_LINK: resolveColorProp(themeTokens, "primary") ?? "#3F79D8",
+      COMPOSER_SPOILER_FG: resolveColorProp(themeTokens, "text-muted") ?? "#a9b8cf",
+      COMPOSER_TEXT: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+    }),
+    [themeTokens],
+  );
   const { bottom } = useSafeAreaInsets();
   const composerHeight = useSharedValue(0);
   const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);

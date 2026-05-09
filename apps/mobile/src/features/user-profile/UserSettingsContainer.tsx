@@ -8,6 +8,7 @@ import UserAccountCard from "@/features/user-profile/UserAccountCard";
 import AppUpdatesCard from "@/features/user-profile/AppUpdatesCard";
 import DeleteAccountConfirmationModal from "@/features/user-profile/DeleteAccountConfirmationModal";
 import UserSettingsCard from "@/features/user-profile/UserSettingsCard";
+import { ThemeBuiltinPickerCard } from "@/features/user-profile/ThemeBuiltinPickerCard";
 import { useCurrentUserIdentity } from "@/features/user-profile/useCurrentUserIdentity";
 import { loadPickedAvatarForUpload } from "@/features/user-profile/loadPickedAvatarForUpload";
 import {
@@ -239,6 +240,11 @@ export default function UserSettingsContainer({
         }}
       />
       <View className="gap-3 mt-3">
+        <ThemeBuiltinPickerCard
+          userId={identity.userId}
+          username={identity.username}
+          avatarUrl={identity.avatarUrl}
+        />
         <AppUpdatesCard />
         <UserSettingsCard rows={settingsRows} />
       </View>

@@ -14,20 +14,23 @@ import {
   HAVEN_TERMS_URL,
   openPlatformExternalUrl,
 } from "@shared/platform/urls";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { signUpWithPassword } from "@/auth/mobileAuthService";
 import type { RootStackParamList } from "@/navigation/types";
-import { getTheme, resolveColorProp } from "@shared/themes";
-
-const THEME_TOKENS = getTheme("default").tokens;
-const PLACEHOLDER_MUTED = resolveColorProp(THEME_TOKENS, "text-muted") ?? "#a9b8cf";
+import { resolveColorProp } from "@shared/themes";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 
 const inputClassName =
   "mb-4 rounded-lg border border-border bg-muted px-4 py-3 text-foreground";
 
 export function SignUpScreen() {
+  const themeTokens = useMobileThemeTokens();
+  const placeholderMuted = useMemo(
+    () => resolveColorProp(themeTokens, "text-muted") ?? "#a9b8cf",
+    [themeTokens],
+  );
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [email, setEmail] = useState("");
@@ -116,7 +119,7 @@ export function SignUpScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="username"
-                placeholderTextColor={PLACEHOLDER_MUTED}
+                placeholderTextColor={placeholderMuted}
                 value={username}
                 onChangeText={setUsername}
               />
@@ -130,7 +133,7 @@ export function SignUpScreen() {
                 autoCorrect={false}
                 keyboardType="email-address"
                 placeholder="email@address.com"
-                placeholderTextColor={PLACEHOLDER_MUTED}
+                placeholderTextColor={placeholderMuted}
                 value={email}
                 onChangeText={setEmail}
               />
@@ -142,7 +145,7 @@ export function SignUpScreen() {
                 className={inputClassName}
                 secureTextEntry
                 placeholder="••••••••"
-                placeholderTextColor={PLACEHOLDER_MUTED}
+                placeholderTextColor={placeholderMuted}
                 value={password}
                 onChangeText={setPassword}
               />
@@ -154,7 +157,7 @@ export function SignUpScreen() {
                 className="mb-6 rounded-lg border border-border bg-muted px-4 py-3 text-foreground"
                 secureTextEntry
                 placeholder="••••••••"
-                placeholderTextColor={PLACEHOLDER_MUTED}
+                placeholderTextColor={placeholderMuted}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
               />
