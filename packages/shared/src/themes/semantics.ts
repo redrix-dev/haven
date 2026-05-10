@@ -60,6 +60,7 @@ export const semanticToPrimitive = {
   'border-dialog': 'surface-4',
   'border-inset-panel': 'border-subtle',
   'border-modmail': 'border-subtle',
+  'border-panel': 'surface-5',
   'border-control': 'border-default',
   'border-selected': 'primary',
   'border-message-row': 'border-subtle',

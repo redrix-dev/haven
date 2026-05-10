@@ -1,12 +1,12 @@
 import { create } from "zustand";
-import { getTheme } from "@shared/themes/registry";
 import {
   clearPersistedThemeId,
   persistThemeId,
 } from "@/storage/mobileThemePreferenceStorage";
+import { normalizeMobileThemeId } from "@/lib/theme";
 
 export type MobileThemePreferenceState = {
-  selectedThemeId: string;
+  selectedThemeId: ReturnType<typeof normalizeMobileThemeId>;
   setSelectedThemeId: (id: string) => void;
   resetToDefault: () => void;
 };
@@ -14,7 +14,7 @@ export type MobileThemePreferenceState = {
 export const useMobileThemePreferenceStore = create<MobileThemePreferenceState>((set) => ({
   selectedThemeId: "default",
   setSelectedThemeId: (id) => {
-    const normalized = getTheme(id).id;
+    const normalized = normalizeMobileThemeId(id);
     set({ selectedThemeId: normalized });
     void persistThemeId(normalized);
   },

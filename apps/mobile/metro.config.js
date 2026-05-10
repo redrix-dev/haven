@@ -1,7 +1,8 @@
 const { getDefaultConfig } = require("expo/metro-config");
-const { withNativeWind } = require("nativewind/metro");
+const { withUniwindConfig } = require("uniwind/metro");
 const path = require("path");
 const metroResolver = require("metro-resolver");
+const { extraThemes } = require("./uniwind-themes.generated.cjs");
 
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, "../..");
@@ -15,9 +16,6 @@ const mobileSrcRoot = path.join(projectRoot, "src");
 const config = getDefaultConfig(projectRoot);
 
 config.watchFolders = [sharedPackageRoot, webClientPackageRoot];
-// Rely on explicit `nodeModulesPaths` + `extraNodeModules` for the monorepo. Keeping the
-// default `disableHierarchicalLookup: false` matches expo-doctor and Expo’s baseline;
-// the explicit resolver paths still pin React/RN/Expo to `apps/mobile/node_modules`.
 config.resolver.nodeModulesPaths = [
   mobileNodeModules,
   path.resolve(monorepoRoot, "node_modules"),
@@ -31,7 +29,11 @@ config.resolver.extraNodeModules = {
   "react-native-reanimated": path.join(mobileNodeModules, "react-native-reanimated"),
 };
 
-const finalConfig = withNativeWind(config, { input: "./global.css" });
+const finalConfig = withUniwindConfig(config, {
+  cssEntryFile: "./global.css",
+  dtsFile: "./uniwind-types.d.ts",
+  extraThemes,
+});
 
 const upstreamResolveRequest = finalConfig.resolver.resolveRequest;
 
@@ -47,11 +49,7 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
       webClientAppUiRoot,
       moduleName.slice("@shared/app/ui/".length),
     );
-    return resolve(
-      { ...context, resolveRequest: resolve },
-      absolutePath,
-      platform,
-    );
+    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
   }
 
   if (moduleName.startsWith("@shared/")) {
@@ -59,11 +57,7 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
       sharedSrcRoot,
       moduleName.slice("@shared/".length),
     );
-    return resolve(
-      { ...context, resolveRequest: resolve },
-      absolutePath,
-      platform,
-    );
+    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
   }
 
   if (moduleName.startsWith("@platform/")) {
@@ -72,11 +66,7 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
       "platform",
       moduleName.slice("@platform/".length),
     );
-    return resolve(
-      { ...context, resolveRequest: resolve },
-      absolutePath,
-      platform,
-    );
+    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
   }
 
   if (moduleName.startsWith("@client/app/")) {
@@ -85,23 +75,12 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
       "app",
       moduleName.slice("@client/app/".length),
     );
-    return resolve(
-      { ...context, resolveRequest: resolve },
-      absolutePath,
-      platform,
-    );
+    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
   }
 
   if (moduleName.startsWith("@/")) {
-    const absolutePath = path.join(
-      mobileSrcRoot,
-      moduleName.slice("@/".length),
-    );
-    return resolve(
-      { ...context, resolveRequest: resolve },
-      absolutePath,
-      platform,
-    );
+    const absolutePath = path.join(mobileSrcRoot, moduleName.slice("@/".length));
+    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
   }
 
   if (upstreamResolveRequest) {

@@ -1,14 +1,12 @@
-import { vars } from 'nativewind';
-import { createThemeProxy, resolveSemanticEntries } from '@shared/themes';
-import type { HavenThemeTokens } from '@shared/themes/types';
+import { Uniwind } from 'uniwind';
+import { builtinThemes, type BuiltinThemeId } from '@shared/themes';
 
-export function buildNativeThemeVars(tokens: HavenThemeTokens) {
-  const proxy = createThemeProxy(tokens);
-  const entries = {
-    ...Object.fromEntries(Object.entries(tokens).map(([key, value]) => [`--${key}`, value])),
-    ...Object.fromEntries(
-      Object.entries(resolveSemanticEntries(proxy)).map(([key, value]) => [`--${key}`, value])
-    ),
-  };
-  return vars(entries);
+export function normalizeMobileThemeId(themeId: string): BuiltinThemeId {
+  return themeId in builtinThemes ? (themeId as BuiltinThemeId) : 'default';
+}
+
+export function applyMobileTheme(themeId: string): BuiltinThemeId {
+  const normalizedThemeId = normalizeMobileThemeId(themeId);
+  Uniwind.setTheme(normalizedThemeId);
+  return normalizedThemeId;
 }

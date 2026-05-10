@@ -1,22 +1,37 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { defaultTokens, semanticToPrimitive } from '../../packages/shared/src/themes';
+import {
+  builtinThemes,
+  createThemeProxy,
+  defaultTokens,
+  resolveSemanticEntries,
+  semanticToPrimitive,
+} from '../../packages/shared/src/themes';
 
 const rootDir = path.resolve(__dirname, '../..');
 const globalsPath = path.join(rootDir, 'packages/shared/src/styles/globals.css');
-const mobileTailwindPath = path.join(rootDir, 'apps/mobile/tailwind.config.js');
+const mobileGlobalsPath = path.join(rootDir, 'apps/mobile/global.css');
+const mobileThemesPath = path.join(rootDir, 'apps/mobile/uniwind-themes.generated.cjs');
+const mobileUniwindTypesPath = path.join(rootDir, 'apps/mobile/uniwind-types.d.ts');
 
 const START_MARKER = '/* GENERATED:theme-bridge:start */';
 const END_MARKER = '/* GENERATED:theme-bridge:end */';
+const MOBILE_START_MARKER = '/* GENERATED:mobile-theme-bridge:start */';
+const MOBILE_END_MARKER = '/* GENERATED:mobile-theme-bridge:end */';
 
-function replaceBetweenMarkers(source: string, replacement: string): string {
-  const start = source.indexOf(START_MARKER);
-  const end = source.indexOf(END_MARKER);
+function replaceBetweenMarkers(
+  source: string,
+  replacement: string,
+  startMarker = START_MARKER,
+  endMarker = END_MARKER
+): string {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker);
   if (start === -1 || end === -1 || end < start) {
     throw new Error('Theme bridge markers were not found or are misordered.');
   }
   const before = source.slice(0, start);
-  const after = source.slice(end + END_MARKER.length);
+  const after = source.slice(end + endMarker.length);
   return `${before}${replacement}${after}`;
 }
 
@@ -27,32 +42,120 @@ function generateCssBridgeBlock(): string {
   return [START_MARKER, '@theme inline {', ...lines, '}', END_MARKER].join('\n');
 }
 
-function generateMobileBridgeBlock(): string {
+function getMobileThemeVariableNames(): string[] {
   const seen = new Set<string>();
-  const lines: string[] = [];
+  const variables: string[] = [];
   for (const token of Object.keys(defaultTokens)) {
-    if (seen.has(token)) {
-      continue;
+    if (!seen.has(token)) {
+      seen.add(token);
+      variables.push(token);
     }
-    seen.add(token);
-    lines.push(`        "${token}": "var(--${token})",`);
   }
   for (const semantic of Object.keys(semanticToPrimitive)) {
-    if (seen.has(semantic)) {
-      continue;
+    if (!seen.has(semantic)) {
+      seen.add(semantic);
+      variables.push(semantic);
     }
-    seen.add(semantic);
-    lines.push(`        "${semantic}": "var(--${semantic})",`);
   }
+  return variables;
+}
+
+function resolveThemeVariables(themeId: string): Record<string, string> {
+  const theme = builtinThemes[themeId];
+  if (!theme) {
+    throw new Error(`Theme "${themeId}" was not found.`);
+  }
+  const proxy = createThemeProxy(theme.tokens);
+  return {
+    ...theme.tokens,
+    ...resolveSemanticEntries(proxy),
+  };
+}
+
+function generateMobileCssBridgeBlock(): string {
+  const variableNames = getMobileThemeVariableNames();
+  const themeIds = Object.keys(builtinThemes);
+  const lines: string[] = [
+    MOBILE_START_MARKER,
+    '@layer theme {',
+    '  :root {',
+  ];
+  const defaultVariables = resolveThemeVariables('default');
+  for (const variableName of variableNames) {
+    const value = defaultVariables[variableName];
+    if (typeof value !== 'string' || value.length === 0) {
+      throw new Error(`Theme "default" is missing "${variableName}".`);
+    }
+    lines.push(`    --${variableName}: ${value};`);
+  }
+  lines.push('');
+
+  for (const builtinThemeId of ['light', 'dark']) {
+    lines.push(`    @variant ${builtinThemeId} {`);
+    for (const variableName of variableNames) {
+      const value = defaultVariables[variableName];
+      if (typeof value !== 'string' || value.length === 0) {
+        throw new Error(`Theme "${builtinThemeId}" is missing "${variableName}".`);
+      }
+      lines.push(`      --${variableName}: ${value};`);
+    }
+    lines.push('    }');
+  }
+
+  for (const themeId of themeIds) {
+    const variables = resolveThemeVariables(themeId);
+    lines.push(`    @variant ${themeId} {`);
+    for (const variableName of variableNames) {
+      const value = variables[variableName];
+      if (typeof value !== 'string' || value.length === 0) {
+        throw new Error(`Theme "${themeId}" is missing "${variableName}".`);
+      }
+      lines.push(`      --${variableName}: ${value};`);
+    }
+    lines.push('    }');
+  }
+
+  lines.push('  }', '}', '', '@theme inline {');
+  for (const variableName of variableNames) {
+    lines.push(`  --color-${variableName}: var(--${variableName});`);
+  }
+  lines.push('}', MOBILE_END_MARKER);
+  return lines.join('\n');
+}
+
+function generateMobileThemesConfig(): string {
+  const themeIds = Object.keys(builtinThemes);
   return [
-    START_MARKER,
-    ...lines,
-    END_MARKER,
+    '// Generated by tooling/scripts/generate-theme-bridge.ts.',
+    '// Do not edit by hand.',
+    '',
+    'module.exports = {',
+    `  extraThemes: ${JSON.stringify(themeIds)},`,
+    '};',
+    '',
+  ].join('\n');
+}
+
+function generateMobileUniwindTypes(): string {
+  const themeIds = ['light', 'dark', ...Object.keys(builtinThemes)];
+  return [
+    '// Generated by tooling/scripts/generate-theme-bridge.ts.',
+    '// This mirrors apps/mobile/metro.config.js extraThemes for typechecking.',
+    '/// <reference types="uniwind/types" />',
+    '',
+    "declare module 'uniwind' {",
+    '  export interface UniwindConfig {',
+    `    themes: readonly ${JSON.stringify(themeIds).replaceAll('"', "'")};`,
+    '  }',
+    '}',
+    '',
+    'export {};',
+    '',
   ].join('\n');
 }
 
 function writeIfChanged(filePath: string, nextContents: string): void {
-  const previous = fs.readFileSync(filePath, 'utf8');
+  const previous = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : null;
   if (previous !== nextContents) {
     fs.writeFileSync(filePath, nextContents, 'utf8');
   }
@@ -63,9 +166,17 @@ function main(): void {
   const nextGlobals = replaceBetweenMarkers(globalsSource, generateCssBridgeBlock());
   writeIfChanged(globalsPath, nextGlobals);
 
-  const mobileSource = fs.readFileSync(mobileTailwindPath, 'utf8');
-  const nextMobile = replaceBetweenMarkers(mobileSource, generateMobileBridgeBlock());
-  writeIfChanged(mobileTailwindPath, nextMobile);
+  const mobileSource = fs.readFileSync(mobileGlobalsPath, 'utf8');
+  const nextMobile = replaceBetweenMarkers(
+    mobileSource,
+    generateMobileCssBridgeBlock(),
+    MOBILE_START_MARKER,
+    MOBILE_END_MARKER
+  );
+  writeIfChanged(mobileGlobalsPath, nextMobile);
+
+  writeIfChanged(mobileThemesPath, generateMobileThemesConfig());
+  writeIfChanged(mobileUniwindTypesPath, generateMobileUniwindTypes());
 
   process.stdout.write('Theme bridge generation complete.\n');
 }

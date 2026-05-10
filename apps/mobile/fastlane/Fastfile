@@ -1,0 +1,39 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Build Haven iOS"
+  lane :build do
+    sync_code_signing(
+      type: "appstore",
+      readonly: true,
+      keychain_password: ENV["MATCH_KEYCHAIN_PASSWORD"]
+    )
+    build_app(
+      workspace: "ios/HavenMobile.xcworkspace",
+      scheme: "HavenMobile",
+      export_method: "app-store",
+      output_directory: "fastlane-builds",
+      output_name: "Haven",
+      xcargs: {
+        "PROVISIONING_PROFILE_SPECIFIER" => "match AppStore com.redrix.haven.mobile",
+        "CODE_SIGN_IDENTITY" => "Apple Distribution",
+        "DEVELOPMENT_TEAM" => "9H229274JB"
+      }
+    )
+  end
+end

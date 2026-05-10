@@ -11,7 +11,7 @@ function createTheme(input: HavenThemeInput): HavenTheme {
   };
 }
 
-export const builtinThemes: HavenThemeRegistry = {
+export const builtinThemes = {
   default: createTheme({
       id: 'default',
       name: 'Haven',
@@ -407,9 +407,11 @@ export const builtinThemes: HavenThemeRegistry = {
       'primary-hover': '#c09020',
     },
   }),
-};
+} satisfies HavenThemeRegistry;
 
-export const themes = builtinThemes;
+export type BuiltinThemeId = keyof typeof builtinThemes;
+
+export const themes: HavenThemeRegistry = builtinThemes;
 
 function sanitizeTokens(tokens: unknown): HavenThemeTokens | null {
   if (!tokens || typeof tokens !== 'object') {

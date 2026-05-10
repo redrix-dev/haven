@@ -1,17 +1,35 @@
-import type { EmailOtpType } from "@supabase/supabase-js";
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { getPlatformAuthConfirmRedirectUrl } from "@shared/platform/urls";
 import {
   buildSignUpMetadata,
   parseAuthConfirmParams,
   parseAuthConfirmUrl,
-  SUPPORTED_EMAIL_OTP_TYPES,
   validateLegalAcceptance,
   validatePasswordConfirmation,
   validateRecoveryPassword,
 } from "@shared/features/auth/domain";
 
 export type MobileAuthResult = { error: unknown | null };
+
+type MobileVerifyOtpParams = Parameters<ReturnType<typeof getMobileSupabase>["auth"]["verifyOtp"]>[0];
+type MobileEmailOtpType = Extract<MobileVerifyOtpParams, { token_hash: string }>["type"];
+
+const SUPPORTED_MOBILE_EMAIL_OTP_TYPES = new Set<MobileEmailOtpType>([
+  "signup",
+  "invite",
+  "magiclink",
+  "recovery",
+  "email_change",
+  "email",
+]);
+
+function parseMobileEmailOtpType(value: string | undefined): MobileEmailOtpType | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+  return SUPPORTED_MOBILE_EMAIL_OTP_TYPES.has(normalized as MobileEmailOtpType)
+    ? (normalized as MobileEmailOtpType)
+    : null;
+}
 
 export const signInWithPassword = async (
   email: string,
@@ -114,7 +132,7 @@ export const consumeAuthConfirmUrl = async (
   const accessToken = params.access_token?.trim();
   const refreshToken = params.refresh_token?.trim();
   const tokenHash = params.token_hash?.trim();
-  const otpType = params.type?.trim().toLowerCase() as EmailOtpType | undefined;
+  const otpType = parseMobileEmailOtpType(params.type);
   const isRecovery = otpType === "recovery";
 
   if (accessToken && refreshToken) {
@@ -126,7 +144,7 @@ export const consumeAuthConfirmUrl = async (
     return { didProcess: true, requiresPasswordRecovery: isRecovery };
   }
 
-  if (tokenHash && otpType && SUPPORTED_EMAIL_OTP_TYPES.has(otpType)) {
+  if (tokenHash && otpType) {
     const { error: verifyError } = await getMobileSupabase().auth.verifyOtp({
       token_hash: tokenHash,
       type: otpType,

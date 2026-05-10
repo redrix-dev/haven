@@ -319,6 +319,7 @@
   --color-border-dialog: var(--surface-4);
   --color-border-inset-panel: var(--border-subtle);
   --color-border-modmail: var(--border-subtle);
+  --color-border-panel: var(--surface-5);
   --color-border-control: var(--border-default);
   --color-border-selected: var(--primary);
   --color-border-message-row: var(--border-subtle);

@@ -10,12 +10,12 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { initializeHavenDataFromClient } from "@shared/lib/bootstrap/initializeHavenDataFromClient";
 import { registerMobileAppHost } from "@/lib/registerMobileAppHost";
 import { getMobileSupabase, resolveMobileSupabaseConfig } from "@/supabase/getMobileSupabase";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { RootNavigator } from "./src/navigation/RootNavigator";
-import { buildNativeThemeVars } from "./src/lib/theme";
-import { getTheme } from "@shared/themes";
+import { applyMobileTheme } from "./src/lib/theme";
 import { loadPersistedThemeId } from "./src/storage/mobileThemePreferenceStorage";
 import { useMobileThemePreferenceStore } from "./src/stores/mobileThemePreferenceStore";
+import { GluestackUIProvider } from "./components/ui/gluestack-ui-provider";
 
 registerMobileAppHost();
 
@@ -56,24 +56,26 @@ function App() {
     };
   }, []);
 
-  const themeVars = useMemo(
-    () => buildNativeThemeVars(getTheme(selectedThemeId).tokens),
-    [selectedThemeId],
-  );
+  useLayoutEffect(() => {
+    if (!themeStorageReady) return;
+    applyMobileTheme(selectedThemeId);
+  }, [selectedThemeId, themeStorageReady]);
 
   if (!themeStorageReady) {
     return null;
   }
 
   return (
-    <GestureHandlerRootView style={[{ flex: 1 }, themeVars]}>
-      <SafeAreaProvider>
-        <KeyboardProvider>
-          <RootNavigator />
-          <StatusBar style="light" />
-        </KeyboardProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <GluestackUIProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <KeyboardProvider>
+            <RootNavigator />
+            <StatusBar style="light" />
+          </KeyboardProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </GluestackUIProvider>
   );
 }
 

@@ -47,6 +47,7 @@
     "mobile:doctor": "node tooling/scripts/mobile/doctor.mjs",
     "mobile:dev:metro": "node tooling/scripts/mobile/run-in-mobile.mjs npm run dev:metro",
     "mobile:dev:metro:clear": "node tooling/scripts/mobile/run-in-mobile.mjs npm run dev:metro:clear",
+    "mobile:fastlane:build": "npm run mobile:release:check && node tooling/scripts/mobile/run-in-mobile.mjs bundle exec fastlane ios build",
     "mobile:run:ios:simulator": "node tooling/scripts/mobile/run-in-mobile.mjs npm run run:ios:simulator",
     "mobile:run:ios:device": "node tooling/scripts/mobile/run-in-mobile.mjs npm run run:ios:device",
     "mobile:run:android": "node tooling/scripts/mobile/run-in-mobile.mjs npm run run:android",
@@ -70,6 +71,8 @@
     "mobile:eas:submit": "node tooling/scripts/mobile/run-in-mobile.mjs npm run eas:submit --",
     "mobile:eas:credentials": "node tooling/scripts/mobile/run-in-mobile.mjs npm run eas:credentials",
     "mobile:ota:deploy": "bash tooling/scripts/mobile/deploy-ota.sh",
+    "mobile:typecheck": "node tooling/scripts/mobile/run-in-mobile.mjs npm run typecheck",
+    "mobile:release:check": "npm run check:themes && npm run mobile:preflight && npm run mobile:typecheck",
     "setup:mobile": "node tooling/scripts/mobile/run-in-mobile.mjs npm ci",
     "reset:mobile": "node tooling/scripts/mobile/reset.mjs"
   },
