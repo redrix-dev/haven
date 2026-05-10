@@ -11,6 +11,8 @@ import { applyShellThemeTokens, setShellThemeApplier } from '@shared/app/shellTh
 import { readSessionStoredThemeId } from '@shared/themes/sessionThemeStorage';
 import { getTheme } from '@shared/themes/registry';
 import { applyThemeWeb } from './lib/theme';
+import { ElectronThemeDemoMenu } from './dev/ElectronThemeDemoMenu';
+import { ElectronThemeLab } from './dev/ElectronThemeLab';
 
 registerElectronAppHost();
 setShellThemeApplier(applyThemeWeb);
@@ -38,6 +40,12 @@ root.render(
   <TooltipProvider>
     <>
       <AppRoot />
+      {process.env.NODE_ENV !== 'production' && (
+        <>
+          <ElectronThemeDemoMenu />
+          <ElectronThemeLab />
+        </>
+      )}
       <SonnerToaster
         position="top-right"
         theme="dark"
