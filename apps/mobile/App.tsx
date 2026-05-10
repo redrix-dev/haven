@@ -9,13 +9,17 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { initializeHavenDataFromClient } from "@shared/lib/bootstrap/initializeHavenDataFromClient";
 import { registerMobileAppHost } from "@/lib/registerMobileAppHost";
-import { getMobileSupabase, resolveMobileSupabaseConfig } from "@/supabase/getMobileSupabase";
+import {
+  getMobileSupabase,
+  resolveMobileSupabaseConfig,
+} from "@/supabase/getMobileSupabase";
 import { useLayoutEffect, useState } from "react";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { applyMobileTheme } from "./src/lib/theme";
 import { loadPersistedThemeId } from "./src/storage/mobileThemePreferenceStorage";
 import { useMobileThemePreferenceStore } from "./src/stores/mobileThemePreferenceStore";
 import { GluestackUIProvider } from "./src/components/ui/gluestack-ui-provider";
+import { MobileDevThemeMenu } from "./src/dev/MobileDevThemeMenu";
 
 registerMobileAppHost();
 
@@ -36,7 +40,9 @@ Notifications.setNotificationHandler({
   }),
 });
 function App() {
-  const selectedThemeId = useMobileThemePreferenceStore((s) => s.selectedThemeId);
+  const selectedThemeId = useMobileThemePreferenceStore(
+    (s) => s.selectedThemeId,
+  );
   const [themeStorageReady, setThemeStorageReady] = useState(false);
 
   useLayoutEffect(() => {
@@ -71,6 +77,7 @@ function App() {
         <SafeAreaProvider>
           <KeyboardProvider>
             <RootNavigator />
+            {__DEV__ ? <MobileDevThemeMenu /> : null}
             <StatusBar style="light" />
           </KeyboardProvider>
         </SafeAreaProvider>

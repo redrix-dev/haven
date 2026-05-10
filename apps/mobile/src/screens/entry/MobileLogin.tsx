@@ -1,19 +1,37 @@
 import type { RootStackParamList } from "@/navigation/types";
 import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getErrorMessage } from "@shared/platform/lib/errors";
-import { useState } from "react";
-import { View, Text, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Easing, Keyboard, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signInWithPassword } from "@/auth/mobileAuthService";
+import { Box } from "@/components/ui/box";
+import { Button, ButtonSpinner, ButtonText } from "@/components/ui/button";
+import {
+  FormControl,
+  FormControlLabel,
+  FormControlLabelText,
+} from "@/components/ui/form-control";
+import { Input, InputField } from "@/components/ui/input";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard-avoiding-view";
+import { Pressable } from "@/components/ui/pressable";
+import { ScrollView } from "@/components/ui/scroll-view";
+import { Text } from "@/components/ui/text";
+import { VStack } from "@/components/ui/vstack";
+
+const KEYBOARD_CARD_LIFT = -64;
+const KEYBOARD_ANIMATION_MS = 220;
 
 export function MobileLogin() {
   const insets = useSafeAreaInsets();
+  const cardTranslateY = useRef(new Animated.Value(0)).current;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const onSubmit = async () => {
     setError("");
     setLoading(true);
@@ -27,58 +45,118 @@ export function MobileLogin() {
     }
   };
 
+  useEffect(() => {
+    const animateCard = (toValue: number, duration = KEYBOARD_ANIMATION_MS) => {
+      Animated.timing(cardTranslateY, {
+        toValue,
+        duration,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      animateCard(KEYBOARD_CARD_LIFT, event.duration);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
+      animateCard(0, event.duration);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [cardTranslateY]);
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1 bg-background">
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom, flexGrow: 1,  justifyContent: 'center' }}>
-        <View className="w-full max-w-sm self-center bg-card rounded-3xl p-6">
-          <Text className="mb-8 text-center text-2xl font-semibold text-foreground">
-            Haven
-          </Text>
-          <Text className="mb-2 text-sm text-muted-foreground">Email</Text>
-          <TextInput
-            className="mb-4 rounded-xl border border-border bg-card px-4 py-3 text-foreground"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            placeholder="you@example.com"
-            placeholderTextColor="#a9b8cf"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <Text className="mb-2 text-sm text-muted-foreground">Password</Text>
-          <TextInput
-            className="mb-6 rounded-xl border border-border bg-card px-4 py-3 text-foreground"
-            secureTextEntry
-            placeholder="••••••••"
-            placeholderTextColor="#a9b8cf"
-            value={password}
-            onChangeText={setPassword}
-          />
-          {error ? (
-            <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
-          ) : null}
-          <Pressable
-            className={`rounded-xl bg-primary py-4 ${loading ? "opacity-60" : ""}`}
-            disabled={loading}
-            onPress={() => void onSubmit()}
-          >
-            <Text className="text-center text-base font-semibold text-primary-foreground">
-              {loading ? "Signing in…" : "Sign in"}
-            </Text>
-          </Pressable>
-          <Pressable
-            className="text-sm text-muted-foreground"
-            onPress={() => void navigation.navigate("PasswordRecovery")}
-          >
-            <Text className="text-center text-sm text-muted-foreground">Forgot password?</Text>
-          </Pressable>
-          <Pressable
-            className="text-sm text-muted-foreground"
-            onPress={() => void navigation.navigate("SignUp")}
-          >
-            <Text className="text-center text-sm text-muted-foreground">Don't have an account? Sign up</Text>
-          </Pressable>
-        </View>
+    <KeyboardAvoidingView className="flex-1 bg-background">
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          flexGrow: 1,
+          justifyContent: "center",
+        }}
+      >
+        <Animated.View style={{ transform: [{ translateY: cardTranslateY }] }}>
+          <Box className="w-full max-w-sm self-center rounded-3xl bg-card p-6">
+            <VStack space="lg">
+              <Text size="2xl" bold className="text-center text-foreground">
+                Haven
+              </Text>
+
+              <FormControl>
+                <FormControlLabel>
+                  <FormControlLabelText className="text-sm text-muted-foreground">
+                    Email
+                  </FormControlLabelText>
+                </FormControlLabel>
+                <Input className="rounded-xl bg-card px-1 py-1">
+                  <InputField
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChangeText={setEmail}
+                  />
+                </Input>
+              </FormControl>
+
+              <FormControl>
+                <FormControlLabel>
+                  <FormControlLabelText className="text-sm text-muted-foreground">
+                    Password
+                  </FormControlLabelText>
+                </FormControlLabel>
+                <Input className="rounded-xl bg-card px-1 py-1">
+                  <InputField
+                    secureTextEntry
+                    placeholder="••••••••"
+                    value={password}
+                    onChangeText={setPassword}
+                  />
+                </Input>
+              </FormControl>
+
+              {error ? (
+                <Text size="sm" className="text-center text-destructive">
+                  {error}
+                </Text>
+              ) : null}
+
+              <Button
+                size="lg"
+                isDisabled={loading}
+                onPress={() => void onSubmit()}
+              >
+                {loading ? <ButtonSpinner /> : null}
+                <ButtonText>{loading ? "Signing in…" : "Sign in"}</ButtonText>
+              </Button>
+
+              <VStack space="sm">
+                <Pressable
+                  onPress={() => void navigation.navigate("PasswordRecovery")}
+                >
+                  <Text size="sm" className="text-center text-muted-foreground">
+                    Forgot password?
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => void navigation.navigate("SignUp")}>
+                  <Text size="sm" className="text-center text-muted-foreground">
+                    Don't have an account? Sign up
+                  </Text>
+                </Pressable>
+              </VStack>
+            </VStack>
+          </Box>
+        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

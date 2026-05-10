@@ -1,38 +1,39 @@
-import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getErrorMessage } from "@shared/platform/lib/errors";
 import {
   HAVEN_PRIVACY_URL,
   HAVEN_TERMS_URL,
   openPlatformExternalUrl,
 } from "@shared/platform/urls";
-import { useMemo, useState } from "react";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Easing, Keyboard, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signUpWithPassword } from "@/auth/mobileAuthService";
+import { Box } from "@/components/ui/box";
+import { Button, ButtonSpinner, ButtonText } from "@/components/ui/button";
+import {
+  FormControl,
+  FormControlLabel,
+  FormControlLabelText,
+} from "@/components/ui/form-control";
+import { HStack } from "@/components/ui/hstack";
+import { Input, InputField } from "@/components/ui/input";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard-avoiding-view";
+import { Pressable } from "@/components/ui/pressable";
+import { ScrollView } from "@/components/ui/scroll-view";
+import { Text } from "@/components/ui/text";
+import { VStack } from "@/components/ui/vstack";
 import type { RootStackParamList } from "@/navigation/types";
-import { resolveColorProp } from "@shared/themes";
-import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 
-const inputClassName =
-  "mb-4 rounded-lg border border-border bg-muted px-4 py-3 text-foreground";
+const KEYBOARD_CARD_LIFT = -128;
+const KEYBOARD_ANIMATION_MS = 220;
 
 export function SignUpScreen() {
-  const themeTokens = useMobileThemeTokens();
-  const placeholderMuted = useMemo(
-    () => resolveColorProp(themeTokens, "text-muted") ?? "#a9b8cf",
-    [themeTokens],
-  );
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const cardTranslateY = useRef(new Animated.Value(0)).current;
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -63,11 +64,36 @@ export function SignUpScreen() {
     }
   };
 
+  useEffect(() => {
+    const animateCard = (toValue: number, duration = KEYBOARD_ANIMATION_MS) => {
+      Animated.timing(cardTranslateY, {
+        toValue,
+        duration,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      animateCard(KEYBOARD_CARD_LIFT, event.duration);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
+      animateCard(0, event.duration);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [cardTranslateY]);
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-background"
-    >
+    <KeyboardAvoidingView className="flex-1 bg-background">
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
@@ -78,156 +104,201 @@ export function SignUpScreen() {
           justifyContent: "center",
         }}
       >
-        <View
-          className="w-full max-w-sm self-center rounded-3xl border border-border bg-card p-6 shadow-xl shadow-background/40"
-          style={Platform.OS === "android" ? { elevation: 8 } : undefined}
-        >
-          <Text className="mb-1 text-center text-2xl font-semibold text-foreground">
-            Haven
-          </Text>
-
-          {submitSuccess ? (
-            <>
-              <Text className="mb-6 text-center text-lg font-semibold text-foreground">
-                Check your email
-              </Text>
-              <Text className="mb-8 text-center text-sm leading-6 text-muted-foreground">
-                We sent a verification link to{" "}
-                <Text className="text-sm text-foreground">{email.trim()}</Text>. Open the email and
-                confirm your account before signing in.
-              </Text>
-              <Pressable
-                className="rounded-xl bg-primary py-4"
-                onPress={() => void navigation.navigate("Login")}
-              >
-                <Text className="text-center text-base font-semibold text-primary-foreground">
-                  Back to login
-                </Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <Text className="mb-8 text-center text-sm text-muted-foreground">
-                Create your account
+        <Animated.View style={{ transform: [{ translateY: cardTranslateY }] }}>
+          <Box className="w-full max-w-sm self-center rounded-3xl bg-card p-6">
+            <VStack space="lg">
+              <Text size="2xl" bold className="text-center text-foreground">
+                Haven
               </Text>
 
-              <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">
-                Username
-              </Text>
-              <TextInput
-                className={inputClassName}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="username"
-                placeholderTextColor={placeholderMuted}
-                value={username}
-                onChangeText={setUsername}
-              />
-
-              <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">
-                Email
-              </Text>
-              <TextInput
-                className={inputClassName}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                placeholder="email@address.com"
-                placeholderTextColor={placeholderMuted}
-                value={email}
-                onChangeText={setEmail}
-              />
-
-              <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">
-                Password
-              </Text>
-              <TextInput
-                className={inputClassName}
-                secureTextEntry
-                placeholder="••••••••"
-                placeholderTextColor={placeholderMuted}
-                value={password}
-                onChangeText={setPassword}
-              />
-
-              <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">
-                Confirm password
-              </Text>
-              <TextInput
-                className="mb-6 rounded-lg border border-border bg-muted px-4 py-3 text-foreground"
-                secureTextEntry
-                placeholder="••••••••"
-                placeholderTextColor={placeholderMuted}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-              />
-
-              <View className="mb-6 rounded-xl border border-border bg-muted p-4">
-                <View className="flex-row items-start gap-3">
-                  <Pressable
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: acceptedLegal }}
-                    hitSlop={8}
-                    onPress={() => setAcceptedLegal(!acceptedLegal)}
-                    className="pt-0.5"
-                  >
-                    <View
-                      className={`h-5 w-5 items-center justify-center rounded border-2 ${
-                        acceptedLegal ? "border-primary bg-primary" : "border-border bg-transparent"
-                      }`}
-                    >
-                      {acceptedLegal ? (
-                        <Text className="text-xs font-bold text-primary-foreground">✓</Text>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                  <Text className="min-w-0 flex-1 text-sm leading-5 text-muted-foreground">
-                    I agree to the{" "}
-                    <Text
-                      className="text-sm text-primary"
-                      onPress={() => void openPlatformExternalUrl(HAVEN_TERMS_URL)}
-                    >
-                      Terms of Service
-                    </Text>{" "}
-                    and{" "}
-                    <Text
-                      className="text-sm text-primary"
-                      onPress={() => void openPlatformExternalUrl(HAVEN_PRIVACY_URL)}
-                    >
-                      Privacy Policy
-                    </Text>
+              {submitSuccess ? (
+                <VStack space="lg">
+                  <Text size="lg" bold className="text-center text-foreground">
+                    Check your email
                   </Text>
-                </View>
-              </View>
+                  <Text size="sm" className="text-center text-muted-foreground">
+                    We sent a verification link to{" "}
+                    <Text size="sm" className="text-foreground">
+                      {email.trim()}
+                    </Text>
+                    . Open the email and confirm your account before signing in.
+                  </Text>
+                  <Button
+                    size="lg"
+                    onPress={() => void navigation.navigate("Login")}
+                  >
+                    <ButtonText>Back to login</ButtonText>
+                  </Button>
+                </VStack>
+              ) : (
+                <VStack space="lg">
+                  <Text size="sm" className="text-center text-muted-foreground">
+                    Create your account
+                  </Text>
 
-              {error ? (
-                <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
-              ) : null}
+                  <FormControl>
+                    <FormControlLabel>
+                      <FormControlLabelText className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Username
+                      </FormControlLabelText>
+                    </FormControlLabel>
+                    <Input className="rounded-xl bg-card px-1 py-1">
+                      <InputField
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        placeholder="username"
+                        value={username}
+                        onChangeText={setUsername}
+                      />
+                    </Input>
+                  </FormControl>
 
-              <Pressable
-                className={`mb-6 rounded-xl bg-primary py-4 ${loading ? "opacity-60" : ""}`}
-                disabled={loading}
-                onPress={() => void onSubmit()}
-              >
-                <Text className="text-center text-base font-semibold text-primary-foreground">
-                  {loading ? "Signing up…" : "Sign Up"}
-                </Text>
-              </Pressable>
+                  <FormControl>
+                    <FormControlLabel>
+                      <FormControlLabelText className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Email
+                      </FormControlLabelText>
+                    </FormControlLabel>
+                    <Input className="rounded-xl bg-card px-1 py-1">
+                      <InputField
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="email-address"
+                        placeholder="email@address.com"
+                        value={email}
+                        onChangeText={setEmail}
+                      />
+                    </Input>
+                  </FormControl>
 
-              <View className="flex-row flex-wrap items-center justify-center gap-x-1">
-                <Text className="text-center text-sm text-muted-foreground">
-                  Already have an account?
-                </Text>
-                <Pressable
-                  onPress={() => void navigation.navigate("Login")}
-                  hitSlop={8}
-                >
-                  <Text className="text-center text-sm text-primary">Sign in</Text>
-                </Pressable>
-              </View>
-            </>
-          )}
-        </View>
+                  <FormControl>
+                    <FormControlLabel>
+                      <FormControlLabelText className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Password
+                      </FormControlLabelText>
+                    </FormControlLabel>
+                    <Input className="rounded-xl bg-card px-1 py-1">
+                      <InputField
+                        secureTextEntry
+                        placeholder="••••••••"
+                        value={password}
+                        onChangeText={setPassword}
+                      />
+                    </Input>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormControlLabel>
+                      <FormControlLabelText className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Confirm password
+                      </FormControlLabelText>
+                    </FormControlLabel>
+                    <Input className="rounded-xl bg-card px-1 py-1">
+                      <InputField
+                        secureTextEntry
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                      />
+                    </Input>
+                  </FormControl>
+
+                  <Box className="rounded-xl border border-border bg-muted p-4">
+                    <HStack space="sm" className="items-start">
+                      <Pressable
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: acceptedLegal }}
+                        hitSlop={8}
+                        onPress={() => setAcceptedLegal(!acceptedLegal)}
+                        className="pt-0.5"
+                      >
+                        <Box
+                          className={`h-5 w-5 items-center justify-center rounded border-2 ${
+                            acceptedLegal
+                              ? "border-primary bg-primary"
+                              : "border-border bg-transparent"
+                          }`}
+                        >
+                          {acceptedLegal ? (
+                            <Text
+                              size="xs"
+                              bold
+                              className="text-primary-foreground"
+                            >
+                              ✓
+                            </Text>
+                          ) : null}
+                        </Box>
+                      </Pressable>
+                      <Text
+                        size="sm"
+                        className="min-w-0 flex-1 text-muted-foreground"
+                      >
+                        I agree to the{" "}
+                        <Text
+                          size="sm"
+                          className="text-primary"
+                          onPress={() =>
+                            void openPlatformExternalUrl(HAVEN_TERMS_URL)
+                          }
+                        >
+                          Terms of Service
+                        </Text>{" "}
+                        and{" "}
+                        <Text
+                          size="sm"
+                          className="text-primary"
+                          onPress={() =>
+                            void openPlatformExternalUrl(HAVEN_PRIVACY_URL)
+                          }
+                        >
+                          Privacy Policy
+                        </Text>
+                      </Text>
+                    </HStack>
+                  </Box>
+
+                  {error ? (
+                    <Text size="sm" className="text-center text-destructive">
+                      {error}
+                    </Text>
+                  ) : null}
+
+                  <Button
+                    size="lg"
+                    isDisabled={loading}
+                    onPress={() => void onSubmit()}
+                  >
+                    {loading ? <ButtonSpinner /> : null}
+                    <ButtonText>
+                      {loading ? "Signing up…" : "Sign Up"}
+                    </ButtonText>
+                  </Button>
+
+                  <HStack
+                    space="xs"
+                    className="flex-wrap items-center justify-center"
+                  >
+                    <Text
+                      size="sm"
+                      className="text-center text-muted-foreground"
+                    >
+                      Already have an account?
+                    </Text>
+                    <Pressable
+                      onPress={() => void navigation.navigate("Login")}
+                      hitSlop={8}
+                    >
+                      <Text size="sm" className="text-center text-primary">
+                        Sign in
+                      </Text>
+                    </Pressable>
+                  </HStack>
+                </VStack>
+              )}
+            </VStack>
+          </Box>
+        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
