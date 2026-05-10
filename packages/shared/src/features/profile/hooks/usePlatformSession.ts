@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ControlPlaneBackend } from '@shared/lib/backend/controlPlaneBackend';
+import { getTheme } from '@shared/themes/registry';
 
 type UsePlatformSessionInput = {
   controlPlaneBackend: Pick<ControlPlaneBackend, 'fetchUserProfile' | 'fetchPlatformStaff'>;
@@ -14,20 +15,29 @@ export function usePlatformSession({
 }: UsePlatformSessionInput) {
   const [profileUsername, setProfileUsername] = React.useState('');
   const [profileAvatarUrl, setProfileAvatarUrl] = React.useState<string | null>(null);
+  /** `null` while the authenticated user's profile row has not finished loading yet. */
+  const [profileThemeId, setProfileThemeId] = React.useState<string | null>(null);
   const [isPlatformStaff, setIsPlatformStaff] = React.useState(false);
   const [platformStaffPrefix, setPlatformStaffPrefix] = React.useState<string | null>(null);
 
   const resetPlatformSession = React.useCallback(() => {
     setProfileUsername('');
     setProfileAvatarUrl(null);
+    setProfileThemeId(null);
     setIsPlatformStaff(false);
     setPlatformStaffPrefix(null);
   }, []);
 
-  const applyLocalProfileUpdate = React.useCallback((values: { username: string; avatarUrl: string | null }) => {
-    setProfileUsername(values.username);
-    setProfileAvatarUrl(values.avatarUrl);
-  }, []);
+  const applyLocalProfileUpdate = React.useCallback(
+    (values: { username: string; avatarUrl: string | null; theme?: string }) => {
+      setProfileUsername(values.username);
+      setProfileAvatarUrl(values.avatarUrl);
+      if (values.theme !== undefined) {
+        setProfileThemeId(getTheme(values.theme).id);
+      }
+    },
+    [],
+  );
 
   React.useEffect(() => {
     let isMounted = true;
@@ -53,10 +63,14 @@ export function usePlatformSession({
         console.error('Error loading profile:', profileResult.reason);
         setProfileUsername(fallbackUsername);
         setProfileAvatarUrl(null);
+        setProfileThemeId(getTheme('default').id);
       } else {
         const profile = profileResult.value;
         setProfileUsername(profile?.username ?? fallbackUsername);
         setProfileAvatarUrl(profile?.avatarUrl ?? null);
+        setProfileThemeId(
+          profile?.theme ? getTheme(profile.theme).id : getTheme('default').id,
+        );
       }
 
       if (staffResult.status === 'rejected') {
@@ -82,6 +96,7 @@ export function usePlatformSession({
     state: {
       profileUsername,
       profileAvatarUrl,
+      profileThemeId,
       isPlatformStaff,
       platformStaffPrefix,
     },

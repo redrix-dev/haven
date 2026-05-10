@@ -6,12 +6,13 @@ import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppRoot } from '@shared/app/AppRoot';
 import '@shared/styles/globals.css';
+import { applyShellThemeTokens, setShellThemeApplier } from '@shared/app/shellThemeRegistry';
+import { readSessionStoredThemeId } from '@shared/themes/sessionThemeStorage';
+import { getTheme } from '@shared/themes/registry';
 import { applyThemeWeb } from './lib/theme';
-import { getTheme, resolveSemanticEntries } from '@shared/themes';
 
-
-console.log(resolveSemanticEntries(getTheme('halloween').tokens));
-applyThemeWeb(getTheme('winter').tokens);
+setShellThemeApplier(applyThemeWeb);
+applyShellThemeTokens(getTheme(readSessionStoredThemeId() ?? 'default').tokens);
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;

@@ -41,6 +41,7 @@ import { useChatAppElevationEffects } from "@shared/app/chat-app/controllers/use
 import { useChatAppBusinessActions } from "@shared/app/chat-app/controllers/useChatAppBusinessActions";
 import { useChatAppConfirmationHandlers } from "@shared/app/chat-app/controllers/useChatAppConfirmationHandlers";
 import { useChatAppLifecycleEffects } from "@shared/app/chat-app/controllers/useChatAppLifecycleEffects";
+import { useShellThemeSync } from "@shared/app/hooks/useShellThemeSync";
 
 export function useChatAppOrchestration() {
   const serverNameByIdRef = useRef<Record<string, string>>({});
@@ -88,6 +89,7 @@ export function useChatAppOrchestration() {
 
   // ── Feature flags ─────────────────────────────────────────────────────────
   const {
+    state: { featureFlags, featureFlagsLoaded },
     derived: { hasFeatureFlag },
     actions: { resetFeatureFlags },
   } = useFeatureFlags({ controlPlaneBackend, userId: user?.id });
@@ -102,7 +104,7 @@ export function useChatAppOrchestration() {
     hasFeatureFlag("rich_markdown_composer") || hasFeatureFlag("rich_composer");
   // ── Platform session ──────────────────────────────────────────────────────
   const {
-    state: { profileUsername, profileAvatarUrl, isPlatformStaff },
+    state: { profileUsername, profileAvatarUrl, profileThemeId, isPlatformStaff },
     actions: { resetPlatformSession, applyLocalProfileUpdate },
   } = usePlatformSession({
     controlPlaneBackend,
@@ -583,6 +585,7 @@ export function useChatAppOrchestration() {
     saveMemberChannelPermissions,
     resolveBanEligibleServers,
     saveAccountSettings,
+    saveThemePreference,
   } = useChatAppBusinessActions({
     user,
     currentServerId,
@@ -596,6 +599,8 @@ export function useChatAppOrchestration() {
     applyChannelAccessRevokedContentVisibility,
     applyLocalProfileUpdate,
     upsertLiveProfile,
+    profileUsername,
+    profileAvatarUrl,
   });
 
   // ── Deep links ────────────────────────────────────────────────────────────
@@ -662,6 +667,13 @@ export function useChatAppOrchestration() {
     prefetchChannelMessages,
   });
 
+  useShellThemeSync({
+    profileThemeId,
+    featureFlags,
+    featureFlagsLoaded,
+    userId: user?.id,
+  });
+
   // ── Return ────────────────────────────────────────────────────────────────
   return {
     // auth
@@ -681,6 +693,7 @@ export function useChatAppOrchestration() {
     // session / profile
     profileUsername,
     profileAvatarUrl,
+    profileThemeId,
     isPlatformStaff,
     userDisplayName,
     baseUserDisplayName,
@@ -691,6 +704,8 @@ export function useChatAppOrchestration() {
     setRainbowMode,
     // feature flags
     hasFeatureFlag,
+    featureFlags,
+    featureFlagsLoaded,
     dmWorkspaceIsActive,
     serverModmailEnabled,
     voiceHardwareDebugPanelEnabled,
@@ -879,6 +894,7 @@ export function useChatAppOrchestration() {
     kickUserFromServer,
     resolveBanEligibleServers,
     saveAccountSettings,
+    saveThemePreference,
     // cache helpers
     getDefaultChannelIdForServer,
     // misc

@@ -1,7 +1,5 @@
 import React from "react";
 import type { User } from "@supabase/supabase-js";
-import { useChatAppOrchestration } from "@shared/app/hooks/useChatAppOrchestration";
-import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
 import { AuthChatModals } from "@shared/features/auth/components/AuthChatModals";
 import { NotificationModalsHost } from "@shared/features/notifications/components/NotificationModalsHost";
 import { SocialChatModals } from "@shared/features/social/components/SocialChatModals";
@@ -11,8 +9,10 @@ import { VoiceChatModals } from "@shared/features/voice/components/VoiceChatModa
 import { CommunityChatModals } from "@shared/features/community/components/CommunityChatModals";
 import { ChatAppShellDialogs } from "@shared/app/chat-app/modals/ChatAppShellDialogs";
 import { useChatAppModalUiState } from "@shared/app/chat-app/modals/useChatAppModalUiState";
+import type { ChatAppOrchestrationApi } from "@shared/app/hooks/useChatAppOrchestration";
+import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
 
-type ChatAppController = ReturnType<typeof useChatAppOrchestration>;
+type ChatAppController = ChatAppOrchestrationApi;
 type VoiceSessionApi = ReturnType<typeof useVoiceSessionController>;
 
 export type ChatAppModalLayerProps = {
