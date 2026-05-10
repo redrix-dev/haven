@@ -1,8 +1,8 @@
 {
   "folders": [
     {
-      "path": ".",
-    },
+      "path": "."
+    }
   ],
   "settings": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -12,10 +12,18 @@
     },
     "typescript.tsdk": "node_modules/typescript/lib",
     "tailwindCSS.experimental.configFile": {
-      "apps/mobile/**": "apps/mobile/tailwind.config.js",
-      "apps/web/**": "../../packages/web-client/tailwind.config.js",
-      "apps/electron/**": "../../packages/electron/tailwind.config.js",
-    },
-  },
+      "apps/mobile/global.css": [
+        "apps/mobile/**/*.{js,jsx,ts,tsx}",
+        "apps/mobile/global.css"
+      ],
+      "packages/shared/src/styles/globals.css": [
+        "apps/web/src/**/*.{js,jsx,ts,tsx}",
+        "apps/electron/src/**/*.{js,jsx,ts,tsx}",
+        "packages/shared/src/**/*.{js,jsx,ts,tsx}",
+        "packages/web-client/src/**/*.{js,jsx,ts,tsx}",
+        "packages/shared/src/styles/globals.css"
+      ]
+    }
+  }
 }
 
