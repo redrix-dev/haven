@@ -15,7 +15,7 @@ import { RootNavigator } from "./src/navigation/RootNavigator";
 import { applyMobileTheme } from "./src/lib/theme";
 import { loadPersistedThemeId } from "./src/storage/mobileThemePreferenceStorage";
 import { useMobileThemePreferenceStore } from "./src/stores/mobileThemePreferenceStore";
-import { GluestackUIProvider } from "./components/ui/gluestack-ui-provider";
+import { GluestackUIProvider } from "./src/components/ui/gluestack-ui-provider";
 
 registerMobileAppHost();
 
