@@ -718,97 +718,54 @@ const mapMessageLinkPreviewRowsWithSignedUrls = async (
 };
 
 export const centralCommunityDataBackend: CommunityDataBackend = {
-  async fetchServerPermissions(communityId) {
-    const [
-      { data: isOwner },
-      { data: canManageServer },
-      { data: canManageRoles },
-      { data: canManageMembers },
-      { data: canCreateChannels },
-      { data: canManageChannelStructure },
-      { data: canManageChannelPermissions },
-      { data: canManageMessages },
-      { data: canManageBans },
-      { data: canViewBanHidden },
-      { data: canCreateReports },
-      { data: canManageReports },
-      { data: canRefreshLinkPreviews },
-      { data: canManageInvites },
-    ] = await Promise.all([
-      havenCommunitySb().rpc('is_community_owner', { p_community_id: communityId }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'manage_server',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'manage_roles',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'manage_members',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'create_channels',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'manage_channels',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'manage_channel_permissions',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'manage_messages',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'manage_bans',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'can_view_ban_hidden',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'create_reports',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'manage_reports',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'refresh_link_previews',
-      }),
-      havenCommunitySb().rpc('user_has_permission', {
-        p_community_id: communityId,
-        p_permission_key: 'manage_invites',
-      }),
-    ]);
+  async getMyPermissions(communityId) {
+    const allFalse: ServerPermissions & { isElevated: boolean } = {
+      isOwner: false,
+      canManageServer: false,
+      canManageRoles: false,
+      canManageMembers: false,
+      canCreateChannels: false,
+      canManageChannelStructure: false,
+      canManageChannelPermissions: false,
+      canManageMessages: false,
+      canManageBans: false,
+      canViewBanHidden: false,
+      canCreateReports: false,
+      canManageReports: false,
+      canRefreshLinkPreviews: false,
+      canManageInvites: false,
+      isElevated: false,
+    };
 
-    const owner = Boolean(isOwner);
-    const manageChannelStructure = owner || Boolean(canManageChannelStructure);
-    const manageChannelPermissions = owner || Boolean(canManageChannelPermissions);
+    const { data, error } = await havenCommunitySb().rpc(
+      'get_my_community_permissions' as never,
+      { p_community_id: communityId } as never,
+    );
+
+    if (error) return allFalse;
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row == null || typeof row !== 'object') return allFalse;
+
+    const r = row as Record<string, unknown>;
+    const bool = (key: string) => Boolean(r[key]);
 
     return {
-      isOwner: owner,
-      canManageServer: owner || Boolean(canManageServer),
-      canManageRoles: owner || Boolean(canManageRoles),
-      canManageMembers: owner || Boolean(canManageMembers),
-      canCreateChannels: owner || Boolean(canCreateChannels) || manageChannelStructure,
-      canManageChannelStructure: manageChannelStructure,
-      canManageChannelPermissions: manageChannelPermissions,
-      canManageMessages: owner || Boolean(canManageMessages),
-      canManageBans: owner || Boolean(canManageBans),
-      canViewBanHidden: owner || Boolean(canViewBanHidden),
-      canCreateReports: owner || Boolean(canCreateReports),
-      canManageReports: owner || Boolean(canManageReports),
-      canRefreshLinkPreviews: owner || Boolean(canRefreshLinkPreviews),
-      canManageInvites: owner || Boolean(canManageInvites),
+      isOwner: bool('is_owner'),
+      canManageServer: bool('can_manage_server'),
+      canManageRoles: bool('can_manage_roles'),
+      canManageMembers: bool('can_manage_members'),
+      canCreateChannels: bool('can_create_channels'),
+      canManageChannelStructure: bool('can_manage_channel_structure'),
+      canManageChannelPermissions: bool('can_manage_channel_permissions'),
+      canManageMessages: bool('can_manage_messages'),
+      canManageBans: bool('can_manage_bans'),
+      canViewBanHidden: bool('can_view_ban_hidden'),
+      canCreateReports: bool('can_create_reports'),
+      canManageReports: bool('can_manage_reports'),
+      canRefreshLinkPreviews: bool('can_refresh_link_previews'),
+      canManageInvites: bool('can_manage_invites'),
+      isElevated: bool('is_elevated'),
     };
   },
 

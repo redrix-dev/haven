@@ -41,7 +41,9 @@ export type MessagePageResult = {
 };
 
 export interface CommunityDataBackend {
-  fetchServerPermissions(communityId: string): Promise<ServerPermissions>;
+  getMyPermissions(
+    communityId: string,
+  ): Promise<ServerPermissions & { isElevated: boolean }>;
   listCommunityMembers(communityId: string): Promise<CommunityMemberListItem[]>;
   reportUserProfile(input: {
     communityId: string;
@@ -83,7 +85,7 @@ export interface CommunityDataBackend {
     userId: string,
   ): Promise<{ memberId: string; roleIds: string[] } | null>;
   /**
-   * Subscribe to postgres changes that affect `fetchServerPermissions` for this member:
+   * Subscribe to postgres changes that affect `getMyPermissions` for this member:
    * `member_roles` (assignments), `role_permissions` (definitions for assigned roles),
    * and `community_members` (e.g. `is_owner`).
    */
