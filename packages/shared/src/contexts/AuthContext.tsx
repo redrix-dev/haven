@@ -7,6 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
+import { getControlPlaneBackend } from "@shared/lib/backend";
 
 const havenAuthClient = () => requireHavenDataRuntime().client;
 import { getAppHost } from "@shared/platform/appHost";
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
     useState(false);
   const processedAuthConfirmUrlsRef = useRef<Set<string>>(new Set());
+  const privateUserChannelUnsubscribeRef = useRef<(() => void) | null>(null);
 
   const consumeAuthConfirmUrl = useCallback(
     async (url: string): Promise<boolean> => {
@@ -188,10 +190,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (event === "SIGNED_OUT") {
         setPasswordRecoveryRequired(false);
       }
+
+      if (event === "SIGNED_OUT") {
+        privateUserChannelUnsubscribeRef.current?.();
+        privateUserChannelUnsubscribeRef.current = null;
+      } else if (
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "INITIAL_SESSION"
+      ) {
+        privateUserChannelUnsubscribeRef.current?.();
+        privateUserChannelUnsubscribeRef.current = null;
+        const userId = session?.user?.id;
+        if (userId) {
+          privateUserChannelUnsubscribeRef.current =
+            getControlPlaneBackend().subscribeToPrivateUserChannel(
+              userId,
+              (evt) => {
+                console.log(
+                  "[private_user_channel]",
+                  evt.type,
+                  evt.payload,
+                );
+              },
+            );
+        }
+      }
     });
 
     return () => {
       isMounted = false;
+      privateUserChannelUnsubscribeRef.current?.();
+      privateUserChannelUnsubscribeRef.current = null;
       subscription.unsubscribe();
     };
   }, []);
