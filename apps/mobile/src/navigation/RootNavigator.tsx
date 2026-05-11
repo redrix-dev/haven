@@ -23,10 +23,17 @@ import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesCon
 import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
 
-
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const Tab = createHavenTabNavigator();
+const USE_UX_LAB = __DEV__ && true;
+
+function resolveMainComponent() {
+  if (!USE_UX_LAB) return MainTabs;
+  const { UxLabNavigator } =
+    require("@/dev/ux-lab/UxLabNavigator") as typeof import("@/dev/ux-lab/UxLabNavigator");
+  return UxLabNavigator;
+}
 
 function MainTabs() {
   const session = useAuthSession();
@@ -46,7 +53,7 @@ function MainTabs() {
     <MobileNotificationsProvider userId={userId}>
       <MobileSocialWorkspaceProvider userId={userId}>
         <MobileDirectMessagesProvider userId={userId}>
-          <Tab.Navigator screenOptions={{ detachInactiveScreens: false}}>
+          <Tab.Navigator screenOptions={{ detachInactiveScreens: false }}>
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Community" component={CommunityScreen} />
           </Tab.Navigator>
@@ -61,7 +68,8 @@ export function RootNavigator() {
   useMobileExpoPushRegistration(session);
   useMobileVoipFoundation(session);
   useServersRealtimeBootstrap(session);
-  const [passwordRecoveryRequired, setPasswordRecoveryRequired] = useState(false);
+  const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
+    useState(false);
   const url = Linking.useURL();
   const processedAuthConfirmUrlsRef = useRef<Set<string>>(new Set());
 
@@ -134,7 +142,9 @@ export function RootNavigator() {
       clearPasswordRecoveryGate={() => setPasswordRecoveryRequired(false)}
     >
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade" }}>
+        <Stack.Navigator
+          screenOptions={{ headerShown: false, animation: "fade" }}
+        >
           {session ? (
             <>
               {passwordRecoveryRequired ? (
@@ -147,7 +157,7 @@ export function RootNavigator() {
                 <>
                   <Stack.Screen
                     name="Main"
-                    component={MainTabs}
+                    component={resolveMainComponent()}
                     options={{ keyboardHandlingEnabled: false }}
                   />
                 </>

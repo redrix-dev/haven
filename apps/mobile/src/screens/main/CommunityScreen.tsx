@@ -490,7 +490,11 @@ export function CommunityScreen() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
 return (
-  <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
+  <SafeAreaView
+    edges={["bottom"]}
+    className="flex-1 bg-background"
+    style={{ flex: 1 }}
+  >
     <CommunityChannelBar
       communityName={community?.name ?? "Community"}
       selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
