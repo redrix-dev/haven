@@ -8,6 +8,8 @@ import React, {
 } from "react";
 import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
 import { getControlPlaneBackend } from "@shared/lib/backend";
+import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
+import { usePermissionsStore } from "@shared/stores/permissionsStore";
 
 const havenAuthClient = () => requireHavenDataRuntime().client;
 import { getAppHost } from "@shared/platform/appHost";
@@ -207,6 +209,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             getControlPlaneBackend().subscribeToPrivateUserChannel(
               userId,
               (evt) => {
+                if (evt.type === "ROLE_CHANGE") {
+                  const communityId = evt.payload.community_id;
+                  if (
+                    typeof communityId !== "string" ||
+                    communityId.trim().length === 0
+                  ) {
+                    return;
+                  }
+                  usePermissionsStore
+                    .getState()
+                    .invalidateElevatedForServer(communityId);
+                  void hydrateCommunityPermissions(communityId);
+                  return;
+                }
                 console.log(
                   "[private_user_channel]",
                   evt.type,
