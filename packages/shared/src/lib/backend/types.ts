@@ -93,6 +93,24 @@ export type MessageLinkPreview = {
   updatedAt: string;
 };
 
+/** Row shape from `list_channel_messages` after mapping DB snake_case → camelCase. */
+export type MessageBundle = {
+  id: string;
+  authorUserId: string | null;
+  displayName: string;
+  avatarSnapshotUrl: string | null;
+  content: string;
+  metadata: Record<string, unknown>;
+  replyToMessageId: string | null;
+  createdAt: string;
+  editedAt: string | null;
+  deletedAt: string | null;
+  isHidden: boolean;
+  reactions: MessageReaction[];
+  attachment: MessageAttachment | null;
+  linkPreview: MessageLinkPreview | null;
+};
+
 export type FeatureFlagKey = string;
 export type FeatureFlagsSnapshot = Record<FeatureFlagKey, boolean>;
 

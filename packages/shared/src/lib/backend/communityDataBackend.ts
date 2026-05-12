@@ -3,10 +3,8 @@ import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient'
 import type { Database } from '@shared/types/database';
 import type { MessageObjectStore } from "./messageObjectStore";
 import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
-import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from "./mediaAttachmentUtils";
 import { createPortableUuid } from "../runtime/uuid";
 import type {
-  AuthorProfile,
   BanCommunityMemberResult,
   BanEligibleServer,
   Channel,
@@ -44,6 +42,7 @@ import type {
   LinkPreviewStatus,
   LinkPreviewEmbedProvider,
   KickCommunityMemberResult,
+  MessageBundle,
 } from './types';
 import type {
   CommunityDataBackend,
@@ -116,6 +115,47 @@ function havenCommunityStore(): MessageObjectStore {
 const MESSAGE_MEDIA_BUCKET = 'message-media';
 const LINK_PREVIEW_IMAGE_BUCKET = 'link-preview-images';
 
+const deriveMessageMediaKindFromMimeType = (mimeType: string): 'image' | 'video' | 'file' => {
+  const base = mimeType.toLowerCase().split(';')[0]?.trim() ?? '';
+  if (base.startsWith('image/')) return 'image';
+  if (base.startsWith('video/')) return 'video';
+  return 'file';
+};
+
+const deriveMessageMediaStorageExtension = (mimeType: string, filename?: string): string => {
+  const trimmedName = filename?.trim();
+  if (trimmedName && trimmedName.includes('.')) {
+    const ext = trimmedName.slice(trimmedName.lastIndexOf('.'));
+    if (ext.length >= 2 && ext.length <= 12) {
+      return ext.startsWith('.') ? ext : `.${ext}`;
+    }
+  }
+  const base = mimeType.toLowerCase().split(';')[0]?.trim() ?? '';
+  const mimeMap: Record<string, string> = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'video/mp4': '.mp4',
+    'video/webm': '.webm',
+    'application/pdf': '.pdf',
+  };
+  return mimeMap[base] ?? '.bin';
+};
+
+const buildMessageMediaObjectPath = (input: {
+  communityId: string;
+  channelId: string;
+  mimeType: string;
+  filename?: string;
+}): string => {
+  const ext = deriveMessageMediaStorageExtension(input.mimeType, input.filename);
+  const stamp = Date.now();
+  const random = createPortableUuid();
+  return `${input.communityId}/${input.channelId}/${stamp}-${random}${ext}`;
+};
+
 type MessageReactionRow = {
   id: string;
   message_id: string;
@@ -184,12 +224,6 @@ type ListCommunityBansRpcRow = {
   revoked_at?: unknown;
   revoked_by_user_id?: unknown;
   revoked_reason?: unknown;
-  username?: unknown;
-  avatar_url?: unknown;
-};
-
-type MessageAuthorProfileRpcRow = {
-  id?: unknown;
   username?: unknown;
   avatar_url?: unknown;
 };
@@ -588,22 +622,6 @@ const waitForConfirmedSupabaseSession = async (timeoutMs = 4000): Promise<boolea
   return false;
 };
 
-const uploadMessageMediaToObjectStore = async (input: {
-  communityId: string;
-  channelId: string;
-  mediaUpload?: {
-    body: Blob | ArrayBuffer;
-    filename?: string;
-    expiresInHours?: number;
-    contentType?: string;
-  };
-}) =>
-  havenCommunityMediaHelpers().uploadMediaToObjectStore({
-    bucketName: MESSAGE_MEDIA_BUCKET,
-    objectPathPrefix: `${input.communityId}/${input.channelId}`,
-    mediaUpload: input.mediaUpload,
-  });
-
 const mapMessageReactionRows = (rows: MessageReactionRow[]): MessageReaction[] =>
   rows.map((row) => ({
     id: row.id,
@@ -612,6 +630,152 @@ const mapMessageReactionRows = (rows: MessageReactionRow[]): MessageReaction[] =
     emoji: row.emoji,
     createdAt: row.created_at,
   }));
+
+const normalizeMessageMetadata = (value: unknown): Record<string, unknown> => {
+  const record = asObjectRecord(value);
+  return record ?? {};
+};
+
+const normalizeReactionsFromRpc = (value: unknown): MessageReaction[] => {
+  if (value == null || !Array.isArray(value)) return [];
+  const out: MessageReaction[] = [];
+  for (const item of value) {
+    const r = asObjectRecord(item);
+    if (!r) continue;
+    const id = typeof r.id === 'string' ? r.id : null;
+    const messageId = typeof r.message_id === 'string' ? r.message_id : null;
+    const userId = typeof r.user_id === 'string' ? r.user_id : null;
+    const emoji = typeof r.emoji === 'string' ? r.emoji : null;
+    const createdAt = typeof r.created_at === 'string' ? r.created_at : null;
+    if (!id || !messageId || !userId || !emoji || !createdAt) continue;
+    out.push({ id, messageId, userId, emoji, createdAt });
+  }
+  return out;
+};
+
+const parseMessageAttachmentRowFromRpcJson = (value: unknown): MessageAttachmentRow | null => {
+  const r = asObjectRecord(value);
+  if (!r) return null;
+  const id = typeof r.id === 'string' ? r.id : null;
+  const message_id = typeof r.message_id === 'string' ? r.message_id : null;
+  const community_id = typeof r.community_id === 'string' ? r.community_id : null;
+  const channel_id = typeof r.channel_id === 'string' ? r.channel_id : null;
+  const owner_user_id = typeof r.owner_user_id === 'string' ? r.owner_user_id : null;
+  const bucket_name = typeof r.bucket_name === 'string' ? r.bucket_name : null;
+  const object_path = typeof r.object_path === 'string' ? r.object_path : null;
+  const mime_type = typeof r.mime_type === 'string' ? r.mime_type : null;
+  const media_kind = r.media_kind;
+  const size_bytes = typeof r.size_bytes === 'number' ? r.size_bytes : null;
+  const created_at = typeof r.created_at === 'string' ? r.created_at : null;
+  const expires_at = typeof r.expires_at === 'string' ? r.expires_at : null;
+  if (
+    !id ||
+    !message_id ||
+    !community_id ||
+    !channel_id ||
+    !owner_user_id ||
+    !bucket_name ||
+    !object_path ||
+    !mime_type ||
+    (media_kind !== 'image' && media_kind !== 'video' && media_kind !== 'file') ||
+    size_bytes == null ||
+    !created_at ||
+    !expires_at
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    message_id,
+    community_id,
+    channel_id,
+    owner_user_id,
+    bucket_name,
+    object_path,
+    original_filename:
+      r.original_filename === null || r.original_filename === undefined
+        ? null
+        : typeof r.original_filename === 'string'
+          ? r.original_filename
+          : null,
+    mime_type,
+    media_kind,
+    size_bytes,
+    created_at,
+    expires_at,
+  };
+};
+
+const parseMessageLinkPreviewRowFromRpcJson = (value: unknown): MessageLinkPreviewRow | null => {
+  const r = asObjectRecord(value);
+  if (!r) return null;
+  const id = typeof r.id === 'string' ? r.id : null;
+  const message_id = typeof r.message_id === 'string' ? r.message_id : null;
+  const community_id = typeof r.community_id === 'string' ? r.community_id : null;
+  const channel_id = typeof r.channel_id === 'string' ? r.channel_id : null;
+  const created_at = typeof r.created_at === 'string' ? r.created_at : null;
+  const updated_at = typeof r.updated_at === 'string' ? r.updated_at : null;
+  const status = r.status;
+  const embed_provider = r.embed_provider;
+  if (
+    !id ||
+    !message_id ||
+    !community_id ||
+    !channel_id ||
+    !created_at ||
+    !updated_at ||
+    (status !== 'pending' &&
+      status !== 'ready' &&
+      status !== 'unsupported' &&
+      status !== 'failed') ||
+    (embed_provider !== 'none' && embed_provider !== 'youtube' && embed_provider !== 'vimeo')
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    message_id,
+    community_id,
+    channel_id,
+    source_url:
+      r.source_url === null || r.source_url === undefined
+        ? null
+        : typeof r.source_url === 'string'
+          ? r.source_url
+          : null,
+    normalized_url:
+      r.normalized_url === null || r.normalized_url === undefined
+        ? null
+        : typeof r.normalized_url === 'string'
+          ? r.normalized_url
+          : null,
+    status,
+    cache_id:
+      r.cache_id === null || r.cache_id === undefined
+        ? null
+        : typeof r.cache_id === 'string'
+          ? r.cache_id
+          : null,
+    snapshot: r.snapshot,
+    embed_provider,
+    thumbnail_bucket_name:
+      r.thumbnail_bucket_name === null || r.thumbnail_bucket_name === undefined
+        ? null
+        : typeof r.thumbnail_bucket_name === 'string'
+          ? r.thumbnail_bucket_name
+          : null,
+    thumbnail_object_path:
+      r.thumbnail_object_path === null || r.thumbnail_object_path === undefined
+        ? null
+        : typeof r.thumbnail_object_path === 'string'
+          ? r.thumbnail_object_path
+          : null,
+    created_at,
+    updated_at,
+  };
+};
 
 const mapMessageAttachmentRowsWithSignedUrls = async (
   attachmentRows: MessageAttachmentRow[]
@@ -1305,44 +1469,80 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return data ?? [];
   },
 
-  async listMessagesPage({ communityId, channelId, beforeCursor, afterCursor, limit = 60 }) {
-    const boundedLimit = Number.isFinite(limit)
-      ? Math.min(Math.max(Math.floor(limit), 1), 100)
-      : 60;
-
-    let query = havenCommunitySb().from('messages')
-      .select('*')
-      .eq('community_id', communityId)
-      .eq('channel_id', channelId)
-      .is('deleted_at', null);
-
-    if (afterCursor?.createdAt && afterCursor?.id) {
-      if (beforeCursor?.createdAt && beforeCursor?.id) {
-        throw new Error('listMessagesPage: beforeCursor and afterCursor cannot both be set.');
-      }
-      query = query.or(
-        `created_at.gt.${afterCursor.createdAt},and(created_at.eq.${afterCursor.createdAt},id.gt.${afterCursor.id})`,
-      );
-    } else if (beforeCursor?.createdAt && beforeCursor?.id) {
-      query = query.or(
-        `created_at.lt.${beforeCursor.createdAt},and(created_at.eq.${beforeCursor.createdAt},id.lt.${beforeCursor.id})`
-      );
-    }
-
-    const { data, error } = await query
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-      .limit(boundedLimit + 1);
-
+  async listChannelMessages(input) {
+    const { communityId, channelId, beforeCreatedAt, beforeMessageId } = input;
+    const rpcLimit = input.limit ?? 50;
+    const { data, error } = await havenCommunitySb().rpc('list_channel_messages' as never, {
+      p_community_id: communityId,
+      p_channel_id: channelId,
+      p_limit: rpcLimit,
+      p_before_created_at: beforeCreatedAt ?? null,
+      p_before_message_id: beforeMessageId ?? null,
+    } as never);
     if (error) throw error;
 
-    const rows = (data ?? []) as Message[];
-    const hasMore = rows.length > boundedLimit;
-    const pageRows = hasMore ? rows.slice(0, boundedLimit) : rows;
+    const rows = (data ?? []) as Record<string, unknown>[];
+    const attachmentRows: MessageAttachmentRow[] = [];
+    const previewRows: MessageLinkPreviewRow[] = [];
+
+    for (const row of rows) {
+      const att = parseMessageAttachmentRowFromRpcJson(row.attachment);
+      if (att) attachmentRows.push(att);
+      const prev = parseMessageLinkPreviewRowFromRpcJson(row.link_preview);
+      if (prev) previewRows.push(prev);
+    }
+
+    const signedAttachments = await mapMessageAttachmentRowsWithSignedUrls(attachmentRows);
+    const signedPreviews = await mapMessageLinkPreviewRowsWithSignedUrls(previewRows);
+    const attByMessageId = new Map(signedAttachments.map((a) => [a.messageId, a]));
+    const previewByMessageId = new Map(signedPreviews.map((p) => [p.messageId, p]));
+
+    const messages: MessageBundle[] = rows.map((row) => {
+      const id = asOptionalString(row.id);
+      if (!id) {
+        throw new Error('list_channel_messages returned a row without id');
+      }
+
+      return {
+        id,
+        authorUserId:
+          row.author_user_id === null || row.author_user_id === undefined
+            ? null
+            : String(row.author_user_id),
+        displayName: typeof row.display_name === 'string' ? row.display_name : '',
+        avatarSnapshotUrl:
+          row.avatar_snapshot_url === null || row.avatar_snapshot_url === undefined
+            ? null
+            : asOptionalString(row.avatar_snapshot_url),
+        content: typeof row.content === 'string' ? row.content : '',
+        metadata: normalizeMessageMetadata(row.metadata),
+        replyToMessageId:
+          row.reply_to_message_id === null || row.reply_to_message_id === undefined
+            ? null
+            : String(row.reply_to_message_id),
+        createdAt: typeof row.created_at === 'string' ? row.created_at : '',
+        editedAt:
+          row.edited_at === null || row.edited_at === undefined
+            ? null
+            : typeof row.edited_at === 'string'
+              ? row.edited_at
+              : null,
+        deletedAt:
+          row.deleted_at === null || row.deleted_at === undefined
+            ? null
+            : typeof row.deleted_at === 'string'
+              ? row.deleted_at
+              : null,
+        isHidden: Boolean(row.is_hidden),
+        reactions: normalizeReactionsFromRpc(row.reactions),
+        attachment: attByMessageId.get(id) ?? null,
+        linkPreview: previewByMessageId.get(id) ?? null,
+      };
+    });
 
     return {
-      messages: [...pageRows].reverse(),
-      hasMore,
+      messages,
+      hasMore: rows.length === (input.limit ?? 50),
     };
   },
 
@@ -1397,32 +1597,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
 
     return mapMessageReactionRows((data ?? []) as MessageReactionRow[]);
-  },
-
-  async listMessageReactionsForMessages({ communityId, channelId, messageIds }) {
-    const uniqueMessageIds = Array.from(new Set(messageIds.filter(Boolean)));
-    if (uniqueMessageIds.length === 0) return [];
-
-    const chunkSize = 200;
-    const chunks: string[][] = [];
-    for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
-      chunks.push(uniqueMessageIds.slice(index, index + chunkSize));
-    }
-
-    const chunkResults = await Promise.all(
-      chunks.map(async (chunk) => {
-        const { data, error } = await havenCommunitySb().from('message_reactions' as never)
-          .select('id, message_id, user_id, emoji, created_at')
-          .eq('community_id', communityId)
-          .eq('channel_id', channelId)
-          .in('message_id', chunk as never)
-          .order('created_at', { ascending: true });
-        if (error) throw error;
-        return (data ?? []) as MessageReactionRow[];
-      })
-    );
-
-    return mapMessageReactionRows(chunkResults.flat());
   },
 
   subscribeToMessageReactions(channelId, onChange) {
@@ -1539,37 +1713,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return await mapMessageAttachmentRowsWithSignedUrls((data ?? []) as MessageAttachmentRow[]);
   },
 
-  async listMessageAttachmentsForMessages({ communityId, channelId, messageIds }) {
-    const uniqueMessageIds = Array.from(new Set(messageIds.filter(Boolean)));
-    if (uniqueMessageIds.length === 0) return [];
-
-    const nowIso = new Date().toISOString();
-    const chunkSize = 200;
-    const chunks: string[][] = [];
-    for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
-      chunks.push(uniqueMessageIds.slice(index, index + chunkSize));
-    }
-
-    const chunkResults = await Promise.all(
-      chunks.map(async (chunk) => {
-        const { data, error } = await havenCommunitySb().from('message_attachments' as never)
-          .select(
-            'id, message_id, community_id, channel_id, owner_user_id, bucket_name, object_path, original_filename, mime_type, media_kind, size_bytes, created_at, expires_at'
-          )
-          .eq('community_id', communityId)
-          .eq('channel_id', channelId)
-          .in('message_id', chunk as never)
-          .gt('expires_at', nowIso)
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
-        return (data ?? []) as MessageAttachmentRow[];
-      })
-    );
-
-    return await mapMessageAttachmentRowsWithSignedUrls(chunkResults.flat());
-  },
-
   subscribeToMessageAttachments(channelId, onChange) {
     return havenCommunitySb().channel(`message_attachments:${channelId}`)
       .on(
@@ -1634,35 +1777,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
 
     return await mapMessageLinkPreviewRowsWithSignedUrls((data ?? []) as MessageLinkPreviewRow[]);
-  },
-
-  async listMessageLinkPreviewsForMessages({ communityId, channelId, messageIds }) {
-    const uniqueMessageIds = Array.from(new Set(messageIds.filter(Boolean)));
-    if (uniqueMessageIds.length === 0) return [];
-
-    const chunkSize = 200;
-    const chunks: string[][] = [];
-    for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
-      chunks.push(uniqueMessageIds.slice(index, index + chunkSize));
-    }
-
-    const chunkResults = await Promise.all(
-      chunks.map(async (chunk) => {
-        const { data, error } = await havenCommunitySb().from('message_link_previews' as never)
-          .select(
-            'id, message_id, community_id, channel_id, source_url, normalized_url, status, cache_id, snapshot, embed_provider, thumbnail_bucket_name, thumbnail_object_path, created_at, updated_at'
-          )
-          .eq('community_id', communityId)
-          .eq('channel_id', channelId)
-          .in('message_id', chunk as never)
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
-        return (data ?? []) as MessageLinkPreviewRow[];
-      })
-    );
-
-    return await mapMessageLinkPreviewRowsWithSignedUrls(chunkResults.flat());
   },
 
   subscribeToMessageLinkPreviews(channelId, onChange) {
@@ -1754,85 +1868,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       maxExpiredMessages: boundedLimit,
       maxDeletionJobs: boundedLimit,
     });
-  },
-
-  async fetchAuthorProfiles(communityId, authorIds) {
-    if (authorIds.length === 0) return {};
-
-    const profileMap: Record<string, AuthorProfile> = {};
-    for (const authorId of authorIds) {
-      profileMap[authorId] = {
-        username: 'Unknown User',
-        isPlatformStaff: false,
-        displayPrefix: null,
-        avatarUrl: null,
-      };
-    }
-
-    const { data: profileRows, error: profileRowsError } = await havenCommunitySb().rpc(
-      'get_message_author_profiles',
-      {
-        p_author_user_ids: authorIds,
-        p_community_id: communityId,
-      }
-    );
-    if (profileRowsError) throw profileRowsError;
-
-    const tombstonedUserIds = new Set<string>();
-    for (const row of (profileRows ?? []) as MessageAuthorProfileRpcRow[]) {
-      const profileId = typeof row.id === 'string' ? row.id : null;
-      if (!profileId) continue;
-
-      const username =
-        typeof row.username === 'string' && row.username.trim().length > 0
-          ? row.username
-          : 'Unknown User';
-      const avatarUrl =
-        typeof row.avatar_url === 'string' && row.avatar_url.trim().length > 0
-          ? row.avatar_url
-          : null;
-      const isTombstone =
-        username === 'Banned User' || (username === 'Unknown User' && avatarUrl === null);
-
-      if (isTombstone) {
-        tombstonedUserIds.add(profileId);
-      }
-
-      profileMap[profileId] = {
-        username,
-        isPlatformStaff: false,
-        displayPrefix: null,
-        avatarUrl,
-      };
-    }
-
-    const staffCandidateIds = authorIds.filter((authorId) => !tombstonedUserIds.has(authorId));
-    if (staffCandidateIds.length === 0) {
-      return profileMap;
-    }
-
-    const { data: activeStaffRows, error: staffError } = await havenCommunitySb().from('platform_staff')
-      .select('user_id, display_prefix')
-      .in('user_id', staffCandidateIds)
-      .eq('is_active', true);
-    if (staffError) throw staffError;
-
-    for (const staffRow of activeStaffRows ?? []) {
-      const existing = profileMap[staffRow.user_id] ?? {
-        username: 'Unknown User',
-        isPlatformStaff: false,
-        displayPrefix: null,
-        avatarUrl: null,
-      };
-
-      profileMap[staffRow.user_id] = {
-        ...existing,
-        isPlatformStaff: true,
-        displayPrefix: staffRow.display_prefix ?? null,
-      };
-    }
-
-    return profileMap;
   },
 
   async isElevatedInServer(communityId) {
@@ -2469,71 +2504,80 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
-  async sendUserMessage({ communityId, channelId, userId, content, replyToMessageId, mediaUpload }) {
-    const trimmedContent = content.trim();
-    const hasMediaUpload = Boolean(mediaUpload?.body);
-    if (!trimmedContent && !hasMediaUpload) {
-      throw new Error('Message content or media is required.');
+  async sendUserMessage({ communityId, channelId, content, replyToMessageId, metadata }) {
+    const { data, error } = await havenCommunitySb().rpc('send_user_message' as never, {
+      p_community_id: communityId,
+      p_channel_id: channelId,
+      p_content: content,
+      p_reply_to_message_id: replyToMessageId ?? null,
+      p_metadata: metadata ?? {},
+    } as never);
+    if (error) throw error;
+    if (data == null || typeof data !== 'string') {
+      throw new Error('send_user_message did not return a message id');
     }
+    return { id: data };
+  },
 
-    const uploadedMedia = await uploadMessageMediaToObjectStore({
-      communityId,
-      channelId,
-      mediaUpload: mediaUpload?.body
-        ? {
-            body: mediaUpload.body,
-            filename: mediaUpload.filename,
-            expiresInHours: mediaUpload.expiresInHours,
-            contentType: mediaUpload.contentType,
-          }
-        : undefined,
+  async uploadMessageMedia(input) {
+    const objectPath = buildMessageMediaObjectPath({
+      communityId: input.communityId,
+      channelId: input.channelId,
+      mimeType: input.mimeType,
+      filename: input.filename,
     });
+    const mediaKind = deriveMessageMediaKindFromMimeType(input.mimeType);
+    const sizeBytes =
+      typeof Blob !== 'undefined' && input.file instanceof Blob
+        ? input.file.size
+        : input.file instanceof ArrayBuffer
+          ? input.file.byteLength
+          : (input.file as ArrayBuffer).byteLength;
 
-    const nextMetadata = {
-      ...(replyToMessageId && replyToMessageId.trim().length > 0
-        ? { replyToMessageId: replyToMessageId.trim() }
-        : {}),
-      ...(uploadedMedia ? { hasAttachment: true } : {}),
+    const uploadContentType = input.contentType ?? input.mimeType;
+    const { error: uploadError } = await havenCommunitySb().storage
+      .from(MESSAGE_MEDIA_BUCKET)
+      .upload(objectPath, input.file, {
+        contentType: uploadContentType,
+        upsert: false,
+      });
+    if (uploadError) throw uploadError;
+
+    const expiresAt = new Date(
+      Date.now() + input.expiresInHours * 60 * 60 * 1000
+    ).toISOString();
+
+    return {
+      objectPath,
+      mimeType: input.mimeType,
+      sizeBytes,
+      mediaKind,
+      expiresAt,
     };
+  },
 
-    const { data: createdMessage, error: insertError } = await havenCommunitySb().from('messages')
-      .insert({
-        community_id: communityId,
-        channel_id: channelId,
-        author_type: 'user',
-        author_user_id: userId,
-        content: trimmedContent || MEDIA_ONLY_CONTENT_PLACEHOLDER,
-        metadata: nextMetadata,
-      })
-      .select('*')
-      .single();
-    if (insertError) {
-      await havenCommunityMediaHelpers().removeUploadedMediaObject(uploadedMedia);
-      throw insertError;
-    }
+  async insertMessageAttachment(input) {
+    const {
+      data: { user },
+      error: authError,
+    } = await havenCommunitySb().auth.getUser();
+    if (authError) throw authError;
+    if (!user?.id) throw new Error('Not authenticated.');
 
-    if (!uploadedMedia) return;
-
-    const { error: attachmentError } = await havenCommunitySb().from('message_attachments' as never)
-      .insert({
-        message_id: createdMessage.id,
-        community_id: communityId,
-        channel_id: channelId,
-        owner_user_id: userId,
-        bucket_name: uploadedMedia.bucketName,
-        object_path: uploadedMedia.objectPath,
-        original_filename: uploadedMedia.originalFilename,
-        mime_type: uploadedMedia.mimeType,
-        media_kind: uploadedMedia.mediaKind,
-        size_bytes: uploadedMedia.sizeBytes,
-        expires_at: uploadedMedia.expiresAt,
-      } as never);
-
-    if (!attachmentError) return;
-
-    await havenCommunityMediaHelpers().removeUploadedMediaObject(uploadedMedia);
-    await havenCommunitySb().from('messages').delete().eq('id', createdMessage.id);
-    throw attachmentError;
+    const { error } = await havenCommunitySb().from('message_attachments' as never).insert({
+      message_id: input.messageId,
+      community_id: input.communityId,
+      channel_id: input.channelId,
+      owner_user_id: user.id,
+      bucket_name: MESSAGE_MEDIA_BUCKET,
+      object_path: input.objectPath,
+      original_filename: input.filename ?? null,
+      mime_type: input.mimeType,
+      media_kind: input.mediaKind,
+      size_bytes: input.sizeBytes,
+      expires_at: input.expiresAt,
+    } as never);
+    if (error) throw error;
   },
 
   async editUserMessage({ communityId, messageId, content }) {
@@ -2547,39 +2591,57 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
-  async deleteMessage({ communityId, messageId }) {
-    // Storage objects must be removed through the Storage API, not direct SQL.
-    const { data: attachmentRows, error: attachmentRowsError } = await havenCommunitySb().from('message_attachments' as never)
-      .select('bucket_name, object_path')
-      .eq('community_id', communityId)
-      .eq('message_id', messageId);
-    if (attachmentRowsError) throw attachmentRowsError;
+  async deleteMessage(input: { communityId: string; messageId: string } | { messageId: string }) {
+    if ('communityId' in input && typeof input.communityId === 'string') {
+      const { communityId, messageId } = input;
+      // Storage objects must be removed through the Storage API, not direct SQL.
+      const { data: attachmentRows, error: attachmentRowsError } = await havenCommunitySb().from('message_attachments' as never)
+        .select('bucket_name, object_path')
+        .eq('community_id', communityId)
+        .eq('message_id', messageId);
+      if (attachmentRowsError) throw attachmentRowsError;
 
-    const attachmentPathsByBucket = new Map<string, string[]>();
-    for (const attachmentRow of (attachmentRows ?? []) as MessageAttachmentStorageRow[]) {
-      const existingPaths = attachmentPathsByBucket.get(attachmentRow.bucket_name) ?? [];
-      existingPaths.push(attachmentRow.object_path);
-      attachmentPathsByBucket.set(attachmentRow.bucket_name, existingPaths);
-    }
-
-    for (const [bucketName, paths] of attachmentPathsByBucket.entries()) {
-      if (paths.length === 0) continue;
-
-      try {
-        await havenCommunityStore().removeObjects(bucketName, paths);
-      } catch (removeError) {
-        console.warn('Failed to remove message attachment objects before message delete:', {
-          messageId,
-          bucketName,
-          removeError,
-        });
+      const attachmentPathsByBucket = new Map<string, string[]>();
+      for (const attachmentRow of (attachmentRows ?? []) as MessageAttachmentStorageRow[]) {
+        const existingPaths = attachmentPathsByBucket.get(attachmentRow.bucket_name) ?? [];
+        existingPaths.push(attachmentRow.object_path);
+        attachmentPathsByBucket.set(attachmentRow.bucket_name, existingPaths);
       }
+
+      for (const [bucketName, paths] of attachmentPathsByBucket.entries()) {
+        if (paths.length === 0) continue;
+
+        try {
+          await havenCommunityStore().removeObjects(bucketName, paths);
+        } catch (removeError) {
+          console.warn('Failed to remove message attachment objects before message delete:', {
+            messageId,
+            bucketName,
+            removeError,
+          });
+        }
+      }
+
+      const { error } = await havenCommunitySb().from('messages')
+        .delete()
+        .eq('community_id', communityId)
+        .eq('id', messageId);
+      if (error) throw error;
+      return;
     }
+
+    const { messageId } = input;
+    const {
+      data: { user },
+      error: authError,
+    } = await havenCommunitySb().auth.getUser();
+    if (authError) throw authError;
+    if (!user?.id) throw new Error('Not authenticated.');
 
     const { error } = await havenCommunitySb().from('messages')
       .delete()
-      .eq('community_id', communityId)
-      .eq('id', messageId);
+      .eq('id', messageId)
+      .eq('author_user_id', user.id);
     if (error) throw error;
   },
 

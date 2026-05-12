@@ -1,29 +1,21 @@
 import React, { useRef } from "react";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import { CHANNEL_BUNDLE_STALE_MS, MESSAGE_PAGE_SIZE } from "@shared/app/constants";
-import type { ChannelMessageBundleCacheEntry } from "@shared/app/types/types";
+import type { ChannelMessageBundleSyncMetadata } from "@shared/app/types/types";
 import {
   applyChannelAccessVisibilityToMessageBundle,
   filterBlockedUserContent,
 } from "@shared/features/messaging/lib/banVisibility";
-import { getReplyToMessageId } from "@shared/features/messaging/components/message-list/messageListContentUtils";
 import {
-  compareMessagesAsc,
-  computeNewestMessageCursor,
-  mergeAttachmentsById,
-  mergeLinkPreviewsById,
-  mergeMessagesById,
-  mergeReactionsById,
   messageReloadReasonsRequireFullLoad,
   parseMessageReloadReasons,
 } from "@shared/features/messaging/lib/mergeMessageBundle";
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useSocialStore } from "@shared/stores/socialStore";
 import type {
-  AuthorProfile,
-  Channel,
   Message,
   MessageAttachment,
+  MessageBundle,
   MessageLinkPreview,
   MessageReaction,
   MessageReportKind,
@@ -36,20 +28,22 @@ import { getAppHost } from "@shared/platform/appHost";
 
 const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000;
 
+type CachedChannelBundles = {
+  bundles: MessageBundle[];
+  hasOlderMessages: boolean;
+  syncMetadata?: ChannelMessageBundleSyncMetadata;
+};
+
 /**
- * Message bundle + revocation + author caches shared across all `useMessages`
+ * Message bundle + revocation caches shared across all `useMessages`
  * hook instances so navigation that unmounts the host screen (e.g. mobile Home
  * ↔ Community) does not discard warm channel data.
  */
-const crossSessionMessageBundleByChannel: Record<
-  string,
-  ChannelMessageBundleCacheEntry
-> = Object.create(null);
+const crossSessionMessageBundleByChannel: Record<string, CachedChannelBundles> =
+  Object.create(null);
 const crossSessionRevokedUserIdsByChannel: Record<string, string[]> =
   Object.create(null);
 const crossSessionLoadedRevokedUserIdsByChannel: Record<string, boolean> =
-  Object.create(null);
-const crossSessionAuthorProfileCache: Record<string, AuthorProfile> =
   Object.create(null);
 
 /** Clears cross-session caches; call on sign-out or account switch. */
@@ -62,9 +56,6 @@ export function clearCrossSessionMessagingCaches(): void {
   }
   for (const key of Object.keys(crossSessionLoadedRevokedUserIdsByChannel)) {
     delete crossSessionLoadedRevokedUserIdsByChannel[key];
-  }
-  for (const key of Object.keys(crossSessionAuthorProfileCache)) {
-    delete crossSessionAuthorProfileCache[key];
   }
 }
 
@@ -104,6 +95,153 @@ const getRealtimeNewRow = (payload: unknown): Record<string, unknown> | null =>
 const getRealtimeOldRow = (payload: unknown): Record<string, unknown> | null =>
   asRecord(asRecord(payload)?.old);
 
+const compareMessageBundlesAsc = (
+  left: MessageBundle,
+  right: MessageBundle,
+): number => {
+  if (left.createdAt < right.createdAt) return -1;
+  if (left.createdAt > right.createdAt) return 1;
+  if (left.id < right.id) return -1;
+  if (left.id > right.id) return 1;
+  return 0;
+};
+
+const computeNewestMessageBundleCursor = (
+  bundles: MessageBundle[],
+): { createdAt: string; id: string } | null => {
+  if (bundles.length === 0) return null;
+  const last = bundles[bundles.length - 1];
+  return { createdAt: last.createdAt, id: last.id };
+};
+
+const mergeBundlesById = (
+  existing: MessageBundle[],
+  incoming: MessageBundle[],
+): MessageBundle[] => {
+  const byId = new Map<string, MessageBundle>();
+  for (const b of existing) {
+    byId.set(b.id, b);
+  }
+  for (const b of incoming) {
+    byId.set(b.id, b);
+  }
+  return Array.from(byId.values()).sort(compareMessageBundlesAsc);
+};
+
+type BanShape = {
+  messages: Message[];
+  reactions: MessageReaction[];
+  attachments: MessageAttachment[];
+  linkPreviews: MessageLinkPreview[];
+};
+
+const bundleToMessage = (
+  bundle: MessageBundle,
+  communityId: string,
+  channelId: string,
+): Message => {
+  const metadata: Record<string, unknown> = {
+    ...bundle.metadata,
+    ...(bundle.replyToMessageId
+      ? { replyToMessageId: bundle.replyToMessageId }
+      : {}),
+  };
+  return {
+    id: bundle.id,
+    community_id: communityId,
+    channel_id: channelId,
+    author_user_id: bundle.authorUserId,
+    content: bundle.content,
+    metadata: metadata as Message["metadata"],
+    created_at: bundle.createdAt,
+    edited_at: bundle.editedAt,
+    deleted_at: bundle.deletedAt,
+    is_hidden: bundle.isHidden,
+  } as Message;
+};
+
+const messageBundlesToBanShape = (
+  bundles: MessageBundle[],
+  communityId: string,
+  channelId: string,
+): BanShape => ({
+  messages: bundles.map((b) => bundleToMessage(b, communityId, channelId)),
+  reactions: bundles.flatMap((b) => b.reactions),
+  attachments: bundles.flatMap((b) => (b.attachment ? [b.attachment] : [])),
+  linkPreviews: bundles.flatMap((b) => (b.linkPreview ? [b.linkPreview] : [])),
+});
+
+const banShapeToBundles = (
+  filtered: BanShape,
+  originalsById: Map<string, MessageBundle>,
+): MessageBundle[] =>
+  filtered.messages.map((msg) => {
+    const orig = originalsById.get(msg.id);
+    const reactions = filtered.reactions.filter((r) => r.messageId === msg.id);
+    const atts = filtered.attachments.filter((a) => a.messageId === msg.id);
+    const attachment = atts.length > 0 ? atts[0] : null;
+    const lps = filtered.linkPreviews.filter((p) => p.messageId === msg.id);
+    const linkPreview = lps.length > 0 ? lps[0] : null;
+    const base =
+      orig ??
+      ({
+        id: msg.id,
+        authorUserId: msg.author_user_id,
+        displayName: "Unknown",
+        avatarSnapshotUrl: null,
+        content: msg.content,
+        metadata: (msg.metadata as Record<string, unknown>) ?? {},
+        replyToMessageId: null,
+        createdAt: msg.created_at,
+        editedAt: msg.edited_at ?? null,
+        deletedAt: msg.deleted_at ?? null,
+        isHidden: Boolean(msg.is_hidden),
+        reactions: [],
+        attachment: null,
+        linkPreview: null,
+      } satisfies MessageBundle);
+    return {
+      ...base,
+      authorUserId: msg.author_user_id,
+      content: msg.content,
+      metadata: (msg.metadata as Record<string, unknown>) ?? {},
+      editedAt: msg.edited_at ?? null,
+      deletedAt: msg.deleted_at ?? null,
+      isHidden: Boolean(msg.is_hidden),
+      reactions,
+      attachment,
+      linkPreview,
+    };
+  });
+
+const applyVisibilityToBundles = (
+  bundles: MessageBundle[],
+  input: {
+    communityId: string;
+    channelId: string;
+    revokedUserIds: string[];
+    blockedUserIds: ReadonlySet<string>;
+    isElevatedInServer: boolean;
+  },
+): MessageBundle[] => {
+  const originalsById = new Map(bundles.map((b) => [b.id, b]));
+  const shape = messageBundlesToBanShape(
+    bundles,
+    input.communityId,
+    input.channelId,
+  );
+  let next = applyChannelAccessVisibilityToMessageBundle(shape, {
+    channelId: input.channelId,
+    revokedUserIds: input.revokedUserIds,
+  });
+  next = filterBlockedUserContent(
+    next,
+    input.blockedUserIds,
+    input.isElevatedInServer,
+  );
+  return banShapeToBundles(next, originalsById);
+};
+
 const parseReactionFromRow = (
   row: Record<string, unknown> | null,
 ): MessageReaction | null => {
@@ -117,60 +255,142 @@ const parseReactionFromRow = (
   return { id, messageId, userId, emoji, createdAt };
 };
 
-type IncrementalMessageApplyInput = {
-  payload: unknown;
-  currentMessageList: Message[];
-  currentReactionList: MessageReaction[];
-  currentAttachmentList: MessageAttachment[];
-  currentLinkPreviewList: MessageLinkPreview[];
-  commitMessages: (nextMessages: Message[], reason: string) => void;
-  commitReactions: (nextReactions: MessageReaction[]) => void;
-  commitAttachments: (nextAttachments: MessageAttachment[]) => void;
-  commitLinkPreviews: (nextLinkPreviews: MessageLinkPreview[]) => void;
+const parseAttachmentFromRow = (
+  row: Record<string, unknown> | null,
+): MessageAttachment | null => {
+  if (!row) return null;
+  const id = getStringField(row, "id");
+  const messageId = getStringField(row, "message_id");
+  const communityId = getStringField(row, "community_id");
+  const channelId = getStringField(row, "channel_id");
+  const ownerUserId = getStringField(row, "owner_user_id");
+  const bucketName = getStringField(row, "bucket_name");
+  const objectPath = getStringField(row, "object_path");
+  const mimeType = getStringField(row, "mime_type");
+  const mediaKind = row.media_kind;
+  const sizeBytes = typeof row.size_bytes === "number" ? row.size_bytes : null;
+  const createdAt = getStringField(row, "created_at");
+  const expiresAt = getStringField(row, "expires_at");
+  if (
+    !id ||
+    !messageId ||
+    !communityId ||
+    !channelId ||
+    !ownerUserId ||
+    !bucketName ||
+    !objectPath ||
+    !mimeType ||
+    (mediaKind !== "image" && mediaKind !== "video" && mediaKind !== "file") ||
+    sizeBytes == null ||
+    !createdAt ||
+    !expiresAt
+  ) {
+    return null;
+  }
+  return {
+    id,
+    messageId,
+    communityId,
+    channelId,
+    ownerUserId,
+    bucketName,
+    objectPath,
+    originalFilename: getNullableStringField(row, "original_filename"),
+    mimeType,
+    mediaKind,
+    sizeBytes,
+    createdAt,
+    expiresAt,
+    signedUrl: null,
+  };
 };
 
-type IncrementalReactionApplyInput = {
-  payload: unknown;
-  currentMessageList: Message[];
-  currentReactionList: MessageReaction[];
-  commitReactions: (nextReactions: MessageReaction[]) => void;
+const parseLinkPreviewFromRow = (
+  row: Record<string, unknown> | null,
+): MessageLinkPreview | null => {
+  if (!row) return null;
+  const id = getStringField(row, "id");
+  const messageId = getStringField(row, "message_id");
+  const communityId = getStringField(row, "community_id");
+  const channelId = getStringField(row, "channel_id");
+  const createdAt = getStringField(row, "created_at");
+  const updatedAt = getStringField(row, "updated_at");
+  const status = row.status;
+  const embedProvider = row.embed_provider;
+  if (
+    !id ||
+    !messageId ||
+    !communityId ||
+    !channelId ||
+    !createdAt ||
+    !updatedAt ||
+    (status !== "pending" &&
+      status !== "ready" &&
+      status !== "unsupported" &&
+      status !== "failed") ||
+    (embedProvider !== "none" &&
+      embedProvider !== "youtube" &&
+      embedProvider !== "vimeo")
+  ) {
+    return null;
+  }
+  return {
+    id,
+    messageId,
+    communityId,
+    channelId,
+    sourceUrl: getNullableStringField(row, "source_url"),
+    normalizedUrl: getNullableStringField(row, "normalized_url"),
+    status,
+    cacheId: getNullableStringField(row, "cache_id"),
+    snapshot: null,
+    embedProvider,
+    thumbnailBucketName: getNullableStringField(row, "thumbnail_bucket_name"),
+    thumbnailObjectPath: getNullableStringField(row, "thumbnail_object_path"),
+    createdAt,
+    updatedAt,
+  };
 };
 
-type SubscribeToMessageRealtimeStreamsInput = {
-  onMessagePayload: (payload: unknown) => void;
-  onReactionPayload: (payload: unknown) => void;
-  onAttachmentPayload: (payload: unknown) => void;
-  onLinkPreviewPayload: (payload: unknown) => void;
+const rawMessageRowToBundle = (
+  row: Record<string, unknown>,
+  communityId: string,
+  channelId: string,
+): MessageBundle | null => {
+  const id = getStringField(row, "id");
+  if (!id) return null;
+  const replyCol = getNullableStringField(row, "reply_to_message_id");
+  const metadataBase = asRecord(row.metadata) ?? {};
+  const metadata: Record<string, unknown> = {
+    ...metadataBase,
+    ...(replyCol ? { replyToMessageId: replyCol } : {}),
+  };
+  return {
+    id,
+    authorUserId: getNullableStringField(row, "author_user_id"),
+    displayName:
+      typeof row.display_name === "string" && row.display_name.trim().length > 0
+        ? row.display_name
+        : "Unknown",
+    avatarSnapshotUrl: getNullableStringField(row, "avatar_snapshot_url"),
+    content: typeof row.content === "string" ? row.content : "",
+    metadata,
+    replyToMessageId: replyCol,
+    createdAt: getStringField(row, "created_at") ?? "",
+    editedAt: getNullableStringField(row, "edited_at"),
+    deletedAt: getNullableStringField(row, "deleted_at"),
+    isHidden: Boolean(row.is_hidden),
+    reactions: [],
+    attachment: null,
+    linkPreview: null,
+  };
 };
 
-type IncrementalRelatedRefreshQueuesInput = {
-  isMounted: () => boolean;
-  getCurrentMessageList: () => Message[];
-  getCurrentAttachmentList: () => MessageAttachment[];
-  getCurrentLinkPreviewList: () => MessageLinkPreview[];
-  commitAttachments: (nextAttachments: MessageAttachment[]) => void;
-  commitLinkPreviews: (nextLinkPreviews: MessageLinkPreview[]) => void;
-  onAttachmentRefreshFallback: (error: unknown) => void;
-  onLinkPreviewRefreshFallback: (error: unknown) => void;
-};
-
-type MessageReloadSchedulerInput = {
-  isMounted: () => boolean;
-  onLoadMessages: (reason: string) => Promise<void>;
-  onLogReload: (event: string, details?: Record<string, unknown>) => void;
-};
-
-type MessageReloadLifecycleInput = {
-  isMounted: () => boolean;
-  scheduleMessageReload: (reason: string, delayMs?: number) => void;
-  onLogReload: (event: string, details?: Record<string, unknown>) => void;
-  maintenanceBatchLimit?: number;
-  maintenanceIntervalMs?: number;
-};
-
-type MessageBundleControllerInput = {
-  isMounted: () => boolean;
-  onMessagesCommitted?: (reason: string, messageList: Message[]) => void;
+const coerceMediaExpiresInHours = (
+  value: number | undefined,
+): 1 | 24 | 168 | 720 => {
+  if (value === 1 || value === 24 || value === 168 || value === 720) return value;
+  return 24;
 };
 
 type UseMessagesInput = {
@@ -179,7 +399,7 @@ type UseMessagesInput = {
   currentUserId: string | null;
   isCurrentUserElevatedInServer: boolean;
   debugChannelReloads: boolean;
-  channels: Channel[];
+  channels: import("@shared/lib/backend/types").Channel[];
 };
 
 export function useMessages({
@@ -194,7 +414,6 @@ export function useMessages({
   const requestOlderMessagesRef = React.useRef<(() => Promise<void>) | null>(
     null,
   );
-  const authorProfileCacheRef = React.useRef(crossSessionAuthorProfileCache);
   const messageBundleByChannelCacheRef = React.useRef(
     crossSessionMessageBundleByChannel,
   );
@@ -205,10 +424,7 @@ export function useMessages({
     createdAt: string;
     id: string;
   } | null>(null);
-  const currentMessageListRef = React.useRef<Message[]>([]);
-  const currentReactionListRef = React.useRef<MessageReaction[]>([]);
-  const currentAttachmentListRef = React.useRef<MessageAttachment[]>([]);
-  const currentLinkPreviewListRef = React.useRef<MessageLinkPreview[]>([]);
+  const currentBundlesRef = React.useRef<MessageBundle[]>([]);
   const revokedUserIdsByChannelRef = React.useRef(
     crossSessionRevokedUserIdsByChannel,
   );
@@ -221,37 +437,12 @@ export function useMessages({
   const unsubscribeBlurListenerRef = useRef<(() => void) | null>(null);
   const lastFreshMessageLoadAtRef = React.useRef(0);
 
-  const setStoredMessages = React.useCallback((messages: Message[]) => {
-    useMessagesStore.getState().setMessages(messages);
+  const hasOlderMessages = useMessagesStore((s) => s.hasMore);
+  const isLoadingOlderMessages = useMessagesStore((s) => s.isLoading);
+
+  const setStoredMessages = React.useCallback((bundles: MessageBundle[]) => {
+    useMessagesStore.getState().setMessages(bundles);
   }, []);
-
-  const setStoredReactions = React.useCallback(
-    (reactions: MessageReaction[]) => {
-      useMessagesStore.getState().setReactions(reactions);
-    },
-    [],
-  );
-
-  const setStoredAttachments = React.useCallback(
-    (attachments: MessageAttachment[]) => {
-      useMessagesStore.getState().setAttachments(attachments);
-    },
-    [],
-  );
-
-  const setStoredLinkPreviews = React.useCallback(
-    (linkPreviews: MessageLinkPreview[]) => {
-      useMessagesStore.getState().setLinkPreviews(linkPreviews);
-    },
-    [],
-  );
-
-  const setStoredProfiles = React.useCallback(
-    (profiles: Record<string, AuthorProfile>) => {
-      useMessagesStore.getState().setProfiles(profiles);
-    },
-    [],
-  );
 
   const setStoredIsLoading = React.useCallback((isLoading: boolean) => {
     useMessagesStore.getState().setIsLoading(isLoading);
@@ -264,6 +455,13 @@ export function useMessages({
   const resetStoredMessages = React.useCallback(() => {
     useMessagesStore.getState().reset();
   }, []);
+
+  const updateMessageBundle = React.useCallback(
+    (id: string, updater: (bundle: MessageBundle) => MessageBundle) => {
+      useMessagesStore.getState().updateMessageBundle(id, updater);
+    },
+    [],
+  );
 
   const markMessagesFresh = React.useCallback(() => {
     lastFreshMessageLoadAtRef.current = Date.now();
@@ -283,28 +481,21 @@ export function useMessages({
 
   const getChannelRevocationCacheKey = getChannelBundleCacheKey;
 
-  const getCachedChannelBundle = React.useCallback(
-    (
-      communityId: string,
-      channelId: string,
-    ): ChannelMessageBundleCacheEntry | null => {
+  const getCachedChannelBundles = React.useCallback(
+    (communityId: string, channelId: string): CachedChannelBundles | null => {
       const cacheKey = getChannelBundleCacheKey(communityId, channelId);
       return messageBundleByChannelCacheRef.current[cacheKey] ?? null;
     },
     [getChannelBundleCacheKey],
   );
 
-  const cacheChannelBundle = React.useCallback(
-    (
-      communityId: string,
-      channelId: string,
-      bundle: ChannelMessageBundleCacheEntry,
-    ) => {
+  const cacheChannelBundles = React.useCallback(
+    (communityId: string, channelId: string, entry: CachedChannelBundles) => {
       const cacheKey = getChannelBundleCacheKey(communityId, channelId);
       const prev = messageBundleByChannelCacheRef.current[cacheKey];
-      const syncMetadata = bundle.syncMetadata ?? prev?.syncMetadata;
+      const syncMetadata = entry.syncMetadata ?? prev?.syncMetadata;
       messageBundleByChannelCacheRef.current[cacheKey] = {
-        ...bundle,
+        ...entry,
         syncMetadata,
       };
     },
@@ -396,82 +587,6 @@ export function useMessages({
     [cacheChannelRevokedUserIds, getCachedChannelRevokedUserIds],
   );
 
-  const applyChannelAccessVisibility = React.useCallback(
-    (input: {
-      communityId: string;
-      channelId: string;
-      messages: Message[];
-      reactions: MessageReaction[];
-      attachments: MessageAttachment[];
-      linkPreviews: MessageLinkPreview[];
-      revokedUserIds?: string[];
-    }) =>
-      applyChannelAccessVisibilityToMessageBundle(
-        {
-          messages: input.messages,
-          reactions: input.reactions,
-          attachments: input.attachments,
-          linkPreviews: input.linkPreviews,
-        },
-        {
-          channelId: input.channelId,
-          revokedUserIds:
-            input.revokedUserIds ??
-            getCachedChannelRevokedUserIds(
-              input.communityId,
-              input.channelId,
-            ) ??
-            [],
-        },
-      ),
-    [getCachedChannelRevokedUserIds],
-  );
-
-  const applyBlockVisibility = React.useCallback(
-    (input: {
-      messages: Message[];
-      reactions: MessageReaction[];
-      attachments: MessageAttachment[];
-      linkPreviews: MessageLinkPreview[];
-      blockedUserIds?: ReadonlySet<string>;
-      isElevatedInServer?: boolean;
-    }) =>
-      filterBlockedUserContent(
-        {
-          messages: input.messages,
-          reactions: input.reactions,
-          attachments: input.attachments,
-          linkPreviews: input.linkPreviews,
-        },
-        input.blockedUserIds ?? blockedUserIds,
-        input.isElevatedInServer ?? isCurrentUserElevatedInServer,
-      ),
-    [blockedUserIds, isCurrentUserElevatedInServer],
-  );
-
-  const applyCurrentChannelVisibility = React.useCallback(
-    (bundle: {
-      messages: Message[];
-      reactions: MessageReaction[];
-      attachments: MessageAttachment[];
-      linkPreviews: MessageLinkPreview[];
-    }) => {
-      if (!currentServerId || !currentChannelId) return bundle;
-      const moderationFilteredBundle = applyChannelAccessVisibility({
-        communityId: currentServerId,
-        channelId: currentChannelId,
-        ...bundle,
-      });
-      return applyBlockVisibility(moderationFilteredBundle);
-    },
-    [
-      applyBlockVisibility,
-      applyChannelAccessVisibility,
-      currentChannelId,
-      currentServerId,
-    ],
-  );
-
   const purgeMessageBundleCacheForServer = React.useCallback(
     (communityId: string) => {
       if (!communityId) return;
@@ -501,53 +616,23 @@ export function useMessages({
       if (messageBundleByChannelCacheRef.current[cacheKey]) return;
       try {
         const communityBackend = getCommunityDataBackend(serverId);
-        const page = await communityBackend.listMessagesPage({
+        const result = await communityBackend.listChannelMessages({
           communityId: serverId,
           channelId,
-          beforeCursor: null,
           limit: MESSAGE_PAGE_SIZE,
+          beforeCreatedAt: null,
+          beforeMessageId: null,
         });
-        const messages = page.messages;
-        const messageIds = messages.map((m) => m.id);
-        const [reactions, attachments, linkPreviews] =
-          messageIds.length > 0
-            ? await Promise.all([
-                communityBackend.listMessageReactionsForMessages({
-                  communityId: serverId,
-                  channelId,
-                  messageIds,
-                }),
-                communityBackend.listMessageAttachmentsForMessages({
-                  communityId: serverId,
-                  channelId,
-                  messageIds,
-                }),
-                communityBackend.listMessageLinkPreviewsForMessages({
-                  communityId: serverId,
-                  channelId,
-                  messageIds,
-                }),
-              ])
-            : [
-                [] as MessageReaction[],
-                [] as MessageAttachment[],
-                [] as MessageLinkPreview[],
-              ];
+        const asc = [...result.messages].reverse();
         const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(
           serverId,
           channelId,
         );
-        const moderationFilteredBundle = applyChannelAccessVisibility({
+        const filtered = applyVisibilityToBundles(asc, {
           communityId: serverId,
           channelId,
-          messages,
-          reactions,
-          attachments,
-          linkPreviews,
           revokedUserIds,
-        });
-        const filteredBundle = applyBlockVisibility({
-          ...moderationFilteredBundle,
+          blockedUserIds,
           isElevatedInServer:
             await usePermissionsStore
               .getState()
@@ -557,19 +642,13 @@ export function useMessages({
                 getCommunityDataBackend(serverId),
               ),
         });
-        // Only write if not already populated — avoid clobbering an active channel load
         if (!messageBundleByChannelCacheRef.current[cacheKey]) {
-          cacheChannelBundle(serverId, channelId, {
-            messages: filteredBundle.messages,
-            reactions: filteredBundle.reactions,
-            attachments: filteredBundle.attachments,
-            linkPreviews: filteredBundle.linkPreviews,
-            hasOlderMessages: page.hasMore,
+          cacheChannelBundles(serverId, channelId, {
+            bundles: filtered,
+            hasOlderMessages: result.hasMore,
             syncMetadata: {
               lastSuccessfulSyncAt: new Date().toISOString(),
-              newestMessageCursor: computeNewestMessageCursor(
-                filteredBundle.messages,
-              ),
+              newestMessageCursor: computeNewestMessageBundleCursor(filtered),
             },
           });
         }
@@ -578,9 +657,8 @@ export function useMessages({
       }
     },
     [
-      applyBlockVisibility,
-      applyChannelAccessVisibility,
-      cacheChannelBundle,
+      blockedUserIds,
+      cacheChannelBundles,
       currentUserId,
       ensureChannelRevokedUserIdsLoaded,
       getChannelBundleCacheKey,
@@ -614,19 +692,19 @@ export function useMessages({
     [],
   );
 
-  const syncOldestLoadedCursor = React.useCallback((messageList: Message[]) => {
+  const syncOldestLoadedCursor = React.useCallback((bundles: MessageBundle[]) => {
     oldestLoadedCursorRef.current =
-      messageList.length > 0
-        ? { createdAt: messageList[0].created_at, id: messageList[0].id }
+      bundles.length > 0
+        ? { createdAt: bundles[0].createdAt, id: bundles[0].id }
         : null;
   }, []);
 
   const syncLoadedMessageWindow = React.useCallback(
-    (messageList: Message[], hasOlder: boolean) => {
+    (bundles: MessageBundle[], hasOlder: boolean) => {
       currentHasOlderMessagesRef.current = hasOlder;
       oldestLoadedCursorRef.current =
-        messageList.length > 0
-          ? { createdAt: messageList[0].created_at, id: messageList[0].id }
+        bundles.length > 0
+          ? { createdAt: bundles[0].createdAt, id: bundles[0].id }
           : null;
       setStoredHasMore(hasOlder);
     },
@@ -646,7 +724,7 @@ export function useMessages({
       loadId: latestLoadIdRef.current,
       oldestLoadedCursor: oldestLoadedCursorRef.current,
     };
-  }, []);
+  }, [setStoredIsLoading]);
 
   const finishOlderMessagesLoad = React.useCallback(
     (options?: { updateUi?: boolean }) => {
@@ -658,9 +736,7 @@ export function useMessages({
   );
 
   const clearAuthorProfileCache = React.useCallback(() => {
-    for (const key of Object.keys(authorProfileCacheRef.current)) {
-      delete authorProfileCacheRef.current[key];
-    }
+    /* legacy no-op — profiles removed from message store */
   }, []);
 
   const resetMessageState = React.useCallback(() => {
@@ -669,13 +745,11 @@ export function useMessages({
     olderLoadInFlightRef.current = false;
     currentHasOlderMessagesRef.current = false;
     oldestLoadedCursorRef.current = null;
-    currentMessageListRef.current = [];
-    currentReactionListRef.current = [];
-    currentAttachmentListRef.current = [];
-    currentLinkPreviewListRef.current = [];
+    currentBundlesRef.current = [];
     lastFreshMessageLoadAtRef.current = 0;
     requestOlderMessagesRef.current = null;
   }, [resetStoredMessages]);
+
   const { setRainbowMode } = useUserStatusStore();
   const sendMessage = React.useCallback(
     async (
@@ -683,7 +757,6 @@ export function useMessages({
       options?: {
         replyToMessageId?: string;
         mediaFile?: Blob | File;
-        /** Mobile / Hermes: prefer ArrayBuffer + mediaContentType over Blob. */
         mediaArrayBuffer?: ArrayBuffer;
         mediaContentType?: string;
         mediaFilename?: string;
@@ -713,29 +786,49 @@ export function useMessages({
           : undefined) ??
         `upload-${Date.now()}`;
 
-      const mediaUpload =
-        hasBuffer
-          ? {
-              body: options.mediaArrayBuffer as ArrayBuffer,
-              filename: inferredMediaFilename,
-              expiresInHours: options.mediaExpiresInHours,
-              contentType: options.mediaContentType?.trim(),
-            }
-          : hasBlob
-            ? {
-                body: options.mediaFile as Blob,
-                filename: inferredMediaFilename,
-                expiresInHours: options.mediaExpiresInHours,
-              }
-            : undefined;
+      if (hasBlob || hasBuffer) {
+        const fileBody = hasBuffer
+          ? (options!.mediaArrayBuffer as ArrayBuffer)
+          : (options!.mediaFile as Blob);
+        const upload = await communityBackend.uploadMessageMedia({
+          communityId: currentServerId,
+          channelId: currentChannelId,
+          file: fileBody,
+          filename: inferredMediaFilename,
+          mimeType: options?.mediaContentType?.trim() ?? "application/octet-stream",
+          expiresInHours: coerceMediaExpiresInHours(options?.mediaExpiresInHours),
+          contentType: options?.mediaContentType?.trim(),
+        });
+        const { id } = await communityBackend.sendUserMessage({
+          communityId: currentServerId,
+          channelId: currentChannelId,
+          content,
+          replyToMessageId: options?.replyToMessageId ?? null,
+        });
+        try {
+          await communityBackend.insertMessageAttachment({
+            messageId: id,
+            communityId: currentServerId,
+            channelId: currentChannelId,
+            objectPath: upload.objectPath,
+            mimeType: upload.mimeType,
+            sizeBytes: upload.sizeBytes,
+            mediaKind: upload.mediaKind,
+            filename: inferredMediaFilename,
+            expiresAt: upload.expiresAt,
+          });
+        } catch {
+          await communityBackend.deleteMessage({ messageId: id });
+          throw;
+        }
+        return;
+      }
 
       await communityBackend.sendUserMessage({
         communityId: currentServerId,
         channelId: currentChannelId,
-        userId: currentUserId,
         content,
-        replyToMessageId: options?.replyToMessageId,
-        mediaUpload,
+        replyToMessageId: options?.replyToMessageId ?? null,
       });
     },
     [currentChannelId, currentServerId, currentUserId, setRainbowMode],
@@ -782,52 +875,28 @@ export function useMessages({
         communityId: currentServerId,
         messageId,
       });
-      const { messages, reactions, attachments, linkPreviews } =
-        useMessagesStore.getState();
-      const nextMessages = messages.filter(
-        (message) => message.id !== messageId,
-      );
-      const nextReactions = Object.values(reactions).filter(
-        (reaction) => reaction.messageId !== messageId,
-      );
-      const nextAttachments = Object.values(attachments).filter(
-        (attachment) => attachment.messageId !== messageId,
-      );
-      const nextLinkPreviews = Object.values(linkPreviews).filter(
-        (preview) => preview.messageId !== messageId,
-      );
-
-      currentMessageListRef.current = nextMessages;
-      currentReactionListRef.current = nextReactions;
-      currentAttachmentListRef.current = nextAttachments;
-      currentLinkPreviewListRef.current = nextLinkPreviews;
-      syncOldestLoadedCursor(nextMessages);
+      const next = useMessagesStore
+        .getState()
+        .messages.filter((b) => b.id !== messageId);
+      currentBundlesRef.current = next;
+      syncOldestLoadedCursor(next);
 
       if (currentChannelId) {
-        cacheChannelBundle(currentServerId, currentChannelId, {
-          messages: nextMessages,
-          reactions: nextReactions,
-          attachments: nextAttachments,
-          linkPreviews: nextLinkPreviews,
+        cacheChannelBundles(currentServerId, currentChannelId, {
+          bundles: next,
           hasOlderMessages: currentHasOlderMessagesRef.current,
         });
       }
 
-      setStoredMessages(nextMessages);
-      setStoredReactions(nextReactions);
-      setStoredAttachments(nextAttachments);
-      setStoredLinkPreviews(nextLinkPreviews);
+      setStoredMessages(next);
       markMessagesFresh();
     },
     [
-      cacheChannelBundle,
+      cacheChannelBundles,
       currentChannelId,
       currentServerId,
       markMessagesFresh,
-      setStoredAttachments,
-      setStoredLinkPreviews,
       setStoredMessages,
-      setStoredReactions,
       syncOldestLoadedCursor,
     ],
   );
@@ -881,157 +950,6 @@ export function useMessages({
     [channels, currentChannelId, currentServerId],
   );
 
-  const fetchLatestMessageWindow = React.useCallback(
-    async (targetCount: number) => {
-      if (!currentServerId || !currentChannelId) {
-        throw new Error("No channel selected.");
-      }
-
-      const communityBackend = getCommunityDataBackend(currentServerId);
-      const boundedTargetCount = Math.max(
-        Math.floor(targetCount),
-        MESSAGE_PAGE_SIZE,
-      );
-      let beforeCursor: { createdAt: string; id: string } | null = null;
-      let aggregatedMessages: Message[] = [];
-      let hasMore = false;
-
-      while (aggregatedMessages.length < boundedTargetCount) {
-        const remaining = boundedTargetCount - aggregatedMessages.length;
-        const page = await communityBackend.listMessagesPage({
-          communityId: currentServerId,
-          channelId: currentChannelId,
-          beforeCursor,
-          limit: Math.min(MESSAGE_PAGE_SIZE, remaining),
-        });
-
-        if (page.messages.length === 0) {
-          hasMore = false;
-          break;
-        }
-
-        aggregatedMessages = [...page.messages, ...aggregatedMessages];
-        hasMore = page.hasMore;
-
-        if (!page.hasMore) {
-          break;
-        }
-
-        const nextOldest = page.messages[0];
-        beforeCursor = nextOldest
-          ? { createdAt: nextOldest.created_at, id: nextOldest.id }
-          : null;
-        if (!beforeCursor) break;
-      }
-
-      return { messageList: aggregatedMessages, hasMore };
-    },
-    [currentChannelId, currentServerId],
-  );
-
-  const fetchMessagesPageBeforeCursor = React.useCallback(
-    async (
-      beforeCursor: { createdAt: string; id: string },
-      limit = MESSAGE_PAGE_SIZE,
-    ) => {
-      if (!currentServerId || !currentChannelId) {
-        throw new Error("No channel selected.");
-      }
-
-      const communityBackend = getCommunityDataBackend(currentServerId);
-      return communityBackend.listMessagesPage({
-        communityId: currentServerId,
-        channelId: currentChannelId,
-        beforeCursor,
-        limit: Math.max(1, Math.floor(limit)),
-      });
-    },
-    [currentChannelId, currentServerId],
-  );
-
-  const fetchRelatedForMessages = React.useCallback(
-    async (messageList: Message[]) => {
-      if (!currentServerId || !currentChannelId) {
-        throw new Error("No channel selected.");
-      }
-
-      const messageIds = messageList.map((message) => message.id);
-      if (messageIds.length === 0) {
-        return {
-          reactionList: [] as MessageReaction[],
-          attachmentList: [] as MessageAttachment[],
-          linkPreviewList: [] as MessageLinkPreview[],
-        };
-      }
-
-      const communityBackend = getCommunityDataBackend(currentServerId);
-      const [reactionList, attachmentList, linkPreviewList] = await Promise.all(
-        [
-          communityBackend.listMessageReactionsForMessages({
-            communityId: currentServerId,
-            channelId: currentChannelId,
-            messageIds,
-          }),
-          communityBackend.listMessageAttachmentsForMessages({
-            communityId: currentServerId,
-            channelId: currentChannelId,
-            messageIds,
-          }),
-          communityBackend.listMessageLinkPreviewsForMessages({
-            communityId: currentServerId,
-            channelId: currentChannelId,
-            messageIds,
-          }),
-        ],
-      );
-
-      return { reactionList, attachmentList, linkPreviewList };
-    },
-    [currentChannelId, currentServerId],
-  );
-
-  const fetchMessageAttachmentsForMessageIds = React.useCallback(
-    async (messageIds: string[]) => {
-      if (!currentServerId || !currentChannelId) {
-        throw new Error("No channel selected.");
-      }
-
-      const uniqueMessageIds = Array.from(new Set(messageIds.filter(Boolean)));
-      if (uniqueMessageIds.length === 0) {
-        return [] as MessageAttachment[];
-      }
-
-      const communityBackend = getCommunityDataBackend(currentServerId);
-      return communityBackend.listMessageAttachmentsForMessages({
-        communityId: currentServerId,
-        channelId: currentChannelId,
-        messageIds: uniqueMessageIds,
-      });
-    },
-    [currentChannelId, currentServerId],
-  );
-
-  const fetchMessageLinkPreviewsForMessageIds = React.useCallback(
-    async (messageIds: string[]) => {
-      if (!currentServerId || !currentChannelId) {
-        throw new Error("No channel selected.");
-      }
-
-      const uniqueMessageIds = Array.from(new Set(messageIds.filter(Boolean)));
-      if (uniqueMessageIds.length === 0) {
-        return [] as MessageLinkPreview[];
-      }
-
-      const communityBackend = getCommunityDataBackend(currentServerId);
-      return communityBackend.listMessageLinkPreviewsForMessages({
-        communityId: currentServerId,
-        channelId: currentChannelId,
-        messageIds: uniqueMessageIds,
-      });
-    },
-    [currentChannelId, currentServerId],
-  );
-
   const runMessageMediaMaintenance = React.useCallback(
     async (limit = 100) => {
       if (!currentServerId) {
@@ -1042,557 +960,6 @@ export function useMessages({
       return communityBackend.runMessageMediaMaintenance(limit);
     },
     [currentServerId],
-  );
-
-  const loadLatestMessagesWithRelated = React.useCallback(
-    async (currentMessageCount: number) => {
-      if (!currentServerId || !currentChannelId) {
-        throw new Error("No server selected.");
-      }
-
-      const loadId = createNextMessageLoadId();
-      const startedAt = Date.now();
-      const targetCount = Math.max(currentMessageCount, MESSAGE_PAGE_SIZE);
-      const { messageList, hasMore } =
-        await fetchLatestMessageWindow(targetCount);
-      const { reactionList, attachmentList, linkPreviewList } =
-        await fetchRelatedForMessages(messageList);
-      const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(
-        currentServerId,
-        currentChannelId,
-      );
-      const moderationFilteredBundle = applyChannelAccessVisibility({
-        communityId: currentServerId,
-        channelId: currentChannelId,
-        messages: messageList,
-        reactions: reactionList,
-        attachments: attachmentList,
-        linkPreviews: linkPreviewList,
-        revokedUserIds,
-      });
-      const filteredBundle = applyBlockVisibility({
-        ...moderationFilteredBundle,
-        isElevatedInServer:
-          await usePermissionsStore
-            .getState()
-            .ensureElevatedInServer(
-              currentServerId,
-              currentUserId,
-              getCommunityDataBackend(currentServerId),
-            ),
-      });
-
-      return {
-        loadId,
-        startedAt,
-        messageList: filteredBundle.messages,
-        reactionList: filteredBundle.reactions,
-        attachmentList: filteredBundle.attachments,
-        linkPreviewList: filteredBundle.linkPreviews,
-        hasOlder: hasMore,
-      };
-    },
-    [
-      applyBlockVisibility,
-      createNextMessageLoadId,
-      applyChannelAccessVisibility,
-      currentChannelId,
-      currentServerId,
-      currentUserId,
-      ensureChannelRevokedUserIdsLoaded,
-      fetchLatestMessageWindow,
-      fetchRelatedForMessages,
-    ],
-  );
-
-  const loadOlderMessagesWithRelated = React.useCallback(
-    async (currentMessageList: Message[]) => {
-      if (!currentServerId || !currentChannelId) {
-        throw new Error("No server selected.");
-      }
-
-      const olderLoad = tryBeginOlderMessagesLoad();
-      if (!olderLoad) {
-        return { kind: "skipped" as const };
-      }
-
-      const { loadId, oldestLoadedCursor } = olderLoad;
-      const startedAt = Date.now();
-
-      const page = await fetchMessagesPageBeforeCursor(
-        oldestLoadedCursor,
-        MESSAGE_PAGE_SIZE,
-      );
-
-      if (page.messages.length === 0) {
-        return {
-          kind: "no_more" as const,
-          loadId,
-          startedAt,
-          oldestLoadedCursor,
-        };
-      }
-
-      const existingIds = new Set(
-        currentMessageList.map((message) => message.id),
-      );
-      const prependMessages = page.messages.filter(
-        (message) => !existingIds.has(message.id),
-      );
-      const nextMessageList = [...prependMessages, ...currentMessageList];
-      const { reactionList, attachmentList, linkPreviewList } =
-        await fetchRelatedForMessages(nextMessageList);
-      const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(
-        currentServerId,
-        currentChannelId,
-      );
-      const moderationFilteredBundle = applyChannelAccessVisibility({
-        communityId: currentServerId,
-        channelId: currentChannelId,
-        messages: nextMessageList,
-        reactions: reactionList,
-        attachments: attachmentList,
-        linkPreviews: linkPreviewList,
-        revokedUserIds,
-      });
-      const filteredBundle = applyBlockVisibility({
-        ...moderationFilteredBundle,
-        isElevatedInServer:
-          await usePermissionsStore
-            .getState()
-            .ensureElevatedInServer(
-              currentServerId,
-              currentUserId,
-              getCommunityDataBackend(currentServerId),
-            ),
-      });
-
-      return {
-        kind: "loaded" as const,
-        loadId,
-        startedAt,
-        oldestLoadedCursor,
-        prependCount: prependMessages.length,
-        messageList: filteredBundle.messages,
-        reactionList: filteredBundle.reactions,
-        attachmentList: filteredBundle.attachments,
-        linkPreviewList: filteredBundle.linkPreviews,
-        hasOlder: page.hasMore,
-      };
-    },
-    [
-      applyBlockVisibility,
-      applyChannelAccessVisibility,
-      currentChannelId,
-      currentServerId,
-      currentUserId,
-      ensureChannelRevokedUserIdsLoaded,
-      fetchMessagesPageBeforeCursor,
-      fetchRelatedForMessages,
-      tryBeginOlderMessagesLoad,
-    ],
-  );
-
-  const getAffectedMessageIdFromRealtimePayload = React.useCallback(
-    (
-      payload: unknown,
-      currentRows: { id: string; messageId: string }[],
-    ): string | null => {
-      const nextRow = getRealtimeNewRow(payload);
-      const oldRow = getRealtimeOldRow(payload);
-      const directMessageId =
-        getStringField(nextRow, "message_id") ??
-        getStringField(oldRow, "message_id");
-      if (directMessageId) return directMessageId;
-
-      const rowId =
-        getStringField(nextRow, "id") ?? getStringField(oldRow, "id");
-      if (!rowId) return null;
-      return currentRows.find((row) => row.id === rowId)?.messageId ?? null;
-    },
-    [],
-  );
-
-  const applyIncrementalMessageRealtimePayload = React.useCallback(
-    ({
-      payload,
-      currentMessageList,
-      currentReactionList,
-      currentAttachmentList,
-      currentLinkPreviewList,
-      commitMessages,
-      commitReactions,
-      commitAttachments,
-      commitLinkPreviews,
-    }: IncrementalMessageApplyInput): boolean => {
-      const eventType = getRealtimeEventType(payload);
-      if (!eventType) return false;
-
-      const nextRow = getRealtimeNewRow(payload);
-      const oldRow = getRealtimeOldRow(payload);
-      const rowRecord = eventType === "DELETE" ? oldRow : nextRow;
-      const messageId = getStringField(rowRecord, "id");
-      if (!messageId) return false;
-
-      if (eventType === "DELETE") {
-        if (!currentMessageList.some((message) => message.id === messageId))
-          return true;
-        commitMessages(
-          currentMessageList.filter((message) => message.id !== messageId),
-          "messages_sub_delete",
-        );
-        commitReactions(
-          currentReactionList.filter(
-            (reaction) => reaction.messageId !== messageId,
-          ),
-        );
-        commitAttachments(
-          currentAttachmentList.filter(
-            (attachment) => attachment.messageId !== messageId,
-          ),
-        );
-        commitLinkPreviews(
-          currentLinkPreviewList.filter(
-            (preview) => preview.messageId !== messageId,
-          ),
-        );
-        return true;
-      }
-
-      const deletedAt = getNullableStringField(nextRow, "deleted_at");
-      if (deletedAt) {
-        if (!currentMessageList.some((message) => message.id === messageId))
-          return true;
-        commitMessages(
-          currentMessageList.filter((message) => message.id !== messageId),
-          "messages_sub_soft_delete",
-        );
-        commitReactions(
-          currentReactionList.filter(
-            (reaction) => reaction.messageId !== messageId,
-          ),
-        );
-        commitAttachments(
-          currentAttachmentList.filter(
-            (attachment) => attachment.messageId !== messageId,
-          ),
-        );
-        commitLinkPreviews(
-          currentLinkPreviewList.filter(
-            (preview) => preview.messageId !== messageId,
-          ),
-        );
-        return true;
-      }
-
-      if (!nextRow) return false;
-      const messageRow = nextRow as unknown as Message;
-      const existingIndex = currentMessageList.findIndex(
-        (message) => message.id === messageId,
-      );
-      const nextMessages = [...currentMessageList];
-      if (existingIndex >= 0) {
-        nextMessages[existingIndex] = messageRow;
-      } else {
-        nextMessages.push(messageRow);
-      }
-      nextMessages.sort(compareMessagesAsc);
-      const moderatedBundle = applyCurrentChannelVisibility({
-        messages: nextMessages,
-        reactions: currentReactionList,
-        attachments: currentAttachmentList,
-        linkPreviews: currentLinkPreviewList,
-      });
-      commitMessages(
-        moderatedBundle.messages,
-        existingIndex >= 0 ? "messages_sub_update" : "messages_sub_insert",
-      );
-      commitReactions(moderatedBundle.reactions);
-      commitAttachments(moderatedBundle.attachments);
-      commitLinkPreviews(moderatedBundle.linkPreviews);
-      return true;
-    },
-    [applyCurrentChannelVisibility],
-  );
-
-  const applyIncrementalReactionRealtimePayload = React.useCallback(
-    ({
-      payload,
-      currentMessageList,
-      currentReactionList,
-      commitReactions,
-    }: IncrementalReactionApplyInput) => {
-      const eventType = getRealtimeEventType(payload);
-      if (!eventType) return false;
-      const nextRow = getRealtimeNewRow(payload);
-      const oldRow = getRealtimeOldRow(payload);
-
-      if (eventType === "DELETE") {
-        const reactionId = getStringField(oldRow, "id");
-        if (!reactionId) return false;
-        if (!currentReactionList.some((reaction) => reaction.id === reactionId))
-          return true;
-        commitReactions(
-          currentReactionList.filter((reaction) => reaction.id !== reactionId),
-        );
-        return true;
-      }
-
-      const reactionRow = parseReactionFromRow(nextRow);
-      if (!reactionRow) return false;
-      if (
-        !currentMessageList.some(
-          (message) => message.id === reactionRow.messageId,
-        )
-      )
-        return true;
-
-      const existingIndex = currentReactionList.findIndex(
-        (reaction) => reaction.id === reactionRow.id,
-      );
-      const nextReactions = [...currentReactionList];
-      if (existingIndex >= 0) {
-        nextReactions[existingIndex] = reactionRow;
-      } else {
-        nextReactions.push(reactionRow);
-      }
-      nextReactions.sort((left, right) => {
-        if (left.createdAt < right.createdAt) return -1;
-        if (left.createdAt > right.createdAt) return 1;
-        if (left.id < right.id) return -1;
-        if (left.id > right.id) return 1;
-        return 0;
-      });
-      const moderatedBundle = applyCurrentChannelVisibility({
-        messages: currentMessageList,
-        reactions: nextReactions,
-        attachments: [] as MessageAttachment[],
-        linkPreviews: [] as MessageLinkPreview[],
-      });
-      commitReactions(moderatedBundle.reactions);
-      return true;
-    },
-    [applyCurrentChannelVisibility],
-  );
-
-  const subscribeToMessageRealtimeStreams = React.useCallback(
-    (input: SubscribeToMessageRealtimeStreamsInput) => {
-      if (!currentServerId || !currentChannelId) {
-        return () => {};
-      }
-
-      const communityBackend = getCommunityDataBackend(currentServerId);
-      const messageChannel = communityBackend.subscribeToMessages(
-        currentChannelId,
-        input.onMessagePayload,
-      );
-      const reactionsChannel = communityBackend.subscribeToMessageReactions(
-        currentChannelId,
-        input.onReactionPayload,
-      );
-      const attachmentsChannel = communityBackend.subscribeToMessageAttachments(
-        currentChannelId,
-        input.onAttachmentPayload,
-      );
-      const linkPreviewsChannel =
-        communityBackend.subscribeToMessageLinkPreviews(
-          currentChannelId,
-          input.onLinkPreviewPayload,
-        );
-
-      return () => {
-        void messageChannel.unsubscribe();
-        void reactionsChannel.unsubscribe();
-        void attachmentsChannel.unsubscribe();
-        void linkPreviewsChannel.unsubscribe();
-      };
-    },
-    [currentChannelId, currentServerId],
-  );
-
-  const createIncrementalRelatedRefreshQueues = React.useCallback(
-    (input: IncrementalRelatedRefreshQueuesInput) => {
-      let pendingAttachmentRefreshTimerId: ReturnType<typeof setTimeout> | null =
-        null;
-      let pendingLinkPreviewRefreshTimerId: ReturnType<typeof setTimeout> | null =
-        null;
-      let attachmentRefreshInFlight = false;
-      let linkPreviewRefreshInFlight = false;
-      const pendingAttachmentRefreshMessageIds = new Set<string>();
-      const pendingLinkPreviewRefreshMessageIds = new Set<string>();
-
-      const flushAttachmentRefreshQueue = () => {
-        if (!input.isMounted()) return;
-        if (attachmentRefreshInFlight) return;
-        if (pendingAttachmentRefreshMessageIds.size === 0) return;
-
-        const messageIds = Array.from(pendingAttachmentRefreshMessageIds);
-        pendingAttachmentRefreshMessageIds.clear();
-        attachmentRefreshInFlight = true;
-
-        void (async () => {
-          const currentMessageList = input.getCurrentMessageList();
-          const currentAttachmentList = input.getCurrentAttachmentList();
-          const uniqueMessageIds = Array.from(
-            new Set(
-              messageIds.filter((messageId) =>
-                currentMessageList.some((message) => message.id === messageId),
-              ),
-            ),
-          );
-          if (uniqueMessageIds.length === 0) return;
-
-          const refreshedRows =
-            await fetchMessageAttachmentsForMessageIds(uniqueMessageIds);
-          const nextAttachments = [
-            ...currentAttachmentList.filter(
-              (attachment) => !uniqueMessageIds.includes(attachment.messageId),
-            ),
-            ...refreshedRows,
-          ].sort((left, right) => {
-            if (left.createdAt < right.createdAt) return -1;
-            if (left.createdAt > right.createdAt) return 1;
-            if (left.id < right.id) return -1;
-            if (left.id > right.id) return 1;
-            return 0;
-          });
-
-          const moderatedBundle = applyCurrentChannelVisibility({
-            messages: currentMessageList,
-            reactions: [] as MessageReaction[],
-            attachments: nextAttachments,
-            linkPreviews: input.getCurrentLinkPreviewList(),
-          });
-
-          input.commitAttachments(moderatedBundle.attachments);
-        })()
-          .catch((error) => {
-            input.onAttachmentRefreshFallback(error);
-          })
-          .finally(() => {
-            attachmentRefreshInFlight = false;
-            if (!input.isMounted()) return;
-            if (
-              pendingAttachmentRefreshMessageIds.size > 0 &&
-              pendingAttachmentRefreshTimerId === null
-            ) {
-              pendingAttachmentRefreshTimerId = setTimeout(() => {
-                pendingAttachmentRefreshTimerId = null;
-                flushAttachmentRefreshQueue();
-              }, 25);
-            }
-          });
-      };
-
-      const queueAttachmentRefresh = (messageId: string) => {
-        if (!messageId) return;
-        pendingAttachmentRefreshMessageIds.add(messageId);
-        if (pendingAttachmentRefreshTimerId !== null) return;
-        pendingAttachmentRefreshTimerId = setTimeout(() => {
-          pendingAttachmentRefreshTimerId = null;
-          flushAttachmentRefreshQueue();
-        }, 25);
-      };
-
-      const flushLinkPreviewRefreshQueue = () => {
-        if (!input.isMounted()) return;
-        if (linkPreviewRefreshInFlight) return;
-        if (pendingLinkPreviewRefreshMessageIds.size === 0) return;
-
-        const messageIds = Array.from(pendingLinkPreviewRefreshMessageIds);
-        pendingLinkPreviewRefreshMessageIds.clear();
-        linkPreviewRefreshInFlight = true;
-
-        void (async () => {
-          const currentMessageList = input.getCurrentMessageList();
-          const currentLinkPreviewList = input.getCurrentLinkPreviewList();
-          const uniqueMessageIds = Array.from(
-            new Set(
-              messageIds.filter((messageId) =>
-                currentMessageList.some((message) => message.id === messageId),
-              ),
-            ),
-          );
-          if (uniqueMessageIds.length === 0) return;
-
-          const refreshedRows =
-            await fetchMessageLinkPreviewsForMessageIds(uniqueMessageIds);
-          const nextLinkPreviews = [
-            ...currentLinkPreviewList.filter(
-              (preview) => !uniqueMessageIds.includes(preview.messageId),
-            ),
-            ...refreshedRows,
-          ].sort((left, right) => {
-            if (left.createdAt < right.createdAt) return -1;
-            if (left.createdAt > right.createdAt) return 1;
-            if (left.id < right.id) return -1;
-            if (left.id > right.id) return 1;
-            return 0;
-          });
-
-          const moderatedBundle = applyCurrentChannelVisibility({
-            messages: currentMessageList,
-            reactions: [] as MessageReaction[],
-            attachments: input.getCurrentAttachmentList(),
-            linkPreviews: nextLinkPreviews,
-          });
-
-          input.commitLinkPreviews(moderatedBundle.linkPreviews);
-        })()
-          .catch((error) => {
-            input.onLinkPreviewRefreshFallback(error);
-          })
-          .finally(() => {
-            linkPreviewRefreshInFlight = false;
-            if (!input.isMounted()) return;
-            if (
-              pendingLinkPreviewRefreshMessageIds.size > 0 &&
-              pendingLinkPreviewRefreshTimerId === null
-            ) {
-              pendingLinkPreviewRefreshTimerId = setTimeout(() => {
-                pendingLinkPreviewRefreshTimerId = null;
-                flushLinkPreviewRefreshQueue();
-              }, 25);
-            }
-          });
-      };
-
-      const queueLinkPreviewRefresh = (messageId: string) => {
-        if (!messageId) return;
-        pendingLinkPreviewRefreshMessageIds.add(messageId);
-        if (pendingLinkPreviewRefreshTimerId !== null) return;
-        pendingLinkPreviewRefreshTimerId = setTimeout(() => {
-          pendingLinkPreviewRefreshTimerId = null;
-          flushLinkPreviewRefreshQueue();
-        }, 25);
-      };
-
-      const cleanup = () => {
-        if (pendingAttachmentRefreshTimerId !== null) {
-          clearTimeout(pendingAttachmentRefreshTimerId);
-        }
-        if (pendingLinkPreviewRefreshTimerId !== null) {
-          clearTimeout(pendingLinkPreviewRefreshTimerId);
-        }
-        pendingAttachmentRefreshTimerId = null;
-        pendingLinkPreviewRefreshTimerId = null;
-        pendingAttachmentRefreshMessageIds.clear();
-        pendingLinkPreviewRefreshMessageIds.clear();
-        attachmentRefreshInFlight = false;
-        linkPreviewRefreshInFlight = false;
-      };
-
-      return {
-        queueAttachmentRefresh,
-        queueLinkPreviewRefresh,
-        cleanup,
-      };
-    },
-    [
-      applyCurrentChannelVisibility,
-      fetchMessageAttachmentsForMessageIds,
-      fetchMessageLinkPreviewsForMessageIds,
-    ],
   );
 
   const applyChannelAccessRevokedContentVisibility = React.useCallback(
@@ -1613,24 +980,18 @@ export function useMessages({
         input.communityId,
         input.channelId,
       );
-      const cachedBundle = messageBundleByChannelCacheRef.current[cacheKey];
-      if (cachedBundle) {
-        const moderationFilteredBundle = applyChannelAccessVisibility({
+      const cached = messageBundleByChannelCacheRef.current[cacheKey];
+      if (cached) {
+        const filtered = applyVisibilityToBundles(cached.bundles, {
           communityId: input.communityId,
           channelId: input.channelId,
-          messages: cachedBundle.messages,
-          reactions: cachedBundle.reactions,
-          attachments: cachedBundle.attachments,
-          linkPreviews: cachedBundle.linkPreviews,
           revokedUserIds,
+          blockedUserIds,
+          isElevatedInServer: isCurrentUserElevatedInServer,
         });
-        const filteredBundle = applyBlockVisibility(moderationFilteredBundle);
         messageBundleByChannelCacheRef.current[cacheKey] = {
-          ...cachedBundle,
-          messages: filteredBundle.messages,
-          reactions: filteredBundle.reactions,
-          attachments: filteredBundle.attachments,
-          linkPreviews: filteredBundle.linkPreviews,
+          ...cached,
+          bundles: filtered,
         };
       }
 
@@ -1640,65 +1001,246 @@ export function useMessages({
       )
         return;
 
-      const moderationFilteredBundle = applyChannelAccessVisibility({
+      const filtered = applyVisibilityToBundles(currentBundlesRef.current, {
         communityId: input.communityId,
         channelId: input.channelId,
-        messages: currentMessageListRef.current,
-        reactions: currentReactionListRef.current,
-        attachments: currentAttachmentListRef.current,
-        linkPreviews: currentLinkPreviewListRef.current,
         revokedUserIds,
+        blockedUserIds,
+        isElevatedInServer: isCurrentUserElevatedInServer,
       });
-      const filteredBundle = applyBlockVisibility(moderationFilteredBundle);
-
-      currentMessageListRef.current = filteredBundle.messages;
-      currentReactionListRef.current = filteredBundle.reactions;
-      currentAttachmentListRef.current = filteredBundle.attachments;
-      currentLinkPreviewListRef.current = filteredBundle.linkPreviews;
+      currentBundlesRef.current = filtered;
       syncLoadedMessageWindow(
-        filteredBundle.messages,
+        filtered,
         currentHasOlderMessagesRef.current,
       );
-      const remainingAuthorIds = new Set(
-        filteredBundle.messages
-          .map((message) => message.author_user_id)
-          .filter((authorUserId): authorUserId is string =>
-            Boolean(authorUserId),
-          ),
-      );
-      const nextProfiles = Object.fromEntries(
-        Object.entries(useMessagesStore.getState().profiles).filter(
-          ([authorUserId]) => remainingAuthorIds.has(authorUserId),
-        ),
-      );
-
-      useMessagesStore.getState().setMessages(filteredBundle.messages);
-      useMessagesStore.getState().setReactions(filteredBundle.reactions);
-      useMessagesStore.getState().setAttachments(filteredBundle.attachments);
-      useMessagesStore.getState().setLinkPreviews(filteredBundle.linkPreviews);
-      useMessagesStore.getState().setProfiles(nextProfiles);
+      setStoredMessages(filtered);
       markMessagesFresh();
     },
     [
       addChannelRevokedUserIdToCache,
-      applyBlockVisibility,
-      applyChannelAccessVisibility,
+      blockedUserIds,
       currentChannelId,
       currentServerId,
       getChannelBundleCacheKey,
+      isCurrentUserElevatedInServer,
       markMessagesFresh,
+      setStoredMessages,
       syncLoadedMessageWindow,
     ],
   );
 
-  const createMessageReloadScheduler = React.useCallback(
-    (input: MessageReloadSchedulerInput) => {
+  React.useEffect(() => {
+    let isMounted = true;
+
+    if (!currentUserId || !currentServerId || !currentChannelId) {
+      resetMessageState();
+      return;
+    }
+
+    const selectedChannel = channels.find(
+      (channel) => channel.id === currentChannelId,
+    );
+    if (!selectedChannel || selectedChannel.community_id !== currentServerId) {
+      resetMessageState();
+      return;
+    }
+
+    if (selectedChannel.kind !== "text") {
+      resetMessageState();
+      return;
+    }
+
+    const communityBackend = getCommunityDataBackend(currentServerId);
+
+    const logReload = (_event: string, _details?: Record<string, unknown>) => {
+      if (!debugChannelReloads) return;
+    };
+
+    const persistCurrentChannelBundleCache = (
+      syncTouch: "http_success" | "realtime",
+    ) => {
+      if (!currentServerId || !currentChannelId) return;
+      const bundles = currentBundlesRef.current;
+      const newest = computeNewestMessageBundleCursor(bundles);
+      const prev = getCachedChannelBundles(currentServerId, currentChannelId);
+      const prevSync = prev?.syncMetadata;
+      const syncMetadata =
+        syncTouch === "http_success"
+          ? {
+              lastSuccessfulSyncAt: new Date().toISOString(),
+              newestMessageCursor: newest,
+            }
+          : prevSync
+            ? { ...prevSync, newestMessageCursor: newest }
+            : {
+                lastSuccessfulSyncAt: new Date(0).toISOString(),
+                newestMessageCursor: newest,
+              };
+      cacheChannelBundles(currentServerId, currentChannelId, {
+        bundles,
+        hasOlderMessages: currentHasOlderMessagesRef.current,
+        syncMetadata,
+      });
+    };
+
+    const applyLoadedBundles = (input: {
+      bundles: MessageBundle[];
+      hasOlder: boolean;
+    }) => {
+      currentBundlesRef.current = input.bundles;
+      syncLoadedMessageWindow(input.bundles, input.hasOlder);
+
+      if (isMounted) {
+        setStoredMessages(input.bundles);
+        markMessagesFresh();
+      }
+
+      persistCurrentChannelBundleCache("http_success");
+    };
+
+    const hydrateFromCache = (): CachedChannelBundles | null => {
+      if (!currentServerId || !currentChannelId) return null;
+      const cached = getCachedChannelBundles(
+        currentServerId,
+        currentChannelId,
+      );
+      if (!cached) return null;
+
+      currentBundlesRef.current = cached.bundles;
+      syncLoadedMessageWindow(
+        cached.bundles,
+        cached.hasOlderMessages,
+      );
+
+      if (isMounted) {
+        setStoredMessages(cached.bundles);
+      }
+
+      return cached;
+    };
+
+    const commitBundles = (next: MessageBundle[], reason: string) => {
+      void reason;
+      currentBundlesRef.current = next;
+      syncOldestLoadedCursor(next);
+      persistCurrentChannelBundleCache("realtime");
+      if (!isMounted) return;
+      setStoredMessages(next);
+      markMessagesFresh();
+    };
+
+    const loadLatestBundles = async (currentCount: number) => {
+      const loadId = createNextMessageLoadId();
+      const startedAt = Date.now();
+      const limit = Math.max(Math.floor(currentCount), MESSAGE_PAGE_SIZE);
+      const result = await communityBackend.listChannelMessages({
+        communityId: currentServerId,
+        channelId: currentChannelId,
+        limit,
+        beforeCreatedAt: null,
+        beforeMessageId: null,
+      });
+      const asc = [...result.messages].reverse();
+      const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(
+        currentServerId,
+        currentChannelId,
+      );
+      const isElevated = await usePermissionsStore
+        .getState()
+        .ensureElevatedInServer(
+          currentServerId,
+          currentUserId,
+          getCommunityDataBackend(currentServerId),
+        );
+      const filtered = applyVisibilityToBundles(asc, {
+        communityId: currentServerId,
+        channelId: currentChannelId,
+        revokedUserIds,
+        blockedUserIds,
+        isElevatedInServer: isElevated,
+      });
+      return {
+        loadId,
+        startedAt,
+        bundles: filtered,
+        hasOlder: result.hasMore,
+      };
+    };
+
+    const loadOlderBundles = async (current: MessageBundle[]) => {
+      if (!currentServerId || !currentChannelId) {
+        throw new Error("No channel selected.");
+      }
+
+      const olderLoad = tryBeginOlderMessagesLoad();
+      if (!olderLoad) {
+        return { kind: "skipped" as const };
+      }
+
+      const { loadId, oldestLoadedCursor } = olderLoad;
+      const startedAt = Date.now();
+
+      const result = await communityBackend.listChannelMessages({
+        communityId: currentServerId,
+        channelId: currentChannelId,
+        limit: MESSAGE_PAGE_SIZE,
+        beforeCreatedAt: oldestLoadedCursor.createdAt,
+        beforeMessageId: oldestLoadedCursor.id,
+      });
+
+      if (result.messages.length === 0) {
+        return {
+          kind: "no_more" as const,
+          loadId,
+          startedAt,
+          oldestLoadedCursor,
+        };
+      }
+
+      const ascPage = [...result.messages].reverse();
+      const existingIds = new Set(current.map((b) => b.id));
+      const prepend = ascPage.filter((b) => !existingIds.has(b.id));
+      const merged = [...prepend, ...current].sort(compareMessageBundlesAsc);
+
+      const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(
+        currentServerId,
+        currentChannelId,
+      );
+      const isElevated = await usePermissionsStore
+        .getState()
+        .ensureElevatedInServer(
+          currentServerId,
+          currentUserId,
+          getCommunityDataBackend(currentServerId),
+        );
+      const filtered = applyVisibilityToBundles(merged, {
+        communityId: currentServerId,
+        channelId: currentChannelId,
+        revokedUserIds,
+        blockedUserIds,
+        isElevatedInServer: isElevated,
+      });
+
+      return {
+        kind: "loaded" as const,
+        loadId,
+        startedAt,
+        oldestLoadedCursor,
+        prependCount: prepend.length,
+        bundles: filtered,
+        hasOlder: result.hasMore,
+      };
+    };
+
+    const createMessageReloadScheduler = (
+      runLoad: (reasonLabel: string) => Promise<void>,
+    ) => {
       let activeLoadPromise: Promise<void> | null = null;
       let scheduledReloadTimerId: ReturnType<typeof setTimeout> | null = null;
       const pendingReloadReasons = new Set<string>();
 
       const flushScheduledMessageReload = () => {
-        if (!input.isMounted()) return;
+        if (!isMounted) return;
         if (activeLoadPromise) return;
         if (pendingReloadReasons.size === 0) return;
 
@@ -1706,9 +1248,9 @@ export function useMessages({
         pendingReloadReasons.clear();
         const reasonLabel = reasons.join("+");
 
-        activeLoadPromise = input.onLoadMessages(reasonLabel).finally(() => {
+        activeLoadPromise = runLoad(reasonLabel).finally(() => {
           activeLoadPromise = null;
-          if (!input.isMounted()) return;
+          if (!isMounted) return;
           if (
             pendingReloadReasons.size > 0 &&
             scheduledReloadTimerId === null
@@ -1722,9 +1264,9 @@ export function useMessages({
       };
 
       const scheduleMessageReload = (reason: string, delayMs = 60) => {
-        if (!input.isMounted()) return;
+        if (!isMounted) return;
         pendingReloadReasons.add(reason);
-        input.onLogReload("load:queued", {
+        logReload("load:queued", {
           reason,
           delayMs,
           pendingReasons: Array.from(pendingReloadReasons),
@@ -1753,34 +1295,30 @@ export function useMessages({
         scheduledReloadTimerId = null;
       };
 
-      return {
-        scheduleMessageReload,
-        cleanup,
-      };
-    },
-    [],
-  );
+      return { scheduleMessageReload, cleanup };
+    };
 
-  const createMessageReloadLifecycle = React.useCallback(
-    (input: MessageReloadLifecycleInput) => {
-      const maintenanceBatchLimit = input.maintenanceBatchLimit ?? 100;
-      const maintenanceIntervalMs = input.maintenanceIntervalMs ?? 60 * 1000;
+    const createMessageReloadLifecycle = (scheduler: {
+      scheduleMessageReload: (reason: string, delayMs?: number) => void;
+    }) => {
+      const maintenanceBatchLimit = 100;
+      const maintenanceIntervalMs = 60 * 1000;
 
       const runMessageMediaMaintenanceForLifecycle = async () => {
         try {
           const result = await runMessageMediaMaintenance(
             maintenanceBatchLimit,
           );
-          if (!input.isMounted()) return;
+          if (!isMounted) return;
           if ((result.deletedMessages ?? 0) > 0) {
-            input.onLogReload("maintenance:deleted", {
+            logReload("maintenance:deleted", {
               deletedMessages: result.deletedMessages ?? 0,
               deletedObjects: result.deletedObjects ?? 0,
             });
-            input.scheduleMessageReload("maintenance_reload", 20);
+            scheduler.scheduleMessageReload("maintenance_reload", 20);
           }
         } catch (error) {
-          if (!input.isMounted()) return;
+          if (!isMounted) return;
           console.warn("Failed to run media maintenance:", error);
         }
       };
@@ -1788,33 +1326,33 @@ export function useMessages({
       const browserRuntime = getAppHost().browserRuntime;
       const handleVisibilityChange = () => {
         const visibility = browserRuntime?.getVisibilityState() ?? "visible";
-        input.onLogReload("visibility", { state: visibility });
+        logReload("visibility", { state: visibility });
         if (visibility === "visible") {
           if (areMessagesFresh()) {
-            input.onLogReload("load:skip_fresh", {
+            logReload("load:skip_fresh", {
               reason: "visibility_resume",
               freshnessWindowMs: MESSAGE_RELOAD_FRESHNESS_WINDOW_MS,
             });
             return;
           }
-          input.scheduleMessageReload("visibility_resume", 120);
+          scheduler.scheduleMessageReload("visibility_resume", 120);
         }
       };
 
       const handleWindowFocus = () => {
-        input.onLogReload("window_focus");
+        logReload("window_focus");
         if (areMessagesFresh()) {
-          input.onLogReload("load:skip_fresh", {
+          logReload("load:skip_fresh", {
             reason: "window_focus",
             freshnessWindowMs: MESSAGE_RELOAD_FRESHNESS_WINDOW_MS,
           });
           return;
         }
-        input.scheduleMessageReload("window_focus", 120);
+        scheduler.scheduleMessageReload("window_focus", 120);
       };
 
       const handleWindowBlur = () => {
-        input.onLogReload("window_blur");
+        logReload("window_blur");
       };
 
       const start = () => {
@@ -1844,453 +1382,97 @@ export function useMessages({
         unsubscribeBlurListenerRef.current = null;
       };
 
-      return {
-        start,
-        cleanup,
-      };
-    },
-    [areMessagesFresh, runMessageMediaMaintenance],
-  );
-
-  const createMessageBundleController = React.useCallback(
-    (input: MessageBundleControllerInput) => {
-      const persistCurrentChannelBundleCache = (
-        syncTouch: "http_success" | "realtime",
-      ) => {
-        if (!currentServerId || !currentChannelId) return;
-        const messages = currentMessageListRef.current;
-        const newest = computeNewestMessageCursor(messages);
-        const prev = getCachedChannelBundle(currentServerId, currentChannelId);
-        const prevSync = prev?.syncMetadata;
-        const syncMetadata =
-          syncTouch === "http_success"
-            ? {
-                lastSuccessfulSyncAt: new Date().toISOString(),
-                newestMessageCursor: newest,
-              }
-            : prevSync
-              ? { ...prevSync, newestMessageCursor: newest }
-              : {
-                  lastSuccessfulSyncAt: new Date(0).toISOString(),
-                  newestMessageCursor: newest,
-                };
-        cacheChannelBundle(currentServerId, currentChannelId, {
-          messages,
-          reactions: currentReactionListRef.current,
-          attachments: currentAttachmentListRef.current,
-          linkPreviews: currentLinkPreviewListRef.current,
-          hasOlderMessages: currentHasOlderMessagesRef.current,
-          syncMetadata,
-        });
-      };
-
-      const getCurrentMessageList = () => currentMessageListRef.current;
-      const getCurrentReactionList = () => currentReactionListRef.current;
-      const getCurrentAttachmentList = () => currentAttachmentListRef.current;
-      const getCurrentLinkPreviewList = () => currentLinkPreviewListRef.current;
-
-      const applyLoadedBundle = (inputBundle: {
-        messageList: Message[];
-        reactionList: MessageReaction[];
-        attachmentList: MessageAttachment[];
-        linkPreviewList: MessageLinkPreview[];
-        hasOlder: boolean;
-      }) => {
-        currentMessageListRef.current = inputBundle.messageList;
-        currentReactionListRef.current = inputBundle.reactionList;
-        currentAttachmentListRef.current = inputBundle.attachmentList;
-        currentLinkPreviewListRef.current = inputBundle.linkPreviewList;
-        syncLoadedMessageWindow(inputBundle.messageList, inputBundle.hasOlder);
-
-        if (input.isMounted()) {
-          setStoredMessages(inputBundle.messageList);
-          setStoredReactions(inputBundle.reactionList);
-          setStoredAttachments(inputBundle.attachmentList);
-          setStoredLinkPreviews(inputBundle.linkPreviewList);
-          markMessagesFresh();
-        }
-
-        persistCurrentChannelBundleCache("http_success");
-      };
-
-      const hydrateFromCache = () => {
-        if (!currentServerId || !currentChannelId) return null;
-        const cachedBundle = getCachedChannelBundle(
-          currentServerId,
-          currentChannelId,
-        );
-        if (!cachedBundle) return null;
-
-        currentMessageListRef.current = cachedBundle.messages;
-        currentReactionListRef.current = cachedBundle.reactions;
-        currentAttachmentListRef.current = cachedBundle.attachments;
-        currentLinkPreviewListRef.current = cachedBundle.linkPreviews;
-        syncLoadedMessageWindow(
-          cachedBundle.messages,
-          cachedBundle.hasOlderMessages,
-        );
-
-        if (input.isMounted()) {
-          setStoredMessages(cachedBundle.messages);
-          setStoredReactions(cachedBundle.reactions);
-          setStoredAttachments(cachedBundle.attachments);
-          setStoredLinkPreviews(cachedBundle.linkPreviews);
-          input.onMessagesCommitted?.(
-            "channel_cache_hydrate",
-            cachedBundle.messages,
-          );
-        }
-
-        return cachedBundle;
-      };
-
-      const commitMessages = (nextMessages: Message[], reason: string) => {
-        currentMessageListRef.current = nextMessages;
-        syncOldestLoadedCursor(nextMessages);
-        persistCurrentChannelBundleCache("realtime");
-        if (!input.isMounted()) return;
-        setStoredMessages(nextMessages);
-        markMessagesFresh();
-        input.onMessagesCommitted?.(reason, nextMessages);
-      };
-
-      const commitReactions = (nextReactions: MessageReaction[]) => {
-        currentReactionListRef.current = nextReactions;
-        persistCurrentChannelBundleCache("realtime");
-        if (!input.isMounted()) return;
-        setStoredReactions(nextReactions);
-        markMessagesFresh();
-      };
-
-      const commitAttachments = (nextAttachments: MessageAttachment[]) => {
-        currentAttachmentListRef.current = nextAttachments;
-        persistCurrentChannelBundleCache("realtime");
-        if (!input.isMounted()) return;
-        setStoredAttachments(nextAttachments);
-        markMessagesFresh();
-      };
-
-      const commitLinkPreviews = (nextLinkPreviews: MessageLinkPreview[]) => {
-        currentLinkPreviewListRef.current = nextLinkPreviews;
-        persistCurrentChannelBundleCache("realtime");
-        if (!input.isMounted()) return;
-        setStoredLinkPreviews(nextLinkPreviews);
-        markMessagesFresh();
-      };
-
-      return {
-        getCurrentMessageList,
-        getCurrentReactionList,
-        getCurrentAttachmentList,
-        getCurrentLinkPreviewList,
-        applyLoadedBundle,
-        hydrateFromCache,
-        commitMessages,
-        commitReactions,
-        commitAttachments,
-        commitLinkPreviews,
-      };
-    },
-    [
-      cacheChannelBundle,
-      currentChannelId,
-      currentServerId,
-      getCachedChannelBundle,
-      markMessagesFresh,
-      setStoredAttachments,
-      setStoredLinkPreviews,
-      setStoredMessages,
-      setStoredReactions,
-      syncLoadedMessageWindow,
-      syncOldestLoadedCursor,
-    ],
-  );
-
-  React.useEffect(() => {
-    let isMounted = true;
-
-    if (!currentUserId || !currentServerId || !currentChannelId) {
-      resetMessageState();
-      setStoredProfiles({});
-      return;
-    }
-
-    const selectedChannel = channels.find(
-      (channel) => channel.id === currentChannelId,
-    );
-    if (!selectedChannel || selectedChannel.community_id !== currentServerId) {
-      resetMessageState();
-      setStoredProfiles({});
-      return;
-    }
-
-    if (selectedChannel.kind !== "text") {
-      resetMessageState();
-      setStoredProfiles({});
-      return;
-    }
-
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    let latestAuthorSyncId = 0;
-
-    const logReload = (_event: string, _details?: Record<string, unknown>) => {
-      if (!debugChannelReloads) return;
+      return { start, cleanup };
     };
 
-    const updateAuthorProfilesForMessages = async (messageList: Message[]) => {
-      const byMessageId = new Map(messageList.map((m) => [m.id, m]));
-      const authorIdSet = new Set<string>();
-      for (const message of messageList) {
-        if (message.author_user_id) {
-          authorIdSet.add(message.author_user_id);
-        }
-        const replyToId = getReplyToMessageId(message);
-        if (replyToId) {
-          const parent = byMessageId.get(replyToId);
-          if (parent?.author_user_id) {
-            authorIdSet.add(parent.author_user_id);
-          }
-        }
-      }
-      const authorIds = Array.from(authorIdSet);
-
-      if (authorIds.length === 0) {
-        if (!isMounted) return { authorCount: 0, fetchedAuthorCount: 0 };
-        setStoredProfiles({});
-        return { authorCount: 0, fetchedAuthorCount: 0 };
-      }
-
-      const missingAuthorIds = authorIds.filter(
-        (authorId) => !authorProfileCacheRef.current[authorId],
-      );
-      if (missingAuthorIds.length > 0) {
-        const fetchedProfiles = await communityBackend.fetchAuthorProfiles(
-          currentServerId,
-          missingAuthorIds,
-        );
-        Object.assign(authorProfileCacheRef.current, fetchedProfiles);
-      }
-
-      const profileMap: Record<string, AuthorProfile> = {};
-      for (const authorId of authorIds) {
-        const cachedProfile = authorProfileCacheRef.current[authorId];
-        if (cachedProfile) {
-          profileMap[authorId] = cachedProfile;
-        }
-      }
-
-      if (!isMounted)
-        return {
-          authorCount: authorIds.length,
-          fetchedAuthorCount: missingAuthorIds.length,
-        };
-      setStoredProfiles(profileMap);
-      return {
-        authorCount: authorIds.length,
-        fetchedAuthorCount: missingAuthorIds.length,
-      };
-    };
-
-    const scheduleAuthorProfileSyncForMessages = (
-      reason: string,
-      messageList: Message[],
-    ) => {
-      const authorSyncId = ++latestAuthorSyncId;
-      const messageSnapshot = [...messageList];
-      void (async () => {
-        try {
-          const { authorCount, fetchedAuthorCount } =
-            await updateAuthorProfilesForMessages(messageSnapshot);
-          if (!isMounted || authorSyncId !== latestAuthorSyncId) return;
-          logReload("authors:sync", {
-            reason,
-            messageCount: messageSnapshot.length,
-            authorCount,
-            fetchedAuthorCount,
-          });
-        } catch (error) {
-          if (!isMounted || authorSyncId !== latestAuthorSyncId) return;
-          console.warn(
-            "Failed to sync author profiles after incremental message change:",
-            error,
-          );
-        }
-      })();
-    };
-
-    const messageBundleController = createMessageBundleController({
-      isMounted: () => isMounted,
-      onMessagesCommitted: (reason, messageList) => {
-        scheduleAuthorProfileSyncForMessages(reason, messageList);
-      },
-    });
-
-    const updateMessageBundleState = async (inputBundle: {
-      reason: string;
-      loadId: number;
-      startedAt: number;
-      messageList: Message[];
-      reactionList: MessageReaction[];
-      attachmentList: MessageAttachment[];
-      linkPreviewList: MessageLinkPreview[];
-      hasOlder: boolean;
-    }) => {
-      if (!isMounted || !isCurrentMessageLoad(inputBundle.loadId)) return;
-
-      let authorCount = 0;
-      let fetchedAuthorCount = 0;
-      try {
-        ({ authorCount, fetchedAuthorCount } =
-          await updateAuthorProfilesForMessages(inputBundle.messageList));
-      } catch {
-        // Profile fetch failed — still render messages with fallback labels
-      }
-
-      if (!isMounted || !isCurrentMessageLoad(inputBundle.loadId)) return;
-
-      messageBundleController.applyLoadedBundle({
-        messageList: inputBundle.messageList,
-        reactionList: inputBundle.reactionList,
-        attachmentList: inputBundle.attachmentList,
-        linkPreviewList: inputBundle.linkPreviewList,
-        hasOlder: inputBundle.hasOlder,
-      });
-
-      logReload("load:success", {
-        reason: inputBundle.reason,
-        loadId: inputBundle.loadId,
-        durationMs: Date.now() - inputBundle.startedAt,
-        messageCount: inputBundle.messageList.length,
-        authorCount,
-        fetchedAuthorCount,
-        hasOlderMessages: inputBundle.hasOlder,
-      });
-    };
-
-    const commitMessages = messageBundleController.commitMessages;
-    const commitReactions = messageBundleController.commitReactions;
-    const commitAttachments = messageBundleController.commitAttachments;
-    const commitLinkPreviews = messageBundleController.commitLinkPreviews;
-
-    const softRevalidateChannelMessages = async (reasonLabel: string) => {
-      const loadId = createNextMessageLoadId();
-      const startedAt = Date.now();
-      logReload("load:soft_start", { reason: reasonLabel, loadId });
-      try {
-        if (!currentServerId || !currentChannelId) return;
-
-        const communityBackend = getCommunityDataBackend(currentServerId);
-        const currentList = messageBundleController.getCurrentMessageList();
-        const tail = computeNewestMessageCursor(currentList);
-        if (!tail) return;
-
-        const page = await communityBackend.listMessagesPage({
-          communityId: currentServerId,
-          channelId: currentChannelId,
-          afterCursor: tail,
-          limit: MESSAGE_PAGE_SIZE,
-        });
-        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
-
-        const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(
-          currentServerId,
-          currentChannelId,
-        );
-        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
-
-        const mergedMessages = mergeMessagesById(currentList, page.messages);
-        const { reactionList, attachmentList, linkPreviewList } =
-          await fetchRelatedForMessages(page.messages);
-        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
-
-        const mergedReactions = mergeReactionsById(
-          messageBundleController.getCurrentReactionList(),
-          reactionList,
-        );
-        const mergedAttachments = mergeAttachmentsById(
-          messageBundleController.getCurrentAttachmentList(),
-          attachmentList,
-        );
-        const mergedLinkPreviews = mergeLinkPreviewsById(
-          messageBundleController.getCurrentLinkPreviewList(),
-          linkPreviewList,
-        );
-
-        const moderationFilteredBundle = applyChannelAccessVisibility({
-          communityId: currentServerId,
-          channelId: currentChannelId,
-          messages: mergedMessages,
-          reactions: mergedReactions,
-          attachments: mergedAttachments,
-          linkPreviews: mergedLinkPreviews,
-          revokedUserIds,
-        });
-        const filteredBundle = applyBlockVisibility({
-          ...moderationFilteredBundle,
-          isElevatedInServer:
-            await usePermissionsStore
-              .getState()
-              .ensureElevatedInServer(
-                currentServerId,
-                currentUserId,
-                getCommunityDataBackend(currentServerId),
-              ),
-        });
-
-        const hasOlder = currentHasOlderMessagesRef.current;
-
-        await updateMessageBundleState({
-          reason: reasonLabel,
-          loadId,
-          startedAt,
-          messageList: filteredBundle.messages,
-          reactionList: filteredBundle.reactions,
-          attachmentList: filteredBundle.attachments,
-          linkPreviewList: filteredBundle.linkPreviews,
-          hasOlder,
-        });
-      } catch (error) {
-        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
-        console.error("Error soft-revalidating messages:", error);
-        logReload("load:soft_error", {
-          reason: reasonLabel,
-          loadId,
-          durationMs: Date.now() - startedAt,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    };
-
-    const loadMessages = async (reasonLabel: string) => {
+    const onLoadMessages = async (reasonLabel: string) => {
       const reasons = parseMessageReloadReasons(reasonLabel);
-      const localCount = messageBundleController.getCurrentMessageList().length;
+      const localCount = currentBundlesRef.current.length;
       const needsFull =
         messageReloadReasonsRequireFullLoad(reasons) || localCount === 0;
 
       if (!needsFull) {
-        await softRevalidateChannelMessages(reasonLabel);
+        const loadId = createNextMessageLoadId();
+        const startedAt = Date.now();
+        logReload("load:soft_start", { reason: reasonLabel, loadId });
+        try {
+          const currentList = currentBundlesRef.current;
+          const tail = computeNewestMessageBundleCursor(currentList);
+          if (!tail) return;
+
+          const page = await communityBackend.listChannelMessages({
+            communityId: currentServerId,
+            channelId: currentChannelId,
+            limit: MESSAGE_PAGE_SIZE,
+            beforeCreatedAt: null,
+            beforeMessageId: null,
+          });
+          if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+
+          const ascTail = [...page.messages].reverse();
+          const merged = mergeBundlesById(currentList, ascTail);
+
+          const revokedUserIds = await ensureChannelRevokedUserIdsLoaded(
+            currentServerId,
+            currentChannelId,
+          );
+          if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+
+          const isElevated = await usePermissionsStore
+            .getState()
+            .ensureElevatedInServer(
+              currentServerId,
+              currentUserId,
+              getCommunityDataBackend(currentServerId),
+            );
+          const filtered = applyVisibilityToBundles(merged, {
+            communityId: currentServerId,
+            channelId: currentChannelId,
+            revokedUserIds,
+            blockedUserIds,
+            isElevatedInServer: isElevated,
+          });
+
+          const hasOlder = currentHasOlderMessagesRef.current;
+          if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+          applyLoadedBundles({ bundles: filtered, hasOlder });
+          logReload("load:soft_success", {
+            reason: reasonLabel,
+            loadId,
+            durationMs: Date.now() - startedAt,
+          });
+        } catch (error) {
+          if (!isMounted) return;
+          console.error("Error soft-revalidating messages:", error);
+          logReload("load:soft_error", {
+            reason: reasonLabel,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       }
 
       let loadId: number | null = null;
       let startedAt = Date.now();
       try {
-        const loadedBundle = await loadLatestMessagesWithRelated(
-          messageBundleController.getCurrentMessageList().length,
+        const loaded = await loadLatestBundles(
+          currentBundlesRef.current.length,
         );
-        loadId = loadedBundle.loadId;
-        startedAt = loadedBundle.startedAt;
+        loadId = loaded.loadId;
+        startedAt = loaded.startedAt;
         logReload("load:start", { reason: reasonLabel, loadId });
 
-        await updateMessageBundleState({
+        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+        applyLoadedBundles({
+          bundles: loaded.bundles,
+          hasOlder: loaded.hasOlder,
+        });
+        logReload("load:success", {
           reason: reasonLabel,
-          loadId: loadedBundle.loadId,
-          startedAt: loadedBundle.startedAt,
-          messageList: loadedBundle.messageList,
-          reactionList: loadedBundle.reactionList,
-          attachmentList: loadedBundle.attachmentList,
-          linkPreviewList: loadedBundle.linkPreviewList,
-          hasOlder: loadedBundle.hasOlder,
+          loadId,
+          durationMs: Date.now() - startedAt,
+          messageCount: loaded.bundles.length,
+          hasOlderMessages: loaded.hasOlder,
         });
       } catch (error) {
         if (loadId == null) {
@@ -2312,16 +1494,12 @@ export function useMessages({
 
     const loadOlderMessages = async () => {
       if (!isMounted) return;
-      let loadResult: Awaited<
-        ReturnType<typeof loadOlderMessagesWithRelated>
-      > | null = null;
+      let loadResult: Awaited<ReturnType<typeof loadOlderBundles>> | null = null;
       let loadId: number | null = null;
       let startedAt = Date.now();
 
       try {
-        loadResult = await loadOlderMessagesWithRelated(
-          messageBundleController.getCurrentMessageList(),
-        );
+        loadResult = await loadOlderBundles(currentBundlesRef.current);
         if (loadResult.kind === "skipped") return;
 
         loadId = loadResult.loadId;
@@ -2330,16 +1508,12 @@ export function useMessages({
           loadId,
           cursorCreatedAt: loadResult.oldestLoadedCursor.createdAt,
           cursorId: loadResult.oldestLoadedCursor.id,
-          currentMessageCount:
-            messageBundleController.getCurrentMessageList().length,
+          currentMessageCount: currentBundlesRef.current.length,
         });
 
         if (loadResult.kind === "no_more") {
           if (!isMounted || !isCurrentMessageLoad(loadId)) return;
-          syncLoadedMessageWindow(
-            messageBundleController.getCurrentMessageList(),
-            false,
-          );
+          syncLoadedMessageWindow(currentBundlesRef.current, false);
           logReload("load-older:complete", {
             loadId,
             addedCount: 0,
@@ -2349,18 +1523,11 @@ export function useMessages({
           return;
         }
 
-        await updateMessageBundleState({
-          reason: "load_older",
-          loadId,
-          startedAt,
-          messageList: loadResult.messageList,
-          reactionList: loadResult.reactionList,
-          attachmentList: loadResult.attachmentList,
-          linkPreviewList: loadResult.linkPreviewList,
+        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
+        applyLoadedBundles({
+          bundles: loadResult.bundles,
           hasOlder: loadResult.hasOlder,
         });
-
-        if (!isMounted || !isCurrentMessageLoad(loadId)) return;
         logReload("load-older:complete", {
           loadId,
           addedCount: loadResult.prependCount,
@@ -2389,63 +1556,24 @@ export function useMessages({
 
     setRequestOlderMessagesLoader(loadOlderMessages);
 
-    const messageReloadScheduler = createMessageReloadScheduler({
-      isMounted: () => isMounted,
-      onLoadMessages: loadMessages,
-      onLogReload: logReload,
-    });
+    const messageReloadScheduler =
+      createMessageReloadScheduler(onLoadMessages);
+    const messageReloadLifecycle =
+      createMessageReloadLifecycle(messageReloadScheduler);
 
-    const incrementalRelatedRefreshQueues =
-      createIncrementalRelatedRefreshQueues({
-        isMounted: () => isMounted,
-        getCurrentMessageList: messageBundleController.getCurrentMessageList,
-        getCurrentAttachmentList:
-          messageBundleController.getCurrentAttachmentList,
-        getCurrentLinkPreviewList:
-          messageBundleController.getCurrentLinkPreviewList,
-        commitAttachments,
-        commitLinkPreviews,
-        onAttachmentRefreshFallback: (error) => {
-          console.warn(
-            "Failed to incrementally refresh message attachments:",
-            error,
-          );
-          messageReloadScheduler.scheduleMessageReload(
-            "attachments_sub_fallback",
-            20,
-          );
-        },
-        onLinkPreviewRefreshFallback: (error) => {
-          console.warn(
-            "Failed to incrementally refresh message link previews:",
-            error,
-          );
-          messageReloadScheduler.scheduleMessageReload(
-            "previews_sub_fallback",
-            20,
-          );
-        },
-      });
-
-    const messageReloadLifecycle = createMessageReloadLifecycle({
-      isMounted: () => isMounted,
-      scheduleMessageReload: messageReloadScheduler.scheduleMessageReload,
-      onLogReload: logReload,
-    });
-
-    const hydratedBundle = messageBundleController.hydrateFromCache();
-    if (hydratedBundle) {
+    const hydrated = hydrateFromCache();
+    if (hydrated) {
       logReload("cache:hydrate", {
-        messageCount: hydratedBundle.messages.length,
-        hasOlderMessages: hydratedBundle.hasOlderMessages,
+        messageCount: hydrated.bundles.length,
+        hasOlderMessages: hydrated.hasOlderMessages,
       });
     }
     messageReloadLifecycle.start();
 
-    if (!hydratedBundle || hydratedBundle.messages.length === 0) {
+    if (!hydrated || hydrated.bundles.length === 0) {
       messageReloadScheduler.scheduleMessageReload("initial", 0);
     } else {
-      const meta = hydratedBundle.syncMetadata;
+      const meta = hydrated.syncMetadata;
       const lastAt = meta ? Date.parse(meta.lastSuccessfulSyncAt) : NaN;
       const stale =
         !meta ||
@@ -2462,111 +1590,246 @@ export function useMessages({
       }
     }
 
-    const cleanupRealtimeMessageStreams = subscribeToMessageRealtimeStreams({
-      onMessagePayload: (payload) => {
-        const handled = applyIncrementalMessageRealtimePayload({
-          payload,
-          currentMessageList: messageBundleController.getCurrentMessageList(),
-          currentReactionList: messageBundleController.getCurrentReactionList(),
-          currentAttachmentList:
-            messageBundleController.getCurrentAttachmentList(),
-          currentLinkPreviewList:
-            messageBundleController.getCurrentLinkPreviewList(),
-          commitMessages,
-          commitReactions,
-          commitAttachments,
-          commitLinkPreviews,
+    const handleMessagePayload = (payload: unknown) => {
+      const eventType = getRealtimeEventType(payload);
+      if (!eventType) {
+        messageReloadScheduler.scheduleMessageReload("messages_sub_fallback");
+        return;
+      }
+      const nextRow = getRealtimeNewRow(payload);
+      const oldRow = getRealtimeOldRow(payload);
+      const rowRecord = eventType === "DELETE" ? oldRow : nextRow;
+      const messageId = getStringField(rowRecord, "id");
+      if (!messageId) {
+        messageReloadScheduler.scheduleMessageReload("messages_sub_fallback");
+        return;
+      }
+
+      if (eventType === "DELETE") {
+        const next = currentBundlesRef.current.filter((b) => b.id !== messageId);
+        commitBundles(next, "messages_sub_delete");
+        return;
+      }
+
+      const deletedAt = getNullableStringField(nextRow, "deleted_at");
+      if (deletedAt) {
+        const next = currentBundlesRef.current.filter((b) => b.id !== messageId);
+        commitBundles(next, "messages_sub_soft_delete");
+        return;
+      }
+
+      if (!nextRow || !currentServerId || !currentChannelId) return;
+      const incoming = rawMessageRowToBundle(
+        nextRow,
+        currentServerId,
+        currentChannelId,
+      );
+      if (!incoming) {
+        messageReloadScheduler.scheduleMessageReload("messages_sub_fallback");
+        return;
+      }
+
+      const list = currentBundlesRef.current;
+      const idx = list.findIndex((b) => b.id === messageId);
+      const base =
+        idx >= 0
+          ? {
+              ...list[idx],
+              ...incoming,
+              reactions: list[idx].reactions,
+              attachment: list[idx].attachment,
+              linkPreview: list[idx].linkPreview,
+            }
+          : incoming;
+      const next = [...list.filter((b) => b.id !== messageId), base].sort(
+        compareMessageBundlesAsc,
+      );
+      const revokedUserIds = getCachedChannelRevokedUserIds(
+        currentServerId,
+        currentChannelId,
+      ) ?? [];
+      const filtered = applyVisibilityToBundles(next, {
+        communityId: currentServerId,
+        channelId: currentChannelId,
+        revokedUserIds,
+        blockedUserIds,
+        isElevatedInServer: isCurrentUserElevatedInServer,
+      });
+      commitBundles(
+        filtered,
+        idx >= 0 ? "messages_sub_update" : "messages_sub_insert",
+      );
+    };
+
+    const handleReactionPayload = (payload: unknown) => {
+      const eventType = getRealtimeEventType(payload);
+      if (!eventType) {
+        messageReloadScheduler.scheduleMessageReload("reactions_sub_fallback");
+        return;
+      }
+      const nextRow = getRealtimeNewRow(payload);
+      const oldRow = getRealtimeOldRow(payload);
+
+      if (eventType === "DELETE") {
+        const reactionId = getStringField(oldRow, "id");
+        if (!reactionId) return;
+        const messageId = getStringField(oldRow, "message_id");
+        if (!messageId) return;
+        updateMessageBundle(messageId, (b) => ({
+          ...b,
+          reactions: b.reactions.filter((r) => r.id !== reactionId),
+        }));
+        currentBundlesRef.current = useMessagesStore.getState().messages;
+        persistCurrentChannelBundleCache("realtime");
+        markMessagesFresh();
+        return;
+      }
+
+      const reaction = parseReactionFromRow(nextRow);
+      if (!reaction) return;
+      if (!currentBundlesRef.current.some((b) => b.id === reaction.messageId))
+        return;
+
+      updateMessageBundle(reaction.messageId, (b) => {
+        const without = b.reactions.filter((r) => r.id !== reaction.id);
+        const merged = [...without, reaction].sort((a, c) => {
+          if (a.createdAt < c.createdAt) return -1;
+          if (a.createdAt > c.createdAt) return 1;
+          return a.id.localeCompare(c.id);
         });
-        if (!handled) {
-          messageReloadScheduler.scheduleMessageReload("messages_sub_fallback");
-        }
-      },
-      onReactionPayload: (payload) => {
-        const handled = applyIncrementalReactionRealtimePayload({
-          payload,
-          currentMessageList: messageBundleController.getCurrentMessageList(),
-          currentReactionList: messageBundleController.getCurrentReactionList(),
-          commitReactions,
-        });
-        if (!handled) {
-          messageReloadScheduler.scheduleMessageReload(
-            "reactions_sub_fallback",
-          );
-        }
-      },
-      onAttachmentPayload: (payload) => {
-        const messageId = getAffectedMessageIdFromRealtimePayload(
-          payload,
-          messageBundleController
-            .getCurrentAttachmentList()
-            .map((row) => ({ id: row.id, messageId: row.messageId })),
+        return { ...b, reactions: merged };
+      });
+      currentBundlesRef.current = useMessagesStore.getState().messages;
+      persistCurrentChannelBundleCache("realtime");
+      markMessagesFresh();
+    };
+
+    const handleAttachmentPayload = (payload: unknown) => {
+      const eventType = getRealtimeEventType(payload);
+      if (!eventType) {
+        messageReloadScheduler.scheduleMessageReload(
+          "attachments_sub_fallback",
         );
-        if (!messageId) {
-          messageReloadScheduler.scheduleMessageReload(
-            "attachments_sub_fallback",
-          );
-          return;
-        }
-        incrementalRelatedRefreshQueues.queueAttachmentRefresh(messageId);
-      },
-      onLinkPreviewPayload: (payload) => {
-        const messageId = getAffectedMessageIdFromRealtimePayload(
-          payload,
-          messageBundleController
-            .getCurrentLinkPreviewList()
-            .map((row) => ({ id: row.id, messageId: row.messageId })),
+        return;
+      }
+      const nextRow = getRealtimeNewRow(payload);
+      const oldRow = getRealtimeOldRow(payload);
+      const messageId =
+        getStringField(nextRow, "message_id") ??
+        getStringField(oldRow, "message_id");
+      if (!messageId) {
+        messageReloadScheduler.scheduleMessageReload(
+          "attachments_sub_fallback",
         );
-        if (!messageId) {
-          messageReloadScheduler.scheduleMessageReload("previews_sub_fallback");
-          return;
+        return;
+      }
+
+      if (eventType === "DELETE") {
+        updateMessageBundle(messageId, (b) => ({ ...b, attachment: null }));
+      } else {
+        const att = parseAttachmentFromRow(nextRow);
+        if (att) {
+          updateMessageBundle(messageId, (b) => ({ ...b, attachment: att }));
         }
-        incrementalRelatedRefreshQueues.queueLinkPreviewRefresh(messageId);
-      },
-    });
+      }
+      currentBundlesRef.current = useMessagesStore.getState().messages;
+      persistCurrentChannelBundleCache("realtime");
+      markMessagesFresh();
+    };
+
+    const handleLinkPreviewPayload = (payload: unknown) => {
+      const eventType = getRealtimeEventType(payload);
+      if (!eventType) {
+        messageReloadScheduler.scheduleMessageReload("previews_sub_fallback");
+        return;
+      }
+      const nextRow = getRealtimeNewRow(payload);
+      const oldRow = getRealtimeOldRow(payload);
+      const messageId =
+        getStringField(nextRow, "message_id") ??
+        getStringField(oldRow, "message_id");
+      if (!messageId) {
+        messageReloadScheduler.scheduleMessageReload("previews_sub_fallback");
+        return;
+      }
+
+      if (eventType === "DELETE") {
+        updateMessageBundle(messageId, (b) => ({ ...b, linkPreview: null }));
+      } else {
+        const lp = parseLinkPreviewFromRow(nextRow);
+        if (lp) {
+          updateMessageBundle(messageId, (b) => ({ ...b, linkPreview: lp }));
+        }
+      }
+      currentBundlesRef.current = useMessagesStore.getState().messages;
+      persistCurrentChannelBundleCache("realtime");
+      markMessagesFresh();
+    };
+
+    const cleanupRealtimeMessageStreams = (() => {
+      const messageChannel = communityBackend.subscribeToMessages(
+        currentChannelId,
+        handleMessagePayload,
+      );
+      const reactionsChannel = communityBackend.subscribeToMessageReactions(
+        currentChannelId,
+        handleReactionPayload,
+      );
+      const attachmentsChannel = communityBackend.subscribeToMessageAttachments(
+        currentChannelId,
+        handleAttachmentPayload,
+      );
+      const linkPreviewsChannel =
+        communityBackend.subscribeToMessageLinkPreviews(
+          currentChannelId,
+          handleLinkPreviewPayload,
+        );
+
+      return () => {
+        void messageChannel.unsubscribe();
+        void reactionsChannel.unsubscribe();
+        void attachmentsChannel.unsubscribe();
+        void linkPreviewsChannel.unsubscribe();
+      };
+    })();
 
     return () => {
       isMounted = false;
       clearRequestOlderMessagesLoader();
       messageReloadScheduler.cleanup();
-      incrementalRelatedRefreshQueues.cleanup();
       cleanupRealtimeMessageStreams();
       messageReloadLifecycle.cleanup();
     };
   }, [
-    currentUserId,
-    currentServerId,
-    currentChannelId,
-    debugChannelReloads,
+    blockedUserIds,
     channels,
-    resetMessageState,
-    setStoredProfiles,
-    isCurrentMessageLoad,
-    syncLoadedMessageWindow,
-    loadLatestMessagesWithRelated,
-    loadOlderMessagesWithRelated,
-    getAffectedMessageIdFromRealtimePayload,
-    applyIncrementalMessageRealtimePayload,
-    applyIncrementalReactionRealtimePayload,
-    subscribeToMessageRealtimeStreams,
-    createIncrementalRelatedRefreshQueues,
-    createMessageReloadScheduler,
-    createMessageReloadLifecycle,
-    createMessageBundleController,
-    finishOlderMessagesLoad,
-    setRequestOlderMessagesLoader,
     clearRequestOlderMessagesLoader,
+    createNextMessageLoadId,
+    currentChannelId,
+    currentServerId,
+    currentUserId,
+    debugChannelReloads,
     ensureChannelRevokedUserIdsLoaded,
-    fetchRelatedForMessages,
-    applyChannelAccessVisibility,
-    applyBlockVisibility,
+    finishOlderMessagesLoad,
+    getCachedChannelBundles,
+    getCachedChannelRevokedUserIds,
+    isCurrentUserElevatedInServer,
+    isCurrentMessageLoad,
+    markMessagesFresh,
+    resetMessageState,
+    setRequestOlderMessagesLoader,
+    setStoredMessages,
+    tryBeginOlderMessagesLoad,
+    updateMessageBundle,
+    runMessageMediaMaintenance,
+    areMessagesFresh,
+    cacheChannelBundles,
   ]);
-
-  const messagesStoreState = useMessagesStore.getState();
 
   return {
     state: {
-      hasOlderMessages: messagesStoreState.hasMore,
-      isLoadingOlderMessages: messagesStoreState.isLoading,
+      hasOlderMessages,
+      isLoadingOlderMessages,
     },
     derived: {},
     actions: {
