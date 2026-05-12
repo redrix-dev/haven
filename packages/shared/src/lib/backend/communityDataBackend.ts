@@ -2532,7 +2532,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         ? input.file.size
         : input.file instanceof ArrayBuffer
           ? input.file.byteLength
-          : (input.file as ArrayBuffer).byteLength;
+          : (input.file as unknown as ArrayBuffer).byteLength;
 
     const uploadContentType = input.contentType ?? input.mimeType;
     const { error: uploadError } = await havenCommunitySb().storage

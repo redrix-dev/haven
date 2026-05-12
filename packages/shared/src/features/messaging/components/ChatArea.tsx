@@ -123,7 +123,7 @@ export function ChatArea({
     );
     if (
       !replyTargetMessage ||
-      (replyTargetMessage.is_hidden && !shouldShowHiddenMessages)
+      (replyTargetMessage.isHidden && !shouldShowHiddenMessages)
     ) {
       setReplyTarget(null);
     }

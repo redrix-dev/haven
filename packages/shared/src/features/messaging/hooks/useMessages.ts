@@ -652,8 +652,9 @@ export function useMessages({
             },
           });
         }
-      } catch {
+      } catch (e) {
         // silent — prefetch failures are non-fatal
+        void e;
       }
     },
     [
@@ -817,9 +818,9 @@ export function useMessages({
             filename: inferredMediaFilename,
             expiresAt: upload.expiresAt,
           });
-        } catch {
+        } catch (e) {
           await communityBackend.deleteMessage({ messageId: id });
-          throw;
+          throw e;
         }
         return;
       }

@@ -100,7 +100,7 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
   async fetchPlatformStaff(userId) {
     const { data, error } = await client
       .from('platform_staff')
-      .select('is_active, can_post_haven_dev, display_prefix')
+      .select('is_active, display_prefix')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -108,7 +108,6 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     if (!data) return null;
     return {
       isActive: Boolean(data.is_active),
-      canPostHavenDev: Boolean(data.can_post_haven_dev),
       displayPrefix: data.display_prefix ?? null,
     };
   },

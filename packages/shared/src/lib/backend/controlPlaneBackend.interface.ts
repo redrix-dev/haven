@@ -9,7 +9,6 @@ import type {
 
 export type PlatformStaffInfo = {
   isActive: boolean;
-  canPostHavenDev: boolean;
   displayPrefix: string | null;
 };
 
