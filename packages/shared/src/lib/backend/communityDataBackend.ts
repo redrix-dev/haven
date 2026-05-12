@@ -1221,69 +1221,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return { memberId: memberRow.id, roleIds };
   },
 
-  subscribeToMyServerPermissionsChanges(
-    communityId,
-    memberId,
-    roleIds,
-    onInvalidate,
-  ) {
-    const uniqueRoleIds = [...new Set(roleIds)];
-    const channelName = `server_permissions:${communityId}:${memberId}:${uniqueRoleIds.slice().sort().join(',')}`;
-    let channel = havenCommunitySb()
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'member_roles',
-          filter: `member_id=eq.${memberId}`,
-        },
-        onInvalidate,
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'community_members',
-          filter: `id=eq.${memberId}`,
-        },
-        (payload) => {
-          if (payload.eventType === 'UPDATE') {
-            const nextRow = payload.new as { is_owner?: boolean } | null;
-            const prevRow = payload.old as { is_owner?: boolean } | null;
-            if (
-              nextRow &&
-              prevRow &&
-              typeof nextRow.is_owner === 'boolean' &&
-              typeof prevRow.is_owner === 'boolean' &&
-              nextRow.is_owner === prevRow.is_owner
-            ) {
-              return;
-            }
-          }
-          onInvalidate();
-        },
-      );
-
-    if (uniqueRoleIds.length > 0) {
-      channel = channel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'role_permissions',
-          filter: `role_id=in.(${uniqueRoleIds.join(',')})`,
-        },
-        onInvalidate,
-      );
-    }
-
-    channel.subscribe();
-    return channel;
-  },
-
   async broadcastMemberBanned({ communityId, bannedUserId }) {
     const broadcastChannel = activeCommunityChannelsById.get(communityId);
     if (!broadcastChannel) {

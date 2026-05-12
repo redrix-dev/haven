@@ -17,11 +17,6 @@ import {
   stableOnMemberChannelAccessRevoked,
 } from "@shared/app/chat-app/realtime/communityAccessBroadcastBridge";
 
-type PermissionRealtimeContext = {
-  memberId: string;
-  roleIds: string[];
-};
-
 type UseCommunityWorkspaceInput = {
   servers: ServerSummary[];
   currentUserId: string | null;
@@ -60,8 +55,6 @@ export function useCommunityWorkspace({
   const [channelsError, setChannelsError] = React.useState<string | null>(null);
   const [reportStatusRefreshVersion, setReportStatusRefreshVersion] =
     React.useState(0);
-  const [permissionRealtimeContext, setPermissionRealtimeContext] =
-    React.useState<PermissionRealtimeContext | null>(null);
 
   const channelsByServerCacheRef = React.useRef<Record<string, Channel[]>>({});
   const lastSelectedChannelIdByServerRef = React.useRef<
@@ -280,97 +273,6 @@ export function useCommunityWorkspace({
 
     void hydrateCommunityPermissions(currentServerId);
   }, [currentServerId, currentUserId]);
-
-  // Resolve member + role ids for tight permission realtime (separate from hydrate RPCs).
-  React.useEffect(() => {
-    if (!currentServerId || !currentUserId) {
-      setPermissionRealtimeContext(null);
-      return;
-    }
-
-    let cancelled = false;
-    setPermissionRealtimeContext(null);
-    const communityBackend = getCommunityDataBackend(currentServerId);
-
-    void (async () => {
-      try {
-        const snapshot =
-          await communityBackend.fetchMyMemberRoleAssignmentForRealtime(
-            currentServerId,
-            currentUserId,
-          );
-        if (cancelled) return;
-        if (!snapshot) {
-          setPermissionRealtimeContext(null);
-          return;
-        }
-        setPermissionRealtimeContext({
-          memberId: snapshot.memberId,
-          roleIds: snapshot.roleIds,
-        });
-      } catch (error) {
-        console.error("Failed to load permission realtime context:", error);
-        if (!cancelled) setPermissionRealtimeContext(null);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentServerId, currentUserId]);
-
-  // member_roles, role_permissions (assigned roles only), community_members (e.g. is_owner)
-  React.useEffect(() => {
-    if (!currentServerId || !currentUserId || !permissionRealtimeContext) {
-      return;
-    }
-
-    let isMounted = true;
-    const communityBackend = getCommunityDataBackend(currentServerId);
-    const { memberId, roleIds } = permissionRealtimeContext;
-
-    const refreshRoleAssignment = async () => {
-      try {
-        const next =
-          await communityBackend.fetchMyMemberRoleAssignmentForRealtime(
-            currentServerId,
-            currentUserId,
-          );
-        if (!isMounted || !next) return;
-        setPermissionRealtimeContext((prev) => {
-          if (!prev) return prev;
-          const prevKey = [...prev.roleIds].sort().join("\0");
-          const nextKey = [...next.roleIds].sort().join("\0");
-          if (prev.memberId !== next.memberId || prevKey !== nextKey) {
-            return { memberId: next.memberId, roleIds: next.roleIds };
-          }
-          return prev;
-        });
-      } catch (error) {
-        console.error(
-          "Failed to refresh role assignment after permission realtime:",
-          error,
-        );
-      }
-    };
-
-    const onInvalidate = () => {
-      void hydrateCommunityPermissions(currentServerId);
-      void refreshRoleAssignment();
-    };
-
-    const channel = communityBackend.subscribeToMyServerPermissionsChanges(
-      currentServerId,
-      memberId,
-      roleIds,
-      onInvalidate,
-    );
-
-    return () => {
-      isMounted = false;
-      void channel.unsubscribe();
-    };
-  }, [currentServerId, currentUserId, permissionRealtimeContext]);
 
   // Derived values
   const currentServer = React.useMemo(
