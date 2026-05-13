@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
 import { getCommunityDataBackend } from "@shared/lib/backend";
+import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import { CHANNEL_BUNDLE_STALE_MS, MESSAGE_PAGE_SIZE } from "@shared/app/constants";
 import type { ChannelMessageBundleSyncMetadata } from "@shared/app/types/types";
 import {
@@ -303,6 +304,25 @@ const parseAttachmentFromRow = (
     expiresAt,
     signedUrl: null,
   };
+};
+
+const signRealtimeMessageAttachment = async (
+  backend: CommunityDataBackend,
+  communityId: string,
+  channelId: string,
+  att: MessageAttachment,
+): Promise<MessageAttachment> => {
+  try {
+    const signedList = await backend.listMessageAttachments(
+      communityId,
+      channelId,
+    );
+    const match = signedList.find((a) => a.id === att.id);
+    if (match) return match;
+  } catch (signedError) {
+    console.error("Failed to sign realtime message attachment:", signedError);
+  }
+  return { ...att, signedUrl: null };
 };
 
 const parseLinkPreviewFromRow = (
@@ -796,9 +816,17 @@ export function useMessages({
           channelId: currentChannelId,
           file: fileBody,
           filename: inferredMediaFilename,
-          mimeType: options?.mediaContentType?.trim() ?? "application/octet-stream",
+          mimeType:
+            options?.mediaContentType?.trim() ??
+            (options?.mediaFile instanceof Blob
+              ? options.mediaFile.type || "application/octet-stream"
+              : "application/octet-stream"),
           expiresInHours: coerceMediaExpiresInHours(options?.mediaExpiresInHours),
-          contentType: options?.mediaContentType?.trim(),
+          contentType:
+            options?.mediaContentType?.trim() ??
+            (options?.mediaFile instanceof Blob
+              ? options.mediaFile.type || undefined
+              : undefined),
         });
         const { id } = await communityBackend.sendUserMessage({
           communityId: currentServerId,
@@ -1727,15 +1755,30 @@ export function useMessages({
 
       if (eventType === "DELETE") {
         updateMessageBundle(messageId, (b) => ({ ...b, attachment: null }));
-      } else {
-        const att = parseAttachmentFromRow(nextRow);
-        if (att) {
-          updateMessageBundle(messageId, (b) => ({ ...b, attachment: att }));
-        }
+        currentBundlesRef.current = useMessagesStore.getState().messages;
+        persistCurrentChannelBundleCache("realtime");
+        markMessagesFresh();
+        return;
       }
-      currentBundlesRef.current = useMessagesStore.getState().messages;
-      persistCurrentChannelBundleCache("realtime");
-      markMessagesFresh();
+
+      void (async () => {
+        const att = parseAttachmentFromRow(nextRow);
+        if (!att) return;
+        const signed = await signRealtimeMessageAttachment(
+          communityBackend,
+          currentServerId,
+          currentChannelId,
+          att,
+        );
+        if (!isMounted) return;
+        updateMessageBundle(messageId, (b) => ({
+          ...b,
+          attachment: signed,
+        }));
+        currentBundlesRef.current = useMessagesStore.getState().messages;
+        persistCurrentChannelBundleCache("realtime");
+        markMessagesFresh();
+      })();
     };
 
     const handleLinkPreviewPayload = (payload: unknown) => {

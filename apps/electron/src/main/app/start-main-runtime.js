@@ -28,7 +28,6 @@ const startMainRuntime = async ({
   updaterService.initialize();
 
   registerDesktopIpcHandlers({
-    app,
     ipcMain,
     settingsStore,
     updaterService,
