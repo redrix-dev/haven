@@ -41,8 +41,6 @@ type UseDirectMessagesInput = {
     | 'markConversationRead'
     | 'setConversationMuted'
     | 'reportMessage'
-    | 'subscribeToConversations'
-    | 'subscribeToMessages'
   >;
   userId: string | null | undefined;
   enabled: boolean;
@@ -57,6 +55,8 @@ export function useDirectMessages({
 }: UseDirectMessagesInput) {
   const dmConversations = useDmStore((state) => state.conversations);
   const dmConversationsLoading = useDmStore((state) => state.isLoading);
+  const dmConversationsRefreshTrigger = useDmStore((state) => state.dmConversationsRefreshTrigger);
+  const dmMessageRefreshTrigger = useDmStore((state) => state.dmMessageRefreshTrigger);
   const [dmConversationsRefreshing, setDmConversationsRefreshing] = React.useState(false);
   const [dmConversationsError, setDmConversationsError] = React.useState<string | null>(null);
   const selectedDmConversationId = useDmStore((state) => state.currentConversationId);
@@ -372,18 +372,11 @@ export function useDirectMessages({
   }, [dmConversations, selectedDmConversationId, syncStoredCurrentConversation]);
 
   React.useEffect(() => {
-    if (!userId || !enabled) return;
-
-    const subscription = directMessageBackend.subscribeToConversations(userId, () => {
-      void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
-        console.error('Failed to refresh DM conversations after realtime update:', error);
-      });
+    if (dmConversationsRefreshTrigger === 0) return;
+    void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
+      console.error('Failed to refresh DM conversations after realtime update:', error);
     });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [directMessageBackend, enabled, refreshDmConversations, userId]);
+  }, [dmConversationsRefreshTrigger, refreshDmConversations]);
 
   React.useEffect(() => {
     if (!isActive || !selectedDmConversationId || !userId) {
@@ -412,24 +405,18 @@ export function useDirectMessages({
   }, [applyCachedDmMessages, isActive, refreshDmMessages, selectedDmConversationId, userId]);
 
   React.useEffect(() => {
-    if (!isActive || !selectedDmConversationId) return;
-
-    const subscription = directMessageBackend.subscribeToMessages(selectedDmConversationId, () => {
-      void refreshDmMessages(selectedDmConversationId, {
-        suppressLoadingState: true,
-        markRead: false,
-      }).catch((error) => {
-        console.error('Failed to refresh DM messages after realtime update:', error);
-      });
-      void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
-        console.error('Failed to refresh DM conversations after message update:', error);
-      });
+    if (dmMessageRefreshTrigger === null) return;
+    if (dmMessageRefreshTrigger.conversationId !== selectedDmConversationId) return;
+    void refreshDmMessages(selectedDmConversationId, {
+      suppressLoadingState: true,
+      markRead: false,
+    }).catch((error) => {
+      console.error('Failed to refresh DM messages after realtime update:', error);
     });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [directMessageBackend, isActive, refreshDmConversations, refreshDmMessages, selectedDmConversationId]);
+    void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
+      console.error('Failed to refresh DM conversations after message update:', error);
+    });
+  }, [dmMessageRefreshTrigger, refreshDmConversations, refreshDmMessages, selectedDmConversationId]);
 
   const openDirectMessageConversation = React.useCallback(
     async (conversationId: string) => {

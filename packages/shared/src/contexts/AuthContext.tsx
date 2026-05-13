@@ -11,6 +11,7 @@ import { getControlPlaneBackend } from "@shared/lib/backend";
 import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useNotificationsStore } from "@shared/stores/notificationsStore";
+import { useDmStore } from "@shared/stores/dmStore";
 
 const havenAuthClient = () => requireHavenDataRuntime().client;
 import { getAppHost } from "@shared/platform/appHost";
@@ -226,6 +227,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
                 if (evt.type === "NOTIFICATION") {
                   useNotificationsStore.getState().triggerInboxRefresh();
+                  return;
+                }
+                if (evt.type === "DM_CONVERSATION") {
+                  useDmStore.getState().triggerConversationsRefresh();
+                  return;
+                }
+                if (evt.type === "DM_MESSAGE") {
+                  const conversationId = evt.payload.conversation_id;
+                  if (typeof conversationId === "string") {
+                    useDmStore.getState().triggerMessageRefresh(conversationId);
+                  }
+                  useDmStore.getState().triggerConversationsRefresh();
                   return;
                 }
                 console.log(
