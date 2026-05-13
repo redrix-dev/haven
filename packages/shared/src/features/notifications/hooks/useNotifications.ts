@@ -24,7 +24,6 @@ type UseNotificationsInput = {
     | 'dismissNotifications'
     | 'getNotificationPreferences'
     | 'updateNotificationPreferences'
-    | 'subscribeToNotificationInbox'
   >;
   userId: string | null | undefined;
   audioSettings: NotificationAudioSettings;
@@ -39,6 +38,7 @@ export function useNotifications({
 }: UseNotificationsInput) {
   const notificationsPanelOpen = useNotificationsStore((state) => state.isPanelOpen);
   const notificationItems = useNotificationsStore((state) => state.notifications);
+  const inboxRefreshTrigger = useNotificationsStore((state) => state.inboxRefreshTrigger);
   const [notificationCounts, setNotificationCounts] = React.useState<NotificationCounts>(
     DEFAULT_NOTIFICATION_COUNTS
   );
@@ -223,24 +223,17 @@ export function useNotifications({
   }, [notificationBackend, userId]);
 
   React.useEffect(() => {
-    if (!userId) return;
-
-    const subscription = notificationBackend.subscribeToNotificationInbox(userId, () => {
-      setNotificationsRefreshing(true);
-      void refreshNotificationInbox({ playSoundsForNew: true })
-        .catch((error) => {
-          console.error('Failed to refresh notifications after realtime update:', error);
-          setNotificationsError(getErrorMessage(error, 'Failed to refresh notifications.'));
-        })
-        .finally(() => {
-          setNotificationsRefreshing(false);
-        });
-    });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [notificationBackend, refreshNotificationInbox, userId]);
+    if (inboxRefreshTrigger === 0) return;
+    setNotificationsRefreshing(true);
+    void refreshNotificationInbox({ playSoundsForNew: true })
+      .catch((error) => {
+        console.error('Failed to refresh notifications after realtime update:', error);
+        setNotificationsError(getErrorMessage(error, 'Failed to refresh notifications.'));
+      })
+      .finally(() => {
+        setNotificationsRefreshing(false);
+      });
+  }, [inboxRefreshTrigger, refreshNotificationInbox]);
 
   React.useEffect(() => {
     if (!autoMarkSeenOnPanelOpen) return;

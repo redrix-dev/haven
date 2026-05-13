@@ -1,4 +1,3 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import type {
   NotificationCounts,
@@ -49,10 +48,6 @@ export interface NotificationBackend {
   dismissNotifications(recipientIds: string[]): Promise<number>;
   getNotificationPreferences(): Promise<NotificationPreferences>;
   updateNotificationPreferences(input: NotificationPreferenceUpdate): Promise<NotificationPreferences>;
-  subscribeToNotificationInbox(
-    userId: string,
-    onChange: (payload?: unknown) => void
-  ): RealtimeChannel;
 }
 
 type NotificationListRow = {
@@ -583,22 +578,6 @@ export function createNotificationBackend(client: HavenSupabaseClient): Notifica
       throw new Error('Notification preferences update returned no row.');
     }
     return mapNotificationPreferences(row);
-  },
-
-  subscribeToNotificationInbox(userId, onChange) {
-    return client
-      .channel(`notification_inbox:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notification_recipients',
-          filter: `recipient_user_id=eq.${userId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .subscribe();
   },
 };
 }

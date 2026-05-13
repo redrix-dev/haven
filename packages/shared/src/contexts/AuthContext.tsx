@@ -10,6 +10,7 @@ import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
+import { useNotificationsStore } from "@shared/stores/notificationsStore";
 
 const havenAuthClient = () => requireHavenDataRuntime().client;
 import { getAppHost } from "@shared/platform/appHost";
@@ -221,6 +222,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     .getState()
                     .invalidateElevatedForServer(communityId);
                   void hydrateCommunityPermissions(communityId);
+                  return;
+                }
+                if (evt.type === "NOTIFICATION") {
+                  useNotificationsStore.getState().triggerInboxRefresh();
                   return;
                 }
                 console.log(
