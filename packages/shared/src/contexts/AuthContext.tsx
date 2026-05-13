@@ -12,6 +12,7 @@ import { hydrateCommunityPermissions } from "@shared/features/community/communit
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useNotificationsStore } from "@shared/stores/notificationsStore";
 import { useDmStore } from "@shared/stores/dmStore";
+import { useSocialStore } from "@shared/stores/socialStore";
 
 const havenAuthClient = () => requireHavenDataRuntime().client;
 import { getAppHost } from "@shared/platform/appHost";
@@ -239,6 +240,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     useDmStore.getState().triggerMessageRefresh(conversationId);
                   }
                   useDmStore.getState().triggerConversationsRefresh();
+                  return;
+                }
+                if (evt.type === "SOCIAL_CHANGE") {
+                  useSocialStore.getState().triggerSocialRefresh(evt.payload);
                   return;
                 }
                 console.log(

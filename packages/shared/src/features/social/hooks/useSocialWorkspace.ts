@@ -9,35 +9,11 @@ import { useSocialGraphRealtimeStore } from '@shared/stores/socialGraphRealtimeS
 type UseSocialWorkspaceInput = {
   socialBackend: Pick<
     SocialBackend,
-    | 'getSocialCounts'
-    | 'listMyBlocks'
-    | 'listUsersBlockingMe'
-    | 'subscribeToSocialGraph'
+    'getSocialCounts' | 'listMyBlocks' | 'listUsersBlockingMe'
   >;
   userId: string | null | undefined;
   enabled: boolean;
 };
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-
-const getRealtimeEventType = (payload: unknown): 'INSERT' | 'UPDATE' | 'DELETE' | null => {
-  const eventType = asRecord(payload)?.eventType;
-  return eventType === 'INSERT' || eventType === 'UPDATE' || eventType === 'DELETE' ? eventType : null;
-};
-
-const getRealtimeTableName = (payload: unknown): string | null => {
-  const table = asRecord(payload)?.table;
-  return typeof table === 'string' ? table : null;
-};
-
-const getRealtimeNewRow = (payload: unknown): Record<string, unknown> | null =>
-  asRecord(asRecord(payload)?.new);
-
-const getRealtimeOldRow = (payload: unknown): Record<string, unknown> | null =>
-  asRecord(asRecord(payload)?.old);
 
 export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocialWorkspaceInput) {
   const [friendsPanelOpen, setFriendsPanelOpen] = React.useState(false);
@@ -47,6 +23,9 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
   const [friendsPanelHighlightedRequestId, setFriendsPanelHighlightedRequestId] =
     React.useState<string | null>(null);
   const [socialCounts, setSocialCounts] = React.useState<SocialCounts>(DEFAULT_SOCIAL_COUNTS);
+
+  const socialRefreshTrigger = useSocialStore((state) => state.socialRefreshTrigger);
+  const lastSocialPayload = useSocialStore((state) => state.lastSocialPayload);
 
   const setStoredBlockLists = React.useCallback(
     (input: { myBlockedUserIds: string[]; usersBlockingMeIds: string[] }) => {
@@ -131,59 +110,35 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
   }, [enabled, refreshBlockLists, refreshSocialCounts, resetStoredBlockLists, userId]);
 
   React.useEffect(() => {
-    if (!userId || !enabled) return;
+    if (socialRefreshTrigger === 0) return;
 
-    const subscription = socialBackend.subscribeToSocialGraph(userId, (payload) => {
-      useSocialGraphRealtimeStore.getState().bump();
+    const payload = lastSocialPayload;
+    const eventType = typeof payload?.event_type === 'string'
+      ? payload.event_type : null;
+    const blockerUserId = typeof payload?.blocker_user_id === 'string'
+      ? payload.blocker_user_id : null;
+    const blockedUserId = typeof payload?.blocked_user_id === 'string'
+      ? payload.blocked_user_id : null;
 
-      if (getRealtimeTableName(payload) === 'user_blocks') {
-        const eventType = getRealtimeEventType(payload);
-        const nextRow = getRealtimeNewRow(payload);
-        const oldRow = getRealtimeOldRow(payload);
-        const blockerUserId =
-          (typeof nextRow?.blocker_user_id === 'string' ? nextRow.blocker_user_id : null) ??
-          (typeof oldRow?.blocker_user_id === 'string' ? oldRow.blocker_user_id : null);
-        const blockedUserId =
-          (typeof nextRow?.blocked_user_id === 'string' ? nextRow.blocked_user_id : null) ??
-          (typeof oldRow?.blocked_user_id === 'string' ? oldRow.blocked_user_id : null);
-
-        if (eventType === 'INSERT') {
-          if (blockerUserId === userId && blockedUserId) {
-            addStoredMyBlockedUserId(blockedUserId);
-          }
-          if (blockedUserId === userId && blockerUserId) {
-            addStoredUserBlockingMeId(blockerUserId);
-          }
-        }
-
-        if (eventType === 'DELETE') {
-          if (blockerUserId === userId && blockedUserId) {
-            removeStoredMyBlockedUserId(blockedUserId);
-          }
-          if (blockedUserId === userId && blockerUserId) {
-            removeStoredUserBlockingMeId(blockerUserId);
-          }
-        }
+    if (blockerUserId && blockedUserId) {
+      if (eventType === 'INSERT') {
+        if (blockerUserId === userId) addStoredMyBlockedUserId(blockedUserId);
+        if (blockedUserId === userId) addStoredUserBlockingMeId(blockerUserId);
       }
+      if (eventType === 'DELETE') {
+        if (blockerUserId === userId) removeStoredMyBlockedUserId(blockedUserId);
+        if (blockedUserId === userId) removeStoredUserBlockingMeId(blockerUserId);
+      }
+    }
 
-      void refreshSocialCounts().catch((error) => {
-        console.error('Failed to refresh social counts after realtime update:', error);
-      });
+    useSocialGraphRealtimeStore.getState().bump();
+
+    void refreshSocialCounts().catch((error) => {
+      console.error('Failed to refresh social counts after realtime update:', error);
     });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [
-    addStoredMyBlockedUserId,
-    addStoredUserBlockingMeId,
-    enabled,
-    refreshSocialCounts,
-    removeStoredMyBlockedUserId,
-    removeStoredUserBlockingMeId,
-    socialBackend,
-    userId,
-  ]);
+    // Intentionally only `socialRefreshTrigger`: `lastSocialPayload` is read when the counter changes, not when the payload reference updates alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socialRefreshTrigger]);
 
   return {
     state: {

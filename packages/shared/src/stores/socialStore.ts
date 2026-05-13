@@ -7,6 +7,8 @@ type SocialStoreData = {
 };
 
 export type SocialStoreState = SocialStoreData & {
+  socialRefreshTrigger: number;
+  lastSocialPayload: Record<string, unknown> | null;
   setBlockLists: (input: {
     myBlockedUserIds: string[];
     usersBlockingMeIds: string[];
@@ -15,6 +17,7 @@ export type SocialStoreState = SocialStoreData & {
   removeMyBlockedUserId: (userId: string) => void;
   addUserBlockingMeId: (userId: string) => void;
   removeUserBlockingMeId: (userId: string) => void;
+  triggerSocialRefresh: (payload: Record<string, unknown>) => void;
   reset: () => void;
 };
 
@@ -55,6 +58,13 @@ const createDefaultSocialState = (): SocialStoreData => createSocialState([], []
 
 export const useSocialStore = create<SocialStoreState>()((set) => ({
   ...createDefaultSocialState(),
+  socialRefreshTrigger: 0,
+  lastSocialPayload: null,
+  triggerSocialRefresh: (payload) =>
+    set((state) => ({
+      socialRefreshTrigger: state.socialRefreshTrigger + 1,
+      lastSocialPayload: payload,
+    })),
   setBlockLists: ({ myBlockedUserIds, usersBlockingMeIds }) =>
     set(createSocialState(myBlockedUserIds, usersBlockingMeIds)),
   addMyBlockedUserId: (userId) =>
@@ -81,5 +91,10 @@ export const useSocialStore = create<SocialStoreState>()((set) => ({
       if (nextUsersBlockingMeIds === state.usersBlockingMeIds) return state;
       return createSocialState(state.myBlockedUserIds, nextUsersBlockingMeIds);
     }),
-  reset: () => set(createDefaultSocialState()),
+  reset: () =>
+    set({
+      ...createDefaultSocialState(),
+      socialRefreshTrigger: 0,
+      lastSocialPayload: null,
+    }),
 }));
