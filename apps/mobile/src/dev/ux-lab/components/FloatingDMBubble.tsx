@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, useWindowDimensions, View, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withClamp,
@@ -39,9 +40,9 @@ const THROW_PROJECTION_S = 0.14;
 
 // Below: decay on both axes (place / gentle release).
 const FLING_STRENGTH_FOR_THROW_SETTLE = 420;
-// At and above: commit to a top corner (ray first-hit); below but above
+// At and above: commit to a screen corner (ray first-hit); below but above
 // FLING_STRENGTH_FOR_THROW_SETTLE: spring to clamped prediction only (no forced corner).
-const FLING_STRENGTH_FOR_TOP_CORNER_COMMIT = 580;
+const FLING_STRENGTH_FOR_CORNER_COMMIT = 580;
 const VERTICAL_VELOCITY_WEIGHT_FOR_FLING_STRENGTH = 0.35;
 
 // Snap spring used for expand (bubble moving to top-right)
@@ -54,10 +55,10 @@ const COLLAPSE_SPRING = { damping: 22, stiffness: 130, mass: 1.1 } as const;
 const EXPAND_SHEET_DELAY_MS = 350;
 
 /**
- * First wall hit by ray (x0,y0) + t*(vx,vy), t>0, inside the bubble bounds
- * rectangle; maps to top-left or top-right corner (y = minY only, never top-center).
+ * First wall hit by ray (x0,y0) + t*(vx,vy), t>0, on the bubble bounds
+ * rectangle; maps to nearest corner (TL / TR / BL / BR), never edge-midpoint.
  */
-function topCornerTargetFromRay(
+function cornerTargetFromRay(
   x0: number,
   y0: number,
   vx: number,
@@ -69,7 +70,7 @@ function topCornerTargetFromRay(
 ): { x: number; y: number } {
   "worklet";
   const midX = (leftSnap + rightSnap) * 0.5;
-  const cornerY = minY;
+  const midY = (minY + maxY) * 0.5;
   const EPS = 1e-3;
 
   let bestT = Number.POSITIVE_INFINITY;
@@ -105,23 +106,54 @@ function topCornerTargetFromRay(
       rightSnap,
       Math.max(leftSnap, x0 + vx * bestT),
     );
-    return { x: xh <= midX ? leftSnap : rightSnap, y: cornerY };
+    return { x: xh <= midX ? leftSnap : rightSnap, y: minY };
   }
   if (hit === 1) {
-    return { x: leftSnap, y: cornerY };
+    const yh = Math.min(
+      maxY,
+      Math.max(minY, y0 + vy * bestT),
+    );
+    return { x: leftSnap, y: yh <= midY ? minY : maxY };
   }
   if (hit === 2) {
-    return { x: rightSnap, y: cornerY };
+    const yh = Math.min(
+      maxY,
+      Math.max(minY, y0 + vy * bestT),
+    );
+    return { x: rightSnap, y: yh <= midY ? minY : maxY };
   }
   if (hit === 3) {
     const xh = Math.min(
       rightSnap,
       Math.max(leftSnap, x0 + vx * bestT),
     );
-    return { x: xh <= midX ? leftSnap : rightSnap, y: cornerY };
+    return { x: xh <= midX ? leftSnap : rightSnap, y: maxY };
   }
 
-  return { x: vx >= 0 ? rightSnap : leftSnap, y: cornerY };
+  if (Math.abs(vx) <= EPS && Math.abs(vy) <= EPS) {
+    return {
+      x: x0 <= midX ? leftSnap : rightSnap,
+      y: y0 <= midY ? minY : maxY,
+    };
+  }
+  if (Math.abs(vx) <= EPS) {
+    return {
+      x: x0 <= midX ? leftSnap : rightSnap,
+      y: vy < 0 ? minY : maxY,
+    };
+  }
+  if (Math.abs(vy) <= EPS) {
+    return {
+      x: vx < 0 ? leftSnap : rightSnap,
+      y: y0 <= midY ? minY : maxY,
+    };
+  }
+  if (vx >= 0) {
+    return vy < 0
+      ? { x: rightSnap, y: minY }
+      : { x: rightSnap, y: maxY };
+  }
+  return vy < 0 ? { x: leftSnap, y: minY } : { x: leftSnap, y: maxY };
 }
 
 export type FloatingDMBubbleProps = Record<string, never>;
@@ -302,6 +334,20 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
           const minY = EDGE_MARGIN;
           const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
 
+          const fingerX = Math.min(
+            rightSnap,
+            Math.max(leftSnap, panAnchorX.value + e.translationX),
+          );
+          const fingerY = Math.min(
+            maxY,
+            Math.max(minY, panAnchorY.value + e.translationY),
+          );
+
+          cancelAnimation(translateX);
+          cancelAnimation(translateY);
+          translateX.value = fingerX;
+          translateY.value = fingerY;
+
           const vx = e.velocityX;
           const vy = e.velocityY;
           const flingStrength = Math.hypot(
@@ -310,14 +356,14 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
           );
           const softEnergeticThrow =
             flingStrength >= FLING_STRENGTH_FOR_THROW_SETTLE &&
-            flingStrength < FLING_STRENGTH_FOR_TOP_CORNER_COMMIT;
+            flingStrength < FLING_STRENGTH_FOR_CORNER_COMMIT;
           const hardCornerThrow =
-            flingStrength >= FLING_STRENGTH_FOR_TOP_CORNER_COMMIT;
+            flingStrength >= FLING_STRENGTH_FOR_CORNER_COMMIT;
 
           if (hardCornerThrow) {
-            const corner = topCornerTargetFromRay(
-              translateX.value,
-              translateY.value,
+            const corner = cornerTargetFromRay(
+              fingerX,
+              fingerY,
               vx,
               vy,
               leftSnap,
@@ -348,8 +394,8 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
               }),
             );
           } else if (softEnergeticThrow) {
-            const rawPredX = translateX.value + vx * THROW_PROJECTION_S;
-            const rawPredY = translateY.value + vy * THROW_PROJECTION_S;
+            const rawPredX = fingerX + vx * THROW_PROJECTION_S;
+            const rawPredY = fingerY + vy * THROW_PROJECTION_S;
             const predX = Math.min(
               rightSnap,
               Math.max(leftSnap, rawPredX),
