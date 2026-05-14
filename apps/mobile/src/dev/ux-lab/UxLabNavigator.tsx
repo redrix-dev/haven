@@ -13,7 +13,7 @@ type UxLabNavMode =
   | "drawer"
   | "customShell";
 
-const UX_LAB_NAV_MODE: UxLabNavMode = "bottomTabs";
+const UX_LAB_NAV_MODE: UxLabNavMode = "drawer";
 
 export function UxLabNavigator() {
   if (UX_LAB_NAV_MODE === "nativeStack") {

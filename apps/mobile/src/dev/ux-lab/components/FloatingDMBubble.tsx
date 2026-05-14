@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
+  withClamp,
   withDecay,
   withSpring,
   withTiming,
@@ -11,50 +12,35 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 
-const BUBBLE_SIZE = 56;
+const BUBBLE_SIZE = 64;
 const EDGE_MARGIN = 12;
 const SHEET_HEIGHT = 400;
 
-// How closely the bubble tracks your thumb during drag
-// Higher mass = more perceived lag behind finger
-// const DRAG_SPRING = { damping: 28, stiffness: 380, mass: 1.4 } as const;
-
-// Horizontal flick: one spring to a rail with release velocity baked in.
-const FLING_X_SPRING = {
-  stiffness: 48,
-  damping: 19,
-  mass: 1.2,
-  overshootClamping: true,
+// Drag: spring toward finger each frame — slight lag + tiny settle wobble when
+// motion stops (lower damping / no overshoot clamp). Touch target = visible 64×64.
+const DRAG_SPRING = {
+  stiffness: 368,
+  damping: 18,
+  mass: 1.0,
+  overshootClamping: false,
 } as const;
 
-// “Projection”: where this release would land along X if we extended current
-// motion by a tunable time slice (emotionally tuned, not full decay integration).
-// Used only to pick left vs right rail for strong flings (avoids pure sign(vx)
-// when you’re near the opposite rail).
-const HORIZONTAL_FLING_PROJECTION_S = 0.14;
+// Throw release: both axes spring toward the same clamped predicted point
+// (positional vector prediction — no separate horizontal rail phase).
+const THROW_SETTLE_SPRING = {
+  stiffness: 52,
+  damping: 20,
+  mass: 1.15,
+  overshootClamping: false,
+} as const;
 
-// |flingStrength| below this uses decay only in X (no edge spring). flingStrength
-// combines horizontal and (weighted) vertical release velocity so a sharp vertical
-// flick still “counts” as energetic.
-const FLING_STRENGTH_FOR_EDGE_SPRING = 420;
+// Seconds-scale factor: predicted landing = position + velocity * factor (then clamped).
+const THROW_PROJECTION_S = 0.14;
+
+// Below this composite speed, use decay on both axes (drag-like release).
+// hypot keeps vertical energy in “was this a throw?” without driving X alone.
+const FLING_STRENGTH_FOR_THROW_SETTLE = 420;
 const VERTICAL_VELOCITY_WEIGHT_FOR_FLING_STRENGTH = 0.35;
-
-/** Stage 1: projected landing along X (unclamped), px. */
-function rawProjectedTranslateX(currentX: number, vx: number): number {
-  "worklet";
-  return currentX + vx * HORIZONTAL_FLING_PROJECTION_S;
-}
-
-/** Stage 1: pick rail from projected rest vs rail midpoint (trajectory-based). */
-function snapXFromHorizontalProjection(
-  rawProjectedX: number,
-  leftSnap: number,
-  rightSnap: number,
-): number {
-  "worklet";
-  const midRail = (leftSnap + rightSnap) * 0.5;
-  return rawProjectedX >= midRail ? rightSnap : leftSnap;
-}
 
 // Snap spring used for expand (bubble moving to top-right)
 // Slightly snappier than edge snap
@@ -85,8 +71,8 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
-  const panPrevTranslationX = useSharedValue(0);
-  const panPrevTranslationY = useSharedValue(0);
+  const panAnchorX = useSharedValue(0);
+  const panAnchorY = useSharedValue(0);
 
   const restX = useSharedValue(0);
   const restY = useSharedValue(0);
@@ -141,26 +127,49 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
     clearExpandTimer();
     setExpanded(true);
     const w = layoutW.value;
-    const targetX = w - insets.right - BUBBLE_SIZE - EDGE_MARGIN;
-    const targetY = EDGE_MARGIN;
+    const h = layoutH.value;
+    const minX = insetLeft.value + EDGE_MARGIN;
+    const maxX = w - insetRight.value - BUBBLE_SIZE - EDGE_MARGIN;
+    const minY = EDGE_MARGIN;
+    const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
+    const targetX = maxX;
+    const targetY = minY;
     sheetOpacity.value = 0;
-    translateX.value = withSpring(targetX, EXPAND_SPRING);
-    translateY.value = withSpring(targetY, EXPAND_SPRING);
+    translateX.value = withClamp(
+      { min: minX, max: maxX },
+      withSpring(targetX, EXPAND_SPRING),
+    );
+    translateY.value = withClamp(
+      { min: minY, max: maxY },
+      withSpring(targetY, EXPAND_SPRING),
+    );
     expandSheetTimeoutRef.current = setTimeout(() => {
       sheetOpacity.value = withTiming(1, { duration: 220 });
       expandSheetTimeoutRef.current = null;
     }, EXPAND_SHEET_DELAY_MS);
-  }, [clearExpandTimer, insets.right, sheetOpacity, translateX, translateY]);
+  }, [clearExpandTimer, insetBottom, insetLeft, insetRight, layoutH, layoutW, sheetOpacity, translateX, translateY]);
 
   const finishCollapse = useCallback(() => {
-    translateX.value = withSpring(restX.value, COLLAPSE_SPRING, (finished) => {
-      "worklet";
-      if (finished) {
-        scheduleOnRN(setExpandedFalse);
-      }
-    });
-    translateY.value = withSpring(restY.value, COLLAPSE_SPRING);
-  }, [setExpandedFalse, translateX, translateY, restX, restY]);
+    const w = layoutW.value;
+    const h = layoutH.value;
+    const minX = insetLeft.value + EDGE_MARGIN;
+    const maxX = w - insetRight.value - BUBBLE_SIZE - EDGE_MARGIN;
+    const minY = EDGE_MARGIN;
+    const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
+    translateX.value = withClamp(
+      { min: minX, max: maxX },
+      withSpring(restX.value, COLLAPSE_SPRING, (finished) => {
+        "worklet";
+        if (finished) {
+          scheduleOnRN(setExpandedFalse);
+        }
+      }),
+    );
+    translateY.value = withClamp(
+      { min: minY, max: maxY },
+      withSpring(restY.value, COLLAPSE_SPRING),
+    );
+  }, [insetBottom, insetLeft, insetRight, layoutH, layoutW, setExpandedFalse, translateX, translateY, restX, restY]);
 
   const beginCollapse = useCallback(() => {
     clearExpandTimer();
@@ -185,27 +194,31 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
       Gesture.Pan()
         .enabled(!expanded)
         .onStart(() => {
-          panPrevTranslationX.value = 0;
-          panPrevTranslationY.value = 0;
+          panAnchorX.value = translateX.value;
+          panAnchorY.value = translateY.value;
         })
         .onUpdate((e) => {
-          const dx = e.translationX - panPrevTranslationX.value;
-          const dy = e.translationY - panPrevTranslationY.value;
-          panPrevTranslationX.value = e.translationX;
-          panPrevTranslationY.value = e.translationY;
           const w = layoutW.value;
           const h = layoutH.value;
           const maxX = w - insetRight.value - BUBBLE_SIZE - EDGE_MARGIN;
           const minX = insetLeft.value + EDGE_MARGIN;
           const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
           const minY = EDGE_MARGIN;
-          translateX.value = Math.min(
+          const targetX = Math.min(
             maxX,
-            Math.max(minX, translateX.value + dx),
+            Math.max(minX, panAnchorX.value + e.translationX),
           );
-          translateY.value = Math.min(
+          const targetY = Math.min(
             maxY,
-            Math.max(minY, translateY.value + dy),
+            Math.max(minY, panAnchorY.value + e.translationY),
+          );
+          translateX.value = withClamp(
+            { min: minX, max: maxX },
+            withSpring(targetX, DRAG_SPRING),
+          );
+          translateY.value = withClamp(
+            { min: minY, max: maxY },
+            withSpring(targetY, DRAG_SPRING),
           );
         })
         .onEnd((e) => {
@@ -222,26 +235,38 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
             vx,
             vy * VERTICAL_VELOCITY_WEIGHT_FOR_FLING_STRENGTH,
           );
-          const strongHorizontalFling =
-            flingStrength >= FLING_STRENGTH_FOR_EDGE_SPRING;
+          const energeticThrow =
+            flingStrength >= FLING_STRENGTH_FOR_THROW_SETTLE;
 
-          if (strongHorizontalFling) {
-            const rawProjX = rawProjectedTranslateX(translateX.value, vx);
-            const snapX = snapXFromHorizontalProjection(
-              rawProjX,
-              leftSnap,
+          if (energeticThrow) {
+            const rawPredX = translateX.value + vx * THROW_PROJECTION_S;
+            const rawPredY = translateY.value + vy * THROW_PROJECTION_S;
+            const predX = Math.min(
               rightSnap,
+              Math.max(leftSnap, rawPredX),
             );
-            translateX.value = withSpring(
-              snapX,
-              { ...FLING_X_SPRING, velocity: vx },
-              (finished) => {
-                "worklet";
-                if (finished) {
-                  restX.value = snapX;
-                  scheduleOnRN(commitRestPosition, snapX, translateY.value);
-                }
-              },
+            const predY = Math.min(maxY, Math.max(minY, rawPredY));
+            translateX.value = withClamp(
+              { min: leftSnap, max: rightSnap },
+              withSpring(
+                predX,
+                { ...THROW_SETTLE_SPRING, velocity: vx },
+                (finished) => {
+                  "worklet";
+                  if (finished) {
+                    restX.value = predX;
+                    restY.value = predY;
+                    scheduleOnRN(commitRestPosition, predX, predY);
+                  }
+                },
+              ),
+            );
+            translateY.value = withClamp(
+              { min: minY, max: maxY },
+              withSpring(predY, {
+                ...THROW_SETTLE_SPRING,
+                velocity: vy,
+              }),
             );
           } else {
             translateX.value = withDecay(
@@ -259,21 +284,21 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
                 }
               },
             );
-          }
 
-          translateY.value = withDecay(
-            {
-              velocity: e.velocityY,
-              deceleration: 0.992,
-              clamp: [minY, maxY],
-            },
-            (finished) => {
-              "worklet";
-              if (finished) {
-                restY.value = translateY.value;
-              }
-            },
-          );
+            translateY.value = withDecay(
+              {
+                velocity: vy,
+                deceleration: 0.992,
+                clamp: [minY, maxY],
+              },
+              (finished) => {
+                "worklet";
+                if (finished) {
+                  restY.value = translateY.value;
+                }
+              },
+            );
+          }
         }),
     [commitRestPosition, expanded],
   );

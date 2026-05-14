@@ -3,6 +3,7 @@ import { createDrawerNavigator } from "@react-navigation/drawer";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useResolveClassNames } from "uniwind";
 import { Box } from "@/components/ui/box";
+import { FloatingDMBubble } from "../components/FloatingDMBubble";
 import { UxLabChannelScreen } from "../screens/UxLabChannelScreen";
 import { UxLabDirectMessagesScreen } from "../screens/UxLabDirectMessagesScreen";
 import { UxLabFriendsScreen } from "../screens/UxLabFriendsScreen";
@@ -109,6 +110,7 @@ export function UxLabDrawer() {
             options={{ title: "Theme specimen" }}
           />
         </Drawer.Navigator>
+        <FloatingDMBubble />
       </Box>
     </SafeAreaView>
   );
