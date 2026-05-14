@@ -39,30 +39,6 @@ const HORIZONTAL_FLING_PROJECTION_S = 0.14;
 const FLING_STRENGTH_FOR_EDGE_SPRING = 420;
 const VERTICAL_VELOCITY_WEIGHT_FOR_FLING_STRENGTH = 0.35;
 
-/** Stage 3: asymptotic resistance past hard rails (drag + decay rubber-band). */
-const RUBBER_BAND_DRAG_RESISTANCE = 0.55;
-const RUBBER_BAND_DECAY_FACTOR = 0.55;
-
-function rubberBandToRange(
-  value: number,
-  min: number,
-  max: number,
-  rangeSize: number,
-): number {
-  "worklet";
-  const dim = Math.max(1, rangeSize);
-  const c = RUBBER_BAND_DRAG_RESISTANCE;
-  if (value >= min && value <= max) {
-    return value;
-  }
-  if (value > max) {
-    const over = value - max;
-    return max + (over * c * dim) / (dim + over);
-  }
-  const under = min - value;
-  return min - (under * c * dim) / (dim + under);
-}
-
 /** Stage 1: projected landing along X (unclamped), px. */
 function rawProjectedTranslateX(currentX: number, vx: number): number {
   "worklet";
@@ -223,19 +199,13 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
           const minX = insetLeft.value + EDGE_MARGIN;
           const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
           const minY = EDGE_MARGIN;
-          const rangeX = maxX - minX;
-          const rangeY = maxY - minY;
-          translateX.value = rubberBandToRange(
-            translateX.value + dx,
-            minX,
+          translateX.value = Math.min(
             maxX,
-            rangeX,
+            Math.max(minX, translateX.value + dx),
           );
-          translateY.value = rubberBandToRange(
-            translateY.value + dy,
-            minY,
+          translateY.value = Math.min(
             maxY,
-            rangeY,
+            Math.max(minY, translateY.value + dy),
           );
         })
         .onEnd((e) => {
@@ -279,8 +249,6 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
                 velocity: vx,
                 deceleration: 0.992,
                 clamp: [leftSnap, rightSnap],
-                rubberBandEffect: true,
-                rubberBandFactor: RUBBER_BAND_DECAY_FACTOR,
               },
               (finished) => {
                 "worklet";
@@ -298,8 +266,6 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
               velocity: e.velocityY,
               deceleration: 0.992,
               clamp: [minY, maxY],
-              rubberBandEffect: true,
-              rubberBandFactor: RUBBER_BAND_DECAY_FACTOR,
             },
             (finished) => {
               "worklet";
