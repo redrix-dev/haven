@@ -37,9 +37,11 @@ const THROW_SETTLE_SPRING = {
 // Seconds-scale factor: predicted landing = position + velocity * factor (then clamped).
 const THROW_PROJECTION_S = 0.14;
 
-// Below this composite speed, use decay on both axes (drag-like release).
-// hypot keeps vertical energy in “was this a throw?” without driving X alone.
+// Below: decay on both axes (place / gentle release).
 const FLING_STRENGTH_FOR_THROW_SETTLE = 420;
+// At and above: commit to a top corner (ray first-hit); below but above
+// FLING_STRENGTH_FOR_THROW_SETTLE: spring to clamped prediction only (no forced corner).
+const FLING_STRENGTH_FOR_TOP_CORNER_COMMIT = 580;
 const VERTICAL_VELOCITY_WEIGHT_FOR_FLING_STRENGTH = 0.35;
 
 // Snap spring used for expand (bubble moving to top-right)
@@ -50,6 +52,77 @@ const EXPAND_SPRING = { damping: 20, stiffness: 160, mass: 1.0 } as const;
 const COLLAPSE_SPRING = { damping: 22, stiffness: 130, mass: 1.1 } as const;
 
 const EXPAND_SHEET_DELAY_MS = 350;
+
+/**
+ * First wall hit by ray (x0,y0) + t*(vx,vy), t>0, inside the bubble bounds
+ * rectangle; maps to top-left or top-right corner (y = minY only, never top-center).
+ */
+function topCornerTargetFromRay(
+  x0: number,
+  y0: number,
+  vx: number,
+  vy: number,
+  leftSnap: number,
+  rightSnap: number,
+  minY: number,
+  maxY: number,
+): { x: number; y: number } {
+  "worklet";
+  const midX = (leftSnap + rightSnap) * 0.5;
+  const cornerY = minY;
+  const EPS = 1e-3;
+
+  let bestT = Number.POSITIVE_INFINITY;
+  let hit = -1; // 0 top, 1 left, 2 right, 3 bottom
+
+  const tryHit = (t: number, kind: number) => {
+    if (t <= EPS || t >= bestT) return;
+    bestT = t;
+    hit = kind;
+  };
+
+  if (Math.abs(vy) > EPS) {
+    const t = (minY - y0) / vy;
+    const xh = x0 + vx * t;
+    if (xh >= leftSnap && xh <= rightSnap) tryHit(t, 0);
+  }
+  if (Math.abs(vx) > EPS) {
+    const tL = (leftSnap - x0) / vx;
+    const yL = y0 + vy * tL;
+    if (yL >= minY && yL <= maxY) tryHit(tL, 1);
+    const tR = (rightSnap - x0) / vx;
+    const yR = y0 + vy * tR;
+    if (yR >= minY && yR <= maxY) tryHit(tR, 2);
+  }
+  if (Math.abs(vy) > EPS) {
+    const t = (maxY - y0) / vy;
+    const xh = x0 + vx * t;
+    if (xh >= leftSnap && xh <= rightSnap) tryHit(t, 3);
+  }
+
+  if (hit === 0) {
+    const xh = Math.min(
+      rightSnap,
+      Math.max(leftSnap, x0 + vx * bestT),
+    );
+    return { x: xh <= midX ? leftSnap : rightSnap, y: cornerY };
+  }
+  if (hit === 1) {
+    return { x: leftSnap, y: cornerY };
+  }
+  if (hit === 2) {
+    return { x: rightSnap, y: cornerY };
+  }
+  if (hit === 3) {
+    const xh = Math.min(
+      rightSnap,
+      Math.max(leftSnap, x0 + vx * bestT),
+    );
+    return { x: xh <= midX ? leftSnap : rightSnap, y: cornerY };
+  }
+
+  return { x: vx >= 0 ? rightSnap : leftSnap, y: cornerY };
+}
 
 export type FloatingDMBubbleProps = Record<string, never>;
 
@@ -235,10 +308,46 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
             vx,
             vy * VERTICAL_VELOCITY_WEIGHT_FOR_FLING_STRENGTH,
           );
-          const energeticThrow =
-            flingStrength >= FLING_STRENGTH_FOR_THROW_SETTLE;
+          const softEnergeticThrow =
+            flingStrength >= FLING_STRENGTH_FOR_THROW_SETTLE &&
+            flingStrength < FLING_STRENGTH_FOR_TOP_CORNER_COMMIT;
+          const hardCornerThrow =
+            flingStrength >= FLING_STRENGTH_FOR_TOP_CORNER_COMMIT;
 
-          if (energeticThrow) {
+          if (hardCornerThrow) {
+            const corner = topCornerTargetFromRay(
+              translateX.value,
+              translateY.value,
+              vx,
+              vy,
+              leftSnap,
+              rightSnap,
+              minY,
+              maxY,
+            );
+            translateX.value = withClamp(
+              { min: leftSnap, max: rightSnap },
+              withSpring(
+                corner.x,
+                { ...THROW_SETTLE_SPRING, velocity: vx },
+                (finished) => {
+                  "worklet";
+                  if (finished) {
+                    restX.value = corner.x;
+                    restY.value = corner.y;
+                    scheduleOnRN(commitRestPosition, corner.x, corner.y);
+                  }
+                },
+              ),
+            );
+            translateY.value = withClamp(
+              { min: minY, max: maxY },
+              withSpring(corner.y, {
+                ...THROW_SETTLE_SPRING,
+                velocity: vy,
+              }),
+            );
+          } else if (softEnergeticThrow) {
             const rawPredX = translateX.value + vx * THROW_PROJECTION_S;
             const rawPredY = translateY.value + vy * THROW_PROJECTION_S;
             const predX = Math.min(
