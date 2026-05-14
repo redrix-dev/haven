@@ -186,7 +186,7 @@ function getAuthorColorForBundle(
   currentUserId: string,
 ): string {
   const isOwn = bundle.authorUserId === currentUserId;
-  const isStaff = Boolean(authorProfile?.isPlatformStaff);
+  const isStaff = Boolean(bundle.isPlatformStaff);
   if (isOwn) return "var(--primary)";
   if (isStaff) return "var(--link)";
   return "var(--status-online)";
@@ -513,7 +513,7 @@ const MessageRow = React.memo(function MessageRow({
     );
   }
 
-  const isStaffUserMessage = Boolean(authorProfile?.isPlatformStaff);
+  const isStaffUserMessage = Boolean(message.isPlatformStaff);
   const isHiddenMessage = message.isHidden;
   const isOwnMessage = message.authorUserId === currentUserId;
   const canProfileMenu = Boolean(message.authorUserId);
@@ -1651,7 +1651,7 @@ export function MessageList({
         liveProfile?.avatarUrl ?? bundle.avatarSnapshotUrl ?? null;
       const synthetic: AuthorProfile = {
         username: baseUsername,
-        isPlatformStaff: false,
+        isPlatformStaff: bundle.isPlatformStaff,
         displayPrefix: null,
         avatarUrl: baseAvatar,
       };
@@ -1662,7 +1662,7 @@ export function MessageList({
           (preserveFetchedTombstone ? null : liveProfile?.username) ??
           bundle.displayName ??
           targetUserId.substring(0, 12),
-        isPlatformStaff: false,
+        isPlatformStaff: bundle.isPlatformStaff,
         displayPrefix: null,
         avatarUrl:
           (preserveFetchedTombstone ? null : liveProfile?.avatarUrl) ??

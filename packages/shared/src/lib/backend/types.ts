@@ -106,6 +106,7 @@ export type MessageBundle = {
   editedAt: string | null;
   deletedAt: string | null;
   isHidden: boolean;
+  isPlatformStaff: boolean;
   reactions: MessageReaction[];
   attachment: MessageAttachment | null;
   linkPreview: MessageLinkPreview | null;

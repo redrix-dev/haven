@@ -1534,6 +1534,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
               ? row.deleted_at
               : null,
         isHidden: Boolean(row.is_hidden),
+        isPlatformStaff: row.is_platform_staff === true,
         reactions: normalizeReactionsFromRpc(row.reactions),
         attachment: attByMessageId.get(id) ?? null,
         linkPreview: previewByMessageId.get(id) ?? null,
