@@ -33,9 +33,11 @@ const FLING_X_SPRING = {
 // when you’re near the opposite rail).
 const HORIZONTAL_FLING_PROJECTION_S = 0.14;
 
-// |velocityX| below this uses decay only in X (no edge spring) so a light toss
-// does not get pulled straight to an edge. Same units as RNGH pan velocity (~px/s).
-const HORIZONTAL_EDGE_SPRING_ESCAPE_VELOCITY = 420;
+// |flingStrength| below this uses decay only in X (no edge spring). flingStrength
+// combines horizontal and (weighted) vertical release velocity so a sharp vertical
+// flick still “counts” as energetic.
+const FLING_STRENGTH_FOR_EDGE_SPRING = 420;
+const VERTICAL_VELOCITY_WEIGHT_FOR_FLING_STRENGTH = 0.35;
 
 /** Stage 1: projected landing along X (unclamped), px. */
 function rawProjectedTranslateX(currentX: number, vx: number): number {
@@ -215,8 +217,13 @@ export function FloatingDMBubble(_props: FloatingDMBubbleProps) {
           const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
 
           const vx = e.velocityX;
+          const vy = e.velocityY;
+          const flingStrength = Math.hypot(
+            vx,
+            vy * VERTICAL_VELOCITY_WEIGHT_FOR_FLING_STRENGTH,
+          );
           const strongHorizontalFling =
-            Math.abs(vx) >= HORIZONTAL_EDGE_SPRING_ESCAPE_VELOCITY;
+            flingStrength >= FLING_STRENGTH_FOR_EDGE_SPRING;
 
           if (strongHorizontalFling) {
             const rawProjX = rawProjectedTranslateX(translateX.value, vx);
