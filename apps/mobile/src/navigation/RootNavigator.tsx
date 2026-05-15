@@ -22,12 +22,10 @@ import { MobileSocialWorkspaceProvider } from "@/contexts/MobileSocialWorkspaceC
 import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesContext";
 import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
+import { USE_HAVEN_REV2 } from "@/config/havenMobileRev2";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-
 const Tab = createHavenTabNavigator();
-/** Set true in dev to load haven-rev2 drawer + bubble shell (see `src/haven-rev2/README.md`). */
-const USE_HAVEN_REV2 = __DEV__ && true;
 const USE_UX_LAB = __DEV__ && false;
 
 function resolveMainComponent() {

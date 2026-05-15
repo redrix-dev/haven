@@ -1,11 +1,11 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Rev2NotificationsScreen } from "@/haven-rev2/screens/Rev2NotificationsScreen";
-import type { Rev2NotificationsStackParamList } from "@/haven-rev2/navigation/types";
+import { Rev2FriendsScreen } from "@/haven-rev2/screens/Rev2FriendsScreen";
+import type { Rev2FriendsStackParamList } from "@/haven-rev2/navigation/types";
 import { useNavigationChromeStyles } from "@/theme-rn";
 
-const Stack = createNativeStackNavigator<Rev2NotificationsStackParamList>();
+const Stack = createNativeStackNavigator<Rev2FriendsStackParamList>();
 
-export function Rev2NotificationsStack() {
+export function Rev2FriendsStack() {
   const chrome = useNavigationChromeStyles();
   return (
     <Stack.Navigator
@@ -17,11 +17,7 @@ export function Rev2NotificationsStack() {
         contentStyle: chrome.sceneContainerStyle,
       }}
     >
-      <Stack.Screen
-        name="Rev2NotificationsHome"
-        component={Rev2NotificationsScreen}
-        options={{ title: "Notifications" }}
-      />
+      <Stack.Screen name="Rev2FriendsHome" component={Rev2FriendsScreen} options={{ title: "Friends" }} />
     </Stack.Navigator>
   );
 }

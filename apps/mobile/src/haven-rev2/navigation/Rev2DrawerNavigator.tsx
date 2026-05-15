@@ -1,27 +1,37 @@
 import type { ComponentProps } from "react";
-import { createDrawerNavigator } from "@react-navigation/drawer";
+import {
+  createDrawerNavigator,
+  DrawerContentScrollView,
+  DrawerItemList,
+  type DrawerContentComponentProps,
+} from "@react-navigation/drawer";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { Box } from "@/components/ui/box";
 import { Rev2CommunityStack } from "@/haven-rev2/navigation/Rev2CommunityStack";
+import { Rev2FriendsStack } from "@/haven-rev2/navigation/Rev2FriendsStack";
 import { Rev2NotificationsStack } from "@/haven-rev2/navigation/Rev2NotificationsStack";
 import { Rev2SettingsStack } from "@/haven-rev2/navigation/Rev2SettingsStack";
 import type { Rev2DrawerParamList } from "@/haven-rev2/navigation/types";
-import { Rev2HomeScreen } from "@/haven-rev2/screens/Rev2HomeScreen";
-import { Rev2ThemeSpecimenScreen } from "@/haven-rev2/screens/Rev2ThemeSpecimenScreen";
+import { Rev2PushNavigationHost } from "@/haven-rev2/Rev2PushNavigationHost";
 import { ThemedIonicons, useNavigationChromeStyles } from "@/theme-rn";
 
 const Drawer = createDrawerNavigator<Rev2DrawerParamList>();
 
-// REV2_INFERRED: Drawer v7 typings here omit `unmountOnBlur` (per-drawer-item) unlike some tab APIs;
-// warm vs disposable surfaces can later use nested native-stack `detachInactiveScreens` or screen freezing.
+function Rev2DrawerContent(props: DrawerContentComponentProps) {
+  return (
+    <DrawerContentScrollView {...props}>
+      <Rev2PushNavigationHost />
+      <DrawerItemList {...props} />
+    </DrawerContentScrollView>
+  );
+}
 
 const icons: Record<keyof Rev2DrawerParamList, ComponentProps<typeof ThemedIonicons>["name"]> = {
   Rev2Home: "home-outline",
-  Rev2Community: "chatbubbles-outline",
+  Rev2Friends: "people-outline",
   Rev2Notifications: "notifications-outline",
   Rev2Settings: "cog-outline",
-  Rev2ThemeSpecimen: "color-palette-outline",
 };
 
 export function Rev2DrawerNavigator() {
@@ -31,6 +41,7 @@ export function Rev2DrawerNavigator() {
     <SafeAreaView edges={["top", "left", "right"]} style={[{ flex: 1 }, chrome.sceneContainerStyle]}>
       <Box className="min-h-0 flex-1 bg-background">
         <Drawer.Navigator
+          drawerContent={(props) => <Rev2DrawerContent {...props} />}
           screenOptions={({ route }) => ({
             headerShown: false,
             drawerActiveBackgroundColor: chrome.drawerActiveBackgroundColor,
@@ -48,21 +59,21 @@ export function Rev2DrawerNavigator() {
             ),
           })}
         >
-          <Drawer.Screen name="Rev2Home" component={Rev2HomeScreen} options={{ title: "Home" }} />
           <Drawer.Screen
-            name="Rev2Community"
+            name="Rev2Home"
             component={Rev2CommunityStack}
-            options={{ title: "Community" }}
+            options={{ title: "Home" }}
             listeners={({ navigation }) => ({
               drawerItemPress: () => {
                 useNavigationStore.getState().setCurrentServerId(null);
                 useNavigationStore.getState().setCurrentChannelId(null);
-                navigation.navigate("Rev2Community", {
+                navigation.navigate("Rev2Home", {
                   screen: "Rev2CommunityList",
                 });
               },
             })}
           />
+          <Drawer.Screen name="Rev2Friends" component={Rev2FriendsStack} options={{ title: "Friends" }} />
           <Drawer.Screen
             name="Rev2Notifications"
             component={Rev2NotificationsStack}
@@ -72,11 +83,6 @@ export function Rev2DrawerNavigator() {
             name="Rev2Settings"
             component={Rev2SettingsStack}
             options={{ title: "Settings" }}
-          />
-          <Drawer.Screen
-            name="Rev2ThemeSpecimen"
-            component={Rev2ThemeSpecimenScreen}
-            options={{ title: "Theme" }}
           />
         </Drawer.Navigator>
       </Box>

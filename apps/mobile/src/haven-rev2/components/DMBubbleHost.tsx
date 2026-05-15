@@ -13,18 +13,29 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { DirectMessagesContainer } from "@/features/direct-messages/DirectMessagesContainer";
+import { MobileModmailPanel } from "@/features/moderation/MobileModmailPanel";
 import { cornerTargetFromRay } from "@/haven-rev2/utils/cornerTargetFromRay";
+import { useDmBubbleShellStore } from "@/haven-rev2/stores/dmBubbleShellStore";
 import type {
+  FloatingDmBubbleIconName,
   FloatingDMBubbleProps,
   FloatingDmChannelConfig,
   FloatingDmChannelId,
 } from "@/theme-rn/floatingDmTypes";
+import { ThemedIonicons } from "@/theme-rn";
 import { useFloatingDmPlaceholderChannels } from "@/theme-rn/useFloatingDmPlaceholderChannels";
 import { useDmBubbleSheetChrome } from "@/theme-rn/useDmBubbleSheetChrome";
+import { usePermissionsStore } from "@shared/stores/permissionsStore";
+import { useServersStore } from "@shared/stores/serversStore";
 
 // haven-rev2: adapted from ux-lab FloatingDMBubble (reference); ux-lab source is unchanged.
 
-export type { FloatingDMBubbleProps, FloatingDmChannelConfig, FloatingDmChannelId } from "@/theme-rn/floatingDmTypes";
+export type {
+  FloatingDmBubbleIconName,
+  FloatingDMBubbleProps,
+  FloatingDmChannelConfig,
+  FloatingDmChannelId,
+} from "@/theme-rn/floatingDmTypes";
 
 const BUBBLE_SIZE = 64;
 const EDGE_MARGIN = 12;
@@ -90,6 +101,27 @@ function resolveDefaultChannelId(
   return channels[0]!.id;
 }
 
+function resolveBubbleFace(channel: FloatingDmChannelConfig): {
+  name: FloatingDmBubbleIconName;
+  colorClassName: `accent-${string}`;
+} {
+  return {
+    name: channel.bubbleIconName ?? (channel.id === "modmail" ? "shield-outline" : "mail-outline"),
+    colorClassName:
+      channel.bubbleIconColorClassName ??
+      (channel.id === "modmail" ? "accent-background" : "accent-primary-foreground"),
+  };
+}
+
+function BubbleFaceIcon({ channel }: { channel: FloatingDmChannelConfig }) {
+  const { name, colorClassName } = resolveBubbleFace(channel);
+  return (
+    <View style={styles.bubbleInner} pointerEvents="none">
+      <ThemedIonicons name={name} size={30} colorClassName={colorClassName} />
+    </View>
+  );
+}
+
 export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
   const {
     channels: channelsProp,
@@ -101,6 +133,16 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
 
   const themedDefaults = useFloatingDmPlaceholderChannels();
   const sheetChrome = useDmBubbleSheetChrome();
+  const servers = useServersStore((s) => s.servers);
+  const permissionsByServerId = usePermissionsStore((s) => s.permissionsByServerId);
+  const modmailManagedCommunityIds = useMemo(
+    () =>
+      servers
+        .filter((s) => permissionsByServerId[s.id]?.canManageReports)
+        .map((s) => s.id),
+    [servers, permissionsByServerId],
+  );
+
   const channels = useMemo(
     () => resolveChannels(channelsProp, themedDefaults),
     [channelsProp, themedDefaults],
@@ -133,13 +175,15 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
   const layoutH = useSharedValue(0);
   const insetLeft = useSharedValue(insets.left);
   const insetRight = useSharedValue(insets.right);
+  const insetTop = useSharedValue(insets.top);
   const insetBottom = useSharedValue(insets.bottom);
 
   useEffect(() => {
     insetLeft.value = insets.left;
     insetRight.value = insets.right;
+    insetTop.value = insets.top;
     insetBottom.value = insets.bottom;
-  }, [insetBottom, insetLeft, insetRight, insets.bottom, insets.left, insets.right]);
+  }, [insetBottom, insetLeft, insetRight, insetTop, insets.bottom, insets.left, insets.right, insets.top]);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -183,14 +227,16 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
       if (layoutInitialized.current || w <= 0 || h <= 0) return;
       layoutInitialized.current = true;
       const rx = w - insets.right - BUBBLE_SIZE - EDGE_MARGIN;
-      const ry = (h - BUBBLE_SIZE) / 2;
+      const minY = insets.top + EDGE_MARGIN;
+      const maxY = h - insets.bottom - BUBBLE_SIZE - EDGE_MARGIN;
+      const ry = Math.min(maxY, Math.max(minY, (h - BUBBLE_SIZE) / 2));
       translateX.value = rx;
       translateY.value = ry;
       restX.value = rx;
       restY.value = ry;
       setRestPosition({ x: rx, y: ry });
     },
-    [insets.right, layoutH, layoutW, restX, restY, translateX, translateY],
+    [insets.bottom, insets.right, insets.top, layoutH, layoutW, restX, restY, translateX, translateY],
   );
 
   const clearExpandTimer = useCallback(() => {
@@ -209,7 +255,7 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
     const h = layoutH.value;
     const minX = insetLeft.value + EDGE_MARGIN;
     const maxX = w - insetRight.value - BUBBLE_SIZE - EDGE_MARGIN;
-    const minY = EDGE_MARGIN;
+    const minY = insetTop.value + EDGE_MARGIN;
     const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
     const targetX = maxX;
     const targetY = minY;
@@ -244,6 +290,7 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
     insetBottom,
     insetLeft,
     insetRight,
+    insetTop,
     layoutH,
     layoutW,
     secondaryChannel,
@@ -259,7 +306,7 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
     const h = layoutH.value;
     const minX = insetLeft.value + EDGE_MARGIN;
     const maxX = w - insetRight.value - BUBBLE_SIZE - EDGE_MARGIN;
-    const minY = EDGE_MARGIN;
+    const minY = insetTop.value + EDGE_MARGIN;
     const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
     translateX.value = withClamp(
       { min: minX, max: maxX },
@@ -274,7 +321,19 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
       { min: minY, max: maxY },
       withSpring(restY.value, COLLAPSE_SPRING),
     );
-  }, [insetBottom, insetLeft, insetRight, layoutH, layoutW, setExpandedFalse, translateX, translateY, restX, restY]);
+  }, [
+    insetBottom,
+    insetLeft,
+    insetRight,
+    insetTop,
+    layoutH,
+    layoutW,
+    setExpandedFalse,
+    translateX,
+    translateY,
+    restX,
+    restY,
+  ]);
 
   const beginCollapse = useCallback(() => {
     clearExpandTimer();
@@ -321,6 +380,29 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
     ],
   );
 
+  const expandTick = useDmBubbleShellStore((s) => s.expandTick);
+  const prevExpandTickRef = useRef(0);
+  useEffect(() => {
+    if (expandTick === 0) {
+      prevExpandTickRef.current = 0;
+      return;
+    }
+    if (expandTick !== prevExpandTickRef.current) {
+      prevExpandTickRef.current = expandTick;
+      if (!expanded) {
+        beginExpand();
+      }
+    }
+  }, [beginExpand, expandTick, expanded]);
+
+  const prevExpandedForCollapseEmitRef = useRef(false);
+  useEffect(() => {
+    if (prevExpandedForCollapseEmitRef.current && !expanded) {
+      useDmBubbleShellStore.getState().emitBubbleCollapsed();
+    }
+    prevExpandedForCollapseEmitRef.current = expanded;
+  }, [expanded]);
+
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
@@ -335,7 +417,7 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
           const maxX = w - insetRight.value - BUBBLE_SIZE - EDGE_MARGIN;
           const minX = insetLeft.value + EDGE_MARGIN;
           const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
-          const minY = EDGE_MARGIN;
+          const minY = insetTop.value + EDGE_MARGIN;
           const targetX = Math.min(
             maxX,
             Math.max(minX, panAnchorX.value + e.translationX),
@@ -358,7 +440,7 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
           const h = layoutH.value;
           const leftSnap = insetLeft.value + EDGE_MARGIN;
           const rightSnap = w - insetRight.value - BUBBLE_SIZE - EDGE_MARGIN;
-          const minY = EDGE_MARGIN;
+          const minY = insetTop.value + EDGE_MARGIN;
           const maxY = h - insetBottom.value - BUBBLE_SIZE - EDGE_MARGIN;
 
           const fingerX = Math.min(
@@ -488,6 +570,7 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
       insetBottom,
       insetLeft,
       insetRight,
+      insetTop,
       layoutH,
       layoutW,
       panAnchorX,
@@ -572,7 +655,7 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
           style={[
             styles.sheetWrap,
             {
-              top: BUBBLE_SIZE + EDGE_MARGIN * 2,
+              top: BUBBLE_SIZE + EDGE_MARGIN * 2 + insets.top,
               left: EDGE_MARGIN,
               right: EDGE_MARGIN,
               bottom: 0,
@@ -630,11 +713,14 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
             <View style={styles.sheetBody}>
               {activeChannelId === "inbox" ? (
                 <DirectMessagesContainer />
+              ) : modmailManagedCommunityIds.length > 0 ? (
+                <View style={styles.modmailPanelWrap}>
+                  <MobileModmailPanel managedCommunityIds={modmailManagedCommunityIds} />
+                </View>
               ) : (
                 <View style={styles.modmailPlaceholder}>
                   <Text style={[styles.sheetPlaceholder, { color: sheetChrome.sheetPlaceholderColor }]}>
-                    {/* REV2_INFERRED: ModMail is not a chat surface — hub UI TBD. */}
-                    ModMail placeholder — wire moderator hub when product defines it.
+                    ModMail appears when you can manage reports in at least one community.
                   </Text>
                 </View>
               )}
@@ -652,7 +738,9 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
               { backgroundColor: activeChannel.bubbleColor },
               bubbleStyle,
             ]}
-          />
+          >
+            <BubbleFaceIcon channel={activeChannel} />
+          </Animated.View>
         </GestureDetector>
       ) : secondaryChannel ? (
         <View
@@ -673,7 +761,9 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
                 ],
                 secondaryBubbleStyle,
               ]}
-            />
+            >
+              <BubbleFaceIcon channel={secondaryChannel} />
+            </Animated.View>
           </GestureDetector>
           <GestureDetector gesture={expandedPrimaryTap}>
             <Animated.View
@@ -689,7 +779,9 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
                 ],
                 bubbleStyle,
               ]}
-            />
+            >
+              <BubbleFaceIcon channel={primaryChannel} />
+            </Animated.View>
           </GestureDetector>
         </View>
       ) : (
@@ -704,7 +796,9 @@ export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
               { borderColor: sheetChrome.bubbleActiveBorderColor },
               bubbleStyle,
             ]}
-          />
+          >
+            <BubbleFaceIcon channel={activeChannel} />
+          </Animated.View>
         </GestureDetector>
       )}
     </View>
@@ -722,11 +816,17 @@ const styles = StyleSheet.create({
     width: BUBBLE_SIZE,
     height: BUBBLE_SIZE,
     borderRadius: BUBBLE_SIZE / 2,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 4,
+  },
+  bubbleInner: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
   },
   dualBubbleCluster: {
     zIndex: 2,
@@ -764,6 +864,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 12,
+  },
+  modmailPanelWrap: {
+    flex: 1,
+    minHeight: 0,
   },
   sheetTitle: {
     fontSize: 17,

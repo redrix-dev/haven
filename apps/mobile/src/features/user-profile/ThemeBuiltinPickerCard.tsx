@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Alert, Pressable, Text, View } from "react-native";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getErrorMessage } from "@platform/lib/errors";
-import { builtinThemes } from "@shared/themes/registry";
+import { listSelectableBuiltinThemes } from "@shared/themes/selectableBuiltinThemes";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
+import { Spinner } from "@/components/ui/spinner";
+import { ThemedIonicons } from "@/theme-rn";
+import { applyMobileTheme, normalizeMobileThemeId } from "@/lib/theme";
 
 type ThemeBuiltinPickerCardProps = {
   userId: string | null;
@@ -21,7 +23,7 @@ export function ThemeBuiltinPickerCard({
   const setSelectedThemeId = useMobileThemePreferenceStore((s) => s.setSelectedThemeId);
 
   const selectableThemes = useMemo(
-    () => Object.values(builtinThemes).filter((t) => t.status !== "preview"),
+    () => listSelectableBuiltinThemes(new Set<string>()),
     [],
   );
 
@@ -38,6 +40,7 @@ export function ThemeBuiltinPickerCard({
     const previousId = selectedThemeId;
     setPendingId(themeId);
     setSelectedThemeId(themeId);
+    applyMobileTheme(themeId);
 
     try {
       const backend = getControlPlaneBackend();
@@ -49,6 +52,7 @@ export function ThemeBuiltinPickerCard({
       });
     } catch (error) {
       setSelectedThemeId(previousId);
+      applyMobileTheme(normalizeMobileThemeId(previousId));
       Alert.alert(
         "Could not save theme",
         getErrorMessage(error, "Something went wrong. Try again."),
@@ -59,9 +63,9 @@ export function ThemeBuiltinPickerCard({
   };
 
   return (
-    <View className="rounded-2xl bg-[#1C1C1E] overflow-hidden">
-      <View className="px-4 pt-3 pb-2">
-        <Text className="text-xs font-medium uppercase tracking-wide text-[#8E8E93]">
+    <View className="overflow-hidden rounded-2xl border border-border bg-card">
+      <View className="px-4 pb-2 pt-3">
+        <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Appearance
         </Text>
       </View>
@@ -80,17 +84,15 @@ export function ThemeBuiltinPickerCard({
             accessibilityState={{ selected }}
             className={`flex-row items-center gap-2.5 px-4 py-3 ${
               pendingId && pendingId !== theme.id ? "opacity-50" : "opacity-100"
-            } ${isLast ? "" : "border-b border-[#2C2C2E]"}`}
+            } ${isLast ? "" : "border-b border-border"}`}
           >
             <View className="flex-1">
-              <Text style={{ color: "#FFFFFF" }} className="text-base font-medium">
-                {theme.name}
-              </Text>
+              <Text className="text-base font-medium text-foreground">{theme.name}</Text>
             </View>
             {busy ? (
-              <ActivityIndicator color="#8E8E93" size="small" />
+              <Spinner size="small" colorClassName="accent-muted-foreground" />
             ) : selected ? (
-              <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+              <ThemedIonicons name="checkmark" size={20} colorClassName="accent-primary" />
             ) : null}
           </Pressable>
         );

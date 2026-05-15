@@ -1,5 +1,5 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Rev2SettingsPlaceholderScreen } from "@/haven-rev2/screens/Rev2SettingsPlaceholderScreen";
+import { Rev2ProfileSettingsScreen } from "@/haven-rev2/screens/Rev2ProfileSettingsScreen";
 import type { Rev2SettingsStackParamList } from "@/haven-rev2/navigation/types";
 import { useNavigationChromeStyles } from "@/theme-rn";
 
@@ -19,7 +19,7 @@ export function Rev2SettingsStack() {
     >
       <Stack.Screen
         name="Rev2SettingsHome"
-        component={Rev2SettingsPlaceholderScreen}
+        component={Rev2ProfileSettingsScreen}
         options={{ title: "Settings" }}
       />
     </Stack.Navigator>

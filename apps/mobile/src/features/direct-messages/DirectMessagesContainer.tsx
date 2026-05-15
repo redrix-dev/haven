@@ -24,9 +24,10 @@ import {
 } from "react-native-enriched-markdown";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { ChatScrollView } from "@/features/community/ChatScrollView";
+import { useDmBubbleShellStore } from "@/haven-rev2/stores/dmBubbleShellStore";
 import {
   loadPickedCommunityMediaForUpload,
   type CommunityMediaUploadPayload,
@@ -41,6 +42,7 @@ import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
+import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 
@@ -89,14 +91,15 @@ export function DirectMessagesContainer() {
   const [isSendingDm, setIsSendingDm] = useState(false);
   const [pendingDmMedia, setPendingDmMedia] = useState<CommunityMediaUploadPayload | null>(null);
   const { bottom } = useSafeAreaInsets();
-  /** Full composer stack height; passed as KeyboardChatScrollView `extraContentPadding` so inset + scroll track growth (see library docs). */
   const composerHeight = useSharedValue(0);
+  const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);
   const composerChromeOpacity = useSharedValue(COMPOSER_CHROME_REST_OPACITY);
   const listDragRef = useRef(false);
   const listMomentumRef = useRef(false);
   const composerSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
   const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(null);
+  const [dmMessageActionsTarget, setDmMessageActionsTarget] = useState<DirectMessage | null>(null);
 
   const {
     state: {
@@ -105,6 +108,7 @@ export function DirectMessagesContainer() {
       dmConversationsRefreshing,
       dmConversationsError,
       selectedDmConversationId,
+      dmComposeDraftPeer,
       dmMessages,
       dmMessagesLoading,
       dmMessagesError,
@@ -113,12 +117,24 @@ export function DirectMessagesContainer() {
     actions: {
       openDirectMessageConversation,
       clearSelectedDmConversation,
+      clearDirectMessageDraft,
       sendDirectMessage,
       refreshDmConversations,
       toggleSelectedDmConversationMuted,
       reportDirectMessage,
     },
   } = useMobileDirectMessages();
+
+  const dmComposeDraftPeerRef = useRef(dmComposeDraftPeer);
+  dmComposeDraftPeerRef.current = dmComposeDraftPeer;
+
+  useEffect(() => {
+    return useDmBubbleShellStore.getState().subscribeBubbleCollapsed(() => {
+      if (dmComposeDraftPeerRef.current) {
+        clearDirectMessageDraft();
+      }
+    });
+  }, [clearDirectMessageDraft]);
 
   const clearComposerSettleTimer = useCallback(() => {
     if (composerSettleTimerRef.current != null) {
@@ -207,9 +223,13 @@ export function DirectMessagesContainer() {
 
   const renderScrollComponent = useCallback(
     (props: ScrollViewProps) => (
-      <ChatScrollView {...props} extraContentPadding={composerHeight} />
+      <ChatScrollView
+        {...props}
+        blankSpace={adjustedBlankSpace}
+        keyboardLiftBehavior="whenAtEnd"
+      />
     ),
-    [composerHeight],
+    [adjustedBlankSpace],
   );
 
   const renderMessage: ListRenderItem<DirectMessage> = useCallback(
@@ -232,7 +252,7 @@ export function DirectMessagesContainer() {
           onLongPress={
             !isSelf
               ? () => {
-                  setDmReportTarget(item);
+                  setDmMessageActionsTarget(item);
                 }
               : undefined
           }
@@ -321,6 +341,12 @@ export function DirectMessagesContainer() {
     [currentUserId, dismissDmComposerKeyboard, windowWidth],
   );
 
+  const dmActionsPeerLabel = useMemo(() => {
+    if (dmComposeDraftPeer) return dmComposeDraftPeer.displayName;
+    if (!selectedDmConversation) return undefined;
+    return otherLabel(selectedDmConversation);
+  }, [dmComposeDraftPeer, otherLabel, selectedDmConversation]);
+
   const handlePickDmMedia = useCallback(async () => {
     if (isPickingDmMedia) return;
     setIsPickingDmMedia(true);
@@ -389,7 +415,7 @@ export function DirectMessagesContainer() {
     }
   }, [draft, pendingDmMedia, sendDirectMessage]);
 
-  if (!selectedDmConversationId) {
+  if (!selectedDmConversationId && !dmComposeDraftPeer) {
     return (
       <View className="min-h-0 flex-1">
         {dmConversationsError ? (
@@ -415,12 +441,20 @@ export function DirectMessagesContainer() {
     );
   }
 
-  const threadTitle = selectedDmConversation ? otherLabel(selectedDmConversation) : "Chat";
+  const threadTitle = dmComposeDraftPeer
+    ? dmComposeDraftPeer.displayName
+    : selectedDmConversation
+      ? otherLabel(selectedDmConversation)
+      : "Chat";
 
   const canSendDmMessage = draft.trim().length > 0 || pendingDmMedia != null;
 
   return (
-    <SafeAreaView edges={["bottom"]} className="min-h-0 flex-1 bg-card">
+    <SafeAreaView
+      edges={["bottom"]}
+      className="min-h-0 flex-1 bg-card"
+      style={{ flex: 1, minHeight: 0 }}
+    >
       <View className="mb-2 flex-row items-center justify-between gap-2">
         <Pressable
           accessibilityRole="button"
@@ -454,7 +488,7 @@ export function DirectMessagesContainer() {
         <Text className="mb-2 text-sm text-red-400">{dmMessagesError}</Text>
       ) : null}
 
-      {dmMessagesLoading && dmMessages.length === 0 ? (
+      {dmMessagesLoading && dmMessages.length === 0 && !dmComposeDraftPeer ? (
         <ActivityIndicator color="#e6edf7" />
       ) : (
         <FlatList
@@ -482,32 +516,37 @@ export function DirectMessagesContainer() {
             scheduleComposerChromeRest();
           }}
           renderScrollComponent={renderScrollComponent}
-          contentContainerStyle={{ paddingTop: 32, flexGrow: 1 }}
+          contentContainerStyle={{ paddingTop: 32 }}
           ListEmptyComponent={
             <Pressable
               onPress={dismissDmComposerKeyboard}
-              className="min-h-[320px] flex-1 items-center justify-center pt-8"
+              className="min-h-[320px] flex-1 items-center justify-center px-4 pt-8"
             >
-              <Text className="text-muted-foreground text-[13px]">No messages yet.</Text>
+              {dmComposeDraftPeer ? (
+                <Text className="text-center text-muted-foreground text-[13px] leading-5">
+                  This is the beginning of your direct messages with {dmComposeDraftPeer.displayName}. Cheers to new
+                  friendships!
+                </Text>
+              ) : (
+                <Text className="text-muted-foreground text-[13px]">No messages yet.</Text>
+              )}
             </Pressable>
           }
         />
       )}
 
       <KeyboardStickyView
-        offset={{ opened: bottom + MARGIN }}
+        offset={{ opened: bottom - MARGIN }}
+        onLayout={(e) => {
+          composerHeight.value = e.nativeEvent.layout.height;
+        }}
         style={{
           position: "absolute",
           width: "100%",
-          bottom: -MARGIN,
+          bottom: bottom - MARGIN,
         }}
       >
-        <View
-          collapsable={Platform.OS === "android" ? false : undefined}
-          onLayout={(e) => {
-            composerHeight.value = e.nativeEvent.layout.height;
-          }}
-        >
+        <View collapsable={Platform.OS === "android" ? false : undefined}>
           {pendingDmMedia ? (
             <View className="flex-row items-center gap-2 border-t border-white/8 bg-surface-modal/90 px-3 py-2">
               <Ionicons name="attach" size={16} color={ICON_MUTED} />
@@ -589,6 +628,17 @@ export function DirectMessagesContainer() {
           </View>
         </View>
       </KeyboardStickyView>
+
+      <DmMessageActionsSheet
+        visible={dmMessageActionsTarget !== null}
+        onClose={() => setDmMessageActionsTarget(null)}
+        peerLabel={dmActionsPeerLabel}
+        onReport={() => {
+          if (dmMessageActionsTarget) {
+            setDmReportTarget(dmMessageActionsTarget);
+          }
+        }}
+      />
 
       <DmReportSheet
         visible={dmReportTarget !== null}

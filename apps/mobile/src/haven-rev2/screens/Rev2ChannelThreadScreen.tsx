@@ -26,6 +26,7 @@ import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import { getCommunityDataBackend } from "@shared/lib/backend";
+import type { Channel } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
 import {
   buildChatListItemsFromChatMessages,
@@ -46,6 +47,7 @@ import {
 } from "@/features/community/MessageActionsSheet";
 import { CommunityReportMessageModal } from "@/features/community/CommunityReportMessageModal";
 import { BanUserModal } from "@/features/community/BanUserModal";
+import { MobileChannelSettingsModal } from "@/features/community/settings/MobileChannelSettingsModal";
 import {
   loadPickedCommunityMediaForUpload,
   type CommunityMediaUploadPayload,
@@ -109,6 +111,8 @@ export function Rev2ChannelThreadScreen() {
   const currentUserId = user?.id ?? null;
 
   const { serverPermissions } = useCurrentServerPermissionUi(communityId);
+  const canOpenChannelSettings =
+    serverPermissions.canManageChannelStructure || serverPermissions.canManageChannelPermissions;
 
   const { servers } = useServers();
   const {
@@ -148,8 +152,8 @@ export function Rev2ChannelThreadScreen() {
   const [messageActionsTarget, setMessageActionsTarget] = useState<MessageActionTarget | null>(null);
   const [showMessageActions, setShowMessageActions] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | null>(null);
+  const [channelSettingsChannel, setChannelSettingsChannel] = useState<Channel | null>(null);
   const [banTarget, setBanTarget] = useState<{ userId: string; username: string } | null>(null);
-
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isPickingCommunityMedia, setIsPickingCommunityMedia] = useState(false);
@@ -169,8 +173,22 @@ export function Rev2ChannelThreadScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: currentRenderableChannel ? `#${currentRenderableChannel.name}` : "Channel",
+      headerRight:
+        currentRenderableChannel && canOpenChannelSettings
+          ? () => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Channel settings"
+                hitSlop={10}
+                onPress={() => setChannelSettingsChannel(currentRenderableChannel)}
+                className="mr-2 p-1 active:opacity-70"
+              >
+                <ThemedIonicons name="options-outline" size={22} colorClassName="accent-foreground" />
+              </Pressable>
+            )
+          : undefined,
     });
-  }, [currentRenderableChannel, navigation]);
+  }, [canOpenChannelSettings, currentRenderableChannel, navigation]);
 
   const handlePickCommunityMedia = useCallback(async () => {
     if (isSending || isPickingCommunityMedia) return;
@@ -540,6 +558,16 @@ export function Rev2ChannelThreadScreen() {
         username={banTarget?.username ?? ""}
         onDismiss={() => setBanTarget(null)}
         onConfirm={confirmBanUser}
+      />
+
+      <MobileChannelSettingsModal
+        visible={Boolean(channelSettingsChannel)}
+        onDismiss={() => setChannelSettingsChannel(null)}
+        communityId={communityId}
+        channel={channelSettingsChannel}
+        currentUserId={currentUserId}
+        canManageChannelStructure={serverPermissions.canManageChannelStructure}
+        canManageChannelPermissions={serverPermissions.canManageChannelPermissions}
       />
     </SafeAreaView>
   );

@@ -20,6 +20,7 @@ import { loadPersistedThemeId } from "./src/storage/mobileThemePreferenceStorage
 import { useMobileThemePreferenceStore } from "./src/stores/mobileThemePreferenceStore";
 import { GluestackUIProvider } from "./src/components/ui/gluestack-ui-provider";
 import { MobileDevThemeMenu } from "./src/dev/MobileDevThemeMenu";
+import { USE_HAVEN_REV2 } from "@/config/havenMobileRev2";
 
 registerMobileAppHost();
 
@@ -77,7 +78,7 @@ function App() {
         <SafeAreaProvider>
           <KeyboardProvider>
             <RootNavigator />
-            {__DEV__ ? <MobileDevThemeMenu /> : null}
+            {__DEV__ && !USE_HAVEN_REV2 ? <MobileDevThemeMenu /> : null}
             <StatusBar style="light" />
           </KeyboardProvider>
         </SafeAreaProvider>

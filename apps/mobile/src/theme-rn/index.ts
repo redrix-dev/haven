@@ -1,4 +1,5 @@
 export type {
+  FloatingDmBubbleIconName,
   FloatingDMBubbleProps,
   FloatingDmChannelConfig,
   FloatingDmChannelId,

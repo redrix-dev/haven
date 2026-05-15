@@ -2,6 +2,9 @@
 
 export type FloatingDmChannelId = "inbox" | "modmail";
 
+/** Ionicons glyph names used on floating bubble faces */
+export type FloatingDmBubbleIconName = "mail-outline" | "shield-outline";
+
 export type FloatingDmChannelConfig = {
   id: FloatingDmChannelId;
   /** Navbar / bubble chrome label (short). */
@@ -10,6 +13,12 @@ export type FloatingDmChannelConfig = {
   sheetTitle: string;
   bubbleColor: string;
   sheetBackgroundColor: string;
+  /**
+   * Ionicons glyph centered in the floating bubble (UniWind `accent-*` on icon).
+   * Defaults by channel id: inbox → mail-outline / accent-primary-foreground; modmail → shield-outline / accent-background.
+   */
+  bubbleIconName?: FloatingDmBubbleIconName;
+  bubbleIconColorClassName?: `accent-${string}`;
   /** Optional badge; maps to dmUnread-style counts later. */
   unreadCount?: number;
 };
