@@ -18,7 +18,7 @@ import {
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
 import { Ionicons } from "@expo/vector-icons";
-import type { Channel, Message, MessageAttachment, MessageLinkPreview } from "@shared/lib/backend/types";
+import type { Channel } from "@shared/lib/backend/types";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommunityWorkspace";
 import { useMessages } from "@shared/features/messaging/hooks/useMessages";
@@ -29,22 +29,21 @@ import { useServers } from "@shared/features/community/hooks/useServers";
 import { useCurrentServerPermissionUi } from "@shared/features/community/hooks/useCurrentServerPermissionUi";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import { getErrorMessage } from "@platform/lib/errors";
-import { getReplyToMessageId, isAuthorProfileTombstone } from "@shared/features/messaging/components/message-list/messageListContentUtils";
-import { resolveLiveAvatarUrl } from "@shared/lib/liveProfiles";
+import {
+  buildChatListItemsFromChatMessages,
+  buildMessageBundleById,
+  getReplyTargetLabel,
+  mapBundlesToChatMessages,
+} from "@/features/community/communityChannelChatFromBundles";
 import { setLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
 import { CommunityChannelBar } from "@/features/community/CommunityChannelBar";
 import { ChatScrollView } from "@/features/community/ChatScrollView";
 import {
   CommunityMessageBubble,
   MessageDateDivider,
-  dayBucket,
-  formatDateDividerLabel,
-  formatTime,
-  GROUP_WINDOW_MS,
   type ChatListItem,
   type ChatMessage,
 } from "@/features/community/CommunityMessageBubble";
-import type { AuthorProfile } from "@shared/lib/backend/types";
 import { ChannelSwitcherModal } from "@/features/community/ChannelSwitcherModal";
 import { CommunityPhaseGate } from "@/features/community/CommunityPhaseGate";
 import {
@@ -70,22 +69,6 @@ const COMPOSER_CHROME_IMMERSIVE_MS = 140;
 const COMPOSER_CHROME_REST_MS = 280;
 const COMPOSER_CHROME_SETTLE_MS = 200;
 const COMPOSER_SELECTION = "rgba(63, 121, 216, 0.4)";
-function getReplyTargetLabel(
-  replyToId: string | null,
-  messageById: Map<string, Message>,
-  profiles: Record<string, AuthorProfile>,
-): string | null {
-  if (!replyToId) return null;
-  const parent = messageById.get(replyToId);
-  if (!parent) return "a message";
-  if (parent.author_type === "haven_dev") return "Haven Moderation Team";
-  if (parent.author_type === "system") return "System";
-  const uid = parent.author_user_id;
-  if (!uid) return "a message";
-  const profile = profiles[uid];
-  if (profile?.username) return profile.username;
-  return uid.slice(0, 12);
-}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -184,10 +167,7 @@ export function CommunityScreen() {
 
   // ── Stores ──
   const storedMessages = useMessagesStore((state) => state.messages);
-  const profiles = useMessagesStore((state) => state.profiles);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
-  const attachmentRecord = useMessagesStore((state) => state.attachments);
-  const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
 
   // ── Derived data ──
   const community = useMemo(
@@ -195,94 +175,17 @@ export function CommunityScreen() {
     [communityId, servers],
   );
 
-  
+  const messageById = useMemo(() => buildMessageBundleById(storedMessages), [storedMessages]);
 
-  const attachmentsByMessageId = useMemo(() => {
-    const grouped: Record<string, MessageAttachment[]> = {};
-    for (const attachment of Object.values(attachmentRecord)) {
-      const list = grouped[attachment.messageId] ?? [];
-      list.push(attachment);
-      grouped[attachment.messageId] = list;
-    }
-    return grouped;
-  }, [attachmentRecord]);
-
-  const linkPreviewsByMessageId = useMemo(() => {
-    const grouped: Record<string, MessageLinkPreview | null> = {};
-    for (const preview of Object.values(linkPreviewRecord)) {
-      grouped[preview.messageId] = preview;
-    }
-    return grouped;
-  }, [linkPreviewRecord]);
-
-  const messageById = useMemo(
-    () => new Map(storedMessages.map((m) => [m.id, m] as const)),
-    [storedMessages],
+  const messages = useMemo<ChatMessage[]>(
+    () => mapBundlesToChatMessages(storedMessages, liveProfiles),
+    [liveProfiles, storedMessages],
   );
 
-  const messages = useMemo<ChatMessage[]>(() => {
-    return [...storedMessages].reverse().map((message: Message) => {
-      const cachedProfile =
-        message.author_user_id != null ? (profiles[message.author_user_id] ?? null) : null;
-      const preserveTombstone = isAuthorProfileTombstone(cachedProfile ?? undefined);
-      const liveAvatar =
-        message.author_user_id != null && !preserveTombstone
-          ? resolveLiveAvatarUrl(liveProfiles, message.author_user_id, cachedProfile?.avatarUrl ?? null)
-          : (cachedProfile?.avatarUrl ?? null);
-      const authorName =
-        message.author_type === "haven_dev"
-          ? "Haven Moderation Team"
-          : message.author_type === "system"
-            ? "System"
-            : (cachedProfile?.username ?? message.author_user_id?.slice(0, 12) ?? "Unknown User");
-
-      return {
-        id: message.id,
-        text: message.content,
-        createdAt: message.created_at,
-        authorUserId: message.author_user_id ?? null,
-        authorName,
-        authorInitial: authorName.trim().charAt(0).toUpperCase() || "U",
-        authorAvatarUrl: liveAvatar,
-        isAuthorStaff: Boolean(message.author_type === "user" && cachedProfile?.isPlatformStaff),
-        timestampLabel: formatTime(message.created_at),
-        replyTargetLabel: getReplyTargetLabel(getReplyToMessageId(message), messageById, profiles),
-        attachments: attachmentsByMessageId[message.id] ?? [],
-      };
-    });
-  }, [attachmentsByMessageId, liveProfiles, messageById, profiles, storedMessages]);
-
-  const chatListItems = useMemo<ChatListItem[]>(() => {
-    const items: ChatListItem[] = [];
-    for (let i = 0; i < messages.length; i++) {
-      const message = messages[i];
-      const prev = messages[i + 1];
-      const currentBucket = dayBucket(message.createdAt);
-      const prevBucket = dayBucket(prev?.createdAt);
-      const shouldInsertDivider = currentBucket !== prevBucket;
-      const isSameDayAsPrev = Boolean(currentBucket) && currentBucket === prevBucket;
-      const isSameAuthor = Boolean(message.authorUserId) && message.authorUserId === prev?.authorUserId;
-      const currentTs = message.createdAt ? Date.parse(message.createdAt) : NaN;
-      const prevTs = prev?.createdAt ? Date.parse(prev.createdAt) : NaN;
-      const hasValidTs = Number.isFinite(currentTs) && Number.isFinite(prevTs);
-      const isCloseInTime = hasValidTs ? Math.abs(currentTs - prevTs) <= GROUP_WINDOW_MS : false;
-
-      items.push({
-        kind: "message",
-        message,
-        isCondensed: isSameAuthor && isCloseInTime && isSameDayAsPrev,
-      });
-
-      if (shouldInsertDivider) {
-        items.push({
-          kind: "divider",
-          id: `divider-${message.id}`,
-          label: formatDateDividerLabel(message.createdAt ?? new Date().toISOString()),
-        });
-      }
-    }
-    return items;
-  }, [messages]);
+  const chatListItems = useMemo<ChatListItem[]>(
+    () => buildChatListItemsFromChatMessages(messages),
+    [messages],
+  );
 
   // ── Channel resolution ──
   const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState(false);
@@ -313,10 +216,11 @@ export function CommunityScreen() {
   const [pendingReplyToMessageId, setPendingReplyToMessageId] = useState<string | null>(null);
 
   const pendingReplyTargetLabel = useMemo(
-    () => pendingReplyToMessageId
-      ? getReplyTargetLabel(pendingReplyToMessageId, messageById, profiles)
-      : null,
-    [messageById, pendingReplyToMessageId, profiles],
+    () =>
+      pendingReplyToMessageId
+        ? getReplyTargetLabel(pendingReplyToMessageId, messageById, liveProfiles)
+        : null,
+    [messageById, pendingReplyToMessageId, liveProfiles],
   );
 
   const handlePickCommunityMedia = useCallback(async () => {
@@ -457,12 +361,11 @@ export function CommunityScreen() {
         {...item.message}
         attachments={item.message.attachments ?? []}
         isCondensed={item.isCondensed}
-        linkPreview={linkPreviewsByMessageId[item.message.id] ?? null}
         onPress={() => composerInputRef.current?.blur()}
         onLongPress={() => openMessageActions(item.message)}
       />
     );
-  }, [linkPreviewsByMessageId, composerInputRef, openMessageActions]);
+  }, [composerInputRef, openMessageActions]);
 
   const phase: "loading" | "ready" | "missing" | "error" =
     serversStatus === "loading" && servers.length === 0

@@ -12,6 +12,19 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { DirectMessagesContainer } from "@/features/direct-messages/DirectMessagesContainer";
+import { cornerTargetFromRay } from "@/haven-rev2/utils/cornerTargetFromRay";
+import type {
+  FloatingDMBubbleProps,
+  FloatingDmChannelConfig,
+  FloatingDmChannelId,
+} from "@/theme-rn/floatingDmTypes";
+import { useFloatingDmPlaceholderChannels } from "@/theme-rn/useFloatingDmPlaceholderChannels";
+import { useDmBubbleSheetChrome } from "@/theme-rn/useDmBubbleSheetChrome";
+
+// haven-rev2: adapted from ux-lab FloatingDMBubble (reference); ux-lab source is unchanged.
+
+export type { FloatingDMBubbleProps, FloatingDmChannelConfig, FloatingDmChannelId } from "@/theme-rn/floatingDmTypes";
 
 const BUBBLE_SIZE = 64;
 const EDGE_MARGIN = 12;
@@ -62,54 +75,11 @@ const MORPH_MS = 220;
 // MobileDirectMessagesProvider / useDirectMessages shape (conversations, selection).
 // ---------------------------------------------------------------------------
 
-/** Stable ids for DM-style surfaces; extend when product adds more entrypoints. */
-export type FloatingDmChannelId = "inbox" | "modmail";
-
-export type FloatingDmChannelConfig = {
-  id: FloatingDmChannelId;
-  /** Navbar / bubble chrome label (short). */
-  label: string;
-  /** Sheet header — maps to HavenModalShell `title` + body context. */
-  sheetTitle: string;
-  bubbleColor: string;
-  sheetBackgroundColor: string;
-  /** Optional badge; maps to dmUnread-style counts later. */
-  unreadCount?: number;
-};
-
-export type FloatingDMBubbleProps = {
-  /** Defaults to inbox + modmail placeholders for design verification. */
-  channels?: FloatingDmChannelConfig[];
-  defaultChannelId?: FloatingDmChannelId;
-  /** Fires when sheet open state changes (modal `visible` parity). */
-  onOpenChange?: (isOpen: boolean) => void;
-  /** Fires when user picks a channel in the sheet (selection / workspace parity). */
-  onChannelChange?: (channelId: FloatingDmChannelId) => void;
-  /** Rest anchor after drag or flick settle — future persist / analytics. */
-  onRestPositionCommit?: (position: { x: number; y: number }) => void;
-};
-
-const PLACEHOLDER_CHANNELS: FloatingDmChannelConfig[] = [
-  {
-    id: "inbox",
-    label: "Inbox",
-    sheetTitle: "Direct messages",
-    bubbleColor: "#6366f1",
-    sheetBackgroundColor: "#1e3a8a",
-    unreadCount: 2,
-  },
-  {
-    id: "modmail",
-    label: "Mod mail",
-    sheetTitle: "Moderator inbox",
-    bubbleColor: "#d97706",
-    sheetBackgroundColor: "#78350f",
-    unreadCount: 0,
-  },
-];
-
-function resolveChannels(input?: FloatingDmChannelConfig[]): FloatingDmChannelConfig[] {
-  return input && input.length > 0 ? input : PLACEHOLDER_CHANNELS;
+function resolveChannels(
+  input: FloatingDmChannelConfig[] | undefined,
+  themedDefaults: FloatingDmChannelConfig[],
+): FloatingDmChannelConfig[] {
+  return input && input.length > 0 ? input : themedDefaults;
 }
 
 function resolveDefaultChannelId(
@@ -120,109 +90,7 @@ function resolveDefaultChannelId(
   return channels[0]!.id;
 }
 
-/**
- * First wall hit by ray (x0,y0) + t*(vx,vy), t>0, on the bubble bounds
- * rectangle; maps to nearest corner (TL / TR / BL / BR), never edge-midpoint.
- */
-function cornerTargetFromRay(
-  x0: number,
-  y0: number,
-  vx: number,
-  vy: number,
-  leftSnap: number,
-  rightSnap: number,
-  minY: number,
-  maxY: number,
-): { x: number; y: number } {
-  "worklet";
-  const midX = (leftSnap + rightSnap) * 0.5;
-  const midY = (minY + maxY) * 0.5;
-  const EPS = 1e-3;
-
-  let bestT = Number.POSITIVE_INFINITY;
-  let hit = -1; // 0 top, 1 left, 2 right, 3 bottom
-
-  const tryHit = (t: number, kind: number) => {
-    if (t <= EPS || t >= bestT) return;
-    bestT = t;
-    hit = kind;
-  };
-
-  if (Math.abs(vy) > EPS) {
-    const t = (minY - y0) / vy;
-    const xh = x0 + vx * t;
-    if (xh >= leftSnap && xh <= rightSnap) tryHit(t, 0);
-  }
-  if (Math.abs(vx) > EPS) {
-    const tL = (leftSnap - x0) / vx;
-    const yL = y0 + vy * tL;
-    if (yL >= minY && yL <= maxY) tryHit(tL, 1);
-    const tR = (rightSnap - x0) / vx;
-    const yR = y0 + vy * tR;
-    if (yR >= minY && yR <= maxY) tryHit(tR, 2);
-  }
-  if (Math.abs(vy) > EPS) {
-    const t = (maxY - y0) / vy;
-    const xh = x0 + vx * t;
-    if (xh >= leftSnap && xh <= rightSnap) tryHit(t, 3);
-  }
-
-  if (hit === 0) {
-    const xh = Math.min(
-      rightSnap,
-      Math.max(leftSnap, x0 + vx * bestT),
-    );
-    return { x: xh <= midX ? leftSnap : rightSnap, y: minY };
-  }
-  if (hit === 1) {
-    const yh = Math.min(
-      maxY,
-      Math.max(minY, y0 + vy * bestT),
-    );
-    return { x: leftSnap, y: yh <= midY ? minY : maxY };
-  }
-  if (hit === 2) {
-    const yh = Math.min(
-      maxY,
-      Math.max(minY, y0 + vy * bestT),
-    );
-    return { x: rightSnap, y: yh <= midY ? minY : maxY };
-  }
-  if (hit === 3) {
-    const xh = Math.min(
-      rightSnap,
-      Math.max(leftSnap, x0 + vx * bestT),
-    );
-    return { x: xh <= midX ? leftSnap : rightSnap, y: maxY };
-  }
-
-  if (Math.abs(vx) <= EPS && Math.abs(vy) <= EPS) {
-    return {
-      x: x0 <= midX ? leftSnap : rightSnap,
-      y: y0 <= midY ? minY : maxY,
-    };
-  }
-  if (Math.abs(vx) <= EPS) {
-    return {
-      x: x0 <= midX ? leftSnap : rightSnap,
-      y: vy < 0 ? minY : maxY,
-    };
-  }
-  if (Math.abs(vy) <= EPS) {
-    return {
-      x: vx < 0 ? leftSnap : rightSnap,
-      y: y0 <= midY ? minY : maxY,
-    };
-  }
-  if (vx >= 0) {
-    return vy < 0
-      ? { x: rightSnap, y: minY }
-      : { x: rightSnap, y: maxY };
-  }
-  return vy < 0 ? { x: leftSnap, y: minY } : { x: leftSnap, y: maxY };
-}
-
-export function FloatingDMBubble(props: FloatingDMBubbleProps = {}) {
+export function DMBubbleHost(props: FloatingDMBubbleProps = {}) {
   const {
     channels: channelsProp,
     defaultChannelId: defaultChannelIdProp,
@@ -231,7 +99,12 @@ export function FloatingDMBubble(props: FloatingDMBubbleProps = {}) {
     onRestPositionCommit,
   } = props;
 
-  const channels = useMemo(() => resolveChannels(channelsProp), [channelsProp]);
+  const themedDefaults = useFloatingDmPlaceholderChannels();
+  const sheetChrome = useDmBubbleSheetChrome();
+  const channels = useMemo(
+    () => resolveChannels(channelsProp, themedDefaults),
+    [channelsProp, themedDefaults],
+  );
   const initialChannelId = useMemo(
     () => resolveDefaultChannelId(channels, defaultChannelIdProp),
     [channels, defaultChannelIdProp],
@@ -684,6 +557,9 @@ export function FloatingDMBubble(props: FloatingDMBubbleProps = {}) {
     opacity: sheetOpacity.value,
   }));
 
+  // REV2_INFERRED: Sheet subtree (including DirectMessagesContainer) mounts only while `expanded`
+  // is true — snappy follow-up is to keep sheet mounted and toggle pointerEvents + opacity only.
+
   return (
     <View
       style={styles.overlay}
@@ -711,9 +587,8 @@ export function FloatingDMBubble(props: FloatingDMBubbleProps = {}) {
             ]}
             pointerEvents="auto"
           >
-            <Text style={styles.sheetTitle}>{activeChannel.sheetTitle}</Text>
-            <Text style={styles.sheetPlaceholder}>
-              Placeholder body — wire DirectMessagesContainer or ModMail here later.
+            <Text style={[styles.sheetTitle, { color: sheetChrome.sheetTitleColor }]}>
+              {activeChannel.sheetTitle}
             </Text>
             <View style={styles.channelRow}>
               {channels.map((ch) => {
@@ -724,17 +599,45 @@ export function FloatingDMBubble(props: FloatingDMBubbleProps = {}) {
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     onPress={() => handleSelectChannel(ch.id)}
-                    style={[styles.channelPill, selected && styles.channelPillSelected]}
+                    style={[
+                      styles.channelPill,
+                      { backgroundColor: sheetChrome.channelPillBackground },
+                      selected && [
+                        styles.channelPillSelected,
+                        {
+                          backgroundColor: sheetChrome.channelPillSelectedBackground,
+                          borderColor: sheetChrome.channelPillBorderColor,
+                        },
+                      ],
+                    ]}
                   >
-                    <Text style={styles.channelPillLabel}>{ch.label}</Text>
+                    <Text style={[styles.channelPillLabel, { color: sheetChrome.channelPillLabelColor }]}>
+                      {ch.label}
+                    </Text>
                     {ch.unreadCount != null && ch.unreadCount > 0 ? (
-                      <View style={styles.unreadBadge}>
-                        <Text style={styles.unreadBadgeText}>{ch.unreadCount}</Text>
+                      <View
+                        style={[styles.unreadBadge, { backgroundColor: sheetChrome.unreadBadgeBackground }]}
+                      >
+                        <Text style={[styles.unreadBadgeText, { color: sheetChrome.unreadBadgeTextColor }]}>
+                          {ch.unreadCount}
+                        </Text>
                       </View>
                     ) : null}
                   </Pressable>
                 );
               })}
+            </View>
+            <View style={styles.sheetBody}>
+              {activeChannelId === "inbox" ? (
+                <DirectMessagesContainer />
+              ) : (
+                <View style={styles.modmailPlaceholder}>
+                  <Text style={[styles.sheetPlaceholder, { color: sheetChrome.sheetPlaceholderColor }]}>
+                    {/* REV2_INFERRED: ModMail is not a chat surface — hub UI TBD. */}
+                    ModMail placeholder — wire moderator hub when product defines it.
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </Animated.View>
@@ -764,7 +667,10 @@ export function FloatingDMBubble(props: FloatingDMBubbleProps = {}) {
                 styles.bubble,
                 styles.bubbleBehind,
                 { backgroundColor: secondaryChannel.bubbleColor },
-                activeChannelId === secondaryChannel.id && styles.bubbleActive,
+                activeChannelId === secondaryChannel.id && [
+                  styles.bubbleActive,
+                  { borderColor: sheetChrome.bubbleActiveBorderColor },
+                ],
                 secondaryBubbleStyle,
               ]}
             />
@@ -777,7 +683,10 @@ export function FloatingDMBubble(props: FloatingDMBubbleProps = {}) {
                 styles.bubble,
                 styles.bubbleFront,
                 { backgroundColor: primaryChannel.bubbleColor },
-                activeChannelId === primaryChannel.id && styles.bubbleActive,
+                activeChannelId === primaryChannel.id && [
+                  styles.bubbleActive,
+                  { borderColor: sheetChrome.bubbleActiveBorderColor },
+                ],
                 bubbleStyle,
               ]}
             />
@@ -792,6 +701,7 @@ export function FloatingDMBubble(props: FloatingDMBubbleProps = {}) {
               styles.bubble,
               { backgroundColor: activeChannel.bubbleColor },
               styles.bubbleActive,
+              { borderColor: sheetChrome.bubbleActiveBorderColor },
               bubbleStyle,
             ]}
           />
@@ -832,7 +742,6 @@ const styles = StyleSheet.create({
   },
   bubbleActive: {
     borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.9)",
   },
   sheetWrap: {
     position: "absolute",
@@ -843,15 +752,25 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     padding: 14,
+    minHeight: 0,
+  },
+  sheetBody: {
+    flex: 1,
+    minHeight: 0,
+    marginTop: 8,
+  },
+  modmailPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 12,
   },
   sheetTitle: {
-    color: "#f8fafc",
     fontSize: 17,
     fontWeight: "600",
     marginBottom: 8,
   },
   sheetPlaceholder: {
-    color: "rgba(248,250,252,0.72)",
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 14,
@@ -867,16 +786,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.12)",
     gap: 6,
   },
   channelPillSelected: {
-    backgroundColor: "rgba(255,255,255,0.28)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.45)",
   },
   channelPillLabel: {
-    color: "#f8fafc",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -884,13 +799,11 @@ const styles = StyleSheet.create({
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#ef4444",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 5,
   },
   unreadBadgeText: {
-    color: "#fff",
     fontSize: 11,
     fontWeight: "700",
   },

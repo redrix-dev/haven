@@ -20,6 +20,8 @@ import {
 type UseCommunityWorkspaceInput = {
   servers: ServerSummary[];
   currentUserId: string | null;
+  /** When false, do not auto-pick the first server if none is selected (e.g. haven-rev2 community list). Default true. */
+  autoSelectFirstServer?: boolean;
   onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
   onMemberChannelAccessRevoked?: (
     payload: MemberChannelAccessRevokedBroadcastPayload,
@@ -32,6 +34,7 @@ type UseCommunityWorkspaceInput = {
 export function useCommunityWorkspace({
   servers,
   currentUserId,
+  autoSelectFirstServer = true,
   onMemberBanned = stableOnMemberBanned,
   onMemberChannelAccessRevoked = stableOnMemberChannelAccessRevoked,
   onReportStatusUpdated,
@@ -132,12 +135,13 @@ export function useCommunityWorkspace({
     [],
   );
 
-  // Auto-select first server if none selected
+  // Auto-select first server if none selected (legacy / single-stack community entry)
   React.useEffect(() => {
+    if (!autoSelectFirstServer) return;
     if (servers.length > 0 && !currentServerId) {
       setCurrentServerId(servers[0].id);
     }
-  }, [servers, currentServerId, setCurrentServerId]);
+  }, [autoSelectFirstServer, servers, currentServerId, setCurrentServerId]);
 
   // Remember last selected channel per server
   React.useEffect(() => {

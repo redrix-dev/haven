@@ -28,6 +28,7 @@ export type ChatMessage = {
   timestampLabel?: string;
   replyTargetLabel?: string | null;
   attachments?: MessageAttachment[];
+  linkPreview?: MessageLinkPreview | null;
 };
 
 export type ChatListItem =
@@ -65,7 +66,6 @@ type CommunityMessageBubbleProps = ChatMessage & {
   isCondensed?: boolean;
   onPress?: () => void;
   onLongPress?: () => void;
-  linkPreview?: MessageLinkPreview | null;
 };
 
 export function CommunityMessageBubble({

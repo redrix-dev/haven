@@ -233,7 +233,43 @@ type ReportProfileRow = Pick<
   'id' | 'username' | 'avatar_url'
 >;
 
-const activeCommunityChannelsById = new Map<string, RealtimeChannel>();
+/** Multiple `useCommunityWorkspace` mounts (e.g. stack keeps host + thread) each subscribe; Supabase reuses topic names, so each subscription uses a unique suffix (see `subscribeToChannels`). */
+const activeCommunityRealtimeChannelsByCommunityId = new Map<string, Set<RealtimeChannel>>();
+
+const addActiveCommunityRealtimeChannel = (
+  communityId: string,
+  channel: RealtimeChannel,
+) => {
+  let set = activeCommunityRealtimeChannelsByCommunityId.get(communityId);
+  if (!set) {
+    set = new Set();
+    activeCommunityRealtimeChannelsByCommunityId.set(communityId, set);
+  }
+  set.add(channel);
+};
+
+const removeActiveCommunityRealtimeChannel = (
+  communityId: string,
+  channel: RealtimeChannel,
+) => {
+  const set = activeCommunityRealtimeChannelsByCommunityId.get(communityId);
+  if (!set) return;
+  set.delete(channel);
+  if (set.size === 0) {
+    activeCommunityRealtimeChannelsByCommunityId.delete(communityId);
+  }
+};
+
+const getAnyActiveCommunityRealtimeChannel = (
+  communityId: string,
+): RealtimeChannel | null => {
+  const set = activeCommunityRealtimeChannelsByCommunityId.get(communityId);
+  if (!set) return null;
+  for (const ch of set) {
+    return ch;
+  }
+  return null;
+};
 
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -1266,7 +1302,8 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   subscribeToChannels(communityId, onChange, options) {
-    const channel = havenCommunitySb().channel(`channels:${communityId}`)
+    const topicSuffix = createPortableUuid();
+    const channel = havenCommunitySb().channel(`channels:${communityId}:${topicSuffix}`)
       .on(
         'postgres_changes',
         {
@@ -1347,15 +1384,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        activeCommunityChannelsById.set(communityId, channel);
+        addActiveCommunityRealtimeChannel(communityId, channel);
       }
     });
 
     const originalUnsubscribe = channel.unsubscribe.bind(channel);
     channel.unsubscribe = async (...args) => {
-      if (activeCommunityChannelsById.get(communityId) === channel) {
-        activeCommunityChannelsById.delete(communityId);
-      }
+      removeActiveCommunityRealtimeChannel(communityId, channel);
       return originalUnsubscribe(...args);
     };
 
@@ -1386,7 +1421,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async broadcastMemberBanned({ communityId, bannedUserId }) {
-    const broadcastChannel = activeCommunityChannelsById.get(communityId);
+    const broadcastChannel = getAnyActiveCommunityRealtimeChannel(communityId);
     if (!broadcastChannel) {
       console.warn(
         `Skipping member_banned broadcast for ${communityId}: no active channels subscription.`
@@ -1409,7 +1444,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async broadcastMemberChannelAccessRevoked({ communityId, channelId, revokedUserId }) {
-    const broadcastChannel = activeCommunityChannelsById.get(communityId);
+    const broadcastChannel = getAnyActiveCommunityRealtimeChannel(communityId);
     if (!broadcastChannel) {
       console.warn(
         `Skipping member_channel_access_revoked broadcast for ${communityId}: no active channels subscription.`
@@ -1433,7 +1468,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async broadcastReportStatusUpdated({ reportId, status, communityId, updatedBy }) {
-    const broadcastChannel = activeCommunityChannelsById.get(communityId);
+    const broadcastChannel = getAnyActiveCommunityRealtimeChannel(communityId);
     if (!broadcastChannel) {
       console.warn(
         `Skipping report_status_updated broadcast for ${communityId}: no active channels subscription.`

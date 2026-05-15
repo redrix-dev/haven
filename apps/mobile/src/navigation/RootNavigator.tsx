@@ -26,9 +26,15 @@ import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeF
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const Tab = createHavenTabNavigator();
-const USE_UX_LAB = __DEV__ && true;
+/** Set true in dev to load haven-rev2 drawer + bubble shell (see `src/haven-rev2/README.md`). */
+const USE_HAVEN_REV2 = __DEV__ && true;
+const USE_UX_LAB = __DEV__ && false;
 
 function resolveMainComponent() {
+  if (USE_HAVEN_REV2) {
+    const { Rev2Main } = require("@/haven-rev2/Rev2Main") as typeof import("@/haven-rev2/Rev2Main");
+    return Rev2Main;
+  }
   if (!USE_UX_LAB) return MainTabs;
   const { UxLabNavigator } =
     require("@/dev/ux-lab/UxLabNavigator") as typeof import("@/dev/ux-lab/UxLabNavigator");
