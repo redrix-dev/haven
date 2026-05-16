@@ -1,4 +1,4 @@
-/** Shared types for haven-rev2 floating DM bubble + theme defaults. */
+/** Shared types for floating DM bubble + theme defaults. */
 
 export type FloatingDmChannelId = "inbox" | "modmail";
 

@@ -1,19 +1,12 @@
 import { builtinThemes } from "@shared/themes";
 import { useMemo, useState } from "react";
 import {
-  Actionsheet,
-  ActionsheetBackdrop,
-  ActionsheetContent,
-  ActionsheetDragIndicator,
-  ActionsheetDragIndicatorWrapper,
-  ActionsheetItem,
-  ActionsheetItemText,
-  ActionsheetScrollView,
-  ActionsheetSectionHeaderText,
-} from "@/components/ui/actionsheet";
-import { Fab, FabLabel } from "@/components/ui/fab";
-import { Text } from "@/components/ui/text";
-import { VStack } from "@/components/ui/vstack";
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { applyMobileTheme } from "@/lib/theme";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
 
@@ -53,53 +46,63 @@ export function MobileDevThemeMenu() {
 
   return (
     <>
-      <Fab
-        size="sm"
-        placement="bottom right"
-        className="bottom-8 right-5"
+      <Pressable
         onPress={() => setIsOpen(true)}
+        className="absolute bottom-8 right-5 rounded-full bg-primary px-4 py-3"
+        accessibilityRole="button"
+        accessibilityLabel="Dev theme menu"
       >
-        <FabLabel>Theme</FabLabel>
-      </Fab>
+        <Text className="text-sm font-semibold text-primary-foreground">Theme</Text>
+      </Pressable>
 
-      <Actionsheet isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <ActionsheetBackdrop />
-        <ActionsheetContent>
-          <ActionsheetDragIndicatorWrapper>
-            <ActionsheetDragIndicator />
-          </ActionsheetDragIndicatorWrapper>
-
-          <VStack space="xs" className="w-full px-3 pb-2">
-            <Text size="lg" bold className="text-foreground">
-              Dev Theme
-            </Text>
-            <Text size="sm" className="text-muted-foreground">
-              Session only. Current: {selectedThemeName}
-            </Text>
-          </VStack>
-
-          <ActionsheetSectionHeaderText>Themes</ActionsheetSectionHeaderText>
-
-          <ActionsheetScrollView>
-            {themeOptions.map((theme) => (
-              <ActionsheetItem
-                key={theme.id}
-                onPress={() => selectTheme(theme.id)}
+      <Modal
+        visible={isOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/50"
+          onPress={() => setIsOpen(false)}
+        >
+          <Pressable
+            className="max-h-[70%] rounded-t-2xl bg-surface-modal pb-8"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View className="px-4 pb-2 pt-4">
+              <Text className="text-lg font-bold text-foreground">Dev Theme</Text>
+              <Text className="text-sm text-muted-foreground">
+                Session only. Current: {selectedThemeName}
+              </Text>
+            </View>
+            <ScrollView>
+              {themeOptions.map((theme) => (
+                <Pressable
+                  key={theme.id}
+                  onPress={() => selectTheme(theme.id)}
+                  className="border-b border-border px-4 py-3"
+                >
+                  <Text
+                    className={`text-base text-foreground ${
+                      theme.id === sessionThemeId ? "font-bold" : "font-normal"
+                    }`}
+                  >
+                    {theme.name}
+                  </Text>
+                </Pressable>
+              ))}
+              <Pressable
+                onPress={restorePersistedTheme}
+                className="px-4 py-3"
               >
-                <ActionsheetItemText bold={theme.id === sessionThemeId}>
-                  {theme.name}
-                </ActionsheetItemText>
-              </ActionsheetItem>
-            ))}
-
-            <ActionsheetItem onPress={restorePersistedTheme}>
-              <ActionsheetItemText>
-                Restore saved preference
-              </ActionsheetItemText>
-            </ActionsheetItem>
-          </ActionsheetScrollView>
-        </ActionsheetContent>
-      </Actionsheet>
+                <Text className="text-base text-foreground">
+                  Restore saved preference
+                </Text>
+              </Pressable>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }

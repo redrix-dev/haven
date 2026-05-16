@@ -22,22 +22,9 @@ import { MobileSocialWorkspaceProvider } from "@/contexts/MobileSocialWorkspaceC
 import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesContext";
 import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
-import { USE_HAVEN_REV2 } from "@/config/havenMobileRev2";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createHavenTabNavigator();
-const USE_UX_LAB = __DEV__ && false;
-
-function resolveMainComponent() {
-  if (USE_HAVEN_REV2) {
-    const { Rev2Main } = require("@/haven-rev2/Rev2Main") as typeof import("@/haven-rev2/Rev2Main");
-    return Rev2Main;
-  }
-  if (!USE_UX_LAB) return MainTabs;
-  const { UxLabNavigator } =
-    require("@/dev/ux-lab/UxLabNavigator") as typeof import("@/dev/ux-lab/UxLabNavigator");
-  return UxLabNavigator;
-}
 
 function MainTabs() {
   const session = useAuthSession();
@@ -161,7 +148,7 @@ export function RootNavigator() {
                 <>
                   <Stack.Screen
                     name="Main"
-                    component={resolveMainComponent()}
+                    component={MainTabs}
                     options={{ keyboardHandlingEnabled: false }}
                   />
                 </>

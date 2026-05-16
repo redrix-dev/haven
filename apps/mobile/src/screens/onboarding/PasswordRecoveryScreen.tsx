@@ -1,43 +1,33 @@
 import {
-  useNavigation,
-  useRoute,
-  type RouteProp,
-} from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getErrorMessage } from "@shared/platform/lib/errors";
-import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Keyboard, Platform } from "react-native";
+  View,
+  Text,
+  Pressable,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getErrorMessage } from "@shared/platform/lib/errors";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import { useState } from "react";
+import type { RootStackParamList } from "@/navigation/types";
+import { usePasswordRecoveryGate } from "@/navigation/PasswordRecoveryGateContext";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   completePasswordRecovery,
   requestPasswordReset,
   signOutFromAuth,
 } from "@/auth/mobileAuthService";
-import { Box } from "@/components/ui/box";
-import { Button, ButtonSpinner, ButtonText } from "@/components/ui/button";
-import {
-  FormControl,
-  FormControlLabel,
-  FormControlLabelText,
-} from "@/components/ui/form-control";
-import { HStack } from "@/components/ui/hstack";
-import { Input, InputField } from "@/components/ui/input";
-import { KeyboardAvoidingView } from "@/components/ui/keyboard-avoiding-view";
-import { Pressable } from "@/components/ui/pressable";
-import { ScrollView } from "@/components/ui/scroll-view";
-import { Text } from "@/components/ui/text";
-import { VStack } from "@/components/ui/vstack";
-import type { RootStackParamList } from "@/navigation/types";
-import { usePasswordRecoveryGate } from "@/navigation/PasswordRecoveryGateContext";
 
-const KEYBOARD_CARD_LIFT = -64;
-const KEYBOARD_ANIMATION_MS = 220;
+const PLACEHOLDER_MUTED = "#a9b8cf";
+
+const inputClassName =
+  "mb-4 rounded-lg border border-border bg-muted px-4 py-3 text-foreground";
 
 export function PasswordRecoveryScreen() {
   const insets = useSafeAreaInsets();
-  const cardTranslateY = useRef(new Animated.Value(0)).current;
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, "PasswordRecovery">>();
   const recoveryGate = usePasswordRecoveryGate();
 
@@ -96,37 +86,12 @@ export function PasswordRecoveryScreen() {
     }
   };
 
-  useEffect(() => {
-    const animateCard = (toValue: number, duration = KEYBOARD_ANIMATION_MS) => {
-      Animated.timing(cardTranslateY, {
-        toValue,
-        duration,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-    const showSubscription = Keyboard.addListener(showEvent, (event) => {
-      animateCard(KEYBOARD_CARD_LIFT, event.duration);
-    });
-    const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
-      animateCard(0, event.duration);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [cardTranslateY]);
-
   if (flow === "setNewPassword") {
     return (
-      <KeyboardAvoidingView className="flex-1 bg-background">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1 bg-background"
+      >
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
@@ -137,94 +102,74 @@ export function PasswordRecoveryScreen() {
             justifyContent: "center",
           }}
         >
-          <Animated.View
-            style={{ transform: [{ translateY: cardTranslateY }] }}
+          <View
+            className="w-full max-w-sm self-center rounded-3xl border border-border bg-card p-6 shadow-xl shadow-background/40"
+            style={Platform.OS === "android" ? { elevation: 8 } : undefined}
           >
-            <Box className="w-full max-w-sm self-center rounded-3xl bg-card p-6">
-              <VStack space="lg">
-                <Text size="2xl" bold className="text-center text-foreground">
-                  Haven
-                </Text>
-                <Text size="lg" bold className="text-center text-foreground">
-                  Set a new password
-                </Text>
-                <Text size="sm" className="text-center text-muted-foreground">
-                  Your reset link is verified. Set a new password to finish
-                  account recovery.
-                </Text>
+            <Text className="mb-1 text-center text-2xl font-semibold text-foreground">Haven</Text>
+            <Text className="mb-2 text-center text-lg font-semibold text-foreground">
+              Set a new password
+            </Text>
+            <Text className="mb-8 text-center text-sm leading-5 text-muted-foreground">
+              Your reset link is verified. Set a new password to finish account recovery.
+            </Text>
 
-                <FormControl>
-                  <FormControlLabel>
-                    <FormControlLabelText className="text-xs uppercase tracking-wide text-muted-foreground">
-                      New password
-                    </FormControlLabelText>
-                  </FormControlLabel>
-                  <Input className="rounded-xl bg-card px-1 py-1">
-                    <InputField
-                      secureTextEntry
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      placeholder="••••••••"
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                    />
-                  </Input>
-                </FormControl>
+            <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">
+              New password
+            </Text>
+            <TextInput
+              className={inputClassName}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="••••••••"
+              placeholderTextColor={PLACEHOLDER_MUTED}
+              value={newPassword}
+              onChangeText={setNewPassword}
+            />
 
-                <FormControl>
-                  <FormControlLabel>
-                    <FormControlLabelText className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Confirm password
-                    </FormControlLabelText>
-                  </FormControlLabel>
-                  <Input className="rounded-xl bg-card px-1 py-1">
-                    <InputField
-                      secureTextEntry
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      placeholder="••••••••"
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                    />
-                  </Input>
-                </FormControl>
+            <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">
+              Confirm password
+            </Text>
+            <TextInput
+              className="mb-6 rounded-lg border border-border bg-muted px-4 py-3 text-foreground"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="••••••••"
+              placeholderTextColor={PLACEHOLDER_MUTED}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+            />
 
-                {setPasswordError ? (
-                  <Text size="sm" className="text-center text-destructive">
-                    {setPasswordError}
-                  </Text>
-                ) : null}
+            {setPasswordError ? (
+              <Text className="mb-4 text-center text-sm text-destructive">{setPasswordError}</Text>
+            ) : null}
 
-                <Button
-                  size="lg"
-                  isDisabled={setPasswordLoading}
-                  onPress={() => void submitNewPassword()}
-                >
-                  {setPasswordLoading ? <ButtonSpinner /> : null}
-                  <ButtonText>
-                    {setPasswordLoading ? "Updating…" : "Update Password"}
-                  </ButtonText>
-                </Button>
+            <Pressable
+              className={`mb-4 rounded-xl bg-primary py-4 ${setPasswordLoading ? "opacity-60" : ""}`}
+              disabled={setPasswordLoading}
+              onPress={() => void submitNewPassword()}
+            >
+              <Text className="text-center text-base font-semibold text-primary-foreground">
+                {setPasswordLoading ? "Updating…" : "Update Password"}
+              </Text>
+            </Pressable>
 
-                <Pressable
-                  className="py-2"
-                  onPress={() => void signOutFromRecovery()}
-                  hitSlop={8}
-                >
-                  <Text size="sm" className="text-center text-muted-foreground">
-                    Sign out
-                  </Text>
-                </Pressable>
-              </VStack>
-            </Box>
-          </Animated.View>
+            <Pressable className="py-2" onPress={() => void signOutFromRecovery()} hitSlop={8}>
+              <Text className="text-center text-sm text-muted-foreground">Sign out</Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     );
   }
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-background">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      className="flex-1 bg-background"
+    >
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
@@ -235,103 +180,75 @@ export function PasswordRecoveryScreen() {
           justifyContent: "center",
         }}
       >
-        <Animated.View style={{ transform: [{ translateY: cardTranslateY }] }}>
-          <Box className="w-full max-w-sm self-center rounded-3xl bg-card p-6">
-            <VStack space="lg">
-              <Text size="2xl" bold className="text-center text-foreground">
-                Haven
+        <View
+          className="w-full max-w-sm self-center rounded-3xl border border-border bg-card p-6 shadow-xl shadow-background/40"
+          style={Platform.OS === "android" ? { elevation: 8 } : undefined}
+        >
+          <Text className="mb-1 text-center text-2xl font-semibold text-foreground">Haven</Text>
+
+          {submitSuccess ? (
+            <>
+              <Text className="mb-6 text-center text-lg font-semibold text-foreground">
+                Check your email
+              </Text>
+              <Text className="mb-8 text-center text-sm leading-6 text-muted-foreground">
+                We sent a password reset link to{" "}
+                <Text className="text-sm text-foreground">{email.trim()}</Text>. Open the email and
+                follow the link to choose a new password.
+              </Text>
+              <Pressable
+                className="rounded-xl bg-primary py-4"
+                onPress={() => void navigation.navigate("Login")}
+              >
+                <Text className="text-center text-base font-semibold text-primary-foreground">
+                  Back to login
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text className="mb-8 text-center text-sm text-muted-foreground">
+                Reset your password
               </Text>
 
-              {submitSuccess ? (
-                <VStack space="lg">
-                  <Text size="lg" bold className="text-center text-foreground">
-                    Check your email
-                  </Text>
-                  <Text size="sm" className="text-center text-muted-foreground">
-                    We sent a password reset link to{" "}
-                    <Text size="sm" className="text-foreground">
-                      {email.trim()}
-                    </Text>
-                    . Open the email and follow the link to choose a new
-                    password.
-                  </Text>
-                  <Button
-                    size="lg"
-                    onPress={() => void navigation.navigate("Login")}
-                  >
-                    <ButtonText>Back to login</ButtonText>
-                  </Button>
-                </VStack>
-              ) : (
-                <VStack space="lg">
-                  <Text size="sm" className="text-center text-muted-foreground">
-                    Reset your password
-                  </Text>
+              <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">Email</Text>
+              <TextInput
+                className={inputClassName}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                placeholder="you@example.com"
+                placeholderTextColor={PLACEHOLDER_MUTED}
+                value={email}
+                onChangeText={setEmail}
+              />
 
-                  <FormControl>
-                    <FormControlLabel>
-                      <FormControlLabelText className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Email
-                      </FormControlLabelText>
-                    </FormControlLabel>
-                    <Input className="rounded-xl bg-card px-1 py-1">
-                      <InputField
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        keyboardType="email-address"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChangeText={setEmail}
-                      />
-                    </Input>
-                  </FormControl>
+              {error ? (
+                <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
+              ) : null}
 
-                  {error ? (
-                    <Text size="sm" className="text-center text-destructive">
-                      {error}
-                    </Text>
-                  ) : null}
+              <Pressable
+                className={`mb-6 rounded-xl bg-primary py-4 ${loading ? "opacity-60" : ""}`}
+                disabled={loading}
+                onPress={() => void requestReset()}
+              >
+                <Text className="text-center text-base font-semibold text-primary-foreground">
+                  {loading ? "Sending…" : "Send reset link"}
+                </Text>
+              </Pressable>
 
-                  <Button
-                    size="lg"
-                    isDisabled={loading}
-                    onPress={() => void requestReset()}
-                  >
-                    {loading ? <ButtonSpinner /> : null}
-                    <ButtonText>
-                      {loading ? "Sending…" : "Send reset link"}
-                    </ButtonText>
-                  </Button>
-
-                  <HStack
-                    space="xs"
-                    className="flex-wrap items-center justify-center"
-                  >
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() => void navigation.navigate("Login")}
-                    >
-                      <Text size="sm" className="text-center text-primary">
-                        Back to login
-                      </Text>
-                    </Pressable>
-                    <Text size="sm" className="text-muted-foreground">
-                      ·
-                    </Text>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() => void navigation.navigate("SignUp")}
-                    >
-                      <Text size="sm" className="text-center text-primary">
-                        Sign up
-                      </Text>
-                    </Pressable>
-                  </HStack>
-                </VStack>
-              )}
-            </VStack>
-          </Box>
-        </Animated.View>
+              <View className="flex-row flex-wrap items-center justify-center gap-x-1 gap-y-1">
+                <Pressable hitSlop={8} onPress={() => void navigation.navigate("Login")}>
+                  <Text className="text-center text-sm text-primary">Back to login</Text>
+                </Pressable>
+                <Text className="text-sm text-muted-foreground"> · </Text>
+                <Pressable hitSlop={8} onPress={() => void navigation.navigate("SignUp")}>
+                  <Text className="text-center text-sm text-primary">Sign up</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

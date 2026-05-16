@@ -10,16 +10,12 @@ const MobileDirectMessagesContext = createContext<DirectMessagesHookReturn | nul
 export function MobileDirectMessagesProvider({
   userId,
   children,
-  /** When true, DM realtime + loads stay active regardless of `workspaceMode` (e.g. haven-rev2 bubble shell). */
-  isDmWorkspaceAlwaysActive = false,
 }: {
   userId: string;
   children: ReactNode;
-  isDmWorkspaceAlwaysActive?: boolean;
 }) {
   const workspaceMode = useNavigationStore((s) => s.workspaceMode);
-  const isDmWorkspaceActive =
-    isDmWorkspaceAlwaysActive || workspaceMode === "dm";
+  const isDmWorkspaceActive = workspaceMode === "dm";
 
   const directMessageBackend = getDirectMessageBackend();
   const directMessages = useDirectMessages({

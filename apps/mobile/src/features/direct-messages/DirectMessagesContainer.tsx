@@ -27,7 +27,7 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { ChatScrollView } from "@/features/community/ChatScrollView";
-import { useDmBubbleShellStore } from "@/haven-rev2/stores/dmBubbleShellStore";
+import { useDmBubbleShellStore } from "@/features/direct-messages/stores/dmBubbleShellStore";
 import {
   loadPickedCommunityMediaForUpload,
   type CommunityMediaUploadPayload,

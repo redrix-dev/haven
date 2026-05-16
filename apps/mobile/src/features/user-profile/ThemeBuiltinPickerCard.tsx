@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getErrorMessage } from "@platform/lib/errors";
 import { listSelectableBuiltinThemes } from "@shared/themes/selectableBuiltinThemes";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
-import { Spinner } from "@/components/ui/spinner";
 import { ThemedIonicons } from "@/theme-rn";
 import { applyMobileTheme, normalizeMobileThemeId } from "@/lib/theme";
 
@@ -90,7 +89,7 @@ export function ThemeBuiltinPickerCard({
               <Text className="text-base font-medium text-foreground">{theme.name}</Text>
             </View>
             {busy ? (
-              <Spinner size="small" colorClassName="accent-muted-foreground" />
+              <ActivityIndicator size="small" color="#a9b8cf" />
             ) : selected ? (
               <ThemedIonicons name="checkmark" size={20} colorClassName="accent-primary" />
             ) : null}

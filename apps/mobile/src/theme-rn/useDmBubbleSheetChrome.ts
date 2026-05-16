@@ -20,7 +20,7 @@ export type DmBubbleSheetChrome = {
 };
 
 /**
- * Sheet / pill chrome for `DMBubbleHost` from UniWind CSS variables.
+ * Sheet / pill chrome for `DMFloatingBubble` from UniWind CSS variables.
  */
 export function useDmBubbleSheetChrome(): DmBubbleSheetChrome {
   const primaryForeground = useCSSVariable("--primary-foreground");
