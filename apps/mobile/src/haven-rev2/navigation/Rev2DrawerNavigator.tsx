@@ -54,7 +54,7 @@ export function Rev2DrawerNavigator() {
               <ThemedIonicons
                 name={icons[route.name]}
                 size={size}
-                colorClassName={focused ? "accent-primary-foreground" : "accent-muted-foreground"}
+                colorClassName={focused ? "accent-primary-foreground" : "accent-text-muted"}
               />
             ),
           })}
