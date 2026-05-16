@@ -42,19 +42,19 @@ export function useNavigationChromeStyles(): NavigationChromeStyles {
   // Drawer rail (the sliding panel: edge border + panel fill)
   // Maps: old `bg-background` + `border-border` → surface-1 + border-default primitive
   // ─────────────────────────────────────────────────────────────────────────────
-  const drawerStyle = useResolveClassNames("border-r border-border-default bg-surface-1");
+  const drawerStyle = useResolveClassNames("border-r border-border-default bg-surface-3b");
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Scene / stack area behind screens (drawer `sceneContainerStyle`, stack `contentStyle`)
   // Maps: old `bg-background` → primitive surface-1 (same as semantic `background`)
   // ─────────────────────────────────────────────────────────────────────────────
-  const sceneContainerStyle = useResolveClassNames("bg-surface-1");
+  const sceneContainerStyle = useResolveClassNames("bg-surface-0");
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Native stack header bar (title area background)
   // Maps: old `bg-background` → surface-1
   // ─────────────────────────────────────────────────────────────────────────────
-  const headerStyle = useResolveClassNames("bg-surface-1");
+  const headerStyle = useResolveClassNames("bg-surface-0 border-b border-border-default");
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Native stack header title text

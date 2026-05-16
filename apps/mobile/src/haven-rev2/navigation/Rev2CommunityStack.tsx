@@ -13,6 +13,7 @@ export function Rev2CommunityStack() {
     <Stack.Navigator
       initialRouteName="Rev2CommunityList"
       screenOptions={{
+        headerShadowVisible: true,
         headerShown: true,
         headerTintColor: chrome.headerTintColor,
         headerStyle: chrome.headerStyle,

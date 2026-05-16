@@ -169,10 +169,10 @@ export function Rev2CommunityListScreen() {
               <View style={{ width: cell }}>
                 <Pressable
                   style={{ height: cell }}
-                  className="items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
+                  className="items-center justify-center rounded-2xl bg-surface-5 active:bg-surface-hover"
                   onPress={() => openCommunityForServer(item.server.id)}
                 >
-                  <Text className="text-3xl font-bold text-foreground">{initial}</Text>
+                  <Text className="text-3xl font-bold text-border-default">{initial}</Text>
                 </Pressable>
                 <Text className="mt-1 text-center text-xs text-muted-foreground" numberOfLines={1}>
                   {item.server.name}
