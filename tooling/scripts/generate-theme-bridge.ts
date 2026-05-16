@@ -6,6 +6,7 @@ import {
   defaultTokens,
   resolveSemanticEntries,
   semanticToPrimitive,
+  type BuiltinThemeId,
 } from '../../packages/shared/src/themes';
 
 const rootDir = path.resolve(__dirname, '../..');
@@ -60,7 +61,7 @@ function getMobileThemeVariableNames(): string[] {
   return variables;
 }
 
-function resolveThemeVariables(themeId: string): Record<string, string> {
+function resolveThemeVariables(themeId: BuiltinThemeId): Record<string, string> {
   const theme = builtinThemes[themeId];
   if (!theme) {
     throw new Error(`Theme "${themeId}" was not found.`);
@@ -102,7 +103,7 @@ function generateMobileCssBridgeBlock(): string {
     lines.push('    }');
   }
 
-  for (const themeId of themeIds) {
+  for (const themeId of themeIds as BuiltinThemeId[]) {
     const variables = resolveThemeVariables(themeId);
     lines.push(`    @variant ${themeId} {`);
     for (const variableName of variableNames) {
@@ -145,7 +146,7 @@ function generateMobileUniwindTypes(): string {
     '',
     "declare module 'uniwind' {",
     '  export interface UniwindConfig {',
-    `    themes: readonly ${JSON.stringify(themeIds).replaceAll('"', "'")};`,
+    `    themes: readonly ${JSON.stringify(themeIds).replace(/"/g, "'")};`,
     '  }',
     '}',
     '',
