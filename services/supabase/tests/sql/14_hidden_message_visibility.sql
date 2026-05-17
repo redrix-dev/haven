@@ -20,18 +20,12 @@ select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 set local role service_role;
 
 create temp table tmp_hidden_message on commit drop as
-with inserted as (
-  insert into public.messages (community_id, channel_id, author_type, author_user_id, content)
-  values (
-    test_support.fixture_community_id(),
-    test_support.fixture_channel_id('general'),
-    'user',
-    test_support.fixture_user_id('member_a'),
-    'message hidden by ban'
-  )
-  returning id
-)
-select id from inserted;
+select test_support.insert_fixture_message(
+  test_support.fixture_community_id(),
+  test_support.fixture_channel_id('general'),
+  test_support.fixture_user_id('member_a'),
+  'message hidden by ban'
+) as id;
 
 insert into test_ids (key, id)
 select 'hidden_message', id from tmp_hidden_message

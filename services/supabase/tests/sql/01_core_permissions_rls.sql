@@ -21,12 +21,13 @@ select test_support.assert_query_count(
 select test_support.expect_exception(
   format(
     $sql$
-      insert into public.messages (community_id, channel_id, author_type, author_user_id, content)
-      values (%L, %L, 'user', %L, 'unauthorized')
+      insert into public.messages (community_id, channel_id, author_user_id, display_name, content)
+      values (%L, %L, %L, %L, 'unauthorized')
     $sql$,
     test_support.fixture_community_id(),
     test_support.fixture_channel_id('general'),
-    test_support.fixture_user_id('non_member')
+    test_support.fixture_user_id('non_member'),
+    test_support.fixture_username('non_member')
   ),
   'row-level security'
 );
@@ -48,18 +49,12 @@ select test_support.assert_query_count(
 );
 
 create temp table tmp_member_a_message_for_mod_delete on commit drop as
-with inserted as (
-  insert into public.messages (community_id, channel_id, author_type, author_user_id, content)
-  values (
-    test_support.fixture_community_id(),
-    test_support.fixture_channel_id('general'),
-    'user',
-    test_support.fixture_user_id('member_a'),
-    'member_a message for moderator delete'
-  )
-  returning id
-)
-select id from inserted;
+select test_support.insert_fixture_message(
+  test_support.fixture_community_id(),
+  test_support.fixture_channel_id('general'),
+  test_support.fixture_user_id('member_a'),
+  'member_a message for moderator delete'
+) as id;
 
 insert into test_ids (key, id)
 select 'mod_delete_target', id from tmp_member_a_message_for_mod_delete
@@ -102,18 +97,12 @@ select test_support.assert_false(
 );
 
 create temp table tmp_member_a_self_delete on commit drop as
-with inserted as (
-  insert into public.messages (community_id, channel_id, author_type, author_user_id, content)
-  values (
-    test_support.fixture_community_id(),
-    test_support.fixture_channel_id('general'),
-    'user',
-    test_support.fixture_user_id('member_a'),
-    'member_a self-delete message'
-  )
-  returning id
-)
-select id from inserted;
+select test_support.insert_fixture_message(
+  test_support.fixture_community_id(),
+  test_support.fixture_channel_id('general'),
+  test_support.fixture_user_id('member_a'),
+  'member_a self-delete message'
+) as id;
 
 insert into test_ids (key, id)
 select 'self_delete_target', id from tmp_member_a_self_delete

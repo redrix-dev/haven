@@ -1,4 +1,4 @@
-# Haven Mobile (Expo + dev client + NativeWind)
+# Haven Mobile (Expo + dev client + UniWind)
 
 Native UI lives here. Shared **business** logic targets `packages/shared`; read [`docs/PORTABLE_SHARED.md`](../../docs/PORTABLE_SHARED.md) for composition-root rules, then `docs/shared-package-inventory.md` for a granular import audit.
 

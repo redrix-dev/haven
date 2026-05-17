@@ -18,7 +18,7 @@ import {
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
 import { Ionicons } from "@expo/vector-icons";
-import type { Channel, Message, MessageAttachment, MessageLinkPreview } from "@shared/lib/backend/types";
+import type { Channel } from "@shared/lib/backend/types";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommunityWorkspace";
 import { useMessages } from "@shared/features/messaging/hooks/useMessages";
@@ -29,22 +29,21 @@ import { useServers } from "@shared/features/community/hooks/useServers";
 import { useCurrentServerPermissionUi } from "@shared/features/community/hooks/useCurrentServerPermissionUi";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import { getErrorMessage } from "@platform/lib/errors";
-import { getReplyToMessageId, isAuthorProfileTombstone } from "@shared/features/messaging/components/message-list/messageListContentUtils";
-import { resolveLiveAvatarUrl } from "@shared/lib/liveProfiles";
+import {
+  buildChatListItemsFromChatMessages,
+  buildMessageBundleById,
+  getReplyTargetLabel,
+  mapBundlesToChatMessages,
+} from "@/features/community/communityChannelChatFromBundles";
 import { setLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
 import { CommunityChannelBar } from "@/features/community/CommunityChannelBar";
 import { ChatScrollView } from "@/features/community/ChatScrollView";
 import {
   CommunityMessageBubble,
   MessageDateDivider,
-  dayBucket,
-  formatDateDividerLabel,
-  formatTime,
-  GROUP_WINDOW_MS,
   type ChatListItem,
   type ChatMessage,
 } from "@/features/community/CommunityMessageBubble";
-import type { AuthorProfile } from "@shared/lib/backend/types";
 import { ChannelSwitcherModal } from "@/features/community/ChannelSwitcherModal";
 import { CommunityPhaseGate } from "@/features/community/CommunityPhaseGate";
 import {
@@ -60,6 +59,8 @@ import {
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { resolveColorProp } from "@shared/themes";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MARGIN = 8;
 const COMPOSER_CHROME_IMMERSIVE_OPACITY = 0.38;
@@ -67,26 +68,34 @@ const COMPOSER_CHROME_REST_OPACITY = 1;
 const COMPOSER_CHROME_IMMERSIVE_MS = 140;
 const COMPOSER_CHROME_REST_MS = 280;
 const COMPOSER_CHROME_SETTLE_MS = 200;
-function getReplyTargetLabel(
-  replyToId: string | null,
-  messageById: Map<string, Message>,
-  profiles: Record<string, AuthorProfile>,
-): string | null {
-  if (!replyToId) return null;
-  const parent = messageById.get(replyToId);
-  if (!parent) return "a message";
-  if (parent.author_type === "haven_dev") return "Haven Moderation Team";
-  if (parent.author_type === "system") return "System";
-  const uid = parent.author_user_id;
-  if (!uid) return "a message";
-  const profile = profiles[uid];
-  if (profile?.username) return profile.username;
-  return uid.slice(0, 12);
-}
+const COMPOSER_SELECTION = "rgba(63, 121, 216, 0.4)";
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function CommunityScreen() {
+  const themeTokens = useMobileThemeTokens();
+  const {
+    SPINNER_FG,
+    ICON_MUTED,
+    ICON_ON_PRIMARY,
+    COMPOSER_PLACEHOLDER,
+    COMPOSER_CURSOR,
+    COMPOSER_LINK,
+    COMPOSER_SPOILER_FG,
+    COMPOSER_TEXT,
+  } = useMemo(
+    () => ({
+      SPINNER_FG: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+      ICON_MUTED: resolveColorProp(themeTokens, "text-dim") ?? "#8b9cbb",
+      ICON_ON_PRIMARY: resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff",
+      COMPOSER_PLACEHOLDER: resolveColorProp(themeTokens, "text-dim") ?? "#8e8e93",
+      COMPOSER_CURSOR: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+      COMPOSER_LINK: resolveColorProp(themeTokens, "primary") ?? "#3F79D8",
+      COMPOSER_SPOILER_FG: resolveColorProp(themeTokens, "text-muted") ?? "#a9b8cf",
+      COMPOSER_TEXT: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+    }),
+    [themeTokens],
+  );
   const { bottom } = useSafeAreaInsets();
   const composerHeight = useSharedValue(0);
   const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);
@@ -158,10 +167,7 @@ export function CommunityScreen() {
 
   // ── Stores ──
   const storedMessages = useMessagesStore((state) => state.messages);
-  const profiles = useMessagesStore((state) => state.profiles);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
-  const attachmentRecord = useMessagesStore((state) => state.attachments);
-  const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
 
   // ── Derived data ──
   const community = useMemo(
@@ -169,94 +175,17 @@ export function CommunityScreen() {
     [communityId, servers],
   );
 
-  
+  const messageById = useMemo(() => buildMessageBundleById(storedMessages), [storedMessages]);
 
-  const attachmentsByMessageId = useMemo(() => {
-    const grouped: Record<string, MessageAttachment[]> = {};
-    for (const attachment of Object.values(attachmentRecord)) {
-      const list = grouped[attachment.messageId] ?? [];
-      list.push(attachment);
-      grouped[attachment.messageId] = list;
-    }
-    return grouped;
-  }, [attachmentRecord]);
-
-  const linkPreviewsByMessageId = useMemo(() => {
-    const grouped: Record<string, MessageLinkPreview | null> = {};
-    for (const preview of Object.values(linkPreviewRecord)) {
-      grouped[preview.messageId] = preview;
-    }
-    return grouped;
-  }, [linkPreviewRecord]);
-
-  const messageById = useMemo(
-    () => new Map(storedMessages.map((m) => [m.id, m] as const)),
-    [storedMessages],
+  const messages = useMemo<ChatMessage[]>(
+    () => mapBundlesToChatMessages(storedMessages, liveProfiles),
+    [liveProfiles, storedMessages],
   );
 
-  const messages = useMemo<ChatMessage[]>(() => {
-    return [...storedMessages].reverse().map((message: Message) => {
-      const cachedProfile =
-        message.author_user_id != null ? (profiles[message.author_user_id] ?? null) : null;
-      const preserveTombstone = isAuthorProfileTombstone(cachedProfile ?? undefined);
-      const liveAvatar =
-        message.author_user_id != null && !preserveTombstone
-          ? resolveLiveAvatarUrl(liveProfiles, message.author_user_id, cachedProfile?.avatarUrl ?? null)
-          : (cachedProfile?.avatarUrl ?? null);
-      const authorName =
-        message.author_type === "haven_dev"
-          ? "Haven Moderation Team"
-          : message.author_type === "system"
-            ? "System"
-            : (cachedProfile?.username ?? message.author_user_id?.slice(0, 12) ?? "Unknown User");
-
-      return {
-        id: message.id,
-        text: message.content,
-        createdAt: message.created_at,
-        authorUserId: message.author_user_id ?? null,
-        authorName,
-        authorInitial: authorName.trim().charAt(0).toUpperCase() || "U",
-        authorAvatarUrl: liveAvatar,
-        isAuthorStaff: Boolean(message.author_type === "user" && cachedProfile?.isPlatformStaff),
-        timestampLabel: formatTime(message.created_at),
-        replyTargetLabel: getReplyTargetLabel(getReplyToMessageId(message), messageById, profiles),
-        attachments: attachmentsByMessageId[message.id] ?? [],
-      };
-    });
-  }, [attachmentsByMessageId, liveProfiles, messageById, profiles, storedMessages]);
-
-  const chatListItems = useMemo<ChatListItem[]>(() => {
-    const items: ChatListItem[] = [];
-    for (let i = 0; i < messages.length; i++) {
-      const message = messages[i];
-      const prev = messages[i + 1];
-      const currentBucket = dayBucket(message.createdAt);
-      const prevBucket = dayBucket(prev?.createdAt);
-      const shouldInsertDivider = currentBucket !== prevBucket;
-      const isSameDayAsPrev = Boolean(currentBucket) && currentBucket === prevBucket;
-      const isSameAuthor = Boolean(message.authorUserId) && message.authorUserId === prev?.authorUserId;
-      const currentTs = message.createdAt ? Date.parse(message.createdAt) : NaN;
-      const prevTs = prev?.createdAt ? Date.parse(prev.createdAt) : NaN;
-      const hasValidTs = Number.isFinite(currentTs) && Number.isFinite(prevTs);
-      const isCloseInTime = hasValidTs ? Math.abs(currentTs - prevTs) <= GROUP_WINDOW_MS : false;
-
-      items.push({
-        kind: "message",
-        message,
-        isCondensed: isSameAuthor && isCloseInTime && isSameDayAsPrev,
-      });
-
-      if (shouldInsertDivider) {
-        items.push({
-          kind: "divider",
-          id: `divider-${message.id}`,
-          label: formatDateDividerLabel(message.createdAt ?? new Date().toISOString()),
-        });
-      }
-    }
-    return items;
-  }, [messages]);
+  const chatListItems = useMemo<ChatListItem[]>(
+    () => buildChatListItemsFromChatMessages(messages),
+    [messages],
+  );
 
   // ── Channel resolution ──
   const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState(false);
@@ -287,10 +216,11 @@ export function CommunityScreen() {
   const [pendingReplyToMessageId, setPendingReplyToMessageId] = useState<string | null>(null);
 
   const pendingReplyTargetLabel = useMemo(
-    () => pendingReplyToMessageId
-      ? getReplyTargetLabel(pendingReplyToMessageId, messageById, profiles)
-      : null,
-    [messageById, pendingReplyToMessageId, profiles],
+    () =>
+      pendingReplyToMessageId
+        ? getReplyTargetLabel(pendingReplyToMessageId, messageById, liveProfiles)
+        : null,
+    [messageById, pendingReplyToMessageId, liveProfiles],
   );
 
   const handlePickCommunityMedia = useCallback(async () => {
@@ -431,12 +361,11 @@ export function CommunityScreen() {
         {...item.message}
         attachments={item.message.attachments ?? []}
         isCondensed={item.isCondensed}
-        linkPreview={linkPreviewsByMessageId[item.message.id] ?? null}
         onPress={() => composerInputRef.current?.blur()}
         onLongPress={() => openMessageActions(item.message)}
       />
     );
-  }, [linkPreviewsByMessageId, composerInputRef, openMessageActions]);
+  }, [composerInputRef, openMessageActions]);
 
   const phase: "loading" | "ready" | "missing" | "error" =
     serversStatus === "loading" && servers.length === 0
@@ -464,7 +393,11 @@ export function CommunityScreen() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
 return (
-  <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
+  <SafeAreaView
+    edges={["bottom"]}
+    className="flex-1 bg-background"
+    style={{ flex: 1 }}
+  >
     <CommunityChannelBar
       communityName={community?.name ?? "Community"}
       selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
@@ -515,7 +448,7 @@ return (
       ListFooterComponent={
         messaging.state.isLoadingOlderMessages ? (
           <View className="py-2.5">
-            <ActivityIndicator color="#e6edf7" />
+            <ActivityIndicator color={SPINNER_FG} />
           </View>
         ) : null
       }
@@ -533,7 +466,7 @@ return (
       }}
     >
       {pendingReplyToMessageId ? (
-        <View className="flex-row items-center justify-between bg-surface-modal px-3 py-2 border-t border-white/[0.08]">
+        <View className="flex-row items-center justify-between bg-surface-modal px-3 py-2 border-t border-white/8">
           <Text className="text-foreground/80 text-xs shrink mr-2.5">
             Replying to {pendingReplyTargetLabel ?? "a message"}
           </Text>
@@ -544,8 +477,8 @@ return (
       ) : null}
 
       {pendingCommunityMedia ? (
-        <View className="flex-row items-center gap-2 border-t border-white/[0.08] bg-surface-modal/90 px-3 py-2">
-          <Ionicons name="attach" size={16} color="#8b9cbb" />
+        <View className="flex-row items-center gap-2 border-t border-white/8 bg-surface-modal/90 px-3 py-2">
+          <Ionicons name="attach" size={16} color={ICON_MUTED} />
           <Text className="min-w-0 flex-1 text-xs text-foreground/90" numberOfLines={1}>
             {pendingCommunityMedia.fileName}
           </Text>
@@ -569,14 +502,14 @@ return (
             onPress={() => void handlePickCommunityMedia()}
             className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5 disabled:opacity-50"
           >
-            <Ionicons name="add" size={20} color="#fff" />
+            <Ionicons name="add" size={20} color={ICON_ON_PRIMARY} />
           </Pressable>
         </Animated.View>
 
         <Animated.View
           style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
         >
-          <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/[0.08] pr-1">
+          <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/8 pr-1">
             <EnrichedMarkdownTextInput
               ref={composerInputRef}
               multiline
@@ -585,20 +518,20 @@ return (
               defaultValue=""
               onChangeMarkdown={setDraft}
               placeholder="Type a message..."
-              placeholderTextColor="#8e8e93"
-              cursorColor="#e6edf7"
-              selectionColor="rgba(63, 121, 216, 0.4)"
+              placeholderTextColor={COMPOSER_PLACEHOLDER}
+              cursorColor={COMPOSER_CURSOR}
+              selectionColor={COMPOSER_SELECTION}
               markdownStyle={{
-                strong: { color: "#e6edf7" },
-                em: { color: "#e6edf7" },
-                link: { color: "#3F79D8", underline: true },
-                spoiler: { color: "#a9b8cf", backgroundColor: "rgba(0,0,0,0.2)" },
+                strong: { color: COMPOSER_TEXT },
+                em: { color: COMPOSER_TEXT },
+                link: { color: COMPOSER_LINK, underline: true },
+                spoiler: { color: COMPOSER_SPOILER_FG, backgroundColor: "rgba(0,0,0,0.2)" },
               }}
               style={{
                 flex: 1,
                 minHeight: 36,
                 maxHeight: 120,
-                color: "#e6edf7",
+                color: COMPOSER_TEXT,
                 paddingHorizontal: 14,
                 paddingTop: 8,
                 paddingBottom: 8,
@@ -615,7 +548,7 @@ return (
               }}
               className="w-7 h-7 shrink-0 rounded-full bg-primary items-center justify-center"
             >
-              <Ionicons name="arrow-up" size={18} color="#fff" />
+              <Ionicons name="arrow-up" size={18} color={ICON_ON_PRIMARY} />
             </Pressable>
           </View>
         </Animated.View>

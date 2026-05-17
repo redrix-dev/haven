@@ -41,8 +41,6 @@ type UseDirectMessagesInput = {
     | 'markConversationRead'
     | 'setConversationMuted'
     | 'reportMessage'
-    | 'subscribeToConversations'
-    | 'subscribeToMessages'
   >;
   userId: string | null | undefined;
   enabled: boolean;
@@ -57,6 +55,8 @@ export function useDirectMessages({
 }: UseDirectMessagesInput) {
   const dmConversations = useDmStore((state) => state.conversations);
   const dmConversationsLoading = useDmStore((state) => state.isLoading);
+  const dmConversationsRefreshTrigger = useDmStore((state) => state.dmConversationsRefreshTrigger);
+  const dmMessageRefreshTrigger = useDmStore((state) => state.dmMessageRefreshTrigger);
   const [dmConversationsRefreshing, setDmConversationsRefreshing] = React.useState(false);
   const [dmConversationsError, setDmConversationsError] = React.useState<string | null>(null);
   const selectedDmConversationId = useDmStore((state) => state.currentConversationId);
@@ -65,6 +65,10 @@ export function useDirectMessages({
   const [dmMessagesRefreshing, setDmMessagesRefreshing] = React.useState(false);
   const [dmMessagesError, setDmMessagesError] = React.useState<string | null>(null);
   const [dmMessageSendPending, setDmMessageSendPending] = React.useState(false);
+  const [dmComposeDraftPeer, setDmComposeDraftPeer] = React.useState<{
+    userId: string;
+    displayName: string;
+  } | null>(null);
 
   const dmReadMarkInFlightRef = React.useRef<Record<string, boolean>>({});
   const dmLastReadMarkAtRef = React.useRef<Record<string, number>>({});
@@ -165,9 +169,19 @@ export function useDirectMessages({
     dmLastReadMarkAtRef.current = {};
     dmMessagesCacheRef.current = {};
     dmLastSuccessfulFetchAtRef.current = {};
+    setDmComposeDraftPeer(null);
   }, [resetStoredDirectMessages, setSelectedDmConversationId]);
 
+  const clearDirectMessageDraft = React.useCallback(() => {
+    setDmComposeDraftPeer(null);
+    setDmMessages([]);
+    setDmMessagesLoading(false);
+    setDmMessagesRefreshing(false);
+    setDmMessagesError(null);
+  }, []);
+
   const clearSelectedDmConversation = React.useCallback(() => {
+    setDmComposeDraftPeer(null);
     setDmMessages([]);
     setSelectedDmConversationId(null);
     setDmMessagesLoading(false);
@@ -181,6 +195,7 @@ export function useDirectMessages({
         setStoredConversations([]);
         setStoredUnreadCounts({});
         setStoredCurrentConversation(null);
+        setDmComposeDraftPeer(null);
         return;
       }
 
@@ -372,18 +387,11 @@ export function useDirectMessages({
   }, [dmConversations, selectedDmConversationId, syncStoredCurrentConversation]);
 
   React.useEffect(() => {
-    if (!userId || !enabled) return;
-
-    const subscription = directMessageBackend.subscribeToConversations(userId, () => {
-      void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
-        console.error('Failed to refresh DM conversations after realtime update:', error);
-      });
+    if (dmConversationsRefreshTrigger === 0) return;
+    void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
+      console.error('Failed to refresh DM conversations after realtime update:', error);
     });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [directMessageBackend, enabled, refreshDmConversations, userId]);
+  }, [dmConversationsRefreshTrigger, refreshDmConversations]);
 
   React.useEffect(() => {
     if (!isActive || !selectedDmConversationId || !userId) {
@@ -412,24 +420,18 @@ export function useDirectMessages({
   }, [applyCachedDmMessages, isActive, refreshDmMessages, selectedDmConversationId, userId]);
 
   React.useEffect(() => {
-    if (!isActive || !selectedDmConversationId) return;
-
-    const subscription = directMessageBackend.subscribeToMessages(selectedDmConversationId, () => {
-      void refreshDmMessages(selectedDmConversationId, {
-        suppressLoadingState: true,
-        markRead: false,
-      }).catch((error) => {
-        console.error('Failed to refresh DM messages after realtime update:', error);
-      });
-      void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
-        console.error('Failed to refresh DM conversations after message update:', error);
-      });
+    if (dmMessageRefreshTrigger === null) return;
+    if (dmMessageRefreshTrigger.conversationId !== selectedDmConversationId) return;
+    void refreshDmMessages(selectedDmConversationId, {
+      suppressLoadingState: true,
+      markRead: false,
+    }).catch((error) => {
+      console.error('Failed to refresh DM messages after realtime update:', error);
     });
-
-    return () => {
-      void subscription.unsubscribe();
-    };
-  }, [directMessageBackend, isActive, refreshDmConversations, refreshDmMessages, selectedDmConversationId]);
+    void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
+      console.error('Failed to refresh DM conversations after message update:', error);
+    });
+  }, [dmMessageRefreshTrigger, refreshDmConversations, refreshDmMessages, selectedDmConversationId]);
 
   const openDirectMessageConversation = React.useCallback(
     async (conversationId: string) => {
@@ -442,6 +444,8 @@ export function useDirectMessages({
       if (!conversationId) {
         throw new Error('DM conversation id is required.');
       }
+
+      setDmComposeDraftPeer(null);
 
       setSelectedDmConversationId(conversationId);
       const hasCachedMessages = applyCachedDmMessages(conversationId);
@@ -488,6 +492,36 @@ export function useDirectMessages({
     ]
   );
 
+  const openDirectMessageDraftWithUser = React.useCallback(
+    (targetUserId: string, displayName?: string | null) => {
+      if (!userId) {
+        throw new Error('Not authenticated.');
+      }
+      if (!enabled) {
+        throw new Error('Direct messages are not enabled for your account.');
+      }
+
+      const existing = useDmStore
+        .getState()
+        .conversations.find((c) => c.otherUserId === targetUserId);
+      if (existing) {
+        void openDirectMessageConversation(existing.conversationId);
+        return;
+      }
+
+      setDmComposeDraftPeer({
+        userId: targetUserId,
+        displayName: displayName?.trim() || 'Direct',
+      });
+      setSelectedDmConversationId(null);
+      setDmMessages([]);
+      setDmMessagesLoading(false);
+      setDmMessagesRefreshing(false);
+      setDmMessagesError(null);
+    },
+    [enabled, openDirectMessageConversation, setSelectedDmConversationId, userId],
+  );
+
   const openDirectMessageWithUser = React.useCallback(
     async (targetUserId: string) => {
       if (!userId) {
@@ -505,14 +539,22 @@ export function useDirectMessages({
 
   const sendDirectMessage = React.useCallback(
     async (content: string, options?: SendDirectMessageOptions) => {
-      if (!selectedDmConversationId) {
+      let activeConversationId = selectedDmConversationId;
+      const draftPeer = dmComposeDraftPeer;
+      if (!activeConversationId && draftPeer) {
+        activeConversationId = await directMessageBackend.getOrCreateDirectConversation(draftPeer.userId);
+        setDmComposeDraftPeer(null);
+        setSelectedDmConversationId(activeConversationId);
+        await refreshDmConversations({ suppressLoadingState: true });
+      }
+
+      if (!activeConversationId) {
         throw new Error('No direct message conversation selected.');
       }
       if (dmSendInFlightRef.current) {
         return;
       }
 
-      const conversationId = selectedDmConversationId;
       dmSendInFlightRef.current = true;
       setDmMessageSendPending(true);
       setDmMessagesError(null);
@@ -533,7 +575,7 @@ export function useDirectMessages({
           `upload-${Date.now()}`;
 
         const sent = await directMessageBackend.sendMessage({
-          conversationId,
+          conversationId: activeConversationId,
           content,
           imageUpload: hasBuffer
             ? {
@@ -551,10 +593,10 @@ export function useDirectMessages({
               : undefined,
         });
 
-        mergeSentDmIntoThread(conversationId, sent);
-        patchDmConversationAfterLocalSend(conversationId, sent);
+        mergeSentDmIntoThread(activeConversationId, sent);
+        patchDmConversationAfterLocalSend(activeConversationId, sent);
 
-        void refreshDmMessages(conversationId, { suppressLoadingState: true, markRead: false }).catch((error) => {
+        void refreshDmMessages(activeConversationId, { suppressLoadingState: true, markRead: false }).catch((error) => {
           console.error('Failed to refresh DM messages after send (reconciliation):', error);
         });
         void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
@@ -572,11 +614,13 @@ export function useDirectMessages({
     },
     [
       directMessageBackend,
+      dmComposeDraftPeer,
       mergeSentDmIntoThread,
       patchDmConversationAfterLocalSend,
       refreshDmConversations,
       refreshDmMessages,
       selectedDmConversationId,
+      setSelectedDmConversationId,
     ]
   );
 
@@ -622,6 +666,7 @@ export function useDirectMessages({
       dmMessagesRefreshing,
       dmMessagesError,
       dmMessageSendPending,
+      dmComposeDraftPeer,
     },
     derived: {
       /** Same as `isActive` input: DM workspace is visible. */
@@ -637,10 +682,12 @@ export function useDirectMessages({
       setDmConversationsError,
       setDmMessagesError,
       openDirectMessageConversation,
+      openDirectMessageDraftWithUser,
       openDirectMessageWithUser,
       sendDirectMessage,
       toggleSelectedDmConversationMuted,
       reportDirectMessage,
+      clearDirectMessageDraft,
     },
   };
 }

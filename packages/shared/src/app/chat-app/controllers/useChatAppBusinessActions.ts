@@ -42,7 +42,10 @@ type UseChatAppBusinessActionsInput = {
   applyLocalProfileUpdate: (profile: {
     username: string;
     avatarUrl: string | null;
+    theme?: string;
   }) => void;
+  profileUsername: string;
+  profileAvatarUrl: string | null;
   upsertLiveProfile: (input: {
     userId: string;
     username: string;
@@ -64,6 +67,8 @@ export function useChatAppBusinessActions({
   applyChannelAccessRevokedContentVisibility,
   applyLocalProfileUpdate,
   upsertLiveProfile,
+  profileUsername,
+  profileAvatarUrl,
 }: UseChatAppBusinessActionsInput) {
   const joinServerByInvite = useCallback(
     async (
@@ -237,7 +242,11 @@ export function useChatAppBusinessActions({
         avatarUrl: values.avatarUrl,
         avatarFile: values.avatarFile ?? null,
       });
-      applyLocalProfileUpdate(updatedProfile);
+      applyLocalProfileUpdate({
+        username: updatedProfile.username,
+        avatarUrl: updatedProfile.avatarUrl,
+        theme: updatedProfile.theme,
+      });
       upsertLiveProfile({
         userId: user.id,
         username: updatedProfile.username,
@@ -246,6 +255,41 @@ export function useChatAppBusinessActions({
       });
     },
     [user, controlPlaneBackend, applyLocalProfileUpdate, upsertLiveProfile],
+  );
+
+  const saveThemePreference = useCallback(
+    async (themeId: string) => {
+      if (!user) throw new Error("Not authenticated");
+      const trimmedUsername = profileUsername.trim();
+      if (!trimmedUsername) {
+        throw new Error("Username is required before changing theme.");
+      }
+      const updatedProfile = await controlPlaneBackend.updateUserProfile({
+        userId: user.id,
+        username: trimmedUsername,
+        avatarUrl: profileAvatarUrl,
+        theme: themeId,
+      });
+      applyLocalProfileUpdate({
+        username: updatedProfile.username,
+        avatarUrl: updatedProfile.avatarUrl,
+        theme: updatedProfile.theme,
+      });
+      upsertLiveProfile({
+        userId: user.id,
+        username: updatedProfile.username,
+        avatarUrl: updatedProfile.avatarUrl,
+        updatedAt: new Date().toISOString(),
+      });
+    },
+    [
+      user,
+      controlPlaneBackend,
+      profileUsername,
+      profileAvatarUrl,
+      applyLocalProfileUpdate,
+      upsertLiveProfile,
+    ],
   );
 
   return {
@@ -257,5 +301,6 @@ export function useChatAppBusinessActions({
     saveMemberChannelPermissions,
     resolveBanEligibleServers,
     saveAccountSettings,
+    saveThemePreference,
   };
 }

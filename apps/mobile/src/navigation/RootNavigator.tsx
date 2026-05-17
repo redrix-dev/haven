@@ -21,16 +21,16 @@ import { MobileNotificationsProvider } from "@/contexts/MobileNotificationsConte
 import { MobileSocialWorkspaceProvider } from "@/contexts/MobileSocialWorkspaceContext";
 import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesContext";
 import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
-
+import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-
 const Tab = createHavenTabNavigator();
 
 function MainTabs() {
   const session = useAuthSession();
   const userId = session?.user?.id;
   useMobileCommunityPermissionsHydration(userId);
+  useHydrateMobileThemeFromProfile(userId);
 
   if (!userId) {
     return (
@@ -44,7 +44,7 @@ function MainTabs() {
     <MobileNotificationsProvider userId={userId}>
       <MobileSocialWorkspaceProvider userId={userId}>
         <MobileDirectMessagesProvider userId={userId}>
-          <Tab.Navigator screenOptions={{ detachInactiveScreens: false}}>
+          <Tab.Navigator screenOptions={{ detachInactiveScreens: false }}>
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Community" component={CommunityScreen} />
           </Tab.Navigator>
@@ -59,7 +59,8 @@ export function RootNavigator() {
   useMobileExpoPushRegistration(session);
   useMobileVoipFoundation(session);
   useServersRealtimeBootstrap(session);
-  const [passwordRecoveryRequired, setPasswordRecoveryRequired] = useState(false);
+  const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
+    useState(false);
   const url = Linking.useURL();
   const processedAuthConfirmUrlsRef = useRef<Set<string>>(new Set());
 
@@ -132,7 +133,9 @@ export function RootNavigator() {
       clearPasswordRecoveryGate={() => setPasswordRecoveryRequired(false)}
     >
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade" }}>
+        <Stack.Navigator
+          screenOptions={{ headerShown: false, animation: "fade" }}
+        >
           {session ? (
             <>
               {passwordRecoveryRequired ? (

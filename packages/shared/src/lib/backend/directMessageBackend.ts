@@ -1,4 +1,3 @@
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
 import {
@@ -39,8 +38,6 @@ export interface DirectMessageBackend {
     kind: DirectMessageReportKind;
     comment: string;
   }): Promise<string>;
-  subscribeToConversations(userId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
-  subscribeToMessages(conversationId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
 }
 
 type DirectMessageConversationRow = {
@@ -248,66 +245,6 @@ export function createDirectMessageBackend(
         throw new Error("DM report creation returned no id.");
       }
       return reportId;
-    },
-
-    subscribeToConversations(userId, onChange) {
-      return client
-        .channel(`dm_conversations:${userId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "dm_conversation_members",
-            filter: `user_id=eq.${userId}`,
-          },
-          (payload) => onChange(payload),
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "dm_conversation_notification_preferences",
-            filter: `user_id=eq.${userId}`,
-          },
-          (payload) => onChange(payload),
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "dm_conversations",
-          },
-          (payload) => onChange(payload),
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "dm_messages",
-          },
-          (payload) => onChange(payload),
-        )
-        .subscribe();
-    },
-
-    subscribeToMessages(conversationId, onChange) {
-      return client
-        .channel(`dm_messages:${conversationId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "dm_messages",
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          (payload) => onChange(payload),
-        )
-        .subscribe();
     },
   };
 }

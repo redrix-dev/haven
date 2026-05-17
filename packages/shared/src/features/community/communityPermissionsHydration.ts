@@ -14,13 +14,19 @@ export function hydrateCommunityPermissions(serverId: string): Promise<void> {
   const promise = (async () => {
     try {
       const backend = getCommunityDataBackend(serverId);
-      const permissions = await backend.fetchServerPermissions(serverId);
       const permissionsStore = usePermissionsStore.getState();
-      permissionsStore.setPermissions(serverId, permissions);
-      permissionsStore.invalidateElevatedForServer(serverId);
+      permissionsStore.beginHydration(serverId);
+      const result = await backend.getMyPermissions(serverId);
+      const { isElevated, ...permissions } = result;
+      permissionsStore.commitHydration(serverId, permissions, isElevated);
     } catch (error) {
       console.error("Error loading server permissions:", error);
-      usePermissionsStore.getState().clearPermissions(serverId);
+      usePermissionsStore.setState((state) => ({
+        hydrationStateByServerId: {
+          ...state.hydrationStateByServerId,
+          [serverId]: "idle",
+        },
+      }));
     } finally {
       inflightByServerId.delete(serverId);
     }

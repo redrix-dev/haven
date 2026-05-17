@@ -9,22 +9,33 @@
     "strict": true,
     "types": [
       "react",
-      "nativewind/types",
       "node"
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@shared/*": ["../../packages/shared/src/*"],
-      "@shared/app/ui/*": ["../../packages/web-client/src/app-ui/*"],
-      "@client/app/*": ["../../packages/shared/src/app/*"],
-      "@platform/*": ["../../packages/shared/src/platform/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@shared/*": [
+        "../../packages/shared/src/*"
+      ],
+      "@shared/app/ui/*": [
+        "../../packages/web-client/src/app-ui/*"
+      ],
+      "@client/app/*": [
+        "../../packages/shared/src/app/*"
+      ],
+      "@platform/*": [
+        "../../packages/shared/src/platform/*"
+      ]
     }
   },
   "include": [
     "./**/*.ts",
     "./**/*.tsx",
-    "./nativewind-env.d.ts",
-    "nativewind-env.d.ts"
+    "./uniwind-types.d.ts",
+    "../../packages/shared/src/types/**/*.d.ts"
   ],
-  "exclude": ["./src/screens/deprecated/**"]
+  "exclude": [
+    "./src/screens/deprecated/**"
+  ]
 }

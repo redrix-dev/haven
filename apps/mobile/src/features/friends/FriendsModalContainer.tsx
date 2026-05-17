@@ -11,7 +11,7 @@ import {
   View,
   type ListRenderItem,
 } from "react-native";
-import type { FriendsPanelTab } from "@shared/app/types";
+import type { FriendsPanelTab } from "@shared/app/types/types";
 import type {
   BlockedUserSummary,
   FriendRequestSummary,
@@ -28,7 +28,7 @@ type FriendsModalContainerProps = {
   userId: string | null;
   initialTab: FriendsPanelTab;
   highlightedRequestId: string | null;
-  onStartDirectMessage: (friendUserId: string) => void;
+  onStartDirectMessage: (friendUserId: string, displayLabel?: string) => void;
 };
 
 const TABS: { id: FriendsPanelTab; label: string }[] = [
@@ -88,7 +88,7 @@ export function FriendsModalContainer({
         <View className="flex-row gap-2">
           <Pressable
             className="rounded-lg bg-accent-slider px-3 py-2"
-            onPress={() => onStartDirectMessage(item.friendUserId)}
+            onPress={() => onStartDirectMessage(item.friendUserId, labelForFriend(item))}
           >
             <Text className="text-xs font-semibold text-white">Message</Text>
           </Pressable>

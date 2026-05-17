@@ -44,9 +44,6 @@
       "./plugins/withNewArchPodfileProperties",
       "./plugins/withHavenIOSNative"
     ],
-    "web": {
-      "bundler": "metro"
-    },
     "ios": {
       "icon": "./assets/haven-app-icon.png",
       "bundleIdentifier": "com.redrix.haven.mobile",

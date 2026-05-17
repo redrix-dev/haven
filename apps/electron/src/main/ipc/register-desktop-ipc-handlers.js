@@ -3,9 +3,6 @@ const path = require('node:path');
 const { BrowserWindow, dialog, shell } = require('electron');
 const { DESKTOP_IPC_KEYS } = require('@platform/ipc/keys');
 const {
-  logHavenExternalNavDebug,
-} = require('../lib/havenExternalNavDebugLog');
-const {
   parseSaveFileFromUrlPayload,
   parseOpenExternalUrlPayload,
   parseSetAutoUpdatePayload,
@@ -21,7 +18,6 @@ const registerIpcHandler = (ipcMain, channel, handler) => {
 };
 
 const registerDesktopIpcHandlers = ({
-  app,
   ipcMain,
   settingsStore,
   updaterService,
@@ -115,11 +111,6 @@ const registerDesktopIpcHandlers = ({
 
   registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.EXTERNAL_URL_OPEN, async (event, payload) => {
     const url = parseOpenExternalUrlPayload(payload);
-    logHavenExternalNavDebug(app, "ipc.EXTERNAL_URL_OPEN", {
-      url,
-      senderId: event.sender.id,
-      frame: event.sender.getFrameName?.() ?? undefined,
-    });
     await shell.openExternal(url);
   });
 

@@ -35,10 +35,7 @@ describe.sequential('CommunityDataBackend mention integration (contract)', () =>
     await getCommunityDataBackend(fixtureCommunityId).sendUserMessage({
       communityId: fixtureCommunityId,
       channelId: fixtureGeneralChannelId,
-      userId: users.member_a.id,
       content: `@${users.member_b.username} backend mention integration`,
-      replyToMessageId: undefined,
-      mediaUpload: undefined,
     });
 
     await signInAsTestUser('member_b');

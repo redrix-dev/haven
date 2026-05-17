@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import ReactCrop, {
   centerCrop,
   makeAspectCrop,
@@ -137,6 +138,9 @@ interface AccountSettingsModalProps {
   onCheckForUpdates: () => Promise<void>;
   onSignOut: () => Promise<void>;
   onDeleteAccount: () => Promise<void>;
+  shellThemeOptions: Array<{ id: string; name: string }>;
+  effectiveShellThemeId: string;
+  onSelectShellTheme: (themeId: string) => Promise<void>;
 }
 
 export function AccountSettingsModal({
@@ -154,6 +158,9 @@ export function AccountSettingsModal({
   onCheckForUpdates,
   onSignOut,
   onDeleteAccount,
+  shellThemeOptions,
+  effectiveShellThemeId,
+  onSelectShellTheme,
 }: AccountSettingsModalProps) {
   const [username, setUsername] = useState(initialUsername);
   const [saving, setSaving] = useState(false);
@@ -162,6 +169,7 @@ export function AccountSettingsModal({
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showDisableAutoUpdateConfirm, setShowDisableAutoUpdateConfirm] = useState(false);
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+  const [shellThemePendingId, setShellThemePendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [autoUpdateError, setAutoUpdateError] = useState<string | null>(null);
   const [crop, setCrop] = useState<Crop>();
@@ -405,6 +413,19 @@ export function AccountSettingsModal({
     }
   };
 
+  const handleShellThemeSelect = async (themeId: string) => {
+    if (!shellThemeOptions.some((t) => t.id === themeId) || shellThemePendingId) return;
+    if (themeId === effectiveShellThemeId) return;
+    setShellThemePendingId(themeId);
+    try {
+      await onSelectShellTheme(themeId);
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Could not save theme. Try again.'));
+    } finally {
+      setShellThemePendingId(null);
+    }
+  };
+
   return (
     <>
       <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -461,6 +482,36 @@ export function AccountSettingsModal({
                   maxLength={32}
                   required
                 />
+              </div>
+
+              <div className="rounded-xl border border-border bg-surface-panel overflow-hidden">
+                <div className="px-4 pt-3 pb-2 border-b border-border">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Appearance</p>
+                </div>
+                {shellThemeOptions.map((theme, index) => {
+                  const isLast = index === shellThemeOptions.length - 1;
+                  const selected = theme.id === effectiveShellThemeId;
+                  const busy = shellThemePendingId === theme.id;
+                  const dimOthers = Boolean(shellThemePendingId && shellThemePendingId !== theme.id);
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      disabled={Boolean(shellThemePendingId)}
+                      onClick={() => void handleShellThemeSelect(theme.id)}
+                      className={`flex w-full flex-row items-center gap-2.5 px-4 py-3 text-left transition-opacity ${
+                        dimOthers ? 'opacity-50' : 'opacity-100'
+                      } ${isLast ? '' : 'border-b border-border'} hover:bg-white/5 disabled:cursor-not-allowed`}
+                    >
+                      <span className="flex-1 text-base font-medium text-white">{theme.name}</span>
+                      {busy ? (
+                        <span className="text-xs text-muted-foreground">Saving...</span>
+                      ) : selected ? (
+                        <span className="text-sm font-semibold text-primary">✓</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="space-y-3 rounded-xl border border-border bg-surface-panel px-4 py-4">

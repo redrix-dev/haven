@@ -1,26 +1,18 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import { listUserCommunitiesWithClient } from '@shared/lib/listUserCommunitiesWithClient';
 import type { Database } from '@shared/types/database';
+import { getTheme } from '@shared/themes/registry';
+import type { ControlPlaneBackend } from './controlPlaneBackend.interface';
 import type {
   BanEligibleServer,
   FeatureFlagsSnapshot,
-  RedeemedInvite,
   LiveProfileIdentity,
+  RedeemedInvite,
   ServerInvite,
   ServerSummary,
 } from './types';
 
-export type PlatformStaffInfo = {
-  isActive: boolean;
-  canPostHavenDev: boolean;
-  displayPrefix: string | null;
-};
-
-export type UserProfileInfo = {
-  username: string;
-  avatarUrl: string | null;
-};
+export type { ControlPlaneBackend, PlatformStaffInfo, UserProfileInfo } from './controlPlaneBackend.interface';
 
 const PROFILE_AVATAR_BUCKET = 'profile-avatars';
 const PROFILE_AVATAR_FILE_SIZE_LIMIT = 5 * 1024 * 1024;
@@ -39,42 +31,6 @@ const getProfileAvatarObjectPathFromUrl = (avatarUrl: string): string | null => 
     return null;
   }
 };
-
-export interface ControlPlaneBackend {
-  fetchUserProfile(userId: string): Promise<UserProfileInfo | null>;
-  fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
-  subscribeToProfileIdentities(onChange: (payload?: unknown) => void): RealtimeChannel;
-  listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
-  /** Pass `ArrayBuffer` on React Native; `Blob`/`File` on web (see Supabase RN upload guidance). */
-  uploadAvatar(
-    file: Blob | ArrayBuffer,
-    options?: { contentType?: string },
-  ): Promise<string>;
-  deleteAvatar(avatarUrl: string): Promise<void>;
-  updateUserProfile(input: {
-    userId: string;
-    username: string;
-    avatarUrl: string | null;
-    avatarFile?: Blob | ArrayBuffer | null;
-    /** Required when `avatarFile` is an `ArrayBuffer` (e.g. mobile); ignored for `Blob`. */
-    avatarContentType?: string;
-  }): Promise<UserProfileInfo>;
-  listUserCommunities(userId: string): Promise<ServerSummary[]>;
-  renameCommunity(input: { communityId: string; name: string }): Promise<void>;
-  deleteCommunity(communityId: string): Promise<void>;
-  leaveCommunity(communityId: string): Promise<void>;
-  subscribeToUserCommunities(userId: string, onChange: () => void): RealtimeChannel;
-  createCommunity(name: string): Promise<{ id: string }>;
-  createCommunityInvite(input: {
-    communityId: string;
-    maxUses: number | null;
-    expiresInHours: number | null;
-  }): Promise<ServerInvite>;
-  redeemCommunityInvite(code: string): Promise<RedeemedInvite>;
-  listBanEligibleServersForUser(targetUserId: string): Promise<BanEligibleServer[]>;
-  listActiveCommunityInvites(communityId: string): Promise<ServerInvite[]>;
-  revokeCommunityInvite(communityId: string, inviteId: string): Promise<void>;
-}
 
 type InviteRecord = Pick<
   Database['public']['Tables']['invites']['Row'],
@@ -128,7 +84,7 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
   async fetchUserProfile(userId) {
     const { data, error } = await client
       .from('profiles')
-      .select('username, avatar_url')
+      .select('username, avatar_url, theme')
       .eq('id', userId)
       .maybeSingle();
 
@@ -137,13 +93,14 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     return {
       username: data.username,
       avatarUrl: data.avatar_url,
+      theme: getTheme(data.theme ?? 'default').id,
     };
   },
 
   async fetchPlatformStaff(userId) {
     const { data, error } = await client
       .from('platform_staff')
-      .select('is_active, can_post_haven_dev, display_prefix')
+      .select('is_active, display_prefix')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -151,7 +108,6 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     if (!data) return null;
     return {
       isActive: Boolean(data.is_active),
-      canPostHavenDev: Boolean(data.can_post_haven_dev),
       displayPrefix: data.display_prefix ?? null,
     };
   },
@@ -230,14 +186,17 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     avatarUrl,
     avatarFile = null,
     avatarContentType,
+    theme,
   }) {
     const { data: existingProfile, error: existingProfileError } = await client
       .from('profiles')
-      .select('avatar_url')
+      .select('avatar_url, theme')
       .eq('id', userId)
       .maybeSingle();
 
     if (existingProfileError) throw existingProfileError;
+
+    const priorThemeId = getTheme(existingProfile?.theme ?? 'default').id;
 
     const existingAvatarUrl = existingProfile?.avatar_url ?? null;
     let nextAvatarUrl = avatarUrl;
@@ -255,19 +214,28 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       await backend.deleteAvatar(existingAvatarUrl);
     }
 
-    const { error } = await client
-      .from('profiles')
-      .update({
-        username,
-        avatar_url: nextAvatarUrl,
-      })
-      .eq('id', userId);
+    const updatePayload: {
+      username: string;
+      avatar_url: string | null;
+      theme?: string;
+    } = {
+      username,
+      avatar_url: nextAvatarUrl,
+    };
+    if (theme !== undefined) {
+      updatePayload.theme = getTheme(theme).id;
+    }
+
+    const { error } = await client.from('profiles').update(updatePayload).eq('id', userId);
 
     if (error) throw error;
+
+    const effectiveThemeId = theme !== undefined ? getTheme(theme).id : priorThemeId;
 
     return {
       username,
       avatarUrl: nextAvatarUrl,
+      theme: effectiveThemeId,
     };
   },
 
@@ -335,6 +303,54 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
         onChange
       )
       .subscribe();
+  },
+
+  subscribeToPrivateUserChannel(userId, onEvent) {
+    const channelName = `private_user:${userId}`;
+    let cancelled = false;
+    let channel: ReturnType<typeof client.channel> | null = null;
+
+    void (async () => {
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+      if (cancelled) return;
+
+      await client.realtime.setAuth(session?.access_token ?? '');
+      if (cancelled) return;
+
+      channel = client.channel(channelName, {
+        config: { private: true },
+      });
+
+      channel
+        .on('broadcast', { event: '*' }, (payload: unknown) => {
+          const envelope = payload as { event?: unknown; payload?: unknown };
+          const type =
+            typeof envelope.event === 'string' ? envelope.event : '';
+          const inner = envelope.payload;
+          const recordPayload =
+            inner != null &&
+            typeof inner === 'object' &&
+            !Array.isArray(inner)
+              ? (inner as Record<string, unknown>)
+              : {};
+          onEvent({ type, payload: recordPayload });
+        })
+        .subscribe((status) => {
+          console.log('[private_user_channel] status:', status);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn(
+              `${channelName} did not reach SUBSCRIBED (status: ${status})`,
+            );
+          }
+        });
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) void client.removeChannel(channel);
+    };
   },
 
   async createCommunity(name) {

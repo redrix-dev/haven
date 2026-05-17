@@ -57,7 +57,7 @@ Business logic, types, and hooks live in `packages/shared` and are platform-agno
 | Web | Vite + React |
 | iOS | React Native + Expo (dev client, TestFlight) |
 | Language | TypeScript |
-| UI | Tailwind CSS + shadcn/ui (desktop/web), NativeWind (iOS) |
+| UI | Tailwind CSS + shadcn/ui (desktop/web), UniWind + Gluestack UI (iOS) |
 | Backend | Supabase (Auth, Postgres, Realtime, Edge Functions) |
 | OTA Updates (iOS) | Custom Expo Updates-compatible pipeline via Supabase Edge Function |
 | Voice | WebRTC + Xirsys TURN relay |

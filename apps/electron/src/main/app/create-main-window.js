@@ -1,8 +1,5 @@
 const { BrowserWindow, Menu, shell } = require("electron");
 const { registerNativeContextMenu } = require("./register-native-context-menu");
-const {
-  logHavenExternalNavDebug,
-} = require("../lib/havenExternalNavDebugLog");
 const { isInAppNavigation } = require("../lib/inAppNavigation");
 
 const createMainWindow = ({
@@ -100,17 +97,8 @@ const createMainWindow = ({
   });
 
   window.webContents.setWindowOpenHandler((details) => {
-    const { url, frameName, features, disposition, referrer } = details;
+    const { url } = details;
     const stayInApp = isInAppNavigation(rendererEntryUrl, url);
-    logHavenExternalNavDebug(app, "setWindowOpenHandler", {
-      url,
-      frameName,
-      features,
-      disposition,
-      referrer,
-      currentUrlBeforeOpen: window.webContents.getURL(),
-      stayInApp,
-    });
     if (stayInApp) {
       return { action: "allow" };
     }
@@ -120,15 +108,7 @@ const createMainWindow = ({
 
   window.webContents.on("will-navigate", (event, url) => {
     const targetUrl = url ?? event.url;
-    const currentUrl = window.webContents.getURL();
     const stayInApp = isInAppNavigation(rendererEntryUrl, targetUrl);
-    logHavenExternalNavDebug(app, "will-navigate", {
-      targetUrl,
-      currentUrl,
-      isMainFrame:
-        typeof event.isMainFrame === "boolean" ? event.isMainFrame : undefined,
-      stayInApp,
-    });
     if (stayInApp) {
       return;
     }

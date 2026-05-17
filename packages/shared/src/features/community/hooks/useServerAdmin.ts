@@ -184,7 +184,7 @@ export function useServerAdmin({
         const communityBackend = getCommunityDataBackend(communityId);
         const [members, permissions] = await Promise.all([
           communityBackend.listCommunityMembers(communityId),
-          communityBackend.fetchServerPermissions(communityId),
+          communityBackend.getMyPermissions(communityId),
         ]);
         setMembersModalMembers(members);
         setMembersModalCanCreateReports(Boolean(permissions.canCreateReports));

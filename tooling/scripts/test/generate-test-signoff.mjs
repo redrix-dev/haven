@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import {
   getVitestMarkdownOutputPath,
@@ -62,8 +63,8 @@ Optional:
   --help
 
 Examples:
-  npm run test:signoff -- --release-label staging-2026-02-26 --environment staging --test-author "Churro" --run-by "Churro"
-  npm run test:signoff -- --release-label v1.4.0-rc1 --environment staging --test-author "Churro" --run-by "Churro" --mode web --json
+  npm run test:signoff -- --release-label staging-2026-02-26 --environment staging
+  npm run test:signoff -- --release-label v1.4.0-rc1 --environment staging --test-author "Test Owner" --run-by "Runner Name" --mode web --json
 `;
 
 function parseArgs(argv) {
@@ -165,6 +166,27 @@ function formatDuration(ms) {
   const minutes = Math.floor(seconds / 60);
   const remSeconds = Math.round(seconds % 60);
   return `${minutes}m ${remSeconds}s`;
+}
+
+async function promptForSignatureNames(args) {
+  if (args.testAuthor && args.runBy) return;
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return;
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  try {
+    if (!args.testAuthor) {
+      args.testAuthor = (await rl.question('Test author name: ')).trim() || null;
+    }
+    if (!args.runBy) {
+      args.runBy = (await rl.question('Run by name: ')).trim() || null;
+    }
+  } finally {
+    rl.close();
+  }
 }
 
 function ensureDir(dir) {
@@ -325,7 +347,7 @@ function buildMarkdownSignoff(data) {
   return `${lines.join('\n')}\n`;
 }
 
-function main() {
+async function main() {
   let args;
   try {
     args = parseArgs(process.argv.slice(2));
@@ -349,6 +371,15 @@ function main() {
   const missing = [];
   if (!args.releaseLabel) missing.push('--release-label');
   if (!args.environment) missing.push('--environment');
+  if (missing.length > 0) {
+    console.error(`[test-signoff] Missing required option(s): ${missing.join(', ')}`);
+    console.error('');
+    console.error(usage);
+    process.exit(1);
+  }
+
+  await promptForSignatureNames(args);
+
   if (!args.testAuthor) missing.push('--test-author');
   if (!args.runBy) missing.push('--run-by');
   if (missing.length > 0) {
@@ -469,5 +500,8 @@ function main() {
   }
 }
 
-main();
+main().catch((error) => {
+  console.error(`[test-signoff] ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+});
 

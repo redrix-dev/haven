@@ -43,14 +43,21 @@ import { Input } from "@shared/app/ui/input";
 import { Textarea } from "@shared/app/ui/textarea";
 import { ProfileContextMenu } from "@shared/app/components/ProfileContextMenu";
 import { ActionMenuContent } from "@shared/app/components/menus/ActionMenuContent";
-import { Database } from "@shared/types/database";
+import {
+  BANNED_REPLY_PLACEHOLDER_CONTENT,
+  filterHiddenMessageContent,
+  filterBlockedUserContent,
+  isModerationRemovedReplyPlaceholder,
+} from "@shared/features/messaging/lib/banVisibility";
 import { resolveContextMenuIntent } from "@shared/lib/contextMenu";
 import { traceContextMenuEvent } from "@shared/lib/contextMenu/debugTrace";
 import { getErrorMessage } from "@platform/lib/errors";
 import type { MenuActionNode } from "@shared/lib/contextMenu/types";
 import type {
   BanEligibleServer,
+  Message,
   MessageAttachment,
+  MessageBundle,
   MessageLinkPreview,
   MessageReaction,
   MessageReportKind,
@@ -59,28 +66,132 @@ import type {
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { MarkdownText } from "@shared/app/ui/MarkdownText";
 import {
-  BANNED_REPLY_PLACEHOLDER_CONTENT,
-  filterHiddenMessageContent,
-  filterBlockedUserContent,
-  isModerationRemovedReplyPlaceholder,
-} from "@shared/features/messaging/lib/banVisibility";
-import { getLiveProfile } from "@shared/lib/liveProfiles";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
-import { useMessagesStore } from "@shared/stores/messagesStore";
-import { useSocialStore } from "@shared/stores/socialStore";
-import {
   QUICK_REACTION_EMOJI,
-  getAuthorColor,
-  getAuthorLabel,
   getFallbackEmbedUrl,
-  getReplyToMessageId,
   isAuthorProfileTombstone,
   messageContainsHttpUrl,
   renderLinkifiedMessageText,
   type MessageListAuthorProfile,
 } from "@shared/features/messaging/components/message-list/messageListContentUtils";
+import { getLiveProfile } from "@shared/lib/liveProfiles";
+import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useMessagesStore } from "@shared/stores/messagesStore";
+import { useSocialStore } from "@shared/stores/socialStore";
 
-type Message = Database["public"]["Tables"]["messages"]["Row"];
+function bundleToMessageRow(
+  bundle: MessageBundle,
+  channelId: string,
+  communityId: string,
+): Message {
+  return {
+    id: bundle.id,
+    author_type: bundle.authorUserId ? "user" : "system",
+    author_user_id: bundle.authorUserId,
+    channel_id: channelId,
+    community_id: communityId,
+    content: bundle.content,
+    created_at: bundle.createdAt,
+    deleted_at: bundle.deletedAt,
+    edited_at: bundle.editedAt,
+    is_hidden: bundle.isHidden,
+    metadata: bundle.metadata as Message["metadata"],
+  };
+}
+
+function bundlesToBanVisibilityInput(
+  bundles: MessageBundle[],
+  channelId: string,
+): {
+  messages: Message[];
+  reactions: MessageReaction[];
+  attachments: MessageAttachment[];
+  linkPreviews: MessageLinkPreview[];
+} {
+  const communityId =
+    bundles.find((b) => b.attachment?.communityId)?.attachment?.communityId ??
+    bundles.find((b) => b.linkPreview?.communityId)?.linkPreview?.communityId ??
+    "";
+  return {
+    messages: bundles.map((b) => bundleToMessageRow(b, channelId, communityId)),
+    reactions: bundles.flatMap((b) => b.reactions),
+    attachments: bundles
+      .map((b) => b.attachment)
+      .filter((a): a is MessageAttachment => Boolean(a)),
+    linkPreviews: bundles
+      .map((b) => b.linkPreview)
+      .filter((p): p is MessageLinkPreview => Boolean(p)),
+  };
+}
+
+function visibleBundlesFromBanFilter(
+  bundles: MessageBundle[],
+  filtered: {
+    messages: Message[];
+    reactions: MessageReaction[];
+    attachments: MessageAttachment[];
+    linkPreviews: MessageLinkPreview[];
+  },
+): MessageBundle[] {
+  const idOrder = filtered.messages.map((m) => m.id);
+  const reactionMap = new Map<string, MessageReaction[]>();
+  for (const r of filtered.reactions) {
+    const list = reactionMap.get(r.messageId) ?? [];
+    list.push(r);
+    reactionMap.set(r.messageId, list);
+  }
+  const attMap = new Map(
+    filtered.attachments.map((a) => [a.messageId, a] as const),
+  );
+  const previewMap = new Map(
+    filtered.linkPreviews.map((p) => [p.messageId, p] as const),
+  );
+
+  return idOrder
+    .map((id) => {
+      const b = bundles.find((x) => x.id === id);
+      if (!b) return null;
+      return {
+        ...b,
+        reactions: reactionMap.get(id) ?? [],
+        attachment: attMap.get(id) ?? null,
+        linkPreview: previewMap.get(id) ?? null,
+      };
+    })
+    .filter((b): b is MessageBundle => b != null);
+}
+
+function getReplyToMessageIdFromBundle(bundle: MessageBundle): string | null {
+  const direct = bundle.replyToMessageId?.trim();
+  if (direct) return direct;
+  return null;
+}
+
+function getAuthorLabelForBundle(
+  bundle: MessageBundle,
+  authorProfile: MessageListAuthorProfile | undefined,
+  currentUserId: string,
+): string {
+  const username =
+    authorProfile?.username ??
+    bundle.displayName ??
+    bundle.authorUserId?.substring(0, 12) ??
+    "Unknown User";
+  if (bundle.authorUserId === currentUserId) return `${username} (You)`;
+  return username;
+}
+
+function getAuthorColorForBundle(
+  bundle: MessageBundle,
+  authorProfile: MessageListAuthorProfile | undefined,
+  currentUserId: string,
+): string {
+  const isOwn = bundle.authorUserId === currentUserId;
+  const isStaff = Boolean(bundle.isPlatformStaff);
+  if (isOwn) return "var(--primary)";
+  if (isStaff) return "var(--link)";
+  return "var(--status-online)";
+}
+
 type AuthorProfile = MessageListAuthorProfile;
 
 interface MessageListProps {
@@ -136,7 +247,7 @@ type MessageReactionSummaryState = {
 };
 
 interface MessageRowProps {
-  message: Message;
+  message: MessageBundle;
   depth: number;
   currentUserId: string;
   canManageMessages: boolean;
@@ -192,7 +303,7 @@ interface MessageTreeSharedProps extends Omit<
   activeEditingContent: string;
   actionBusyMessageId: string | null;
   expandedReplyThreads: Readonly<Record<string, boolean>>;
-  repliesByParentId: ReadonlyMap<string, Message[]>;
+  repliesByParentId: ReadonlyMap<string, MessageBundle[]>;
   attachmentsByMessageId: ReadonlyMap<string, MessageAttachment[]>;
   linkPreviewByMessageId: ReadonlyMap<string, MessageLinkPreview>;
   reactionsByMessageId: ReadonlyMap<
@@ -204,13 +315,13 @@ interface MessageTreeSharedProps extends Omit<
 }
 
 interface MessageTreeItemProps extends MessageTreeSharedProps {
-  message: Message;
+  message: MessageBundle;
   depth: number;
   ancestorPath: string;
 }
 
 interface MessageVirtuosoItemProps extends MessageTreeSharedProps {
-  message: Message;
+  message: MessageBundle;
 }
 
 const EMPTY_MESSAGE_ATTACHMENTS: readonly MessageAttachment[] = [];
@@ -218,7 +329,7 @@ const EMPTY_MESSAGE_REACTION_MAP: ReadonlyMap<
   string,
   MessageReactionSummaryState
 > = new Map<string, MessageReactionSummaryState>();
-const EMPTY_REPLY_MESSAGES: readonly Message[] = [];
+const EMPTY_REPLY_MESSAGES: readonly MessageBundle[] = [];
 const ANCESTOR_PATH_SEPARATOR = "\u0000";
 
 const areAuthorProfilesEqual = (
@@ -283,16 +394,18 @@ const areMessageReactionMapsEqual = (
   return true;
 };
 
-const areMessagesEqual = (previousMessage: Message, nextMessage: Message) => {
+const areMessagesEqual = (
+  previousMessage: MessageBundle,
+  nextMessage: MessageBundle,
+) => {
   if (previousMessage === nextMessage) return true;
 
   return (
     previousMessage.id === nextMessage.id &&
-    previousMessage.author_type === nextMessage.author_type &&
-    previousMessage.author_user_id === nextMessage.author_user_id &&
+    previousMessage.authorUserId === nextMessage.authorUserId &&
     previousMessage.content === nextMessage.content &&
-    previousMessage.created_at === nextMessage.created_at &&
-    previousMessage.is_hidden === nextMessage.is_hidden &&
+    previousMessage.createdAt === nextMessage.createdAt &&
+    previousMessage.isHidden === nextMessage.isHidden &&
     previousMessage.metadata === nextMessage.metadata
   );
 };
@@ -381,7 +494,9 @@ const MessageRow = React.memo(function MessageRow({
   onDirectMessageUser,
   onResolveBanEligibleServers,
 }: MessageRowProps) {
-  const isModerationPlaceholder = isModerationRemovedReplyPlaceholder(message);
+  const isModerationPlaceholder = isModerationRemovedReplyPlaceholder(
+    message as unknown as Message,
+  );
   const isReply = depth > 0;
   const replyIndent = Math.min(depth, 4) * 20;
 
@@ -398,23 +513,20 @@ const MessageRow = React.memo(function MessageRow({
     );
   }
 
-  const isStaffUserMessage =
-    message.author_type === "user" && Boolean(authorProfile?.isPlatformStaff);
-  const isHiddenMessage = message.is_hidden;
-  const isOwnMessage =
-    message.author_type === "user" && message.author_user_id === currentUserId;
-  const canProfileMenu =
-    message.author_type === "user" && Boolean(message.author_user_id);
+  const isStaffUserMessage = Boolean(message.isPlatformStaff);
+  const isHiddenMessage = message.isHidden;
+  const isOwnMessage = message.authorUserId === currentUserId;
+  const canProfileMenu = Boolean(message.authorUserId);
   const kickDisabledReason =
     canManageMembers &&
-    message.author_user_id !== currentUserId &&
+    message.authorUserId !== currentUserId &&
     (isHiddenMessage || authorProfile?.username === "Banned User")
       ? "User is not a member"
       : null;
   const canDeleteMessage = isOwnMessage || canManageMessages;
   const canEditMessage = isOwnMessage;
-  const authorLabel = getAuthorLabel(message, authorProfile, currentUserId);
-  const authorColor = getAuthorColor(message, authorProfile, currentUserId);
+  const authorLabel = getAuthorLabelForBundle(message, authorProfile, currentUserId);
+  const authorColor = getAuthorColorForBundle(message, authorProfile, currentUserId);
   const reactionSummaries = Array.from(messageReactionMap.entries());
   const messageHasHttpUrl = messageContainsHttpUrl(message.content);
   const trimmedMessageContent = message.content.trim();
@@ -606,20 +718,20 @@ const MessageRow = React.memo(function MessageRow({
         >
           <div className="flex items-start justify-between gap-2 mb-1">
             <div className="flex items-center gap-2 min-w-0">
-              {canProfileMenu && message.author_user_id ? (
+              {canProfileMenu && message.authorUserId ? (
                 <ProfileContextMenu
-                  userId={message.author_user_id}
+                  userId={message.authorUserId}
                   username={authorLabel}
                   avatarUrl={authorProfile?.avatarUrl ?? null}
-                  canDirectMessage={message.author_user_id !== currentUserId}
+                  canDirectMessage={message.authorUserId !== currentUserId}
                   canReport={
-                    canCreateReports && message.author_user_id !== currentUserId
+                    canCreateReports && message.authorUserId !== currentUserId
                   }
                   canBan={
-                    canManageBans && message.author_user_id !== currentUserId
+                    canManageBans && message.authorUserId !== currentUserId
                   }
                   canKick={
-                    canManageMembers && message.author_user_id !== currentUserId
+                    canManageMembers && message.authorUserId !== currentUserId
                   }
                   kickDisabledReason={kickDisabledReason}
                   onDirectMessage={onDirectMessageUser}
@@ -644,7 +756,7 @@ const MessageRow = React.memo(function MessageRow({
                 </span>
               )}
               <span className="text-xs text-placeholder-dim shrink-0">
-                {new Date(message.created_at).toLocaleTimeString([], {
+                {new Date(message.createdAt).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
@@ -1187,10 +1299,6 @@ export function MessageList({
   showHiddenMessages = false,
 }: MessageListProps) {
   const messages = useMessagesStore((state) => state.messages);
-  const reactionRecord = useMessagesStore((state) => state.reactions);
-  const attachmentRecord = useMessagesStore((state) => state.attachments);
-  const linkPreviewRecord = useMessagesStore((state) => state.linkPreviews);
-  const authorProfiles = useMessagesStore((state) => state.profiles);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
   const hasOlderMessages = useMessagesStore((state) => state.hasMore);
@@ -1244,77 +1352,56 @@ export function MessageList({
   const [banConfirmOpen, setBanConfirmOpen] = useState(false);
   const [kickSubmitting, setKickSubmitting] = useState(false);
 
-  const messageReactions = useMemo(
-    () => Object.values(reactionRecord),
-    [reactionRecord],
-  );
-  const messageAttachments = useMemo(
-    () => Object.values(attachmentRecord),
-    [attachmentRecord],
-  );
-  const messageLinkPreviews = useMemo(
-    () => Object.values(linkPreviewRecord),
-    [linkPreviewRecord],
-  );
-
-  const visibleBundle = useMemo(
-    () =>
-      filterHiddenMessageContent(
-        filterBlockedUserContent(
-          {
-            messages,
-            reactions: messageReactions,
-            attachments: messageAttachments,
-            linkPreviews: messageLinkPreviews,
-          },
-          blockedUserIds,
-          isElevatedViewer,
-        ),
-        showHiddenMessages,
-      ),
-    [
+  const visibleBundles = useMemo(() => {
+    const raw = bundlesToBanVisibilityInput(messages, channelId);
+    const afterBlock = filterBlockedUserContent(
+      raw,
       blockedUserIds,
       isElevatedViewer,
-      messageAttachments,
-      messageLinkPreviews,
-      messageReactions,
-      messages,
+    );
+    const afterHidden = filterHiddenMessageContent(
+      afterBlock,
       showHiddenMessages,
-    ],
-  );
-
-  const visibleMessages = visibleBundle.messages;
-  const visibleReactions = visibleBundle.reactions;
-  const visibleAttachments = visibleBundle.attachments;
-  const visibleLinkPreviews = visibleBundle.linkPreviews;
+    );
+    return visibleBundlesFromBanFilter(messages, afterHidden);
+  }, [
+    blockedUserIds,
+    channelId,
+    isElevatedViewer,
+    messages,
+    showHiddenMessages,
+  ]);
 
   const messageById = useMemo(() => {
-    const next = new Map<string, Message>();
-    for (const message of visibleMessages) {
-      next.set(message.id, message);
+    const next = new Map<string, MessageBundle>();
+    for (const bundle of visibleBundles) {
+      next.set(bundle.id, bundle);
     }
     return next;
-  }, [visibleMessages]);
+  }, [visibleBundles]);
 
   const attachmentsByMessageId = useMemo(() => {
     const next = new Map<string, MessageAttachment[]>();
-    for (const attachment of visibleAttachments) {
-      if (!messageById.has(attachment.messageId)) continue;
-      const existing = next.get(attachment.messageId) ?? [];
-      existing.push(attachment);
-      next.set(attachment.messageId, existing);
+    for (const bundle of visibleBundles) {
+      next.set(
+        bundle.id,
+        bundle.attachment
+          ? [bundle.attachment]
+          : [...EMPTY_MESSAGE_ATTACHMENTS],
+      );
     }
     return next;
-  }, [messageById, visibleAttachments]);
+  }, [visibleBundles]);
 
   const linkPreviewByMessageId = useMemo(() => {
     const next = new Map<string, MessageLinkPreview>();
-    for (const preview of visibleLinkPreviews) {
-      if (!messageById.has(preview.messageId)) continue;
-      next.set(preview.messageId, preview);
+    for (const bundle of visibleBundles) {
+      if (bundle.linkPreview) {
+        next.set(bundle.id, bundle.linkPreview);
+      }
     }
     return next;
-  }, [messageById, visibleLinkPreviews]);
+  }, [visibleBundles]);
 
   const getRenderableEmbedUrl = React.useCallback(
     (preview: MessageLinkPreview): string | null => {
@@ -1351,31 +1438,32 @@ export function MessageList({
       string,
       Map<string, { count: number; reactedByCurrentUser: boolean }>
     >();
-    for (const reaction of visibleReactions) {
-      if (!messageById.has(reaction.messageId)) continue;
-      const byEmoji =
-        next.get(reaction.messageId) ??
-        new Map<string, { count: number; reactedByCurrentUser: boolean }>();
-      const current = byEmoji.get(reaction.emoji) ?? {
-        count: 0,
-        reactedByCurrentUser: false,
-      };
-      current.count += 1;
-      if (reaction.userId === currentUserId) {
-        current.reactedByCurrentUser = true;
+    for (const bundle of visibleBundles) {
+      for (const reaction of bundle.reactions) {
+        const byEmoji =
+          next.get(bundle.id) ??
+          new Map<string, { count: number; reactedByCurrentUser: boolean }>();
+        const current = byEmoji.get(reaction.emoji) ?? {
+          count: 0,
+          reactedByCurrentUser: false,
+        };
+        current.count += 1;
+        if (reaction.userId === currentUserId) {
+          current.reactedByCurrentUser = true;
+        }
+        byEmoji.set(reaction.emoji, current);
+        next.set(bundle.id, byEmoji);
       }
-      byEmoji.set(reaction.emoji, current);
-      next.set(reaction.messageId, byEmoji);
     }
     return next;
-  }, [currentUserId, messageById, visibleReactions]);
+  }, [currentUserId, visibleBundles]);
 
   const replyTree = useMemo(() => {
-    const repliesByParentId = new Map<string, Message[]>();
-    const rootMessages: Message[] = [];
+    const repliesByParentId = new Map<string, MessageBundle[]>();
+    const rootMessages: MessageBundle[] = [];
 
-    for (const message of visibleMessages) {
-      const parentId = getReplyToMessageId(message);
+    for (const message of visibleBundles) {
+      const parentId = getReplyToMessageIdFromBundle(message);
       const parentExists = Boolean(
         parentId && parentId !== message.id && messageById.has(parentId),
       );
@@ -1390,15 +1478,15 @@ export function MessageList({
       repliesByParentId.set(parentId, existing);
     }
 
-    if (rootMessages.length === 0 && visibleMessages.length > 0) {
+    if (rootMessages.length === 0 && visibleBundles.length > 0) {
       return {
-        rootMessages: visibleMessages,
-        repliesByParentId: new Map<string, Message[]>(),
+        rootMessages: visibleBundles,
+        repliesByParentId: new Map<string, MessageBundle[]>(),
       };
     }
 
     return { rootMessages, repliesByParentId };
-  }, [messageById, visibleMessages]);
+  }, [messageById, visibleBundles]);
 
   useEffect(() => {
     const validThreadParentIds = new Set(replyTree.repliesByParentId.keys());
@@ -1549,38 +1637,68 @@ export function MessageList({
     [onToggleMessageReaction],
   );
 
-  const getResolvedAuthorProfile = React.useCallback(
-    (targetUserId: string | null | undefined): AuthorProfile | undefined => {
+  const getResolvedAuthorProfileForBundle = React.useCallback(
+    (bundle: MessageBundle): AuthorProfile | undefined => {
+      const targetUserId = bundle.authorUserId;
       if (!targetUserId) return undefined;
 
-      const authorProfile = authorProfiles[targetUserId];
       const liveProfile = getLiveProfile(liveProfiles, targetUserId);
-      if (!authorProfile && !liveProfile) return undefined;
-      const preserveFetchedTombstone = isAuthorProfileTombstone(authorProfile);
+      const baseUsername =
+        liveProfile?.username ??
+        bundle.displayName ??
+        targetUserId.substring(0, 12);
+      const baseAvatar =
+        liveProfile?.avatarUrl ?? bundle.avatarSnapshotUrl ?? null;
+      const synthetic: AuthorProfile = {
+        username: baseUsername,
+        isPlatformStaff: bundle.isPlatformStaff,
+        displayPrefix: null,
+        avatarUrl: baseAvatar,
+      };
+      const preserveFetchedTombstone = isAuthorProfileTombstone(synthetic);
 
       return {
         username:
           (preserveFetchedTombstone ? null : liveProfile?.username) ??
-          authorProfile?.username ??
+          bundle.displayName ??
           targetUserId.substring(0, 12),
-        isPlatformStaff: authorProfile?.isPlatformStaff ?? false,
-        displayPrefix: authorProfile?.displayPrefix ?? null,
+        isPlatformStaff: bundle.isPlatformStaff,
+        displayPrefix: null,
         avatarUrl:
           (preserveFetchedTombstone ? null : liveProfile?.avatarUrl) ??
-          authorProfile?.avatarUrl ??
+          bundle.avatarSnapshotUrl ??
           null,
       };
     },
-    [authorProfiles, liveProfiles],
+    [liveProfiles],
+  );
+
+  const getResolvedAuthorProfileForUserId = React.useCallback(
+    (targetUserId: string | null | undefined): AuthorProfile | undefined => {
+      if (!targetUserId) return undefined;
+      const bundle = visibleBundles.find(
+        (b) => b.authorUserId === targetUserId,
+      );
+      if (bundle) return getResolvedAuthorProfileForBundle(bundle);
+      const liveProfile = getLiveProfile(liveProfiles, targetUserId);
+      if (!liveProfile) return undefined;
+      return {
+        username: liveProfile.username ?? targetUserId.substring(0, 12),
+        isPlatformStaff: false,
+        displayPrefix: null,
+        avatarUrl: liveProfile.avatarUrl ?? null,
+      };
+    },
+    [getResolvedAuthorProfileForBundle, liveProfiles, visibleBundles],
   );
 
   const authorProfilesByMessageId = useMemo(() => {
     const next = new Map<string, AuthorProfile | undefined>();
-    for (const message of visibleMessages) {
-      next.set(message.id, getResolvedAuthorProfile(message.author_user_id));
+    for (const bundle of visibleBundles) {
+      next.set(bundle.id, getResolvedAuthorProfileForBundle(bundle));
     }
     return next;
-  }, [getResolvedAuthorProfile, visibleMessages]);
+  }, [getResolvedAuthorProfileForBundle, visibleBundles]);
 
   const reportProfile = React.useCallback(
     async (targetUserId: string) => {
@@ -1590,7 +1708,7 @@ export function MessageList({
         );
         return;
       }
-      const profile = getResolvedAuthorProfile(targetUserId);
+      const profile = getResolvedAuthorProfileForUserId(targetUserId);
       setProfileReportDraft({
         targetUserId,
         username: profile?.username ?? targetUserId.substring(0, 12),
@@ -1599,12 +1717,12 @@ export function MessageList({
       setProfileReportSubmitting(false);
       setActionError(null);
     },
-    [canCreateReports, getResolvedAuthorProfile],
+    [canCreateReports, getResolvedAuthorProfileForUserId],
   );
 
   const openBanDialog = React.useCallback(
     (targetUserId: string, communityId: string) => {
-      const profile = getResolvedAuthorProfile(targetUserId);
+      const profile = getResolvedAuthorProfileForUserId(targetUserId);
       const username = profile?.username ?? targetUserId.substring(0, 12);
       setBanDraft({
         targetUserId,
@@ -1616,12 +1734,12 @@ export function MessageList({
       setBanConfirmOpen(false);
       setActionError(null);
     },
-    [getResolvedAuthorProfile],
+    [getResolvedAuthorProfileForUserId],
   );
 
   const openKickDialog = React.useCallback(
     (targetUserId: string) => {
-      const profile = getResolvedAuthorProfile(targetUserId);
+      const profile = getResolvedAuthorProfileForUserId(targetUserId);
       const username = profile?.username ?? targetUserId.substring(0, 12);
       setKickDraft({
         targetUserId,
@@ -1630,7 +1748,7 @@ export function MessageList({
       setKickSubmitting(false);
       setActionError(null);
     },
-    [getResolvedAuthorProfile],
+    [getResolvedAuthorProfileForUserId],
   );
 
   const handleStartEditingMessage = React.useCallback(
@@ -1847,14 +1965,14 @@ export function MessageList({
   );
 
   const renderVirtuosoItem = React.useCallback(
-    (_index: number, message: Message) => (
+    (_index: number, message: MessageBundle) => (
       <MessageVirtuosoItem {...messageTreeSharedProps} message={message} />
     ),
     [messageTreeSharedProps],
   );
 
   const computeItemKey = React.useCallback(
-    (_index: number, message: Message) => message.id,
+    (_index: number, message: MessageBundle) => message.id,
     [],
   );
 

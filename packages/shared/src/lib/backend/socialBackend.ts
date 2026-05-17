@@ -1,4 +1,3 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import type {
   BlockedUserSummary,
@@ -23,7 +22,6 @@ export interface SocialBackend {
   removeFriend(otherUserId: string): Promise<boolean>;
   blockUser(targetUserId: string): Promise<boolean>;
   unblockUser(targetUserId: string): Promise<boolean>;
-  subscribeToSocialGraph(userId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
 }
 
 type SocialCountsRow = {
@@ -268,72 +266,6 @@ export function createSocialBackend(client: HavenSupabaseClient): SocialBackend 
     );
     if (error) throw error;
     return true;
-  },
-
-  subscribeToSocialGraph(userId, onChange) {
-    return client
-      .channel(`social_graph:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'friend_requests',
-          filter: `sender_user_id=eq.${userId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'friend_requests',
-          filter: `recipient_user_id=eq.${userId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'friendships',
-          filter: `user_low_id=eq.${userId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'friendships',
-          filter: `user_high_id=eq.${userId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_blocks',
-          filter: `blocker_user_id=eq.${userId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_blocks',
-          filter: `blocked_user_id=eq.${userId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .subscribe();
   },
 };
 }
