@@ -1,5 +1,5 @@
 import "react-native-gesture-handler";
-
+import { PortalHost } from "@rn-primitives/portal";
 import "./global.css";
 
 import * as Notifications from "expo-notifications";
@@ -77,6 +77,7 @@ function App() {
           <RootNavigator />
           {__DEV__ ? <MobileDevThemeMenu /> : null}
           <StatusBar style="light" />
+          <PortalHost />
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
