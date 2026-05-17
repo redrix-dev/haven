@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../..');
-const supabaseWorkdir = path.join(repoRoot, 'services');
 const outPath = path.join(repoRoot, 'packages/shared/src/types/database.ts');
 
 function getSupabaseCliInvocation() {
@@ -16,13 +15,13 @@ function getSupabaseCliInvocation() {
     });
     return {
       command: 'supabase',
-      baseArgs: ['--workdir', supabaseWorkdir],
+      baseArgs: [],
       shell: false,
     };
   } catch {
     return {
       command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
-      baseArgs: ['supabase', '--workdir', supabaseWorkdir],
+      baseArgs: ['supabase'],
       shell: process.platform === 'win32',
     };
   }
@@ -50,5 +49,6 @@ const output = execFileSync(
   }
 );
 
+fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, output, 'utf8');
 console.log(`Wrote ${path.relative(repoRoot, outPath)}`);

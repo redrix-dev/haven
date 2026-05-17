@@ -70,9 +70,9 @@ flowchart TB
     tooling_support["test-support/<br/>setup/env.ts<br/>setup/jsdom.ts<br/>setup/supabaseLocal.ts<br/>fixtures/users.ts"]:::tool
   end
 
-  subgraph services["services/supabase/"]
+  subgraph services["supabase/"]
     direction TB
-    services_root["services/supabase/"]:::root
+    services_root["supabase/"]:::root
     supabase_functions["functions/<br/>_shared/*<br/>link-preview-backfill/index.ts<br/>link-preview-worker/index.ts<br/>message-media-maintenance/index.ts<br/>report-alert/index.ts<br/>voice-ice/index.ts<br/>web-push-worker/index.ts"]:::service
     supabase_migrations["migrations/<br/>20260217...20260327 *.sql<br/>schema + permissions + messaging + DM + notifications + web push + moderation"]:::service
     supabase_tests["tests/<br/>sql/*.sql<br/>fixtures/*.sql<br/>_helpers/*.sql<br/>run_order.txt<br/>README.md"]:::service

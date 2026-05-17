@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
-const supabaseWorkdir = path.join(repoRoot, 'services');
 
 function getSupabaseCliInvocation() {
   try {
@@ -14,13 +13,13 @@ function getSupabaseCliInvocation() {
     });
     return {
       command: 'supabase',
-      baseArgs: ['--workdir', supabaseWorkdir],
+      baseArgs: [],
       shell: false,
     };
   } catch {
     return {
       command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
-      baseArgs: ['supabase', '--workdir', supabaseWorkdir],
+      baseArgs: ['supabase'],
       shell: process.platform === 'win32',
     };
   }
@@ -63,7 +62,7 @@ export function resolveSupabaseLocalEnv() {
     });
   } catch (error) {
     throw new Error(
-      `Unable to resolve Supabase local env from ${supabaseWorkdir}. Ensure Docker Desktop is running and Supabase local is started (try \`npx supabase start --workdir services\`). Original error: ${error.message}`
+      `Unable to resolve Supabase local env from ${repoRoot}/supabase. Ensure Docker Desktop is running and Supabase local is started (try \`npx supabase start\` from the repo root). Original error: ${error.message}`
     );
   }
   const raw = parseEnvLines(output);

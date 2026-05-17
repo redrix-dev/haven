@@ -55,7 +55,7 @@ let cachedBootstrappedUsers: BootstrappedTestUsers | null = null;
 export function loadBootstrappedTestUsers(): BootstrappedTestUsers {
   if (cachedBootstrappedUsers) return cachedBootstrappedUsers;
 
-  const filePath = path.resolve(process.cwd(), 'services/supabase/tests/.generated/users.json');
+  const filePath = path.resolve(process.cwd(), 'supabase/tests/.generated/users.json');
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(filePath, 'utf8'));

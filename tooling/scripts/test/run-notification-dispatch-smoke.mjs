@@ -7,7 +7,7 @@ import { getSupabaseCliCommand, resolveSupabaseLocalEnv } from './resolve-supaba
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
-const generatedUsersPath = path.join(repoRoot, 'services/supabase/tests/.generated/users.json');
+const generatedUsersPath = path.join(repoRoot, 'supabase/tests/.generated/users.json');
 
 const DEFAULTS = {
   prepare: false,

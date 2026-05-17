@@ -82,7 +82,7 @@ async function main() {
 
   const outDir = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    '../../../services/supabase/tests/.generated'
+    '../../../supabase/tests/.generated'
   );
   mkdirSync(outDir, { recursive: true });
   const outPath = path.join(outDir, 'users.json');
