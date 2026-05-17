@@ -18,7 +18,7 @@ import { getErrorMessage } from "@platform/lib/errors";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useMemo, useState, useCallback } from "react";
-import { HavenModalShell } from "@/components/HavenModalShell";
+import { HavenFormSheet } from "@/components/HavenFormSheet";
 import type { RootStackParamList } from "@/navigation/types";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
@@ -205,8 +205,7 @@ export function HomeScreen() {
         }}
       />
 
-      <HavenModalShell
-        variant="settings"
+      <HavenFormSheet
         visible={createModalOpen}
         onDismiss={() => {
           setCreateModalOpen(false);
@@ -255,9 +254,8 @@ export function HomeScreen() {
             </Pressable>
           </View>
         </View>
-      </HavenModalShell>
-      <HavenModalShell
-        variant="settings"
+      </HavenFormSheet>
+      <HavenFormSheet
         visible={joinModalOpen}
         onDismiss={() => {
           setJoinModalOpen(false);
@@ -307,7 +305,7 @@ export function HomeScreen() {
             </Pressable>
           </View>
         </View>
-      </HavenModalShell>
+      </HavenFormSheet>
     </View>
   );
 }

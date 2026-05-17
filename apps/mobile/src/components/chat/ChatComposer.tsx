@@ -1,0 +1,108 @@
+import { Pressable, View } from "react-native";
+import Animated from "react-native-reanimated";
+import { useChatSurfaceChrome } from "@/components/chat/ChatSurfaceContext";
+import {
+  EnrichedMarkdownTextInput,
+  type EnrichedMarkdownTextInputInstance,
+} from "react-native-enriched-markdown";
+import { Ionicons } from "@expo/vector-icons";
+import { COMPOSER_SELECTION_COLOR } from "@/components/chat/chatSurfaceConstants";
+import type { ChatComposerColors } from "@/components/chat/useChatComposerColors";
+
+export type ChatComposerProps = {
+  inputRef: React.RefObject<EnrichedMarkdownTextInputInstance | null>;
+  colors: ChatComposerColors;
+  isSending: boolean;
+  isPickingMedia: boolean;
+  canSend: boolean;
+  onChangeMarkdown: (markdown: string) => void;
+  onSend: () => void;
+  onPickMedia: () => void;
+  /** Strips above the input row (reply, pending media, etc.). */
+  strips?: React.ReactNode;
+  sendAccessibilityLabel?: string;
+};
+
+export function ChatComposer({
+  inputRef,
+  colors,
+  isSending,
+  isPickingMedia,
+  canSend,
+  onChangeMarkdown,
+  onSend,
+  onPickMedia,
+  strips,
+  sendAccessibilityLabel = "Send message",
+}: ChatComposerProps) {
+  const { composerChromeAnimatedStyle } = useChatSurfaceChrome();
+
+  return (
+    <>
+      {strips}
+
+      <View className="flex-row items-end gap-2 bg-transparent px-3 pb-3 pt-2.5">
+        <Animated.View style={composerChromeAnimatedStyle}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add media"
+            disabled={isSending || isPickingMedia}
+            onPress={onPickMedia}
+            className="mb-0.5 h-[34px] w-[34px] items-center justify-center rounded-full bg-white/10 disabled:opacity-50"
+          >
+            <Ionicons name="add" size={20} color={colors.iconOnPrimary} />
+          </Pressable>
+        </Animated.View>
+
+        <Animated.View
+          style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
+        >
+          <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/8 pr-1">
+            <EnrichedMarkdownTextInput
+              ref={inputRef}
+              multiline
+              editable={!isSending}
+              scrollEnabled
+              defaultValue=""
+              onChangeMarkdown={onChangeMarkdown}
+              placeholder="Type a message..."
+              placeholderTextColor={colors.placeholder}
+              cursorColor={colors.cursor}
+              selectionColor={COMPOSER_SELECTION_COLOR}
+              markdownStyle={{
+                strong: { color: colors.text },
+                em: { color: colors.text },
+                link: { color: colors.link, underline: true },
+                spoiler: { color: colors.spoiler, backgroundColor: "rgba(0,0,0,0.2)" },
+              }}
+              style={{
+                flex: 1,
+                minHeight: 36,
+                maxHeight: 120,
+                color: colors.text,
+                paddingHorizontal: 14,
+                paddingTop: 8,
+                paddingBottom: 8,
+                fontSize: 16,
+                backgroundColor: "transparent",
+              }}
+            />
+            <Pressable
+              onPress={onSend}
+              disabled={isSending || !canSend}
+              accessibilityRole="button"
+              accessibilityLabel={sendAccessibilityLabel}
+              style={{
+                opacity: canSend ? (isSending ? 0.55 : 1) : 0,
+                pointerEvents: canSend ? "auto" : "none",
+              }}
+              className="h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary"
+            >
+              <Ionicons name="arrow-up" size={18} color={colors.iconOnPrimary} />
+            </Pressable>
+          </View>
+        </Animated.View>
+      </View>
+    </>
+  );
+}

@@ -11,7 +11,8 @@ import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { HavenModalShell } from "@/components/HavenModalShell";
+import { HavenFormSheet } from "@/components/HavenFormSheet";
+import { HavenListSheet } from "@/components/HavenListSheet";
 import { HavenNavbar } from "@/components/HavenNavbar";
 import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
 import { useMobileNotifications } from "@/contexts/MobileNotificationsContext";
@@ -234,8 +235,7 @@ function HavenTabNavigator({
           </View>
         </View>
       </NavigationContent>
-      <HavenModalShell
-        variant="settings"
+      <HavenFormSheet
         visible={isSettingsModalOpen}
         onDismiss={handleCloseSettings}
         title="Settings"
@@ -250,9 +250,8 @@ function HavenTabNavigator({
             handleCloseSettings();
           }}
         />
-      </HavenModalShell>
-      <HavenModalShell
-        variant="inbox"
+      </HavenFormSheet>
+      <HavenListSheet
         visible={isNotificationsModalOpen}
         onDismiss={handleCloseNotifications}
         bodyScrollable={false}
@@ -265,18 +264,16 @@ function HavenTabNavigator({
           onOpenFriendsPanel={handleOpenFriendsFromNotification}
           onOpenDirectMessages={handleOpenDirectMessages}
         />
-      </HavenModalShell>
-      <HavenModalShell
-        variant="inbox"
+      </HavenListSheet>
+      <HavenListSheet
         visible={isDirectMessagesModalOpen}
         onDismiss={handleCloseDirectMessages}
         title="Direct messages"
         bodyScrollable={false}
       >
         <DirectMessagesContainer />
-      </HavenModalShell>
-      <HavenModalShell
-        variant="inbox"
+      </HavenListSheet>
+      <HavenListSheet
         visible={isFriendsModalOpen}
         onDismiss={handleCloseFriends}
         title="Friends"
@@ -289,7 +286,7 @@ function HavenTabNavigator({
           highlightedRequestId={friendsHighlightedRequestId}
           onStartDirectMessage={handleStartDmFromFriend}
         />
-      </HavenModalShell>
+      </HavenListSheet>
     </>
   );
 }

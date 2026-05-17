@@ -148,6 +148,7 @@ release/
 apps/mobile/.expo/
 apps/mobile/.tmp-expo-export/
 apps/mobile/ios/
+apps/mobile/android/
 
 # OTA export output (tooling/scripts/mobile/deploy-ota.sh)
 .ota-export/

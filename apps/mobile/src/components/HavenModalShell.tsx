@@ -1,23 +1,28 @@
-import { Modal, View, Text, Pressable, ScrollView, Keyboard, Platform, useWindowDimensions } from "react-native";
+import { Modal, View, Text, Pressable, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withTiming,
 } from "react-native-reanimated";
-import { KeyboardController } from "react-native-keyboard-controller";
 import { useEffect, useRef, useState } from "react";
 import { scheduleOnRN } from "react-native-worklets";
+import { cn } from "@/lib/utils";
 
-interface HavenModalShellProps {
-    variant: "settings" | "inbox";
+export type HavenModalShellProps = {
     visible: boolean;
     onDismiss: () => void;
     title?: string;
-    /** When false, inbox body is a plain flex container (use for nested FlatList). */
-    bodyScrollable?: boolean;
+    /** Height/sizing classes on the sliding card (e.g. `h-[92%]`, `max-h-[90%] flex-1`). */
+    cardClassName?: string;
+    /**
+     * Override scrim tap. Receives the shell close function — call `close(true)` to
+     * animate out and notify the parent, or `close(false)` when the parent already
+     * initiated dismiss.
+     */
+    onScrimPress?: (close: (notifyParent: boolean) => void) => void;
     children: React.ReactNode;
-}
+};
 
 const SLIDE_DURATION = 320;
 const FADE_DURATION = 220;
@@ -25,22 +30,20 @@ const FADE_DURATION = 220;
 const OFFSCREEN_BUFFER_PX = 24;
 
 export function HavenModalShell({
-    variant,
     visible,
     onDismiss,
     title,
-    bodyScrollable = true,
+    cardClassName,
+    onScrimPress,
     children,
 }: HavenModalShellProps) {
     const insets = useSafeAreaInsets();
     const { height: windowHeight } = useWindowDimensions();
-    const isSettingsVariant = variant === "settings";
 
     const offscreenTranslateY = windowHeight + insets.bottom + OFFSCREEN_BUFFER_PX;
 
     // Keep modal mounted during exit animation
     const [modalVisible, setModalVisible] = useState(visible);
-    const [keyboardInset, setKeyboardInset] = useState(0);
     const isClosingRef = useRef(false);
     const closeCompletedRef = useRef(false);
     const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,30 +108,6 @@ export function HavenModalShell({
         }
     }, [visible]);
 
-    useEffect(() => {
-        if (!isSettingsVariant || !modalVisible) {
-            setKeyboardInset(0);
-            return;
-        }
-
-        const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-        const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-        const showSub = Keyboard.addListener(showEvent, (event) => {
-            const height = event.endCoordinates?.height ?? 0;
-            setKeyboardInset(height);
-        });
-
-        const hideSub = Keyboard.addListener(hideEvent, () => {
-            setKeyboardInset(0);
-        });
-
-        return () => {
-            showSub.remove();
-            hideSub.remove();
-        };
-    }, [isSettingsVariant, modalVisible]);
-
     const scrimStyle = useAnimatedStyle(() => ({
         opacity: scrimOpacity.value,
     }));
@@ -138,8 +117,8 @@ export function HavenModalShell({
     }));
 
     const handleScrimPress = () => {
-        if (isSettingsVariant && KeyboardController.isVisible()) {
-            void KeyboardController.dismiss();
+        if (onScrimPress) {
+            onScrimPress(startCloseAnimation);
             return;
         }
         startCloseAnimation(true);
@@ -166,42 +145,21 @@ export function HavenModalShell({
 
                 {/* Card — slides independently */}
                 <Animated.View
-                    className={`rounded-t-3xl border-t border-border bg-card px-6 pt-6 ${
-                        isSettingsVariant
-                            ? "h-[92%]"
-                            : bodyScrollable
-                              ? "max-h-[90%]"
-                              : "max-h-[90%] flex-1"
-                    }`}
+                    className={cn(
+                        "rounded-t-3xl border-t border-border bg-card px-6 pt-6",
+                        cardClassName,
+                    )}
                     style={[cardStyle, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}
                 >
-                    {title && (
+                    {title ? (
                         <View className="mb-4 flex-row items-center justify-between">
                             <Text className="text-lg font-semibold text-foreground">{title}</Text>
                             <Pressable onPress={() => startCloseAnimation(true)} hitSlop={12}>
                                 <Text className="text-lg text-muted-foreground">✕</Text>
                             </Pressable>
                         </View>
-                    )}
-                    {isSettingsVariant ? (
-                        <ScrollView
-                            className="flex-1"
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled"
-                            keyboardDismissMode="interactive"
-                            contentContainerStyle={{
-                                paddingBottom: 8 + Math.max(0, keyboardInset - insets.bottom),
-                            }}
-                        >
-                            {children}
-                        </ScrollView>
-                    ) : bodyScrollable ? (
-                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
-                            {children}
-                        </ScrollView>
-                    ) : (
-                        <View className="min-h-0 flex-1">{children}</View>
-                    )}
+                    ) : null}
+                    {children}
                 </Animated.View>
             </View>
         </Modal>

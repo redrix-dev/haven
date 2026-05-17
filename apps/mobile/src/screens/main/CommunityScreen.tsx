@@ -1,23 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Platform,
   Pressable,
   Text,
   View,
-  type ScrollViewProps,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { KeyboardStickyView } from "react-native-keyboard-controller";
-import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from "react-native-reanimated";
 import {
   EnrichedMarkdownTextInput,
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
-import { Ionicons } from "@expo/vector-icons";
 import type { Channel } from "@shared/lib/backend/types";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommunityWorkspace";
@@ -36,8 +30,12 @@ import {
   mapBundlesToChatMessages,
 } from "@/features/community/communityChannelChatFromBundles";
 import { setLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
+import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatInterface } from "@/components/chat/ChatInterface";
+import { ChatMediaAttachmentStrip } from "@/components/chat/ChatMediaAttachmentStrip";
+import { ChatReplyStrip } from "@/components/chat/ChatReplyStrip";
+import { useChatComposerColors } from "@/components/chat/useChatComposerColors";
 import { CommunityChannelBar } from "@/features/community/CommunityChannelBar";
-import { ChatScrollView } from "@/features/community/ChatScrollView";
 import {
   CommunityMessageBubble,
   MessageDateDivider,
@@ -59,84 +57,10 @@ import {
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { resolveColorProp } from "@shared/themes";
-import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const MARGIN = 8;
-const COMPOSER_CHROME_IMMERSIVE_OPACITY = 0.38;
-const COMPOSER_CHROME_REST_OPACITY = 1;
-const COMPOSER_CHROME_IMMERSIVE_MS = 140;
-const COMPOSER_CHROME_REST_MS = 280;
-const COMPOSER_CHROME_SETTLE_MS = 200;
-const COMPOSER_SELECTION = "rgba(63, 121, 216, 0.4)";
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function CommunityScreen() {
-  const themeTokens = useMobileThemeTokens();
-  const {
-    SPINNER_FG,
-    ICON_MUTED,
-    ICON_ON_PRIMARY,
-    COMPOSER_PLACEHOLDER,
-    COMPOSER_CURSOR,
-    COMPOSER_LINK,
-    COMPOSER_SPOILER_FG,
-    COMPOSER_TEXT,
-  } = useMemo(
-    () => ({
-      SPINNER_FG: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
-      ICON_MUTED: resolveColorProp(themeTokens, "text-dim") ?? "#8b9cbb",
-      ICON_ON_PRIMARY: resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff",
-      COMPOSER_PLACEHOLDER: resolveColorProp(themeTokens, "text-dim") ?? "#8e8e93",
-      COMPOSER_CURSOR: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
-      COMPOSER_LINK: resolveColorProp(themeTokens, "primary") ?? "#3F79D8",
-      COMPOSER_SPOILER_FG: resolveColorProp(themeTokens, "text-muted") ?? "#a9b8cf",
-      COMPOSER_TEXT: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
-    }),
-    [themeTokens],
-  );
-  const { bottom } = useSafeAreaInsets();
-  const composerHeight = useSharedValue(0);
-  const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);
-  const composerChromeOpacity = useSharedValue(COMPOSER_CHROME_REST_OPACITY);
-  const listDragRef = useRef(false);
-  const listMomentumRef = useRef(false);
-  const composerSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const composerColors = useChatComposerColors();
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
-  const listRef = useRef<FlatList<ChatListItem> | null>(null);
-
-  const clearComposerSettleTimer = useCallback(() => {
-    if (composerSettleTimerRef.current != null) {
-      clearTimeout(composerSettleTimerRef.current);
-      composerSettleTimerRef.current = null;
-    }
-  }, []);
-
-  const goComposerChromeImmersive = useCallback(() => {
-    clearComposerSettleTimer();
-    composerChromeOpacity.value = withTiming(COMPOSER_CHROME_IMMERSIVE_OPACITY, {
-      duration: COMPOSER_CHROME_IMMERSIVE_MS,
-    });
-  }, [clearComposerSettleTimer]);
-
-  const scheduleComposerChromeRest = useCallback(() => {
-    clearComposerSettleTimer();
-    composerSettleTimerRef.current = setTimeout(() => {
-      composerSettleTimerRef.current = null;
-      if (!listDragRef.current && !listMomentumRef.current) {
-        composerChromeOpacity.value = withTiming(COMPOSER_CHROME_REST_OPACITY, {
-          duration: COMPOSER_CHROME_REST_MS,
-        });
-      }
-    }, COMPOSER_CHROME_SETTLE_MS);
-  }, [clearComposerSettleTimer]);
-
-  useEffect(() => () => clearComposerSettleTimer(), [clearComposerSettleTimer]);
-
-  const composerChromeAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: composerChromeOpacity.value,
-  }));
 
   // ── Auth + navigation store ──
   const communityId = useNavigationStore((state) => state.currentServerId) ?? null;
@@ -343,14 +267,6 @@ export function CommunityScreen() {
     [banTarget, communityId],
   );
 
-  // ── renderScrollComponent ──
-  const renderScrollComponent = useCallback(
-    (props: ScrollViewProps) => (
-      <ChatScrollView {...props} blankSpace={adjustedBlankSpace} />
-    ),
-    [adjustedBlankSpace],
-  );
-
   const renderChatItem = useCallback(({ item }: { item: ChatListItem }) => {
     if (item.kind === "divider") {
       return <MessageDateDivider label={item.label} />;
@@ -407,33 +323,10 @@ return (
       onPressSelectedChannel={() => setIsChannelDropdownOpen(true)}
     />
 
-    <FlatList
-      ref={listRef}
-      className="flex-1"
+    <ChatInterface
       data={chatListItems}
-      inverted
-      keyboardShouldPersistTaps="handled"
-      scrollEventThrottle={16}
-      onScrollBeginDrag={() => {
-        listDragRef.current = true;
-        goComposerChromeImmersive();
-      }}
-      onScrollEndDrag={() => {
-        listDragRef.current = false;
-        scheduleComposerChromeRest();
-      }}
-      onMomentumScrollBegin={() => {
-        listMomentumRef.current = true;
-        goComposerChromeImmersive();
-      }}
-      onMomentumScrollEnd={() => {
-        listMomentumRef.current = false;
-        scheduleComposerChromeRest();
-      }}
-      contentContainerStyle={{ paddingTop: 32 }}
       keyExtractor={(item) => (item.kind === "message" ? item.message.id : item.id)}
       renderItem={renderChatItem}
-      renderScrollComponent={renderScrollComponent}
       onEndReachedThreshold={0.3}
       onEndReached={() => {
         if (messaging.state.hasOlderMessages && !messaging.state.isLoadingOlderMessages) {
@@ -448,112 +341,41 @@ return (
       ListFooterComponent={
         messaging.state.isLoadingOlderMessages ? (
           <View className="py-2.5">
-            <ActivityIndicator color={SPINNER_FG} />
+            <ActivityIndicator color={composerColors.spinner} />
           </View>
         ) : null
       }
+      composer={
+        <ChatComposer
+          inputRef={composerInputRef}
+          colors={composerColors}
+          isSending={isSending}
+          isPickingMedia={isPickingCommunityMedia}
+          canSend={canSendCommunityMessage}
+          onChangeMarkdown={setDraft}
+          onSend={() => void handleSend()}
+          onPickMedia={() => void handlePickCommunityMedia()}
+          strips={
+            <>
+              {pendingReplyToMessageId ? (
+                <ChatReplyStrip
+                  label={`Replying to ${pendingReplyTargetLabel ?? "a message"}`}
+                  onCancel={() => setPendingReplyToMessageId(null)}
+                />
+              ) : null}
+              {pendingCommunityMedia ? (
+                <ChatMediaAttachmentStrip
+                  fileName={pendingCommunityMedia.fileName}
+                  iconColor={composerColors.iconMuted}
+                  disabled={isSending}
+                  onRemove={() => setPendingCommunityMedia(null)}
+                />
+              ) : null}
+            </>
+          }
+        />
+      }
     />
-
-    <KeyboardStickyView
-      offset={{ opened: bottom - MARGIN }}
-      onLayout={(e) => {
-        composerHeight.value = e.nativeEvent.layout.height;
-      }}
-      style={{
-        position: 'absolute',
-        width: '100%',
-        bottom: bottom - MARGIN,
-      }}
-    >
-      {pendingReplyToMessageId ? (
-        <View className="flex-row items-center justify-between bg-surface-modal px-3 py-2 border-t border-white/8">
-          <Text className="text-foreground/80 text-xs shrink mr-2.5">
-            Replying to {pendingReplyTargetLabel ?? "a message"}
-          </Text>
-          <Pressable hitSlop={8} onPress={() => setPendingReplyToMessageId(null)}>
-            <Text className="text-primary text-xs font-semibold">Cancel</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {pendingCommunityMedia ? (
-        <View className="flex-row items-center gap-2 border-t border-white/8 bg-surface-modal/90 px-3 py-2">
-          <Ionicons name="attach" size={16} color={ICON_MUTED} />
-          <Text className="min-w-0 flex-1 text-xs text-foreground/90" numberOfLines={1}>
-            {pendingCommunityMedia.fileName}
-          </Text>
-          <Pressable
-            hitSlop={8}
-            disabled={isSending}
-            onPress={() => setPendingCommunityMedia(null)}
-            className="shrink-0"
-          >
-            <Text className="text-xs font-semibold text-primary">Remove</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <View className="flex-row items-end bg-transparent px-3 pt-2.5 pb-3 gap-2">
-        <Animated.View style={composerChromeAnimatedStyle}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Add media"
-            disabled={isSending || isPickingCommunityMedia}
-            onPress={() => void handlePickCommunityMedia()}
-            className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5 disabled:opacity-50"
-          >
-            <Ionicons name="add" size={20} color={ICON_ON_PRIMARY} />
-          </Pressable>
-        </Animated.View>
-
-        <Animated.View
-          style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
-        >
-          <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/8 pr-1">
-            <EnrichedMarkdownTextInput
-              ref={composerInputRef}
-              multiline
-              editable={!isSending}
-              scrollEnabled
-              defaultValue=""
-              onChangeMarkdown={setDraft}
-              placeholder="Type a message..."
-              placeholderTextColor={COMPOSER_PLACEHOLDER}
-              cursorColor={COMPOSER_CURSOR}
-              selectionColor={COMPOSER_SELECTION}
-              markdownStyle={{
-                strong: { color: COMPOSER_TEXT },
-                em: { color: COMPOSER_TEXT },
-                link: { color: COMPOSER_LINK, underline: true },
-                spoiler: { color: COMPOSER_SPOILER_FG, backgroundColor: "rgba(0,0,0,0.2)" },
-              }}
-              style={{
-                flex: 1,
-                minHeight: 36,
-                maxHeight: 120,
-                color: COMPOSER_TEXT,
-                paddingHorizontal: 14,
-                paddingTop: 8,
-                paddingBottom: 8,
-                fontSize: 16,
-                backgroundColor: "transparent",
-              }}
-            />
-            <Pressable
-              onPress={() => void handleSend()}
-              disabled={isSending || !canSendCommunityMessage}
-              style={{
-                opacity: canSendCommunityMessage ? (isSending ? 0.55 : 1) : 0,
-                pointerEvents: canSendCommunityMessage ? "auto" : "none",
-              }}
-              className="w-7 h-7 shrink-0 rounded-full bg-primary items-center justify-center"
-            >
-              <Ionicons name="arrow-up" size={18} color={ICON_ON_PRIMARY} />
-            </Pressable>
-          </View>
-        </Animated.View>
-      </View>
-    </KeyboardStickyView>
 
     <ChannelSwitcherModal
       visible={isChannelDropdownOpen}
