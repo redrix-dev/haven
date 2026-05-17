@@ -14,30 +14,18 @@ set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 
 create temp table tmp_mention_message on commit drop as
-with inserted as (
-  insert into public.messages (
-    community_id,
-    channel_id,
-    author_type,
-    author_user_id,
-    content
+select test_support.insert_fixture_message(
+  test_support.fixture_community_id(),
+  test_support.fixture_channel_id('general'),
+  test_support.fixture_user_id('member_a'),
+  format(
+    '@%s hello @%s (dup) @%s self @%s nonmember',
+    test_support.fixture_username('member_b'),
+    test_support.fixture_username('member_b'),
+    test_support.fixture_username('member_a'),
+    test_support.fixture_username('non_member')
   )
-  values (
-    test_support.fixture_community_id(),
-    test_support.fixture_channel_id('general'),
-    'user',
-    test_support.fixture_user_id('member_a'),
-    format(
-      '@%s hello @%s (dup) @%s self @%s nonmember',
-      test_support.fixture_username('member_b'),
-      test_support.fixture_username('member_b'),
-      test_support.fixture_username('member_a'),
-      test_support.fixture_username('non_member')
-    )
-  )
-  returning id
-)
-select id from inserted;
+) as id;
 
 insert into mention_ids (key, id)
 select 'message_1', id from tmp_mention_message
@@ -104,24 +92,12 @@ set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('server_mod'));
 
 create temp table tmp_mention_message_hidden_channel on commit drop as
-with inserted as (
-  insert into public.messages (
-    community_id,
-    channel_id,
-    author_type,
-    author_user_id,
-    content
-  )
-  values (
-    test_support.fixture_community_id(),
-    test_support.fixture_channel_id('mods-only'),
-    'user',
-    test_support.fixture_user_id('server_mod'),
-    format('@%s hidden channel mention should not leak', test_support.fixture_username('member_a'))
-  )
-  returning id
-)
-select id from inserted;
+select test_support.insert_fixture_message(
+  test_support.fixture_community_id(),
+  test_support.fixture_channel_id('mods-only'),
+  test_support.fixture_user_id('server_mod'),
+  format('@%s hidden channel mention should not leak', test_support.fixture_username('member_a'))
+) as id;
 
 insert into mention_ids (key, id)
 select 'message_hidden_channel', id from tmp_mention_message_hidden_channel
@@ -156,24 +132,12 @@ set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 
 create temp table tmp_mention_message_2 on commit drop as
-with inserted as (
-  insert into public.messages (
-    community_id,
-    channel_id,
-    author_type,
-    author_user_id,
-    content
-  )
-  values (
-    test_support.fixture_community_id(),
-    test_support.fixture_channel_id('general'),
-    'user',
-    test_support.fixture_user_id('member_a'),
-    format('@%s mention should be suppressed by prefs', test_support.fixture_username('member_b'))
-  )
-  returning id
-)
-select id from inserted;
+select test_support.insert_fixture_message(
+  test_support.fixture_community_id(),
+  test_support.fixture_channel_id('general'),
+  test_support.fixture_user_id('member_a'),
+  format('@%s mention should be suppressed by prefs', test_support.fixture_username('member_b'))
+) as id;
 
 insert into mention_ids (key, id)
 select 'message_2', id from tmp_mention_message_2
@@ -208,24 +172,12 @@ set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 
 create temp table tmp_mention_message_push_only on commit drop as
-with inserted as (
-  insert into public.messages (
-    community_id,
-    channel_id,
-    author_type,
-    author_user_id,
-    content
-  )
-  values (
-    test_support.fixture_community_id(),
-    test_support.fixture_channel_id('general'),
-    'user',
-    test_support.fixture_user_id('member_a'),
-    format('@%s push-only mention should still create recipient row', test_support.fixture_username('member_b'))
-  )
-  returning id
-)
-select id from inserted;
+select test_support.insert_fixture_message(
+  test_support.fixture_community_id(),
+  test_support.fixture_channel_id('general'),
+  test_support.fixture_user_id('member_a'),
+  format('@%s push-only mention should still create recipient row', test_support.fixture_username('member_b'))
+) as id;
 
 insert into mention_ids (key, id)
 select 'message_push_only', id from tmp_mention_message_push_only
@@ -247,22 +199,24 @@ select test_support.assert_eq_int(
   'push-only mention prefs should create a recipient row with in-app/sound flags false'
 );
 
--- Trigger should ignore non-user author types.
+-- Trigger should ignore rows without author_user_id (system-style messages).
+set local role service_role;
+
 create temp table tmp_non_user_author_message on commit drop as
 with inserted as (
   insert into public.messages (
     community_id,
     channel_id,
-    author_type,
     author_user_id,
+    display_name,
     content
   )
   values (
     test_support.fixture_community_id(),
     test_support.fixture_channel_id('general'),
-    'haven_dev',
     null,
-    format('@%s should not trigger mention from haven_dev', test_support.fixture_username('member_b'))
+    'Haven',
+    format('@%s should not trigger mention without author_user_id', test_support.fixture_username('member_b'))
   )
   returning id
 )
@@ -279,7 +233,7 @@ select test_support.assert_eq_int(
       and ne.source_id = (select id from mention_ids where key = 'message_non_user')
   ),
   0,
-  'non-user author_type should not produce mention notifications'
+  'messages without author_user_id should not produce mention notifications'
 );
 
 rollback;

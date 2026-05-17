@@ -18,6 +18,48 @@ as $$
   where test_support.fixture_user_id(key) is not null;
 $$;
 
+create or replace function test_support.insert_fixture_message(
+  p_community_id uuid,
+  p_channel_id uuid,
+  p_author_user_id uuid,
+  p_content text,
+  p_display_name text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+  v_display_name text;
+begin
+  v_display_name := coalesce(
+    nullif(trim(p_display_name), ''),
+    (select p.username from public.profiles p where p.id = p_author_user_id limit 1),
+    'Test User'
+  );
+
+  insert into public.messages (
+    community_id,
+    channel_id,
+    author_user_id,
+    display_name,
+    content
+  )
+  values (
+    p_community_id,
+    p_channel_id,
+    p_author_user_id,
+    v_display_name,
+    p_content
+  )
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
 create or replace function test_support.cleanup_fixture_domain_state()
 returns void
 language plpgsql
