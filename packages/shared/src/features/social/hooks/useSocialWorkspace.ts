@@ -137,7 +137,6 @@ export function useSocialWorkspace({ socialBackend, userId, enabled }: UseSocial
       console.error('Failed to refresh social counts after realtime update:', error);
     });
     // Intentionally only `socialRefreshTrigger`: `lastSocialPayload` is read when the counter changes, not when the payload reference updates alone.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socialRefreshTrigger]);
 
   return {
