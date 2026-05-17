@@ -52,4 +52,10 @@ export const defaultTokens: HavenThemeTokens = {
   'accent-amber': '#d6a24a',
   'accent-slider': '#4f8df5',
   'accent-success': '#2f9f73',
+  radius: '0.625rem',
+  'chart-1': '#3f79d8',
+  'chart-2': '#4f92e2',
+  'chart-3': '#5aaad8',
+  'chart-4': '#c1964a',
+  'chart-5': '#6bb48b',
 };
