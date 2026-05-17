@@ -49,16 +49,12 @@ select test_support.assert_query_count(
 );
 
 create temp table tmp_member_a_message_for_mod_delete on commit drop as
-with inserted as (
-  select test_support.insert_fixture_message(
-    test_support.fixture_community_id(),
-    test_support.fixture_channel_id('general'),
-    test_support.fixture_user_id('member_a'),
-    'member_a message for moderator delete'
-  )
-  returning id
-)
-select id from inserted;
+select test_support.insert_fixture_message(
+  test_support.fixture_community_id(),
+  test_support.fixture_channel_id('general'),
+  test_support.fixture_user_id('member_a'),
+  'member_a message for moderator delete'
+) as id;
 
 insert into test_ids (key, id)
 select 'mod_delete_target', id from tmp_member_a_message_for_mod_delete
@@ -101,16 +97,12 @@ select test_support.assert_false(
 );
 
 create temp table tmp_member_a_self_delete on commit drop as
-with inserted as (
-  select test_support.insert_fixture_message(
-    test_support.fixture_community_id(),
-    test_support.fixture_channel_id('general'),
-    test_support.fixture_user_id('member_a'),
-    'member_a self-delete message'
-  )
-  returning id
-)
-select id from inserted;
+select test_support.insert_fixture_message(
+  test_support.fixture_community_id(),
+  test_support.fixture_channel_id('general'),
+  test_support.fixture_user_id('member_a'),
+  'member_a self-delete message'
+) as id;
 
 insert into test_ids (key, id)
 select 'self_delete_target', id from tmp_member_a_self_delete
