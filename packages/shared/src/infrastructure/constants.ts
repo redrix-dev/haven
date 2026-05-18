@@ -2,7 +2,7 @@ import type {
   NotificationCounts,
   SocialCounts,
 } from '@shared/lib/backend/types';
-import type { AppSettings, NotificationAudioSettings, VoiceSettings } from '@shared/app/types/settings';
+import type { AppSettings, NotificationAudioSettings, VoiceSettings } from '@shared/types/settings';
 
 export const ENABLE_CHANNEL_RELOAD_DIAGNOSTICS =
   typeof process !== 'undefined' && process.env.HAVEN_DEBUG_CHANNEL_RELOADS === '1';

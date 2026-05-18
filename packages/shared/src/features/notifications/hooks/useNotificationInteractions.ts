@@ -3,7 +3,7 @@ import type { NotificationBackend } from '@shared/lib/backend/notificationBacken
 import type { SocialBackend } from '@shared/lib/backend/socialBackend';
 import type { NotificationItem } from '@shared/lib/backend/types';
 import { getErrorMessage } from '@platform/lib/errors';
-import { getNotificationPayloadString } from '@shared/app/utils';
+import { getNotificationPayloadString } from '@shared/infrastructure/utils/appUtils';
 
 type UseNotificationInteractionsInput = {
   notificationBackend: Pick<NotificationBackend, 'markNotificationsRead' | 'dismissNotifications'>;

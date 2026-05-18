@@ -2,8 +2,8 @@ import React, { useRef } from "react";
 import { dataCacheDebug } from "@shared/debug";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
-import { CHANNEL_BUNDLE_STALE_MS, MESSAGE_PAGE_SIZE } from "@shared/app/constants";
-import type { ChannelMessageBundleSyncMetadata } from "@shared/app/types/types";
+import { CHANNEL_BUNDLE_STALE_MS, MESSAGE_PAGE_SIZE } from "@shared/infrastructure/constants";
+import type { ChannelMessageBundleSyncMetadata } from "@shared/types/types";
 import {
   applyChannelAccessVisibilityToMessageBundle,
   filterBlockedUserContent,
@@ -26,7 +26,7 @@ import type {
 import { asRecord } from "@platform/lib/records";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { getAppHost } from "@shared/platform/appHost";
+import { getAppHost } from "@shared/infrastructure/platform/appHost";
 
 const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000;
 

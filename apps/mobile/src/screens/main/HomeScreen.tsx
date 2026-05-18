@@ -10,10 +10,10 @@ import {
   Pressable,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { normalizeInviteCode } from "@shared/app/chat-app/inviteCode";
+import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { getControlPlaneBackend } from "@shared/lib/backend";
-import { getPlatformInviteInputPlaceholder } from "@shared/platform/urls";
+import { getPlatformInviteInputPlaceholder } from "@shared/infrastructure/platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
 import { applyCommunityNavigationTarget } from "@shared/features/community/communityNavigation";
 import { useMobileMainSession } from "@/contexts/MobileMainSessionContext";

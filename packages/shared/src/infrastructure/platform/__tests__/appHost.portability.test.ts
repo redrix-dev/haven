@@ -3,7 +3,7 @@ import {
   resetAppHostToWebDefaults,
   setAppHost,
   type AppHost,
-} from "@shared/platform/appHost";
+} from "@shared/infrastructure/platform/appHost";
 
 describe("appHost portability runtime", () => {
   afterEach(() => {

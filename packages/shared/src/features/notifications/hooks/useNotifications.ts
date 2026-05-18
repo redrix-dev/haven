@@ -1,17 +1,17 @@
 import React from 'react';
 import { useNotificationsStore } from '@shared/stores/notificationsStore';
-import { playNotificationSound } from '@shared/lib/notifications/sound';
+import { playNotificationSound } from '@shared/features/notifications/utils/sound';
 import type { NotificationBackend } from '@shared/lib/backend/notificationBackend';
-import { recordLocalNotificationDeliveryTrace } from '@shared/lib/notifications/devTrace';
+import { recordLocalNotificationDeliveryTrace } from '@shared/features/notifications/utils/devTrace';
 import type {
   NotificationCounts,
   NotificationItem,
   NotificationPreferenceUpdate,
   NotificationPreferences,
 } from '@shared/lib/backend/types';
-import type { NotificationAudioSettings } from '@shared/app/types/settings';
+import type { NotificationAudioSettings } from '@shared/types/settings';
 import { getErrorMessage } from '@platform/lib/errors';
-import { DEFAULT_NOTIFICATION_COUNTS } from '@shared/app/constants';
+import { DEFAULT_NOTIFICATION_COUNTS } from '@shared/infrastructure/constants';
 
 type UseNotificationsInput = {
   notificationBackend: Pick<

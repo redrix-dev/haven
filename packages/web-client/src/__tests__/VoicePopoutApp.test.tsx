@@ -3,9 +3,9 @@ import React from 'react';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { VoicePopoutApp } from '@shared/app/VoicePopoutApp';
-import type { VoicePopoutControlAction, VoicePopoutState } from '@shared/platform/desktop/types';
-import type { AppHost } from '@shared/platform/appHost';
+import { VoicePopoutApp } from '@web-client/VoicePopoutApp';
+import type { VoicePopoutControlAction, VoicePopoutState } from '@shared/infrastructure/platform/desktop/types';
+import type { AppHost } from '@shared/infrastructure/platform/appHost';
 
 const { popoutMocks, makeTestAppHost } = vi.hoisted(() => {
   const listeners: Array<(state: VoicePopoutState) => void> = [];
@@ -51,11 +51,11 @@ const { popoutMocks, makeTestAppHost } = vi.hoisted(() => {
   return { popoutMocks, makeTestAppHost };
 });
 
-vi.mock('@shared/platform/appHost', () => ({
+vi.mock('@shared/infrastructure/platform/appHost', () => ({
   getAppHost: vi.fn(() => makeTestAppHost()),
 }));
 
-import { getAppHost } from '@shared/platform/appHost';
+import { getAppHost } from '@shared/infrastructure/platform/appHost';
 
 describe('VoicePopoutApp', () => {
   beforeEach(() => {

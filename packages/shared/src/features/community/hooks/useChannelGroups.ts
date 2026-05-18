@@ -1,8 +1,8 @@
 import React from 'react';
 import { getCommunityDataBackend } from '@shared/lib/backend';
-import { requireHavenDataRuntime } from '@shared/runtime/havenRuntimeRegistry';
+import { requireHavenDataRuntime } from '@shared/infrastructure/runtime/havenRuntimeRegistry';
 import type { Channel, ChannelGroupState } from '@shared/lib/backend/types';
-import { stableOnActiveChannelAccessLost } from '@shared/app/chat-app/realtime/communityAccessBroadcastBridge';
+import { stableOnActiveChannelAccessLost } from '@shared/infrastructure/realtime/communityAccessBroadcastBridge';
 
 type UseChannelGroupsInput = {
   currentServerId: string | null;

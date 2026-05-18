@@ -1,22 +1,22 @@
 import React from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
+import { requireHavenDataRuntime } from "@shared/infrastructure/runtime/havenRuntimeRegistry";
 
 const voiceRt = () => requireHavenDataRuntime().client;
-import { fetchIceConfig } from "@shared/lib/voice/ice";
-import { matchesVoicePushToTalkBinding } from "@shared/lib/voice/pushToTalk";
+import { fetchIceConfig } from "@shared/features/voice/utils/ice";
+import { matchesVoicePushToTalkBinding } from "@shared/features/voice/utils/pushToTalk";
 import { useVoiceMemberVolumes } from "@shared/features/voice/hooks/useVoiceMemberVolumes";
-import { isEditableKeyboardTarget } from "@shared/app/utils";
-import { playVoicePresenceSound } from "@shared/lib/notifications/sound";
+import { isEditableKeyboardTarget } from "@shared/infrastructure/utils/appUtils";
+import { playVoicePresenceSound } from "@shared/features/notifications/utils/sound";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useVoiceStore } from "@shared/stores/voiceStore";
-import { createPortableUuid } from "@shared/lib/runtime/uuid";
+import { createPortableUuid } from "@shared/infrastructure/uuid";
 import { useSocialStore } from "@shared/stores/socialStore";
-import { getAppHost } from "@shared/platform/appHost";
+import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import type {
   NotificationAudioSettings,
   VoiceSettings,
-} from "@shared/app/types/settings";
+} from "@shared/types/settings";
 import type {
   VoiceControllerChannel,
   VoiceParticipant,

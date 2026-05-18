@@ -9,7 +9,7 @@ import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import type {
   NotificationItem,
 } from "@shared/lib/backend/types";
-import type { NotificationAudioSettings } from "@shared/app/types/settings";
+import type { NotificationAudioSettings } from "@shared/types/settings";
 
 const nowIso = new Date().toISOString();
 

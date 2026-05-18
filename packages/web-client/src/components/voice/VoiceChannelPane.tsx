@@ -1,5 +1,5 @@
 import React from "react";
-import type { VoiceSettings } from "@shared/app/types/settings";
+import type { VoiceSettings } from "@shared/types/settings";
 import type {
   VoiceParticipant,
   VoicePeerDiagnostics,

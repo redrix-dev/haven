@@ -11,7 +11,7 @@ import {
 } from "@shared/app/ui/dialog";
 import type { VoiceSessionControllerActions } from "@shared/features/voice/types";
 import type { VoiceSessionControllerState } from "@shared/features/voice/types";
-import type { VoiceSettings } from "@shared/app/types/settings";
+import type { VoiceSettings } from "@shared/types/settings";
 
 type VoiceSettingsModalProps = {
   open: boolean;

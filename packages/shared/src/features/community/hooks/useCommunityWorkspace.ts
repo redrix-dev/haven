@@ -16,7 +16,7 @@ import { useUiStore } from "@shared/stores";
 import {
   stableOnMemberBanned,
   stableOnMemberChannelAccessRevoked,
-} from "@shared/app/chat-app/realtime/communityAccessBroadcastBridge";
+} from "@shared/infrastructure/realtime/communityAccessBroadcastBridge";
 
 /**
  * Cross-hook channel list cache (e.g. mobile shell + chat must share one list).

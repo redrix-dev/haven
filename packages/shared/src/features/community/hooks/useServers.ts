@@ -5,7 +5,7 @@ import { useAuthStore } from "@shared/stores/authStore";
 import { useServersStore } from "@shared/stores/serversStore";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { useNavigationStore } from "@shared/stores/navigationStore";
-import { stableOnActiveServerAccessLost } from "@shared/app/chat-app/realtime/communityAccessBroadcastBridge";
+import { stableOnActiveServerAccessLost } from "@shared/infrastructure/realtime/communityAccessBroadcastBridge";
 
 type ServersStatus = "idle" | "loading" | "success" | "error";
 

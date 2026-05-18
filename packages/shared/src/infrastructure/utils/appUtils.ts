@@ -1,5 +1,5 @@
 import type { NotificationItem } from '@shared/lib/backend/types';
-import type { VoiceSidebarParticipant } from '@shared/app/types/types';
+import type { VoiceSidebarParticipant } from '@shared/types/types';
 
 export const areVoiceParticipantListsEqual = (
   left: VoiceSidebarParticipant[],

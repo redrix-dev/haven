@@ -1,19 +1,19 @@
 import React from "react";
-import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
+import { requireHavenDataRuntime } from "@shared/infrastructure/runtime/havenRuntimeRegistry";
 
 const voiceRt = () => requireHavenDataRuntime().client;
 import type { Channel } from "@shared/lib/backend/types";
 import type {
   VoicePresenceStateRow,
   VoiceSidebarParticipant,
-} from "@shared/app/types/types";
+} from "@shared/types/types";
 import {
   areVoiceParticipantListsEqual,
   isEditableKeyboardTarget,
-} from "@shared/app/utils";
+} from "@shared/infrastructure/utils/appUtils";
 import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
 import { useVoiceStore } from "@shared/stores/voiceStore";
-import { getAppHost } from "@shared/platform/appHost";
+import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import {
   createInitialVoiceSessionStoreState,
   reduceVoiceSessionStoreState,

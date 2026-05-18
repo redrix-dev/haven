@@ -1,7 +1,7 @@
 import React from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@platform/lib/errors";
-import { VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL } from "@shared/app/constants";
+import { VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL } from "@shared/infrastructure/constants";
 import { VoiceHardwareDebugPanel } from "@web-client/components/voice/VoiceHardwareDebugPanel";
 import { VoiceSettingsModal } from "@web-client/components/voice/VoiceSettingsModal";
 import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CHANNEL_BUNDLE_STALE_MS } from '@shared/app/constants';
+import { CHANNEL_BUNDLE_STALE_MS } from '@shared/infrastructure/constants';
 import type { DirectMessageBackend } from '@shared/lib/backend/directMessageBackend';
 import { useDmStore } from '@shared/stores/dmStore';
 import type {

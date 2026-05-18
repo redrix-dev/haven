@@ -31,7 +31,7 @@ import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
 } from "@shared/infrastructure/liveProfiles";
-import type { NotificationAudioSettings } from "@shared/app/types/settings";
+import type { NotificationAudioSettings } from "@shared/types/settings";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { Bell, BellDot, RefreshCcw } from "lucide-react";
 

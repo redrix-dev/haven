@@ -3,7 +3,7 @@ import React from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_NOTIFICATION_AUDIO_SETTINGS, DEFAULT_VOICE_SETTINGS } from "@shared/app/constants";
+import { DEFAULT_NOTIFICATION_AUDIO_SETTINGS, DEFAULT_VOICE_SETTINGS } from "@shared/infrastructure/constants";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";
 import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
 import { VoiceDrawer } from "@web-client/components/voice/VoiceDrawer";

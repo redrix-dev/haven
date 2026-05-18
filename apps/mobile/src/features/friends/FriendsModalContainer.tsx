@@ -11,14 +11,14 @@ import {
   View,
   type ListRenderItem,
 } from "react-native";
-import type { FriendsPanelTab } from "@shared/app/types/types";
+import type { FriendsPanelTab } from "@shared/types/types";
 import type {
   BlockedUserSummary,
   FriendRequestSummary,
   FriendSearchResult,
   FriendSummary,
 } from "@shared/lib/backend/types";
-import { resolveLiveUsername } from "@shared/lib/liveProfiles";
+import { resolveLiveUsername } from "@shared/infrastructure/liveProfiles";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useFriendsModalData } from "@/features/friends/useFriendsModalData";
 import { useMobileSocialWorkspace } from "@/contexts/MobileSocialWorkspaceContext";
