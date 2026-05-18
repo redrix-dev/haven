@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import { dataCacheDebug } from "@shared/debug";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import { CHANNEL_BUNDLE_STALE_MS, MESSAGE_PAGE_SIZE } from "@shared/app/constants";
@@ -49,6 +50,7 @@ const crossSessionLoadedRevokedUserIdsByChannel: Record<string, boolean> =
 
 /** Clears cross-session caches; call on sign-out or account switch. */
 export function clearCrossSessionMessagingCaches(): void {
+  dataCacheDebug.cacheWrite("useMessages", "clearCrossSessionMessagingCaches");
   for (const key of Object.keys(crossSessionMessageBundleByChannel)) {
     delete crossSessionMessageBundleByChannel[key];
   }
@@ -57,6 +59,120 @@ export function clearCrossSessionMessagingCaches(): void {
   }
   for (const key of Object.keys(crossSessionLoadedRevokedUserIdsByChannel)) {
     delete crossSessionLoadedRevokedUserIdsByChannel[key];
+  }
+}
+
+function getChannelBundleCacheKey(communityId: string, channelId: string): string {
+  return `${communityId}:${channelId}`;
+}
+
+export function getCachedMessageBundlesForChannel(
+  communityId: string,
+  channelId: string,
+): CachedChannelBundles | null {
+  const cacheKey = getChannelBundleCacheKey(communityId, channelId);
+  const hit = crossSessionMessageBundleByChannel[cacheKey] ?? null;
+  dataCacheDebug.cacheRead("useMessages", hit ? "message bundle hit" : "message bundle miss", {
+    cacheKey,
+    bundleCount: hit?.bundles.length ?? 0,
+  });
+  return hit;
+}
+
+export type PrefetchCommunityChannelMessagesInput = {
+  serverId: string;
+  channelId: string;
+  currentUserId: string | null;
+};
+
+/** Warms the cross-session message cache (mobile home grid prefetch, etc.). */
+export async function prefetchCommunityChannelMessages({
+  serverId,
+  channelId,
+  currentUserId,
+}: PrefetchCommunityChannelMessagesInput): Promise<void> {
+  const cacheKey = getChannelBundleCacheKey(serverId, channelId);
+  if (crossSessionMessageBundleByChannel[cacheKey]) {
+    dataCacheDebug.cacheRead("useMessages", "prefetch skip — already cached", { cacheKey });
+    return;
+  }
+
+  dataCacheDebug.fetch("useMessages", "prefetchCommunityChannelMessages start", {
+    serverId,
+    channelId,
+  });
+
+  try {
+    const communityBackend = getCommunityDataBackend(serverId);
+    const result = await communityBackend.listChannelMessages({
+      communityId: serverId,
+      channelId,
+      limit: MESSAGE_PAGE_SIZE,
+      beforeCreatedAt: null,
+      beforeMessageId: null,
+    });
+    const asc = [...result.messages].reverse();
+
+    const revocationKey = getChannelBundleCacheKey(serverId, channelId);
+    let revokedUserIds: string[] = [];
+    if (
+      Object.prototype.hasOwnProperty.call(
+        crossSessionRevokedUserIdsByChannel,
+        revocationKey,
+      ) &&
+      crossSessionLoadedRevokedUserIdsByChannel[revocationKey] === true
+    ) {
+      revokedUserIds = crossSessionRevokedUserIdsByChannel[revocationKey] ?? [];
+    } else {
+      revokedUserIds = await communityBackend.listChannelRevokedUserIds({
+        communityId: serverId,
+        channelId,
+      });
+      crossSessionRevokedUserIdsByChannel[revocationKey] = revokedUserIds;
+      crossSessionLoadedRevokedUserIdsByChannel[revocationKey] = true;
+    }
+
+    const blockedUserIds = useSocialStore.getState().blockedUserIds;
+    const isElevated = currentUserId
+      ? await usePermissionsStore
+          .getState()
+          .ensureElevatedInServer(
+            serverId,
+            currentUserId,
+            getCommunityDataBackend(serverId),
+          )
+      : false;
+
+    const filtered = applyVisibilityToBundles(asc, {
+      communityId: serverId,
+      channelId,
+      revokedUserIds,
+      blockedUserIds,
+      isElevatedInServer: isElevated,
+    });
+
+    if (!crossSessionMessageBundleByChannel[cacheKey]) {
+      crossSessionMessageBundleByChannel[cacheKey] = {
+        bundles: filtered,
+        hasOlderMessages: result.hasMore,
+        syncMetadata: {
+          lastSuccessfulSyncAt: new Date().toISOString(),
+          newestMessageCursor: computeNewestMessageBundleCursor(filtered),
+        },
+      };
+      dataCacheDebug.cacheWrite("useMessages", "prefetchCommunityChannelMessages cached", {
+        cacheKey,
+        bundleCount: filtered.length,
+        hasMore: result.hasMore,
+      });
+    }
+  } catch (error) {
+    dataCacheDebug.fetch(
+      "useMessages",
+      "prefetchCommunityChannelMessages failed",
+      { cacheKey, error: String(error) },
+      "warn",
+    );
   }
 }
 
@@ -458,9 +574,11 @@ export function useMessages({
   const unsubscribeFocusListenerRef = useRef<(() => void) | null>(null);
   const unsubscribeBlurListenerRef = useRef<(() => void) | null>(null);
   const lastFreshMessageLoadAtRef = React.useRef(0);
+  const lastEffectArmKeyRef = React.useRef<string | null>(null);
 
   const hasOlderMessages = useMessagesStore((s) => s.hasMore);
   const isLoadingOlderMessages = useMessagesStore((s) => s.isLoading);
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = React.useState(false);
 
   const setStoredMessages = React.useCallback((bundles: MessageBundle[]) => {
     useMessagesStore.getState().setMessages(bundles);
@@ -764,6 +882,7 @@ export function useMessages({
 
   const resetMessageState = React.useCallback(() => {
     resetStoredMessages();
+    setHasCompletedInitialLoad(false);
     latestLoadIdRef.current = 0;
     olderLoadInFlightRef.current = false;
     currentHasOlderMessagesRef.current = false;
@@ -1064,6 +1183,14 @@ export function useMessages({
     let isMounted = true;
 
     if (!currentUserId || !currentServerId || !currentChannelId) {
+      dataCacheDebug.lifecycle("useMessages", "effect bail — missing ids", {
+        currentUserId: Boolean(currentUserId),
+        currentServerId,
+        currentChannelId,
+      });
+      if (currentServerId && !currentChannelId) {
+        return;
+      }
       resetMessageState();
       return;
     }
@@ -1071,15 +1198,51 @@ export function useMessages({
     const selectedChannel = channels.find(
       (channel) => channel.id === currentChannelId,
     );
-    if (!selectedChannel || selectedChannel.community_id !== currentServerId) {
+    const channelListReady = channels.length > 0;
+
+    if (channelListReady) {
+      if (!selectedChannel || selectedChannel.community_id !== currentServerId) {
+        dataCacheDebug.lifecycle("useMessages", "effect bail — channel mismatch", {
+          currentServerId,
+          currentChannelId,
+          channelListReady,
+          channelsCount: channels.length,
+          selectedChannelCommunityId: selectedChannel?.community_id ?? null,
+        });
+        return;
+      }
+      if (selectedChannel.kind !== "text") {
+        dataCacheDebug.lifecycle("useMessages", "effect bail — non-text channel", {
+          currentChannelId,
+          kind: selectedChannel.kind,
+        });
+        resetMessageState();
+        return;
+      }
+    } else if (!getCachedChannelBundles(currentServerId, currentChannelId)) {
+      dataCacheDebug.lifecycle("useMessages", "effect bail — channels empty, no cache", {
+        currentServerId,
+        currentChannelId,
+      });
       resetMessageState();
       return;
     }
 
-    if (selectedChannel.kind !== "text") {
-      resetMessageState();
+    const effectArmKey = `${currentServerId}:${currentChannelId}`;
+    if (lastEffectArmKeyRef.current === effectArmKey) {
+      dataCacheDebug.lifecycle("useMessages", "effect skip — already armed", {
+        effectArmKey,
+      });
       return;
     }
+    lastEffectArmKeyRef.current = effectArmKey;
+
+    dataCacheDebug.fetch("useMessages", "effect armed", {
+      currentServerId,
+      currentChannelId,
+      channelListReady,
+      channelsCount: channels.length,
+    });
 
     const communityBackend = getCommunityDataBackend(currentServerId);
 
@@ -1124,6 +1287,7 @@ export function useMessages({
       if (isMounted) {
         setStoredMessages(input.bundles);
         markMessagesFresh();
+        setHasCompletedInitialLoad(true);
       }
 
       persistCurrentChannelBundleCache("http_success");
@@ -1145,6 +1309,7 @@ export function useMessages({
 
       if (isMounted) {
         setStoredMessages(cached.bundles);
+        setHasCompletedInitialLoad(true);
       }
 
       return cached;
@@ -1498,6 +1663,13 @@ export function useMessages({
           bundles: loaded.bundles,
           hasOlder: loaded.hasOlder,
         });
+        dataCacheDebug.fetch("useMessages", "load:success", {
+          currentServerId,
+          currentChannelId,
+          messageCount: loaded.bundles.length,
+          hasOlder: loaded.hasOlder,
+          reason: reasonLabel,
+        });
         logReload("load:success", {
           reason: reasonLabel,
           loadId,
@@ -1594,6 +1766,12 @@ export function useMessages({
 
     const hydrated = hydrateFromCache();
     if (hydrated) {
+      dataCacheDebug.hydration("useMessages", "hydrateFromCache", {
+        currentServerId,
+        currentChannelId,
+        messageCount: hydrated.bundles.length,
+        hasOlderMessages: hydrated.hasOlderMessages,
+      });
       logReload("cache:hydrate", {
         messageCount: hydrated.bundles.length,
         hasOlderMessages: hydrated.hasOlderMessages,
@@ -1601,8 +1779,19 @@ export function useMessages({
     }
     messageReloadLifecycle.start();
 
-    if (!hydrated || hydrated.bundles.length === 0) {
+    if (!hydrated) {
+      dataCacheDebug.fetch("useMessages", "schedule initial load", {
+        currentServerId,
+        currentChannelId,
+        hydrated: false,
+      });
       messageReloadScheduler.scheduleMessageReload("initial", 0);
+    } else if (hydrated.bundles.length === 0) {
+      dataCacheDebug.fetch("useMessages", "schedule soft revalidate — empty cache hydrate", {
+        currentServerId,
+        currentChannelId,
+      });
+      messageReloadScheduler.scheduleMessageReload("soft_revalidate", 120);
     } else {
       const meta = hydrated.syncMetadata;
       const lastAt = meta ? Date.parse(meta.lastSuccessfulSyncAt) : NaN;
@@ -1617,7 +1806,7 @@ export function useMessages({
           2500,
         );
       } else {
-        messageReloadScheduler.scheduleMessageReload("soft_revalidate", 0);
+        messageReloadScheduler.scheduleMessageReload("soft_revalidate", 120);
       }
     }
 
@@ -1812,6 +2001,11 @@ export function useMessages({
       markMessagesFresh();
     };
 
+    dataCacheDebug.realtime("useMessages", "subscribe message streams", {
+      currentServerId,
+      currentChannelId,
+    });
+
     const cleanupRealtimeMessageStreams = (() => {
       const messageChannel = communityBackend.subscribeToMessages(
         currentChannelId,
@@ -1841,6 +2035,9 @@ export function useMessages({
 
     return () => {
       isMounted = false;
+      if (lastEffectArmKeyRef.current === effectArmKey) {
+        lastEffectArmKeyRef.current = null;
+      }
       clearRequestOlderMessagesLoader();
       messageReloadScheduler.cleanup();
       cleanupRealtimeMessageStreams();
@@ -1876,6 +2073,7 @@ export function useMessages({
     state: {
       hasOlderMessages,
       isLoadingOlderMessages,
+      hasCompletedInitialLoad,
     },
     derived: {},
     actions: {

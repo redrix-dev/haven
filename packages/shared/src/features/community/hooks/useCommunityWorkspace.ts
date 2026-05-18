@@ -1,4 +1,5 @@
 import React from "react";
+import { dataCacheDebug } from "@shared/debug";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import type {
@@ -16,6 +17,83 @@ import {
   stableOnMemberBanned,
   stableOnMemberChannelAccessRevoked,
 } from "@shared/app/chat-app/realtime/communityAccessBroadcastBridge";
+
+/**
+ * Cross-hook channel list cache (e.g. mobile shell + chat must share one list).
+ * Survives screen unmount; cleared on sign-out / account switch.
+ */
+const crossSessionChannelsByServer: Record<string, Channel[]> =
+  Object.create(null);
+const crossSessionLastChannelIdByServer: Record<string, string | null> =
+  Object.create(null);
+
+export function getCachedChannelsForServer(serverId: string): Channel[] | null {
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      crossSessionChannelsByServer,
+      serverId,
+    )
+  ) {
+    dataCacheDebug.cacheRead("useCommunityWorkspace", "channels miss", { serverId });
+    return null;
+  }
+  const channels = crossSessionChannelsByServer[serverId] ?? [];
+  dataCacheDebug.cacheRead("useCommunityWorkspace", "channels hit", {
+    serverId,
+    count: channels.length,
+  });
+  return channels;
+}
+
+/** Shared channel pick logic for workspace load, warm prefetch, and mobile entry. */
+export function resolvePreferredChannelIdForServer(
+  serverId: string,
+  channelList: Channel[],
+  options?: {
+    lastVisitedChannelId?: string | null;
+    previousChannelId?: string | null;
+  },
+): string | null {
+  if (channelList.length === 0) return null;
+
+  const rememberedId = crossSessionLastChannelIdByServer[serverId] ?? null;
+  const previousId = options?.previousChannelId ?? null;
+  const previousValid =
+    previousId &&
+    channelList.some(
+      (channel) => channel.id === previousId && channel.community_id === serverId,
+    )
+      ? previousId
+      : null;
+
+  const candidates = [
+    options?.lastVisitedChannelId ?? null,
+    rememberedId,
+    previousValid,
+  ];
+
+  for (const candidate of candidates) {
+    if (
+      candidate &&
+      channelList.some((channel) => channel.id === candidate)
+    ) {
+      return candidate;
+    }
+  }
+
+  const firstTextChannel = channelList.find((channel) => channel.kind === "text");
+  return firstTextChannel?.id ?? channelList[0].id;
+}
+
+export function clearCrossSessionCommunityWorkspaceCaches(): void {
+  dataCacheDebug.cacheWrite("useCommunityWorkspace", "clearCrossSessionCommunityWorkspaceCaches");
+  for (const key of Object.keys(crossSessionChannelsByServer)) {
+    delete crossSessionChannelsByServer[key];
+  }
+  for (const key of Object.keys(crossSessionLastChannelIdByServer)) {
+    delete crossSessionLastChannelIdByServer[key];
+  }
+}
 
 type UseCommunityWorkspaceInput = {
   servers: ServerSummary[];
@@ -52,17 +130,52 @@ export function useCommunityWorkspace({
   const setCurrentChannelId = useNavigationStore(
     (state) => state.setCurrentChannelId,
   );
+  const setCommunityNavigation = useNavigationStore(
+    (state) => state.setCommunityNavigation,
+  );
 
-  const [channels, setChannels] = React.useState<Channel[]>([]);
+  const initialChannels = React.useMemo(() => {
+    if (!currentServerId) return [];
+    return getCachedChannelsForServer(currentServerId) ?? [];
+  }, [currentServerId]);
+
+  const [channels, setChannels] = React.useState<Channel[]>(initialChannels);
   const [channelsLoading, setChannelsLoading] = React.useState(false);
   const [channelsError, setChannelsError] = React.useState<string | null>(null);
   const [reportStatusRefreshVersion, setReportStatusRefreshVersion] =
     React.useState(0);
 
-  const channelsByServerCacheRef = React.useRef<Record<string, Channel[]>>({});
-  const lastSelectedChannelIdByServerRef = React.useRef<
-    Record<string, string | null>
-  >({});
+  React.useEffect(() => {
+    if (!currentServerId) {
+      setChannels([]);
+      return;
+    }
+    dataCacheDebug.hydration("useCommunityWorkspace", "server hydrate effect", {
+      currentServerId,
+    });
+    const cached = getCachedChannelsForServer(currentServerId);
+    if (cached) {
+      setChannels(cached);
+      const nav = useNavigationStore.getState();
+      if (nav.currentServerId === currentServerId) {
+        const currentValid =
+          nav.currentChannelId != null &&
+          cached.some((channel) => channel.id === nav.currentChannelId);
+        if (!currentValid) {
+          const preferred = resolvePreferredChannelIdForServer(
+            currentServerId,
+            cached,
+            { previousChannelId: nav.currentChannelId },
+          );
+          setCommunityNavigation(currentServerId, preferred);
+        }
+      }
+      dataCacheDebug.hydration("useCommunityWorkspace", "channels state hydrated", {
+        currentServerId,
+        count: cached.length,
+      });
+    }
+  }, [currentServerId, setCommunityNavigation]);
 
   const resetChannelsWorkspace = React.useCallback(() => {
     setChannels([]);
@@ -78,7 +191,7 @@ export function useCommunityWorkspace({
           .filter(
             (id) =>
               !Object.prototype.hasOwnProperty.call(
-                channelsByServerCacheRef.current,
+                crossSessionChannelsByServer,
                 id,
               ),
           )
@@ -86,9 +199,18 @@ export function useCommunityWorkspace({
             try {
               const communityBackend = getCommunityDataBackend(id);
               const channelList = await communityBackend.listChannels(id);
-              channelsByServerCacheRef.current[id] = channelList;
-            } catch {
-              // silent — prefetch failures are non-fatal
+              crossSessionChannelsByServer[id] = channelList;
+              dataCacheDebug.cacheWrite("useCommunityWorkspace", "prefetchServersChannels", {
+                serverId: id,
+                count: channelList.length,
+              });
+            } catch (error) {
+              dataCacheDebug.fetch(
+                "useCommunityWorkspace",
+                "prefetchServersChannels failed",
+                { serverId: id, error: String(error) },
+                "warn",
+              );
             }
           }),
       );
@@ -108,7 +230,7 @@ export function useCommunityWorkspace({
     ) => {
       await Promise.allSettled(
         serverIds.flatMap((serverId) => {
-          const channelList = channelsByServerCacheRef.current[serverId] ?? [];
+          const channelList = crossSessionChannelsByServer[serverId] ?? [];
           return channelList
             .filter((channel) => channel.kind === "text")
             .slice(0, PREFETCH_TEXT_CHANNELS_PER_SERVER)
@@ -121,16 +243,11 @@ export function useCommunityWorkspace({
 
   const getDefaultChannelIdForServer = React.useCallback(
     (serverId: string, lastVisitedChannelId?: string | null): string | null => {
-      const cached = channelsByServerCacheRef.current[serverId];
+      const cached = crossSessionChannelsByServer[serverId];
       if (!cached || cached.length === 0) return null;
-      const rememberedId =
-        lastSelectedChannelIdByServerRef.current[serverId] ?? null;
-      const candidates = [lastVisitedChannelId ?? null, rememberedId];
-      for (const candidate of candidates) {
-        if (candidate && cached.some((c) => c.id === candidate))
-          return candidate;
-      }
-      return cached.find((c) => c.kind === "text")?.id ?? cached[0]?.id ?? null;
+      return resolvePreferredChannelIdForServer(serverId, cached, {
+        lastVisitedChannelId,
+      });
     },
     [],
   );
@@ -147,8 +264,7 @@ export function useCommunityWorkspace({
   React.useEffect(() => {
     if (!currentServerId) return;
     if (!currentChannelId) return;
-    lastSelectedChannelIdByServerRef.current[currentServerId] =
-      currentChannelId;
+    crossSessionLastChannelIdByServer[currentServerId] = currentChannelId;
   }, [currentServerId, currentChannelId]);
 
   // Load channels when server changes
@@ -156,52 +272,48 @@ export function useCommunityWorkspace({
     let isMounted = true;
 
     if (!currentServerId) {
+      dataCacheDebug.lifecycle("useCommunityWorkspace", "no currentServerId — reset workspace");
       resetChannelsWorkspace();
       return () => {
         isMounted = false;
       };
     }
 
+    dataCacheDebug.fetch("useCommunityWorkspace", "loadChannels effect start", {
+      currentServerId,
+      currentChannelId,
+      hasCachedChannels: Object.prototype.hasOwnProperty.call(
+        crossSessionChannelsByServer,
+        currentServerId,
+      ),
+    });
+
     const communityBackend = getCommunityDataBackend(currentServerId);
     const hasCachedChannels = Object.prototype.hasOwnProperty.call(
-      channelsByServerCacheRef.current,
+      crossSessionChannelsByServer,
       currentServerId,
     );
     const cachedChannels = hasCachedChannels
-      ? (channelsByServerCacheRef.current[currentServerId] ?? [])
+      ? (crossSessionChannelsByServer[currentServerId] ?? [])
       : null;
 
-    const resolvePreferredChannelId = (
-      channelList: Channel[],
-      previousChannelId: string | null,
-    ) => {
-      if (channelList.length === 0) return null;
-
-      const rememberedChannelId =
-        lastSelectedChannelIdByServerRef.current[currentServerId] ?? null;
-      const candidates = [rememberedChannelId, previousChannelId];
-      for (const candidate of candidates) {
-        if (
-          candidate &&
-          channelList.some((channel) => channel.id === candidate)
-        ) {
-          return candidate;
-        }
-      }
-
-      const firstTextChannel = channelList.find(
-        (channel) => channel.kind === "text",
-      );
-      return firstTextChannel?.id ?? channelList[0].id;
-    };
+    const navigationChannelId = useNavigationStore.getState().currentChannelId;
 
     if (cachedChannels) {
+      const preferred = resolvePreferredChannelIdForServer(
+        currentServerId,
+        cachedChannels,
+        { previousChannelId: navigationChannelId },
+      );
       setChannels(cachedChannels);
       setChannelsError(null);
       setChannelsLoading(false);
-      setCurrentChannelId(
-        resolvePreferredChannelId(cachedChannels, currentChannelId),
-      );
+      setCommunityNavigation(currentServerId, preferred);
+      dataCacheDebug.navigation("useCommunityWorkspace", "channel from cache", {
+        currentServerId,
+        preferredChannelId: preferred,
+        channelCount: cachedChannels.length,
+      });
     }
 
     const loadChannels = async (options?: { blocking?: boolean }) => {
@@ -217,19 +329,36 @@ export function useCommunityWorkspace({
 
         if (!isMounted) return;
 
-        channelsByServerCacheRef.current[currentServerId] = channelList;
+        crossSessionChannelsByServer[currentServerId] = channelList;
         setChannels(channelList);
-        const nextChannelId = resolvePreferredChannelId(
+        const nextChannelId = resolvePreferredChannelIdForServer(
+          currentServerId,
           channelList,
-          currentChannelId,
+          { previousChannelId: useNavigationStore.getState().currentChannelId },
         );
-        setCurrentChannelId(nextChannelId);
+        setCommunityNavigation(currentServerId, nextChannelId);
+        dataCacheDebug.fetch("useCommunityWorkspace", "loadChannels success", {
+          currentServerId,
+          channelCount: channelList.length,
+          nextChannelId,
+          blocking: options?.blocking === true,
+        });
+        dataCacheDebug.cacheWrite("useCommunityWorkspace", "channels cached", {
+          currentServerId,
+          channelCount: channelList.length,
+        });
       } catch (error: unknown) {
         if (!isMounted) return;
+        dataCacheDebug.fetch(
+          "useCommunityWorkspace",
+          "loadChannels error",
+          { currentServerId, error: String(error) },
+          "error",
+        );
         console.error("Error loading channels:", error);
         if (!hasCachedChannels) {
           setChannels([]);
-          setCurrentChannelId(null);
+          setCommunityNavigation(currentServerId, null);
         }
         setChannelsError(getErrorMessage(error, "Failed to load channels."));
       }
@@ -242,6 +371,9 @@ export function useCommunityWorkspace({
     const subscription = communityBackend.subscribeToChannels(
       currentServerId,
       () => {
+        dataCacheDebug.realtime("useCommunityWorkspace", "channels subscription event", {
+          currentServerId,
+        });
         void loadChannels({ blocking: false });
       },
       {
@@ -264,6 +396,7 @@ export function useCommunityWorkspace({
     onMemberChannelAccessRevoked,
     onReportStatusUpdated,
     resetChannelsWorkspace,
+    setCommunityNavigation,
   ]);
 
   // Load permissions when server or user changes

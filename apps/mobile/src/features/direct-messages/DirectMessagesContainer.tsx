@@ -20,7 +20,6 @@ import {
   EnrichedMarkdownText,
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatInterface } from "@/components/chat/ChatInterface";
@@ -368,11 +367,7 @@ export function DirectMessagesContainer() {
   const canSendDmMessage = draft.trim().length > 0 || pendingDmMedia != null;
 
   return (
-    <SafeAreaView
-      edges={["bottom"]}
-      className="min-h-0 flex-1 bg-card"
-      style={{ flex: 1, minHeight: 0 }}
-    >
+    <View className="min-h-0 flex-1 bg-card" style={{ flex: 1, minHeight: 0 }}>
       <View className="mb-2 flex-row items-center justify-between gap-2">
         <Pressable
           accessibilityRole="button"
@@ -482,7 +477,7 @@ export function DirectMessagesContainer() {
           });
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

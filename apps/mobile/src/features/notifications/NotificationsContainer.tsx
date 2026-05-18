@@ -45,8 +45,6 @@ export default function NotificationsContainer({
   const liveProfiles = useLiveProfilesStore((s) => s.profiles);
   const servers = useServersStore((s) => s.servers);
   const permissionsByServerId = usePermissionsStore((s) => s.permissionsByServerId);
-  const setCurrentServerId = useNavigationStore((s) => s.setCurrentServerId);
-  const setCurrentChannelId = useNavigationStore((s) => s.setCurrentChannelId);
   const setWorkspaceMode = useNavigationStore((s) => s.setWorkspaceMode);
 
   const modmailCommunityIds = useMemo(
@@ -108,10 +106,15 @@ export default function NotificationsContainer({
     },
     onOpenChannelMention: ({ communityId, channelId }) => {
       setWorkspaceMode("community");
-      setCurrentServerId(communityId);
-      setCurrentChannelId(channelId);
+      useNavigationStore.getState().setCommunityNavigation(communityId, channelId);
       navigation.dispatch(
-        CommonActions.navigate({ name: "Main", params: { screen: "Community" } }),
+        CommonActions.navigate({
+          name: "Main",
+          params: {
+            screen: "Community",
+            params: { serverId: communityId, openDrawer: false },
+          },
+        }),
       );
     },
   });

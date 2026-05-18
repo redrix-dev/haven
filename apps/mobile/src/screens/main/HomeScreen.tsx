@@ -15,11 +15,12 @@ import type { ServerSummary } from "@shared/lib/backend/types";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getPlatformInviteInputPlaceholder } from "@shared/platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
-import { useServers } from "@shared/features/community/hooks/useServers";
-import { useNavigationStore } from "@shared/stores/navigationStore";
+import { applyCommunityNavigationTarget } from "@shared/features/community/communityNavigation";
+import { useMobileMainSession } from "@/contexts/MobileMainSessionContext";
+import { getLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
 import { useMemo, useState, useCallback } from "react";
 import { HavenFormSheet } from "@/components/HavenFormSheet";
-import type { RootStackParamList } from "@/navigation/types";
+import type { MainStackParamList } from "@/navigation/types";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 
@@ -42,8 +43,15 @@ function buildGridItems(servers: ServerSummary[]): GridItem[] {
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { servers, status, error: loadError, refreshServers, createServer } = useServers();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const {
+    servers,
+    serversStatus: status,
+    serversError: loadError,
+    refreshServers,
+    createServer,
+    warmCommunityForEntry,
+  } = useMobileMainSession();
   const controlPlaneBackend = useMemo(() => getControlPlaneBackend(), []);
   const themeTokens = useMobileThemeTokens();
   const { placeholderMuted, spinnerFg } = useMemo(
@@ -69,11 +77,25 @@ export function HomeScreen() {
   const items = buildGridItems(servers);
 
   const openCommunityForServer = useCallback(
-    (serverId: string) => {
-      useNavigationStore.getState().setCurrentServerId(serverId);
-      navigation.navigate("Main", { screen: "Community" });
+    async (serverId: string) => {
+      await Promise.race([
+        warmCommunityForEntry(serverId),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, 350);
+        }),
+      ]);
+      const lastVisited = await getLastTextChannelIdForCommunity(serverId);
+      applyCommunityNavigationTarget(serverId, { lastVisitedChannelId: lastVisited });
+      navigation.navigate("Community", { serverId, openDrawer: true });
     },
-    [navigation],
+    [navigation, warmCommunityForEntry],
+  );
+
+  const primeCommunityForServer = useCallback(
+    (serverId: string) => {
+      void warmCommunityForEntry(serverId);
+    },
+    [warmCommunityForEntry],
   );
 
   const handleCreateCommunity = useCallback(async () => {
@@ -85,14 +107,15 @@ export function HomeScreen() {
       const { id } = await createServer(name);
       setCreateModalOpen(false);
       setCreateName("");
-      useNavigationStore.getState().setCurrentServerId(id);
-      navigation.navigate("Main", { screen: "Community" });
+      await warmCommunityForEntry(id);
+      applyCommunityNavigationTarget(id);
+      navigation.navigate("Community", { serverId: id, openDrawer: true });
     } catch (err) {
       setCreateError(getErrorMessage(err, "Could not create community."));
     } finally {
       setCreateLoading(false);
     }
-  }, [createName, createServer, navigation]);
+  }, [createName, createServer, navigation, warmCommunityForEntry]);
 
   const handleJoinCommunity = useCallback(async () => {
     const code = normalizeInviteCode(joinInvite);
@@ -107,14 +130,19 @@ export function HomeScreen() {
       await refreshServers();
       setJoinModalOpen(false);
       setJoinInvite("");
-      useNavigationStore.getState().setCurrentServerId(redeemed.communityId);
-      navigation.navigate("Main", { screen: "Community" });
+      const communityId = redeemed.communityId;
+      await warmCommunityForEntry(communityId);
+      applyCommunityNavigationTarget(communityId);
+      navigation.navigate("Community", {
+        serverId: communityId,
+        openDrawer: true,
+      });
     } catch (err) {
       setJoinError(getErrorMessage(err, "Failed to join from invite."));
     } finally {
       setJoinLoading(false);
     }
-  }, [controlPlaneBackend, joinInvite, navigation, refreshServers]);
+  }, [controlPlaneBackend, joinInvite, navigation, refreshServers, warmCommunityForEntry]);
 
   if (status === "loading" && servers.length === 0) {
     return (
@@ -134,7 +162,7 @@ export function HomeScreen() {
         className="flex-1"
         contentContainerStyle={{
           paddingHorizontal: H_PAD,
-          paddingTop: GAP * 2,
+          paddingTop: insets.top + GAP * 2,
           paddingBottom: insets.bottom + 24,
         }}
         columnWrapperStyle={{ gap: GAP, marginBottom: GAP }}
@@ -153,6 +181,7 @@ export function HomeScreen() {
                 <Pressable
                   style={{ height: cell }}
                   className="items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
+                  onPressIn={() => primeCommunityForServer(item.server.id)}
                   onPress={() => openCommunityForServer(item.server.id)}
                 >
                   <Text className="text-3xl font-bold text-foreground">{initial}</Text>

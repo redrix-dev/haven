@@ -18,9 +18,11 @@ import { RootNavigator } from "./src/navigation/RootNavigator";
 import { applyMobileTheme } from "./src/lib/theme";
 import { loadPersistedThemeId } from "./src/storage/mobileThemePreferenceStorage";
 import { useMobileThemePreferenceStore } from "./src/stores/mobileThemePreferenceStore";
-import { MobileDevThemeMenu } from "./src/dev/MobileDevThemeMenu";
+import { bootstrapDataCacheDebug } from "./src/debug/bootstrapDataCacheDebug";
+import { MobileDevToolsOverlay } from "./src/dev/MobileDevToolsOverlay";
 
 registerMobileAppHost();
+bootstrapDataCacheDebug();
 
 const mobileClient = getMobileSupabase();
 const mobileConfig = resolveMobileSupabaseConfig();
@@ -75,7 +77,7 @@ function App() {
       <SafeAreaProvider>
         <KeyboardProvider>
           <RootNavigator />
-          {__DEV__ ? <MobileDevThemeMenu /> : null}
+          {__DEV__ ? <MobileDevToolsOverlay /> : null}
           <StatusBar style="light" />
           <PortalHost />
         </KeyboardProvider>

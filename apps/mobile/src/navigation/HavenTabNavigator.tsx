@@ -39,9 +39,6 @@ function HavenTabNavigator({
 }: BottomTabNavigatorProps) {
   const userId = useAuthStore((s) => s.user?.id ?? null);
   const setWorkspaceMode = useNavigationStore((s) => s.setWorkspaceMode);
-  const setCurrentServerId = useNavigationStore((s) => s.setCurrentServerId);
-  const setCurrentChannelId = useNavigationStore((s) => s.setCurrentChannelId);
-
   const {
     state,
     descriptors,
@@ -173,8 +170,7 @@ function HavenTabNavigator({
       },
       openMention: (communityId, channelId) => {
         setWorkspaceMode("community");
-        setCurrentServerId(communityId);
-        setCurrentChannelId(channelId);
+        useNavigationStore.getState().setCommunityNavigation(communityId, channelId);
         tabNavigation.navigate("Community");
       },
       openNotifications: () => {
@@ -196,8 +192,6 @@ function HavenTabNavigator({
     refreshDmConversations,
     refreshNotificationInbox,
     refreshSocialCounts,
-    setCurrentChannelId,
-    setCurrentServerId,
     setWorkspaceMode,
     tabNavigation,
   ]);

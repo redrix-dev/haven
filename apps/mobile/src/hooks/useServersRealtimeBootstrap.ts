@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { dataCacheDebug } from "@shared/debug";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { useServersStore } from "@shared/stores/serversStore";
 
@@ -21,13 +22,25 @@ export function useServersRealtimeBootstrap(
     const userId = session.user.id;
 
     const refreshServers = async () => {
+      dataCacheDebug.fetch("useServersRealtimeBootstrap", "refreshServers start", {
+        userId,
+      });
       useServersStore.getState().setIsLoading(true);
       try {
         const serverList = await controlPlaneBackend.listUserCommunities(userId);
         if (disposed) return;
         useServersStore.getState().setServers(serverList);
+        dataCacheDebug.fetch("useServersRealtimeBootstrap", "refreshServers success", {
+          count: serverList.length,
+        });
       } catch (error) {
         if (disposed) return;
+        dataCacheDebug.fetch(
+          "useServersRealtimeBootstrap",
+          "refreshServers error",
+          { error: String(error) },
+          "error",
+        );
         console.error("Error loading servers in realtime bootstrap:", error);
       } finally {
         if (!disposed) {
@@ -41,6 +54,7 @@ export function useServersRealtimeBootstrap(
     const subscription = controlPlaneBackend.subscribeToUserCommunities(
       userId,
       () => {
+        dataCacheDebug.realtime("useServersRealtimeBootstrap", "communities subscription");
         void refreshServers();
       },
     );

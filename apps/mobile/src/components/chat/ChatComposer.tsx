@@ -6,7 +6,10 @@ import {
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
 import { Ionicons } from "@expo/vector-icons";
-import { COMPOSER_SELECTION_COLOR } from "@/components/chat/chatSurfaceConstants";
+import {
+  CHAT_COMPOSER_NATIVE_ID,
+  COMPOSER_SELECTION_COLOR,
+} from "@/components/chat/chatSurfaceConstants";
 import type { ChatComposerColors } from "@/components/chat/useChatComposerColors";
 
 export type ChatComposerProps = {
@@ -60,6 +63,7 @@ export function ChatComposer({
           <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/8 pr-1">
             <EnrichedMarkdownTextInput
               ref={inputRef}
+              nativeID={CHAT_COMPOSER_NATIVE_ID}
               multiline
               editable={!isSending}
               scrollEnabled

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { dataCacheDebug } from "@shared/debug";
 import { getMobileSupabase } from "../supabase/getMobileSupabase";
 import { clearAllChannelScrollExits } from "../storage/communityTimelinePrefs";
+import { clearCrossSessionCommunityWorkspaceCaches } from "@shared/features/community/hooks/useCommunityWorkspace";
 import { clearCrossSessionMessagingCaches } from "@shared/features/messaging/hooks/useMessages";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useMessagesStore } from "@shared/stores/messagesStore";
@@ -20,8 +22,10 @@ export function useAuthSession(): Session | null | undefined {
       void supabase.auth.getSession().then(({ data }) => {
         const nextSession = data.session ?? null;
         if (!nextSession?.user) {
+          dataCacheDebug.lifecycle("useAuthSession", "signed out — clear caches");
           useMessagesStore.getState().reset();
           clearCrossSessionMessagingCaches();
+          clearCrossSessionCommunityWorkspaceCaches();
           clearAllChannelScrollExits();
           useMobileThemePreferenceStore.getState().resetToDefault();
         }
@@ -37,13 +41,20 @@ export function useAuthSession(): Session | null | undefined {
         const prevUserId = useAuthStore.getState().user?.id ?? null;
         const nextUserId = next?.user?.id ?? null;
         if (!nextUserId) {
+          dataCacheDebug.lifecycle("useAuthSession", "auth change — signed out");
           useMessagesStore.getState().reset();
           clearCrossSessionMessagingCaches();
+          clearCrossSessionCommunityWorkspaceCaches();
           clearAllChannelScrollExits();
           useMobileThemePreferenceStore.getState().resetToDefault();
         } else if (prevUserId && prevUserId !== nextUserId) {
+          dataCacheDebug.lifecycle("useAuthSession", "auth change — account switch", {
+            prevUserId,
+            nextUserId,
+          });
           useMessagesStore.getState().reset();
           clearCrossSessionMessagingCaches();
+          clearCrossSessionCommunityWorkspaceCaches();
           clearAllChannelScrollExits();
           useMobileThemePreferenceStore.getState().resetToDefault();
         }

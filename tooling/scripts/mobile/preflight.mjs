@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -57,6 +58,17 @@ try {
   mobileRequire.resolve("react-native-reanimated/plugin");
 } catch {
   fail("Missing react-native-reanimated Babel plugin. Ensure react-native-reanimated is installed.");
+}
+
+const checkChatSurface = path.join(repoRoot, "tooling/scripts/check-chat-surface.mjs");
+if (fs.existsSync(checkChatSurface)) {
+  const result = spawnSync(process.execPath, [checkChatSurface], {
+    cwd: repoRoot,
+    stdio: "inherit",
+  });
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
 }
 
 console.log("[mobile:preflight] OK");

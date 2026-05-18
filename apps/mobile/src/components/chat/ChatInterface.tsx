@@ -1,14 +1,42 @@
 import { useCallback } from "react";
-import { FlatList, Platform, View, type FlatListProps, type ScrollViewProps } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { KeyboardStickyView } from "react-native-keyboard-controller";
-import { useDerivedValue, useSharedValue } from "react-native-reanimated";
+import {
+  FlatList,
+  View,
+  type FlatListProps,
+  type LayoutChangeEvent,
+  type ScrollViewProps,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import {
+  KeyboardGestureArea,
+  KeyboardStickyView,
+} from "react-native-keyboard-controller";
+import { useSharedValue, withTiming } from "react-native-reanimated";
 import type { KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
-import { ChatScrollView } from "@/features/community/ChatScrollView";
-import { CHAT_LIST_TOP_PADDING, CHAT_SURFACE_MARGIN } from "@/components/chat/chatSurfaceConstants";
+import { ChatScrollView } from "@/components/chat/internal/ChatScrollView";
+import {
+  CHAT_COMPOSER_MIN_HEIGHT,
+  CHAT_COMPOSER_NATIVE_ID,
+  CHAT_LIST_TOP_PADDING,
+  CHAT_SURFACE_MARGIN,
+} from "@/components/chat/chatSurfaceConstants";
 import { ChatSurfaceProvider } from "@/components/chat/ChatSurfaceContext";
 import { useChatComposerChrome } from "@/components/chat/useChatComposerChrome";
 
+const EXTRA_PADDING_ANIM_MS = 220;
+
+/**
+ * Canonical RNKC chat shell (inverted list + sticky composer).
+ *
+ * Screens must use this component — not `KeyboardChatScrollView`, `KeyboardStickyView`,
+ * or ad-hoc `SafeAreaView` / `paddingTop` for message clearance.
+ *
+ * @see .cursor/skills/haven-mobile-chat-surface/SKILL.md
+ * Layout diagnostics: `@/components/chat/debug-tooling`
+ */
 export type ChatInterfaceProps<T> = Omit<
   FlatListProps<T>,
   | "inverted"
@@ -42,49 +70,79 @@ export function ChatInterface<T>({
   ...listProps
 }: ChatInterfaceProps<T>) {
   const { bottom } = useSafeAreaInsets();
-  const composerHeight = useSharedValue(0);
-  const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);
+  const extraContentPadding = useSharedValue(0);
   const chrome = useChatComposerChrome();
   const { listScrollHandlers } = chrome;
 
+  const applyExtraContentPadding = useCallback(
+    (height: number) => {
+      const target = Math.max(height - CHAT_COMPOSER_MIN_HEIGHT, 0);
+      extraContentPadding.value = withTiming(target, {
+        duration: EXTRA_PADDING_ANIM_MS,
+      });
+    },
+    [extraContentPadding],
+  );
+
+  const onComposerLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      applyExtraContentPadding(event.nativeEvent.layout.height);
+    },
+    [applyExtraContentPadding],
+  );
+
   const renderScrollComponent = useCallback(
     (props: ScrollViewProps) => (
-      <ChatScrollView {...props} blankSpace={adjustedBlankSpace} {...keyboardScrollProps} />
+      <ChatScrollView
+        {...props}
+        inverted={props.inverted ?? true}
+        extraContentPadding={extraContentPadding}
+        {...keyboardScrollProps}
+      />
     ),
-    [adjustedBlankSpace, keyboardScrollProps],
+    [extraContentPadding, keyboardScrollProps],
   );
 
   return (
     <ChatSurfaceProvider value={{ composerChromeAnimatedStyle: chrome.composerChromeAnimatedStyle }}>
-      <View className="flex-1">
-        {listPlaceholder ?? (
-          <FlatList
-            ref={listRef}
-            {...listProps}
-            className={className ?? "flex-1"}
-            inverted
-            keyboardShouldPersistTaps="handled"
-            scrollEventThrottle={16}
-            contentContainerStyle={{ paddingTop: CHAT_LIST_TOP_PADDING }}
-            renderScrollComponent={renderScrollComponent}
-            {...listScrollHandlers}
-          />
-        )}
-
-        <KeyboardStickyView
-          offset={{ opened: bottom - CHAT_SURFACE_MARGIN }}
-          onLayout={(e) => {
-            composerHeight.value = e.nativeEvent.layout.height;
-          }}
-          style={{
-            position: "absolute",
-            width: "100%",
-            bottom: bottom - CHAT_SURFACE_MARGIN,
-          }}
+      <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
+        <KeyboardGestureArea
+          interpolator="ios"
+          offset={CHAT_COMPOSER_MIN_HEIGHT}
+          style={{ flex: 1 }}
+          textInputNativeID={CHAT_COMPOSER_NATIVE_ID}
         >
-          <View collapsable={composerCollapsable === false ? false : undefined}>{composer}</View>
-        </KeyboardStickyView>
-      </View>
+          <View className="flex-1">
+            {listPlaceholder ?? (
+              <FlatList
+                ref={listRef}
+                {...listProps}
+                className={className ?? "flex-1"}
+                inverted
+                keyboardShouldPersistTaps="handled"
+                scrollEventThrottle={16}
+                contentContainerStyle={{ paddingTop: CHAT_LIST_TOP_PADDING }}
+                renderScrollComponent={renderScrollComponent}
+                {...listScrollHandlers}
+              />
+            )}
+
+            <KeyboardStickyView
+              offset={{ opened: bottom - CHAT_SURFACE_MARGIN }}
+              onLayout={onComposerLayout}
+              style={{
+                position: "absolute",
+                width: "100%",
+                bottom: CHAT_SURFACE_MARGIN,
+              }}
+            >
+              <View collapsable={composerCollapsable === false ? false : undefined}>
+                {composer}
+              </View>
+            </KeyboardStickyView>
+          </View>
+        </KeyboardGestureArea>
+      </SafeAreaView>
     </ChatSurfaceProvider>
   );
 }

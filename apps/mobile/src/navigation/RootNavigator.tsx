@@ -5,7 +5,6 @@ import { useAuthSession } from "@/hooks/useAuthSession";
 import { useMobileExpoPushRegistration } from "@/hooks/useMobileExpoPushRegistration";
 import { useMobileVoipFoundation } from "@/hooks/useMobileVoipFoundation";
 import { useServersRealtimeBootstrap } from "@/hooks/useServersRealtimeBootstrap";
-import { HomeScreen } from "@/screens/main/HomeScreen";
 import type { RootStackParamList } from "./types";
 import { PasswordRecoveryGateProvider } from "./PasswordRecoveryGateContext";
 import { MobileLogin } from "@/screens/entry/MobileLogin";
@@ -15,44 +14,10 @@ import * as Linking from "expo-linking";
 import { useEffect, useRef, useState } from "react";
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { consumeAuthConfirmUrl } from "@/auth/mobileAuthService";
-import { CommunityScreen } from "@/screens/main/CommunityScreen";
-import { createHavenTabNavigator } from "@/navigation/HavenTabNavigator";
-import { MobileNotificationsProvider } from "@/contexts/MobileNotificationsContext";
-import { MobileSocialWorkspaceProvider } from "@/contexts/MobileSocialWorkspaceContext";
-import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesContext";
-import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
-import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
+import { MainNavigator } from "@/navigation/MainNavigator";
+import { NAV_THEME } from "@/lib/theme";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createHavenTabNavigator();
-
-function MainTabs() {
-  const session = useAuthSession();
-  const userId = session?.user?.id;
-  useMobileCommunityPermissionsHydration(userId);
-  useHydrateMobileThemeFromProfile(userId);
-
-  if (!userId) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface-app">
-        <ActivityIndicator color="#e6edf7" size="large" />
-      </View>
-    );
-  }
-
-  return (
-    <MobileNotificationsProvider userId={userId}>
-      <MobileSocialWorkspaceProvider userId={userId}>
-        <MobileDirectMessagesProvider userId={userId}>
-          <Tab.Navigator screenOptions={{ detachInactiveScreens: false }}>
-            <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Community" component={CommunityScreen} />
-          </Tab.Navigator>
-        </MobileDirectMessagesProvider>
-      </MobileSocialWorkspaceProvider>
-    </MobileNotificationsProvider>
-  );
-}
 
 export function RootNavigator() {
   const session = useAuthSession();
@@ -132,7 +97,7 @@ export function RootNavigator() {
     <PasswordRecoveryGateProvider
       clearPasswordRecoveryGate={() => setPasswordRecoveryRequired(false)}
     >
-      <NavigationContainer>
+      <NavigationContainer theme={NAV_THEME.dark}>
         <Stack.Navigator
           screenOptions={{ headerShown: false, animation: "fade" }}
         >
@@ -148,7 +113,7 @@ export function RootNavigator() {
                 <>
                   <Stack.Screen
                     name="Main"
-                    component={MainTabs}
+                    component={MainNavigator}
                     options={{ keyboardHandlingEnabled: false }}
                   />
                 </>
