@@ -2,7 +2,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
-const appAssets = require('../../packages/shared/src/config/appAssets.json');
+const appAssets = require('../../packages/web-client/src/config/appAssets.json');
 
 const resolveRepoPath = (relativePath) => path.resolve(repoRoot, relativePath);
 

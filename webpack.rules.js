@@ -2,11 +2,11 @@ const path = require("path");
 
 const notificationAudioDir = path.resolve(
   __dirname,
-  "packages/shared/src/assets/audio/notifications",
+  "packages/web-client/src/assets/audio/notifications",
 );
 const voiceAudioDir = path.resolve(
   __dirname,
-  "packages/shared/src/assets/audio/voice",
+  "packages/web-client/src/assets/audio/voice",
 );
 
 function createWebpackRules(tsconfigFile) {
