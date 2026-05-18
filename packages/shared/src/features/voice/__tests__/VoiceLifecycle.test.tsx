@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_NOTIFICATION_AUDIO_SETTINGS, DEFAULT_VOICE_SETTINGS } from "@shared/app/constants";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";
 import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
-import { VoiceDrawer } from "@shared/features/voice/components/VoiceDrawer";
+import { VoiceDrawer } from "@web-client/components/voice/VoiceDrawer";
 import type { Channel } from "@shared/lib/backend/types";
 
 const voiceMocks = vi.hoisted(() => {
@@ -116,7 +116,7 @@ const voiceMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@shared/runtime/havenRuntimeRegistry", () => ({
+vi.mock("@shared/infrastructure/runtime/havenRuntimeRegistry", () => ({
   requireHavenDataRuntime: () => ({
     client: {
       channel: (topic: string, options?: { config?: unknown }) =>
@@ -131,11 +131,11 @@ vi.mock("@shared/runtime/havenRuntimeRegistry", () => ({
   }),
 }));
 
-vi.mock("@shared/lib/voice/ice", () => ({
+vi.mock("@shared/features/voice/utils/ice", () => ({
   fetchIceConfig: voiceMocks.fetchIceConfig,
 }));
 
-vi.mock("@shared/lib/notifications/sound", () => ({
+vi.mock("@shared/features/notifications/utils/sound", () => ({
   playVoicePresenceSound: voiceMocks.playVoicePresenceSound,
 }));
 
