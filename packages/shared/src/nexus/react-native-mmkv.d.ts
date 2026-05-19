@@ -1,7 +1,13 @@
 declare module "react-native-mmkv" {
-  export class MMKV {
-    set(key: string, value: string): void;
+  export interface MMKV {
+    set(key: string, value: boolean | string | number | ArrayBuffer): void;
     getString(key: string): string | undefined;
-    delete(key: string): void;
+    remove(key: string): boolean;
   }
+
+  export type Configuration = {
+    id: string;
+  };
+
+  export function createMMKV(configuration?: Configuration): MMKV;
 }

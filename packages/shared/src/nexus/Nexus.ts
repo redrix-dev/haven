@@ -1,5 +1,5 @@
 import { create, type StoreApi, type UseBoundStore } from "zustand";
-import { MMKV } from "react-native-mmkv";
+import type { MMKV } from "react-native-mmkv";
 
 type NexusEntry<T> = {
   data: T;
@@ -15,15 +15,21 @@ export abstract class Nexus<T, R = unknown> {
   private entityType: string;
   private instanceId: string;
   private storage: MMKV;
-  private store: UseBoundStore<StoreApi<NexusState<T>>>;
+  private _store: UseBoundStore<StoreApi<NexusState<T>>> | null = null;
 
   constructor(entityType: string, instanceId: string, storage: MMKV) {
     this.entityType = entityType;
     this.instanceId = instanceId;
     this.storage = storage;
-    this.store = create<NexusState<T>>(() => ({
-      entities: {},
-    }));
+  }
+
+  private get store(): UseBoundStore<StoreApi<NexusState<T>>> {
+    if (!this._store) {
+      this._store = create<NexusState<T>>(() => ({
+        entities: {},
+      }));
+    }
+    return this._store;
   }
 
   private get storageKey(): string {
@@ -134,7 +140,7 @@ export abstract class Nexus<T, R = unknown> {
       this.store.setState({ entities: parsed });
     } catch (e) {
       console.warn(`[Nexus] Failed to rehydrate ${this.storageKey}`, e);
-      this.storage.delete(this.storageKey);
+      this.storage.remove(this.storageKey);
     }
   }
 
@@ -145,6 +151,6 @@ export abstract class Nexus<T, R = unknown> {
 
   clear(): void {
     this.store.setState({ entities: {} });
-    this.storage.delete(this.storageKey);
+    this.storage.remove(this.storageKey);
   }
 }

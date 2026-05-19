@@ -33,7 +33,8 @@
     "./**/*.ts",
     "./**/*.tsx",
     "./uniwind-types.d.ts",
-    "../../packages/shared/src/types/**/*.d.ts"
+    "../../packages/shared/src/types/**/*.d.ts",
+    "../../packages/shared/src/nexus/**/*.d.ts"
   ],
   "exclude": [
     "./src/screens/deprecated/**"

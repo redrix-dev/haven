@@ -1,4 +1,4 @@
-import { MMKV } from 'react-native-mmkv'
+import type { MMKV } from 'react-native-mmkv'
 import { Nexus } from '../Nexus'
 import type { MessageBundle } from '@shared/lib/backend/types'
 

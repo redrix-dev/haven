@@ -13,6 +13,7 @@ import {
 } from "react-native-enriched-markdown";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useMessages } from "@shared/features/messaging/hooks/useMessages";
+import { useMessageNexus } from "@shared/features/messaging/hooks/useMessageNexus";
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
@@ -95,6 +96,8 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     channels,
   });
 
+  const nexusMessaging = useMessageNexus(communityId ?? null, activeChannelId ?? null);
+
   const storedMessages = useMessagesStore((state) => state.messages);
 
   useDataCacheComponentProbe("CommunityChatScreen", {
@@ -108,6 +111,8 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     hasOlderMessages: messaging.state.hasOlderMessages,
     isLoadingOlderMessages: messaging.state.isLoadingOlderMessages,
     hasCompletedInitialLoad: messaging.state.hasCompletedInitialLoad,
+    nexusMessagesCount: nexusMessaging.messages.length,
+    nexusIsInitialized: nexusMessaging.isInitialized,
     channelsLoading,
     communityIdMatchesRoute: communityId === serverId,
   });
