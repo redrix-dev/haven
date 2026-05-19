@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseExpoPushNotificationData,
   parseExpoPushUrl,
-} from "@shared/features/mobile/push/parseExpoPushNotificationData";
+} from "../parseExpoPushNotificationData";
 
 describe("parseExpoPushNotificationData", () => {
   it("parses explicit dm_message fields", () => {

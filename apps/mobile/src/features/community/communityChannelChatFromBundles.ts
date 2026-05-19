@@ -2,13 +2,13 @@ import type { MessageBundle } from "@shared/lib/backend/types";
 import {
   isAuthorProfileTombstone,
   type MessageListAuthorProfile,
-} from "@shared/features/messaging/components/message-list/messageListContentUtils";
+} from "@shared/features/profile/utils/profileTombstone";
 import {
   getLiveProfile,
   resolveLiveAvatarUrl,
   resolveLiveUsername,
   type LiveProfilesRecord,
-} from "@shared/lib/liveProfiles";
+} from "@shared/infrastructure/liveProfiles";
 import {
   dayBucket,
   formatDateDividerLabel,

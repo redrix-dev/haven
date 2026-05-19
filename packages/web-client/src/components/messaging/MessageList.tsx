@@ -67,12 +67,14 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { MarkdownText } from "@shared/app/ui/MarkdownText";
 import {
   QUICK_REACTION_EMOJI,
-  getFallbackEmbedUrl,
-  isAuthorProfileTombstone,
   messageContainsHttpUrl,
   renderLinkifiedMessageText,
+} from "@web-client/utils/messageLinkRendering";
+import { getFallbackEmbedUrl } from "@shared/features/messaging/utils/embedUtils";
+import {
+  isAuthorProfileTombstone,
   type MessageListAuthorProfile,
-} from "@shared/features/messaging/utils/messageListContentUtils";
+} from "@shared/features/profile/utils/profileTombstone";
 import { getLiveProfile } from "@shared/infrastructure/liveProfiles";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useMessagesStore } from "@shared/stores/messagesStore";

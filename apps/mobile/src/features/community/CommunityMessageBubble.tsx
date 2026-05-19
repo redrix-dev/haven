@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import type { MessageAttachment, MessageLinkPreview } from "@shared/lib/backend/types";
-import { getFallbackEmbedUrl } from "@shared/features/messaging/components/message-list/messageListContentUtils";
+import { getFallbackEmbedUrl } from "@shared/features/messaging/utils/embedUtils";
 import { CommunityAttachmentVideo } from "./CommunityAttachmentVideo";
 
 // ─── Layout constants ────────────────────────────────────────────────────────

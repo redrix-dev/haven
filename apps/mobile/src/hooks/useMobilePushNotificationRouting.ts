@@ -1,6 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
-import { parseExpoPushNotificationData } from "@shared/features/mobile/push/parseExpoPushNotificationData";
+import { parseExpoPushNotificationData } from "@/features/notifications/utils/parseExpoPushNotificationData";
 import { useMobilePushNavigationStore, dispatchParsedPayload } from "@/stores/mobilePushNavigationStore";
 
 function notificationDedupeKey(
