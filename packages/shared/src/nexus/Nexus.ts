@@ -1,4 +1,4 @@
-import { create, type StoreApi, type UseBoundStore } from "zustand";
+import { create, useStore, type StoreApi, type UseBoundStore } from "zustand";
 import type { MMKV } from "react-native-mmkv";
 
 type NexusEntry<T> = {
@@ -104,11 +104,11 @@ export abstract class Nexus<T, R = unknown> {
   }
 
   use<S>(selector: (state: NexusState<T>) => S): S {
-    return this.store(selector);
+    return useStore(this.store, selector);
   }
 
   useAll(): T[] {
-    return this.store((state) =>
+    return useStore(this.store, (state) =>
       Object.values(state.entities)
         .filter((entry) => !entry.partial)
         .map((entry) => entry.data),
@@ -116,7 +116,7 @@ export abstract class Nexus<T, R = unknown> {
   }
 
   useOne(id: string): T | undefined {
-    return this.store((state) => state.entities[id]?.data);
+    return useStore(this.store, (state) => state.entities[id]?.data);
   }
 
   persist(): void {
