@@ -1,14 +1,16 @@
 import { create, useStore, type StoreApi, type UseBoundStore } from "zustand";
+import { useStoreWithEqualityFn } from "zustand/traditional";
 import type { MMKV } from "react-native-mmkv";
 
-type NexusEntry<T> = {
+export type NexusEntry<T> = {
   data: T;
   partial: boolean;
   cachedAt: number;
 };
 
-type NexusState<T> = {
+export type NexusState<T> = {
   entities: Record<string, NexusEntry<T>>;
+  revision: number;
 };
 
 export abstract class Nexus<T, R = unknown> {
@@ -23,10 +25,11 @@ export abstract class Nexus<T, R = unknown> {
     this.storage = storage;
   }
 
-  private get store(): UseBoundStore<StoreApi<NexusState<T>>> {
+  protected get store(): UseBoundStore<StoreApi<NexusState<T>>> {
     if (!this._store) {
       this._store = create<NexusState<T>>(() => ({
         entities: {},
+        revision: 0,
       }));
     }
     return this._store;
@@ -37,6 +40,13 @@ export abstract class Nexus<T, R = unknown> {
   }
 
   protected abstract transform(raw: R): T;
+
+  protected notifyRevision(): void {
+    this.store.setState((state) => ({
+      ...state,
+      revision: state.revision + 1,
+    }));
+  }
 
   getOrCreate(id: string, raw: R, isNew = false): T {
     const existing = this.store.getState().entities[id];
@@ -103,8 +113,15 @@ export abstract class Nexus<T, R = unknown> {
     return this.store.getState().entities[id]?.data;
   }
 
-  use<S>(selector: (state: NexusState<T>) => S): S {
-    return useStore(this.store, selector);
+  use<S>(
+    selector: (state: NexusState<T>) => S,
+    equalityFn?: (a: S, b: S) => boolean,
+  ): S {
+    return useStoreWithEqualityFn(
+      this.store,
+      selector,
+      equalityFn ?? Object.is,
+    );
   }
 
   useAll(): T[] {
@@ -137,7 +154,7 @@ export abstract class Nexus<T, R = unknown> {
       if (!raw) return;
 
       const parsed = JSON.parse(raw) as Record<string, NexusEntry<T>>;
-      this.store.setState({ entities: parsed });
+      this.store.setState({ entities: parsed, revision: 0 });
     } catch (e) {
       console.warn(`[Nexus] Failed to rehydrate ${this.storageKey}`, e);
       this.storage.remove(this.storageKey);
@@ -150,7 +167,7 @@ export abstract class Nexus<T, R = unknown> {
   }
 
   clear(): void {
-    this.store.setState({ entities: {} });
+    this.store.setState({ entities: {}, revision: 0 });
     this.storage.remove(this.storageKey);
   }
 }

@@ -1,6 +1,50 @@
 import { useCallback, useEffect, useState } from 'react'
+import { create } from 'zustand'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { havenEventBus } from '@shared/infrastructure/realtime'
 import { getCommunityDataBackend } from '@shared/lib/backend'
+import type { MessageBundle } from '@shared/lib/backend/types'
+import type { NexusState } from '@shared/nexus/Nexus'
+import {
+  channelMetaEqual,
+  CommunityMessageNexus,
+  messagesEqual,
+  type ChannelMeta,
+} from '@shared/nexus/community/CommunityMessageNexus'
+
+const NULL_NEXUS_STORE = create<NexusState<MessageBundle>>(() => ({
+  entities: {},
+  revision: 0,
+}))
+
+const selectEmptyMessages = (_state: NexusState<MessageBundle>): MessageBundle[] => []
+
+const selectEmptyMeta = (_state: NexusState<MessageBundle>): ChannelMeta => ({
+  hasMore: false,
+  cursor: null,
+})
+
+function useMessageNexusChannel(
+  nexus: CommunityMessageNexus | null,
+  channelId: string,
+): MessageBundle[] {
+  return useStoreWithEqualityFn(
+    nexus ? nexus.getReactiveStore() : NULL_NEXUS_STORE,
+    nexus ? nexus.getChannelStateSelector(channelId) : selectEmptyMessages,
+    messagesEqual,
+  )
+}
+
+function useMessageNexusMeta(
+  nexus: CommunityMessageNexus | null,
+  channelId: string,
+): ChannelMeta {
+  return useStoreWithEqualityFn(
+    nexus ? nexus.getReactiveStore() : NULL_NEXUS_STORE,
+    nexus ? nexus.getChannelMetaSelector(channelId) : selectEmptyMeta,
+    channelMetaEqual,
+  )
+}
 
 export function useMessageNexus(
   communityId: string | null,
@@ -9,24 +53,22 @@ export function useMessageNexus(
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoadingOlder, setIsLoadingOlder] = useState(false)
 
-  const nexus = communityId
+  const communityMessageNexus = communityId
     ? havenEventBus.getMessageNexus(communityId)
     : null
 
-  const messages = nexus?.useChannel(channelId ?? '') ?? []
-  const meta = nexus?.useChannelMeta(channelId ?? '') ?? {
-    hasMore: false,
-    cursor: null
-  }
+  const resolvedChannelId = channelId ?? ''
+  const messages = useMessageNexusChannel(communityMessageNexus, resolvedChannelId)
+  const meta = useMessageNexusMeta(communityMessageNexus, resolvedChannelId)
 
   useEffect(() => {
-    if (!communityId || !channelId || !nexus) return
+    if (!communityId || !channelId || !communityMessageNexus) return
     setIsInitialized(false)
 
     getCommunityDataBackend(communityId)
       .listChannelMessages({ communityId, channelId })
       .then(result => {
-        nexus.insertMessages(result.messages, channelId, {
+        communityMessageNexus.insertMessages(result.messages, channelId, {
           hasMore: result.hasMore,
           cursor: result.messages[0]?.createdAt ?? null
         })
@@ -36,10 +78,10 @@ export function useMessageNexus(
         console.warn('[useMessageNexus] initial load failed', err)
         setIsInitialized(true)
       })
-  }, [communityId, channelId])
+  }, [communityId, channelId, communityMessageNexus])
 
   const loadOlder = useCallback(async () => {
-    if (!communityId || !channelId || !nexus || !meta.hasMore || isLoadingOlder) return
+    if (!communityId || !channelId || !communityMessageNexus || !meta.hasMore || isLoadingOlder) return
     setIsLoadingOlder(true)
     try {
       const result = await getCommunityDataBackend(communityId)
@@ -48,7 +90,7 @@ export function useMessageNexus(
           channelId,
           beforeCreatedAt: meta.cursor ?? undefined
         })
-      nexus.insertMessages(result.messages, channelId, {
+      communityMessageNexus.insertMessages(result.messages, channelId, {
         hasMore: result.hasMore,
         cursor: result.messages[0]?.createdAt ?? null
       })
@@ -57,7 +99,7 @@ export function useMessageNexus(
     } finally {
       setIsLoadingOlder(false)
     }
-  }, [communityId, channelId, meta.hasMore, meta.cursor, isLoadingOlder])
+  }, [communityId, channelId, communityMessageNexus, meta.hasMore, meta.cursor, isLoadingOlder])
 
   return {
     messages,

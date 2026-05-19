@@ -1,12 +1,33 @@
 import type { MMKV } from 'react-native-mmkv'
-import { Nexus } from '../Nexus'
+import { Nexus, type NexusState } from '../Nexus'
 import type { MessageBundle } from '@shared/lib/backend/types'
+import type { StoreApi, UseBoundStore } from 'zustand'
 
 type CommunityMessageState = {
   byChannel: Record<string, string[]>
   cursors: Record<string, string | null>
   hasMore: Record<string, boolean>
 }
+
+export type ChannelMeta = {
+  hasMore: boolean
+  cursor: string | null
+}
+
+const EMPTY_MESSAGES: MessageBundle[] = []
+const DEFAULT_CHANNEL_META: ChannelMeta = { hasMore: false, cursor: null }
+
+export const messagesEqual = (a: MessageBundle[], b: MessageBundle[]): boolean => {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+export const channelMetaEqual = (a: ChannelMeta, b: ChannelMeta): boolean =>
+  a.hasMore === b.hasMore && a.cursor === b.cursor
 
 export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   private channelState: CommunityMessageState = {
@@ -15,12 +36,80 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     hasMore: {}
   }
 
+  private channelSelectors = new Map<
+    string,
+    (state: NexusState<MessageBundle>) => MessageBundle[]
+  >()
+
+  private metaSelectors = new Map<
+    string,
+    (state: NexusState<MessageBundle>) => ChannelMeta
+  >()
+
   constructor(communityId: string, storage: MMKV) {
     super('community-messages', communityId, storage)
   }
 
   protected transform(raw: MessageBundle): MessageBundle {
     return raw
+  }
+
+  getReactiveStore(): UseBoundStore<StoreApi<NexusState<MessageBundle>>> {
+    return this.store
+  }
+
+  getChannelStateSelector(
+    channelId: string,
+  ): (state: NexusState<MessageBundle>) => MessageBundle[] {
+    return this.getChannelSelector(channelId)
+  }
+
+  getChannelMetaSelector(
+    channelId: string,
+  ): (state: NexusState<MessageBundle>) => ChannelMeta {
+    return this.getMetaSelector(channelId)
+  }
+
+  private getChannelSelector(
+    channelId: string,
+  ): (state: NexusState<MessageBundle>) => MessageBundle[] {
+    if (!this.channelSelectors.has(channelId)) {
+      this.channelSelectors.set(channelId, (state) => {
+        void state.revision
+        const ids = this.channelState.byChannel[channelId]
+        if (!ids?.length) return EMPTY_MESSAGES
+
+        const messages: MessageBundle[] = []
+        for (const id of ids) {
+          const entry = state.entities[id]
+          if (entry && !entry.partial) {
+            messages.push(entry.data)
+          }
+        }
+        return messages
+      })
+    }
+    return this.channelSelectors.get(channelId)!
+  }
+
+  private getMetaSelector(
+    channelId: string,
+  ): (state: NexusState<MessageBundle>) => ChannelMeta {
+    if (!this.metaSelectors.has(channelId)) {
+      this.metaSelectors.set(channelId, (state) => {
+        void state.revision
+        const hasMore = this.channelState.hasMore[channelId]
+        const cursor = this.channelState.cursors[channelId]
+        if (hasMore === undefined && cursor === undefined) {
+          return DEFAULT_CHANNEL_META
+        }
+        return {
+          hasMore: hasMore ?? false,
+          cursor: cursor ?? null,
+        }
+      })
+    }
+    return this.metaSelectors.get(channelId)!
   }
 
   // ---- Private channel index helpers ----
@@ -70,6 +159,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     this.getOrCreate(message.id, message)
     this.insertIntoChannel(message)
     this.persist()
+    this.notifyRevision()
   }
 
   insertMessages(
@@ -77,8 +167,21 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     channelId: string,
     options: { hasMore: boolean; cursor: string | null }
   ): void {
+    this.store.setState((state) => {
+      const next = { ...state.entities }
+      for (const message of messages) {
+        if (!next[message.id] || next[message.id].partial) {
+          next[message.id] = {
+            data: this.transform(message),
+            partial: false,
+            cachedAt: Date.now(),
+          }
+        }
+      }
+      return { entities: next }
+    })
+
     for (const message of messages) {
-      this.getOrCreate(message.id, message)
       this.insertIntoChannel(message)
     }
 
@@ -95,6 +198,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     }
 
     this.persist()
+    this.notifyRevision()
   }
 
   updateMessage(messageId: string, changes: Partial<MessageBundle>): void {
@@ -105,6 +209,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   removeMessage(messageId: string, channelId: string): void {
     this.removeFromChannel(messageId, channelId)
     this.evict(messageId)
+    this.notifyRevision()
   }
 
   evictChannel(channelId: string): void {
@@ -130,27 +235,17 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     }
 
     this.persist()
+    this.notifyRevision()
   }
 
   // ---- Public read API (reactive) ----
 
   useChannel(channelId: string): MessageBundle[] {
-    const ids = this.use(state =>
-      this.channelState.byChannel[channelId] ?? []
-    )
-    return ids
-      .map(id => this.useOne(id))
-      .filter((m): m is MessageBundle => m !== undefined)
+    return this.use(this.getChannelSelector(channelId), messagesEqual)
   }
 
-  useChannelMeta(channelId: string): {
-    hasMore: boolean
-    cursor: string | null
-  } {
-    return {
-      hasMore: this.channelState.hasMore[channelId] ?? false,
-      cursor: this.channelState.cursors[channelId] ?? null
-    }
+  useChannelMeta(channelId: string): ChannelMeta {
+    return this.use(this.getMetaSelector(channelId), channelMetaEqual)
   }
 
   getLastMessageId(channelId: string): string | null {
