@@ -1,6 +1,7 @@
 import { createMMKV } from 'react-native-mmkv'
 import { CommunityMessageNexus } from '@shared/nexus/community/CommunityMessageNexus'
 import { communityNexus } from '@shared/nexus/community/CommunityNexus'
+import { channelNexus } from '@shared/nexus/community/ChannelNexus'
 import { getCommunityDataBackend } from '@shared/lib/backend'
 import { usePermissionsStore } from '@shared/stores/permissionsStore'
 import { useNotificationsStore } from '@shared/stores/notificationsStore'
@@ -74,6 +75,7 @@ class HavenEventBus {
       this.clearCommunity(communityId)
     }
     communityNexus.clear()
+    channelNexus.clear()
   }
 
   addMessageSyncListener(listener: MessageSyncListener): () => void {
@@ -261,6 +263,26 @@ class HavenEventBus {
 
       case 'SOCIAL_CHANGE': {
         useSocialStore.getState().triggerSocialRefresh(evt.payload)
+        return
+      }
+
+      case 'member_channel_access_revoked': {
+        const channelId =
+          typeof evt.payload.channel_id === 'string'
+            ? evt.payload.channel_id
+            : typeof evt.payload.channelId === 'string'
+              ? evt.payload.channelId
+              : null
+        const communityId =
+          typeof evt.payload.community_id === 'string'
+            ? evt.payload.community_id
+            : typeof evt.payload.communityId === 'string'
+              ? evt.payload.communityId
+              : null
+        if (!channelId || !communityId) return
+
+        channelNexus.removeChannel(channelId, communityId)
+        this.getMessageNexus(communityId).evictChannel(channelId)
         return
       }
 
