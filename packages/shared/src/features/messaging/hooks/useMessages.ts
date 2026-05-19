@@ -303,6 +303,7 @@ const banShapeToBundles = (
       orig ??
       ({
         id: msg.id,
+        channelId: msg.channel_id,
         authorUserId: msg.author_user_id,
         displayName: "Unknown",
         avatarSnapshotUrl: null,
@@ -504,6 +505,7 @@ const rawMessageRowToBundle = (
   };
   return {
     id,
+    channelId,
     authorUserId: getNullableStringField(row, "author_user_id"),
     displayName:
       typeof row.display_name === "string" && row.display_name.trim().length > 0

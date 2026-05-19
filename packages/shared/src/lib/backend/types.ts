@@ -96,6 +96,7 @@ export type MessageLinkPreview = {
 /** Row shape from `list_channel_messages` after mapping DB snake_case → camelCase. */
 export type MessageBundle = {
   id: string;
+  channelId: string;
   authorUserId: string | null;
   displayName: string;
   avatarSnapshotUrl: string | null;

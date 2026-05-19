@@ -8,10 +8,6 @@ type CommunityMessageState = {
   hasMore: Record<string, boolean>
 }
 
-type ChannelMessageBundle = MessageBundle & {
-  channel_id: string
-}
-
 export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   private channelState: CommunityMessageState = {
     byChannel: {},
@@ -30,7 +26,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   // ---- Private channel index helpers ----
 
   private insertIntoChannel(message: MessageBundle): void {
-    const channelId = (message as ChannelMessageBundle).channel_id
+    const channelId = message.channelId
     const existing = this.channelState.byChannel[channelId] ?? []
 
     if (existing.includes(message.id)) return

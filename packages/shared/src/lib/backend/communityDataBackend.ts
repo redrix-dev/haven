@@ -1540,6 +1540,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
       return {
         id,
+        channelId: typeof row.channel_id === 'string' ? row.channel_id : '',
         authorUserId:
           row.author_user_id === null || row.author_user_id === undefined
             ? null
