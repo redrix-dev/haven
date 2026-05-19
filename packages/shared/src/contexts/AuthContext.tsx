@@ -15,7 +15,7 @@ import { useDmStore } from "@shared/stores/dmStore";
 import { useSocialStore } from "@shared/stores/socialStore";
 
 const havenAuthClient = () => requireHavenDataRuntime().client;
-import { getAppHost } from "@shared/platform/appHost";
+import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
 import {

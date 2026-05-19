@@ -7,7 +7,7 @@ import {
   normalizeDeepLinkPathname,
   WebAppDeepLinkTarget,
 } from "@shared/lib/deepLinks";
-import { getAppHost } from "@shared/platform/appHost";
+import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
 import type { FriendsPanelTab } from "@shared/app/types/types";
 import { useNavigationStore } from "@shared/stores/navigationStore";

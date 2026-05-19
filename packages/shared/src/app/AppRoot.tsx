@@ -3,7 +3,7 @@ import { AuthProvider } from '@shared/contexts/AuthContext';
 import { TitleBar } from '@shared/app/components/TitleBar';
 import { ChatApp } from '@shared/app/ChatApp';
 import { VoicePopoutApp } from '@shared/app/VoicePopoutApp';
-import { getAppHost } from '@shared/platform/appHost';
+import { getAppHost } from '@shared/infrastructure/platform/appHost';
 
 export function AppRoot() {
   const params = new URLSearchParams(window.location.search);

@@ -8,7 +8,7 @@
  *   const { orderedServers, setOrder, resetOrder } = useServerOrder(userId, servers);
  */
 import React from 'react';
-import { getAppHost } from '@shared/platform/appHost';
+import { getAppHost } from '@shared/infrastructure/platform/appHost';
 
 function storageKey(userId: string) {
   return `haven:user-${userId}:server-order`;

@@ -1,4 +1,4 @@
-import { getAppHost } from '@shared/platform/appHost';
+import { getAppHost } from '@shared/infrastructure/platform/appHost';
 
 const DESKTOP_AUTH_CONFIRM_REDIRECT_URL = 'haven://auth/confirm';
 const DESKTOP_INVITE_BASE_URL = 'haven://invite/';

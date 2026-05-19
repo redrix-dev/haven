@@ -1,5 +1,5 @@
 import React from 'react';
-import { getAppHost } from '@shared/platform/appHost';
+import { getAppHost } from '@shared/infrastructure/platform/appHost';
 
 const WINDOW_CONTROL_BUTTON_CLASS =
   'no-drag flex h-8 w-10 items-center justify-center text-muted-foreground transition-colors hover:bg-border-titlebar hover:text-white';

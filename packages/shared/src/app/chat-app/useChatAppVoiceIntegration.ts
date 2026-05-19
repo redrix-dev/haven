@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { VoicePopoutState } from "@shared/platform/desktop/types";
-import { getAppHost } from "@shared/platform/appHost";
+import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
 import type { ChatAppOrchestrationApi } from "@shared/app/hooks/useChatAppOrchestration";
 import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";

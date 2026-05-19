@@ -1,8 +1,8 @@
 import { desktopClient } from "@platform/desktop/client";
-import { setAppHost, type AppHost } from "@shared/platform/appHost";
+import { setAppHost, type AppHost } from "@shared/infrastructure/platform/appHost";
 
 /**
- * Wires the Electron preload `desktop` bridge into `@shared/platform/appHost`
+ * Wires the Electron preload `desktop` bridge into `@shared/infrastructure/platform/appHost`
  * so `packages/shared` never imports `@platform/desktop/client` directly.
  */
 export function registerElectronAppHost(): void {

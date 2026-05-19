@@ -1,5 +1,5 @@
 import React from 'react';
-import { getAppHost } from '@shared/platform/appHost';
+import { getAppHost } from '@shared/infrastructure/platform/appHost';
 import type {
   AppSettings,
   NotificationAudioSettings,

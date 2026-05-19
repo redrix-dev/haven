@@ -1,7 +1,7 @@
 import React from 'react';
 import { VoiceDrawer as VoiceQuickControlsDrawer } from '@shared/features/voice/components/VoiceDrawer';
 import type { VoicePopoutControlAction, VoicePopoutState } from '@shared/platform/desktop/types';
-import { getAppHost } from '@shared/platform/appHost';
+import { getAppHost } from '@shared/infrastructure/platform/appHost';
 
 const EMPTY_STATE: VoicePopoutState = {
   isOpen: false,

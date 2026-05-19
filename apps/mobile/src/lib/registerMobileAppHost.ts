@@ -1,5 +1,5 @@
 import * as Linking from "expo-linking";
-import { setAppHost, type AppHost } from "@shared/platform/appHost";
+import { setAppHost, type AppHost } from "@shared/infrastructure/platform/appHost";
 
 /**
  * Replaces web-default `window.open` host behavior before shared auth/navigation runs.
