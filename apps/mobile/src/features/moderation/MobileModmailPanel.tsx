@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import type { ServerReportDetail, ServerReportSummary } from "@shared/lib/backend/types";
 import { getServerModmailBackend } from "@shared/lib/backend";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 type MobileModmailPanelProps = {
   /** Communities where `canManageReports` is true */

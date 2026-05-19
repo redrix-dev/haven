@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import type { Channel, ChannelPermissionState } from "@shared/lib/backend/types";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 type MobileChannelSettingsModalProps = {
   visible: boolean;

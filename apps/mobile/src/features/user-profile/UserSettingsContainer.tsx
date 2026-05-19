@@ -2,7 +2,7 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { Alert, View } from "react-native";
 import { getControlPlaneBackend } from "@shared/lib/backend";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import UserAccountCard from "@/features/user-profile/UserAccountCard";
 import AppUpdatesCard from "@/features/user-profile/AppUpdatesCard";

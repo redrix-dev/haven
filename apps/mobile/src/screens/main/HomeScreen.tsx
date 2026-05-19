@@ -14,7 +14,7 @@ import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getPlatformInviteInputPlaceholder } from "@shared/infrastructure/platform/urls";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { applyCommunityNavigationTarget } from "@shared/features/community/communityNavigation";
 import { useMobileMainSession } from "@/contexts/MobileMainSessionContext";
 import { getLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";

@@ -17,7 +17,7 @@ import DraggableFlatList, {
 } from "react-native-draggable-flatlist";
 import type { ServerRoleItem, ServerSettingsUpdate } from "@shared/lib/backend/types";
 import { getPlatformInviteBaseUrl } from "@shared/platform/urls";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   loadMobileServerSnapshots,
   useMobileServerAdminActions,

@@ -6,7 +6,7 @@ import type {
   ServerRoleItem,
   ServerSettingsUpdate,
 } from "@shared/lib/backend/types";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 /** Backend wiring for mobile server settings without desktop `useServerAdmin` / uiStore. */
 export function useMobileServerAdminActions(

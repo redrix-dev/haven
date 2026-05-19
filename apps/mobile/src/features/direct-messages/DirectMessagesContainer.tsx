@@ -34,7 +34,7 @@ import type {
   DirectMessage,
   DirectMessageConversationSummary,
 } from "@shared/lib/backend/types";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { getControlPlaneBackend } from "@shared/lib/backend";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { listSelectableBuiltinThemes } from "@shared/themes/selectableBuiltinThemes";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
 import { ThemedIonicons } from "@/theme-rn";

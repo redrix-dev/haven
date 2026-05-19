@@ -17,7 +17,7 @@ import { useMessageNexus } from "@shared/features/messaging/hooks/useMessageNexu
 import { useMessagesStore } from "@shared/stores/messagesStore";
 import { useNavigationStore } from "@shared/stores/navigationStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   buildChatListItemsFromChatMessages,
   buildMessageBundleById,

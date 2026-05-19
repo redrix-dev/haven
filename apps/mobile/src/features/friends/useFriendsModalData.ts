@@ -7,7 +7,7 @@ import type {
   FriendSummary,
   SocialCounts,
 } from "@shared/lib/backend/types";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { useSocialGraphRealtimeStore } from "@shared/stores/socialGraphRealtimeStore";
 
 const DEFAULT_COUNTS: SocialCounts = {
