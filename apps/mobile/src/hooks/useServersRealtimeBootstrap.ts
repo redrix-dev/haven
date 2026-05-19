@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { dataCacheDebug } from "@shared/debug";
 import { getControlPlaneBackend } from "@shared/lib/backend";
+import { communityNexus } from "@shared/nexus/community/CommunityNexus";
 import { useServersStore } from "@shared/stores/serversStore";
 
 /**
@@ -30,6 +31,13 @@ export function useServersRealtimeBootstrap(
         const serverList = await controlPlaneBackend.listUserCommunities(userId);
         if (disposed) return;
         useServersStore.getState().setServers(serverList);
+        communityNexus.setCommunities(
+          serverList.map((s) => ({
+            id: s.id,
+            name: s.name,
+            createdAt: s.created_at,
+          })),
+        );
         dataCacheDebug.fetch("useServersRealtimeBootstrap", "refreshServers success", {
           count: serverList.length,
         });
