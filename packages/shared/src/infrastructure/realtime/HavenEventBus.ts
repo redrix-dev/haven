@@ -1,5 +1,6 @@
 import { createMMKV } from 'react-native-mmkv'
 import { CommunityMessageNexus } from '@shared/nexus/community/CommunityMessageNexus'
+import { communityNexus } from '@shared/nexus/community/CommunityNexus'
 import { getCommunityDataBackend } from '@shared/lib/backend'
 import { usePermissionsStore } from '@shared/stores/permissionsStore'
 import { useNotificationsStore } from '@shared/stores/notificationsStore'
@@ -72,6 +73,7 @@ class HavenEventBus {
     for (const [communityId] of this.messageNexuses) {
       this.clearCommunity(communityId)
     }
+    communityNexus.clear()
   }
 
   addMessageSyncListener(listener: MessageSyncListener): () => void {

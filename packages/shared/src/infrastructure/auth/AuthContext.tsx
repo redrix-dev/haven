@@ -9,6 +9,8 @@ import React, {
 import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { havenEventBus } from "@shared/infrastructure/realtime";
+import { initializeNexuses } from "@shared/infrastructure/bootstrap/initializeNexuses";
+import { communityNexus } from "@shared/nexus/community/CommunityNexus";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@shared/platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
@@ -194,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === "SIGNED_OUT") {
         privateUserChannelUnsubscribeRef.current?.();
         privateUserChannelUnsubscribeRef.current = null;
+        communityNexus.clear();
         havenEventBus.clearAll();
       } else if (
         event === "SIGNED_IN" ||
@@ -209,6 +212,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               userId,
               (evt) => havenEventBus.handle(evt),
             );
+
+          void initializeNexuses(userId);
         }
       }
     });
