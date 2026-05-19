@@ -46,6 +46,9 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     (state: NexusState<MessageBundle>) => ChannelMeta
   >()
 
+  private channelMessageSnapshots = new Map<string, MessageBundle[]>()
+  private channelMetaSnapshots = new Map<string, ChannelMeta>()
+
   constructor(communityId: string, storage: MMKV) {
     super('community-messages', communityId, storage)
   }
@@ -86,6 +89,13 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
             messages.push(entry.data)
           }
         }
+
+        const cached = this.channelMessageSnapshots.get(channelId)
+        if (cached && messagesEqual(cached, messages)) {
+          return cached
+        }
+
+        this.channelMessageSnapshots.set(channelId, messages)
         return messages
       })
     }
@@ -103,10 +113,16 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
         if (hasMore === undefined && cursor === undefined) {
           return DEFAULT_CHANNEL_META
         }
-        return {
+        const next: ChannelMeta = {
           hasMore: hasMore ?? false,
           cursor: cursor ?? null,
         }
+        const cached = this.channelMetaSnapshots.get(channelId)
+        if (cached && channelMetaEqual(cached, next)) {
+          return cached
+        }
+        this.channelMetaSnapshots.set(channelId, next)
+        return next
       })
     }
     return this.metaSelectors.get(channelId)!
@@ -204,6 +220,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   updateMessage(messageId: string, changes: Partial<MessageBundle>): void {
     this.update(messageId, changes)
     this.persist()
+    this.notifyRevision()
   }
 
   removeMessage(messageId: string, channelId: string): void {
@@ -251,5 +268,18 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   getLastMessageId(channelId: string): string | null {
     const ids = this.channelState.byChannel[channelId] ?? []
     return ids[ids.length - 1] ?? null
+  }
+
+  clear(): void {
+    this.channelState = {
+      byChannel: {},
+      cursors: {},
+      hasMore: {},
+    }
+    this.channelSelectors.clear()
+    this.metaSelectors.clear()
+    this.channelMessageSnapshots.clear()
+    this.channelMetaSnapshots.clear()
+    super.clear()
   }
 }

@@ -4,6 +4,7 @@ import { ActivityIndicator, View } from "react-native";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { useMobileExpoPushRegistration } from "@/hooks/useMobileExpoPushRegistration";
 import { useMobileVoipFoundation } from "@/hooks/useMobileVoipFoundation";
+import { usePrivateUserChannelBootstrap } from "@/hooks/usePrivateUserChannelBootstrap";
 import { useServersRealtimeBootstrap } from "@/hooks/useServersRealtimeBootstrap";
 import type { RootStackParamList } from "./types";
 import { PasswordRecoveryGateProvider } from "./PasswordRecoveryGateContext";
@@ -24,6 +25,7 @@ export function RootNavigator() {
   useMobileExpoPushRegistration(session);
   useMobileVoipFoundation(session);
   useServersRealtimeBootstrap(session);
+  usePrivateUserChannelBootstrap(session);
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
     useState(false);
   const url = Linking.useURL();

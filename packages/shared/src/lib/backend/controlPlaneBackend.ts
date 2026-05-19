@@ -14,6 +14,27 @@ import type {
 
 export type { ControlPlaneBackend, PlatformStaffInfo, UserProfileInfo } from './controlPlaneBackend.interface';
 
+type PrivateUserChannelEvent = {
+  type: string;
+  payload: Record<string, unknown>;
+};
+
+const parsePrivateUserBroadcastEvent = (raw: unknown): PrivateUserChannelEvent => {
+  const envelope =
+    raw != null && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+
+  const type = typeof envelope.event === 'string' ? envelope.event : '';
+  const inner = envelope.payload;
+  const recordPayload =
+    inner != null && typeof inner === 'object' && !Array.isArray(inner)
+      ? (inner as Record<string, unknown>)
+      : {};
+
+  return { type, payload: recordPayload };
+};
+
 const PROFILE_AVATAR_BUCKET = 'profile-avatars';
 const PROFILE_AVATAR_FILE_SIZE_LIMIT = 5 * 1024 * 1024;
 const PROFILE_AVATAR_PUBLIC_PATH_SEGMENT = `/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/`;
@@ -310,6 +331,19 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     let cancelled = false;
     let channel: ReturnType<typeof client.channel> | null = null;
 
+    const {
+      data: { subscription: authSubscription },
+    } = client.auth.onAuthStateChange(async (event, session) => {
+      if (cancelled) return;
+      if (
+        event === 'SIGNED_IN' ||
+        event === 'TOKEN_REFRESHED' ||
+        event === 'INITIAL_SESSION'
+      ) {
+        await client.realtime.setAuth(session?.access_token ?? '');
+      }
+    });
+
     void (async () => {
       const {
         data: { session },
@@ -325,20 +359,18 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
 
       channel
         .on('broadcast', { event: '*' }, (payload: unknown) => {
-          const envelope = payload as { event?: unknown; payload?: unknown };
-          const type =
-            typeof envelope.event === 'string' ? envelope.event : '';
-          const inner = envelope.payload;
-          const recordPayload =
-            inner != null &&
-            typeof inner === 'object' &&
-            !Array.isArray(inner)
-              ? (inner as Record<string, unknown>)
-              : {};
-          onEvent({ type, payload: recordPayload });
+          const parsed = parsePrivateUserBroadcastEvent(payload);
+          if (!parsed.type) {
+            console.warn(
+              '[private_user_channel] broadcast missing event name',
+              payload,
+            );
+            return;
+          }
+          onEvent(parsed);
         })
         .subscribe((status) => {
-          console.log('[private_user_channel] status:', status);
+          console.log('[private_user_channel] status:', status, channelName);
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.warn(
               `${channelName} did not reach SUBSCRIBED (status: ${status})`,
@@ -349,6 +381,7 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
 
     return () => {
       cancelled = true;
+      authSubscription.unsubscribe();
       if (channel) void client.removeChannel(channel);
     };
   },

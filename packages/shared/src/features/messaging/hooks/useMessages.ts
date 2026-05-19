@@ -27,8 +27,30 @@ import { asRecord } from "@platform/lib/records";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
+import { havenEventBus } from "@shared/infrastructure/realtime";
 
 const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000;
+
+function emitLocalMessageInsert(params: {
+  communityId: string;
+  channelId: string;
+  messageId: string;
+  authorUserId: string;
+  content: string;
+}): void {
+  havenEventBus.handle({
+    type: "MESSAGE_INSERT",
+    payload: {
+      community_id: params.communityId,
+      channel_id: params.channelId,
+      message_id: params.messageId,
+      author_user_id: params.authorUserId,
+      content: params.content,
+      metadata: {},
+      created_at: new Date().toISOString(),
+    },
+  });
+}
 
 type CachedChannelBundles = {
   bundles: MessageBundle[];
@@ -957,6 +979,13 @@ export function useMessages({
           content,
           replyToMessageId: options?.replyToMessageId ?? null,
         });
+        emitLocalMessageInsert({
+          communityId: currentServerId,
+          channelId: currentChannelId,
+          messageId: id,
+          authorUserId: currentUserId,
+          content,
+        });
         try {
           await communityBackend.insertMessageAttachment({
             messageId: id,
@@ -976,11 +1005,18 @@ export function useMessages({
         return;
       }
 
-      await communityBackend.sendUserMessage({
+      const { id } = await communityBackend.sendUserMessage({
         communityId: currentServerId,
         channelId: currentChannelId,
         content,
         replyToMessageId: options?.replyToMessageId ?? null,
+      });
+      emitLocalMessageInsert({
+        communityId: currentServerId,
+        channelId: currentChannelId,
+        messageId: id,
+        authorUserId: currentUserId,
+        content,
       });
     },
     [currentChannelId, currentServerId, currentUserId, setRainbowMode],
@@ -2008,6 +2044,71 @@ export function useMessages({
       currentChannelId,
     });
 
+    const mergeBusMessage = (incoming: MessageBundle, reason: string) => {
+      const list = currentBundlesRef.current;
+      const idx = list.findIndex((b) => b.id === incoming.id);
+      const base =
+        idx >= 0
+          ? {
+              ...list[idx],
+              ...incoming,
+              reactions: list[idx].reactions,
+              attachment: incoming.attachment ?? list[idx].attachment,
+              linkPreview: incoming.linkPreview ?? list[idx].linkPreview,
+            }
+          : incoming;
+      const next = [...list.filter((b) => b.id !== incoming.id), base].sort(
+        compareMessageBundlesAsc,
+      );
+      const revokedUserIds = getCachedChannelRevokedUserIds(
+        currentServerId,
+        currentChannelId,
+      ) ?? [];
+      const filtered = applyVisibilityToBundles(next, {
+        communityId: currentServerId,
+        channelId: currentChannelId,
+        revokedUserIds,
+        blockedUserIds,
+        isElevatedInServer: isCurrentUserElevatedInServer,
+      });
+      commitBundles(filtered, reason);
+    };
+
+    const unsubscribeMessageBus = havenEventBus.addMessageSyncListener(
+      (syncEvent) => {
+        if (!currentServerId || !currentChannelId) return;
+        if (
+          syncEvent.communityId !== currentServerId ||
+          syncEvent.channelId !== currentChannelId
+        ) {
+          return;
+        }
+
+        dataCacheDebug.realtime("useMessages", "private user bus message", {
+          type: syncEvent.type,
+          messageId: syncEvent.messageId,
+          currentServerId,
+          currentChannelId,
+        });
+
+        if (syncEvent.type === "MESSAGE_DELETE") {
+          const next = currentBundlesRef.current.filter(
+            (b) => b.id !== syncEvent.messageId,
+          );
+          commitBundles(next, "private_user_bus_delete");
+          return;
+        }
+
+        if (!syncEvent.message) return;
+        mergeBusMessage(
+          syncEvent.message,
+          syncEvent.type === "MESSAGE_INSERT"
+            ? "private_user_bus_insert"
+            : "private_user_bus_update",
+        );
+      },
+    );
+
     const cleanupRealtimeMessageStreams = (() => {
       const messageChannel = communityBackend.subscribeToMessages(
         currentChannelId,
@@ -2042,6 +2143,7 @@ export function useMessages({
       }
       clearRequestOlderMessagesLoader();
       messageReloadScheduler.cleanup();
+      unsubscribeMessageBus();
       cleanupRealtimeMessageStreams();
       messageReloadLifecycle.cleanup();
     };
