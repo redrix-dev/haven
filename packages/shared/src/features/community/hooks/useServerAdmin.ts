@@ -12,7 +12,7 @@ import type {
   ServerSummary,
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
-import { useNavigationStore } from "@shared/stores/navigationStore";
+import { requireHavenCore } from "@shared/core";
 import { useUiStore } from "@shared/stores";
 
 type UseServerAdminInput = {
@@ -362,9 +362,9 @@ export function useServerAdmin({
     },
     [currentServerId, loadServerSettings, refreshServers],
   );
-  const setCurrentServerId = useNavigationStore(
-    (state) => state.setCurrentServerId,
-  );
+  const setCurrentServerId = React.useCallback((id: string | null) => {
+    requireHavenCore().communities.setActiveId(id);
+  }, []);
   const openServerSettingsModal = React.useCallback(
     async (communityIdOverride?: string) => {
       const targetCommunityId = communityIdOverride ?? currentServerId;

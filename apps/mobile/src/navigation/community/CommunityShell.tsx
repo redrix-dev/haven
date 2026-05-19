@@ -4,8 +4,7 @@ import {
   useMobileCommunityWorkspace,
   useMobileServersFromSession,
 } from "@/contexts/MobileMainSessionContext";
-import { applyCommunityNavigationTarget } from "@shared/features/community/communityNavigation";
-import { useNavigationStore } from "@shared/stores/navigationStore";
+import { applyCommunityFocus, useHavenCore } from "@shared/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackHandler, Dimensions, Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -31,16 +30,23 @@ type Props = NativeStackScreenProps<MainStackParamList, "Community">;
 
 export function CommunityShell({ route, navigation }: Props) {
   const { serverId, openDrawer: openDrawerOnEnter = false } = route.params;
-  const setCurrentChannelId = useNavigationStore((state) => state.setCurrentChannelId);
+  const core = useHavenCore();
+  const setCurrentChannelId = useCallback(
+    (id: string | null) => {
+      core.channels.setActiveChannelId(id);
+    },
+    [core],
+  );
   const [drawerOpen, setDrawerOpen] = useState(openDrawerOnEnter);
   const drawerOffset = useSharedValue(openDrawerOnEnter ? 0 : -DRAWER_WIDTH);
   const dragStartOffset = useSharedValue(0);
 
   useEffect(() => {
-    const nav = useNavigationStore.getState();
-    if (nav.currentServerId === serverId && nav.currentChannelId) return;
-    applyCommunityNavigationTarget(serverId);
-  }, [serverId]);
+    const activeCommunityId = core.communities.getActiveId();
+    const activeChannelId = core.channels.getActiveChannelId();
+    if (activeCommunityId === serverId && activeChannelId) return;
+    applyCommunityFocus(core, serverId);
+  }, [core, serverId]);
 
   const { servers } = useMobileServersFromSession();
   const {

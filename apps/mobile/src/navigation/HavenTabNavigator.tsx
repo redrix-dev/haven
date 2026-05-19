@@ -6,8 +6,8 @@ import {
 import type { BottomTabNavigatorProps } from "@react-navigation/bottom-tabs";
 import type { FriendsPanelTab } from "@shared/types/types";
 import { countFilteredUnreadInInbox } from "@shared/features/notifications/inboxNotificationFilter";
-import { useNotificationsStore } from "@shared/stores/notificationsStore";
-import { useNavigationStore } from "@shared/stores/navigationStore";
+import { useUiStore } from "@shared/stores/uiStore";
+import { syncFocusFromRoute, useHavenCore } from "@shared/core";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -38,7 +38,8 @@ function HavenTabNavigator({
   UNSTABLE_router,
 }: BottomTabNavigatorProps) {
   const userId = useAuthStore((s) => s.user?.id ?? null);
-  const setWorkspaceMode = useNavigationStore((s) => s.setWorkspaceMode);
+  const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
+  const core = useHavenCore();
   const {
     state,
     descriptors,
@@ -59,6 +60,7 @@ function HavenTabNavigator({
 
   const {
     actions: { refreshNotificationInbox },
+    state: { notificationItems },
   } = useMobileNotifications();
 
   const {
@@ -98,16 +100,15 @@ function HavenTabNavigator({
   }, []);
 
   useEffect(() => {
-    useNotificationsStore.getState().setIsPanelOpen(isNotificationsModalOpen);
+    useUiStore.getState().setNotificationsPanelOpen(isNotificationsModalOpen);
     return () => {
-      useNotificationsStore.getState().setIsPanelOpen(false);
+      useUiStore.getState().setNotificationsPanelOpen(false);
     };
   }, [isNotificationsModalOpen]);
 
-  const notificationRows = useNotificationsStore((s) => s.notifications);
   const filteredNotificationsUnread = useMemo(
-    () => countFilteredUnreadInInbox(notificationRows),
-    [notificationRows],
+    () => countFilteredUnreadInInbox(notificationItems),
+    [notificationItems],
   );
 
   const dmUnreadTotal = useMemo(
@@ -170,7 +171,7 @@ function HavenTabNavigator({
       },
       openMention: (communityId, channelId) => {
         setWorkspaceMode("community");
-        useNavigationStore.getState().setCommunityNavigation(communityId, channelId);
+        syncFocusFromRoute(core, { communityId, channelId });
         tabNavigation.navigate("Community");
       },
       openNotifications: () => {
@@ -194,6 +195,7 @@ function HavenTabNavigator({
     refreshSocialCounts,
     setWorkspaceMode,
     tabNavigation,
+    core,
   ]);
 
   return (

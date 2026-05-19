@@ -8,6 +8,14 @@ import { useVoice } from "@shared/features/voice/hooks/useVoice";
 import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
 import { VoiceDrawer } from "@web-client/components/voice/VoiceDrawer";
 import type { Channel } from "@shared/lib/backend/types";
+import {
+  createMemoryPersistence,
+  registerHavenCore,
+  resetHavenCore,
+} from "@shared/core";
+import type { HavenCore } from "@shared/core/HavenCore";
+import { VoiceNexus } from "@shared/nexus/voice/VoiceNexus";
+import { SocialNexus } from "@shared/nexus/social/SocialNexus";
 
 const voiceMocks = vi.hoisted(() => {
   type PresenceHandler = () => void;
@@ -116,20 +124,23 @@ const voiceMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@shared/infrastructure/runtime/havenRuntimeRegistry", () => ({
-  requireHavenDataRuntime: () => ({
-    client: {
-      channel: (topic: string, options?: { config?: unknown }) =>
-        voiceMocks.createChannel(topic, { config: options?.config }),
-      getChannels: () => voiceMocks.channels,
-      removeChannel: voiceMocks.removeChannel,
+function registerTestHavenCore() {
+  const persistence = createMemoryPersistence();
+  const voice = new VoiceNexus(persistence);
+  const social = new SocialNexus(persistence);
+  registerHavenCore({
+    backends: {
+      client: {
+        channel: (topic: string, options?: { config?: unknown }) =>
+          voiceMocks.createChannel(topic, { config: options?.config }),
+        getChannels: () => voiceMocks.channels,
+        removeChannel: voiceMocks.removeChannel,
+      },
     },
-    publicConfig: {
-      supabaseUrl: "http://localhost",
-      supabaseAnonKey: "test-anon-key",
-    },
-  }),
-}));
+    voice,
+    social,
+  } as unknown as HavenCore);
+}
 
 vi.mock("@shared/features/voice/utils/ice", () => ({
   fetchIceConfig: voiceMocks.fetchIceConfig,
@@ -450,6 +461,8 @@ function DirectVoiceControllerHarness({
 
 describe("voice lifecycle regressions", () => {
   beforeEach(() => {
+    resetHavenCore();
+    registerTestHavenCore();
     voiceMocks.reset();
     const consoleError = console.error;
     vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {

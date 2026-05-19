@@ -52,7 +52,7 @@ export function FriendsModalContainer({
     actions: { refreshSocialCounts },
   } = useMobileSocialWorkspace();
 
-  const data = useFriendsModalData(visible, userId, refreshSocialCounts);
+  const data = useFriendsModalData(visible, userId);
 
   useEffect(() => {
     if (visible) setActiveTab(initialTab);
@@ -105,7 +105,7 @@ export function FriendsModalContainer({
                     style: "destructive",
                     onPress: () =>
                       void data.runMutation(`remove:${item.friendUserId}`, async () => {
-                        await data.socialBackend.removeFriend(item.friendUserId);
+                        await data.core.social.removeFriend(item.friendUserId);
                       }),
                   },
                 ],
@@ -134,7 +134,7 @@ export function FriendsModalContainer({
             disabled={data.busyActionKey !== null}
             onPress={() =>
               void data.runMutation(`accept:${item.requestId}`, async () => {
-                await data.socialBackend.acceptFriendRequest(item.requestId);
+                await data.core.social.acceptFriendRequest(item.requestId);
               })
             }
           >
@@ -145,7 +145,7 @@ export function FriendsModalContainer({
             disabled={data.busyActionKey !== null}
             onPress={() =>
               void data.runMutation(`decline:${item.requestId}`, async () => {
-                await data.socialBackend.declineFriendRequest(item.requestId);
+                await data.core.social.declineFriendRequest(item.requestId);
               })
             }
           >
@@ -166,7 +166,7 @@ export function FriendsModalContainer({
           disabled={data.busyActionKey !== null}
           onPress={() =>
             void data.runMutation(`cancel:${item.requestId}`, async () => {
-              await data.socialBackend.cancelFriendRequest(item.requestId);
+              await data.core.social.cancelFriendRequest(item.requestId);
             })
           }
         >
@@ -186,7 +186,7 @@ export function FriendsModalContainer({
           disabled={data.busyActionKey !== null}
           onPress={() =>
             void data.runMutation(`unblock:${item.blockedUserId}`, async () => {
-              await data.socialBackend.unblockUser(item.blockedUserId);
+              await data.core.social.unblockUser(item.blockedUserId);
             })
           }
         >
@@ -215,7 +215,7 @@ export function FriendsModalContainer({
                 void data.runMutation(
                   `send:${item.username}`,
                   async () => {
-                    await data.socialBackend.sendFriendRequest(item.username);
+                    await data.core.social.sendFriendRequest(item.username);
                   },
                   true,
                 )

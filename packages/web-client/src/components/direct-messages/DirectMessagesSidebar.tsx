@@ -8,12 +8,12 @@ import { Badge } from "@shared/app/ui/badge";
 import { Button } from "@shared/app/ui/button";
 import { ScrollArea } from "@shared/app/ui/scroll-area";
 import { Skeleton } from "@shared/app/ui/skeleton";
+import { useHavenCore } from "@shared/core";
 import { DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT } from "@shared/lib/backend/directMessageUtils";
 import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
 } from "@shared/infrastructure/liveProfiles";
-import { useDmStore } from "@shared/stores/dmStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { MessageCircle, RefreshCcw, VolumeX } from "lucide-react";
 
@@ -46,12 +46,10 @@ export function DirectMessagesSidebar({
   onSelectConversation,
   onRefresh,
 }: DirectMessagesSidebarProps) {
-  const conversations = useDmStore((state) => state.conversations);
-  const selectedConversationId = useDmStore(
-    (state) => state.currentConversationId,
-  );
-  const loading = useDmStore((state) => state.isLoading);
-  const unreadCounts = useDmStore((state) => state.unreadCounts);
+  const core = useHavenCore();
+  const conversations = core.directMessages.useConversations();
+  const selectedConversationId = core.directMessages.useActiveConversationId();
+  const loading = core.directMessages.useIsLoadingConversations();
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const sidebarRef = React.useRef<HTMLDivElement | null>(null);
   const userTitleRef = React.useRef<HTMLParagraphElement | null>(null);
@@ -258,14 +256,11 @@ export function DirectMessagesSidebar({
                           {conversation.isMuted && (
                             <VolumeX className="size-3.5 shrink-0 text-meta" />
                           )}
-                          {(unreadCounts[conversation.conversationId] ??
-                            conversation.unreadCount) > 0 && (
+                          {(conversation.unreadCount) > 0 && (
                             <Badge variant="default" className="bg-primary text-white">
-                              {(unreadCounts[conversation.conversationId] ??
-                                conversation.unreadCount) > 99
+                              {conversation.unreadCount > 99
                                 ? "99+"
-                                : (unreadCounts[conversation.conversationId] ??
-                                  conversation.unreadCount)}
+                                : conversation.unreadCount}
                             </Badge>
                           )}
                         </div>

@@ -10,7 +10,8 @@ import {
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
 import type { FriendsPanelTab } from "@shared/types/types";
-import { useNavigationStore } from "@shared/stores/navigationStore";
+import { requireHavenCore, syncFocusFromRoute } from "@shared/core";
+import { useUiStore } from "@shared/stores/uiStore";
 
 type DeepLinkNotifier = (
   level: "success" | "error",
@@ -27,8 +28,6 @@ interface UseDeepLinksOptions {
   setFriendsPanelOpen: (open: boolean) => void;
   setFriendsPanelRequestedTab: (tab: FriendsPanelTab | null) => void;
   setFriendsPanelHighlightedRequestId: (id: string | null) => void;
-  setCurrentServerId: (id: string) => void;
-  setCurrentChannelId: (id: string) => void;
   notify?: DeepLinkNotifier;
 }
 
@@ -40,13 +39,9 @@ export function useDeepLinks({
   setFriendsPanelOpen,
   setFriendsPanelRequestedTab,
   setFriendsPanelHighlightedRequestId,
-  setCurrentServerId,
-  setCurrentChannelId,
   notify,
 }: UseDeepLinksOptions) {
-  const setWorkspaceMode = useNavigationStore(
-    (state) => state.setWorkspaceMode,
-  );
+  const setWorkspaceMode = useUiStore((state) => state.setWorkspaceMode);
   const processedWebDeepLinkKeysRef = useRef<Map<string, number>>(new Map());
   const pendingWebDeepLinkRef = useRef<{
     target: WebAppDeepLinkTarget;
@@ -155,8 +150,10 @@ export function useDeepLinks({
           }
           case "channel_mention": {
             setWorkspaceMode("community");
-            setCurrentServerId(target.communityId);
-            setCurrentChannelId(target.channelId);
+            syncFocusFromRoute(requireHavenCore(), {
+              communityId: target.communityId,
+              channelId: target.channelId,
+            });
             setNotificationsPanelOpen(false);
             break;
           }
@@ -182,8 +179,6 @@ export function useDeepLinks({
       clearBrowserDeepLinkUrl,
       joinServerByInvite,
       openDirectMessageConversation,
-      setCurrentChannelId,
-      setCurrentServerId,
       setFriendsPanelHighlightedRequestId,
       setFriendsPanelOpen,
       setFriendsPanelRequestedTab,

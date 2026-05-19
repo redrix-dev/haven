@@ -1,7 +1,7 @@
 import React from "react";
-import { requireHavenDataRuntime } from "@shared/infrastructure/runtime/havenRuntimeRegistry";
+import { requireHavenCore, useHavenCore } from "@shared/core";
 
-const voiceRt = () => requireHavenDataRuntime().client;
+const voiceRt = () => requireHavenCore().backends.client;
 import type { Channel } from "@shared/lib/backend/types";
 import type {
   VoicePresenceStateRow,
@@ -12,7 +12,6 @@ import {
   isEditableKeyboardTarget,
 } from "@shared/infrastructure/utils/appUtils";
 import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
-import { useVoiceStore } from "@shared/stores/voiceStore";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import {
   createInitialVoiceSessionStoreState,
@@ -66,6 +65,8 @@ export function useVoice({
   voiceHardwareDebugPanelEnabled,
   channels,
 }: UseVoiceInput) {
+  const core = useHavenCore();
+  const voiceSession = core.voice.useSession();
   const [voiceSessionStoreState, dispatchVoiceSessionStoreEvent] =
     React.useReducer(
       reduceVoiceSessionStoreState,
@@ -77,9 +78,9 @@ export function useVoice({
   const [voicePanelOpen, setVoicePanelOpen] = React.useState(false);
   const [voiceHardwareDebugPanelOpen, setVoiceHardwareDebugPanelOpen] =
     React.useState(false);
-  const voiceConnected = useVoiceStore((state) => state.voiceConnected);
-  const voiceParticipants = useVoiceStore((state) => state.participants);
-  const storedVoiceSessionState = useVoiceStore((state) => state.sessionState);
+  const voiceConnected = voiceSession.voiceConnected;
+  const voiceParticipants = voiceSession.participants;
+  const storedVoiceSessionState = voiceSession.sessionState;
   const [voicePresenceByChannelId, setVoicePresenceByChannelId] =
     React.useState<Record<string, VoiceSidebarParticipant[]>>({});
   const [voiceControlActions, setVoiceControlActions] =
@@ -92,38 +93,40 @@ export function useVoice({
   );
   const voiceSessionState = storedVoiceSessionState ?? defaultVoiceSessionState;
 
-  const setStoredVoiceConnected = React.useCallback((connected: boolean) => {
-    useVoiceStore.getState().setVoiceConnected(connected);
-  }, []);
+  const setStoredVoiceConnected = React.useCallback(
+    (connected: boolean) => {
+      core.voice.setVoiceConnected(connected);
+    },
+    [core],
+  );
 
   const setStoredVoiceParticipants = React.useCallback(
     (participants: VoiceSidebarParticipant[]) => {
-      useVoiceStore.getState().setParticipants(participants);
+      core.voice.setParticipants(participants);
     },
-    [],
+    [core],
   );
 
   const setStoredVoiceSessionState = React.useCallback(
     (nextState: VoiceSessionState) => {
-      const store = useVoiceStore.getState();
-      store.setSessionState(nextState);
-      store.setJoined(nextState.joined);
-      store.setIsMuted(nextState.isMuted);
-      store.setIsDeafened(nextState.isDeafened);
+      core.voice.setSessionState(nextState);
+      core.voice.setJoined(nextState.joined);
+      core.voice.setIsMuted(nextState.isMuted);
+      core.voice.setIsDeafened(nextState.isDeafened);
     },
-    [],
+    [core],
   );
 
   const setStoredCurrentChannelId = React.useCallback(
     (channelId: string | null) => {
-      useVoiceStore.getState().setCurrentChannelId(channelId);
+      core.voice.setCurrentChannelId(channelId);
     },
-    [],
+    [core],
   );
 
   const resetStoredVoiceState = React.useCallback(() => {
-    useVoiceStore.getState().reset();
-  }, []);
+    core.voice.clear();
+  }, [core]);
 
   const resetVoiceState = React.useCallback(() => {
     dispatchVoiceSessionStoreEvent({ type: "COMPLETE_DISCONNECT" });

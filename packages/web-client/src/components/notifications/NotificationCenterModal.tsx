@@ -1,5 +1,5 @@
 import React from "react";
-import { useNotificationsStore } from "@shared/stores/notificationsStore";
+import { useHavenCore } from "@shared/core";
 import {
   Avatar,
   AvatarFallback,
@@ -101,8 +101,9 @@ export function NotificationCenterModal({
   localAudioError,
   onUpdateLocalAudioSettings,
 }: NotificationCenterModalProps) {
-  const notifications = useNotificationsStore((state) => state.notifications);
-  const loading = useNotificationsStore((state) => state.isLoading);
+  const core = useHavenCore();
+  const notifications = core.notifications.useNotifications();
+  const loading = core.notifications.useIsLoading();
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const [showSettings, setShowSettings] = React.useState(false);
   // DMs, friend requests, and accepted-FR toasts are owned by other surfaces; see inbox filter helper.

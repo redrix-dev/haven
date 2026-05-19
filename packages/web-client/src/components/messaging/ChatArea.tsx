@@ -5,7 +5,8 @@ import { Database } from "@shared/types/database";
 import { Button } from "@shared/app/ui/button";
 import { Switch } from "@shared/app/ui/switch";
 import { Headphones } from "lucide-react";
-import { useMessagesStore } from "@shared/stores/messagesStore";
+import { useHavenCore } from "@shared/core";
+import { useUiStore } from "@shared/stores/uiStore";
 import type {
   BanEligibleServer,
   MessageAttachment,
@@ -16,17 +17,19 @@ import type {
 type ChannelKind = Database["public"]["Enums"]["channel_kind"];
 
 interface ChatAreaProps {
+  communityId: string;
   channelId: string;
   channelName: string;
   channelKind: ChannelKind;
   currentUserId: string;
-  isElevatedViewer: boolean;
   canManageMessages: boolean;
   canCreateReports: boolean;
   canManageBans: boolean;
   canManageMembers: boolean;
   canViewBanHidden: boolean;
   canRefreshLinkPreviews: boolean;
+  hasOlderMessages?: boolean;
+  isLoadingOlderMessages?: boolean;
   showVoiceDiagnostics?: boolean;
   onOpenChannelSettings?: () => void;
   onOpenVoiceControls?: () => void;
@@ -71,17 +74,19 @@ interface ChatAreaProps {
 }
 
 export function ChatArea({
+  communityId,
   channelId,
   channelName,
   channelKind,
   currentUserId,
-  isElevatedViewer,
   canManageMessages,
   canCreateReports,
   canManageBans,
   canManageMembers,
   canViewBanHidden,
   canRefreshLinkPreviews,
+  hasOlderMessages = false,
+  isLoadingOlderMessages = false,
   showVoiceDiagnostics = false,
   onOpenChannelSettings,
   onOpenVoiceControls,
@@ -100,8 +105,13 @@ export function ChatArea({
   onDirectMessageUser,
   enableRichComposer = false,
 }: ChatAreaProps) {
+  const core = useHavenCore();
+  const messages = core.messages
+    .for(communityId)
+    .useVisibleChannel(channelId);
+  const showHiddenMessages = useUiStore((state) => state.showHiddenMessages);
+  const setShowHiddenMessages = useUiStore((state) => state.setShowHiddenMessages);
   const isVoiceChannel = channelKind === "voice";
-  const messages = useMessagesStore((state) => state.messages);
   const [composerHeight, setComposerHeight] = React.useState(96);
   const hiddenMessagesToggleId = React.useId();
   const [replyTarget, setReplyTarget] = React.useState<{
@@ -109,8 +119,6 @@ export function ChatArea({
     authorLabel: string;
     preview: string;
   } | null>(null);
-  const [showHiddenMessages, setShowHiddenMessages] = React.useState(false);
-  const shouldShowHiddenMessages = canViewBanHidden && showHiddenMessages;
 
   React.useEffect(() => {
     setReplyTarget(null);
@@ -121,13 +129,18 @@ export function ChatArea({
     const replyTargetMessage = messages.find(
       (message) => message.id === replyTarget.id,
     );
-    if (
-      !replyTargetMessage ||
-      (replyTargetMessage.isHidden && !shouldShowHiddenMessages)
-    ) {
+    if (!replyTargetMessage) {
       setReplyTarget(null);
     }
-  }, [messages, replyTarget, shouldShowHiddenMessages]);
+  }, [messages, replyTarget]);
+
+  const handleHiddenMessagesToggle = React.useCallback(
+    (checked: boolean) => {
+      setShowHiddenMessages(checked);
+      core.syncViewerMessagePolicy(communityId);
+    },
+    [communityId, core, setShowHiddenMessages],
+  );
 
   const handleSendMessage = React.useCallback(
     async (
@@ -198,7 +211,7 @@ export function ChatArea({
                 id={hiddenMessagesToggleId}
                 size="sm"
                 checked={showHiddenMessages}
-                onCheckedChange={setShowHiddenMessages}
+                onCheckedChange={handleHiddenMessagesToggle}
                 className="data-[state=checked]:bg-red-500/70 data-[state=unchecked]:bg-border-dialog"
               />
             </label>
@@ -249,8 +262,8 @@ export function ChatArea({
             {/* Messages */}
             <MessageList
               channelId={channelId}
+              messages={messages}
               currentUserId={currentUserId}
-              isElevatedViewer={isElevatedViewer}
               canManageMessages={canManageMessages}
               canCreateReports={canCreateReports}
               canManageBans={canManageBans}
@@ -271,8 +284,9 @@ export function ChatArea({
                 onRequestMessageLinkPreviewRefresh
               }
               onRequestOlderMessages={onRequestOlderMessages}
+              hasOlderMessages={hasOlderMessages}
+              isLoadingOlderMessages={isLoadingOlderMessages}
               bottomInset={composerHeight + 16}
-              showHiddenMessages={shouldShowHiddenMessages}
             />
 
             {/* Input */}

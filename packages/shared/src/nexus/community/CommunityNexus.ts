@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { createMMKV, type MMKV } from 'react-native-mmkv'
 import { Nexus, type NexusEntry, type NexusState } from '../Nexus'
+import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
+import type { ControlPlaneBackend } from '@shared/lib/backend/controlPlaneBackend.interface'
 import type { ServerSummary } from '@shared/lib/backend/types'
 import type { StoreApi, UseBoundStore } from 'zustand'
 
@@ -19,15 +20,6 @@ export type CommunityNexusState = NexusState<Community> & {
 
 const STORAGE_KEY = 'haven:nexus:communities:global'
 const EMPTY_COMMUNITIES: Community[] = []
-
-let sharedNexusStorage: MMKV | null = null
-
-function getSharedNexusStorage(): MMKV {
-  if (!sharedNexusStorage) {
-    sharedNexusStorage = createMMKV({ id: 'haven-nexus-storage' })
-  }
-  return sharedNexusStorage
-}
 
 const selectActiveId = (state: CommunityNexusState) => state.activeId
 const selectIsLoading = (state: CommunityNexusState) => state.isLoading
@@ -72,8 +64,42 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
     return next
   }
 
-  constructor() {
-    super('communities', 'global', getSharedNexusStorage())
+  private controlPlane: ControlPlaneBackend | null = null
+
+  constructor(persistence: NexusPersistence) {
+    super('communities', 'global', persistence)
+  }
+
+  /**
+   * Wire the backend used by `load`. Called by HavenCore once during construction.
+   */
+  setControlPlane(controlPlane: ControlPlaneBackend): void {
+    this.controlPlane = controlPlane
+  }
+
+  /**
+   * Replace the community list from the control plane. Called during
+   * bootstrapSession and when a community is created/joined/left.
+   */
+  async load(userId: string): Promise<void> {
+    if (!this.controlPlane) {
+      throw new Error(
+        'CommunityNexus.load called before controlPlane was attached. HavenCore must wire backends during construction.',
+      )
+    }
+    this.setIsLoading(true)
+    try {
+      const list = await this.controlPlane.listUserCommunities(userId)
+      this.setCommunities(
+        list.map((community) => ({
+          id: community.id,
+          name: community.name,
+          createdAt: community.created_at,
+        })),
+      )
+    } finally {
+      this.setIsLoading(false)
+    }
   }
 
   protected transform(raw: ServerSummary): Community {
@@ -172,6 +198,10 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
     this.persist()
   }
 
+  getActiveId(): string | null {
+    return this.store.getState().activeId
+  }
+
   setIsLoading(loading: boolean): void {
     this.store.setState((state) => ({
       ...state,
@@ -190,7 +220,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
         orderedIds: state.orderedIds,
         activeId: state.activeId,
       }
-      getSharedNexusStorage().set(STORAGE_KEY, JSON.stringify(persistable))
+      this.persistence.set(STORAGE_KEY, JSON.stringify(persistable))
     } catch (error) {
       console.warn('[CommunityNexus] Failed to persist', error)
     }
@@ -198,7 +228,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
 
   override rehydrate(): void {
     try {
-      const raw = getSharedNexusStorage().getString(STORAGE_KEY)
+      const raw = this.persistence.getString(STORAGE_KEY)
       if (!raw) return
 
       const parsed = JSON.parse(raw) as {
@@ -216,7 +246,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       }))
     } catch (error) {
       console.warn('[CommunityNexus] Failed to rehydrate', error)
-      getSharedNexusStorage().remove(STORAGE_KEY)
+      this.persistence.remove(STORAGE_KEY)
     }
   }
 
@@ -230,7 +260,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
     })
     this.communitiesSnapshot = EMPTY_COMMUNITIES
     this.communitySelectors.clear()
-    getSharedNexusStorage().remove(STORAGE_KEY)
+    this.persistence.remove(STORAGE_KEY)
   }
 
   useCommunities(): Community[] {
@@ -254,4 +284,3 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
   }
 }
 
-export const communityNexus = new CommunityNexus()

@@ -5,11 +5,7 @@ import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
 import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
 import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
-import { useNavigationStore } from "@shared/stores/navigationStore";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useServersStore } from "@shared/stores/serversStore";
-import { useSocialStore } from "@shared/stores";
-import { useVoiceStore } from "@shared/stores/voiceStore";
+import { useHavenCore } from "@shared/core";
 import { useUiStore } from "@shared/stores/uiStore";
 import {
   filterBlockedUsersFromParticipantList,
@@ -17,19 +13,18 @@ import {
 } from "@shared/features/voice/utils/voiceParticipantVisibility";
 
 export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
-  const servers = useServersStore((state) => state.servers);
-  const currentServerId = useNavigationStore((state) => state.currentServerId);
+  const core = useHavenCore();
+  const currentServerId = core.communities.useActiveId();
   const currentServer = useMemo(
-    () => servers.find((server) => server.id === currentServerId) ?? null,
-    [currentServerId, servers],
+    () => app.servers.find((server) => server.id === currentServerId) ?? null,
+    [app.servers, currentServerId],
   );
-  const voiceJoined = useVoiceStore((state) => state.joined);
-  const voiceMuted = useVoiceStore((state) => state.isMuted);
-  const voiceDeafened = useVoiceStore((state) => state.isDeafened);
-  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
-  const serverPermissions = usePermissionsStore((state) =>
-    state.getPermissions(currentServerId ?? ""),
-  );
+  const voiceSession = core.voice.useSession();
+  const voiceJoined = voiceSession.joined;
+  const voiceMuted = voiceSession.isMuted;
+  const voiceDeafened = voiceSession.isDeafened;
+  const blockedUserIds = core.social.useBlockedUserIds();
+  const serverPermissions = core.permissions.usePermissions(currentServerId ?? "");
   const canKickVoiceParticipants =
     serverPermissions.isOwner ||
     serverPermissions.canManageServer ||
@@ -44,7 +39,7 @@ export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
   const setVoicePanelOpen = app.setVoicePanelOpen;
   const disconnectVoiceSession = app.disconnectVoiceSession;
   const activeVoiceServer = app.activeVoiceChannel
-    ? (servers.find(
+    ? (app.servers.find(
         (server) => server.id === app.activeVoiceChannel?.community_id,
       ) ?? null)
     : null;
@@ -121,9 +116,9 @@ export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
     onUpdateVoiceSettings: (next) => {
       void app.setVoiceSettings(next);
     },
-    onParticipantsChange: useVoiceStore.getState().setParticipants,
-    onConnectionChange: useVoiceStore.getState().setVoiceConnected,
-    onSessionStateChange: useVoiceStore.getState().setSessionState,
+    onParticipantsChange: core.voice.setParticipants.bind(core.voice),
+    onConnectionChange: core.voice.setVoiceConnected.bind(core.voice),
+    onSessionStateChange: core.voice.setSessionState.bind(core.voice),
     onControlActionsReady: app.setVoiceControlActions,
     onSessionError: handleVoiceSessionError,
     onVoiceKick: handleVoiceKickReceived,

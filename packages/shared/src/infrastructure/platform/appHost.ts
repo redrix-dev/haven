@@ -81,6 +81,22 @@ export type VoiceRuntimeBridge = {
   ) => () => void;
 };
 
+/**
+ * Imperative shell navigation requested from non-UI code (notification taps,
+ * deep links, access-revoked redirects). The shell implementation owns the
+ * actual navigation primitive (React Navigation ref, history.pushState, etc).
+ *
+ * UI components should NOT call these directly during normal interaction —
+ * they exist for external events that cannot reach the router by themselves.
+ */
+export type ShellNavigationBridge = {
+  navigateToCommunity?: (
+    serverId: string,
+    channelId?: string | null,
+  ) => void;
+  navigateToDm?: (conversationId: string) => void;
+};
+
 export type AppHost = {
   isDesktopApp: () => boolean;
   openExternalUrl: (url: string) => Promise<void>;
@@ -88,12 +104,33 @@ export type AppHost = {
     url: string;
     suggestedName: string;
   }) => Promise<SaveFileFromUrlResult>;
+  navigateToCommunity?: ShellNavigationBridge["navigateToCommunity"];
+  navigateToDm?: ShellNavigationBridge["navigateToDm"];
   desktopSettings?: DesktopSettingsBridge;
   desktopAuth?: DesktopAuthBridge;
   voicePopout?: VoicePopoutBridge;
   windowChrome?: WindowChromeBridge;
   browserRuntime?: BrowserRuntimeBridge;
   voiceRuntime?: VoiceRuntimeBridge;
+};
+
+const buildCommunityUrlPath = (
+  serverId: string,
+  channelId?: string | null,
+): string => (channelId ? `/c/${serverId}/${channelId}` : `/c/${serverId}`);
+
+const buildDmUrlPath = (conversationId: string): string =>
+  `/dm/${conversationId}`;
+
+const navigateWebTo = (path: string) => {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === path) return;
+  try {
+    window.history.pushState({}, document.title, path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  } catch {
+    window.location.assign(path);
+  }
 };
 
 const defaultWebHost: AppHost = {
@@ -108,6 +145,12 @@ const defaultWebHost: AppHost = {
     }
     window.open(url, "_blank", "noopener,noreferrer");
     return { saved: false, filePath: null };
+  },
+  navigateToCommunity: (serverId, channelId) => {
+    navigateWebTo(buildCommunityUrlPath(serverId, channelId));
+  },
+  navigateToDm: (conversationId) => {
+    navigateWebTo(buildDmUrlPath(conversationId));
   },
   browserRuntime: {
     getVisibilityState: () => {

@@ -251,11 +251,11 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
             </Text>
             <Text className="mt-4 text-xs font-semibold text-foreground">Instrumented stores</Text>
             <Text className="text-xs text-muted-foreground">
-              navigationStore, messagesStore, serversStore, authStore, socialStore, dmStore
+              authStore
             </Text>
             <Text className="mt-4 text-xs font-semibold text-foreground">Instrumented hooks</Text>
             <Text className="text-xs text-muted-foreground">
-              useCommunityWorkspace, useMessages, prefetchCommunityChannelMessages,
+              MobileMainSessionContext, useMessages, prefetchCommunityChannelMessages,
               MobileMainSession warmCommunityForEntry, servers realtime bootstrap, auth session cache
               clears
             </Text>

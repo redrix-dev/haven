@@ -10,7 +10,6 @@ import {
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DirectMessageArea } from "@web-client/components/direct-messages/DirectMessageArea";
-import { useDmStore } from "@shared/stores/dmStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import type {
   DirectMessage,
@@ -38,10 +37,9 @@ const conversation: DirectMessageConversationSummary = {
 function renderArea(
   overrides?: Partial<React.ComponentProps<typeof DirectMessageArea>>,
 ) {
-  useDmStore.getState().setCurrentConversation(conversation);
-  useDmStore.getState().setCurrentConversationId(conversation.conversationId);
   return render(
     <DirectMessageArea
+      conversation={conversation}
       currentUserId="user-1"
       currentUserDisplayName="Me"
       messages={[]}
@@ -60,7 +58,6 @@ function renderArea(
 
 describe("DirectMessageArea", () => {
   beforeEach(() => {
-    useDmStore.getState().reset();
     useLiveProfilesStore.getState().reset();
   });
 

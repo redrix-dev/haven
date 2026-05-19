@@ -29,8 +29,7 @@ import type {
 import { ThemedIonicons } from "@/theme-rn";
 import { useFloatingDmPlaceholderChannels } from "@/theme-rn/useFloatingDmPlaceholderChannels";
 import { useDmBubbleSheetChrome } from "@/theme-rn/useDmBubbleSheetChrome";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useServersStore } from "@shared/stores/serversStore";
+import { useHavenCore } from "@shared/core";
 
 export type {
   FloatingDmBubbleIconName,
@@ -135,14 +134,18 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
 
   const themedDefaults = useFloatingDmPlaceholderChannels();
   const sheetChrome = useDmBubbleSheetChrome();
-  const servers = useServersStore((s) => s.servers);
-  const permissionsByServerId = usePermissionsStore((s) => s.permissionsByServerId);
+  const core = useHavenCore();
+  const communities = core.communities.useCommunities();
+  const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
   const modmailManagedCommunityIds = useMemo(
     () =>
-      servers
-        .filter((s) => permissionsByServerId[s.id]?.canManageReports)
-        .map((s) => s.id),
-    [servers, permissionsByServerId],
+      communities
+        .filter(
+          (community) =>
+            permissionsByCommunityId[community.id]?.canManageReports,
+        )
+        .map((community) => community.id),
+    [communities, permissionsByCommunityId],
   );
 
   const channels = useMemo(

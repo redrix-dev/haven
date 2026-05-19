@@ -1,6 +1,6 @@
 import { create, useStore, type StoreApi, type UseBoundStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
-import type { MMKV } from "react-native-mmkv";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 
 export type NexusEntry<T> = {
   data: T;
@@ -13,16 +13,32 @@ export type NexusState<T> = {
   revision: number;
 };
 
+/**
+ * Abstract entity cache used by every domain Nexus.
+ *
+ * Responsibilities:
+ *   - entity map (Zustand store)
+ *   - getOrCreate / getOrPartial / update / delete
+ *   - persist/rehydrate via injected NexusPersistence
+ *   - stable selectors for React
+ *
+ * Subclasses provide transform(raw) and may extend the store shape.
+ * Storage is platform-agnostic; hosts inject the adapter at HavenCore creation.
+ */
 export abstract class Nexus<T, R = unknown> {
   private entityType: string;
   private instanceId: string;
-  private storage: MMKV;
+  protected persistence: NexusPersistence;
   private _store: UseBoundStore<StoreApi<NexusState<T>>> | null = null;
 
-  constructor(entityType: string, instanceId: string, storage: MMKV) {
+  constructor(
+    entityType: string,
+    instanceId: string,
+    persistence: NexusPersistence,
+  ) {
     this.entityType = entityType;
     this.instanceId = instanceId;
-    this.storage = storage;
+    this.persistence = persistence;
   }
 
   protected get store(): UseBoundStore<StoreApi<NexusState<T>>> {
@@ -35,7 +51,7 @@ export abstract class Nexus<T, R = unknown> {
     return this._store;
   }
 
-  private get storageKey(): string {
+  protected get storageKey(): string {
     return `haven:nexus:${this.entityType}:${this.instanceId}`;
   }
 
@@ -48,7 +64,7 @@ export abstract class Nexus<T, R = unknown> {
     }));
   }
 
-  getOrCreate(id: string, raw: R, isNew = false): T {
+  getOrCreate(id: string, raw: R, _isNew = false): T {
     const existing = this.store.getState().entities[id];
     if (existing && !existing.partial) return existing.data;
 
@@ -142,7 +158,7 @@ export abstract class Nexus<T, R = unknown> {
       const persistable = Object.fromEntries(
         Object.entries(state.entities).filter(([_, entry]) => !entry.partial),
       );
-      this.storage.set(this.storageKey, JSON.stringify(persistable));
+      this.persistence.set(this.storageKey, JSON.stringify(persistable));
     } catch (e) {
       console.warn(`[Nexus] Failed to persist ${this.storageKey}`, e);
     }
@@ -150,14 +166,14 @@ export abstract class Nexus<T, R = unknown> {
 
   rehydrate(): void {
     try {
-      const raw = this.storage.getString(this.storageKey);
+      const raw = this.persistence.getString(this.storageKey);
       if (!raw) return;
 
       const parsed = JSON.parse(raw) as Record<string, NexusEntry<T>>;
       this.store.setState({ entities: parsed, revision: 0 });
     } catch (e) {
       console.warn(`[Nexus] Failed to rehydrate ${this.storageKey}`, e);
-      this.storage.remove(this.storageKey);
+      this.persistence.remove(this.storageKey);
     }
   }
 
@@ -168,6 +184,6 @@ export abstract class Nexus<T, R = unknown> {
 
   clear(): void {
     this.store.setState({ entities: {}, revision: 0 });
-    this.storage.remove(this.storageKey);
+    this.persistence.remove(this.storageKey);
   }
 }

@@ -1,28 +1,32 @@
 import { useEffect, useMemo } from "react";
 import { hydrateCommunityPermissionsForMany } from "@shared/features/community/communityPermissionsHydration";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useServersStore } from "@shared/stores/serversStore";
+import { useHavenCore } from "@shared/core";
 
 /**
- * Keeps `permissionsStore` in sync with joined communities (same pattern as desktop
+ * Keeps PermissionsNexus in sync with joined communities (same pattern as desktop
  * `usePermissionsReportSlice` / chat app lifecycle).
  */
 export function useMobileCommunityPermissionsHydration(userId: string | undefined) {
-  const servers = useServersStore((s) => s.servers);
-  const serverIdsKey = useMemo(() => servers.map((s) => s.id).sort().join(","), [servers]);
+  const core = useHavenCore();
+  const communities = core.communities.useCommunities();
+  const serverIdsKey = useMemo(
+    () => communities.map((community) => community.id).sort().join(","),
+    [communities],
+  );
 
   useEffect(() => {
     if (!userId) return;
 
-    const joinedIds = new Set(servers.map((s) => s.id));
-    const { permissionsByServerId, clearPermissions } = usePermissionsStore.getState();
-    for (const id of Object.keys(permissionsByServerId)) {
+    const joinedIds = new Set(communities.map((community) => community.id));
+    for (const id of Object.keys(core.permissions.getPermissionsByCommunityId())) {
       if (!joinedIds.has(id)) {
-        clearPermissions(id);
+        core.permissions.invalidate(id);
       }
     }
 
-    if (servers.length === 0) return;
-    void hydrateCommunityPermissionsForMany(servers.map((s) => s.id));
-  }, [userId, serverIdsKey, servers]);
+    if (communities.length === 0) return;
+    void hydrateCommunityPermissionsForMany(
+      communities.map((community) => community.id),
+    );
+  }, [communities, core, serverIdsKey, userId]);
 }

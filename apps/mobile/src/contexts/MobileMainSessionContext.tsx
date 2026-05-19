@@ -2,23 +2,63 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useState,
   type ReactNode,
 } from "react";
 import { dataCacheDebug, useDataCacheComponentProbe } from "@shared/debug";
-import { applyCommunityNavigationTarget } from "@shared/features/community/communityNavigation";
-import { useNavigationStore } from "@shared/stores/navigationStore";
-import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommunityWorkspace";
+import {
+  applyCommunityFocus,
+  toChannel,
+  resolvePreferredChannelIdForServer,
+  useHavenCore,
+} from "@shared/core";
+import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import { prefetchCommunityChannelMessages } from "@shared/features/messaging/hooks/useMessages";
-import { useServersStore } from "@shared/stores/serversStore";
+import { useUiStore } from "@shared/stores/uiStore";
+import type { Channel } from "@shared/lib/backend/types";
 import { getLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
 
-type CommunityWorkspaceReturn = ReturnType<typeof useCommunityWorkspace>;
 type ServersReturn = Pick<
   ReturnType<typeof useServers>,
   "servers" | "status" | "error" | "loading" | "refreshServers" | "createServer"
 >;
+
+type CommunityWorkspaceState = {
+  channels: Channel[];
+  channelsLoading: boolean;
+  channelsError: string | null;
+};
+
+type CommunityWorkspaceDerived = {
+  currentServer: ServersReturn["servers"][number] | null;
+  currentChannel: Channel | null;
+  currentChannelBelongsToCurrentServer: boolean;
+  channelSettingsTarget: Channel | null;
+  currentRenderableChannel: Channel | null;
+  currentChannelKind: Channel["kind"] | null;
+};
+
+type CommunityWorkspaceActions = {
+  resetChannelsWorkspace: () => void;
+  prefetchServersChannels: (serverIds: string[]) => Promise<void>;
+  prefetchMessageCachesForServers: (
+    serverIds: string[],
+    prefetchChannelMessages: (serverId: string, channelId: string) => Promise<void>,
+  ) => Promise<void>;
+  getDefaultChannelIdForServer: (
+    serverId: string,
+    lastVisitedChannelId?: string | null,
+  ) => string | null;
+};
+
+type CommunityWorkspaceReturn = {
+  state: CommunityWorkspaceState;
+  derived: CommunityWorkspaceDerived;
+  actions: CommunityWorkspaceActions;
+};
 
 type MobileMainSessionContextValue = {
   servers: ServersReturn["servers"];
@@ -28,13 +68,14 @@ type MobileMainSessionContextValue = {
   refreshServers: ServersReturn["refreshServers"];
   createServer: ServersReturn["createServer"];
   communityWorkspace: CommunityWorkspaceReturn;
-  /** Prefetch channel list + last visited channel messages before navigation. */
   warmCommunityForEntry: (serverId: string) => Promise<void>;
 };
 
 const MobileMainSessionContext = createContext<MobileMainSessionContextValue | null>(
   null,
 );
+
+const PREFETCH_TEXT_CHANNELS_PER_SERVER = 8;
 
 export function MobileMainSessionProvider({
   userId,
@@ -43,12 +84,189 @@ export function MobileMainSessionProvider({
   userId: string;
   children: ReactNode;
 }) {
+  const core = useHavenCore();
   const { servers, status, error, loading, refreshServers, createServer } = useServers();
-  const communityWorkspace = useCommunityWorkspace({
-    servers,
-    currentUserId: userId,
-    autoSelectFirstServer: false,
-  });
+  const currentServerId = core.communities.useActiveId();
+  const currentChannelId = core.channels.useActiveChannelId();
+  const channelSettingsTargetId = useUiStore(
+    (state) => state.channelSettingsTargetId,
+  );
+
+  const havenChannels = core.channels.useChannels(currentServerId ?? "__none__");
+  const channelsLoading = core.channels.useIsLoading(currentServerId ?? "__none__");
+  const channels = useMemo(
+    () => havenChannels.map(toChannel),
+    [havenChannels],
+  );
+  const [channelsError, setChannelsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentServerId) return;
+    setChannelsError(null);
+    void core.channels.ensureLoaded(currentServerId).catch((err) => {
+      console.warn("[MobileMainSession] ensureLoaded failed", err);
+      setChannelsError(
+        err instanceof Error ? err.message : "Failed to load channels.",
+      );
+    });
+  }, [core, currentServerId]);
+
+  useEffect(() => {
+    if (!currentServerId || channels.length === 0) return;
+    const valid =
+      currentChannelId != null &&
+      channels.some((channel) => channel.id === currentChannelId);
+    if (valid) return;
+    const preferred = resolvePreferredChannelIdForServer(
+      core,
+      currentServerId,
+      channels,
+      { previousChannelId: currentChannelId },
+    );
+    core.communities.setActiveId(currentServerId);
+    core.channels.setActiveChannelId(preferred);
+  }, [channels, core, currentChannelId, currentServerId]);
+
+  useEffect(() => {
+    if (!userId || !currentServerId) {
+      if (currentServerId) {
+        core.permissions.invalidate(currentServerId);
+      }
+      return;
+    }
+    void hydrateCommunityPermissions(currentServerId);
+  }, [core, currentServerId, userId]);
+
+  const currentServer = useMemo(
+    () => servers.find((server) => server.id === currentServerId) ?? null,
+    [servers, currentServerId],
+  );
+
+  const currentChannel = useMemo(
+    () => channels.find((channel) => channel.id === currentChannelId) ?? null,
+    [channels, currentChannelId],
+  );
+
+  const currentChannelBelongsToCurrentServer = Boolean(
+    currentChannel &&
+      currentServerId &&
+      currentChannel.community_id === currentServerId,
+  );
+
+  const channelSettingsTarget = useMemo(
+    () =>
+      channels.find(
+        (channel) =>
+          channel.id === (channelSettingsTargetId ?? currentChannelId),
+      ) ?? null,
+    [channels, channelSettingsTargetId, currentChannelId],
+  );
+
+  const currentRenderableChannel = useMemo(
+    () =>
+      currentChannel &&
+      currentChannelBelongsToCurrentServer &&
+      currentChannel.kind === "text"
+        ? currentChannel
+        : (channels.find(
+            (channel) =>
+              channel.kind === "text" &&
+              (!currentServerId || channel.community_id === currentServerId),
+          ) ?? (currentChannelBelongsToCurrentServer ? currentChannel : null)),
+    [
+      channels,
+      currentChannel,
+      currentChannelBelongsToCurrentServer,
+      currentServerId,
+    ],
+  );
+
+  const currentChannelKind = currentChannel?.kind ?? null;
+
+  const resetChannelsWorkspace = useCallback(() => {
+    setChannelsError(null);
+    if (currentServerId) {
+      core.channels.setActiveChannelId(null);
+    }
+  }, [core, currentServerId]);
+
+  const prefetchServersChannels = useCallback(
+    async (serverIds: string[]) => {
+      await Promise.allSettled(
+        serverIds.map((id) => core.channels.ensureLoaded(id)),
+      );
+    },
+    [core],
+  );
+
+  const prefetchMessageCachesForServers = useCallback(
+    async (
+      serverIds: string[],
+      prefetchChannelMessages: (
+        serverId: string,
+        channelId: string,
+      ) => Promise<void>,
+    ) => {
+      await Promise.allSettled(
+        serverIds.flatMap((serverId) => {
+          const list = core.channels.getChannelsSnapshot(serverId);
+          return list
+            .filter((channel) => channel.kind === "text")
+            .slice(0, PREFETCH_TEXT_CHANNELS_PER_SERVER)
+            .map((channel) => prefetchChannelMessages(serverId, channel.id));
+        }),
+      );
+    },
+    [core],
+  );
+
+  const getDefaultChannelIdForServer = useCallback(
+    (serverId: string, lastVisitedChannelId?: string | null): string | null => {
+      const channelList = core.channels
+        .getChannelsSnapshot(serverId)
+        .map(toChannel);
+      if (channelList.length === 0) return null;
+      return resolvePreferredChannelIdForServer(core, serverId, channelList, {
+        lastVisitedChannelId,
+      });
+    },
+    [core],
+  );
+
+  const communityWorkspace = useMemo<CommunityWorkspaceReturn>(
+    () => ({
+      state: { channels, channelsLoading, channelsError },
+      derived: {
+        currentServer,
+        currentChannel,
+        currentChannelBelongsToCurrentServer,
+        channelSettingsTarget,
+        currentRenderableChannel,
+        currentChannelKind,
+      },
+      actions: {
+        resetChannelsWorkspace,
+        prefetchServersChannels,
+        prefetchMessageCachesForServers,
+        getDefaultChannelIdForServer,
+      },
+    }),
+    [
+      channelSettingsTarget,
+      channels,
+      channelsError,
+      channelsLoading,
+      currentChannel,
+      currentChannelBelongsToCurrentServer,
+      currentChannelKind,
+      currentRenderableChannel,
+      currentServer,
+      getDefaultChannelIdForServer,
+      prefetchMessageCachesForServers,
+      prefetchServersChannels,
+      resetChannelsWorkspace,
+    ],
+  );
 
   const warmCommunityForEntry = useCallback(
     async (serverId: string) => {
@@ -77,22 +295,19 @@ export function MobileMainSessionProvider({
         });
       }
 
-      applyCommunityNavigationTarget(serverId, { lastVisitedChannelId: lastVisited });
+      applyCommunityFocus(core, serverId, { lastVisitedChannelId: lastVisited });
 
       dataCacheDebug.lifecycle("MobileMainSession", "warmCommunityForEntry complete", {
         serverId,
         channelId,
       });
     },
-    [communityWorkspace.actions, userId],
+    [communityWorkspace.actions, core, userId],
   );
 
-  const navServerId = useNavigationStore((s) => s.currentServerId);
-  const navChannelId = useNavigationStore((s) => s.currentChannelId);
-
   useDataCacheComponentProbe("MobileMainSession", {
-    navServerId,
-    navChannelId,
+    navServerId: currentServerId,
+    navChannelId: currentChannelId,
     serversCount: servers.length,
     serversStatus: status,
     channelsCount: communityWorkspace.state.channels.length,
@@ -143,10 +358,14 @@ export function useMobileCommunityWorkspace(): CommunityWorkspaceReturn {
   return useMobileMainSession().communityWorkspace;
 }
 
-/** Read servers list without requiring the full session hook surface. */
 export function useMobileServersFromSession() {
-  const { servers, serversStatus, serversError, refreshServers } =
+  const { servers, serversStatus, serversError, serversLoading, refreshServers } =
     useMobileMainSession();
-  const loading = useServersStore((state) => state.isLoading);
-  return { servers, status: serversStatus, error: serversError, loading, refreshServers };
+  return {
+    servers,
+    status: serversStatus,
+    error: serversError,
+    loading: serversLoading,
+    refreshServers,
+  };
 }

@@ -4,7 +4,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotificationCenterModal } from "@web-client/components/notifications/NotificationCenterModal";
-import { useNotificationsStore } from "@shared/stores/notificationsStore";
+import {
+  createMemoryPersistence,
+  registerHavenCore,
+  resetHavenCore,
+} from "@shared/core";
+import type { HavenCore } from "@shared/core/HavenCore";
+import { NotificationNexus } from "@shared/nexus/notifications/NotificationNexus";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import type {
   NotificationItem,
@@ -20,6 +26,8 @@ const baseLocalAudioSettings: NotificationAudioSettings = {
   voicePresenceSoundVolume: 50,
   playSoundsWhenFocused: true,
 };
+
+let notificationNexus: NotificationNexus;
 
 function makeNotification(
   partial: Partial<NotificationItem>,
@@ -48,16 +56,22 @@ function makeNotification(
   };
 }
 
+function seedNotifications(items: NotificationItem[]) {
+  notificationNexus.setNotifications(items, { hasMore: false });
+}
+
 describe("NotificationCenterModal", () => {
   beforeEach(() => {
-    useNotificationsStore.getState().reset();
+    resetHavenCore();
+    notificationNexus = new NotificationNexus(createMemoryPersistence());
+    registerHavenCore({ notifications: notificationNexus } as HavenCore);
     useLiveProfilesStore.getState().reset();
   });
 
   it("opens a visible notification row via click and keyboard", async () => {
     const user = userEvent.setup();
     const onOpenNotificationItem = vi.fn();
-    useNotificationsStore.getState().setNotifications([
+    seedNotifications([
       makeNotification({
         recipientId: "recipient-mention-1",
         kind: "channel_mention",
@@ -70,7 +84,6 @@ describe("NotificationCenterModal", () => {
         },
       }),
     ]);
-    useNotificationsStore.getState().setUnreadCount(1);
 
     render(
       <NotificationCenterModal
@@ -101,10 +114,7 @@ describe("NotificationCenterModal", () => {
   });
 
   it("filters dm notifications out of the inbox list UI", () => {
-    useNotificationsStore
-      .getState()
-      .setNotifications([makeNotification({ recipientId: "recipient-dm-1" })]);
-    useNotificationsStore.getState().setUnreadCount(1);
+    seedNotifications([makeNotification({ recipientId: "recipient-dm-1" })]);
 
     render(
       <NotificationCenterModal
@@ -135,7 +145,7 @@ describe("NotificationCenterModal", () => {
       avatarUrl: "https://example.com/live-actor.png",
       updatedAt: nowIso,
     });
-    useNotificationsStore.getState().setNotifications([
+    seedNotifications([
       makeNotification({
         recipientId: "recipient-mention-live",
         kind: "channel_mention",
@@ -148,7 +158,6 @@ describe("NotificationCenterModal", () => {
         },
       }),
     ]);
-    useNotificationsStore.getState().setUnreadCount(1);
 
     render(
       <NotificationCenterModal
@@ -176,7 +185,7 @@ describe("NotificationCenterModal", () => {
     const user = userEvent.setup();
     const onDismissAll = vi.fn();
     const onUpdateLocalAudioSettings = vi.fn();
-    useNotificationsStore.getState().setNotifications([
+    seedNotifications([
       makeNotification({
         recipientId: "recipient-mention-1",
         kind: "channel_mention",
@@ -189,7 +198,6 @@ describe("NotificationCenterModal", () => {
         },
       }),
     ]);
-    useNotificationsStore.getState().setUnreadCount(1);
 
     render(
       <NotificationCenterModal
@@ -271,7 +279,7 @@ describe("NotificationCenterModal", () => {
   it("does not render friend request actions in the notification center modal", async () => {
     const user = userEvent.setup();
     const onDismissFriendRequestNotification = vi.fn();
-    useNotificationsStore.getState().setNotifications([
+    seedNotifications([
       makeNotification({
         recipientId: "recipient-fr-1",
         kind: "friend_request_received",
@@ -283,7 +291,6 @@ describe("NotificationCenterModal", () => {
         },
       }),
     ]);
-    useNotificationsStore.getState().setUnreadCount(1);
 
     render(
       <NotificationCenterModal

@@ -1,7 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useDirectMessages } from "@shared/features/direct-messages/hooks/useDirectMessages";
-import { getDirectMessageBackend } from "@shared/lib/backend";
-import { useNavigationStore } from "@shared/stores/navigationStore";
+import { useUiStore } from "@shared/stores/uiStore";
 
 type DirectMessagesHookReturn = ReturnType<typeof useDirectMessages>;
 
@@ -14,12 +13,10 @@ export function MobileDirectMessagesProvider({
   userId: string;
   children: ReactNode;
 }) {
-  const workspaceMode = useNavigationStore((s) => s.workspaceMode);
+  const workspaceMode = useUiStore((s) => s.workspaceMode);
   const isDmWorkspaceActive = workspaceMode === "dm";
 
-  const directMessageBackend = getDirectMessageBackend();
   const directMessages = useDirectMessages({
-    directMessageBackend,
     userId,
     enabled: true,
     isActive: isDmWorkspaceActive,

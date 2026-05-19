@@ -18,7 +18,7 @@ import {
 import { Checkbox } from '@shared/app/ui/checkbox';
 import { Input } from '@shared/app/ui/input';
 import { Label } from '@shared/app/ui/label';
-import { useAuth } from '@shared/infrastructure/auth/AuthContext';
+import { useAuth } from '@shared/contexts/AuthContext';
 import { getErrorMessage } from '@platform/lib/errors';
 import {
   HAVEN_PRIVACY_URL,

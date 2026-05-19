@@ -32,7 +32,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@shared/app/ui/dropdown-menu";
-import { useNavigationStore } from "@shared/stores/navigationStore";
+import { useHavenCore } from "@shared/core";
 const SIDEBAR_BASE_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 640;
 const SIDEBAR_WIDTH_STORAGE_KEY = "haven:sidebar-width";
@@ -117,9 +117,7 @@ export function Sidebar({
   onOpenServerSettings,
   footerStatusActions,
 }: SidebarProps) {
-  const currentChannelId = useNavigationStore(
-    (state) => state.currentChannelId,
-  );
+  const currentChannelId = useHavenCore().channels.useActiveChannelId();
   const sidebarRef = React.useRef<HTMLDivElement | null>(null);
   const serverNameRef = React.useRef<HTMLSpanElement | null>(null);
   const [autoMinWidth, setAutoMinWidth] = React.useState(

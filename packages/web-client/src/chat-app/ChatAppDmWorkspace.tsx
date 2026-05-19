@@ -5,7 +5,7 @@ import { DirectMessageArea } from "@web-client/components/direct-messages/Direct
 import { DirectMessagesSidebar } from "@web-client/components/direct-messages/DirectMessagesSidebar";
 import { getErrorMessage } from "@platform/lib/errors";
 import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
-import { useSocialStore } from "@shared/stores";
+import { useHavenCore } from "@shared/core";
 
 type ChatAppDmWorkspaceProps = {
   app: ChatAppOrchestrationApi;
@@ -13,7 +13,8 @@ type ChatAppDmWorkspaceProps = {
 };
 
 export function ChatAppDmWorkspace({ app, user }: ChatAppDmWorkspaceProps) {
-  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
+  const core = useHavenCore();
+  const blockedUserIds = core.social.useBlockedUserIds();
   const isSelectedDmConversationBlocked = Boolean(
     app.selectedDmConversation?.otherUserId &&
       blockedUserIds.has(app.selectedDmConversation.otherUserId),
@@ -38,6 +39,7 @@ export function ChatAppDmWorkspace({ app, user }: ChatAppDmWorkspaceProps) {
         }}
       />
       <DirectMessageArea
+        conversation={app.selectedDmConversation}
         currentUserId={user.id}
         currentUserDisplayName={app.userDisplayName}
         messages={app.dmMessages}

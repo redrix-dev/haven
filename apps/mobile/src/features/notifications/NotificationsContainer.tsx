@@ -8,9 +8,8 @@ import { filterNotificationsForInbox } from "@shared/features/notifications/inbo
 import { getNotificationBackend, getSocialBackend } from "@shared/lib/backend";
 import type { NotificationItem } from "@shared/lib/backend/types";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
-import { useNavigationStore } from "@shared/stores/navigationStore";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useServersStore } from "@shared/stores/serversStore";
+import { syncFocusFromRoute, useHavenCore } from "@shared/core";
+import { useUiStore } from "@shared/stores/uiStore";
 import type { RootStackParamList } from "@/navigation/types";
 import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
 import { useMobileNotifications } from "@/contexts/MobileNotificationsContext";
@@ -43,16 +42,20 @@ export default function NotificationsContainer({
 }: NotificationsContainerProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const liveProfiles = useLiveProfilesStore((s) => s.profiles);
-  const servers = useServersStore((s) => s.servers);
-  const permissionsByServerId = usePermissionsStore((s) => s.permissionsByServerId);
-  const setWorkspaceMode = useNavigationStore((s) => s.setWorkspaceMode);
+  const core = useHavenCore();
+  const communities = core.communities.useCommunities();
+  const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
+  const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
 
   const modmailCommunityIds = useMemo(
     () =>
-      servers
-        .filter((s) => permissionsByServerId[s.id]?.canManageReports)
-        .map((s) => s.id),
-    [servers, permissionsByServerId],
+      communities
+        .filter(
+          (community) =>
+            permissionsByCommunityId[community.id]?.canManageReports,
+        )
+        .map((community) => community.id),
+    [communities, permissionsByCommunityId],
   );
   const modmailEnabled = modmailCommunityIds.length > 0;
 
@@ -106,7 +109,7 @@ export default function NotificationsContainer({
     },
     onOpenChannelMention: ({ communityId, channelId }) => {
       setWorkspaceMode("community");
-      useNavigationStore.getState().setCommunityNavigation(communityId, channelId);
+      syncFocusFromRoute(core, { communityId, channelId });
       navigation.dispatch(
         CommonActions.navigate({
           name: "Main",

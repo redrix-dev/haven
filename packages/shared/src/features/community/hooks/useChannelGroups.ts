@@ -1,8 +1,8 @@
 import React from 'react';
 import { getCommunityDataBackend } from '@shared/lib/backend';
-import { requireHavenDataRuntime } from '@shared/infrastructure/runtime/havenRuntimeRegistry';
+import { requireHavenCore } from '@shared/core';
+import { notifyActiveChannelAccessLost } from '@shared/core/communityAccessHandlers';
 import type { Channel, ChannelGroupState } from '@shared/lib/backend/types';
-import { stableOnActiveChannelAccessLost } from '@shared/infrastructure/realtime/communityAccessBroadcastBridge';
 
 type UseChannelGroupsInput = {
   currentServerId: string | null;
@@ -23,7 +23,7 @@ export function useChannelGroups({
   currentUserId,
   currentChannelId,
   channels,
-  onActiveChannelAccessLost = stableOnActiveChannelAccessLost,
+  onActiveChannelAccessLost = notifyActiveChannelAccessLost,
 }: UseChannelGroupsInput) {
   const [channelGroupState, setChannelGroupState] = React.useState<ChannelGroupState>(
     createEmptyChannelGroupState()
@@ -127,7 +127,7 @@ export function useChannelGroups({
 
     void loadChannelGroups();
 
-    const groupSubscription = requireHavenDataRuntime().client
+    const groupSubscription = requireHavenCore().backends.client
       .channel(`channel_groups:${currentServerId}`)
       .on(
         'postgres_changes',

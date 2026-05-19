@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { installPromptTrap } from "@shared/infrastructure/contextMenu/debugTrace";
-import { useNavigationStore } from "@shared/stores/navigationStore";
+import { requireHavenCore } from "@shared/core";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useUiStore } from "@shared/stores/uiStore";
 
@@ -82,7 +82,9 @@ export function useChatAppLifecycleEffects({
 
   useEffect(() => {
     if (user) return;
-    useNavigationStore.getState().clearNavigation();
+    const core = requireHavenCore();
+    core.communities.setActiveId(null);
+    core.channels.setActiveChannelId(null);
     resetPlatformSession();
     resetVoiceState();
     setNotificationsPanelOpen(false);

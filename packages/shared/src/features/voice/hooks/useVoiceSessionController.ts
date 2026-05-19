@@ -1,17 +1,16 @@
 import React from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { requireHavenDataRuntime } from "@shared/infrastructure/runtime/havenRuntimeRegistry";
+import { requireHavenCore } from "@shared/core";
 
-const voiceRt = () => requireHavenDataRuntime().client;
+const voiceRt = () => requireHavenCore().backends.client;
 import { fetchIceConfig } from "@shared/features/voice/utils/ice";
 import { matchesVoicePushToTalkBinding } from "@shared/features/voice/utils/pushToTalk";
 import { useVoiceMemberVolumes } from "@shared/features/voice/hooks/useVoiceMemberVolumes";
 import { isEditableKeyboardTarget } from "@shared/infrastructure/utils/appUtils";
 import { playVoicePresenceSound } from "@shared/features/notifications/utils/sound";
 import { getErrorMessage } from "@platform/lib/errors";
-import { useVoiceStore } from "@shared/stores/voiceStore";
+import { useHavenCore } from "@shared/core";
 import { createPortableUuid } from "@shared/infrastructure/uuid";
-import { useSocialStore } from "@shared/stores/socialStore";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import type {
   NotificationAudioSettings,
@@ -127,8 +126,10 @@ export function useVoiceSessionController({
 } {
   const voiceRuntime = getAppHost().voiceRuntime;
   const browserRuntime = getAppHost().browserRuntime;
-  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
-  const joined = useVoiceStore((state) => state.joined);
+  const core = useHavenCore();
+  const blockedUserIds = core.social.useBlockedUserIds();
+  const voiceSession = core.voice.useSession();
+  const joined = voiceSession.joined;
   const [joining, setJoining] = React.useState(false);
   const [participants, setParticipants] = React.useState<VoiceParticipant[]>(
     [],
@@ -136,8 +137,8 @@ export function useVoiceSessionController({
   const [remoteStreams, setRemoteStreams] = React.useState<
     Record<string, MediaStream>
   >({});
-  const isMuted = useVoiceStore((state) => state.isMuted);
-  const isDeafened = useVoiceStore((state) => state.isDeafened);
+  const isMuted = voiceSession.isMuted;
+  const isDeafened = voiceSession.isDeafened;
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [iceSource, setIceSource] = React.useState<
@@ -214,43 +215,43 @@ export function useVoiceSessionController({
 
   const setStoredJoined = React.useCallback(
     (value: React.SetStateAction<boolean>) => {
-      const previousValue = useVoiceStore.getState().joined;
+      const previousValue = core.voice.getSnapshot().joined;
       const nextValue =
         typeof value === "function"
           ? (value as (previousState: boolean) => boolean)(previousValue)
           : value;
-      useVoiceStore.getState().setJoined(nextValue);
+      core.voice.setJoined(nextValue);
     },
     [],
   );
 
   const setStoredIsMuted = React.useCallback(
     (value: React.SetStateAction<boolean>) => {
-      const previousValue = useVoiceStore.getState().isMuted;
+      const previousValue = core.voice.getSnapshot().isMuted;
       const nextValue =
         typeof value === "function"
           ? (value as (previousState: boolean) => boolean)(previousValue)
           : value;
-      useVoiceStore.getState().setIsMuted(nextValue);
+      core.voice.setIsMuted(nextValue);
     },
     [],
   );
 
   const setStoredIsDeafened = React.useCallback(
     (value: React.SetStateAction<boolean>) => {
-      const previousValue = useVoiceStore.getState().isDeafened;
+      const previousValue = core.voice.getSnapshot().isDeafened;
       const nextValue =
         typeof value === "function"
           ? (value as (previousState: boolean) => boolean)(previousValue)
           : value;
-      useVoiceStore.getState().setIsDeafened(nextValue);
+      core.voice.setIsDeafened(nextValue);
     },
     [],
   );
 
   const setStoredParticipants = React.useCallback(
     (nextParticipants: VoiceParticipant[]) => {
-      useVoiceStore.getState().setParticipants(
+      core.voice.setParticipants(
         nextParticipants.map((participant) => ({
           userId: participant.userId,
           displayName: participant.displayName,
@@ -964,7 +965,7 @@ export function useVoiceSessionController({
       joined: currentJoined,
       isMuted: currentIsMuted,
       isDeafened: currentIsDeafened,
-    } = useVoiceStore.getState();
+    } = core.voice.getSnapshot();
     const baseAllowsSend = !currentIsMuted && !currentIsDeafened;
     const transmissionMode = voiceSettingsRef.current.transmissionMode;
 
@@ -1101,7 +1102,7 @@ export function useVoiceSessionController({
   );
 
   const cleanupVoiceSession = React.useCallback(async () => {
-    const wasJoined = useVoiceStore.getState().joined;
+    const wasJoined = core.voice.getSnapshot().joined;
     const channel = channelRef.current;
     channelRef.current = null;
     signalingSessionIdRef.current = null;

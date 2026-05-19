@@ -27,11 +27,12 @@ import {
 import { ActionMenuContent } from "@web-client/components/menus/ActionMenuContent";
 import { resolveContextMenuIntent } from "@shared/infrastructure/contextMenu";
 import { traceContextMenuEvent } from "@shared/infrastructure/contextMenu/debugTrace";
-import { useServersStore } from "@shared/stores/serversStore";
+import { useHavenCore } from "@shared/core";
+import type { ServerSummary } from "@shared/lib/backend/types";
 import type { MenuActionNode } from "@shared/infrastructure/contextMenu/types";
-import { useNavigationStore } from "@shared/stores/navigationStore";
 
 interface ServerListProps {
+  servers: ServerSummary[];
   currentServerIsOwner: boolean;
   canManageCurrentServer: boolean;
   canOpenCurrentServerSettings: boolean;
@@ -61,6 +62,7 @@ interface ServerListProps {
 }
 
 export function ServerList({
+  servers,
   currentServerIsOwner,
   canManageCurrentServer,
   canOpenCurrentServerSettings,
@@ -87,8 +89,7 @@ export function ServerList({
   onOpenServerSettingsForServer,
   onReorder,
 }: ServerListProps) {
-  const servers = useServersStore((state) => state.servers);
-  const currentServerId = useNavigationStore((state) => state.currentServerId);
+  const currentServerId = useHavenCore().communities.useActiveId();
   const avatarInitial = userDisplayName.trim().charAt(0).toUpperCase() || "U";
 
   // Drag-to-reorder state

@@ -17,7 +17,7 @@ import type {
   VoiceSettings,
 } from "@shared/types/settings";
 import type { VoicePopoutDeviceOption } from "@shared/infrastructure/platform/desktop/types";
-import { useVoiceStore } from "@shared/stores/voiceStore";
+import { useHavenCore } from "@shared/core";
 import {
   ExternalLink,
   Headphones,
@@ -118,8 +118,9 @@ export function VoiceDrawer({
   onOpenVoiceHardwareTest,
   onOpenVoicePopout,
 }: VoiceDrawerProps) {
-  const storedVoiceConnected = useVoiceStore((state) => state.voiceConnected);
-  const storedVoiceSessionState = useVoiceStore((state) => state.sessionState);
+  const voiceSession = useHavenCore().voice.useSession();
+  const storedVoiceConnected = voiceSession.voiceConnected;
+  const storedVoiceSessionState = voiceSession.sessionState;
   const voiceConnected =
     surface === "popout" ? voiceConnectedProp : storedVoiceConnected;
   const voiceSessionState = React.useMemo(

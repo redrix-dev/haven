@@ -42,7 +42,7 @@ import {
 import { ProfileContextMenu } from "@web-client/components/ProfileContextMenu";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
-import { useSocialStore } from "@shared/stores/socialStore";
+import { useHavenCore } from "@shared/core";
 
 interface ServerMembersModalProps {
   open: boolean;
@@ -85,8 +85,9 @@ export function ServerMembersModal({
   onKickUser,
   onClose,
 }: ServerMembersModalProps) {
+  const core = useHavenCore();
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
-  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
+  const blockedUserIds = core.social.useBlockedUserIds();
   const [search, setSearch] = React.useState("");
   const [reportDraft, setReportDraft] = React.useState<{
     targetUserId: string;

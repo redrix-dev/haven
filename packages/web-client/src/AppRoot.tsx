@@ -1,5 +1,5 @@
 import React from 'react';
-import { AuthProvider } from '@shared/infrastructure/auth/AuthContext';
+import { AuthProvider } from '@shared/contexts/AuthContext';
 import { TitleBar } from '@web-client/components/TitleBar';
 import { ChatApp } from '@web-client/ChatApp';
 import { VoicePopoutApp } from '@web-client/VoicePopoutApp';

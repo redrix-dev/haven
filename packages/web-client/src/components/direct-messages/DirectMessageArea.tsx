@@ -57,10 +57,10 @@ import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
 } from "@shared/infrastructure/liveProfiles";
-import { useDmStore } from "@shared/stores/dmStore";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 
 type DirectMessageAreaProps = {
+  conversation: DirectMessageConversationSummary | null;
   currentUserId: string;
   currentUserDisplayName: string;
   messages: DirectMessage[];
@@ -138,6 +138,7 @@ const getAttachmentLabel = (attachment: DirectMessageAttachment): string =>
   "image";
 
 export function DirectMessageArea({
+  conversation,
   currentUserId,
   currentUserDisplayName,
   messages,
@@ -153,7 +154,6 @@ export function DirectMessageArea({
   onReportMessage,
   enableRichComposer = false,
 }: DirectMessageAreaProps) {
-  const conversation = useDmStore((state) => state.currentConversation);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
   const [draft, setDraft] = React.useState("");
   const [actionError, setActionError] = React.useState<string | null>(null);

@@ -56,9 +56,24 @@ vi.mock('@shared/infrastructure/platform/appHost', () => ({
 }));
 
 import { getAppHost } from '@shared/infrastructure/platform/appHost';
+import {
+  createMemoryPersistence,
+  registerHavenCore,
+  resetHavenCore,
+} from '@shared/core';
+import type { HavenCore } from '@shared/core/HavenCore';
+import { VoiceNexus } from '@shared/nexus/voice/VoiceNexus';
+
+function registerTestHavenCore() {
+  const persistence = createMemoryPersistence();
+  const voice = new VoiceNexus(persistence);
+  registerHavenCore({ voice } as unknown as HavenCore);
+}
 
 describe('VoicePopoutApp', () => {
   beforeEach(() => {
+    resetHavenCore();
+    registerTestHavenCore();
     popoutMocks.reset();
     vi.mocked(getAppHost).mockReturnValue(makeTestAppHost());
   });

@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useLiveProfiles } from "@shared/features/profile/hooks/useLiveProfiles";
 import { useNotifications } from "@shared/features/notifications/hooks/useNotifications";
-import { getControlPlaneBackend, getNotificationBackend } from "@shared/lib/backend";
+import { getControlPlaneBackend } from "@shared/lib/backend";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
 
 type NotificationsHookReturn = ReturnType<typeof useNotifications>;
@@ -15,9 +15,7 @@ export function MobileNotificationsProvider({
   userId: string;
   children: ReactNode;
 }) {
-  const notificationBackend = getNotificationBackend();
   const notifications = useNotifications({
-    notificationBackend,
     userId,
     audioSettings: MOBILE_DEFAULT_NOTIFICATION_AUDIO,
     autoMarkSeenOnPanelOpen: false,

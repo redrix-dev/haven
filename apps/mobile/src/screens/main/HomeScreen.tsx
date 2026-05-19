@@ -15,7 +15,7 @@ import type { ServerSummary } from "@shared/lib/backend/types";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getPlatformInviteInputPlaceholder } from "@shared/infrastructure/platform/urls";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import { applyCommunityNavigationTarget } from "@shared/features/community/communityNavigation";
+import { applyCommunityFocus, useHavenCore } from "@shared/core";
 import { useMobileMainSession } from "@/contexts/MobileMainSessionContext";
 import { getLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
 import { useMemo, useState, useCallback } from "react";
@@ -52,6 +52,7 @@ export function HomeScreen() {
     createServer,
     warmCommunityForEntry,
   } = useMobileMainSession();
+  const core = useHavenCore();
   const controlPlaneBackend = useMemo(() => getControlPlaneBackend(), []);
   const themeTokens = useMobileThemeTokens();
   const { placeholderMuted, spinnerFg } = useMemo(
@@ -85,10 +86,10 @@ export function HomeScreen() {
         }),
       ]);
       const lastVisited = await getLastTextChannelIdForCommunity(serverId);
-      applyCommunityNavigationTarget(serverId, { lastVisitedChannelId: lastVisited });
+      applyCommunityFocus(core, serverId, { lastVisitedChannelId: lastVisited });
       navigation.navigate("Community", { serverId, openDrawer: true });
     },
-    [navigation, warmCommunityForEntry],
+    [core, navigation, warmCommunityForEntry],
   );
 
   const primeCommunityForServer = useCallback(
@@ -108,14 +109,14 @@ export function HomeScreen() {
       setCreateModalOpen(false);
       setCreateName("");
       await warmCommunityForEntry(id);
-      applyCommunityNavigationTarget(id);
+      applyCommunityFocus(core, id);
       navigation.navigate("Community", { serverId: id, openDrawer: true });
     } catch (err) {
       setCreateError(getErrorMessage(err, "Could not create community."));
     } finally {
       setCreateLoading(false);
     }
-  }, [createName, createServer, navigation, warmCommunityForEntry]);
+  }, [core, createName, createServer, navigation, warmCommunityForEntry]);
 
   const handleJoinCommunity = useCallback(async () => {
     const code = normalizeInviteCode(joinInvite);
@@ -132,7 +133,7 @@ export function HomeScreen() {
       setJoinInvite("");
       const communityId = redeemed.communityId;
       await warmCommunityForEntry(communityId);
-      applyCommunityNavigationTarget(communityId);
+      applyCommunityFocus(core, communityId);
       navigation.navigate("Community", {
         serverId: communityId,
         openDrawer: true,
@@ -142,7 +143,7 @@ export function HomeScreen() {
     } finally {
       setJoinLoading(false);
     }
-  }, [controlPlaneBackend, joinInvite, navigation, refreshServers, warmCommunityForEntry]);
+  }, [controlPlaneBackend, core, joinInvite, navigation, refreshServers, warmCommunityForEntry]);
 
   if (status === "loading" && servers.length === 0) {
     return (

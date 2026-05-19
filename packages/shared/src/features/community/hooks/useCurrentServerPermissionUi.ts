@@ -1,12 +1,11 @@
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
+import { useHavenCore } from "@shared/core";
 
 /**
- * Derived UI flags from `permissionsStore` for the currently selected community.
+ * Derived UI flags from PermissionsNexus for the currently selected community.
  */
 export function useCurrentServerPermissionUi(currentServerId: string | null) {
-  const serverPermissions = usePermissionsStore((state) =>
-    state.getPermissions(currentServerId ?? ""),
-  );
+  const core = useHavenCore();
+  const serverPermissions = core.permissions.usePermissions(currentServerId ?? "");
 
   const canOpenServerSettings =
     serverPermissions.canManageServer ||

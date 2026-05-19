@@ -7,9 +7,7 @@ import { VoiceDrawer } from "@web-client/components/voice/VoiceDrawer";
 import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
 import { useChatAppVoiceIntegration } from "@web-client/chat-app/useChatAppVoiceIntegration";
 import { getErrorMessage } from "@platform/lib/errors";
-import { useNavigationStore } from "@shared/stores/navigationStore";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useServersStore } from "@shared/stores/serversStore";
+import { useHavenCore } from "@shared/core";
 import { useUiStore } from "@shared/stores/uiStore";
 
 type CommunityWorkspaceShellProps = {
@@ -23,18 +21,19 @@ export function CommunityWorkspaceShell({
   user,
   voice,
 }: CommunityWorkspaceShellProps) {
-  const servers = useServersStore((state) => state.servers);
-  const currentServerId = useNavigationStore((state) => state.currentServerId);
+  const core = useHavenCore();
+  const currentServerId = core.communities.useActiveId();
   const currentServer = React.useMemo(
-    () => servers.find((server) => server.id === currentServerId) ?? null,
-    [currentServerId, servers],
+    () => app.servers.find((server) => server.id === currentServerId) ?? null,
+    [app.servers, currentServerId],
   );
-  const setCurrentChannelId = useNavigationStore(
-    (state) => state.setCurrentChannelId,
+  const setCurrentChannelId = React.useCallback(
+    (id: string | null) => {
+      core.channels.setActiveChannelId(id);
+    },
+    [core],
   );
-  const serverPermissions = usePermissionsStore((state) =>
-    state.getPermissions(currentServerId ?? ""),
-  );
+  const serverPermissions = core.permissions.usePermissions(currentServerId ?? "");
   const canManageChannelStructure =
     serverPermissions.canManageChannelStructure;
   const canManageChannelPermissions =
@@ -243,11 +242,11 @@ export function CommunityWorkspaceShell({
         </div>
       ) : app.currentRenderableChannel ? (
         <ChatArea
+          communityId={currentServer.id}
           channelId={app.currentRenderableChannel.id}
           channelName={app.currentRenderableChannel.name}
           channelKind={app.currentRenderableChannel.kind}
           currentUserId={user.id}
-          isElevatedViewer={app.isCurrentUserElevatedInCurrentServer}
           canManageMessages={serverPermissions.canManageMessages}
           canCreateReports={serverPermissions.canCreateReports}
           canManageBans={serverPermissions.canManageBans}
@@ -275,6 +274,8 @@ export function CommunityWorkspaceShell({
             app.requestMessageLinkPreviewRefresh
           }
           onRequestOlderMessages={app.requestOlderMessages}
+          hasOlderMessages={app.hasOlderMessages}
+          isLoadingOlderMessages={app.isLoadingOlderMessages}
           onSaveAttachment={app.saveAttachment}
           onReportUserProfile={({ targetUserId, reason }) =>
             app.reportUserProfile({

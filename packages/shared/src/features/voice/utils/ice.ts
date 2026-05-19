@@ -1,4 +1,4 @@
-import { requireHavenDataRuntime } from "@shared/infrastructure/runtime/havenRuntimeRegistry";
+import { requireHavenCore } from "@shared/core";
 import { getErrorMessage } from '@shared/infrastructure/platform/lib/errors';
 
 export type IceConfigSource = 'xirsys' | 'fallback';
@@ -38,7 +38,7 @@ export async function fetchIceConfig(params: {
   channelId: string;
 }): Promise<IceConfigResult> {
   try {
-    const { supabaseUrl, supabaseAnonKey } = requireHavenDataRuntime().publicConfig;
+    const { supabaseUrl, supabaseAnonKey } = requireHavenCore().backends.publicConfig;
 
     if (!supabaseUrl || !supabaseAnonKey) {
       return {
@@ -50,7 +50,7 @@ export async function fetchIceConfig(params: {
 
     const {
       data: { session },
-    } = await requireHavenDataRuntime().client.auth.getSession();
+    } = await requireHavenCore().backends.client.auth.getSession();
     const accessToken = session?.access_token ?? null;
 
     if (!accessToken) {

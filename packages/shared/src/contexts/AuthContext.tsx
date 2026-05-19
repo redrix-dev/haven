@@ -6,15 +6,9 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
-import { getControlPlaneBackend } from "@shared/lib/backend";
-import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useNotificationsStore } from "@shared/stores/notificationsStore";
-import { useDmStore } from "@shared/stores/dmStore";
-import { useSocialStore } from "@shared/stores/socialStore";
+import { requireHavenCore } from "@shared/core";
 
-const havenAuthClient = () => requireHavenDataRuntime().client;
+const havenAuthClient = () => requireHavenCore().backends.client;
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
@@ -76,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
     useState(false);
   const processedAuthConfirmUrlsRef = useRef<Set<string>>(new Set());
-  const privateUserChannelUnsubscribeRef = useRef<(() => void) | null>(null);
+  const activeSessionUserIdRef = useRef<string | null>(null);
 
   const consumeAuthConfirmUrl = useCallback(
     async (url: string): Promise<boolean> => {
@@ -196,71 +190,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPasswordRecoveryRequired(false);
       }
 
+      const core = requireHavenCore();
+
       if (event === "SIGNED_OUT") {
-        privateUserChannelUnsubscribeRef.current?.();
-        privateUserChannelUnsubscribeRef.current = null;
+        activeSessionUserIdRef.current = null;
+        void core.clearSession();
       } else if (
         event === "SIGNED_IN" ||
         event === "TOKEN_REFRESHED" ||
         event === "INITIAL_SESSION"
       ) {
-        privateUserChannelUnsubscribeRef.current?.();
-        privateUserChannelUnsubscribeRef.current = null;
-        const userId = session?.user?.id;
-        if (userId) {
-          privateUserChannelUnsubscribeRef.current =
-            getControlPlaneBackend().subscribeToPrivateUserChannel(
-              userId,
-              (evt) => {
-                if (evt.type === "ROLE_CHANGE") {
-                  const communityId = evt.payload.community_id;
-                  if (
-                    typeof communityId !== "string" ||
-                    communityId.trim().length === 0
-                  ) {
-                    return;
-                  }
-                  usePermissionsStore
-                    .getState()
-                    .invalidateElevatedForServer(communityId);
-                  void hydrateCommunityPermissions(communityId);
-                  return;
-                }
-                if (evt.type === "NOTIFICATION") {
-                  useNotificationsStore.getState().triggerInboxRefresh();
-                  return;
-                }
-                if (evt.type === "DM_CONVERSATION") {
-                  useDmStore.getState().triggerConversationsRefresh();
-                  return;
-                }
-                if (evt.type === "DM_MESSAGE") {
-                  const conversationId = evt.payload.conversation_id;
-                  if (typeof conversationId === "string") {
-                    useDmStore.getState().triggerMessageRefresh(conversationId);
-                  }
-                  useDmStore.getState().triggerConversationsRefresh();
-                  return;
-                }
-                if (evt.type === "SOCIAL_CHANGE") {
-                  useSocialStore.getState().triggerSocialRefresh(evt.payload);
-                  return;
-                }
-                console.log(
-                  "[private_user_channel]",
-                  evt.type,
-                  evt.payload,
-                );
-              },
-            );
+        const userId = session?.user?.id ?? null;
+        if (!userId) {
+          activeSessionUserIdRef.current = null;
+          return;
         }
+        if (activeSessionUserIdRef.current === userId) return;
+        activeSessionUserIdRef.current = userId;
+        void core.bootstrapSession(userId).catch((err) => {
+          console.warn("[AuthContext] bootstrapSession failed", err);
+        });
       }
     });
 
     return () => {
       isMounted = false;
-      privateUserChannelUnsubscribeRef.current?.();
-      privateUserChannelUnsubscribeRef.current = null;
       subscription.unsubscribe();
     };
   }, []);

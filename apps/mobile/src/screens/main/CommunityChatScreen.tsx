@@ -14,8 +14,7 @@ import {
 import { useAuthStore } from "@shared/stores/authStore";
 import { useMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useMessageNexus } from "@shared/features/messaging/hooks/useMessageNexus";
-import { useMessagesStore } from "@shared/stores/messagesStore";
-import { useNavigationStore } from "@shared/stores/navigationStore";
+import { useHavenCore } from "@shared/core";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
@@ -54,8 +53,9 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
   const composerColors = useChatComposerColors();
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
 
-  const communityId = useNavigationStore((state) => state.currentServerId) ?? serverId;
-  const navigationChannelId = useNavigationStore((state) => state.currentChannelId);
+  const core = useHavenCore();
+  const communityId = core.communities.useActiveId() ?? serverId;
+  const navigationChannelId = core.channels.useActiveChannelId();
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
 
@@ -97,8 +97,7 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
   });
 
   const nexusMessaging = useMessageNexus(communityId ?? null, activeChannelId ?? null);
-
-  const storedMessages = useMessagesStore((state) => state.messages);
+  const visibleMessages = nexusMessaging.messages;
 
   useDataCacheComponentProbe("CommunityChatScreen", {
     serverId,
@@ -107,11 +106,11 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     activeChannelId,
     channelsCount: channels.length,
     currentRenderableChannelId: currentRenderableChannel?.id ?? null,
-    storedMessagesCount: storedMessages.length,
+    visibleMessagesCount: visibleMessages.length,
     hasOlderMessages: messaging.state.hasOlderMessages,
     isLoadingOlderMessages: messaging.state.isLoadingOlderMessages,
     hasCompletedInitialLoad: messaging.state.hasCompletedInitialLoad,
-    nexusMessagesCount: nexusMessaging.messages.length,
+    nexusMessagesCount: visibleMessages.length,
     nexusIsInitialized: nexusMessaging.isInitialized,
     channelsLoading,
     communityIdMatchesRoute: communityId === serverId,
@@ -123,11 +122,11 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     [communityId, servers],
   );
 
-  const messageById = useMemo(() => buildMessageBundleById(storedMessages), [storedMessages]);
+  const messageById = useMemo(() => buildMessageBundleById(visibleMessages), [visibleMessages]);
 
   const messages = useMemo<ChatMessage[]>(
-    () => mapBundlesToChatMessages(storedMessages, liveProfiles),
-    [liveProfiles, storedMessages],
+    () => mapBundlesToChatMessages(visibleMessages, liveProfiles),
+    [liveProfiles, visibleMessages],
   );
 
   const chatListItems = useMemo<ChatListItem[]>(
@@ -250,7 +249,7 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
 
   const isMessagesBootstrapping =
     Boolean(activeChannelId) &&
-    storedMessages.length === 0 &&
+    visibleMessages.length === 0 &&
     !messaging.state.hasCompletedInitialLoad;
 
   const listEmptyContent =

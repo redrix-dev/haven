@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { LoginScreen } from "@web-client/components/auth/LoginScreen";
 import { ServerList } from "@web-client/components/ServerList";
 import { useServerOrder } from "@shared/features/community/hooks/useServerOrder";
@@ -6,46 +6,30 @@ import { ChatAppModals } from "@web-client/components/ChatAppModals";
 import { ChatAppDmWorkspace } from "@web-client/chat-app/ChatAppDmWorkspace";
 import { CommunityWorkspaceShell } from "@web-client/chat-app/CommunityWorkspaceShell";
 import { useChatAppVoiceIntegration } from "@web-client/chat-app/useChatAppVoiceIntegration";
-import { useDmStore } from "@shared/stores/dmStore";
-import { useServersStore } from "@shared/stores/serversStore";
-import { useNavigationStore } from "@shared/stores/navigationStore";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useNotificationsStore } from "@shared/stores/notificationsStore";
 import { useUiStore } from "@shared/stores/uiStore";
+import { useHavenCore } from "@shared/core";
 import { useChatAppOrchestration } from "@web-client/hooks/useChatAppOrchestration";
-
-function hasSameServerIdOrder(
-  left: ReadonlyArray<{ id: string }>,
-  right: ReadonlyArray<{ id: string }>,
-) {
-  if (left.length !== right.length) return false;
-  return left.every((server, index) => server.id === right[index]?.id);
-}
 
 export function ChatApp() {
   const app = useChatAppOrchestration();
   const voice = useChatAppVoiceIntegration(app);
-  const totalDmUnreadCount = useDmStore((state) =>
-    Object.values(state.unreadCounts).reduce(
-      (total, count) => total + count,
-      0,
-    ),
+  const totalDmUnreadCount = React.useMemo(
+    () => app.dmConversations.reduce((total, conversation) => total + conversation.unreadCount, 0),
+    [app.dmConversations],
   );
-  const servers = useServersStore((state) => state.servers);
-  const setStoredServers = useServersStore((state) => state.setServers);
-  const currentServerId = useNavigationStore((state) => state.currentServerId);
-  const setWorkspaceMode = useNavigationStore(
-    (state) => state.setWorkspaceMode,
+  const core = useHavenCore();
+  const currentServerId = core.communities.useActiveId();
+  const setWorkspaceMode = useUiStore((state) => state.setWorkspaceMode);
+  const setCurrentServerId = useCallback(
+    (id: string | null) => {
+      core.communities.setActiveId(id);
+    },
+    [core],
   );
-  const setCurrentServerId = useNavigationStore(
-    (state) => state.setCurrentServerId,
-  );
-  const serverPermissions = usePermissionsStore((state) =>
-    state.getPermissions(currentServerId ?? ""),
-  );
+  const serverPermissions = core.permissions.usePermissions(currentServerId ?? "");
   const { orderedServers, setOrder: setServerOrder } = useServerOrder(
     app.user?.id ?? null,
-    servers,
+    app.servers,
   );
   const managedReportServers = React.useMemo(
     () =>
@@ -54,12 +38,6 @@ export function ChatApp() {
         .map((server) => ({ id: server.id, name: server.name })),
     [app.managedReportServerIds, orderedServers],
   );
-
-  React.useEffect(() => {
-    if (!hasSameServerIdOrder(servers, orderedServers)) {
-      setStoredServers(orderedServers);
-    }
-  }, [servers, orderedServers, setStoredServers]);
 
   if (app.authStatus === "initializing") {
     return (
@@ -94,6 +72,7 @@ export function ChatApp() {
     <>
       <div className="flex h-screen overflow-hidden bg-surface-app text-foreground">
         <ServerList
+          servers={orderedServers}
           onReorder={setServerOrder}
           currentServerIsOwner={serverPermissions.isOwner}
           canManageCurrentServer={app.canManageCurrentServer}
@@ -109,7 +88,7 @@ export function ChatApp() {
             useUiStore.getState().setShowJoinServerModal(true)
           }
           onOpenNotifications={() =>
-            useNotificationsStore.getState().setIsPanelOpen(true)
+            useUiStore.getState().setNotificationsPanelOpen(true)
           }
           notificationUnseenCount={app.notificationCounts.unseenCount}
           notificationHasUnseenPulse={app.notificationCounts.unseenCount > 0}

@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { useAuth } from "@shared/infrastructure/auth/AuthContext";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@shared/contexts/AuthContext";
+import {
+  useHavenCore,
+  toChannel,
+  resolvePreferredChannelIdForServer,
+} from "@shared/core";
+import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import { useServers } from "@shared/features/community/hooks/useServers";
 import {
   getControlPlaneBackend,
-  getDirectMessageBackend,
   getNotificationBackend,
   getSocialBackend,
 } from "@shared/lib/backend";
@@ -14,7 +19,6 @@ import {
 } from "@shared/infrastructure/constants";
 import type { FriendsPanelTab } from "@shared/types/types";
 import { useDesktopSettings } from "@web-client/hooks/useDesktopSettings";
-import { useCommunityWorkspace } from "@shared/features/community/hooks/useCommunityWorkspace";
 import { useServerAdmin } from "@shared/features/community/hooks/useServerAdmin";
 import { useChannelManagement } from "@shared/features/community/hooks/useChannelManagement";
 import { useChannelGroups } from "@shared/features/community/hooks/useChannelGroups";
@@ -23,17 +27,13 @@ import { useMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useNotifications } from "@shared/features/notifications/hooks/useNotifications";
 import { useNotificationInteractions } from "@shared/features/notifications/hooks/useNotificationInteractions";
 import { useDeepLinks } from "@web-client/hooks/useDeepLinks";
-import { useSocialWorkspace } from "@shared/features/social/hooks/useSocialWorkspace";
 import { useDirectMessages } from "@shared/features/direct-messages/hooks/useDirectMessages";
 import { useDirectMessageInteractions } from "@shared/features/direct-messages/hooks/useDirectMessageInteractions";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";
 import { useFeatureFlags } from "@shared/infrastructure/useFeatureFlags";
 import { useLiveProfiles } from "@shared/features/profile/hooks/useLiveProfiles";
 import { usePlatformSession } from "@shared/features/profile/hooks/usePlatformSession";
-import { useServersStore } from "@shared/stores/serversStore";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
-import { useNavigationStore } from "@shared/stores/navigationStore";
-import { useNotificationsStore } from "@shared/stores/notificationsStore";
 import { useUiStore } from "@shared/stores/uiStore";
 import { usePermissionsReportSlice } from "@web-client/chat-app/controllers/usePermissionsReportSlice";
 import { useChatAppAccessAndBroadcastOrchestration } from "@web-client/chat-app/controllers/useChatAppAccessAndBroadcastOrchestration";
@@ -59,7 +59,6 @@ export function useChatAppOrchestration() {
   ] = useState(false);
   // ── Backend singletons ────────────────────────────────────────────────────
   const controlPlaneBackend = getControlPlaneBackend();
-  const directMessageBackend = getDirectMessageBackend();
   const notificationBackend = getNotificationBackend();
   const socialBackend = getSocialBackend();
 
@@ -111,11 +110,11 @@ export function useChatAppOrchestration() {
     userId: user?.id,
     userEmail: user?.email,
   });
-  const notificationsPanelOpen = useNotificationsStore(
-    (state) => state.isPanelOpen,
+  const notificationsPanelOpen = useUiStore(
+    (state) => state.notificationsPanelOpen,
   );
-  const setNotificationsPanelOpen = useNotificationsStore(
-    (state) => state.setIsPanelOpen,
+  const setNotificationsPanelOpen = useUiStore(
+    (state) => state.setNotificationsPanelOpen,
   );
   const { status: userStatus, setStatus: setUserStatus } = useUserStatusStore();
   const { rainbowMode: rainbowMode, setRainbowMode: setRainbowMode } =
@@ -143,53 +142,204 @@ export function useChatAppOrchestration() {
   }, [baseUserDisplayName, profileAvatarUrl, upsertLiveProfile, user?.id]);
 
   // ── UI / workspace state ──────────────────────────────────────────────────
-  const workspaceMode = useNavigationStore((state) => state.workspaceMode);
-  const setWorkspaceMode = useNavigationStore(
-    (state) => state.setWorkspaceMode,
-  );
+  const workspaceMode = useUiStore((state) => state.workspaceMode);
+  const setWorkspaceMode = useUiStore((state) => state.setWorkspaceMode);
   const showServerSettingsModal = useUiStore(
     (state) => state.showServerSettingsModal,
   );
 
-  // ── Community workspace ───────────────────────────────────────────────────
-  const currentServerId = useNavigationStore((state) => state.currentServerId);
-  const setCurrentServerId = useNavigationStore(
-    (state) => state.setCurrentServerId,
+  // ── Community workspace (nexus-backed) ─────────────────────────────────────
+  const core = useHavenCore();
+  const currentServerId = core.communities.useActiveId();
+  const currentChannelId = core.channels.useActiveChannelId();
+  const setCurrentServerId = useCallback(
+    (id: string | null) => {
+      core.communities.setActiveId(id);
+    },
+    [core],
   );
+  const setCurrentChannelId = useCallback(
+    (id: string | null) => {
+      core.channels.setActiveChannelId(id);
+    },
+    [core],
+  );
+  const setCommunityNavigation = useCallback(
+    (serverId: string | null, channelId: string | null) => {
+      core.communities.setActiveId(serverId);
+      core.channels.setActiveChannelId(channelId);
+    },
+    [core],
+  );
+
+  const havenChannels = core.channels.useChannels(currentServerId ?? "__none__");
+  const channelsLoading = core.channels.useIsLoading(currentServerId ?? "__none__");
+  const channels = useMemo(
+    () => havenChannels.map(toChannel),
+    [havenChannels],
+  );
+  const [channelsError, setChannelsError] = useState<string | null>(null);
+  const reportStatusRefreshVersion = useUiStore(
+    (state) => state.reportStatusRevision,
+  );
+
+  useEffect(() => {
+    if (servers.length > 0 && !currentServerId) {
+      setCurrentServerId(servers[0].id);
+    }
+  }, [servers, currentServerId, setCurrentServerId]);
+
+  useEffect(() => {
+    if (!currentServerId) return;
+    setChannelsError(null);
+    void core.channels.ensureLoaded(currentServerId).catch((err) => {
+      console.warn("[useChatAppOrchestration] ensureLoaded failed", err);
+      setChannelsError(
+        err instanceof Error ? err.message : "Failed to load channels.",
+      );
+    });
+  }, [core, currentServerId]);
+
+  useEffect(() => {
+    if (!currentServerId || channels.length === 0) return;
+    const valid =
+      currentChannelId != null &&
+      channels.some((channel) => channel.id === currentChannelId);
+    if (valid) return;
+    const preferred = resolvePreferredChannelIdForServer(
+      core,
+      currentServerId,
+      channels,
+      { previousChannelId: currentChannelId },
+    );
+    setCommunityNavigation(currentServerId, preferred);
+  }, [
+    channels,
+    core,
+    currentChannelId,
+    currentServerId,
+    setCommunityNavigation,
+  ]);
+
+  useEffect(() => {
+    if (!user?.id || !currentServerId) {
+      if (currentServerId) {
+        core.permissions.invalidate(currentServerId);
+      }
+      return;
+    }
+    void hydrateCommunityPermissions(currentServerId);
+  }, [core, currentServerId, user?.id]);
+
+  const channelSettingsTargetId = useUiStore(
+    (state) => state.channelSettingsTargetId,
+  );
+
+  const currentServer = useMemo(
+    () => servers.find((server) => server.id === currentServerId) ?? null,
+    [servers, currentServerId],
+  );
+
+  const currentChannel = useMemo(
+    () => channels.find((channel) => channel.id === currentChannelId) ?? null,
+    [channels, currentChannelId],
+  );
+
+  const currentChannelBelongsToCurrentServer = Boolean(
+    currentChannel &&
+      currentServerId &&
+      currentChannel.community_id === currentServerId,
+  );
+
+  const channelSettingsTarget = useMemo(
+    () =>
+      channels.find(
+        (channel) =>
+          channel.id === (channelSettingsTargetId ?? currentChannelId),
+      ) ?? null,
+    [channels, channelSettingsTargetId, currentChannelId],
+  );
+
+  const currentRenderableChannel = useMemo(
+    () =>
+      currentChannel &&
+      currentChannelBelongsToCurrentServer &&
+      currentChannel.kind === "text"
+        ? currentChannel
+        : (channels.find(
+            (channel) =>
+              channel.kind === "text" &&
+              (!currentServerId || channel.community_id === currentServerId),
+          ) ?? (currentChannelBelongsToCurrentServer ? currentChannel : null)),
+    [
+      channels,
+      currentChannel,
+      currentChannelBelongsToCurrentServer,
+      currentServerId,
+    ],
+  );
+
+  const currentChannelKind = currentChannel?.kind ?? null;
+
+  const resetChannelsWorkspace = useCallback(() => {
+    setChannelsError(null);
+    if (currentServerId) {
+      core.channels.setActiveChannelId(null);
+    }
+  }, [core, currentServerId]);
+
+  const prefetchServersChannels = useCallback(
+    async (serverIds: string[]) => {
+      await Promise.allSettled(
+        serverIds.map((id) => core.channels.ensureLoaded(id)),
+      );
+    },
+    [core],
+  );
+
+  const PREFETCH_TEXT_CHANNELS_PER_SERVER = 8;
+
+  const prefetchMessageCachesForServers = useCallback(
+    async (
+      serverIds: string[],
+      prefetchChannelMessages: (
+        serverId: string,
+        channelId: string,
+      ) => Promise<void>,
+    ) => {
+      await Promise.allSettled(
+        serverIds.flatMap((serverId) => {
+          const list = core.channels.getChannelsSnapshot(serverId);
+          return list
+            .filter((channel) => channel.kind === "text")
+            .slice(0, PREFETCH_TEXT_CHANNELS_PER_SERVER)
+            .map((channel) => prefetchChannelMessages(serverId, channel.id));
+        }),
+      );
+    },
+    [core],
+  );
+
+  const getDefaultChannelIdForServer = useCallback(
+    (serverId: string, lastVisitedChannelId?: string | null): string | null => {
+      const channelList = core.channels
+        .getChannelsSnapshot(serverId)
+        .map(toChannel);
+      if (channelList.length === 0) return null;
+      return resolvePreferredChannelIdForServer(core, serverId, channelList, {
+        lastVisitedChannelId,
+      });
+    },
+    [core],
+  );
+
+  const dmWorkspaceIsActive = workspaceMode === "dm";
+
   const {
     serverPermissions,
     canOpenServerSettings,
     canManageCurrentServer,
   } = useCurrentServerPermissionUi(currentServerId);
-  const currentChannelId = useNavigationStore(
-    (state) => state.currentChannelId,
-  );
-  const setCurrentChannelId = useNavigationStore(
-    (state) => state.setCurrentChannelId,
-  );
-  const {
-    state: { channels, channelsLoading, channelsError },
-    derived: {
-      currentServer,
-      currentChannel,
-      channelSettingsTarget,
-      currentRenderableChannel,
-      currentChannelKind,
-      reportStatusRefreshVersion,
-    },
-    actions: {
-      resetChannelsWorkspace,
-      setChannels,
-      prefetchServersChannels,
-      prefetchMessageCachesForServers,
-      getDefaultChannelIdForServer,
-    },
-  } = useCommunityWorkspace({
-    servers,
-    currentUserId: user?.id ?? null,
-  });
-
-  const dmWorkspaceIsActive = workspaceMode === "dm";
 
   // ── Voice ─────────────────────────────────────────────────────────────────
   const {
@@ -233,25 +383,33 @@ export function useChatAppOrchestration() {
     channels,
   });
 
-  const {
-    state: {
-      friendsPanelOpen,
-      friendsPanelRequestedTab,
-      friendsPanelHighlightedRequestId,
-      socialCounts,
-    },
-    actions: {
-      setFriendsPanelOpen,
-      setFriendsPanelRequestedTab,
-      setFriendsPanelHighlightedRequestId,
-      refreshSocialCounts,
-      resetSocialWorkspace,
-    },
-  } = useSocialWorkspace({
-    socialBackend,
-    userId: user?.id,
-    enabled: true,
-  });
+  const friendsPanelOpen = useUiStore((state) => state.friendsPanelOpen);
+  const friendsPanelRequestedTab = useUiStore(
+    (state) => state.friendsPanelRequestedTab,
+  );
+  const friendsPanelHighlightedRequestId = useUiStore(
+    (state) => state.friendsPanelHighlightedRequestId,
+  );
+  const setFriendsPanelOpen = useUiStore((state) => state.setFriendsPanelOpen);
+  const setFriendsPanelRequestedTab = useUiStore(
+    (state) => state.setFriendsPanelRequestedTab,
+  );
+  const setFriendsPanelHighlightedRequestId = useUiStore(
+    (state) => state.setFriendsPanelHighlightedRequestId,
+  );
+  const socialCounts = core.social.useCounts();
+  const refreshSocialCounts = useCallback(async () => {
+    await core.social.load();
+  }, [core]);
+  const resetSocialWorkspace = useCallback(() => {
+    setFriendsPanelOpen(false);
+    setFriendsPanelRequestedTab(null);
+    setFriendsPanelHighlightedRequestId(null);
+  }, [
+    setFriendsPanelHighlightedRequestId,
+    setFriendsPanelOpen,
+    setFriendsPanelRequestedTab,
+  ]);
 
   // ── Channel groups ────────────────────────────────────────────────────────
   const {
@@ -364,11 +522,21 @@ export function useChatAppOrchestration() {
     currentUserId: user?.id ?? null,
     currentChannelId,
     channels,
-    setChannels,
   });
 
   // ── Messages ──────────────────────────────────────────────────────────────
+  const messageNexus = useMemo(
+    () => (currentServerId ? core.messages.for(currentServerId) : null),
+    [core, currentServerId],
+  );
+  const visibleChannelMessages =
+    messageNexus?.useVisibleChannel(currentChannelId ?? "__none__") ?? [];
+
   const {
+    state: {
+      hasOlderMessages,
+      isLoadingOlderMessages,
+    },
     actions: {
       resetMessageState,
       clearAuthorProfileCache,
@@ -460,7 +628,6 @@ export function useChatAppOrchestration() {
       setNotificationsError,
     },
   } = useNotifications({
-    notificationBackend,
     userId: user?.id,
     audioSettings: appSettings.notifications,
     autoMarkSeenOnPanelOpen: false,
@@ -495,7 +662,6 @@ export function useChatAppOrchestration() {
       reportDirectMessage,
     },
   } = useDirectMessages({
-    directMessageBackend,
     userId: user?.id,
     enabled: true,
     isActive: dmWorkspaceIsActive,
@@ -612,8 +778,6 @@ export function useChatAppOrchestration() {
     setFriendsPanelOpen,
     setFriendsPanelRequestedTab,
     setFriendsPanelHighlightedRequestId,
-    setCurrentServerId,
-    setCurrentChannelId,
   });
 
   const {
@@ -804,6 +968,9 @@ export function useChatAppOrchestration() {
     openChannelSettingsModal,
     saveRoleChannelPermissions,
     saveMemberChannelPermissions,
+    visibleChannelMessages,
+    hasOlderMessages,
+    isLoadingOlderMessages,
     requestOlderMessages,
     sendMessage,
     toggleMessageReaction,

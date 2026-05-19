@@ -46,6 +46,61 @@ const havenRev2UniwindRestrictions = [
   },
 ];
 
+/**
+ * HavenCore architecture boundary restrictions.
+ * The Nexus layer is the only authority that may touch backend factories,
+ * Supabase clients, or persistence directly. Features and UI must read state
+ * through `requireHavenCore()` / nexus hooks instead.
+ */
+const havenCoreDeprecatedImports = [
+  {
+    group: [
+      '@shared/stores/navigationStore',
+      '**/stores/navigationStore',
+      '@shared/features/community/hooks/useCommunityWorkspace',
+      '**/useCommunityWorkspace',
+      '@shared/features/social/hooks/useSocialWorkspace',
+      '**/useSocialWorkspace',
+      '@shared/features/community/communityNavigation',
+      '**/communityNavigation',
+      '@shared/infrastructure/realtime/communityAccessBroadcastBridge',
+      '**/communityAccessBroadcastBridge',
+      '@shared/stores/messagesStore',
+      '**/stores/messagesStore',
+    ],
+    message:
+      'Deprecated HavenCore migration shims are deleted. Use requireHavenCore().communities/channels for focus, uiStore for workspace UI, and core.social for social counts.',
+  },
+];
+
+const havenCoreNexusBoundary = [
+  {
+    group: ['react-native-mmkv', 'react-native-mmkv/*'],
+    message:
+      'Persistence must flow through NexusPersistence. Only @shared/core/persistence/createMmkvPersistence.ts may import react-native-mmkv.',
+  },
+  {
+    group: [
+      '@shared/runtime',
+      '@shared/runtime/*',
+      '@shared/infrastructure/runtime',
+      '@shared/infrastructure/runtime/*',
+      '@shared/lib/bootstrap/*',
+      '@shared/infrastructure/bootstrap/*',
+    ],
+    message:
+      'Legacy runtime/bootstrap modules have been removed. Use createHavenCore + requireHavenCore from @shared/core.',
+  },
+  {
+    group: [
+      '@shared/infrastructure/realtime/HavenEventBus',
+      '**/HavenEventBus',
+    ],
+    message:
+      'HavenEventBus is removed. Use requireHavenCore().routeEvent for ingestion and core.messages.* for reads.',
+  },
+];
+
 const mobileBoundaryRestrictions = [
   {
     group: ['@web/*', '**/apps/web/src/*'],
@@ -120,19 +175,25 @@ export default [
   },
   {
     files: [
-      'packages/shared/src/app/hooks/useChatAppOrchestration.ts',
-      'packages/shared/src/app/components/ChatAppModals.tsx',
+      'apps/web-client/**/*.{ts,tsx,js,jsx}',
+      'apps/mobile/**/*.{ts,tsx,js,jsx}',
+      'packages/shared/src/features/**/*.{ts,tsx,js,jsx}',
     ],
     rules: {
-      'max-lines': [
-        'warn',
-        { max: 550, skipBlankLines: true, skipComments: true },
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: havenCoreDeprecatedImports,
+        },
       ],
     },
   },
   {
     files: ['packages/shared/src/**/*.{ts,tsx}'],
-    ignores: ['packages/shared/src/platform/desktop/client.ts'],
+    ignores: [
+      'packages/shared/src/core/persistence/createMmkvPersistence.ts',
+      'packages/shared/src/platform/desktop/client.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -144,6 +205,7 @@ export default [
                 'Import getAppHost from @shared/platform/appHost instead. Electron registers the real bridge in apps/electron/src/renderer/registerElectronAppHost.ts.',
             },
           ],
+          patterns: [...havenCoreNexusBoundary, ...havenCoreDeprecatedImports],
         },
       ],
     },

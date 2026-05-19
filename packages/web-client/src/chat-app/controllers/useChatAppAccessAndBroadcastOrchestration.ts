@@ -1,7 +1,8 @@
 import { useCallback, useEffect, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import { getCommunityDataBackend } from "@shared/lib/backend";
-import { registerCommunityAccessBroadcastHandlers } from "@shared/infrastructure/realtime/communityAccessBroadcastBridge";
+import { registerCommunityAccessHandlers } from "@shared/core/communityAccessHandlers";
+import { requireHavenCore } from "@shared/core";
 import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import type {
   Channel,
@@ -10,8 +11,8 @@ import type {
   ServerSummary,
 } from "@shared/lib/backend/types";
 import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
-import { useNavigationStore } from "@shared/stores/navigationStore";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
+import { useUiStore } from "@shared/stores/uiStore";
 
 type VoiceChannelLike = { id: string; community_id: string } | null;
 
@@ -64,9 +65,10 @@ export function useChatAppAccessAndBroadcastOrchestration({
   const handleServerAccessLossReset = useCallback(
     (serverId: string) => {
       if (!serverId) return;
-      useNavigationStore.getState().setCurrentServerId(null);
-      useNavigationStore.getState().setCurrentChannelId(null);
-      useNavigationStore.getState().setWorkspaceMode("community");
+      const core = requireHavenCore();
+      core.communities.setActiveId(null);
+      core.channels.setActiveChannelId(null);
+      useUiStore.getState().setWorkspaceMode("community");
       resetMessageState();
       resetChannelGroups();
       resetChannelsWorkspace();
@@ -279,7 +281,7 @@ export function useChatAppAccessAndBroadcastOrchestration({
   );
 
   useEffect(() => {
-    registerCommunityAccessBroadcastHandlers({
+    registerCommunityAccessHandlers({
       onActiveServerAccessLost: handleServerAccessLostCascade,
       onActiveChannelAccessLost: handleChannelAccessLostCascade,
       onMemberBanned: handleMemberBannedBroadcast,

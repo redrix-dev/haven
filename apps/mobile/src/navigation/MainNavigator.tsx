@@ -1,5 +1,8 @@
+import { useNavigation } from "@react-navigation/native";
+import type { NavigationProp } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
+import { useEffect } from "react";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
@@ -11,10 +14,45 @@ import { HomeScreen } from "@/screens/main/HomeScreen";
 import { CommunityShell } from "@/navigation/community/CommunityShell";
 import type { MainStackParamList } from "@/navigation/types";
 import { NAV_THEME } from "@/lib/theme";
+import { setMobileNavigationDelegate } from "@/lib/registerMobileAppHost";
+import { requireHavenCore } from "@shared/core";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const mainStackScreenBackground = NAV_THEME.dark.colors.background;
+
+/**
+ * Bridges React Navigation imperative API into the shared AppHost so external
+ * events (notification taps, deep links, access-revoked redirects) can move
+ * the user without a navigation ref reaching into shared code.
+ */
+function MainNavigationDelegateBridge() {
+  const navigation =
+    useNavigation<NavigationProp<MainStackParamList>>();
+
+  useEffect(() => {
+    setMobileNavigationDelegate({
+      navigateToCommunity: (serverId, channelId) => {
+        try {
+          requireHavenCore().communities.setActiveId(serverId);
+          if (channelId) {
+            requireHavenCore().channels.setActiveChannelId(channelId);
+          }
+        } catch {
+          // HavenCore may not be ready during cold-start race; navigation alone is fine.
+        }
+        navigation.navigate("Community", { serverId });
+      },
+      navigateToDm: (_conversationId) => {
+        // DM workspace is Phase 4 — for now route to Home where DMs live.
+        navigation.navigate("Home");
+      },
+    });
+    return () => setMobileNavigationDelegate(null);
+  }, [navigation]);
+
+  return null;
+}
 
 export function MainNavigator() {
   const session = useAuthSession();
@@ -35,6 +73,7 @@ export function MainNavigator() {
       <MobileSocialWorkspaceProvider userId={userId}>
         <MobileDirectMessagesProvider userId={userId}>
           <MobileMainSessionProvider userId={userId}>
+            <MainNavigationDelegateBridge />
             <Stack.Navigator
               detachInactiveScreens={false}
               screenOptions={{

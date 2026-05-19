@@ -45,8 +45,6 @@ import { ProfileContextMenu } from "@web-client/components/ProfileContextMenu";
 import { ActionMenuContent } from "@web-client/components/menus/ActionMenuContent";
 import {
   BANNED_REPLY_PLACEHOLDER_CONTENT,
-  filterHiddenMessageContent,
-  filterBlockedUserContent,
   isModerationRemovedReplyPlaceholder,
 } from "@shared/features/messaging/lib/banVisibility";
 import { resolveContextMenuIntent } from "@shared/infrastructure/contextMenu";
@@ -77,90 +75,6 @@ import {
 } from "@shared/features/profile/utils/profileTombstone";
 import { getLiveProfile } from "@shared/infrastructure/liveProfiles";
 import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
-import { useMessagesStore } from "@shared/stores/messagesStore";
-import { useSocialStore } from "@shared/stores/socialStore";
-
-function bundleToMessageRow(
-  bundle: MessageBundle,
-  channelId: string,
-  communityId: string,
-): Message {
-  return {
-    id: bundle.id,
-    author_type: bundle.authorUserId ? "user" : "system",
-    author_user_id: bundle.authorUserId,
-    channel_id: channelId,
-    community_id: communityId,
-    content: bundle.content,
-    created_at: bundle.createdAt,
-    deleted_at: bundle.deletedAt,
-    edited_at: bundle.editedAt,
-    is_hidden: bundle.isHidden,
-    metadata: bundle.metadata as Message["metadata"],
-  };
-}
-
-function bundlesToBanVisibilityInput(
-  bundles: MessageBundle[],
-  channelId: string,
-): {
-  messages: Message[];
-  reactions: MessageReaction[];
-  attachments: MessageAttachment[];
-  linkPreviews: MessageLinkPreview[];
-} {
-  const communityId =
-    bundles.find((b) => b.attachment?.communityId)?.attachment?.communityId ??
-    bundles.find((b) => b.linkPreview?.communityId)?.linkPreview?.communityId ??
-    "";
-  return {
-    messages: bundles.map((b) => bundleToMessageRow(b, channelId, communityId)),
-    reactions: bundles.flatMap((b) => b.reactions),
-    attachments: bundles
-      .map((b) => b.attachment)
-      .filter((a): a is MessageAttachment => Boolean(a)),
-    linkPreviews: bundles
-      .map((b) => b.linkPreview)
-      .filter((p): p is MessageLinkPreview => Boolean(p)),
-  };
-}
-
-function visibleBundlesFromBanFilter(
-  bundles: MessageBundle[],
-  filtered: {
-    messages: Message[];
-    reactions: MessageReaction[];
-    attachments: MessageAttachment[];
-    linkPreviews: MessageLinkPreview[];
-  },
-): MessageBundle[] {
-  const idOrder = filtered.messages.map((m) => m.id);
-  const reactionMap = new Map<string, MessageReaction[]>();
-  for (const r of filtered.reactions) {
-    const list = reactionMap.get(r.messageId) ?? [];
-    list.push(r);
-    reactionMap.set(r.messageId, list);
-  }
-  const attMap = new Map(
-    filtered.attachments.map((a) => [a.messageId, a] as const),
-  );
-  const previewMap = new Map(
-    filtered.linkPreviews.map((p) => [p.messageId, p] as const),
-  );
-
-  return idOrder
-    .map((id) => {
-      const b = bundles.find((x) => x.id === id);
-      if (!b) return null;
-      return {
-        ...b,
-        reactions: reactionMap.get(id) ?? [],
-        attachment: attMap.get(id) ?? null,
-        linkPreview: previewMap.get(id) ?? null,
-      };
-    })
-    .filter((b): b is MessageBundle => b != null);
-}
 
 function getReplyToMessageIdFromBundle(bundle: MessageBundle): string | null {
   const direct = bundle.replyToMessageId?.trim();
@@ -198,8 +112,8 @@ type AuthorProfile = MessageListAuthorProfile;
 
 interface MessageListProps {
   channelId: string;
+  messages: MessageBundle[];
   currentUserId: string;
-  isElevatedViewer: boolean;
   canManageMessages: boolean;
   canCreateReports: boolean;
   canManageBans: boolean;
@@ -239,8 +153,9 @@ interface MessageListProps {
   }) => Promise<void>;
   onRequestMessageLinkPreviewRefresh: (messageId: string) => Promise<void>;
   onRequestOlderMessages?: () => Promise<void>;
+  hasOlderMessages?: boolean;
+  isLoadingOlderMessages?: boolean;
   bottomInset?: number;
-  showHiddenMessages?: boolean;
 }
 
 type MessageReactionSummaryState = {
@@ -1277,8 +1192,8 @@ const MessageVirtuosoItem = React.memo(function MessageVirtuosoItem({
 
 export function MessageList({
   channelId,
+  messages,
   currentUserId,
-  isElevatedViewer,
   canManageMessages,
   canCreateReports,
   canManageBans,
@@ -1297,14 +1212,11 @@ export function MessageList({
   onReportMessage,
   onRequestMessageLinkPreviewRefresh,
   onRequestOlderMessages,
+  hasOlderMessages = false,
+  isLoadingOlderMessages = false,
   bottomInset = 96,
-  showHiddenMessages = false,
 }: MessageListProps) {
-  const messages = useMessagesStore((state) => state.messages);
   const liveProfiles = useLiveProfilesStore((state) => state.profiles);
-  const blockedUserIds = useSocialStore((state) => state.blockedUserIds);
-  const hasOlderMessages = useMessagesStore((state) => state.hasMore);
-  const isLoadingOlderMessages = useMessagesStore((state) => state.isLoading);
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);
   const isAtBottomRef = useRef(true);
   const previousChannelIdRef = useRef(channelId);
@@ -1354,37 +1266,17 @@ export function MessageList({
   const [banConfirmOpen, setBanConfirmOpen] = useState(false);
   const [kickSubmitting, setKickSubmitting] = useState(false);
 
-  const visibleBundles = useMemo(() => {
-    const raw = bundlesToBanVisibilityInput(messages, channelId);
-    const afterBlock = filterBlockedUserContent(
-      raw,
-      blockedUserIds,
-      isElevatedViewer,
-    );
-    const afterHidden = filterHiddenMessageContent(
-      afterBlock,
-      showHiddenMessages,
-    );
-    return visibleBundlesFromBanFilter(messages, afterHidden);
-  }, [
-    blockedUserIds,
-    channelId,
-    isElevatedViewer,
-    messages,
-    showHiddenMessages,
-  ]);
-
   const messageById = useMemo(() => {
     const next = new Map<string, MessageBundle>();
-    for (const bundle of visibleBundles) {
+    for (const bundle of messages) {
       next.set(bundle.id, bundle);
     }
     return next;
-  }, [visibleBundles]);
+  }, [messages]);
 
   const attachmentsByMessageId = useMemo(() => {
     const next = new Map<string, MessageAttachment[]>();
-    for (const bundle of visibleBundles) {
+    for (const bundle of messages) {
       next.set(
         bundle.id,
         bundle.attachment
@@ -1393,17 +1285,17 @@ export function MessageList({
       );
     }
     return next;
-  }, [visibleBundles]);
+  }, [messages]);
 
   const linkPreviewByMessageId = useMemo(() => {
     const next = new Map<string, MessageLinkPreview>();
-    for (const bundle of visibleBundles) {
+    for (const bundle of messages) {
       if (bundle.linkPreview) {
         next.set(bundle.id, bundle.linkPreview);
       }
     }
     return next;
-  }, [visibleBundles]);
+  }, [messages]);
 
   const getRenderableEmbedUrl = React.useCallback(
     (preview: MessageLinkPreview): string | null => {
@@ -1440,7 +1332,7 @@ export function MessageList({
       string,
       Map<string, { count: number; reactedByCurrentUser: boolean }>
     >();
-    for (const bundle of visibleBundles) {
+    for (const bundle of messages) {
       for (const reaction of bundle.reactions) {
         const byEmoji =
           next.get(bundle.id) ??
@@ -1458,13 +1350,13 @@ export function MessageList({
       }
     }
     return next;
-  }, [currentUserId, visibleBundles]);
+  }, [currentUserId, messages]);
 
   const replyTree = useMemo(() => {
     const repliesByParentId = new Map<string, MessageBundle[]>();
     const rootMessages: MessageBundle[] = [];
 
-    for (const message of visibleBundles) {
+    for (const message of messages) {
       const parentId = getReplyToMessageIdFromBundle(message);
       const parentExists = Boolean(
         parentId && parentId !== message.id && messageById.has(parentId),
@@ -1480,15 +1372,15 @@ export function MessageList({
       repliesByParentId.set(parentId, existing);
     }
 
-    if (rootMessages.length === 0 && visibleBundles.length > 0) {
+    if (rootMessages.length === 0 && messages.length > 0) {
       return {
-        rootMessages: visibleBundles,
+        rootMessages: messages,
         repliesByParentId: new Map<string, MessageBundle[]>(),
       };
     }
 
     return { rootMessages, repliesByParentId };
-  }, [messageById, visibleBundles]);
+  }, [messageById, messages]);
 
   useEffect(() => {
     const validThreadParentIds = new Set(replyTree.repliesByParentId.keys());
@@ -1678,7 +1570,7 @@ export function MessageList({
   const getResolvedAuthorProfileForUserId = React.useCallback(
     (targetUserId: string | null | undefined): AuthorProfile | undefined => {
       if (!targetUserId) return undefined;
-      const bundle = visibleBundles.find(
+      const bundle = messages.find(
         (b) => b.authorUserId === targetUserId,
       );
       if (bundle) return getResolvedAuthorProfileForBundle(bundle);
@@ -1691,16 +1583,16 @@ export function MessageList({
         avatarUrl: liveProfile.avatarUrl ?? null,
       };
     },
-    [getResolvedAuthorProfileForBundle, liveProfiles, visibleBundles],
+    [getResolvedAuthorProfileForBundle, liveProfiles, messages],
   );
 
   const authorProfilesByMessageId = useMemo(() => {
     const next = new Map<string, AuthorProfile | undefined>();
-    for (const bundle of visibleBundles) {
+    for (const bundle of messages) {
       next.set(bundle.id, getResolvedAuthorProfileForBundle(bundle));
     }
     return next;
-  }, [getResolvedAuthorProfileForBundle, visibleBundles]);
+  }, [getResolvedAuthorProfileForBundle, messages]);
 
   const reportProfile = React.useCallback(
     async (targetUserId: string) => {

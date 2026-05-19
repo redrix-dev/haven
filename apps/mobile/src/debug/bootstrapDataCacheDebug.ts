@@ -1,10 +1,5 @@
 import { dataCacheDebug, instrumentZustandStore } from "@shared/debug";
 import { useAuthStore } from "@shared/stores/authStore";
-import { useDmStore } from "@shared/stores/dmStore";
-import { useMessagesStore } from "@shared/stores/messagesStore";
-import { useNavigationStore } from "@shared/stores/navigationStore";
-import { useServersStore } from "@shared/stores/serversStore";
-import { useSocialStore } from "@shared/stores/socialStore";
 
 let bootstrapped = false;
 
@@ -16,24 +11,10 @@ export function bootstrapDataCacheDebug(): void {
   bootstrapped = true;
   dataCacheDebug.setEnabled(true);
 
-  const unsubscribers = [
-    instrumentZustandStore(useNavigationStore, "navigationStore"),
-    instrumentZustandStore(useMessagesStore, "messagesStore"),
-    instrumentZustandStore(useServersStore, "serversStore"),
-    instrumentZustandStore(useAuthStore, "authStore"),
-    instrumentZustandStore(useSocialStore, "socialStore"),
-    instrumentZustandStore(useDmStore, "dmStore"),
-  ];
+  const unsubscribers = [instrumentZustandStore(useAuthStore, "authStore")];
 
   dataCacheDebug.lifecycle("bootstrapDataCacheDebug", "Store instrumentation active", {
-    stores: [
-      "navigationStore",
-      "messagesStore",
-      "serversStore",
-      "authStore",
-      "socialStore",
-      "dmStore",
-    ],
+    stores: ["authStore"],
   });
 
   if (typeof globalThis !== "undefined") {

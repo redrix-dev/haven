@@ -1,7 +1,17 @@
-import type { MMKV } from 'react-native-mmkv'
+import { useMemo } from "react";
+import { useStoreWithEqualityFn } from "zustand/traditional";
 import { Nexus, type NexusState } from '../Nexus'
-import type { MessageBundle } from '@shared/lib/backend/types'
+import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
+import type { ViewerMessagePolicyStore } from '@shared/core/viewerMessagePolicy'
+import {
+  projectVisibleChannelMessages,
+  projectVisibleChannelMessagesBlockOnly,
+} from '@shared/nexus/community/projectVisibleChannelMessages'
+import type { CommunityDataBackend } from '@shared/lib/backend/communityDataBackend.interface'
+import type { MessageBundle, MessageReportKind, MessageReportTarget } from '@shared/lib/backend/types'
 import type { StoreApi, UseBoundStore } from 'zustand'
+
+const MESSAGE_PAGE_SIZE = 50
 
 type CommunityMessageState = {
   byChannel: Record<string, string[]>
@@ -49,12 +59,187 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   private channelMessageSnapshots = new Map<string, MessageBundle[]>()
   private channelMetaSnapshots = new Map<string, ChannelMeta>()
 
-  constructor(communityId: string, storage: MMKV) {
-    super('community-messages', communityId, storage)
+  private communityData: CommunityDataBackend | null = null
+  private initialLoadInflight = new Map<string, Promise<void>>()
+  private olderLoadInflight = new Map<string, Promise<void>>()
+
+  constructor(
+    private readonly communityId: string,
+    persistence: NexusPersistence,
+    private readonly viewerMessagePolicyStore: ViewerMessagePolicyStore | null = null,
+  ) {
+    super('community-messages', communityId, persistence)
+  }
+
+  /**
+   * Wire the backend. Called by MessageNexusRegistry when this nexus is
+   * created so loadInitial / loadOlder / send / edit / delete / react work.
+   */
+  setCommunityData(communityData: CommunityDataBackend): void {
+    this.communityData = communityData
   }
 
   protected transform(raw: MessageBundle): MessageBundle {
     return raw
+  }
+
+  // ---- Data orchestration ----
+
+  /**
+   * Initial page for a channel. Idempotent and deduplicates concurrent calls.
+   */
+  async loadInitial(channelId: string): Promise<void> {
+    if (!this.communityData) {
+      throw new Error('CommunityMessageNexus.loadInitial called before backend attached.')
+    }
+    const inflight = this.initialLoadInflight.get(channelId)
+    if (inflight) return inflight
+
+    const promise = (async () => {
+      const result = await this.communityData!.listChannelMessages({
+        communityId: this.communityId,
+        channelId,
+        limit: MESSAGE_PAGE_SIZE,
+        beforeCreatedAt: null,
+        beforeMessageId: null,
+      })
+      const ascending = [...result.messages].reverse()
+      this.insertMessages(ascending, channelId, {
+        hasMore: result.hasMore,
+        cursor:
+          ascending.length > 0
+            ? `${ascending[0].createdAt}|${ascending[0].id}`
+            : null,
+      })
+    })().finally(() => {
+      this.initialLoadInflight.delete(channelId)
+    })
+
+    this.initialLoadInflight.set(channelId, promise)
+    return promise
+  }
+
+  /**
+   * Prepend the next page of older messages for a channel.
+   */
+  async loadOlder(channelId: string): Promise<void> {
+    if (!this.communityData) {
+      throw new Error('CommunityMessageNexus.loadOlder called before backend attached.')
+    }
+    const inflight = this.olderLoadInflight.get(channelId)
+    if (inflight) return inflight
+
+    const meta = this.getChannelMetaSnapshot(channelId)
+    if (!meta.hasMore) return
+    const ids = this.channelState.byChannel[channelId] ?? []
+    const oldestId = ids[0]
+    const oldest = oldestId ? this.getSnapshot(oldestId) : undefined
+    if (!oldest) return
+
+    const promise = (async () => {
+      const result = await this.communityData!.listChannelMessages({
+        communityId: this.communityId,
+        channelId,
+        limit: MESSAGE_PAGE_SIZE,
+        beforeCreatedAt: oldest.createdAt,
+        beforeMessageId: oldest.id,
+      })
+      const ascending = [...result.messages].reverse()
+      this.insertMessages(ascending, channelId, {
+        hasMore: result.hasMore,
+        cursor:
+          ascending.length > 0
+            ? `${ascending[0].createdAt}|${ascending[0].id}`
+            : meta.cursor,
+      })
+    })().finally(() => {
+      this.olderLoadInflight.delete(channelId)
+    })
+
+    this.olderLoadInflight.set(channelId, promise)
+    return promise
+  }
+
+  /**
+   * Send a user message in this community. Returns the new message id.
+   * The realtime stream is the source of truth; we don't optimistically
+   * insert here, the routeEvent pipeline does it on MESSAGE_INSERT.
+   */
+  async send(
+    channelId: string,
+    content: string,
+    options?: { replyToMessageId?: string | null },
+  ): Promise<{ id: string }> {
+    if (!this.communityData) {
+      throw new Error('CommunityMessageNexus.send called before backend attached.')
+    }
+    return this.communityData.sendUserMessage({
+      communityId: this.communityId,
+      channelId,
+      content,
+      replyToMessageId: options?.replyToMessageId ?? null,
+    })
+  }
+
+  async edit(messageId: string, content: string): Promise<void> {
+    if (!this.communityData) {
+      throw new Error('CommunityMessageNexus.edit called before backend attached.')
+    }
+    await this.communityData.editUserMessage({
+      communityId: this.communityId,
+      messageId,
+      content,
+    })
+  }
+
+  async deleteMessageRpc(messageId: string): Promise<void> {
+    if (!this.communityData) {
+      throw new Error('CommunityMessageNexus.deleteMessageRpc called before backend attached.')
+    }
+    await this.communityData.deleteMessage({
+      communityId: this.communityId,
+      messageId,
+    })
+  }
+
+  async toggleReaction(
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    if (!this.communityData) {
+      throw new Error('CommunityMessageNexus.toggleReaction called before backend attached.')
+    }
+    await this.communityData.toggleMessageReaction({
+      communityId: this.communityId,
+      channelId,
+      messageId,
+      emoji,
+    })
+  }
+
+  async report(input: {
+    channelId: string
+    messageId: string
+    reporterUserId: string
+    target: MessageReportTarget
+    kind: MessageReportKind
+    comment: string
+  }): Promise<void> {
+    if (!this.communityData) {
+      throw new Error('CommunityMessageNexus.report called before backend attached.')
+    }
+    await this.communityData.reportMessage({
+      communityId: this.communityId,
+      ...input,
+    })
+  }
+
+  private getChannelMetaSnapshot(channelId: string): ChannelMeta {
+    return {
+      hasMore: this.channelState.hasMore[channelId] ?? false,
+      cursor: this.channelState.cursors[channelId] ?? null,
+    }
   }
 
   getReactiveStore(): UseBoundStore<StoreApi<NexusState<MessageBundle>>> {
@@ -259,6 +444,24 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
 
   useChannel(channelId: string): MessageBundle[] {
     return this.use(this.getChannelSelector(channelId), messagesEqual)
+  }
+
+  useVisibleChannel(channelId: string): MessageBundle[] {
+    const raw = this.useChannel(channelId)
+    const policy = this.viewerMessagePolicyStore
+      ? useStoreWithEqualityFn(this.viewerMessagePolicyStore, (state) => state)
+      : null
+
+    return useMemo(() => {
+      if (!policy || Object.keys(policy.communities).length === 0) {
+        const hidden = policy?.hiddenAuthorIds ?? new Set<string>()
+        return projectVisibleChannelMessagesBlockOnly(raw, hidden)
+      }
+      return projectVisibleChannelMessages(raw, policy, {
+        communityId: this.communityId,
+        channelId,
+      })
+    }, [raw, policy, channelId])
   }
 
   useChannelMeta(channelId: string): ChannelMeta {

@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { createMMKV, type MMKV } from 'react-native-mmkv'
 import { Nexus, type NexusEntry, type NexusState } from '../Nexus'
+import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
+import type { CommunityDataBackend } from '@shared/lib/backend/communityDataBackend.interface'
 import type {
   Channel,
   ChannelGroup,
@@ -27,19 +28,11 @@ export type ChannelNexusState = NexusState<HavenChannel> & {
   collapsed: Record<string, string[]>
   activeChannelId: string | null
   loadingByCommunity: Record<string, boolean>
+  lastChannelByCommunity: Record<string, string | null>
 }
 
 const STORAGE_KEY = 'haven:nexus:channels:global'
 const EMPTY_CHANNELS: HavenChannel[] = []
-
-let sharedNexusStorage: MMKV | null = null
-
-function getSharedNexusStorage(): MMKV {
-  if (!sharedNexusStorage) {
-    sharedNexusStorage = createMMKV({ id: 'haven-nexus-storage' })
-  }
-  return sharedNexusStorage
-}
 
 const selectActiveChannelId = (state: ChannelNexusState) => state.activeChannelId
 
@@ -93,8 +86,102 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
   private channelsSnapshots = new Map<string, HavenChannel[]>()
   private groupStateSnapshots = new Map<string, ChannelGroupState>()
 
-  constructor() {
-    super('channels', 'global', getSharedNexusStorage())
+  private communityData: CommunityDataBackend | null = null
+  private inflight = new Map<string, Promise<void>>()
+
+  constructor(persistence: NexusPersistence) {
+    super('channels', 'global', persistence)
+  }
+
+  /**
+   * Wire the backend used by `loadForCommunity`. Called once by HavenCore.
+   */
+  setCommunityData(communityData: CommunityDataBackend): void {
+    this.communityData = communityData
+  }
+
+  /**
+   * Fetch channels and channel-groups for a community and replace the nexus
+   * entries for that community. Deduplicated: concurrent calls share the same promise.
+   */
+  async loadForCommunity(communityId: string): Promise<void> {
+    if (!this.communityData) {
+      throw new Error(
+        'ChannelNexus.loadForCommunity called before communityData was attached.',
+      )
+    }
+
+    const existing = this.inflight.get(communityId)
+    if (existing) return existing
+
+    const promise = (async () => {
+      this.setIsLoading(communityId, true)
+      try {
+        const channels = await this.communityData!.listChannels(communityId)
+        let groupState: ChannelGroupState
+        try {
+          groupState = await this.communityData!.listChannelGroups({
+            communityId,
+            channelIds: channels.map((channel) => channel.id),
+          })
+        } catch {
+          groupState = {
+            groups: [],
+            ungroupedChannelIds: channels.map((channel) => channel.id),
+            collapsedGroupIds: [],
+          }
+        }
+        this.setChannels(communityId, channels, groupState)
+      } finally {
+        this.setIsLoading(communityId, false)
+        this.inflight.delete(communityId)
+      }
+    })()
+
+    this.inflight.set(communityId, promise)
+    return promise
+  }
+
+  /**
+   * Load channels for a community if we don't already have them cached.
+   * The nexus reads `byCommunity` to decide; rehydrated state counts as cached.
+   */
+  async ensureLoaded(communityId: string): Promise<void> {
+    const ids = this.store.getState().byCommunity[communityId] ?? []
+    if (ids.length > 0) return
+    await this.loadForCommunity(communityId)
+  }
+
+  /**
+   * Insert / update a single channel from a realtime event.
+   */
+  upsertChannel(raw: Channel): void {
+    const channel = this.transform(raw)
+    this.store.setState((state) => {
+      const communityIds = state.byCommunity[channel.communityId] ?? []
+      const alreadyIndexed = communityIds.includes(channel.id)
+      const nextEntities = {
+        ...state.entities,
+        [channel.id]: {
+          data: channel,
+          partial: false,
+          cachedAt: Date.now(),
+        },
+      }
+      const nextByCommunity = alreadyIndexed
+        ? state.byCommunity
+        : {
+            ...state.byCommunity,
+            [channel.communityId]: [...communityIds, channel.id],
+          }
+      return {
+        ...state,
+        entities: nextEntities,
+        byCommunity: nextByCommunity,
+        revision: state.revision + 1,
+      }
+    })
+    this.persist()
   }
 
   protected transform(raw: Channel): HavenChannel {
@@ -119,6 +206,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         collapsed: {},
         activeChannelId: null,
         loadingByCommunity: {},
+        lastChannelByCommunity: {},
         revision: 0,
       }))
       this.rehydrate()
@@ -295,12 +383,38 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
   }
 
   setActiveChannelId(id: string | null): void {
-    this.store.setState((state) => ({
-      ...state,
-      activeChannelId: id,
-      revision: state.revision + 1,
-    }))
+    this.store.setState((state) => {
+      const next: Partial<ChannelNexusState> = {
+        activeChannelId: id,
+        revision: state.revision + 1,
+      }
+
+      if (id) {
+        const entry = state.entities[id]
+        const communityId = entry?.data.communityId
+        if (communityId) {
+          next.lastChannelByCommunity = {
+            ...state.lastChannelByCommunity,
+            [communityId]: id,
+          }
+        }
+      }
+
+      return { ...state, ...next }
+    })
     this.persist()
+  }
+
+  getActiveChannelId(): string | null {
+    return this.store.getState().activeChannelId
+  }
+
+  /**
+   * Last visited channel for a community.
+   * Used by route focus sync to restore the user's place.
+   */
+  getLastChannelId(communityId: string): string | null {
+    return this.store.getState().lastChannelByCommunity[communityId] ?? null
   }
 
   setGroupCollapsed(
@@ -376,8 +490,9 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         ungrouped: state.ungrouped,
         collapsed: state.collapsed,
         activeChannelId: state.activeChannelId,
+        lastChannelByCommunity: state.lastChannelByCommunity,
       }
-      getSharedNexusStorage().set(STORAGE_KEY, JSON.stringify(persistable))
+      this.persistence.set(STORAGE_KEY, JSON.stringify(persistable))
     } catch (error) {
       console.warn('[ChannelNexus] Failed to persist', error)
     }
@@ -385,7 +500,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
 
   override rehydrate(): void {
     try {
-      const raw = getSharedNexusStorage().getString(STORAGE_KEY)
+      const raw = this.persistence.getString(STORAGE_KEY)
       if (!raw) return
 
       const parsed = JSON.parse(raw) as {
@@ -395,6 +510,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         ungrouped: Record<string, string[]>
         collapsed: Record<string, string[]>
         activeChannelId: string | null
+        lastChannelByCommunity?: Record<string, string | null>
       }
 
       this.store.setState((state) => ({
@@ -405,12 +521,13 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         ungrouped: parsed.ungrouped ?? {},
         collapsed: parsed.collapsed ?? {},
         activeChannelId: parsed.activeChannelId ?? null,
+        lastChannelByCommunity: parsed.lastChannelByCommunity ?? {},
         loadingByCommunity: {},
         revision: 0,
       }))
     } catch (error) {
       console.warn('[ChannelNexus] Failed to rehydrate', error)
-      getSharedNexusStorage().remove(STORAGE_KEY)
+      this.persistence.remove(STORAGE_KEY)
     }
   }
 
@@ -423,6 +540,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
       collapsed: {},
       activeChannelId: null,
       loadingByCommunity: {},
+      lastChannelByCommunity: {},
       revision: 0,
     })
     this.channelSelectors.clear()
@@ -431,7 +549,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
     this.loadingSelectors.clear()
     this.channelsSnapshots.clear()
     this.groupStateSnapshots.clear()
-    getSharedNexusStorage().remove(STORAGE_KEY)
+    this.persistence.remove(STORAGE_KEY)
   }
 
   useChannels(communityId: string): HavenChannel[] {
@@ -463,4 +581,3 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
   }
 }
 
-export const channelNexus = new ChannelNexus()

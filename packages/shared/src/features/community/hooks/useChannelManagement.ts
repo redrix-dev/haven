@@ -1,5 +1,6 @@
 import React from "react";
 import { getCommunityDataBackend } from "@shared/lib/backend";
+import { requireHavenCore } from "@shared/core";
 import type {
   Channel,
   ChannelAccessRevokedResult,
@@ -11,13 +12,12 @@ import type {
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useUiStore } from "@shared/stores/uiStore";
-import { useNavigationStore } from "@shared/stores";
+
 type UseChannelManagementInput = {
   currentServerId: string | null;
   currentUserId: string | null;
   currentChannelId: string | null;
   channels: Channel[];
-  setChannels: React.Dispatch<React.SetStateAction<Channel[]>>;
 };
 
 export function useChannelManagement({
@@ -25,11 +25,10 @@ export function useChannelManagement({
   currentUserId,
   currentChannelId,
   channels,
-  setChannels,
 }: UseChannelManagementInput) {
-  const setCurrentChannelId = useNavigationStore(
-    (state) => state.setCurrentChannelId,
-  )
+  const setCurrentChannelId = React.useCallback((id: string | null) => {
+    requireHavenCore().channels.setActiveChannelId(id);
+  }, []);
   const channelSettingsTargetId = useUiStore((state) => state.channelSettingsTargetId);
   const setChannelSettingsTargetId = useUiStore((state) => state.setChannelSettingsTargetId);
   const setShowChannelSettingsModal = useUiStore((state) => state.setShowChannelSettingsModal);
@@ -76,18 +75,13 @@ export function useChannelManagement({
         kind: values.kind,
       });
 
-      setChannels((prev) => {
-        if (prev.some((existingChannel) => existingChannel.id === channel.id))
-          return prev;
-        return [...prev, channel].sort((a, b) => a.position - b.position);
-      });
+      requireHavenCore().channels.upsertChannel(channel);
       setCurrentChannelId(channel.id);
     },
     [
       channels,
       currentServerId,
       currentUserId,
-      setChannels,
       setCurrentChannelId,
     ],
   );
@@ -106,15 +100,12 @@ export function useChannelManagement({
         topic: values.topic,
       });
 
-      setChannels((prev) =>
-        prev.map((channel) =>
-          channel.id === channelIdToUpdate
-            ? { ...channel, name: values.name, topic: values.topic }
-            : channel,
-        ),
-      );
+      requireHavenCore().channels.updateChannel(channelIdToUpdate, {
+        name: values.name,
+        topic: values.topic,
+      });
     },
-    [channelSettingsTargetId, currentChannelId, currentServerId, setChannels],
+    [channelSettingsTargetId, currentChannelId, currentServerId],
   );
 
   const renameChannel = React.useCallback(
@@ -138,15 +129,11 @@ export function useChannelManagement({
         topic: channelRow.topic,
       });
 
-      setChannels((prev) =>
-        prev.map((channel) =>
-          channel.id === channelId
-            ? { ...channel, name: normalizedName }
-            : channel,
-        ),
-      );
+      requireHavenCore().channels.updateChannel(channelId, {
+        name: normalizedName,
+      });
     },
-    [channels, currentServerId, setChannels],
+    [channels, currentServerId],
   );
 
   const deleteChannel = React.useCallback(
@@ -162,21 +149,22 @@ export function useChannelManagement({
         channelId,
       });
 
-      setChannels((prev) => {
-        const next = prev.filter((channel) => channel.id !== channelId);
-        if (currentChannelId === channelId) {
-          setCurrentChannelId(next.length > 0 ? next[0].id : null);
-        }
-        return next;
-      });
+      const core = requireHavenCore();
+      core.channels.removeChannel(channelId, currentServerId);
+      if (currentChannelId === channelId) {
+        const remaining = core.channels
+          .getChannelsSnapshot(currentServerId)
+          .map((ch) => ch.id);
+        setCurrentChannelId(remaining.length > 0 ? remaining[0] : null);
+      }
       const current = useUiStore.getState().channelSettingsTargetId;
       setChannelSettingsTargetId(current === channelId ? null : current);
     },
     [
       channels.length,
+      currentChannelId,
       currentServerId,
       setChannelSettingsTargetId,
-      setChannels,
       setCurrentChannelId,
     ],
   );
