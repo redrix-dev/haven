@@ -1,4 +1,4 @@
-import type { AppSettings, NotificationAudioSettings, VoiceSettings, VoiceTransmissionMode } from "@shared/app/types/settings";
+import type { AppSettings, NotificationAudioSettings, VoiceSettings, VoiceTransmissionMode } from "@shared/types/settings";
 
 export type UpdaterStatus = {
   supported: boolean;

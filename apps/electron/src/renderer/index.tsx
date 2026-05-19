@@ -1,13 +1,13 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
-import { initializeHavenDataFromClient } from '@shared/lib/bootstrap/initializeHavenDataFromClient';
+import { createHavenCore, createMemoryPersistence } from '@shared/core';
 import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { registerElectronAppHost } from './registerElectronAppHost';
-import { AppRoot } from '@shared/app/AppRoot';
+import { AppRoot } from '@web-client/AppRoot';
 import '@shared/styles/globals.css';
-import { applyShellThemeTokens, setShellThemeApplier } from '@shared/app/shellThemeRegistry';
+import { applyShellThemeTokens, setShellThemeApplier } from '@web-client/shellThemeRegistry';
 import { readSessionStoredThemeId } from '@shared/themes/sessionThemeStorage';
 import { getTheme } from '@shared/themes/registry';
 import { applyThemeWeb } from './lib/theme';
@@ -29,9 +29,10 @@ const havenElectronClient = createHavenSupabaseClient(supabaseUrl, supabaseAnonK
     detectSessionInUrl: false,
   },
 });
-initializeHavenDataFromClient(havenElectronClient, {
-  supabaseUrl,
-  supabaseAnonKey,
+createHavenCore({
+  client: havenElectronClient,
+  publicConfig: { supabaseUrl, supabaseAnonKey },
+  persistence: createMemoryPersistence(),
 });
 
 const root = createRoot(document.body);

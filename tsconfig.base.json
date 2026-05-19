@@ -14,6 +14,7 @@
     "paths": {
       "@electron/*": ["./apps/electron/src/*"],
       "@web/*": ["./apps/web/src/*"],
+      "@web-client/*": ["./packages/web-client/src/*"],
       "@shared/app/ui/*": ["./packages/web-client/src/app-ui/*"],
       "@shared/*": ["./packages/shared/src/*"],
       "@client/app/*": ["./packages/shared/src/app/*"],

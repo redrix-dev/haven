@@ -5,6 +5,8 @@ import type {
 } from "./dataCacheDebugTypes";
 import { safeSerializeDebugRecord } from "./safeSerializeDebugValue";
 
+declare const __DEV__: boolean;
+
 const MAX_ENTRIES = 2500;
 const MAX_COMPONENT_SNAPSHOTS = 80;
 

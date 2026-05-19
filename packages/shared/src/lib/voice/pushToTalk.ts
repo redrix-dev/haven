@@ -1,4 +1,4 @@
-import type { VoicePushToTalkBinding } from '@shared/app/types/settings';
+import type { VoicePushToTalkBinding } from '@shared/types/settings';
 
 const CODE_LABEL_OVERRIDES: Record<string, string> = {
   Space: 'Space',
