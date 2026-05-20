@@ -104,6 +104,37 @@ export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
       app.voiceChannelParticipants,
     ],
   );
+  const handleParticipantsChange = useCallback(
+    (
+      participants: Array<{
+        userId: string;
+        displayName: string;
+        avatarUrl?: string | null;
+        isSpeaking?: boolean;
+      }>,
+    ) => {
+      core.voice.setParticipants(participants);
+    },
+    [core],
+  );
+  const handleConnectionChange = useCallback(
+    (connected: boolean) => {
+      core.voice.setVoiceConnected(connected);
+    },
+    [core],
+  );
+  const handleSessionStateChange = useCallback(
+    (state: { joined: boolean; isMuted: boolean; isDeafened: boolean }) => {
+      core.voice.setSessionState(state);
+    },
+    [core],
+  );
+  const handleUpdateVoiceSettings = useCallback(
+    (next: Parameters<typeof app.setVoiceSettings>[0]) => {
+      void app.setVoiceSettings(next);
+    },
+    [app.setVoiceSettings],
+  );
   const voiceController = useVoiceSessionController({
     activeChannel: activeVoiceControllerChannel,
     currentUserId: app.user?.id,
@@ -113,12 +144,10 @@ export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
     voiceSettings: app.appSettings.voice,
     notificationAudioSettings: app.appSettings.notifications,
     showDiagnostics: app.isPlatformStaff,
-    onUpdateVoiceSettings: (next) => {
-      void app.setVoiceSettings(next);
-    },
-    onParticipantsChange: core.voice.setParticipants.bind(core.voice),
-    onConnectionChange: core.voice.setVoiceConnected.bind(core.voice),
-    onSessionStateChange: core.voice.setSessionState.bind(core.voice),
+    onUpdateVoiceSettings: handleUpdateVoiceSettings,
+    onParticipantsChange: handleParticipantsChange,
+    onConnectionChange: handleConnectionChange,
+    onSessionStateChange: handleSessionStateChange,
     onControlActionsReady: app.setVoiceControlActions,
     onSessionError: handleVoiceSessionError,
     onVoiceKick: handleVoiceKickReceived,

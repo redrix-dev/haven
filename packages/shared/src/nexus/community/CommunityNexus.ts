@@ -190,6 +190,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
   }
 
   setActiveId(id: string | null): void {
+    if (this.store.getState().activeId === id) return
     this.store.setState((state) => ({
       ...state,
       activeId: id,

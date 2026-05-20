@@ -117,6 +117,12 @@ export class PermissionsNexus {
     communityId: string,
     communityBackend: CommunityDataBackend,
   ): Promise<void> {
+    if (
+      this.store.getState().hydrationByCommunityId[communityId] === "hydrated"
+    ) {
+      return;
+    }
+
     const existing = this.inflight.get(communityId);
     if (existing) return existing;
 

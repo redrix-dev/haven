@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { installPromptTrap } from "@shared/infrastructure/contextMenu/debugTrace";
 import { requireHavenCore } from "@shared/core";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
@@ -71,6 +71,62 @@ export function useChatAppLifecycleEffects({
   prefetchMessageCachesForServers,
   prefetchChannelMessages,
 }: UseChatAppLifecycleEffectsInput) {
+  const actionsRef = useRef({
+    setNotificationsPanelOpen,
+    setFriendsPanelOpen,
+    setWorkspaceMode,
+    resetPlatformSession,
+    resetVoiceState,
+    resetMessageState,
+    clearAuthorProfileCache,
+    clearCrossSessionMessagingCaches,
+    resetFeatureFlags,
+    resetNotifications,
+    resetSocialWorkspace,
+    resetDirectMessages,
+    resetChannelsWorkspace,
+    resetServerSettingsState,
+    resetServerInvites,
+    resetServerRoleManagement,
+    resetChannelPermissionsState,
+    resetChannelGroups,
+    resetMembersModal,
+    resetCommunityBans,
+    prefetchServersChannels,
+    prefetchMessageCachesForServers,
+    prefetchChannelMessages,
+  });
+  actionsRef.current = {
+    setNotificationsPanelOpen,
+    setFriendsPanelOpen,
+    setWorkspaceMode,
+    resetPlatformSession,
+    resetVoiceState,
+    resetMessageState,
+    clearAuthorProfileCache,
+    clearCrossSessionMessagingCaches,
+    resetFeatureFlags,
+    resetNotifications,
+    resetSocialWorkspace,
+    resetDirectMessages,
+    resetChannelsWorkspace,
+    resetServerSettingsState,
+    resetServerInvites,
+    resetServerRoleManagement,
+    resetChannelPermissionsState,
+    resetChannelGroups,
+    resetMembersModal,
+    resetCommunityBans,
+    prefetchServersChannels,
+    prefetchMessageCachesForServers,
+    prefetchChannelMessages,
+  };
+
+  const serverIdsKey = useMemo(
+    () => servers.map((server) => server.id).sort().join(","),
+    [servers],
+  );
+
   useEffect(() => {
     installPromptTrap();
   }, []);
@@ -82,101 +138,67 @@ export function useChatAppLifecycleEffects({
 
   useEffect(() => {
     if (user) return;
+    const actions = actionsRef.current;
     const core = requireHavenCore();
     core.communities.setActiveId(null);
     core.channels.setActiveChannelId(null);
-    resetPlatformSession();
-    resetVoiceState();
-    setNotificationsPanelOpen(false);
+    actions.resetPlatformSession();
+    actions.resetVoiceState();
+    actions.setNotificationsPanelOpen(false);
     useUiStore.getState().reset();
-    setFriendsPanelOpen(false);
-    setWorkspaceMode("community");
-    resetMessageState();
-    clearAuthorProfileCache();
-    clearCrossSessionMessagingCaches();
-    resetFeatureFlags();
-    resetNotifications();
-    resetSocialWorkspace();
-    resetDirectMessages();
-    resetChannelsWorkspace();
+    actions.setFriendsPanelOpen(false);
+    actions.setWorkspaceMode("community");
+    actions.resetMessageState();
+    actions.clearAuthorProfileCache();
+    actions.clearCrossSessionMessagingCaches();
+    actions.resetFeatureFlags();
+    actions.resetNotifications();
+    actions.resetSocialWorkspace();
+    actions.resetDirectMessages();
+    actions.resetChannelsWorkspace();
     usePermissionsStore.getState().reset();
-    resetServerSettingsState();
-    resetServerInvites();
-    resetServerRoleManagement();
-    resetChannelPermissionsState();
-    resetChannelGroups();
-    resetMembersModal();
-    resetCommunityBans();
-  }, [
-    clearAuthorProfileCache,
-    clearCrossSessionMessagingCaches,
-    resetChannelGroups,
-    resetChannelsWorkspace,
-    resetChannelPermissionsState,
-    resetCommunityBans,
-    resetDirectMessages,
-    resetFeatureFlags,
-    resetMembersModal,
-    resetMessageState,
-    resetNotifications,
-    resetPlatformSession,
-    resetServerInvites,
-    resetServerRoleManagement,
-    resetServerSettingsState,
-    resetSocialWorkspace,
-    resetVoiceState,
-    setFriendsPanelOpen,
-    setNotificationsPanelOpen,
-    setWorkspaceMode,
-    user,
-  ]);
+    actions.resetServerSettingsState();
+    actions.resetServerInvites();
+    actions.resetServerRoleManagement();
+    actions.resetChannelPermissionsState();
+    actions.resetChannelGroups();
+    actions.resetMembersModal();
+    actions.resetCommunityBans();
+  }, [user]);
 
   useEffect(() => {
     if (currentServerId) return;
-    resetChannelsWorkspace();
-    resetVoiceState();
-    resetMessageState();
+    const actions = actionsRef.current;
+    actions.resetChannelsWorkspace();
+    actions.resetVoiceState();
+    actions.resetMessageState();
     useUiStore.getState().setShowCreateChannelModal(false);
     useUiStore.getState().setShowJoinServerModal(false);
     useUiStore.getState().setShowServerSettingsModal(false);
     useUiStore.getState().setShowChannelSettingsModal(false);
     useUiStore.getState().setChannelSettingsTargetId(null);
-    resetServerSettingsState();
-    resetServerInvites();
-    resetServerRoleManagement();
-    resetChannelPermissionsState();
-    resetChannelGroups();
-    resetMembersModal();
+    actions.resetServerSettingsState();
+    actions.resetServerInvites();
+    actions.resetServerRoleManagement();
+    actions.resetChannelPermissionsState();
+    actions.resetChannelGroups();
+    actions.resetMembersModal();
     useUiStore.getState().setRenameChannelDraft(null);
     useUiStore.getState().setRenameGroupDraft(null);
     useUiStore.getState().setCreateGroupDraft(null);
-    resetCommunityBans();
-  }, [
-    currentServerId,
-    resetChannelGroups,
-    resetChannelPermissionsState,
-    resetChannelsWorkspace,
-    resetCommunityBans,
-    resetMembersModal,
-    resetServerInvites,
-    resetServerRoleManagement,
-    resetServerSettingsState,
-    resetMessageState,
-    resetVoiceState,
-  ]);
+    actions.resetCommunityBans();
+  }, [currentServerId]);
 
   useEffect(() => {
-    if (servers.length === 0 || !userId) return;
-    const serverIds = servers.map((s) => s.id);
+    if (!userId || serverIdsKey.length === 0) return;
+    const serverIds = serverIdsKey.split(",");
+    const actions = actionsRef.current;
     void (async () => {
-      await prefetchServersChannels(serverIds);
-      await prefetchMessageCachesForServers(serverIds, prefetchChannelMessages);
+      await actions.prefetchServersChannels(serverIds);
+      await actions.prefetchMessageCachesForServers(
+        serverIds,
+        actions.prefetchChannelMessages,
+      );
     })();
-  }, [
-    servers,
-    userId,
-    prefetchServersChannels,
-    prefetchMessageCachesForServers,
-    prefetchChannelMessages,
-  ]);
+  }, [serverIdsKey, userId]);
 }

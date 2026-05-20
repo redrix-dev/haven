@@ -4,6 +4,10 @@ import { Nexus, type NexusState } from '../Nexus'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
 import type { ViewerMessagePolicyStore } from '@shared/core/viewerMessagePolicy'
 import {
+  viewerCommunityPolicyEqual,
+  viewerPolicyHiddenAuthorIdsEqual,
+} from '@shared/core/viewerMessagePolicy'
+import {
   projectVisibleChannelMessages,
   projectVisibleChannelMessagesBlockOnly,
 } from '@shared/nexus/community/projectVisibleChannelMessages'
@@ -448,20 +452,46 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
 
   useVisibleChannel(channelId: string): MessageBundle[] {
     const raw = this.useChannel(channelId)
-    const policy = this.viewerMessagePolicyStore
-      ? useStoreWithEqualityFn(this.viewerMessagePolicyStore, (state) => state)
+    const hiddenAuthorIds = this.viewerMessagePolicyStore
+      ? useStoreWithEqualityFn(
+          this.viewerMessagePolicyStore,
+          (state) => state.hiddenAuthorIds,
+          viewerPolicyHiddenAuthorIdsEqual,
+        )
       : null
+    const showHiddenMessages = this.viewerMessagePolicyStore
+      ? useStoreWithEqualityFn(
+          this.viewerMessagePolicyStore,
+          (state) => state.showHiddenMessages,
+        )
+      : false
+    const communityPolicy = this.viewerMessagePolicyStore
+      ? useStoreWithEqualityFn(
+          this.viewerMessagePolicyStore,
+          (state) => state.communities[this.communityId],
+          viewerCommunityPolicyEqual,
+        )
+      : undefined
 
     return useMemo(() => {
-      if (!policy || Object.keys(policy.communities).length === 0) {
-        const hidden = policy?.hiddenAuthorIds ?? new Set<string>()
-        return projectVisibleChannelMessagesBlockOnly(raw, hidden)
+      if (!this.viewerMessagePolicyStore) {
+        return projectVisibleChannelMessagesBlockOnly(raw, new Set<string>())
+      }
+      const policy = {
+        hiddenAuthorIds: hiddenAuthorIds ?? new Set<string>(),
+        showHiddenMessages,
+        communities: communityPolicy
+          ? { [this.communityId]: communityPolicy }
+          : {},
+      }
+      if (Object.keys(policy.communities).length === 0) {
+        return projectVisibleChannelMessagesBlockOnly(raw, policy.hiddenAuthorIds)
       }
       return projectVisibleChannelMessages(raw, policy, {
         communityId: this.communityId,
         channelId,
       })
-    }, [raw, policy, channelId])
+    }, [raw, hiddenAuthorIds, showHiddenMessages, communityPolicy, channelId])
   }
 
   useChannelMeta(channelId: string): ChannelMeta {

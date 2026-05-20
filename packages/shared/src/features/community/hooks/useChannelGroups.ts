@@ -69,6 +69,7 @@ export function useChannelGroups({
 
   const detectActiveChannelAccessLoss = React.useCallback(
     (accessibleChannelIds: string[], channelIdToValidate: string | null) => {
+      if (accessibleChannelIds.length === 0) return;
       if (!channelIdToValidate) {
         lastAccessLostChannelIdRef.current = null;
         return;

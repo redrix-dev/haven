@@ -1,17 +1,13 @@
 import React from "react";
 import { useHavenCore } from "@shared/core";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useUiStore } from "@shared/stores/uiStore";
 import { getPendingUiConfirmationCopy } from "@web-client/ui-confirmations";
 
 export function useChatAppModalUiState() {
-  const currentServerId = useHavenCore().communities.useActiveId();
-  const serverPermissions = usePermissionsStore((state) =>
-    state.getPermissions(currentServerId ?? ""),
-  );
-  const serverPermissionsById = usePermissionsStore(
-    (state) => state.permissionsByServerId,
-  );
+  const core = useHavenCore();
+  const currentServerId = core.communities.useActiveId();
+  const serverPermissions = core.permissions.usePermissions(currentServerId ?? "");
+  const serverPermissionsById = core.permissions.usePermissionsByCommunityId();
   const notificationsPanelOpen = useUiStore(
     (state) => state.notificationsPanelOpen,
   );

@@ -5,8 +5,8 @@ import {
   toChannel,
   resolvePreferredChannelIdForServer,
 } from "@shared/core";
-import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import { useServers } from "@shared/features/community/hooks/useServers";
+import { hydrateCommunityPermissions } from "@shared/features/community/utils/communityPermissionsHydration";
 import {
   getControlPlaneBackend,
   getNotificationBackend,
@@ -184,10 +184,14 @@ export function useChatAppOrchestration() {
   );
 
   useEffect(() => {
-    if (servers.length > 0 && !currentServerId) {
-      setCurrentServerId(servers[0].id);
-    }
-  }, [servers, currentServerId, setCurrentServerId]);
+    if (!user?.id || servers.length === 0 || currentServerId) return;
+    setCurrentServerId(servers[0].id);
+  }, [servers, currentServerId, setCurrentServerId, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !currentServerId) return;
+    void hydrateCommunityPermissions(currentServerId);
+  }, [currentServerId, user?.id]);
 
   useEffect(() => {
     if (!currentServerId) return;
@@ -204,7 +208,11 @@ export function useChatAppOrchestration() {
     if (!currentServerId || channels.length === 0) return;
     const valid =
       currentChannelId != null &&
-      channels.some((channel) => channel.id === currentChannelId);
+      channels.some(
+        (channel) =>
+          channel.id === currentChannelId &&
+          channel.community_id === currentServerId,
+      );
     if (valid) return;
     const preferred = resolvePreferredChannelIdForServer(
       core,
@@ -212,6 +220,7 @@ export function useChatAppOrchestration() {
       channels,
       { previousChannelId: currentChannelId },
     );
+    if (preferred === currentChannelId) return;
     setCommunityNavigation(currentServerId, preferred);
   }, [
     channels,
@@ -220,16 +229,6 @@ export function useChatAppOrchestration() {
     currentServerId,
     setCommunityNavigation,
   ]);
-
-  useEffect(() => {
-    if (!user?.id || !currentServerId) {
-      if (currentServerId) {
-        core.permissions.invalidate(currentServerId);
-      }
-      return;
-    }
-    void hydrateCommunityPermissions(currentServerId);
-  }, [core, currentServerId, user?.id]);
 
   const channelSettingsTargetId = useUiStore(
     (state) => state.channelSettingsTargetId,
@@ -525,13 +524,6 @@ export function useChatAppOrchestration() {
   });
 
   // ── Messages ──────────────────────────────────────────────────────────────
-  const messageNexus = useMemo(
-    () => (currentServerId ? core.messages.for(currentServerId) : null),
-    [core, currentServerId],
-  );
-  const visibleChannelMessages =
-    messageNexus?.useVisibleChannel(currentChannelId ?? "__none__") ?? [];
-
   const {
     state: {
       hasOlderMessages,
@@ -968,7 +960,6 @@ export function useChatAppOrchestration() {
     openChannelSettingsModal,
     saveRoleChannelPermissions,
     saveMemberChannelPermissions,
-    visibleChannelMessages,
     hasOlderMessages,
     isLoadingOlderMessages,
     requestOlderMessages,

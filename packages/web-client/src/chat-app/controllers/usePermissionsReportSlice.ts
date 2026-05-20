@@ -9,6 +9,10 @@ export function usePermissionsReportSlice(
 ) {
   const core = useHavenCore();
   const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
+  const serverIdsKey = useMemo(
+    () => servers.map((server) => server.id).sort().join(","),
+    [servers],
+  );
 
   const managedReportServerIds = useMemo(
     () =>
@@ -24,15 +28,17 @@ export function usePermissionsReportSlice(
 
   useEffect(() => {
     if (!userId) return;
-    const joinedIds = new Set(servers.map((server) => server.id));
+    const joinedIds = new Set(
+      serverIdsKey.length > 0 ? serverIdsKey.split(",") : [],
+    );
     for (const id of Object.keys(core.permissions.getPermissionsByCommunityId())) {
       if (!joinedIds.has(id)) {
         core.permissions.invalidate(id);
       }
     }
-    if (servers.length === 0) return;
-    void hydrateCommunityPermissionsForMany(servers.map((server) => server.id));
-  }, [core, servers, userId]);
+    if (joinedIds.size === 0) return;
+    void hydrateCommunityPermissionsForMany(Array.from(joinedIds));
+  }, [core, serverIdsKey, userId]);
 
   return { managedReportServerIds, serverModmailEnabled };
 }

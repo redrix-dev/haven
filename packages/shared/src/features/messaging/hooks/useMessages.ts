@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useHavenCore } from "@shared/core";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import type {
@@ -65,16 +65,9 @@ export function useMessages({
 }: UseMessagesInput) {
   const core = useHavenCore();
   const { setRainbowMode } = useUserStatusStore();
-
-  const messageNexus = useMemo(
-    () => (currentServerId ? core.messages.for(currentServerId) : null),
-    [core, currentServerId],
-  );
-
-  const meta = messageNexus?.useChannelMeta(currentChannelId ?? "__none__") ?? {
-    hasMore: false,
-    cursor: null,
-  };
+  const communityId = currentServerId ?? "__none__";
+  const messageNexus = core.messages.for(communityId);
+  const meta = messageNexus.useChannelMeta(currentChannelId ?? "__none__");
 
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
@@ -87,7 +80,7 @@ export function useMessages({
 
   // Trigger initial load when channel changes.
   useEffect(() => {
-    if (!currentServerId || !currentChannelId || !messageNexus) return;
+    if (!currentServerId || !currentChannelId) return;
 
     const channel = channels.find((c) => c.id === currentChannelId);
     if (channels.length > 0) {

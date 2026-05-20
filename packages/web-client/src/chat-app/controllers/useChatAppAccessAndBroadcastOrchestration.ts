@@ -72,6 +72,7 @@ export function useChatAppAccessAndBroadcastOrchestration({
       resetMessageState();
       resetChannelGroups();
       resetChannelsWorkspace();
+      core.permissions.invalidate(serverId);
       usePermissionsStore.getState().clearPermissions(serverId);
       purgeMessageBundleCacheForServer(serverId);
       setWorkspaceMode("community");

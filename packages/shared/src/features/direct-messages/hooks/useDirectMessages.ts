@@ -238,6 +238,16 @@ export function useDirectMessages({
     [dmConversations, selectedDmConversationId],
   );
 
+  const resetDirectMessages = React.useCallback(() => {
+    dm.setActiveConversationId(null);
+    setDmComposeDraftPeer(null);
+    setDmConversationsRefreshing(false);
+    setDmConversationsError(null);
+    setDmMessagesRefreshing(false);
+    setDmMessagesError(null);
+    setDmMessageSendPending(false);
+  }, [dm]);
+
   return {
     state: {
       dmConversations,
@@ -257,15 +267,7 @@ export function useDirectMessages({
       selectedDmConversation,
     },
     actions: {
-      resetDirectMessages: () => {
-        dm.setActiveConversationId(null);
-        setDmComposeDraftPeer(null);
-        setDmConversationsRefreshing(false);
-        setDmConversationsError(null);
-        setDmMessagesRefreshing(false);
-        setDmMessagesError(null);
-        setDmMessageSendPending(false);
-      },
+      resetDirectMessages,
       clearSelectedDmConversation: () => {
         setDmComposeDraftPeer(null);
         dm.setActiveConversationId(null);

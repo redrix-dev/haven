@@ -77,16 +77,38 @@ export class VoiceNexus {
   }
 
   setParticipants(participants: VoiceSidebarParticipant[]): void {
+    const previous = this.store.getState().participants;
+    if (
+      previous.length === participants.length &&
+      previous.every(
+        (entry, index) =>
+          entry.userId === participants[index]?.userId &&
+          entry.displayName === participants[index]?.displayName &&
+          entry.avatarUrl === participants[index]?.avatarUrl &&
+          entry.isSpeaking === participants[index]?.isSpeaking,
+      )
+    ) {
+      return;
+    }
     this.store.setState({ participants });
     this.bump();
   }
 
   setVoiceConnected(voiceConnected: boolean): void {
+    if (this.store.getState().voiceConnected === voiceConnected) return;
     this.store.setState({ voiceConnected });
     this.bump();
   }
 
   setSessionState(sessionState: VoiceSessionSnapshot | null): void {
+    const previous = this.store.getState().sessionState;
+    if (
+      previous?.joined === sessionState?.joined &&
+      previous?.isMuted === sessionState?.isMuted &&
+      previous?.isDeafened === sessionState?.isDeafened
+    ) {
+      return;
+    }
     this.store.setState({ sessionState });
     this.bump();
   }

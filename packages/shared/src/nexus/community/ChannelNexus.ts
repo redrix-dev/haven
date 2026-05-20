@@ -383,6 +383,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
   }
 
   setActiveChannelId(id: string | null): void {
+    if (this.store.getState().activeChannelId === id) return
     this.store.setState((state) => {
       const next: Partial<ChannelNexusState> = {
         activeChannelId: id,

@@ -48,5 +48,36 @@ const hiddenAuthorIdsEqual = (
   return true;
 };
 
+const revokedByChannelEqual = (
+  a: Readonly<Record<string, readonly string[]>>,
+  b: Readonly<Record<string, readonly string[]>>,
+): boolean => {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    const left = a[key] ?? [];
+    const right = b[key] ?? [];
+    if (left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i++) {
+      if (left[i] !== right[i]) return false;
+    }
+  }
+  return true;
+};
+
+export const viewerCommunityPolicyEqual = (
+  a: ViewerMessagePolicyState["communities"][string] | undefined,
+  b: ViewerMessagePolicyState["communities"][string] | undefined,
+): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.suppressAuthorFilter === b.suppressAuthorFilter &&
+    a.canViewBanHidden === b.canViewBanHidden &&
+    revokedByChannelEqual(a.revokedAuthorIdsByChannel, b.revokedAuthorIdsByChannel)
+  );
+};
+
 /** Stable selector equality for policy store subscriptions. */
 export const viewerPolicyHiddenAuthorIdsEqual = hiddenAuthorIdsEqual;

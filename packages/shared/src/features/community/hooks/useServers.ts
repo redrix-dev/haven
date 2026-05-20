@@ -46,6 +46,9 @@ export function useServers({
 
   // Surface access-loss events when the active community disappears from the list.
   useEffect(() => {
+    if (nexusLoading || servers.length === 0) {
+      return;
+    }
     const currentServerId = core.communities.getActiveId();
     if (!currentServerId) {
       lastAccessLostServerIdRef.current = null;
@@ -63,7 +66,7 @@ export function useServers({
     if (lastAccessLostServerIdRef.current === currentServerId) return;
     lastAccessLostServerIdRef.current = currentServerId;
     onActiveServerAccessLost?.(currentServerId);
-  }, [core, servers, onActiveServerAccessLost]);
+  }, [core, nexusLoading, onActiveServerAccessLost, servers]);
 
   // Surface status from nexus state.
   useEffect(() => {

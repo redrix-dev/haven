@@ -20,6 +20,8 @@ import { routeRealtimeEvent, type RealtimeEvent } from "./routeRealtimeEvent";
 import {
   createDefaultViewerMessagePolicyState,
   createViewerMessagePolicyStore,
+  viewerCommunityPolicyEqual,
+  viewerPolicyHiddenAuthorIdsEqual,
   type ViewerMessagePolicyStore,
 } from "./viewerMessagePolicy";
 
@@ -179,8 +181,8 @@ export class HavenCore {
     const hiddenAuthorIds = this.social.getHiddenAuthorIdsForViewer();
     const showHiddenMessages = useUiStore.getState().showHiddenMessages;
 
-    const prevCommunities =
-      this.viewerMessagePolicyStore.getState().communities;
+    const prev = this.viewerMessagePolicyStore.getState();
+    const prevCommunities = prev.communities;
     const communities = { ...prevCommunities };
 
     if (activeCommunityId) {
@@ -191,6 +193,21 @@ export class HavenCore {
         revokedAuthorIdsByChannel:
           this.permissions.getRevokedAuthorIdsByChannel(activeCommunityId),
       };
+    }
+
+    const nextCommunityPolicy = activeCommunityId
+      ? communities[activeCommunityId]
+      : undefined;
+    const prevCommunityPolicy = activeCommunityId
+      ? prevCommunities[activeCommunityId]
+      : undefined;
+
+    if (
+      viewerPolicyHiddenAuthorIdsEqual(prev.hiddenAuthorIds, hiddenAuthorIds) &&
+      prev.showHiddenMessages === showHiddenMessages &&
+      viewerCommunityPolicyEqual(prevCommunityPolicy, nextCommunityPolicy)
+    ) {
+      return;
     }
 
     this.viewerMessagePolicyStore.setState({

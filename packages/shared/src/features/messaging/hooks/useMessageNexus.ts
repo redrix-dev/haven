@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { requireHavenCore } from '@shared/core'
 import type { MessageBundle } from '@shared/lib/backend/types'
 
+const NO_COMMUNITY = '__none__'
+
 /**
  * @deprecated Thin reader for community messages. Prefer reading from
  * `useHavenCore().messages.for(communityId).useVisibleChannel(channelId)` directly.
@@ -13,17 +15,14 @@ export function useMessageNexus(
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoadingOlder, setIsLoadingOlder] = useState(false)
 
-  const nexus = communityId ? requireHavenCore().messages.for(communityId) : null
+  const nexus = requireHavenCore().messages.for(communityId ?? NO_COMMUNITY)
   const safeChannelId = channelId ?? '__none__'
 
-  const messages: MessageBundle[] = nexus?.useVisibleChannel(safeChannelId) ?? []
-  const meta = nexus?.useChannelMeta(safeChannelId) ?? {
-    hasMore: false,
-    cursor: null,
-  }
+  const messages: MessageBundle[] = nexus.useVisibleChannel(safeChannelId)
+  const meta = nexus.useChannelMeta(safeChannelId)
 
   useEffect(() => {
-    if (!nexus || !channelId) return
+    if (!communityId || !channelId) return
     setIsInitialized(false)
     nexus
       .loadInitial(channelId)
@@ -32,10 +31,10 @@ export function useMessageNexus(
         console.warn('[useMessageNexus] initial load failed', err)
         setIsInitialized(true)
       })
-  }, [nexus, channelId])
+  }, [communityId, channelId, nexus])
 
   const loadOlder = useCallback(async () => {
-    if (!nexus || !channelId || !meta.hasMore || isLoadingOlder) return
+    if (!communityId || !channelId || !meta.hasMore || isLoadingOlder) return
     setIsLoadingOlder(true)
     try {
       await nexus.loadOlder(channelId)
@@ -44,7 +43,7 @@ export function useMessageNexus(
     } finally {
       setIsLoadingOlder(false)
     }
-  }, [nexus, channelId, meta.hasMore, isLoadingOlder])
+  }, [communityId, channelId, isLoadingOlder, meta.hasMore, nexus])
 
   return {
     messages,

@@ -104,7 +104,7 @@ export function useNotifications({
     void playNewSounds().catch((error) => {
       console.error('Failed to play notification sounds:', error);
     });
-  }, [notificationItems, playNewSounds, userId]);
+  }, [notificationItems.length, playNewSounds, userId]);
 
   React.useEffect(() => {
     if (!userId) return;
@@ -152,6 +152,17 @@ export function useNotifications({
     [refreshNotificationInbox],
   );
 
+  const resetNotifications = React.useCallback(() => {
+    setNotificationsRefreshing(false);
+    setNotificationsError(null);
+    setNotificationPreferences(null);
+    setNotificationPreferencesLoading(false);
+    setNotificationPreferencesSaving(false);
+    setNotificationPreferencesError(null);
+    bootstrappedRef.current = false;
+    knownSoundIdsRef.current = new Set();
+  }, []);
+
   return {
     state: {
       notificationItems,
@@ -166,16 +177,7 @@ export function useNotifications({
     },
     derived: {},
     actions: {
-      resetNotifications: () => {
-        setNotificationsRefreshing(false);
-        setNotificationsError(null);
-        setNotificationPreferences(null);
-        setNotificationPreferencesLoading(false);
-        setNotificationPreferencesSaving(false);
-        setNotificationPreferencesError(null);
-        bootstrappedRef.current = false;
-        knownSoundIdsRef.current = new Set();
-      },
+      resetNotifications,
       refreshNotificationInbox,
       refreshNotificationPreferences: async () => {
         if (!userId) return;
