@@ -8,7 +8,7 @@ import type {
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
-/** Backend wiring for mobile server settings without desktop `useServerAdmin` / uiStore. */
+/** Backend wiring for mobile server settings via `core.admin` + uiStore. */
 export function useMobileServerAdminActions(
   communityId: string | null,
   currentUserId: string | null,

@@ -133,21 +133,6 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     };
   },
 
-  subscribeToProfileIdentities(onChange) {
-    return client
-      .channel('profile_identities')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profile_identities',
-        },
-        (payload) => onChange(payload)
-      )
-      .subscribe();
-  },
-
   async listMyFeatureFlags() {
     const { data, error } = await client.rpc('list_my_feature_flags' as never);
     if (error) throw error;
@@ -308,22 +293,6 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       .eq('community_id', communityId)
       .eq('user_id', user.id);
     if (error) throw error;
-  },
-
-  subscribeToUserCommunities(userId, onChange) {
-    return client
-      .channel(`community_members_changes:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'community_members',
-          filter: `user_id=eq.${userId}`,
-        },
-        onChange
-      )
-      .subscribe();
   },
 
   subscribeToPrivateUserChannel(userId, onEvent) {

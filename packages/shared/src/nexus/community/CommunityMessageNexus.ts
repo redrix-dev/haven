@@ -16,11 +16,24 @@ import type { MessageBundle, MessageReportKind, MessageReportTarget } from '@sha
 import type { StoreApi, UseBoundStore } from 'zustand'
 
 const MESSAGE_PAGE_SIZE = 50
+const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000
 
 type CommunityMessageState = {
   byChannel: Record<string, string[]>
   cursors: Record<string, string | null>
   hasMore: Record<string, boolean>
+  initialLoadComplete: Record<string, boolean>
+  loadingInitial: Record<string, boolean>
+  loadingOlder: Record<string, boolean>
+  lastInitialLoadedAt: Record<string, number>
+}
+
+export type SendCommunityMessageMediaOptions = {
+  mediaFile?: Blob | File
+  mediaArrayBuffer?: ArrayBuffer
+  mediaContentType?: string
+  mediaFilename?: string
+  mediaExpiresInHours?: number
 }
 
 export type ChannelMeta = {
@@ -30,6 +43,13 @@ export type ChannelMeta = {
 
 const EMPTY_MESSAGES: MessageBundle[] = []
 const DEFAULT_CHANNEL_META: ChannelMeta = { hasMore: false, cursor: null }
+
+const coerceMediaExpiresInHours = (
+  value: number | undefined,
+): 1 | 24 | 168 | 720 => {
+  if (value === 1 || value === 24 || value === 168 || value === 720) return value
+  return 24
+}
 
 export const messagesEqual = (a: MessageBundle[], b: MessageBundle[]): boolean => {
   if (a === b) return true
@@ -47,7 +67,11 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   private channelState: CommunityMessageState = {
     byChannel: {},
     cursors: {},
-    hasMore: {}
+    hasMore: {},
+    initialLoadComplete: {},
+    loadingInitial: {},
+    loadingOlder: {},
+    lastInitialLoadedAt: {},
   }
 
   private channelSelectors = new Map<
@@ -58,6 +82,21 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   private metaSelectors = new Map<
     string,
     (state: NexusState<MessageBundle>) => ChannelMeta
+  >()
+
+  private loadingInitialSelectors = new Map<
+    string,
+    (state: NexusState<MessageBundle>) => boolean
+  >()
+
+  private loadingOlderSelectors = new Map<
+    string,
+    (state: NexusState<MessageBundle>) => boolean
+  >()
+
+  private initialLoadCompleteSelectors = new Map<
+    string,
+    (state: NexusState<MessageBundle>) => boolean
   >()
 
   private channelMessageSnapshots = new Map<string, MessageBundle[]>()
@@ -83,6 +122,10 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     this.communityData = communityData
   }
 
+  isCommunityDataAttached(): boolean {
+    return this.communityData !== null
+  }
+
   protected transform(raw: MessageBundle): MessageBundle {
     return raw
   }
@@ -99,6 +142,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     const inflight = this.initialLoadInflight.get(channelId)
     if (inflight) return inflight
 
+    this.setLoadingInitial(channelId, true)
     const promise = (async () => {
       const result = await this.communityData!.listChannelMessages({
         communityId: this.communityId,
@@ -115,12 +159,33 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
             ? `${ascending[0].createdAt}|${ascending[0].id}`
             : null,
       })
+      this.markInitialLoadComplete(channelId)
     })().finally(() => {
       this.initialLoadInflight.delete(channelId)
+      this.setLoadingInitial(channelId, false)
     })
 
     this.initialLoadInflight.set(channelId, promise)
     return promise
+  }
+
+  /**
+   * Load initial messages when the channel is focused. Skips refetch while
+   * data is still fresh (default 10s) unless `freshnessMs` is 0.
+   */
+  async ensureInitialLoaded(
+    channelId: string,
+    options?: { freshnessMs?: number },
+  ): Promise<void> {
+    const freshnessMs = options?.freshnessMs ?? MESSAGE_RELOAD_FRESHNESS_WINDOW_MS
+    const lastAt = this.channelState.lastInitialLoadedAt[channelId] ?? 0
+    if (
+      this.channelState.initialLoadComplete[channelId] &&
+      Date.now() - lastAt < freshnessMs
+    ) {
+      return
+    }
+    await this.loadInitial(channelId)
   }
 
   /**
@@ -140,6 +205,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     const oldest = oldestId ? this.getSnapshot(oldestId) : undefined
     if (!oldest) return
 
+    this.setLoadingOlder(channelId, true)
     const promise = (async () => {
       const result = await this.communityData!.listChannelMessages({
         communityId: this.communityId,
@@ -158,6 +224,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
       })
     })().finally(() => {
       this.olderLoadInflight.delete(channelId)
+      this.setLoadingOlder(channelId, false)
     })
 
     this.olderLoadInflight.set(channelId, promise)
@@ -182,6 +249,95 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
       channelId,
       content,
       replyToMessageId: options?.replyToMessageId ?? null,
+    })
+  }
+
+  async sendWithMedia(
+    channelId: string,
+    content: string,
+    options?: { replyToMessageId?: string | null } & SendCommunityMessageMediaOptions,
+  ): Promise<void> {
+    if (!this.communityData) {
+      throw new Error('CommunityMessageNexus.sendWithMedia called before backend attached.')
+    }
+
+    const hasBlob = options?.mediaFile != null
+    const hasBuffer = options?.mediaArrayBuffer != null
+    if (hasBlob && hasBuffer) {
+      throw new Error('Cannot send both mediaFile and mediaArrayBuffer.')
+    }
+    if (hasBuffer && !options.mediaContentType?.trim()) {
+      throw new Error('mediaContentType is required when sending mediaArrayBuffer.')
+    }
+
+    if (!hasBlob && !hasBuffer) {
+      await this.send(channelId, content, {
+        replyToMessageId: options?.replyToMessageId ?? null,
+      })
+      return
+    }
+
+    const inferredMediaFilename =
+      options?.mediaFilename ??
+      (options?.mediaFile && 'name' in options.mediaFile
+        ? String(options.mediaFile.name)
+        : undefined) ??
+      `upload-${Date.now()}`
+
+    const fileBody = hasBuffer
+      ? (options!.mediaArrayBuffer as ArrayBuffer)
+      : (options!.mediaFile as Blob)
+
+    const upload = await this.communityData.uploadMessageMedia({
+      communityId: this.communityId,
+      channelId,
+      file: fileBody,
+      filename: inferredMediaFilename,
+      mimeType:
+        options?.mediaContentType?.trim() ??
+        (options?.mediaFile instanceof Blob
+          ? options.mediaFile.type || 'application/octet-stream'
+          : 'application/octet-stream'),
+      expiresInHours: coerceMediaExpiresInHours(options?.mediaExpiresInHours),
+      contentType:
+        options?.mediaContentType?.trim() ??
+        (options?.mediaFile instanceof Blob
+          ? options.mediaFile.type || undefined
+          : undefined),
+    })
+
+    const { id } = await this.send(channelId, content, {
+      replyToMessageId: options?.replyToMessageId ?? null,
+    })
+
+    try {
+      await this.communityData.insertMessageAttachment({
+        messageId: id,
+        communityId: this.communityId,
+        channelId,
+        objectPath: upload.objectPath,
+        mimeType: upload.mimeType,
+        sizeBytes: upload.sizeBytes,
+        mediaKind: upload.mediaKind,
+        filename: inferredMediaFilename,
+        expiresAt: upload.expiresAt,
+      })
+    } catch (error) {
+      await this.deleteMessageRpc(id)
+      throw error
+    }
+  }
+
+  async requestLinkPreviewBackfill(channelId: string, messageIds: string[]): Promise<void> {
+    if (!this.communityData) {
+      throw new Error(
+        'CommunityMessageNexus.requestLinkPreviewBackfill called before backend attached.',
+      )
+    }
+    await this.communityData.requestChannelLinkPreviewBackfill({
+      communityId: this.communityId,
+      channelId,
+      messageIds,
     })
   }
 
@@ -428,16 +584,32 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
       ...this.channelState,
       byChannel: {
         ...this.channelState.byChannel,
-        [channelId]: []
+        [channelId]: [],
       },
       cursors: {
         ...this.channelState.cursors,
-        [channelId]: null
+        [channelId]: null,
       },
       hasMore: {
         ...this.channelState.hasMore,
-        [channelId]: false
-      }
+        [channelId]: false,
+      },
+      initialLoadComplete: {
+        ...this.channelState.initialLoadComplete,
+        [channelId]: false,
+      },
+      loadingInitial: {
+        ...this.channelState.loadingInitial,
+        [channelId]: false,
+      },
+      loadingOlder: {
+        ...this.channelState.loadingOlder,
+        [channelId]: false,
+      },
+      lastInitialLoadedAt: {
+        ...this.channelState.lastInitialLoadedAt,
+        [channelId]: 0,
+      },
     }
 
     this.persist()
@@ -498,6 +670,18 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     return this.use(this.getMetaSelector(channelId), channelMetaEqual)
   }
 
+  useIsLoadingInitial(channelId: string): boolean {
+    return this.use(this.getLoadingInitialSelector(channelId))
+  }
+
+  useIsLoadingOlder(channelId: string): boolean {
+    return this.use(this.getLoadingOlderSelector(channelId))
+  }
+
+  useHasInitialLoadCompleted(channelId: string): boolean {
+    return this.use(this.getInitialLoadCompleteSelector(channelId))
+  }
+
   getLastMessageId(channelId: string): string | null {
     const ids = this.channelState.byChannel[channelId] ?? []
     return ids[ids.length - 1] ?? null
@@ -508,11 +692,91 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
       byChannel: {},
       cursors: {},
       hasMore: {},
+      initialLoadComplete: {},
+      loadingInitial: {},
+      loadingOlder: {},
+      lastInitialLoadedAt: {},
     }
     this.channelSelectors.clear()
     this.metaSelectors.clear()
+    this.loadingInitialSelectors.clear()
+    this.loadingOlderSelectors.clear()
+    this.initialLoadCompleteSelectors.clear()
     this.channelMessageSnapshots.clear()
     this.channelMetaSnapshots.clear()
     super.clear()
+  }
+
+  private setLoadingInitial(channelId: string, loading: boolean): void {
+    this.channelState = {
+      ...this.channelState,
+      loadingInitial: {
+        ...this.channelState.loadingInitial,
+        [channelId]: loading,
+      },
+    }
+    this.notifyRevision()
+  }
+
+  private setLoadingOlder(channelId: string, loading: boolean): void {
+    this.channelState = {
+      ...this.channelState,
+      loadingOlder: {
+        ...this.channelState.loadingOlder,
+        [channelId]: loading,
+      },
+    }
+    this.notifyRevision()
+  }
+
+  private markInitialLoadComplete(channelId: string): void {
+    this.channelState = {
+      ...this.channelState,
+      initialLoadComplete: {
+        ...this.channelState.initialLoadComplete,
+        [channelId]: true,
+      },
+      lastInitialLoadedAt: {
+        ...this.channelState.lastInitialLoadedAt,
+        [channelId]: Date.now(),
+      },
+    }
+    this.notifyRevision()
+  }
+
+  private getLoadingInitialSelector(
+    channelId: string,
+  ): (state: NexusState<MessageBundle>) => boolean {
+    if (!this.loadingInitialSelectors.has(channelId)) {
+      this.loadingInitialSelectors.set(channelId, (state) => {
+        void state.revision
+        return this.channelState.loadingInitial[channelId] ?? false
+      })
+    }
+    return this.loadingInitialSelectors.get(channelId)!
+  }
+
+  private getLoadingOlderSelector(
+    channelId: string,
+  ): (state: NexusState<MessageBundle>) => boolean {
+    if (!this.loadingOlderSelectors.has(channelId)) {
+      this.loadingOlderSelectors.set(channelId, (state) => {
+        void state.revision
+        return this.channelState.loadingOlder[channelId] ?? false
+      })
+    }
+    return this.loadingOlderSelectors.get(channelId)!
+  }
+
+  private getInitialLoadCompleteSelector(
+    channelId: string,
+  ): (state: NexusState<MessageBundle>) => boolean {
+    if (!this.initialLoadCompleteSelectors.has(channelId)) {
+      this.initialLoadCompleteSelectors.set(channelId, (state) => {
+        void state.revision
+        return this.channelState.initialLoadComplete[channelId] ?? false
+      })
+    }
+    return this.initialLoadCompleteSelectors.get(channelId)!
   }
 }

@@ -410,12 +410,150 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
     return this.store.getState().activeChannelId
   }
 
+  getChannel(id: string): HavenChannel | undefined {
+    return this.store.getState().entities[id]?.data
+  }
+
   /**
    * Last visited channel for a community.
    * Used by route focus sync to restore the user's place.
    */
   getLastChannelId(communityId: string): string | null {
     return this.store.getState().lastChannelByCommunity[communityId] ?? null
+  }
+
+  private getGroupStateSnapshot(communityId: string): ChannelGroupState {
+    const state = this.store.getState()
+    return {
+      groups: state.groups[communityId] ?? [],
+      ungroupedChannelIds: state.ungrouped[communityId] ?? [],
+      collapsedGroupIds: state.collapsed[communityId] ?? [],
+    }
+  }
+
+  private requireCommunityData(): CommunityDataBackend {
+    if (!this.communityData) {
+      throw new Error(
+        'ChannelNexus mutation called before communityData was attached.',
+      )
+    }
+    return this.communityData
+  }
+
+  async createChannelGroup(
+    communityId: string,
+    name: string,
+    createdByUserId: string,
+    channelIdToAssign?: string | null,
+  ): Promise<void> {
+    const normalizedName = name.trim()
+    if (!normalizedName) throw new Error('Group name is required.')
+
+    const communityData = this.requireCommunityData()
+    const groupState = this.getGroupStateSnapshot(communityId)
+    const nextPosition =
+      groupState.groups.length === 0
+        ? 0
+        : Math.max(...groupState.groups.map((group) => group.position)) + 1
+
+    const createdGroup = await communityData.createChannelGroup({
+      communityId,
+      name: normalizedName,
+      position: nextPosition,
+      createdByUserId,
+    })
+
+    if (channelIdToAssign) {
+      await communityData.setChannelGroupForChannel({
+        communityId,
+        channelId: channelIdToAssign,
+        groupId: createdGroup.id,
+        position: 0,
+      })
+    }
+
+    await this.loadForCommunity(communityId)
+  }
+
+  async renameChannelGroup(
+    communityId: string,
+    groupId: string,
+    name: string,
+  ): Promise<void> {
+    const normalizedName = name.trim()
+    if (!normalizedName) throw new Error('Group name is required.')
+
+    await this.requireCommunityData().renameChannelGroup({
+      communityId,
+      groupId,
+      name: normalizedName,
+    })
+
+    this.store.setState((state) => ({
+      ...state,
+      groups: {
+        ...state.groups,
+        [communityId]: (state.groups[communityId] ?? []).map((group) =>
+          group.id === groupId ? { ...group, name: normalizedName } : group,
+        ),
+      },
+      revision: state.revision + 1,
+    }))
+    this.groupStateSnapshots.delete(communityId)
+    this.persist()
+  }
+
+  async deleteChannelGroup(communityId: string, groupId: string): Promise<void> {
+    await this.requireCommunityData().deleteChannelGroup({
+      communityId,
+      groupId,
+    })
+    await this.loadForCommunity(communityId)
+  }
+
+  async assignChannelToGroup(
+    communityId: string,
+    channelId: string,
+    groupId: string,
+  ): Promise<void> {
+    const targetGroup = this.getGroupStateSnapshot(communityId).groups.find(
+      (group) => group.id === groupId,
+    )
+    if (!targetGroup) throw new Error('Channel group not found.')
+
+    await this.requireCommunityData().setChannelGroupForChannel({
+      communityId,
+      channelId,
+      groupId,
+      position: targetGroup.channelIds.length,
+    })
+    await this.loadForCommunity(communityId)
+  }
+
+  async removeChannelFromGroup(
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    await this.requireCommunityData().setChannelGroupForChannel({
+      communityId,
+      channelId,
+      groupId: null,
+      position: 0,
+    })
+    await this.loadForCommunity(communityId)
+  }
+
+  async setChannelGroupCollapsed(
+    communityId: string,
+    groupId: string,
+    isCollapsed: boolean,
+  ): Promise<void> {
+    await this.requireCommunityData().setChannelGroupCollapsed({
+      communityId,
+      groupId,
+      isCollapsed,
+    })
+    this.setGroupCollapsed(communityId, groupId, isCollapsed)
   }
 
   setGroupCollapsed(

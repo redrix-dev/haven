@@ -12,19 +12,24 @@ import {
   applyCommunityFocus,
   toChannel,
   resolvePreferredChannelIdForServer,
+  prefetchCommunityChannelMessages,
+  toServerSummaries,
+  deriveCommunitiesLoadStatus,
   useHavenCore,
 } from "@shared/core";
 import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
-import { useServers } from "@shared/features/community/hooks/useServers";
-import { prefetchCommunityChannelMessages } from "@shared/features/messaging/hooks/useMessages";
 import { useUiStore } from "@shared/stores/uiStore";
-import type { Channel } from "@shared/lib/backend/types";
+import type { Channel, ServerSummary } from "@shared/lib/backend/types";
 import { getLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
 
-type ServersReturn = Pick<
-  ReturnType<typeof useServers>,
-  "servers" | "status" | "error" | "loading" | "refreshServers" | "createServer"
->;
+type ServersReturn = {
+  servers: ServerSummary[];
+  status: ReturnType<typeof deriveCommunitiesLoadStatus>;
+  error: string | null;
+  loading: boolean;
+  refreshServers: () => Promise<void>;
+  createServer: (name: string) => Promise<{ id: string }>;
+};
 
 type CommunityWorkspaceState = {
   channels: Channel[];
@@ -85,7 +90,31 @@ export function MobileMainSessionProvider({
   children: ReactNode;
 }) {
   const core = useHavenCore();
-  const { servers, status, error, loading, refreshServers, createServer } = useServers();
+  const nexusCommunities = core.communities.useCommunities();
+  const serversLoading = core.communities.useIsLoading();
+  const serversLoadError = core.communities.useLoadError();
+  const servers = useMemo(
+    () => toServerSummaries(nexusCommunities),
+    [nexusCommunities],
+  );
+  const status = deriveCommunitiesLoadStatus({
+    hasUser: Boolean(userId),
+    isLoading: serversLoading,
+    loadError: serversLoadError,
+    communityCount: nexusCommunities.length,
+  });
+  const error = serversLoadError;
+
+  const refreshServers = useCallback(async () => {
+    await core.refreshCommunities(userId);
+  }, [core, userId]);
+
+  const createServer = useCallback(
+    async (name: string) => core.createCommunity(userId, name),
+    [core, userId],
+  );
+
+  const loading = serversLoading;
   const currentServerId = core.communities.useActiveId();
   const currentChannelId = core.channels.useActiveChannelId();
   const channelSettingsTargetId = useUiStore(
@@ -291,7 +320,6 @@ export function MobileMainSessionProvider({
         await prefetchCommunityChannelMessages({
           serverId,
           channelId,
-          currentUserId: userId,
         });
       }
 

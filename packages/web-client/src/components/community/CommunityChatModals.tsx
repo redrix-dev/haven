@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import type { User } from "@supabase/supabase-js";
 import { CreateServerModal } from "@web-client/components/community/CreateServerModal";
 import { CreateChannelModal } from "@web-client/components/community/CreateChannelModal";
@@ -7,22 +7,26 @@ import { QuickRenameDialog } from "@web-client/components/community/QuickRenameD
 import { ServerMembersModal } from "@web-client/components/community/ServerMembersModal";
 import { ServerSettingsModal } from "@web-client/components/community/ServerSettingsModal";
 import { ChannelSettingsModal } from "@web-client/components/community/ChannelSettingsModal";
-import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
-import type { ChatAppModalUiState } from "@web-client/chat-app/modals/useChatAppModalUiState";
+import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
+import { useChatAppModalUiState } from "@web-client/chat-app/modals/chatAppModalUiState";
+import { useHavenCore, toChannel } from "@shared/core";
+import { getPlatformInviteBaseUrl } from "@platform/urls";
 
 type CommunityChatModalsProps = {
-  app: ChatAppOrchestrationApi;
   user: User;
-  ui: ChatAppModalUiState;
 };
 
-export function CommunityChatModals({
-  app,
-  user,
-  ui,
-}: CommunityChatModalsProps) {
+export function CommunityChatModals({ user }: CommunityChatModalsProps) {
+  const app = useChatAppSession();
+  const core = useHavenCore();
+  const admin = core.admin;
+  const membersModal = admin.useMembersModalState();
+  const serverPanel = admin.useServerPanelState();
+  const channelPermissions = admin.useChannelPermissionsState();
+  const ui = useChatAppModalUiState();
   const {
     currentServerId,
+    currentChannelId,
     serverPermissions,
     showCreateModal,
     setShowCreateModal,
@@ -34,6 +38,7 @@ export function CommunityChatModals({
     setShowServerSettingsModal,
     showChannelSettingsModal,
     setShowChannelSettingsModal,
+    channelSettingsTargetId,
     setChannelSettingsTargetId,
     renameServerDraft,
     setRenameServerDraft,
@@ -47,6 +52,28 @@ export function CommunityChatModals({
     canManageChannelPermissions,
     canOpenChannelSettings,
   } = ui;
+
+  const havenChannels = core.channels.useChannels(currentServerId ?? "__none__");
+  const channels = useMemo(
+    () => havenChannels.map(toChannel),
+    [havenChannels],
+  );
+
+  const channelSettingsTarget = useMemo(
+    () =>
+      channels.find(
+        (channel) =>
+          channel.id === (channelSettingsTargetId ?? currentChannelId),
+      ) ?? null,
+    [channels, channelSettingsTargetId, currentChannelId],
+  );
+
+  const canOpenServerSettings =
+    serverPermissions.canManageServer ||
+    serverPermissions.canManageRoles ||
+    serverPermissions.canManageMembers ||
+    serverPermissions.canManageBans ||
+    serverPermissions.canManageInvites;
 
   return (
     <>
@@ -62,7 +89,7 @@ export function CommunityChatModals({
         serverPermissions.canCreateChannels && (
           <CreateChannelModal
             onClose={() => setShowCreateChannelModal(false)}
-            onCreate={app.createChannel}
+            onCreate={admin.createChannel}
           />
         )}
 
@@ -75,100 +102,100 @@ export function CommunityChatModals({
 
       {showServerSettingsModal &&
         currentServerId &&
-        app.canOpenServerSettings && (
+        canOpenServerSettings && (
           <ServerSettingsModal
-            initialValues={app.serverSettingsInitialValues}
-            loadingInitialValues={app.serverSettingsLoading}
-            initialLoadError={app.serverSettingsLoadError}
+            initialValues={serverPanel.serverSettingsInitialValues}
+            loadingInitialValues={serverPanel.serverSettingsLoading}
+            initialLoadError={serverPanel.serverSettingsLoadError}
             canManageServer={serverPermissions.canManageServer}
             canManageRoles={serverPermissions.canManageRoles}
             canManageMembers={serverPermissions.canManageMembers}
             canManageBans={serverPermissions.canManageBans}
             isOwner={serverPermissions.isOwner}
-            roles={app.serverRoles}
-            members={app.serverMembers}
-            permissionsCatalog={app.serverPermissionCatalog}
-            roleManagementLoading={app.serverRoleManagementLoading}
-            roleManagementError={app.serverRoleManagementError}
+            roles={serverPanel.serverRoles}
+            members={serverPanel.serverMembers}
+            permissionsCatalog={serverPanel.serverPermissionCatalog}
+            roleManagementLoading={serverPanel.serverRoleManagementLoading}
+            roleManagementError={serverPanel.serverRoleManagementError}
             canManageInvites={serverPermissions.canManageInvites}
-            invites={app.serverInvites}
-            invitesLoading={app.serverInvitesLoading}
-            invitesError={app.serverInvitesError}
-            bans={app.communityBans}
-            bansLoading={app.communityBansLoading}
-            bansError={app.communityBansError}
-            inviteBaseUrl={app.getPlatformInviteBaseUrl()}
+            invites={serverPanel.serverInvites}
+            invitesLoading={serverPanel.serverInvitesLoading}
+            invitesError={serverPanel.serverInvitesError}
+            bans={serverPanel.communityBans}
+            bansLoading={serverPanel.communityBansLoading}
+            bansError={serverPanel.communityBansError}
+            inviteBaseUrl={getPlatformInviteBaseUrl()}
             onClose={() => setShowServerSettingsModal(false)}
-            onSave={app.saveServerSettings}
-            onCreateRole={app.createServerRole}
-            onUpdateRole={app.updateServerRole}
-            onDeleteRole={app.deleteServerRole}
-            onSaveRolePermissions={app.saveServerRolePermissions}
-            onSaveMemberRoles={app.saveServerMemberRoles}
-            onCreateInvite={app.createServerInvite}
-            onRevokeInvite={app.revokeServerInvite}
-            onUnbanUser={app.unbanUserFromCurrentServer}
+            onSave={admin.saveServerSettings}
+            onCreateRole={admin.createServerRole}
+            onUpdateRole={admin.updateServerRole}
+            onDeleteRole={admin.deleteServerRole}
+            onSaveRolePermissions={admin.saveServerRolePermissions}
+            onSaveMemberRoles={admin.saveServerMemberRoles}
+            onCreateInvite={admin.createServerInvite}
+            onRevokeInvite={admin.revokeServerInvite}
+            onUnbanUser={admin.unbanUserFromCurrentServer}
           />
         )}
 
       {showChannelSettingsModal &&
-        app.channelSettingsTarget &&
+        channelSettingsTarget &&
         canOpenChannelSettings && (
           <ChannelSettingsModal
-            initialName={app.channelSettingsTarget.name}
-            initialTopic={app.channelSettingsTarget.topic}
-            canDelete={app.channels.length > 1}
+            initialName={channelSettingsTarget.name}
+            initialTopic={channelSettingsTarget.topic}
+            canDelete={channels.length > 1}
             canManageChannelStructure={canManageChannelStructure}
             canManageChannelPermissions={canManageChannelPermissions}
-            rolePermissions={app.channelRolePermissions}
-            memberPermissions={app.channelMemberPermissions}
-            availableMembers={app.channelPermissionMemberOptions}
-            permissionsLoading={app.channelPermissionsLoading}
-            permissionsLoadError={app.channelPermissionsLoadError}
+            rolePermissions={channelPermissions.channelRolePermissions}
+            memberPermissions={channelPermissions.channelMemberPermissions}
+            availableMembers={channelPermissions.channelPermissionMemberOptions}
+            permissionsLoading={channelPermissions.channelPermissionsLoading}
+            permissionsLoadError={channelPermissions.channelPermissionsLoadError}
             onClose={() => {
               setShowChannelSettingsModal(false);
               setChannelSettingsTargetId(null);
             }}
-            onSave={app.saveChannelSettings}
-            onDelete={app.deleteCurrentChannel}
-            onSaveRolePermissions={app.saveRoleChannelPermissions}
+            onSave={admin.saveChannelSettings}
+            onDelete={admin.deleteCurrentChannel}
+            onSaveRolePermissions={admin.saveRoleChannelPermissions}
             onSaveMemberPermissions={app.saveMemberChannelPermissions}
           />
         )}
-      {app.showMembersModal && (
+      {membersModal.showMembersModal && (
         <ServerMembersModal
-          open={app.showMembersModal}
+          open={membersModal.showMembersModal}
           currentUserId={user?.id ?? null}
-          serverName={app.membersModalServerName}
-          loading={app.membersModalLoading}
-          error={app.membersModalError}
-          members={app.membersModalMembers}
+          serverName={membersModal.membersModalServerName}
+          loading={membersModal.membersModalLoading}
+          error={membersModal.membersModalError}
+          members={membersModal.membersModalMembers}
           isElevatedViewer={app.isCurrentUserElevatedInMembersModalServer}
-          canReportProfiles={app.membersModalCanCreateReports}
-          canBanProfiles={app.membersModalCanManageBans}
-          canKickProfiles={app.membersModalCanManageMembers}
+          canReportProfiles={membersModal.membersModalCanCreateReports}
+          canBanProfiles={membersModal.membersModalCanManageBans}
+          canKickProfiles={membersModal.membersModalCanManageMembers}
           onResolveBanServers={app.resolveBanEligibleServers}
           onDirectMessage={app.directMessageUser}
           onReportUser={async (targetUserId, reason) => {
-            if (!app.membersModalCommunityId) return;
+            if (!membersModal.membersModalCommunityId) return;
             await app.reportUserProfile({
               targetUserId,
               reason,
-              communityId: app.membersModalCommunityId,
+              communityId: membersModal.membersModalCommunityId,
             });
           }}
           onBanUser={async (targetUserId, communityId, reason) => {
             await app.banUserFromServer({ targetUserId, communityId, reason });
           }}
           onKickUser={async (targetUserId, username) => {
-            if (!app.membersModalCommunityId) return;
+            if (!membersModal.membersModalCommunityId) return;
             await app.kickUserFromServer({
               targetUserId,
               username,
-              communityId: app.membersModalCommunityId,
+              communityId: membersModal.membersModalCommunityId,
             });
           }}
-          onClose={app.closeMembersModal}
+          onClose={admin.closeMembersModal}
         />
       )}
       {Boolean(renameServerDraft) && (
@@ -180,7 +207,7 @@ export function CommunityChatModals({
           onClose={() => setRenameServerDraft(null)}
           onConfirm={async (value) => {
             if (!renameServerDraft) return;
-            await app.renameServer(renameServerDraft.serverId, value);
+            await admin.renameServer(renameServerDraft.serverId, value);
             setRenameServerDraft(null);
           }}
         />
@@ -194,7 +221,7 @@ export function CommunityChatModals({
           onClose={() => setRenameChannelDraft(null)}
           onConfirm={async (value) => {
             if (!renameChannelDraft) return;
-            await app.renameChannel(renameChannelDraft.channelId, value);
+            await admin.renameChannel(renameChannelDraft.channelId, value);
             setRenameChannelDraft(null);
           }}
         />

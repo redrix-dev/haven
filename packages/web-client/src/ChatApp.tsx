@@ -1,23 +1,31 @@
 import React, { useCallback } from "react";
 import { LoginScreen } from "@web-client/components/auth/LoginScreen";
 import { ServerList } from "@web-client/components/ServerList";
-import { useServerOrder } from "@shared/features/community/hooks/useServerOrder";
 import { ChatAppModals } from "@web-client/components/ChatAppModals";
 import { ChatAppDmWorkspace } from "@web-client/chat-app/ChatAppDmWorkspace";
 import { CommunityWorkspaceShell } from "@web-client/chat-app/CommunityWorkspaceShell";
 import { useChatAppVoiceIntegration } from "@web-client/chat-app/useChatAppVoiceIntegration";
+import {
+  ChatAppSessionProvider,
+  useChatAppSession,
+} from "@web-client/chat-app/ChatAppSession";
 import { useUiStore } from "@shared/stores/uiStore";
-import { useHavenCore } from "@shared/core";
-import { useChatAppOrchestration } from "@web-client/hooks/useChatAppOrchestration";
+import { useHavenCore, toServerSummaries } from "@shared/core";
 
-export function ChatApp() {
-  const app = useChatAppOrchestration();
-  const voice = useChatAppVoiceIntegration(app);
-  const totalDmUnreadCount = React.useMemo(
-    () => app.dmConversations.reduce((total, conversation) => total + conversation.unreadCount, 0),
-    [app.dmConversations],
-  );
+function ChatAppInner() {
+  const app = useChatAppSession();
+  const voice = useChatAppVoiceIntegration();
   const core = useHavenCore();
+  const dmConversations = core.directMessages.useConversations();
+  const notificationCounts = core.notifications.useCounts();
+  const totalDmUnreadCount = React.useMemo(
+    () =>
+      dmConversations.reduce(
+        (total, conversation) => total + conversation.unreadCount,
+        0,
+      ),
+    [dmConversations],
+  );
   const currentServerId = core.communities.useActiveId();
   const setWorkspaceMode = useUiStore((state) => state.setWorkspaceMode);
   const setCurrentServerId = useCallback(
@@ -27,9 +35,22 @@ export function ChatApp() {
     [core],
   );
   const serverPermissions = core.permissions.usePermissions(currentServerId ?? "");
-  const { orderedServers, setOrder: setServerOrder } = useServerOrder(
-    app.user?.id ?? null,
-    app.servers,
+  const canOpenServerSettings =
+    serverPermissions.canManageServer ||
+    serverPermissions.canManageRoles ||
+    serverPermissions.canManageMembers ||
+    serverPermissions.canManageBans ||
+    serverPermissions.canManageInvites;
+  const orderedCommunities = core.communities.useOrderedCommunities();
+  const orderedServers = React.useMemo(
+    () => toServerSummaries(orderedCommunities),
+    [orderedCommunities],
+  );
+  const setServerOrder = useCallback(
+    (ids: string[]) => {
+      core.setCommunityDisplayOrder(ids);
+    },
+    [core],
   );
   const managedReportServers = React.useMemo(
     () =>
@@ -38,6 +59,7 @@ export function ChatApp() {
         .map((server) => ({ id: server.id, name: server.name })),
     [app.managedReportServerIds, orderedServers],
   );
+  const dmWorkspaceIsActive = useUiStore((state) => state.workspaceMode === "dm");
 
   if (app.authStatus === "initializing") {
     return (
@@ -62,11 +84,6 @@ export function ChatApp() {
   }
 
   const { user } = app;
-  const canManageChannelStructure = serverPermissions.canManageChannelStructure;
-  const canManageChannelPermissions =
-    serverPermissions.canManageChannelPermissions;
-  const canOpenChannelSettings =
-    canManageChannelStructure || canManageChannelPermissions;
 
   return (
     <>
@@ -75,25 +92,23 @@ export function ChatApp() {
           servers={orderedServers}
           onReorder={setServerOrder}
           currentServerIsOwner={serverPermissions.isOwner}
-          canManageCurrentServer={app.canManageCurrentServer}
-          canOpenCurrentServerSettings={app.canOpenServerSettings}
+          canManageCurrentServer={
+            serverPermissions.isOwner || serverPermissions.canManageServer
+          }
+          canOpenCurrentServerSettings={canOpenServerSettings}
           onServerClick={(serverId) => {
             setWorkspaceMode("community");
             setCurrentServerId(serverId);
           }}
-          onCreateServer={() =>
-            useUiStore.getState().setShowCreateModal(true)
-          }
-          onJoinServer={() =>
-            useUiStore.getState().setShowJoinServerModal(true)
-          }
+          onCreateServer={() => useUiStore.getState().setShowCreateModal(true)}
+          onJoinServer={() => useUiStore.getState().setShowJoinServerModal(true)}
           onOpenNotifications={() =>
             useUiStore.getState().setNotificationsPanelOpen(true)
           }
-          notificationUnseenCount={app.notificationCounts.unseenCount}
-          notificationHasUnseenPulse={app.notificationCounts.unseenCount > 0}
+          notificationUnseenCount={notificationCounts.unseenCount}
+          notificationHasUnseenPulse={notificationCounts.unseenCount > 0}
           onOpenDirectMessages={app.openDirectMessagesWorkspace}
-          directMessagesActive={app.dmWorkspaceIsActive}
+          directMessagesActive={dmWorkspaceIsActive}
           directMessageUnreadCount={totalDmUnreadCount}
           onOpenFriends={() => {
             app.setFriendsPanelRequestedTab(null);
@@ -117,28 +132,27 @@ export function ChatApp() {
             useUiStore.getState().setShowAccountModal(true)
           }
           onViewServerMembers={(serverId) => {
-            void app.openServerMembersModal(serverId);
+            void core.admin.openServerMembersModal(serverId);
           }}
           onLeaveServer={app.handleLeaveServer}
           onDeleteServer={app.handleDeleteServer}
           onRenameServer={app.handleRenameServer}
           onOpenServerSettingsForServer={(serverId) => {
-            void app.openServerSettingsModal(serverId);
+            void core.admin.openServerSettingsModal(serverId);
           }}
         />
 
-        {app.showDmWorkspace ? (
-          <ChatAppDmWorkspace app={app} user={user} />
+        {dmWorkspaceIsActive ? (
+          <ChatAppDmWorkspace user={user} />
         ) : app.isServersLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <p className="text-muted-foreground">Loading servers...</p>
           </div>
         ) : (
-          <CommunityWorkspaceShell app={app} user={user} voice={voice} />
+          <CommunityWorkspaceShell user={user} voice={voice} />
         )}
       </div>
       <ChatAppModals
-        app={app}
         user={user}
         managedReportServers={managedReportServers}
         voiceSession={voice.voiceController}
@@ -160,5 +174,13 @@ export function ChatApp() {
         />
       ))}
     </>
+  );
+}
+
+export function ChatApp() {
+  return (
+    <ChatAppSessionProvider>
+      <ChatAppInner />
+    </ChatAppSessionProvider>
   );
 }

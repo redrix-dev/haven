@@ -1,4 +1,3 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import type {
   BanEligibleServer,
   FeatureFlagsSnapshot,
@@ -22,7 +21,6 @@ export type UserProfileInfo = {
 export interface ControlPlaneBackend {
   fetchUserProfile(userId: string): Promise<UserProfileInfo | null>;
   fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
-  subscribeToProfileIdentities(onChange: (payload?: unknown) => void): RealtimeChannel;
   listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
   /** Pass `ArrayBuffer` on React Native; `Blob`/`File` on web (see Supabase RN upload guidance). */
   uploadAvatar(
@@ -44,10 +42,6 @@ export interface ControlPlaneBackend {
   renameCommunity(input: { communityId: string; name: string }): Promise<void>;
   deleteCommunity(communityId: string): Promise<void>;
   leaveCommunity(communityId: string): Promise<void>;
-  subscribeToUserCommunities(
-    userId: string,
-    onChange: () => void,
-  ): RealtimeChannel;
   createCommunity(name: string): Promise<{ id: string }>;
   createCommunityInvite(input: {
     communityId: string;

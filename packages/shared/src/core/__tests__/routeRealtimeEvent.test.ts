@@ -7,12 +7,13 @@ import {
 import { ChannelNexus } from '@shared/nexus/community/ChannelNexus';
 import { CommunityNexus } from '@shared/nexus/community/CommunityNexus';
 import { CommunityMessageNexus } from '@shared/nexus/community/CommunityMessageNexus';
+import { ProfileNexus } from '@shared/nexus/profile/ProfileNexus';
 import type { HavenCore } from '@shared/core/HavenCore';
 import type { MessageBundle } from '@shared/lib/backend/types';
 
 type FakeCore = Pick<
   HavenCore,
-  'communities' | 'channels' | 'messages' | 'routeEvent'
+  'communities' | 'channels' | 'messages' | 'profiles' | 'routeEvent'
 > & {
   backends: { communityData: Pick<HavenBackends['communityData'], 'listChannelMessages'> };
   onRoleChange: HavenCore['onRoleChange'];
@@ -28,11 +29,13 @@ const buildFakeCore = (
   const persistence = createMemoryPersistence();
   const communities = new CommunityNexus(persistence);
   const channels = new ChannelNexus(persistence);
+  const profiles = new ProfileNexus(persistence);
   const messageNexuses = new Map<string, CommunityMessageNexus>();
 
   const core: FakeCore = {
     communities,
     channels,
+    profiles,
     messages: {
       for: (communityId: string) => {
         let nexus = messageNexuses.get(communityId);
@@ -133,5 +136,47 @@ describe('routeRealtimeEvent', () => {
     });
 
     expect(nexus.getSnapshot('msg-del')).toBeUndefined();
+  });
+
+  it('PROFILE_IDENTITY_CHANGE upserts and deletes profiles', () => {
+    const core = buildFakeCore(vi.fn());
+
+    routeRealtimeEvent(core as unknown as HavenCore, {
+      type: 'PROFILE_IDENTITY_CHANGE',
+      payload: {
+        event: 'INSERT',
+        user_id: 'user-2',
+        username: 'alice',
+        avatar_url: null,
+        updated_at: new Date().toISOString(),
+      },
+    });
+
+    expect(core.profiles.getProfile('user-2')?.username).toBe('alice');
+
+    routeRealtimeEvent(core as unknown as HavenCore, {
+      type: 'PROFILE_IDENTITY_CHANGE',
+      payload: {
+        event: 'DELETE',
+        user_id: 'user-2',
+      },
+    });
+
+    expect(core.profiles.getProfile('user-2')).toBeUndefined();
+  });
+
+  it('CHANNEL_GROUP_CHANGE reloads channel groups for a community', async () => {
+    const loadForCommunity = vi.fn().mockResolvedValue(undefined);
+    const core = buildFakeCore(vi.fn());
+    core.channels.loadForCommunity = loadForCommunity;
+
+    routeRealtimeEvent(core as unknown as HavenCore, {
+      type: 'CHANNEL_GROUP_CHANGE',
+      payload: { community_id: 'srv-1' },
+    });
+
+    await vi.waitFor(() => {
+      expect(loadForCommunity).toHaveBeenCalledWith('srv-1');
+    });
   });
 });

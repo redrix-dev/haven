@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,10 +12,8 @@ import {
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
 import { useAuthStore } from "@shared/stores/authStore";
-import { useMessages } from "@shared/features/messaging/hooks/useMessages";
-import { useMessageNexus } from "@shared/features/messaging/hooks/useMessageNexus";
+import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { useHavenCore } from "@shared/core";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   buildChatListItemsFromChatMessages,
@@ -54,8 +52,10 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
 
   const core = useHavenCore();
+  const { setRainbowMode } = useUserStatusStore();
   const communityId = core.communities.useActiveId() ?? serverId;
   const navigationChannelId = core.channels.useActiveChannelId();
+  const messageNexus = core.messages.for(communityId ?? "__none__");
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
 
@@ -87,17 +87,57 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     serverId,
   ]);
 
-  const messaging = useMessages({
-    currentServerId: communityId,
-    currentChannelId: activeChannelId,
-    currentUserId,
-    isCurrentUserElevatedInServer: false,
-    debugChannelReloads: false,
-    channels,
-  });
+  const activeChannelIdForLoad = activeChannelId;
 
-  const nexusMessaging = useMessageNexus(communityId ?? null, activeChannelId ?? null);
-  const visibleMessages = nexusMessaging.messages;
+  useEffect(() => {
+    if (!communityId || !activeChannelIdForLoad) return;
+    void core.prepareTextChannelMessages(communityId, activeChannelIdForLoad);
+  }, [core, communityId, activeChannelIdForLoad]);
+
+  const channelMeta = messageNexus.useChannelMeta(activeChannelId ?? "__none__");
+  const hasOlderMessages = channelMeta.hasMore;
+  const isLoadingOlderMessages = messageNexus.useIsLoadingOlder(
+    activeChannelId ?? "__none__",
+  );
+  const hasCompletedInitialLoad = messageNexus.useHasInitialLoadCompleted(
+    activeChannelId ?? "__none__",
+  );
+
+  const requestOlderMessages = useCallback(async () => {
+    if (!activeChannelId || !hasOlderMessages || isLoadingOlderMessages) return;
+    try {
+      await messageNexus.loadOlder(activeChannelId);
+    } catch (err) {
+      console.error("Error loading older messages:", err);
+    }
+  }, [activeChannelId, hasOlderMessages, isLoadingOlderMessages, messageNexus]);
+
+  const sendMessage = useCallback(
+    async (
+      content: string,
+      options?: {
+        replyToMessageId?: string;
+        mediaArrayBuffer?: ArrayBuffer;
+        mediaContentType?: string;
+        mediaFilename?: string;
+      },
+    ) => {
+      if (content === "#RainbowRoad") {
+        setRainbowMode(!useUserStatusStore.getState().rainbowMode);
+        return;
+      }
+      if (!currentUserId || !activeChannelId) return;
+      await messageNexus.sendWithMedia(activeChannelId, content, {
+        replyToMessageId: options?.replyToMessageId ?? null,
+        mediaArrayBuffer: options?.mediaArrayBuffer,
+        mediaContentType: options?.mediaContentType,
+        mediaFilename: options?.mediaFilename,
+      });
+    },
+    [activeChannelId, currentUserId, messageNexus, setRainbowMode],
+  );
+
+  const visibleMessages = messageNexus.useVisibleChannel(activeChannelId ?? "__none__");
 
   useDataCacheComponentProbe("CommunityChatScreen", {
     serverId,
@@ -107,15 +147,15 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     channelsCount: channels.length,
     currentRenderableChannelId: currentRenderableChannel?.id ?? null,
     visibleMessagesCount: visibleMessages.length,
-    hasOlderMessages: messaging.state.hasOlderMessages,
-    isLoadingOlderMessages: messaging.state.isLoadingOlderMessages,
-    hasCompletedInitialLoad: messaging.state.hasCompletedInitialLoad,
+    hasOlderMessages,
+    isLoadingOlderMessages,
+    hasCompletedInitialLoad,
     nexusMessagesCount: visibleMessages.length,
-    nexusIsInitialized: nexusMessaging.isInitialized,
+    nexusIsInitialized: visibleMessages.length > 0 || hasCompletedInitialLoad,
     channelsLoading,
     communityIdMatchesRoute: communityId === serverId,
   });
-  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const liveProfiles = core.profiles.useProfilesRecord();
 
   const community = useMemo(
     () => (communityId ? servers.find((s) => s.id === communityId) ?? null : null),
@@ -196,7 +236,7 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     const media = pendingCommunityMedia;
     try {
       setIsSending(true);
-      await messaging.actions.sendMessage(text, {
+      await sendMessage(text, {
         ...(replyToMessageId ? { replyToMessageId } : {}),
         ...(media
           ? {
@@ -215,7 +255,7 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     } finally {
       setIsSending(false);
     }
-  }, [draft, messageById, messaging.actions, pendingCommunityMedia, pendingReplyToMessageId]);
+  }, [draft, messageById, pendingCommunityMedia, pendingReplyToMessageId, sendMessage]);
 
   const renderChatItem = useCallback(({ item }: { item: ChatListItem }) => {
     if (item.kind === "divider") {
@@ -250,7 +290,7 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
   const isMessagesBootstrapping =
     Boolean(activeChannelId) &&
     visibleMessages.length === 0 &&
-    !messaging.state.hasCompletedInitialLoad;
+    !hasCompletedInitialLoad;
 
   const listEmptyContent =
     !activeChannelId && channelsLoading ? (
@@ -283,13 +323,13 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
         renderItem={renderChatItem}
         onEndReachedThreshold={0.3}
         onEndReached={() => {
-          if (messaging.state.hasOlderMessages && !messaging.state.isLoadingOlderMessages) {
-            void messaging.actions.requestOlderMessages();
+          if (hasOlderMessages && !isLoadingOlderMessages) {
+            void requestOlderMessages();
           }
         }}
         ListEmptyComponent={listEmptyContent}
         ListFooterComponent={
-          messaging.state.isLoadingOlderMessages ? (
+          isLoadingOlderMessages ? (
             <View className="py-2.5">
               <ActivityIndicator color={composerColors.spinner} />
             </View>

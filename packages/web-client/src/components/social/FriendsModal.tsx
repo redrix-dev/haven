@@ -45,7 +45,7 @@ import type {
   SocialCounts,
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useHavenCore } from "@shared/core";
 import { useSocialGraphRealtimeStore } from "@shared/stores/socialGraphRealtimeStore";
 import { RefreshCcw, UserPlus, Users } from "lucide-react";
 
@@ -97,7 +97,8 @@ export function FriendsModal({
   requestedTab = null,
   highlightedRequestId = null,
 }: FriendsModalProps) {
-  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const core = useHavenCore();
+  const liveProfiles = core.profiles.useProfilesRecord();
   const [activeTab, setActiveTab] = React.useState<FriendsTab>("friends");
   const [counts, setCounts] = React.useState<SocialCounts>(
     DEFAULT_SOCIAL_COUNTS,

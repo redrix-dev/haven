@@ -4,8 +4,13 @@ import {
   useHavenCore,
   toChannel,
   resolvePreferredChannelIdForServer,
+  toServerSummaries,
+  deriveCommunitiesLoadStatus,
+  bootstrapNotificationSoundSync,
+  createNotificationSoundSyncState,
+  resetNotificationSoundSyncState,
+  syncNotificationSounds,
 } from "@shared/core";
-import { useServers } from "@shared/features/community/hooks/useServers";
 import { hydrateCommunityPermissions } from "@shared/features/community/utils/communityPermissionsHydration";
 import {
   getControlPlaneBackend,
@@ -18,24 +23,16 @@ import {
   VOICE_HARDWARE_DEBUG_PANEL_FLAG,
 } from "@shared/infrastructure/constants";
 import type { FriendsPanelTab } from "@shared/types/types";
+import { getErrorMessage } from "@platform/lib/errors";
 import { useDesktopSettings } from "@web-client/hooks/useDesktopSettings";
-import { useServerAdmin } from "@shared/features/community/hooks/useServerAdmin";
-import { useChannelManagement } from "@shared/features/community/hooks/useChannelManagement";
-import { useChannelGroups } from "@shared/features/community/hooks/useChannelGroups";
-import { useCurrentServerPermissionUi } from "@shared/features/community/hooks/useCurrentServerPermissionUi";
-import { useMessages } from "@shared/features/messaging/hooks/useMessages";
-import { useNotifications } from "@shared/features/notifications/hooks/useNotifications";
-import { useNotificationInteractions } from "@shared/features/notifications/hooks/useNotificationInteractions";
 import { useDeepLinks } from "@web-client/hooks/useDeepLinks";
-import { useDirectMessages } from "@shared/features/direct-messages/hooks/useDirectMessages";
 import { useDirectMessageInteractions } from "@shared/features/direct-messages/hooks/useDirectMessageInteractions";
+import { useNotificationInteractions } from "@shared/features/notifications/hooks/useNotificationInteractions";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";
 import { useFeatureFlags } from "@shared/infrastructure/useFeatureFlags";
-import { useLiveProfiles } from "@shared/features/profile/hooks/useLiveProfiles";
 import { usePlatformSession } from "@shared/features/profile/hooks/usePlatformSession";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { useUiStore } from "@shared/stores/uiStore";
-import { usePermissionsReportSlice } from "@web-client/chat-app/controllers/usePermissionsReportSlice";
 import { useChatAppAccessAndBroadcastOrchestration } from "@web-client/chat-app/controllers/useChatAppAccessAndBroadcastOrchestration";
 import { useChatAppElevationEffects } from "@web-client/chat-app/controllers/useChatAppElevationEffects";
 import { useChatAppBusinessActions } from "@web-client/chat-app/controllers/useChatAppBusinessActions";
@@ -43,7 +40,7 @@ import { useChatAppConfirmationHandlers } from "@web-client/chat-app/controllers
 import { useChatAppLifecycleEffects } from "@web-client/chat-app/controllers/useChatAppLifecycleEffects";
 import { useShellThemeSync } from "@web-client/hooks/useShellThemeSync";
 
-export function useChatAppOrchestration() {
+export function useChatAppSessionState() {
   const serverNameByIdRef = useRef<Record<string, string>>({});
   const [
     isCurrentUserElevatedInCurrentServer,
@@ -73,18 +70,36 @@ export function useChatAppOrchestration() {
     deleteAccount,
   } = useAuth();
 
-  // ── Servers ───────────────────────────────────────────────────────────────
-  const {
-    servers,
-    status: serversStatus,
-    error: serversError,
-    createServer,
-    refreshServers,
-  } = useServers();
-  const isServersLoading = serversStatus === "loading";
+  const core = useHavenCore();
 
-  const { managedReportServerIds, serverModmailEnabled } =
-    usePermissionsReportSlice(user?.id, servers);
+  // ── Servers ───────────────────────────────────────────────────────────────
+  const nexusCommunities = core.communities.useCommunities();
+  const servers = useMemo(
+    () => toServerSummaries(nexusCommunities),
+    [nexusCommunities],
+  );
+  const serversLoadError = core.communities.useLoadError();
+  const isServersLoading = core.communities.useIsLoading();
+  const serversStatus = deriveCommunitiesLoadStatus({
+    hasUser: Boolean(user?.id),
+    isLoading: isServersLoading,
+    loadError: serversLoadError,
+    communityCount: nexusCommunities.length,
+  });
+  const serversError = serversLoadError;
+
+  const refreshServers = useCallback(async () => {
+    if (!user?.id) return;
+    await core.refreshCommunities(user.id);
+  }, [core, user?.id]);
+
+  const createServer = useCallback(
+    async (name: string) => {
+      if (!user?.id) throw new Error("Not authenticated");
+      return core.createCommunity(user.id, name);
+    },
+    [core, user?.id],
+  );
 
   // ── Feature flags ─────────────────────────────────────────────────────────
   const {
@@ -124,22 +139,39 @@ export function useChatAppOrchestration() {
     profileUsername || user?.email?.split("@")[0] || "User";
   const userDisplayName = baseUserDisplayName;
 
-  const {
-    actions: { upsertProfile: upsertLiveProfile },
-  } = useLiveProfiles({
-    controlPlaneBackend,
-    userId: user?.id,
-  });
+  const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
+  const managedReportServerIds = useMemo(
+    () =>
+      servers
+        .filter(
+          (server) => permissionsByCommunityId[server.id]?.canManageReports,
+        )
+        .map((server) => server.id),
+    [permissionsByCommunityId, servers],
+  );
+  const serverModmailEnabled = managedReportServerIds.length > 0;
 
   useEffect(() => {
     if (!user?.id) return;
-    upsertLiveProfile({
+    core.profiles.upsertProfile({
       userId: user.id,
       username: baseUserDisplayName,
       avatarUrl: profileAvatarUrl,
       updatedAt: new Date().toISOString(),
     });
-  }, [baseUserDisplayName, profileAvatarUrl, upsertLiveProfile, user?.id]);
+  }, [baseUserDisplayName, core.profiles, profileAvatarUrl, user?.id]);
+
+  const upsertLiveProfile = useCallback(
+    (input: {
+      userId: string;
+      username: string;
+      avatarUrl: string | null;
+      updatedAt: string;
+    }) => {
+      core.profiles.upsertProfile(input);
+    },
+    [core.profiles],
+  );
 
   // ── UI / workspace state ──────────────────────────────────────────────────
   const workspaceMode = useUiStore((state) => state.workspaceMode);
@@ -149,7 +181,6 @@ export function useChatAppOrchestration() {
   );
 
   // ── Community workspace (nexus-backed) ─────────────────────────────────────
-  const core = useHavenCore();
   const currentServerId = core.communities.useActiveId();
   const currentChannelId = core.channels.useActiveChannelId();
   const setCurrentServerId = useCallback(
@@ -334,11 +365,15 @@ export function useChatAppOrchestration() {
 
   const dmWorkspaceIsActive = workspaceMode === "dm";
 
-  const {
-    serverPermissions,
-    canOpenServerSettings,
-    canManageCurrentServer,
-  } = useCurrentServerPermissionUi(currentServerId);
+  const serverPermissions = core.permissions.usePermissions(currentServerId ?? "");
+  const canOpenServerSettings =
+    serverPermissions.canManageServer ||
+    serverPermissions.canManageRoles ||
+    serverPermissions.canManageMembers ||
+    serverPermissions.canManageBans ||
+    serverPermissions.canManageInvites;
+  const canManageCurrentServer =
+    serverPermissions.isOwner || serverPermissions.canManageServer;
 
   // ── Voice ─────────────────────────────────────────────────────────────────
   const {
@@ -411,148 +446,161 @@ export function useChatAppOrchestration() {
   ]);
 
   // ── Channel groups ────────────────────────────────────────────────────────
-  const {
-    state: { channelGroupState },
-    derived: { sidebarChannelGroups },
-    actions: {
-      resetChannelGroups,
-      createChannelGroup,
-      assignChannelToGroup,
-      removeChannelFromGroup,
-      setChannelGroupCollapsed,
-      renameChannelGroup,
-      deleteChannelGroup,
-    },
-  } = useChannelGroups({
-    currentServerId,
-    currentUserId: user?.id ?? null,
-    currentChannelId,
-    channels,
-  });
+  const channelGroupState = core.channels.useChannelGroups(currentServerId ?? "");
+  const sidebarChannelGroups = useMemo(
+    () =>
+      channelGroupState.groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        channelIds: group.channelIds,
+        isCollapsed: channelGroupState.collapsedGroupIds.includes(group.id),
+      })),
+    [channelGroupState.collapsedGroupIds, channelGroupState.groups],
+  );
 
-  // ── Server admin ──────────────────────────────────────────────────────────
-  const {
-    state: {
-      showMembersModal,
-      membersModalCommunityId,
-      membersModalServerName,
-      membersModalMembers,
-      membersModalLoading,
-      membersModalError,
-      membersModalCanCreateReports,
-      membersModalCanManageMembers,
-      membersModalCanManageBans,
-      communityBans,
-      communityBansLoading,
-      communityBansError,
-      serverInvites,
-      serverInvitesLoading,
-      serverInvitesError,
-      serverRoles,
-      serverMembers,
-      serverPermissionCatalog,
-      serverRoleManagementLoading,
-      serverRoleManagementError,
-      serverSettingsInitialValues,
-      serverSettingsLoading,
-      serverSettingsLoadError,
-    },
-    actions: {
-      resetMembersModal,
-      closeMembersModal,
-      openServerMembersModal,
-      refreshMembersModalMembersIfOpen,
-      resetCommunityBans,
-      loadCommunityBans,
-      unbanUserFromCurrentServer,
-      resetServerInvites,
-      createServerInvite,
-      revokeServerInvite,
-      resetServerRoleManagement,
-      createServerRole,
-      updateServerRole,
-      deleteServerRole,
-      saveServerRolePermissions,
-      saveServerMemberRoles,
-      resetServerSettingsState,
-      saveServerSettings,
-      openServerSettingsModal,
-      leaveServer,
-      deleteServer,
-      renameServer,
-    },
-  } = useServerAdmin({
-    servers,
-    controlPlaneBackend,
-    currentServerId,
-    currentUserId: user?.id ?? null,
-    canManageInvites: serverPermissions.canManageInvites,
-    refreshServers,
-    onActiveServerRemoved: () => {
-      const ui = useUiStore.getState();
-      ui.setShowServerSettingsModal(false);
-      ui.setShowChannelSettingsModal(false);
-      ui.setChannelSettingsTargetId(null);
-    },
-  });
+  const resetChannelGroups = useCallback(() => {
+    if (!currentServerId) return;
+    void core.channels.loadForCommunity(currentServerId);
+  }, [core.channels, currentServerId]);
 
-  // ── Channel management ────────────────────────────────────────────────────
-  const {
-    state: {
-      channelRolePermissions,
-      channelMemberPermissions,
-      channelPermissionMemberOptions,
-      channelPermissionsLoading,
-      channelPermissionsLoadError,
+  const createChannelGroup = useCallback(
+    async (name: string, channelIdToAssign?: string | null) => {
+      if (!currentServerId || !user?.id) throw new Error("No server selected.");
+      await core.channels.createChannelGroup(
+        currentServerId,
+        name,
+        user.id,
+        channelIdToAssign,
+      );
     },
-    actions: {
-      resetChannelPermissionsState,
-      createChannel,
-      saveChannelSettings,
-      renameChannel,
-      deleteChannel,
-      deleteCurrentChannel,
-      openChannelSettingsModal,
-      saveRoleChannelPermissions,
-      saveMemberChannelPermissions: saveMemberChannelPermissionsRaw,
-    },
-  } = useChannelManagement({
-    currentServerId,
-    currentUserId: user?.id ?? null,
-    currentChannelId,
-    channels,
-  });
+    [core.channels, currentServerId, user?.id],
+  );
 
-  // ── Messages ──────────────────────────────────────────────────────────────
-  const {
-    state: {
-      hasOlderMessages,
-      isLoadingOlderMessages,
+  const assignChannelToGroup = useCallback(
+    async (channelId: string, groupId: string) => {
+      if (!currentServerId) throw new Error("No server selected.");
+      await core.channels.assignChannelToGroup(currentServerId, channelId, groupId);
     },
-    actions: {
-      resetMessageState,
-      clearAuthorProfileCache,
-      clearCrossSessionMessagingCaches,
-      requestOlderMessages,
-      sendMessage,
-      toggleMessageReaction,
-      editMessage,
-      deleteMessage,
-      reportMessage,
-      requestMessageLinkPreviewRefresh,
-      prefetchChannelMessages,
-      purgeMessageBundleCacheForServer,
-      purgeMessageBundleCacheForChannel,
-      applyChannelAccessRevokedContentVisibility,
+    [core.channels, currentServerId],
+  );
+
+  const removeChannelFromGroup = useCallback(
+    async (channelId: string) => {
+      if (!currentServerId) throw new Error("No server selected.");
+      await core.channels.removeChannelFromGroup(currentServerId, channelId);
     },
-  } = useMessages({
-    currentServerId,
-    currentChannelId,
-    currentUserId: user?.id ?? null,
-    isCurrentUserElevatedInServer: isCurrentUserElevatedInCurrentServer,
-    debugChannelReloads,
-    channels,
-  });
+    [core.channels, currentServerId],
+  );
+
+  const setChannelGroupCollapsed = useCallback(
+    async (groupId: string, isCollapsed: boolean) => {
+      if (!currentServerId) throw new Error("No server selected.");
+      await core.channels.setChannelGroupCollapsed(
+        currentServerId,
+        groupId,
+        isCollapsed,
+      );
+    },
+    [core.channels, currentServerId],
+  );
+
+  const renameChannelGroup = useCallback(
+    async (groupId: string, name: string) => {
+      if (!currentServerId) throw new Error("No server selected.");
+      await core.channels.renameChannelGroup(currentServerId, groupId, name);
+    },
+    [core.channels, currentServerId],
+  );
+
+  const deleteChannelGroup = useCallback(
+    async (groupId: string) => {
+      if (!currentServerId) throw new Error("No server selected.");
+      await core.channels.deleteChannelGroup(currentServerId, groupId);
+    },
+    [core.channels, currentServerId],
+  );
+
+  const admin = core.admin;
+
+  const resetMessageState = useCallback(() => {}, []);
+
+  const prefetchChannelMessages = useCallback(
+    async (serverId: string, channelId: string) => {
+      await core.messages.for(serverId).ensureInitialLoaded(channelId, {
+        freshnessMs: 0,
+      });
+    },
+    [core],
+  );
+
+  const purgeMessageBundleCacheForServer = useCallback(
+    (targetCommunityId: string) => core.messages.clearCommunity(targetCommunityId),
+    [core],
+  );
+
+  const purgeMessageBundleCacheForChannel = useCallback(
+    (targetCommunityId: string, channelId: string) => {
+      core.messages.for(targetCommunityId).evictChannel(channelId);
+    },
+    [core],
+  );
+
+  const applyChannelAccessRevokedContentVisibility = useCallback(
+    (input: { communityId: string; channelId: string; revokedUserId: string }) => {
+      core.permissions.appendRevokedAuthorId(
+        input.communityId,
+        input.channelId,
+        input.revokedUserId,
+      );
+    },
+    [core],
+  );
+
+  const clearAuthorProfileCache = useCallback(() => {}, []);
+  const clearCrossSessionMessagingCaches = useCallback(() => {}, []);
+
+  const [dmConversationsError, setDmConversationsError] = useState<string | null>(
+    null,
+  );
+
+  const refreshDmConversations = useCallback(
+    async (options?: { suppressLoadingState?: boolean }) => {
+      void options;
+      if (!user?.id) return;
+      setDmConversationsError(null);
+      try {
+        await core.directMessages.loadConversations();
+      } catch (error) {
+        setDmConversationsError(
+          getErrorMessage(error, "Failed to load direct messages."),
+        );
+      }
+    },
+    [core.directMessages, user?.id],
+  );
+
+  const openDirectMessageConversation = useCallback(
+    async (conversationId: string) => {
+      if (!user?.id) throw new Error("Not authenticated.");
+      setDmConversationsError(null);
+      await core.directMessages.openConversation(conversationId, { markRead: true });
+    },
+    [core.directMessages, user?.id],
+  );
+
+  const openDirectMessageWithUser = useCallback(
+    async (targetUserId: string) => {
+      if (!user?.id) throw new Error("Not authenticated.");
+      setWorkspaceMode("dm");
+      await core.directMessages.openWithUser(targetUserId);
+    },
+    [core.directMessages, setWorkspaceMode, user?.id],
+  );
+
+  const resetDirectMessages = useCallback(() => {
+    core.directMessages.clearFocusedConversation();
+    setDmConversationsError(null);
+  }, [core.directMessages]);
 
   const { showVoiceDisconnectToast } =
     useChatAppAccessAndBroadcastOrchestration({
@@ -595,69 +643,39 @@ export function useChatAppOrchestration() {
     },
   } = useDesktopSettings();
 
-  // ─── Notifications ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  const {
-    state: {
-      notificationItems,
-      notificationCounts,
-      notificationsLoading,
-      notificationsRefreshing,
-      notificationsError,
-      notificationPreferences,
-      notificationPreferencesLoading,
-      notificationPreferencesSaving,
-      notificationPreferencesError,
-    },
-    actions: {
-      resetNotifications,
-      refreshNotificationInbox,
-      saveNotificationPreferences,
-      refreshNotificationsManually,
-      markAllNotificationsSeen,
-      markNotificationRead,
-      dismissNotification,
-      dismissAllNotifications,
-      setNotificationsError,
-    },
-  } = useNotifications({
-    userId: user?.id,
-    audioSettings: appSettings.notifications,
-    autoMarkSeenOnPanelOpen: false,
-  });
+  const notificationSoundSyncRef = useRef(createNotificationSoundSyncState());
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const notificationItems = core.notifications.useNotifications();
 
-  // ── Social / Friends ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  // ── Direct messages ───────────────────────────────────────────────────────
-  const {
-    state: {
-      dmConversations,
-      dmConversationsLoading,
-      dmConversationsRefreshing,
-      dmConversationsError,
-      selectedDmConversationId,
-      dmMessages,
-      dmMessagesLoading,
-      dmMessagesRefreshing,
-      dmMessagesError,
-      dmMessageSendPending,
-    },
-    derived: { showDmWorkspace, selectedDmConversation },
-    actions: {
-      resetDirectMessages,
-      refreshDmConversations,
-      refreshDmMessages,
-      setSelectedDmConversationId,
-      setDmConversationsError,
-      openDirectMessageConversation,
-      openDirectMessageWithUser,
-      sendDirectMessage,
-      toggleSelectedDmConversationMuted,
-      reportDirectMessage,
-    },
-  } = useDirectMessages({
-    userId: user?.id,
-    enabled: true,
-    isActive: dmWorkspaceIsActive,
-  });
+  const refreshNotificationInbox = useCallback(async () => {
+    if (!user?.id) return;
+    await core.notifications.refreshInbox();
+  }, [core.notifications, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      resetNotificationSoundSyncState(notificationSoundSyncRef.current);
+      return;
+    }
+    void bootstrapNotificationSoundSync(core, notificationSoundSyncRef.current);
+  }, [core, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !notificationSoundSyncRef.current.bootstrapped) return;
+    void syncNotificationSounds(
+      core,
+      appSettings.notifications,
+      notificationSoundSyncRef.current,
+    ).catch((error) => {
+      console.error("Failed to play notification sounds:", error);
+    });
+  }, [appSettings.notifications, core, notificationItems.length, user?.id]);
+
+  const resetNotifications = useCallback(() => {
+    setNotificationsError(null);
+    core.notifications.setPreferences(null);
+    resetNotificationSoundSyncState(notificationSoundSyncRef.current);
+  }, [core.notifications]);
 
   // ── DM interactions ───────────────────────────────────────────────────────
   const {
@@ -696,7 +714,6 @@ export function useChatAppOrchestration() {
     currentServerId,
     userId: user?.id,
     activeVoiceCommunityId: activeVoiceChannel?.community_id ?? null,
-    membersModalCommunityId,
     setIsCurrentUserElevatedInCurrentServer,
     setIsCurrentUserElevatedInActiveVoiceServer,
     setIsCurrentUserElevatedInMembersModalServer,
@@ -747,13 +764,6 @@ export function useChatAppOrchestration() {
   } = useChatAppBusinessActions({
     user,
     currentServerId,
-    showServerSettingsModal,
-    controlPlaneBackend,
-    refreshServers,
-    setCurrentServerId,
-    refreshMembersModalMembersIfOpen,
-    loadCommunityBans,
-    saveMemberChannelPermissionsRaw,
     applyChannelAccessRevokedContentVisibility,
     applyLocalProfileUpdate,
     upsertLiveProfile,
@@ -786,10 +796,6 @@ export function useChatAppOrchestration() {
     servers,
     channels,
     channelGroupStateGroups: channelGroupState.groups,
-    leaveServer,
-    deleteServer,
-    deleteChannel,
-    deleteChannelGroup,
   });
 
   useChatAppLifecycleEffects({
@@ -811,13 +817,13 @@ export function useChatAppOrchestration() {
     resetSocialWorkspace,
     resetDirectMessages,
     resetChannelsWorkspace,
-    resetServerSettingsState,
-    resetServerInvites,
-    resetServerRoleManagement,
-    resetChannelPermissionsState,
+    resetServerSettingsState: admin.resetServerSettingsState,
+    resetServerInvites: admin.resetServerInvites,
+    resetServerRoleManagement: admin.resetServerRoleManagement,
+    resetChannelPermissionsState: admin.resetChannelPermissionsState,
     resetChannelGroups,
-    resetMembersModal,
-    resetCommunityBans,
+    resetMembersModal: admin.resetMembersModal,
+    resetCommunityBans: admin.resetCommunityBans,
     prefetchServersChannels,
     prefetchMessageCachesForServers,
     prefetchChannelMessages,
@@ -907,68 +913,6 @@ export function useChatAppOrchestration() {
     setChannelGroupCollapsed,
     renameChannelGroup,
     deleteChannelGroup,
-    // server admin
-    showMembersModal,
-    membersModalCommunityId,
-    membersModalServerName,
-    membersModalMembers,
-    membersModalLoading,
-    membersModalError,
-    membersModalCanCreateReports,
-    membersModalCanManageMembers,
-    membersModalCanManageBans,
-    communityBans,
-    communityBansLoading,
-    communityBansError,
-    serverInvites,
-    serverInvitesLoading,
-    serverInvitesError,
-    serverRoles,
-    serverMembers,
-    serverPermissionCatalog,
-    serverRoleManagementLoading,
-    serverRoleManagementError,
-    serverSettingsInitialValues,
-    serverSettingsLoading,
-    serverSettingsLoadError,
-    closeMembersModal,
-    openServerMembersModal,
-    createServerInvite,
-    revokeServerInvite,
-    createServerRole,
-    updateServerRole,
-    deleteServerRole,
-    saveServerRolePermissions,
-    saveServerMemberRoles,
-    saveServerSettings,
-    openServerSettingsModal,
-    leaveServer,
-    renameServer,
-    loadCommunityBans,
-    unbanUserFromCurrentServer,
-    // channel management
-    channelRolePermissions,
-    channelMemberPermissions,
-    channelPermissionMemberOptions,
-    channelPermissionsLoading,
-    channelPermissionsLoadError,
-    createChannel,
-    saveChannelSettings,
-    renameChannel,
-    deleteChannel,
-    deleteCurrentChannel,
-    openChannelSettingsModal,
-    saveRoleChannelPermissions,
-    saveMemberChannelPermissions,
-    hasOlderMessages,
-    isLoadingOlderMessages,
-    requestOlderMessages,
-    sendMessage,
-    toggleMessageReaction,
-    editMessage,
-    deleteMessage,
-    reportMessage,
-    requestMessageLinkPreviewRefresh,
     // desktop settings
     appSettings,
     appSettingsLoading,
@@ -983,22 +927,6 @@ export function useChatAppOrchestration() {
     setNotificationAudioSettings,
     setVoiceSettings,
     checkForUpdatesNow,
-    // notifications
-    notificationItems,
-    notificationCounts,
-    notificationsLoading,
-    notificationsRefreshing,
-    notificationsError,
-    notificationPreferences,
-    notificationPreferencesLoading,
-    notificationPreferencesSaving,
-    notificationPreferencesError,
-    refreshNotificationsManually,
-    markAllNotificationsSeen,
-    markNotificationRead,
-    dismissNotification,
-    dismissAllNotifications,
-    saveNotificationPreferences,
     openNotificationItem,
     acceptFriendRequestFromNotification,
     declineFriendRequestFromNotification,
@@ -1014,26 +942,6 @@ export function useChatAppOrchestration() {
     directMessageUser,
     blockDirectMessageUser,
     openDirectMessagesWorkspace,
-    // direct messages
-    dmConversations,
-    dmConversationsLoading,
-    dmConversationsRefreshing,
-    dmConversationsError,
-    selectedDmConversationId,
-    selectedDmConversation,
-    dmMessages,
-    dmMessagesLoading,
-    dmMessagesRefreshing,
-    dmMessagesError,
-    dmMessageSendPending,
-    showDmWorkspace,
-    refreshDmConversations,
-    refreshDmMessages,
-    sendDirectMessage,
-    toggleSelectedDmConversationMuted,
-    reportDirectMessage,
-    openDirectMessageConversation,
-    setSelectedDmConversationId,
     confirmPendingUiAction,
     // handle functions
     handleLeaveServer,
@@ -1050,6 +958,7 @@ export function useChatAppOrchestration() {
     reportUserProfile,
     banUserFromServer,
     kickUserFromServer,
+    saveMemberChannelPermissions,
     resolveBanEligibleServers,
     saveAccountSettings,
     saveThemePreference,
@@ -1060,4 +969,4 @@ export function useChatAppOrchestration() {
   };
 }
 
-export type ChatAppOrchestrationApi = ReturnType<typeof useChatAppOrchestration>;
+export type ChatAppSessionState = ReturnType<typeof useChatAppSessionState>;

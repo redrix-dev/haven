@@ -11,9 +11,15 @@ import type { StoreApi, UseBoundStore } from 'zustand'
 
 const STORAGE_KEY = 'haven:nexus:direct-messages:global'
 const DM_PAGE_SIZE = 50
+const DM_RELOAD_FRESHNESS_WINDOW_MS = 10_000
 
 const EMPTY_CONVERSATIONS: DirectMessageConversationSummary[] = []
 const EMPTY_MESSAGES: DirectMessage[] = []
+
+export type DmComposeDraftPeer = {
+  userId: string
+  displayName: string
+}
 
 export type DirectMessageNexusState = NexusState<
   DirectMessageConversationSummary
@@ -25,12 +31,17 @@ export type DirectMessageNexusState = NexusState<
   activeConversationId: string | null
   isLoadingConversations: boolean
   loadingByConversation: Record<string, boolean>
+  messagesLoadComplete: Record<string, boolean>
+  messagesLastLoadedAt: Record<string, number>
+  composeDraftPeer: DmComposeDraftPeer | null
 }
 
 const selectActiveConversationId = (state: DirectMessageNexusState) =>
   state.activeConversationId
 const selectIsLoadingConversations = (state: DirectMessageNexusState) =>
   state.isLoadingConversations
+const selectComposeDraftPeer = (state: DirectMessageNexusState) =>
+  state.composeDraftPeer
 
 export const conversationsEqual = (
   a: DirectMessageConversationSummary[],
@@ -130,6 +141,9 @@ export class DirectMessageNexus extends Nexus<
         activeConversationId: null,
         isLoadingConversations: false,
         loadingByConversation: {},
+        messagesLoadComplete: {},
+        messagesLastLoadedAt: {},
+        composeDraftPeer: null,
         revision: 0,
       }))
       this.rehydrate()
@@ -178,6 +192,7 @@ export class DirectMessageNexus extends Nexus<
         this.replaceMessages(conversationId, ascending, {
           hasMore: messages.length === DM_PAGE_SIZE,
         })
+        this.markMessagesLoadComplete(conversationId)
       } finally {
         this.setLoadingForConversation(conversationId, false)
       }
@@ -187,6 +202,64 @@ export class DirectMessageNexus extends Nexus<
 
     this.messagesInflight.set(conversationId, promise)
     return promise
+  }
+
+  /**
+   * Load messages when a conversation is focused. Skips refetch while data is
+   * still fresh (default 10s) unless `freshnessMs` is 0.
+   */
+  async ensureMessagesLoaded(
+    conversationId: string,
+    options?: { freshnessMs?: number },
+  ): Promise<void> {
+    const freshnessMs = options?.freshnessMs ?? DM_RELOAD_FRESHNESS_WINDOW_MS
+    const state = this.store.getState()
+    const lastAt = state.messagesLastLoadedAt[conversationId] ?? 0
+    if (
+      state.messagesLoadComplete[conversationId] &&
+      Date.now() - lastAt < freshnessMs
+    ) {
+      return
+    }
+    await this.loadMessages(conversationId)
+  }
+
+  async openConversation(
+    conversationId: string,
+    options?: { markRead?: boolean },
+  ): Promise<void> {
+    this.setComposeDraftPeer(null)
+    this.setActiveConversationId(conversationId)
+    await this.ensureMessagesLoaded(conversationId, { freshnessMs: 0 })
+    if (options?.markRead !== false) {
+      await this.markRead(conversationId)
+    }
+    const conversations = this.store.getState().conversationIds
+    if (!conversations.includes(conversationId)) {
+      await this.loadConversations()
+    }
+  }
+
+  async openWithUser(otherUserId: string): Promise<string> {
+    const conversationId = await this.getOrCreateDirectConversation(otherUserId)
+    await this.openConversation(conversationId, { markRead: true })
+    return conversationId
+  }
+
+  openDraftWithUser(targetUserId: string, displayName?: string | null): void {
+    const state = this.store.getState()
+    const existing = state.conversationIds
+      .map((id) => state.entities[id]?.data)
+      .find((conversation) => conversation?.otherUserId === targetUserId)
+    if (existing) {
+      void this.openConversation(existing.conversationId, { markRead: true })
+      return
+    }
+    this.setComposeDraftPeer({
+      userId: targetUserId,
+      displayName: displayName?.trim() || 'Direct',
+    })
+    this.setActiveConversationId(null)
   }
 
   async loadOlderMessages(conversationId: string): Promise<void> {
@@ -407,6 +480,20 @@ export class DirectMessageNexus extends Nexus<
     this.persist()
   }
 
+  setComposeDraftPeer(peer: DmComposeDraftPeer | null): void {
+    this.store.setState((state) => ({
+      ...state,
+      composeDraftPeer: peer,
+      revision: state.revision + 1,
+    }))
+    this.persist()
+  }
+
+  clearFocusedConversation(): void {
+    this.setComposeDraftPeer(null)
+    this.setActiveConversationId(null)
+  }
+
   setIsLoadingConversations(loading: boolean): void {
     this.store.setState((state) => ({
       ...state,
@@ -490,6 +577,17 @@ export class DirectMessageNexus extends Nexus<
     )
   }
 
+  useComposeDraftPeer(): DmComposeDraftPeer | null {
+    return useStoreWithEqualityFn(this.store, selectComposeDraftPeer)
+  }
+
+  useHasMessagesLoadCompleted(conversationId: string): boolean {
+    return useStoreWithEqualityFn(
+      this.store,
+      (state) => state.messagesLoadComplete[conversationId] ?? false,
+    )
+  }
+
   private getMessagesSelector(
     conversationId: string,
   ): (state: DirectMessageNexusState) => DirectMessage[] {
@@ -521,6 +619,7 @@ export class DirectMessageNexus extends Nexus<
         entities: state.entities,
         conversationIds: state.conversationIds,
         activeConversationId: state.activeConversationId,
+        composeDraftPeer: state.composeDraftPeer,
       }
       this.persistence.set(STORAGE_KEY, JSON.stringify(persistable))
     } catch (error) {
@@ -538,6 +637,7 @@ export class DirectMessageNexus extends Nexus<
         entities: parsed.entities ?? {},
         conversationIds: parsed.conversationIds ?? [],
         activeConversationId: parsed.activeConversationId ?? null,
+        composeDraftPeer: parsed.composeDraftPeer ?? null,
         revision: 0,
       }))
     } catch (error) {
@@ -556,11 +656,29 @@ export class DirectMessageNexus extends Nexus<
       activeConversationId: null,
       isLoadingConversations: false,
       loadingByConversation: {},
+      messagesLoadComplete: {},
+      messagesLastLoadedAt: {},
+      composeDraftPeer: null,
       revision: 0,
     })
     this.conversationsSnapshot = EMPTY_CONVERSATIONS
     this.messagesSelectors.clear()
     this.messageSnapshots.clear()
     this.persistence.remove(STORAGE_KEY)
+  }
+
+  private markMessagesLoadComplete(conversationId: string): void {
+    this.store.setState((state) => ({
+      ...state,
+      messagesLoadComplete: {
+        ...state.messagesLoadComplete,
+        [conversationId]: true,
+      },
+      messagesLastLoadedAt: {
+        ...state.messagesLastLoadedAt,
+        [conversationId]: Date.now(),
+      },
+      revision: state.revision + 1,
+    }))
   }
 }

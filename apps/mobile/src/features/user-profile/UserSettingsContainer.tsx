@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState, useEffect } from "react";
 import { Alert, View } from "react-native";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useHavenCore } from "@shared/core";
 import UserAccountCard from "@/features/user-profile/UserAccountCard";
 import AppUpdatesCard from "@/features/user-profile/AppUpdatesCard";
 import DeleteAccountConfirmationModal from "@/features/user-profile/DeleteAccountConfirmationModal";
@@ -25,6 +25,7 @@ export default function UserSettingsContainer({
   onSignOut,
   onDeleteAccount,
 }: UserSettingsContainerProps) {
+  const core = useHavenCore();
   const identity = useCurrentUserIdentity();
 
   const [draftUsername, setDraftUsername] = useState(identity.username);
@@ -76,7 +77,7 @@ export default function UserSettingsContainer({
           avatarContentType: contentType,
         });
 
-        useLiveProfilesStore.getState().upsertProfile({
+        core.profiles.upsertProfile({
           userId,
           username: result.username,
           avatarUrl: result.avatarUrl,
@@ -92,7 +93,7 @@ export default function UserSettingsContainer({
         setPendingAvatarPreviewUri(null);
       }
     },
-    [identity.avatarUrl, identity.userId, identity.username],
+    [core.profiles, identity.avatarUrl, identity.userId, identity.username],
   );
 
   const { pickAvatar, isPicking } = useProfileAvatarPicker({
@@ -127,7 +128,7 @@ export default function UserSettingsContainer({
         avatarUrl: identity.avatarUrl,
       });
 
-      useLiveProfilesStore.getState().upsertProfile({
+      core.profiles.upsertProfile({
         userId,
         username: result.username,
         avatarUrl: result.avatarUrl,
@@ -144,7 +145,7 @@ export default function UserSettingsContainer({
     } finally {
       setIsSavingAccount(false);
     }
-  }, [draftUsername, identity.avatarUrl, identity.userId, identity.username]);
+  }, [core.profiles, draftUsername, identity.avatarUrl, identity.userId, identity.username]);
 
   const handleSignOut = useCallback(async () => {
     if (!onSignOut) return;

@@ -32,7 +32,6 @@ import {
   resolveLiveUsername,
 } from "@shared/infrastructure/liveProfiles";
 import type { NotificationAudioSettings } from "@shared/types/settings";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { Bell, BellDot, RefreshCcw } from "lucide-react";
 
 type NotificationCenterModalProps = {
@@ -104,7 +103,7 @@ export function NotificationCenterModal({
   const core = useHavenCore();
   const notifications = core.notifications.useNotifications();
   const loading = core.notifications.useIsLoading();
-  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const liveProfiles = core.profiles.useProfilesRecord();
   const [showSettings, setShowSettings] = React.useState(false);
   // DMs, friend requests, and accepted-FR toasts are owned by other surfaces; see inbox filter helper.
   const visibleNotifications = filterNotificationsForInbox(notifications);

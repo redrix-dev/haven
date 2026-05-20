@@ -19,7 +19,7 @@ import type {
   FriendSummary,
 } from "@shared/lib/backend/types";
 import { resolveLiveUsername } from "@shared/infrastructure/liveProfiles";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useHavenCore } from "@shared/core";
 import { useFriendsModalData } from "@/features/friends/useFriendsModalData";
 import { useMobileSocialWorkspace } from "@/contexts/MobileSocialWorkspaceContext";
 
@@ -45,7 +45,8 @@ export function FriendsModalContainer({
   highlightedRequestId,
   onStartDirectMessage,
 }: FriendsModalContainerProps) {
-  const liveProfiles = useLiveProfilesStore((s) => s.profiles);
+  const core = useHavenCore();
+  const liveProfiles = core.profiles.useProfilesRecord();
   const [activeTab, setActiveTab] = useState<FriendsPanelTab>("friends");
 
   const {

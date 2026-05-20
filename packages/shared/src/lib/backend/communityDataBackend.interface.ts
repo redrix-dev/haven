@@ -1,4 +1,3 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Database } from '@shared/types/database';
 import type {
   BanCommunityMemberResult,
@@ -68,17 +67,6 @@ export interface CommunityDataBackend {
   }): Promise<void>;
   listBanEligibleServersForUser(targetUserId: string): Promise<BanEligibleServer[]>;
   listChannels(communityId: string): Promise<Channel[]>;
-  subscribeToChannels(
-    communityId: string,
-    onChange: () => void,
-    options?: {
-      onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
-      onMemberChannelAccessRevoked?: (
-        payload: MemberChannelAccessRevokedBroadcastPayload
-      ) => void;
-      onReportStatusUpdated?: (payload: ReportStatusUpdatedBroadcastPayload) => void;
-    }
-  ): RealtimeChannel;
   /** Resolves the signed-in user's `community_members` row id and assigned `role_id`s in this community. */
   fetchMyMemberRoleAssignmentForRealtime(
     communityId: string,
@@ -129,9 +117,7 @@ export interface CommunityDataBackend {
     beforeCreatedAt?: string | null;
     beforeMessageId?: string | null;
   }): Promise<{ messages: MessageBundle[]; hasMore: boolean }>;
-  subscribeToMessages(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   listMessageReactions(communityId: string, channelId: string): Promise<MessageReaction[]>;
-  subscribeToMessageReactions(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   toggleMessageReaction(input: {
     communityId: string;
     channelId: string;
@@ -139,10 +125,8 @@ export interface CommunityDataBackend {
     emoji: string;
   }): Promise<void>;
   listMessageAttachments(communityId: string, channelId: string): Promise<MessageAttachment[]>;
-  subscribeToMessageAttachments(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   cleanupExpiredMessageAttachments(limit?: number): Promise<number>;
   listMessageLinkPreviews(communityId: string, channelId: string): Promise<MessageLinkPreview[]>;
-  subscribeToMessageLinkPreviews(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   requestChannelLinkPreviewBackfill(input: {
     communityId: string;
     channelId: string;

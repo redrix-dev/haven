@@ -11,7 +11,7 @@ import {
 } from "@shared/core";
 import type { HavenCore } from "@shared/core/HavenCore";
 import { NotificationNexus } from "@shared/nexus/notifications/NotificationNexus";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
 import type {
   NotificationItem,
 } from "@shared/lib/backend/types";
@@ -28,6 +28,7 @@ const baseLocalAudioSettings: NotificationAudioSettings = {
 };
 
 let notificationNexus: NotificationNexus;
+let profileNexus: ProfileNexus;
 
 function makeNotification(
   partial: Partial<NotificationItem>,
@@ -64,8 +65,12 @@ describe("NotificationCenterModal", () => {
   beforeEach(() => {
     resetHavenCore();
     notificationNexus = new NotificationNexus(createMemoryPersistence());
-    registerHavenCore({ notifications: notificationNexus } as HavenCore);
-    useLiveProfilesStore.getState().reset();
+    profileNexus = new ProfileNexus(createMemoryPersistence());
+    registerHavenCore({
+      notifications: notificationNexus,
+      profiles: profileNexus,
+    } as HavenCore);
+    profileNexus.clear();
   });
 
   it("opens a visible notification row via click and keyboard", async () => {
@@ -139,7 +144,7 @@ describe("NotificationCenterModal", () => {
   });
 
   it("overlays live actor identity details when available", () => {
-    useLiveProfilesStore.getState().upsertProfile({
+    profileNexus.upsertProfile({
       userId: "user-2",
       username: "Live Actor",
       avatarUrl: "https://example.com/live-actor.png",

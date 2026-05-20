@@ -37,6 +37,22 @@ export {
   getCachedChannelsForServer,
   resolvePreferredChannelIdForServer,
 } from "./communityChannelUtils";
+export { toServerSummary, toServerSummaries, deriveCommunitiesLoadStatus } from "./communitySummaries";
+export type { CommunitiesLoadStatus } from "./communitySummaries";
+export {
+  applyCommunityDisplayOrder,
+  readCommunityDisplayOrder,
+  writeCommunityDisplayOrder,
+} from "./communityDisplayOrder";
+export { prefetchCommunityChannelMessages } from "./prefetchCommunityChannelMessages";
+export type { PrefetchCommunityChannelMessagesInput } from "./prefetchCommunityChannelMessages";
+export {
+  bootstrapNotificationSoundSync,
+  createNotificationSoundSyncState,
+  resetNotificationSoundSyncState,
+  syncNotificationSounds,
+} from "./syncNotificationSounds";
+export type { NotificationSoundSyncState } from "./syncNotificationSounds";
 export {
   registerCommunityAccessHandlers,
   notifyActiveServerAccessLost,

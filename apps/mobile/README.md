@@ -31,7 +31,7 @@ Copy `.env.example` to `.env` when you add keys (`.env` is gitignored at repo ro
 
 - Email/password sign-in (Supabase `signInWithPassword`), session persisted via AsyncStorage.
 - Home: top bar (Haven + nav icons, cog opens account/settings stub) and 4-column community grid with **Create** / **Join** dashed tiles.
-- Does not use shared `AuthContext`, `LoginScreen`, or `useServers` (avoids web-only imports).
+- Does not use shared `AuthContext` or `LoginScreen` (avoids web-only imports).
 
 ## Development build (expo-dev-client)
 

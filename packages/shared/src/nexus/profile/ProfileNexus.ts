@@ -52,6 +52,17 @@ export class ProfileNexus {
     );
   }
 
+  getProfile(userId: string): LiveProfileIdentity | undefined {
+    return this.store.getState().profiles[userId];
+  }
+
+  useProfilesRecord(): Record<string, LiveProfileIdentity> {
+    return useStoreWithEqualityFn(this.store, (state) => {
+      void state.revision;
+      return state.profiles;
+    });
+  }
+
   useProfiles(userIds: readonly string[]): Record<string, LiveProfileIdentity> {
     return useStoreWithEqualityFn(this.store, (state) => {
       void state.revision;

@@ -255,7 +255,7 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
             </Text>
             <Text className="mt-4 text-xs font-semibold text-foreground">Instrumented hooks</Text>
             <Text className="text-xs text-muted-foreground">
-              MobileMainSessionContext, useMessages, prefetchCommunityChannelMessages,
+              MobileMainSessionContext, prefetchCommunityChannelMessages,
               MobileMainSession warmCommunityForEntry, servers realtime bootstrap, auth session cache
               clears
             </Text>

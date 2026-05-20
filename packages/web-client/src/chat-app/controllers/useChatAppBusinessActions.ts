@@ -2,10 +2,12 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@platform/lib/errors";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
+import { requireHavenCore } from "@shared/core";
 import {
   getCommunityDataBackend,
   getControlPlaneBackend,
 } from "@shared/lib/backend";
+import { useUiStore } from "@shared/stores/uiStore";
 import type {
   BanEligibleServer,
   MessageAttachment,
@@ -16,24 +18,6 @@ import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode
 type UseChatAppBusinessActionsInput = {
   user: User | null;
   currentServerId: string | null;
-  showServerSettingsModal: boolean;
-  controlPlaneBackend: ReturnType<typeof getControlPlaneBackend>;
-  refreshServers: () => Promise<void>;
-  setCurrentServerId: (id: string) => void;
-  refreshMembersModalMembersIfOpen: (communityId: string) => Promise<void>;
-  loadCommunityBans: (communityId: string) => Promise<void>;
-  saveMemberChannelPermissionsRaw: (
-    memberId: string,
-    permissions: {
-      canView: boolean | null;
-      canSend: boolean | null;
-      canManage: boolean | null;
-    },
-  ) => Promise<{
-    communityId: string;
-    channelId: string;
-    revokedUserId: string;
-  } | null>;
   applyChannelAccessRevokedContentVisibility: (payload: {
     communityId: string;
     channelId: string;
@@ -57,19 +41,24 @@ type UseChatAppBusinessActionsInput = {
 export function useChatAppBusinessActions({
   user,
   currentServerId,
-  showServerSettingsModal,
-  controlPlaneBackend,
-  refreshServers,
-  setCurrentServerId,
-  refreshMembersModalMembersIfOpen,
-  loadCommunityBans,
-  saveMemberChannelPermissionsRaw,
   applyChannelAccessRevokedContentVisibility,
   applyLocalProfileUpdate,
   upsertLiveProfile,
   profileUsername,
   profileAvatarUrl,
 }: UseChatAppBusinessActionsInput) {
+  const controlPlaneBackend = getControlPlaneBackend();
+  const admin = requireHavenCore().admin;
+  const showServerSettingsModal = useUiStore(
+    (state) => state.showServerSettingsModal,
+  );
+  const refreshServers = useCallback(async () => {
+    if (!user) return;
+    await requireHavenCore().refreshCommunities(user.id);
+  }, [user]);
+  const setCurrentServerId = useCallback((id: string) => {
+    requireHavenCore().communities.setActiveId(id);
+  }, []);
   const joinServerByInvite = useCallback(
     async (
       inviteInput: string,
@@ -138,24 +127,19 @@ export function useChatAppBusinessActions({
         console.error("Failed to broadcast member ban:", error);
       }
       try {
-        await refreshMembersModalMembersIfOpen(input.communityId);
+        await admin.refreshMembersModalMembersIfOpen(input.communityId);
       } catch (error) {
         console.error("Failed to refresh members after ban:", error);
       }
       if (showServerSettingsModal && currentServerId === input.communityId) {
         try {
-          await loadCommunityBans(input.communityId);
+          await admin.loadCommunityBans(input.communityId);
         } catch (error) {
           console.error("Failed to refresh bans after ban:", error);
         }
       }
     },
-    [
-      refreshMembersModalMembersIfOpen,
-      loadCommunityBans,
-      showServerSettingsModal,
-      currentServerId,
-    ],
+    [admin, showServerSettingsModal, currentServerId],
   );
 
   const kickUserFromServer = useCallback(
@@ -171,7 +155,7 @@ export function useChatAppBusinessActions({
           targetUserId: input.targetUserId,
         });
         try {
-          await refreshMembersModalMembersIfOpen(input.communityId);
+          await admin.refreshMembersModalMembersIfOpen(input.communityId);
         } catch (error) {
           console.error("Failed to refresh members after kick:", error);
         }
@@ -196,7 +180,7 @@ export function useChatAppBusinessActions({
         throw error;
       }
     },
-    [refreshMembersModalMembersIfOpen],
+    [admin],
   );
 
   const saveMemberChannelPermissions = useCallback(
@@ -208,17 +192,14 @@ export function useChatAppBusinessActions({
         canManage: boolean | null;
       },
     ) => {
-      const accessRevokedResult = await saveMemberChannelPermissionsRaw(
+      const accessRevokedResult = await admin.saveMemberChannelPermissions(
         memberId,
         permissions,
       );
       if (!accessRevokedResult) return;
       applyChannelAccessRevokedContentVisibility(accessRevokedResult);
     },
-    [
-      applyChannelAccessRevokedContentVisibility,
-      saveMemberChannelPermissionsRaw,
-    ],
+    [admin, applyChannelAccessRevokedContentVisibility],
   );
 
   const resolveBanEligibleServers = useCallback(

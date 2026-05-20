@@ -6,6 +6,13 @@ export { CommunityNexus } from "./community/CommunityNexus";
 export type { Community } from "./community/CommunityNexus";
 export { ChannelNexus } from "./community/ChannelNexus";
 export type { HavenChannel } from "./community/ChannelNexus";
+export { CommunityAdminNexus } from "./community/CommunityAdminNexus";
+export type {
+  CommunityAdminNexusState,
+  CommunityAdminMembersModalState,
+  CommunityAdminServerPanelState,
+  CommunityAdminChannelPermissionsState,
+} from "./community/CommunityAdminNexus";
 export { DirectMessageNexus } from "./direct-messages/DirectMessageNexus";
 export type { DirectMessageNexusState } from "./direct-messages/DirectMessageNexus";
 export { NotificationNexus } from "./notifications/NotificationNexus";

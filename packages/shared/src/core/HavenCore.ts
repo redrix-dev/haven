@@ -1,10 +1,12 @@
 import type { HavenSupabaseClient } from "@shared/infrastructure/client/createHavenSupabaseClient";
+import { hydrateCommunityPermissionsForMany } from "@shared/features/community/communityPermissionsHydration";
 import {
   CommunityNexus,
 } from "@shared/nexus/community/CommunityNexus";
 import {
   ChannelNexus,
 } from "@shared/nexus/community/ChannelNexus";
+import { CommunityAdminNexus } from "@shared/nexus/community/CommunityAdminNexus";
 import { CommunityMessageNexus } from "@shared/nexus/community/CommunityMessageNexus";
 import { DirectMessageNexus } from "@shared/nexus/direct-messages/DirectMessageNexus";
 import { NotificationNexus } from "@shared/nexus/notifications/NotificationNexus";
@@ -13,7 +15,9 @@ import { PermissionsNexus } from "@shared/nexus/permissions/PermissionsNexus";
 import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
 import { VoiceNexus } from "@shared/nexus/voice/VoiceNexus";
 import { useUiStore } from "@shared/stores/uiStore";
+import { getCommunityDataBackend } from "@shared/lib/backend";
 import { createHavenBackends, type HavenBackends, type HavenSupabasePublicConfig } from "./backends";
+import { notifyActiveServerAccessLost } from "./communityAccessHandlers";
 import { BootstrapPhase, type BootstrapPhaseSnapshot, type BootstrapPhaseListener } from "./bootstrapPhase";
 import type { NexusPersistence } from "./persistence/NexusPersistence";
 import { routeRealtimeEvent, type RealtimeEvent } from "./routeRealtimeEvent";
@@ -92,6 +96,7 @@ export class HavenCore {
   readonly persistence: NexusPersistence;
   readonly communities: CommunityNexus;
   readonly channels: ChannelNexus;
+  readonly admin: CommunityAdminNexus;
   readonly messages: MessageNexusRegistry;
   readonly directMessages: DirectMessageNexus;
   readonly notifications: NotificationNexus;
@@ -105,6 +110,7 @@ export class HavenCore {
   private readonly phase = new BootstrapPhase();
   private realtimeUnsubscribe: (() => void) | null = null;
   private sessionUserId: string | null = null;
+  private lastNotifiedAccessLostCommunityId: string | null = null;
 
   constructor(options: HavenCoreOptions) {
     this.persistence = options.persistence;
@@ -113,6 +119,7 @@ export class HavenCore {
 
     this.communities = new CommunityNexus(options.persistence);
     this.channels = new ChannelNexus(options.persistence);
+    this.admin = new CommunityAdminNexus(options.persistence);
     this.messages = new MessageNexusRegistry(
       options.persistence,
       this.viewerMessagePolicyStore,
@@ -125,6 +132,7 @@ export class HavenCore {
     this.voice = new VoiceNexus(options.persistence);
 
     this.communities.setControlPlane(this.backends.controlPlane);
+    this.admin.setControlPlane(this.backends.controlPlane);
     this.channels.setCommunityData(this.backends.communityData);
     this.messages.setBackends(this.backends);
     this.directMessages.setBackend(this.backends.directMessages);
@@ -138,6 +146,60 @@ export class HavenCore {
       this.syncViewerMessagePolicy(communityId);
     });
     this.voice.setViewerPolicyStore(this.viewerMessagePolicyStore);
+
+    this.communities.setOnListChanged(() => {
+      this.syncActiveCommunityAccess();
+    });
+  }
+
+  /**
+   * Notify host handlers when the active community disappears from the list.
+   */
+  syncActiveCommunityAccess(): void {
+    if (this.communities.getIsLoading()) return;
+
+    const communityIds = this.communities.getCommunityIds();
+    const activeCommunityId = this.communities.getActiveId();
+    if (!activeCommunityId) {
+      this.lastNotifiedAccessLostCommunityId = null;
+      return;
+    }
+
+    if (communityIds.includes(activeCommunityId)) {
+      if (this.lastNotifiedAccessLostCommunityId === activeCommunityId) {
+        this.lastNotifiedAccessLostCommunityId = null;
+      }
+      return;
+    }
+
+    if (communityIds.length === 0) {
+      // Wait until a non-empty refresh confirms access loss vs transient load.
+      return;
+    }
+
+    if (this.lastNotifiedAccessLostCommunityId === activeCommunityId) return;
+    this.lastNotifiedAccessLostCommunityId = activeCommunityId;
+    notifyActiveServerAccessLost(activeCommunityId);
+  }
+
+  async refreshCommunities(userId: string): Promise<void> {
+    if (!userId) return;
+    await this.communities.load(userId);
+  }
+
+  async createCommunity(userId: string, name: string): Promise<{ id: string }> {
+    if (!userId) throw new Error("Not authenticated");
+    const community = await this.backends.controlPlane.createCommunity(name);
+    await this.refreshCommunities(userId);
+    return community;
+  }
+
+  setCommunityDisplayOrder(ids: string[]): void {
+    this.communities.setDisplayOrder(ids, this.sessionUserId);
+  }
+
+  resetCommunityDisplayOrder(): void {
+    this.communities.resetDisplayOrder(this.sessionUserId);
   }
 
   routeEvent(evt: RealtimeEvent): void {
@@ -227,12 +289,25 @@ export class HavenCore {
     try {
       this.phase.set("rehydrating");
       this.communities.rehydrate();
+      this.communities.loadDisplayOrder(userId);
       this.channels.rehydrate();
       this.directMessages.rehydrate();
       this.notifications.rehydrate();
 
       this.phase.set("loading_communities");
       await this.communities.load(userId);
+
+      const joinedIds = new Set(this.communities.getCommunityIds());
+      for (const id of Object.keys(
+        this.permissions.getPermissionsByCommunityId(),
+      )) {
+        if (!joinedIds.has(id)) {
+          this.permissions.invalidate(id);
+        }
+      }
+      if (joinedIds.size > 0) {
+        await hydrateCommunityPermissionsForMany(Array.from(joinedIds));
+      }
 
       this.phase.set("loading_session_data");
       const activeCommunityId = this.communities.getActiveId();
@@ -241,13 +316,8 @@ export class HavenCore {
         this.notifications.loadInbox().then(() =>
           this.notifications.refreshCounts(),
         ),
+        this.notifications.loadPreferences(),
         this.social.load(),
-        activeCommunityId
-          ? this.permissions.ensureLoaded(
-              activeCommunityId,
-              this.backends.communityData,
-            )
-          : Promise.resolve(),
       ]);
       this.syncViewerMessagePolicy(activeCommunityId);
 
@@ -265,10 +335,12 @@ export class HavenCore {
   }
 
   async clearSession(): Promise<void> {
+    this.lastNotifiedAccessLostCommunityId = null;
     this.unsubscribeRealtime();
     this.sessionUserId = null;
     this.communities.clear();
     this.channels.clear();
+    this.admin.clear();
     this.messages.clearAll();
     this.directMessages.clear();
     this.notifications.clear();
@@ -330,5 +402,50 @@ export class HavenCore {
   onSocialChange(payload: Record<string, unknown>): void {
     this.social.handleSocialChange(payload);
     this.syncViewerMessagePolicy();
+  }
+
+  /**
+   * Prepare a focused text channel for display: viewer policy, revoked-author
+   * ids, and initial message page (with freshness dedupe on the nexus).
+   */
+  async prepareTextChannelMessages(
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    this.syncViewerMessagePolicy(communityId);
+
+    const channel = this.channels.getChannel(channelId);
+    if (channel?.kind !== "text") return;
+
+    const messageNexus = this.messages.for(communityId);
+    if (!messageNexus.isCommunityDataAttached()) return;
+
+    try {
+      await this.permissions.loadRevokedAuthorIdsForChannel(
+        communityId,
+        channelId,
+        getCommunityDataBackend(communityId),
+      );
+      this.syncViewerMessagePolicy(communityId);
+    } catch (err) {
+      console.warn("[HavenCore] loadRevokedAuthorIds failed", err);
+    }
+
+    await messageNexus.ensureInitialLoaded(channelId);
+  }
+
+  /**
+   * Prepare a focused DM thread: load messages and optionally mark read.
+   */
+  async prepareDirectMessageConversation(
+    conversationId: string,
+    options?: { markRead?: boolean; freshnessMs?: number },
+  ): Promise<void> {
+    await this.directMessages.ensureMessagesLoaded(conversationId, {
+      freshnessMs: options?.freshnessMs,
+    });
+    if (options?.markRead !== false) {
+      await this.directMessages.markRead(conversationId);
+    }
   }
 }

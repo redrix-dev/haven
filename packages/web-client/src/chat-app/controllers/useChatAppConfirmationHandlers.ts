@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { requireHavenCore } from "@shared/core";
 import type { Channel } from "@shared/lib/backend/types";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { useUiStore } from "@shared/stores/uiStore";
@@ -11,21 +12,14 @@ type UseChatAppConfirmationHandlersInput = {
   servers: ServerSummary[];
   channels: Channel[];
   channelGroupStateGroups: ChannelGroupStateGroups;
-  leaveServer: (communityId: string) => Promise<void>;
-  deleteServer: (communityId: string) => Promise<void>;
-  deleteChannel: (channelId: string) => Promise<void>;
-  deleteChannelGroup: (groupId: string) => Promise<void>;
 };
 
 export function useChatAppConfirmationHandlers({
   servers,
   channels,
   channelGroupStateGroups,
-  leaveServer,
-  deleteServer,
-  deleteChannel,
-  deleteChannelGroup,
 }: UseChatAppConfirmationHandlersInput) {
+  const admin = requireHavenCore().admin;
   const handleLeaveServer = useCallback(
     (communityId: string) => {
       const server = servers.find((s) => s.id === communityId);
@@ -123,42 +117,48 @@ export function useChatAppConfirmationHandlers({
     const action = ui.pendingUiConfirmation;
     if (!action) return;
     ui.setPendingUiConfirmation(null);
+    const core = requireHavenCore();
     switch (action.kind) {
       case "leave-server":
-        void leaveServer(action.communityId).catch((error: unknown) => {
+        void admin.leaveServer(action.communityId).catch((error: unknown) => {
           toast.error(getErrorMessage(error, "Failed to leave server."), {
             id: "leave-server-error",
           });
         });
         return;
       case "delete-server":
-        void deleteServer(action.communityId).catch((error: unknown) => {
+        void admin.deleteServer(action.communityId).catch((error: unknown) => {
           toast.error(getErrorMessage(error, "Failed to delete server."), {
             id: "delete-server-error",
           });
         });
         return;
       case "delete-channel":
-        void deleteChannel(action.channelId).catch((error: unknown) => {
+        void admin.deleteChannel(action.channelId).catch((error: unknown) => {
           toast.error(getErrorMessage(error, "Failed to delete channel."), {
             id: "delete-channel-error",
           });
         });
         return;
-      case "delete-channel-group":
-        void deleteChannelGroup(action.groupId).catch((error: unknown) => {
-          toast.error(
-            getErrorMessage(error, "Failed to delete channel group."),
-            {
-              id: "delete-channel-group-error",
-            },
-          );
-        });
+      case "delete-channel-group": {
+        const communityId = core.communities.getActiveId();
+        if (!communityId) return;
+        void core.channels
+          .deleteChannelGroup(communityId, action.groupId)
+          .catch((error: unknown) => {
+            toast.error(
+              getErrorMessage(error, "Failed to delete channel group."),
+              {
+                id: "delete-channel-group-error",
+              },
+            );
+          });
         return;
+      }
       default:
         return;
     }
-  }, [leaveServer, deleteServer, deleteChannel, deleteChannelGroup]);
+  }, [admin]);
 
   return {
     handleLeaveServer,

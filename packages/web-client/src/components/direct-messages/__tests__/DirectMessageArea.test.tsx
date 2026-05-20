@@ -10,7 +10,13 @@ import {
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DirectMessageArea } from "@web-client/components/direct-messages/DirectMessageArea";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import {
+  createMemoryPersistence,
+  registerHavenCore,
+  resetHavenCore,
+} from "@shared/core";
+import type { HavenCore } from "@shared/core/HavenCore";
+import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
@@ -57,8 +63,13 @@ function renderArea(
 }
 
 describe("DirectMessageArea", () => {
+  let profileNexus: ProfileNexus;
+
   beforeEach(() => {
-    useLiveProfilesStore.getState().reset();
+    resetHavenCore();
+    profileNexus = new ProfileNexus(createMemoryPersistence());
+    registerHavenCore({ profiles: profileNexus } as HavenCore);
+    profileNexus.clear();
   });
 
   it("renders explicit blocked/unfriended style error hint", () => {
@@ -128,7 +139,7 @@ describe("DirectMessageArea", () => {
   });
 
   it("overlays live profile identities for the conversation header and message rows", () => {
-    useLiveProfilesStore.getState().upsertProfile({
+    profileNexus.upsertProfile({
       userId: "user-2",
       username: "Live Friend",
       avatarUrl: "https://example.com/live-friend.png",

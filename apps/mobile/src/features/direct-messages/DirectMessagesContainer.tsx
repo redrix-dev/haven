@@ -36,8 +36,8 @@ import type {
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
+import { useHavenCore } from "@shared/core";
 import { useAuthStore } from "@shared/stores/authStore";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
@@ -51,7 +51,8 @@ function formatDmTime(iso: string): string {
 export function DirectMessagesContainer() {
   const composerColors = useChatComposerColors();
   const { width: windowWidth } = useWindowDimensions();
-  const liveProfiles = useLiveProfilesStore((s) => s.profiles);
+  const core = useHavenCore();
+  const liveProfiles = core.profiles.useProfilesRecord();
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
   const [draft, setDraft] = useState("");
   const [isPickingDmMedia, setIsPickingDmMedia] = useState(false);

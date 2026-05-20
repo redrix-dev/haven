@@ -6,6 +6,10 @@ import { getPendingUiConfirmationCopy } from "@web-client/ui-confirmations";
 export function useChatAppModalUiState() {
   const core = useHavenCore();
   const currentServerId = core.communities.useActiveId();
+  const currentChannelId = core.channels.useActiveChannelId();
+  const channelSettingsTargetId = useUiStore(
+    (state) => state.channelSettingsTargetId,
+  );
   const serverPermissions = core.permissions.usePermissions(currentServerId ?? "");
   const serverPermissionsById = core.permissions.usePermissionsByCommunityId();
   const notificationsPanelOpen = useUiStore(
@@ -89,6 +93,8 @@ export function useChatAppModalUiState() {
 
   return {
     currentServerId,
+    currentChannelId,
+    channelSettingsTargetId,
     serverPermissions,
     serverPermissionsById,
     notificationsPanelOpen,

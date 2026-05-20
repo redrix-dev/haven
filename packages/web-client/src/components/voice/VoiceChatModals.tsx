@@ -4,21 +4,13 @@ import { getErrorMessage } from "@platform/lib/errors";
 import { VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL } from "@shared/infrastructure/constants";
 import { VoiceHardwareDebugPanel } from "@web-client/components/voice/VoiceHardwareDebugPanel";
 import { VoiceSettingsModal } from "@web-client/components/voice/VoiceSettingsModal";
-import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
-import type { ChatAppModalUiState } from "@web-client/chat-app/modals/useChatAppModalUiState";
+import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
+import { useChatAppModalUiState } from "@web-client/chat-app/modals/chatAppModalUiState";
 import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
 
 type VoiceSessionApi = ReturnType<typeof useVoiceSessionController>;
 
 type VoiceChatModalsProps = {
-  app: ChatAppOrchestrationApi;
-  ui: Pick<
-    ChatAppModalUiState,
-    | "showVoiceSettingsModal"
-    | "setShowVoiceSettingsModal"
-    | "userVoiceHardwareTestOpen"
-    | "setUserVoiceHardwareTestOpen"
-  >;
   voiceSession: VoiceSessionApi;
   visibleActiveVoiceParticipants: VoiceSessionApi["state"]["participants"];
   canOpenVoicePopout: boolean;
@@ -31,13 +23,6 @@ type VoiceChatModalsProps = {
 };
 
 export function VoiceChatModals({
-  app,
-  ui: {
-    showVoiceSettingsModal,
-    setShowVoiceSettingsModal,
-    userVoiceHardwareTestOpen,
-    setUserVoiceHardwareTestOpen,
-  },
   voiceSession,
   visibleActiveVoiceParticipants,
   canOpenVoicePopout,
@@ -45,6 +30,13 @@ export function VoiceChatModals({
   handleOpenVoicePopout,
   handleKickVoiceParticipant,
 }: VoiceChatModalsProps) {
+  const app = useChatAppSession();
+  const {
+    showVoiceSettingsModal,
+    setShowVoiceSettingsModal,
+    userVoiceHardwareTestOpen,
+    setUserVoiceHardwareTestOpen,
+  } = useChatAppModalUiState();
   return (
     <>
       {app.voiceHardwareDebugPanelEnabled && (

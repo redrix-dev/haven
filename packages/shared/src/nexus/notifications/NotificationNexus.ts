@@ -6,6 +6,8 @@ import type { NotificationBackend } from '@shared/lib/backend/notificationBacken
 import type {
   NotificationCounts,
   NotificationItem,
+  NotificationPreferenceUpdate,
+  NotificationPreferences,
 } from '@shared/lib/backend/types'
 import type { StoreApi, UseBoundStore } from 'zustand'
 
@@ -20,10 +22,18 @@ export type NotificationNexusState = NexusState<NotificationItem> & {
   counts: NotificationCounts
   isLoading: boolean
   hasMore: boolean
+  preferences: NotificationPreferences | null
+  preferencesLoading: boolean
+  preferencesSaving: boolean
 }
 
 const selectCounts = (state: NotificationNexusState) => state.counts
 const selectIsLoading = (state: NotificationNexusState) => state.isLoading
+const selectPreferences = (state: NotificationNexusState) => state.preferences
+const selectPreferencesLoading = (state: NotificationNexusState) =>
+  state.preferencesLoading
+const selectPreferencesSaving = (state: NotificationNexusState) =>
+  state.preferencesSaving
 
 const notificationsEqual = (
   a: NotificationItem[],
@@ -88,6 +98,9 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
         counts: DEFAULT_COUNTS,
         isLoading: false,
         hasMore: false,
+        preferences: null,
+        preferencesLoading: false,
+        preferencesSaving: false,
         revision: 0,
       }))
       this.rehydrate()
@@ -118,6 +131,73 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     })
 
     return this.listInflight
+  }
+
+  async refreshInbox(): Promise<void> {
+    await this.loadInbox()
+  }
+
+  async loadPreferences(): Promise<NotificationPreferences> {
+    if (!this.backend) {
+      throw new Error('NotificationNexus.loadPreferences called before backend attached.')
+    }
+    this.setPreferencesLoading(true)
+    try {
+      const preferences = await this.backend.getNotificationPreferences()
+      this.setPreferences(preferences)
+      return preferences
+    } finally {
+      this.setPreferencesLoading(false)
+    }
+  }
+
+  async savePreferences(
+    values: NotificationPreferenceUpdate,
+  ): Promise<NotificationPreferences> {
+    if (!this.backend) {
+      throw new Error('NotificationNexus.savePreferences called before backend attached.')
+    }
+    this.setPreferencesSaving(true)
+    try {
+      const next = await this.backend.updateNotificationPreferences(values)
+      this.setPreferences(next)
+      await this.refreshInbox()
+      return next
+    } finally {
+      this.setPreferencesSaving(false)
+    }
+  }
+
+  async markAllSeen(): Promise<void> {
+    if (!this.backend) {
+      throw new Error('NotificationNexus.markAllSeen called before backend attached.')
+    }
+    await this.backend.markAllNotificationsSeen()
+    await this.refreshInbox()
+  }
+
+  async markRead(recipientIds: string[]): Promise<void> {
+    if (!this.backend) {
+      throw new Error('NotificationNexus.markRead called before backend attached.')
+    }
+    if (recipientIds.length === 0) return
+    await this.backend.markNotificationsRead(recipientIds)
+    await this.refreshInbox()
+  }
+
+  async dismiss(recipientIds: string[]): Promise<void> {
+    if (!this.backend) {
+      throw new Error('NotificationNexus.dismiss called before backend attached.')
+    }
+    if (recipientIds.length === 0) return
+    await this.backend.dismissNotifications(recipientIds)
+    await this.refreshInbox()
+  }
+
+  async dismissAll(): Promise<void> {
+    const recipientIds = this.store.getState().recipientOrder
+    if (recipientIds.length === 0) return
+    await this.dismiss(recipientIds)
   }
 
   async refreshCounts(): Promise<void> {
@@ -182,6 +262,31 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     }))
   }
 
+  setPreferences(preferences: NotificationPreferences | null): void {
+    this.store.setState((state) => ({
+      ...state,
+      preferences,
+      revision: state.revision + 1,
+    }))
+    this.persist()
+  }
+
+  setPreferencesLoading(loading: boolean): void {
+    this.store.setState((state) => ({
+      ...state,
+      preferencesLoading: loading,
+      revision: state.revision + 1,
+    }))
+  }
+
+  setPreferencesSaving(saving: boolean): void {
+    this.store.setState((state) => ({
+      ...state,
+      preferencesSaving: saving,
+      revision: state.revision + 1,
+    }))
+  }
+
   useNotifications(): NotificationItem[] {
     return useStoreWithEqualityFn(
       this.store,
@@ -196,6 +301,18 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
 
   useIsLoading(): boolean {
     return useStoreWithEqualityFn(this.store, selectIsLoading)
+  }
+
+  usePreferences(): NotificationPreferences | null {
+    return useStoreWithEqualityFn(this.store, selectPreferences)
+  }
+
+  usePreferencesLoading(): boolean {
+    return useStoreWithEqualityFn(this.store, selectPreferencesLoading)
+  }
+
+  usePreferencesSaving(): boolean {
+    return useStoreWithEqualityFn(this.store, selectPreferencesSaving)
   }
 
   override persist(): void {
@@ -239,6 +356,9 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       counts: DEFAULT_COUNTS,
       isLoading: false,
       hasMore: false,
+      preferences: null,
+      preferencesLoading: false,
+      preferencesSaving: false,
       revision: 0,
     })
     this.notificationsSnapshot = EMPTY_NOTIFICATIONS

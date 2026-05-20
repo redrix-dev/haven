@@ -1,7 +1,15 @@
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { Nexus, type NexusEntry, type NexusState } from '../Nexus'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
+import {
+  applyCommunityDisplayOrder,
+  clearCommunityDisplayOrder,
+  hasSameIdSequence,
+  readCommunityDisplayOrder,
+  writeCommunityDisplayOrder,
+} from '@shared/core/communityDisplayOrder'
 import type { ControlPlaneBackend } from '@shared/lib/backend/controlPlaneBackend.interface'
 import type { ServerSummary } from '@shared/lib/backend/types'
 import type { StoreApi, UseBoundStore } from 'zustand'
@@ -16,6 +24,8 @@ export type CommunityNexusState = NexusState<Community> & {
   orderedIds: string[]
   activeId: string | null
   isLoading: boolean
+  loadError: string | null
+  displayOrderIds: string[] | null
 }
 
 const STORAGE_KEY = 'haven:nexus:communities:global'
@@ -23,6 +33,8 @@ const EMPTY_COMMUNITIES: Community[] = []
 
 const selectActiveId = (state: CommunityNexusState) => state.activeId
 const selectIsLoading = (state: CommunityNexusState) => state.isLoading
+const selectLoadError = (state: CommunityNexusState) => state.loadError
+const selectDisplayOrderIds = (state: CommunityNexusState) => state.displayOrderIds
 
 const selectCommunities = (state: CommunityNexusState): Community[] => {
   if (state.orderedIds.length === 0) return EMPTY_COMMUNITIES
@@ -65,6 +77,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
   }
 
   private controlPlane: ControlPlaneBackend | null = null
+  private onListChanged: (() => void) | null = null
 
   constructor(persistence: NexusPersistence) {
     super('communities', 'global', persistence)
@@ -75,6 +88,10 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
    */
   setControlPlane(controlPlane: ControlPlaneBackend): void {
     this.controlPlane = controlPlane
+  }
+
+  setOnListChanged(listener: (() => void) | null): void {
+    this.onListChanged = listener
   }
 
   /**
@@ -88,6 +105,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       )
     }
     this.setIsLoading(true)
+    this.setLoadError(null)
     try {
       const list = await this.controlPlane.listUserCommunities(userId)
       this.setCommunities(
@@ -97,9 +115,39 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
           createdAt: community.created_at,
         })),
       )
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to load communities.'
+      this.setLoadError(message)
+      throw error
     } finally {
       this.setIsLoading(false)
     }
+  }
+
+  loadDisplayOrder(userId: string | null): void {
+    if (!userId) {
+      this.setDisplayOrderIds(null)
+      return
+    }
+    this.setDisplayOrderIds(readCommunityDisplayOrder(userId))
+  }
+
+  setDisplayOrder(ids: string[], userId: string | null): void {
+    const communities = selectCommunities(this.store.getState())
+    const currentOrderedIds = applyCommunityDisplayOrder(
+      communities,
+      this.store.getState().displayOrderIds,
+    ).map((community) => community.id)
+    if (hasSameIdSequence(currentOrderedIds, ids)) return
+
+    this.setDisplayOrderIds(ids)
+    if (userId) writeCommunityDisplayOrder(userId, ids)
+  }
+
+  resetDisplayOrder(userId: string | null): void {
+    this.setDisplayOrderIds(null)
+    if (userId) clearCommunityDisplayOrder(userId)
   }
 
   protected transform(raw: ServerSummary): Community {
@@ -117,6 +165,8 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
         orderedIds: [],
         activeId: null,
         isLoading: false,
+        loadError: null,
+        displayOrderIds: null,
         revision: 0,
       }))
       this.rehydrate()
@@ -154,6 +204,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       revision: state.revision + 1,
     }))
     this.persist()
+    this.onListChanged?.()
   }
 
   updateCommunity(id: string, changes: Partial<Community>): void {
@@ -187,6 +238,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       }
     })
     this.persist()
+    this.onListChanged?.()
   }
 
   setActiveId(id: string | null): void {
@@ -203,10 +255,42 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
     return this.store.getState().activeId
   }
 
+  getIsLoading(): boolean {
+    return this.store.getState().isLoading
+  }
+
+  getCommunityIds(): string[] {
+    return this.store.getState().orderedIds
+  }
+
+  getCommunity(id: string): Community | undefined {
+    return this.store.getState().entities[id]?.data
+  }
+
   setIsLoading(loading: boolean): void {
     this.store.setState((state) => ({
       ...state,
       isLoading: loading,
+      revision: state.revision + 1,
+    }))
+  }
+
+  setLoadError(error: string | null): void {
+    this.store.setState((state) => ({
+      ...state,
+      loadError: error,
+      revision: state.revision + 1,
+    }))
+  }
+
+  clearLoadError(): void {
+    this.setLoadError(null)
+  }
+
+  private setDisplayOrderIds(ids: string[] | null): void {
+    this.store.setState((state) => ({
+      ...state,
+      displayOrderIds: ids,
       revision: state.revision + 1,
     }))
   }
@@ -257,6 +341,8 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       orderedIds: [],
       activeId: null,
       isLoading: false,
+      loadError: null,
+      displayOrderIds: null,
       revision: 0,
     })
     this.communitiesSnapshot = EMPTY_COMMUNITIES
@@ -282,6 +368,23 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
 
   useIsLoading(): boolean {
     return useStoreWithEqualityFn(this.store, selectIsLoading)
+  }
+
+  useLoadError(): string | null {
+    return useStoreWithEqualityFn(this.store, selectLoadError)
+  }
+
+  useDisplayOrderIds(): string[] | null {
+    return useStoreWithEqualityFn(this.store, selectDisplayOrderIds)
+  }
+
+  useOrderedCommunities(): Community[] {
+    const communities = this.useCommunities()
+    const displayOrderIds = this.useDisplayOrderIds()
+    return useMemo(
+      () => applyCommunityDisplayOrder(communities, displayOrderIds),
+      [communities, displayOrderIds],
+    )
   }
 }
 

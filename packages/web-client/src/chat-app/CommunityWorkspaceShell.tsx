@@ -1,29 +1,38 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { Sidebar } from "@web-client/components/Sidebar";
 import { ChatArea } from "@web-client/components/messaging/ChatArea";
 import { VoiceDrawer } from "@web-client/components/voice/VoiceDrawer";
-import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
+import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 import { useChatAppVoiceIntegration } from "@web-client/chat-app/useChatAppVoiceIntegration";
 import { getErrorMessage } from "@platform/lib/errors";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore, toChannel } from "@shared/core";
 import { useUiStore } from "@shared/stores/uiStore";
+import { useUserStatusStore } from "@shared/stores/userStatusStore";
+import type { MessageReportKind, MessageReportTarget } from "@shared/lib/backend/types";
 
 type CommunityWorkspaceShellProps = {
-  app: ChatAppOrchestrationApi;
   user: User;
   voice: ReturnType<typeof useChatAppVoiceIntegration>;
 };
 
 export function CommunityWorkspaceShell({
-  app,
   user,
   voice,
 }: CommunityWorkspaceShellProps) {
+  const app = useChatAppSession();
   const core = useHavenCore();
+  const admin = core.admin;
   const currentServerId = core.communities.useActiveId();
-  const currentServer = React.useMemo(
+  const currentChannelId = core.channels.useActiveChannelId();
+  const havenChannels = core.channels.useChannels(currentServerId ?? "__none__");
+  const channelsLoading = core.channels.useIsLoading(currentServerId ?? "__none__");
+  const channels = useMemo(
+    () => havenChannels.map(toChannel),
+    [havenChannels],
+  );
+  const currentServer = useMemo(
     () => app.servers.find((server) => server.id === currentServerId) ?? null,
     [app.servers, currentServerId],
   );
@@ -34,12 +43,153 @@ export function CommunityWorkspaceShell({
     [core],
   );
   const serverPermissions = core.permissions.usePermissions(currentServerId ?? "");
+  const canOpenServerSettings =
+    serverPermissions.canManageServer ||
+    serverPermissions.canManageRoles ||
+    serverPermissions.canManageMembers ||
+    serverPermissions.canManageBans ||
+    serverPermissions.canManageInvites;
   const canManageChannelStructure =
     serverPermissions.canManageChannelStructure;
   const canManageChannelPermissions =
     serverPermissions.canManageChannelPermissions;
   const canOpenChannelSettings =
     canManageChannelStructure || canManageChannelPermissions;
+
+  const currentChannel = useMemo(
+    () => channels.find((channel) => channel.id === currentChannelId) ?? null,
+    [channels, currentChannelId],
+  );
+
+  const currentChannelBelongsToCurrentServer = Boolean(
+    currentChannel &&
+      currentServerId &&
+      currentChannel.community_id === currentServerId,
+  );
+
+  const currentRenderableChannel = useMemo(
+    () =>
+      currentChannel &&
+      currentChannelBelongsToCurrentServer &&
+      currentChannel.kind === "text"
+        ? currentChannel
+        : (channels.find(
+            (channel) =>
+              channel.kind === "text" &&
+              (!currentServerId || channel.community_id === currentServerId),
+          ) ?? (currentChannelBelongsToCurrentServer ? currentChannel : null)),
+    [
+      channels,
+      currentChannel,
+      currentChannelBelongsToCurrentServer,
+      currentServerId,
+    ],
+  );
+
+  const activeTextChannelId = currentRenderableChannel?.id ?? null;
+  const messageCommunityId = currentServerId ?? "__none__";
+  const messageNexus = core.messages.for(messageCommunityId);
+  const channelMeta = messageNexus.useChannelMeta(activeTextChannelId ?? "__none__");
+  const hasOlderMessages = channelMeta.hasMore;
+  const isLoadingOlderMessages = messageNexus.useIsLoadingOlder(
+    activeTextChannelId ?? "__none__",
+  );
+  const { setRainbowMode } = useUserStatusStore();
+
+  useEffect(() => {
+    if (!currentServerId || !activeTextChannelId) return;
+    void core.prepareTextChannelMessages(currentServerId, activeTextChannelId);
+  }, [core, currentServerId, activeTextChannelId]);
+
+  const requestOlderMessages = useCallback(async () => {
+    if (!activeTextChannelId || !hasOlderMessages || isLoadingOlderMessages) return;
+    try {
+      await messageNexus.loadOlder(activeTextChannelId);
+    } catch (err) {
+      console.error("Error loading older messages:", err);
+    }
+  }, [activeTextChannelId, hasOlderMessages, isLoadingOlderMessages, messageNexus]);
+
+  const sendMessage = useCallback(
+    async (
+      content: string,
+      options?: {
+        replyToMessageId?: string;
+        mediaFile?: Blob | File;
+        mediaArrayBuffer?: ArrayBuffer;
+        mediaContentType?: string;
+        mediaFilename?: string;
+        mediaExpiresInHours?: number;
+      },
+    ) => {
+      if (content === "#RainbowRoad") {
+        setRainbowMode(!useUserStatusStore.getState().rainbowMode);
+        return;
+      }
+      if (!user.id || !activeTextChannelId || !currentServerId) return;
+      await messageNexus.sendWithMedia(activeTextChannelId, content, {
+        replyToMessageId: options?.replyToMessageId ?? null,
+        mediaFile: options?.mediaFile,
+        mediaArrayBuffer: options?.mediaArrayBuffer,
+        mediaContentType: options?.mediaContentType,
+        mediaFilename: options?.mediaFilename,
+        mediaExpiresInHours: options?.mediaExpiresInHours,
+      });
+    },
+    [activeTextChannelId, currentServerId, messageNexus, setRainbowMode, user.id],
+  );
+
+  const toggleMessageReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!activeTextChannelId) throw new Error("No channel selected.");
+      await messageNexus.toggleReaction(activeTextChannelId, messageId, emoji);
+    },
+    [activeTextChannelId, messageNexus],
+  );
+
+  const editMessage = useCallback(
+    async (messageId: string, content: string) => {
+      const trimmed = content.trim();
+      if (!trimmed) throw new Error("Message content is required.");
+      await messageNexus.edit(messageId, trimmed);
+    },
+    [messageNexus],
+  );
+
+  const deleteMessage = useCallback(
+    async (messageId: string) => {
+      await messageNexus.deleteMessageRpc(messageId);
+    },
+    [messageNexus],
+  );
+
+  const reportMessage = useCallback(
+    async (input: {
+      messageId: string;
+      target: MessageReportTarget;
+      kind: MessageReportKind;
+      comment: string;
+    }) => {
+      if (!activeTextChannelId) throw new Error("No channel selected.");
+      await messageNexus.report({
+        channelId: activeTextChannelId,
+        messageId: input.messageId,
+        reporterUserId: user.id,
+        target: input.target,
+        kind: input.kind,
+        comment: input.comment,
+      });
+    },
+    [activeTextChannelId, messageNexus, user.id],
+  );
+
+  const requestMessageLinkPreviewRefresh = useCallback(
+    async (messageId: string) => {
+      if (!activeTextChannelId) throw new Error("No channel selected.");
+      await messageNexus.requestLinkPreviewBackfill(activeTextChannelId, [messageId]);
+    },
+    [activeTextChannelId, messageNexus],
+  );
 
   if (!currentServer) {
     return (
@@ -56,7 +206,7 @@ export function CommunityWorkspaceShell({
       <Sidebar
         serverName={currentServer.name}
         userName={app.userDisplayName}
-        channels={app.channels.map((channel) => ({
+        channels={channels.map((channel) => ({
           id: channel.id,
           name: channel.name,
           kind: channel.kind,
@@ -170,7 +320,7 @@ export function CommunityWorkspaceShell({
         onOpenChannelSettings={
           canOpenChannelSettings
             ? (channelId) => {
-                void app.openChannelSettingsModal(channelId);
+                void admin.openChannelSettingsModal(channelId);
               }
             : undefined
         }
@@ -230,22 +380,22 @@ export function CommunityWorkspaceShell({
           canManageChannelStructure ? app.handleDeleteChannelGroup : undefined
         }
         onOpenServerSettings={
-          app.canOpenServerSettings
-            ? () => void app.openServerSettingsModal()
+          canOpenServerSettings
+            ? () => void admin.openServerSettingsModal()
             : undefined
         }
       />
 
-      {app.channelsLoading && !app.currentRenderableChannel ? (
+      {channelsLoading && !currentRenderableChannel ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-muted-foreground">Loading channels...</p>
         </div>
-      ) : app.currentRenderableChannel ? (
+      ) : currentRenderableChannel ? (
         <ChatArea
           communityId={currentServer.id}
-          channelId={app.currentRenderableChannel.id}
-          channelName={app.currentRenderableChannel.name}
-          channelKind={app.currentRenderableChannel.kind}
+          channelId={currentRenderableChannel.id}
+          channelName={currentRenderableChannel.name}
+          channelKind={currentRenderableChannel.kind}
           currentUserId={user.id}
           canManageMessages={serverPermissions.canManageMessages}
           canCreateReports={serverPermissions.canCreateReports}
@@ -257,25 +407,21 @@ export function CommunityWorkspaceShell({
           onOpenChannelSettings={
             canOpenChannelSettings
               ? () =>
-                  void app.openChannelSettingsModal(
-                    app.currentRenderableChannel!.id,
-                  )
+                  void admin.openChannelSettingsModal(currentRenderableChannel.id)
               : undefined
           }
           onOpenVoiceControls={() =>
             useUiStore.getState().setShowVoiceSettingsModal(true)
           }
-          onSendMessage={app.sendMessage}
-          onEditMessage={app.editMessage}
-          onDeleteMessage={app.deleteMessage}
-          onToggleMessageReaction={app.toggleMessageReaction}
-          onReportMessage={app.reportMessage}
-          onRequestMessageLinkPreviewRefresh={
-            app.requestMessageLinkPreviewRefresh
-          }
-          onRequestOlderMessages={app.requestOlderMessages}
-          hasOlderMessages={app.hasOlderMessages}
-          isLoadingOlderMessages={app.isLoadingOlderMessages}
+          onSendMessage={sendMessage}
+          onEditMessage={editMessage}
+          onDeleteMessage={deleteMessage}
+          onToggleMessageReaction={toggleMessageReaction}
+          onReportMessage={reportMessage}
+          onRequestMessageLinkPreviewRefresh={requestMessageLinkPreviewRefresh}
+          onRequestOlderMessages={requestOlderMessages}
+          hasOlderMessages={hasOlderMessages}
+          isLoadingOlderMessages={isLoadingOlderMessages}
           onSaveAttachment={app.saveAttachment}
           onReportUserProfile={({ targetUserId, reason }) =>
             app.reportUserProfile({

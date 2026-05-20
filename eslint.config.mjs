@@ -65,8 +65,14 @@ const havenCoreDeprecatedImports = [
       '**/communityNavigation',
       '@shared/infrastructure/realtime/communityAccessBroadcastBridge',
       '**/communityAccessBroadcastBridge',
-      '@shared/stores/messagesStore',
-      '**/stores/messagesStore',
+      '@shared/features/community/hooks/useChannelGroups',
+      '**/useChannelGroups',
+      '@shared/features/messaging/hooks/useMessageNexus',
+      '**/useMessageNexus',
+      '@shared/features/profile/hooks/useLiveProfiles',
+      '**/useLiveProfiles',
+      '@web-client/hooks/useChatAppOrchestration',
+      '**/useChatAppOrchestration',
     ],
     message:
       'Deprecated HavenCore migration shims are deleted. Use requireHavenCore().communities/channels for focus, uiStore for workspace UI, and core.social for social counts.',
@@ -184,6 +190,23 @@ export default [
         'error',
         {
           patterns: havenCoreDeprecatedImports,
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'packages/shared/src/features/**/*.{ts,tsx,js,jsx}',
+      'apps/web-client/**/*.{ts,tsx,js,jsx}',
+    ],
+    ignores: ['packages/shared/src/features/voice/hooks/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "Literal[value='postgres_changes']",
+          message:
+            'Domain realtime must use HavenCore.subscribeRealtime → routeRealtimeEvent. Voice hooks are exempt.',
         },
       ],
     },

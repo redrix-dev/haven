@@ -1,4 +1,5 @@
 import type { HavenCore } from "./HavenCore";
+import { mapLiveProfileIdentity } from "@shared/lib/backend/controlPlaneBackend";
 import type { MessageBundle } from "@shared/lib/backend/types";
 import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import { useUiStore } from "@shared/stores/uiStore";
@@ -279,6 +280,63 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
 
     case "report_status_updated": {
       useUiStore.getState().bumpReportStatusRevision();
+      return;
+    }
+
+    case "CHANNEL_GROUP_CHANGE": {
+      const communityId = evt.payload.community_id;
+      if (typeof communityId !== "string" || communityId.trim().length === 0)
+        return;
+      void core.channels.loadForCommunity(communityId).catch((err) => {
+        console.warn("[routeRealtimeEvent] CHANNEL_GROUP_CHANGE reload failed", err);
+      });
+      return;
+    }
+
+    case "PROFILE_IDENTITY_CHANGE": {
+      const event =
+        typeof evt.payload.event === "string" ? evt.payload.event : null;
+      const userId =
+        typeof evt.payload.user_id === "string" ? evt.payload.user_id : null;
+      if (!userId) return;
+
+      if (event === "DELETE") {
+        core.profiles.removeProfile(userId);
+        return;
+      }
+
+      const username =
+        typeof evt.payload.username === "string" ? evt.payload.username : null;
+      const updatedAt =
+        typeof evt.payload.updated_at === "string"
+          ? evt.payload.updated_at
+          : null;
+      if (!username || !updatedAt) return;
+
+      core.profiles.upsertProfile(
+        mapLiveProfileIdentity({
+          user_id: userId,
+          username,
+          avatar_url:
+            typeof evt.payload.avatar_url === "string"
+              ? evt.payload.avatar_url
+              : null,
+          updated_at: updatedAt,
+        }),
+      );
+      return;
+    }
+
+    case "COMMUNITY_MEMBERSHIP_CHANGE": {
+      const userId =
+        typeof evt.payload.user_id === "string" ? evt.payload.user_id : null;
+      if (!userId) return;
+      void core.communities.load(userId).catch((err) => {
+        console.warn(
+          "[routeRealtimeEvent] COMMUNITY_MEMBERSHIP_CHANGE reload failed",
+          err,
+        );
+      });
       return;
     }
 

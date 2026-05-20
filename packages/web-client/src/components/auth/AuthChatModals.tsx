@@ -1,12 +1,9 @@
 import React from "react";
 import { PasswordRecoveryDialog } from "@web-client/components/auth/PasswordRecoveryDialog";
-import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
+import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 
-type AuthChatModalsProps = {
-  app: ChatAppOrchestrationApi;
-};
-
-export function AuthChatModals({ app }: AuthChatModalsProps) {
+export function AuthChatModals() {
+  const app = useChatAppSession();
   return (
     <PasswordRecoveryDialog
       open={app.passwordRecoveryRequired}

@@ -10,8 +10,6 @@ export type {
 export { useUserStatusStore } from "./userStatusStore";
 export type { UserStatusStoreState } from "./userStatusStore";
 
-export { useLiveProfilesStore } from "./liveProfilesStore";
-
 export { useSocialGraphRealtimeStore } from "./socialGraphRealtimeStore";
 
 export { useUiStore } from "./uiStore";

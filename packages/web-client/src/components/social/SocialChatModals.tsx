@@ -1,14 +1,14 @@
 import React from "react";
 import type { User } from "@supabase/supabase-js";
 import { FriendsModal } from "@web-client/components/social/FriendsModal";
-import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
+import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 
 type SocialChatModalsProps = {
-  app: ChatAppOrchestrationApi;
   user: User;
 };
 
-export function SocialChatModals({ app, user }: SocialChatModalsProps) {
+export function SocialChatModals({ user }: SocialChatModalsProps) {
+  const app = useChatAppSession();
   return (
     <FriendsModal
       open={app.friendsPanelOpen}

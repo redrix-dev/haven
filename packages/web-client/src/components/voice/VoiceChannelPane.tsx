@@ -32,7 +32,7 @@ import {
   resolveLiveUsername,
 } from "@shared/infrastructure/liveProfiles";
 import { cn } from "@shared/infrastructure/utils";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useHavenCore } from "@shared/core";
 import {
   ExternalLink,
   Headphones,
@@ -151,7 +151,8 @@ export function VoiceChannelPane({
   getMemberVolume,
   onKickParticipant,
 }: VoiceChannelPaneProps) {
-  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const core = useHavenCore();
+  const liveProfiles = core.profiles.useProfilesRecord();
   const updateVoiceSettingsPatch = (patch: Partial<VoiceSettings>) => {
     onUpdateVoiceSettingsPatch?.(patch);
   };

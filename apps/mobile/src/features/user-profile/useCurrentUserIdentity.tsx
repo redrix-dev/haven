@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getControlPlaneBackend } from "@shared/lib/backend";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
+import { useHavenCore } from "@shared/core";
 import { useAuthStore } from "@shared/stores/authStore";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 
 type CurrentUserIdentity = {
   userId: string | null;
@@ -20,7 +20,8 @@ type BaseProfile = {
 
 export function useCurrentUserIdentity(): CurrentUserIdentity {
   const user = useAuthStore((state) => state.user);
-  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const core = useHavenCore();
+  const liveProfiles = core.profiles.useProfilesRecord();
 
   const [baseProfile, setBaseProfile] = useState<BaseProfile>({
     username: null,

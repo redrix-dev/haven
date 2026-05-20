@@ -14,7 +14,6 @@ import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
 } from "@shared/infrastructure/liveProfiles";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { MessageCircle, RefreshCcw, VolumeX } from "lucide-react";
 
 const DM_SIDEBAR_BASE_MIN_WIDTH = 280;
@@ -50,7 +49,7 @@ export function DirectMessagesSidebar({
   const conversations = core.directMessages.useConversations();
   const selectedConversationId = core.directMessages.useActiveConversationId();
   const loading = core.directMessages.useIsLoadingConversations();
-  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const liveProfiles = core.profiles.useProfilesRecord();
   const sidebarRef = React.useRef<HTMLDivElement | null>(null);
   const userTitleRef = React.useRef<HTMLParagraphElement | null>(null);
   const [autoMinWidth, setAutoMinWidth] = React.useState(

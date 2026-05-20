@@ -34,19 +34,26 @@ export function syncFocusFromRoute(
     return;
   }
 
+  let resolvedChannelId: string | null = null;
+
   if (channelId) {
     core.channels.setActiveChannelId(channelId);
-    return;
+    resolvedChannelId = channelId;
+  } else {
+    const last = core.channels.getLastChannelId(communityId);
+    if (last) {
+      core.channels.setActiveChannelId(last);
+      resolvedChannelId = last;
+    } else {
+      const fallback = core.channels.getDefaultChannelId(communityId);
+      core.channels.setActiveChannelId(fallback);
+      resolvedChannelId = fallback;
+    }
   }
 
-  const last = core.channels.getLastChannelId(communityId);
-  if (last) {
-    core.channels.setActiveChannelId(last);
-    return;
-  }
+  if (!resolvedChannelId) return;
 
-  const fallback = core.channels.getDefaultChannelId(communityId);
-  core.channels.setActiveChannelId(fallback);
+  void core.prepareTextChannelMessages(communityId, resolvedChannelId);
 }
 
 /**

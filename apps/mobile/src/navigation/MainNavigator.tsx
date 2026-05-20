@@ -4,7 +4,6 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
 import { useEffect } from "react";
 import { useAuthSession } from "@/hooks/useAuthSession";
-import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
 import { MobileNotificationsProvider } from "@/contexts/MobileNotificationsContext";
 import { MobileSocialWorkspaceProvider } from "@/contexts/MobileSocialWorkspaceContext";
@@ -57,7 +56,6 @@ function MainNavigationDelegateBridge() {
 export function MainNavigator() {
   const session = useAuthSession();
   const userId = session?.user?.id;
-  useMobileCommunityPermissionsHydration(userId);
   useHydrateMobileThemeFromProfile(userId);
 
   if (!userId) {

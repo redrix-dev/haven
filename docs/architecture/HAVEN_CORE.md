@@ -4,22 +4,27 @@ HavenCore is the session-scoped composition root for the Haven client. Every hos
 
 > Status: Totality migration in progress. Core nexuses (Social, Permissions, Profile, Voice, ViewerMessagePolicy) are registered on HavenCore. Legacy domain stores and workspace hooks are being removed.
 
-## Onboarding rule
+## Onboarding rules
 
 **UI asks the thing for the thing.** Chat UI calls `useVisibleChannel`, not SocialNexus + filters. Raw message truth lives in `useChannel`. Viewer policy is HavenCore-injected. Block/unblock syncs policy once; moderation mutates raw; visible reads heal themselves.
+
+**HavenCore orchestrates; realtime mutates.** Session bootstrap, event routing, cross-nexus policy sync, and focus-driven loads live on HavenCore (or a single nexus command). The private-user channel is the event bus: most events are a **targeted nexus patch or evict** — not a hook fan-out that refreshes three domains after every click.
+
+**Hooks observe React lifecycle.** A hook belongs when it exposes a *small* interface tied to mount/focus/auth/platform (Electron settings, deep links, WebRTC). If a Nexus already owns the state and actions, migrate callers to `core.*` and delete the hook. Do not add reusable hook files that only aggregate nexus selectors or re-fetch what realtime should already deliver.
 
 ## Nexus registry
 
 | Nexus | Access | Notes |
 |-------|--------|-------|
-| `core.communities` | `useCommunities()`, `useActiveId()`, `load()` | |
+| `core.communities` | `useCommunities()`, `useOrderedCommunities()`, `useActiveId()`, `load()` | Display order is host-local presentation metadata |
 | `core.channels` | `useChannels(id)`, `useActiveChannelId()`, `ensureLoaded()` | |
 | `core.messages.for(id)` | `useChannel(ch)`, **`useVisibleChannel(ch)`** | Shared `viewerMessagePolicyStore` |
 | `core.directMessages` | `useConversations()`, `loadMessages()` | |
-| `core.notifications` | `useInbox()`, `refreshCounts()` | |
+| `core.notifications` | `useNotifications()`, `useCounts()`, `loadInbox()` | |
+| `core.admin` | `useServerPanelState()`, `useMembersModalState()`, `useChannelPermissionsState()` | Server/channel admin modal state + CRUD |
 | `core.social` | `useCounts()`, `useFriends()`, `blockUser()` | Feeds policy via `getHiddenAuthorIdsForViewer()` |
 | `core.permissions` | `usePermissions(id)`, `ensureLoaded()` | Community-keyed policy buckets |
-| `core.profiles` | `useProfile(userId)` | |
+| `core.profiles` | `useProfile(userId)`, `useProfilesRecord()` | |
 | `core.voice` | `useSession()`, `useVisibleParticipants(ch)` | |
 
 ## ViewerMessagePolicy
@@ -54,7 +59,7 @@ Policy shape (community-keyed for mod/revoked fields):
 |-------|------|----------|
 | **Router / shell** | Screen stack, URL (web), route params (mobile), drawer/layout | Domain entity caches, fetch, realtime |
 | **Nexus** (focus + data) | Entity map, indexes, `transform`, `load*` / `ensureLoaded`, persist/rehydrate, domain evict, stable selectors, **domain focus** (`activeId`, `activeChannelId`) | Supabase subscribe, auth, screen stack |
-| **HavenCore** | Session lifecycle, `routeEvent`, cross-nexus commands (eviction, moderation), bootstrap phases, `messages.for(id)` registry | React hooks, UI state |
+| **HavenCore** | Session lifecycle, `routeEvent`, cross-nexus orchestration (policy sync, focus load, eviction), bootstrap phases, `messages.for(id)` registry | React hooks, UI state, multi-nexus refresh fan-out in feature hooks |
 | **uiStore / local UI** | Modals, panels, friends panel state, workspace layout mode | Domain entities, block lists, counts, messages |
 | **AppHost** | OS bridges + **imperative shell navigation** for external events (push tap, deep link, access revoked redirect) | Domain data, nexus writes |
 
@@ -81,7 +86,7 @@ const communities = core.communities.useCommunities()
 const channels = core.channels.useChannels(communityId!)
 const messages = core.messages.for(communityId!).useVisibleChannel(channelId!)
 await core.channels.ensureLoaded(communityId!)
-await core.messages.for(communityId!).loadTail(channelId!)
+await core.prepareTextChannelMessages(communityId!, channelId!)
 ```
 
 External navigation (notification tap, deep link, access revoked):
@@ -93,12 +98,27 @@ getAppHost().navigateToDm?.(conversationId)
 
 ## Realtime
 
-There is exactly **one** realtime ingress: `core.routeEvent(payload)`. `core.subscribeRealtime(userId)` subscribes the user's private Supabase channel and feeds every event into `routeEvent`. Feature code never subscribes to realtime for migrated domains.
+There is exactly **one domain realtime subscription per user**: `core.subscribeRealtime(userId)` → `private_user:{userId}` → `routeEvent`. Feature hooks and nexuses must not open parallel `postgres_changes` listeners.
+
+**Voice exception:** room-scoped `voice:presence:{communityId}:{channelId}` channels are allowed for WebRTC signaling and in-call presence only.
+
+### Event → nexus (default shape)
+
+Most realtime handlers should do **one** of:
+
+- **Patch** — upsert/update a row the nexus already owns (`MESSAGE_INSERT`, `PROFILE_IDENTITY_CHANGE`)
+- **Evict** — drop a slice and optionally lazy-reload (`member_channel_access_revoked`, channel delete → `messages.evictChannel`)
+- **Reload one domain** — `CommunityNexus.load`, `ChannelNexus.loadForCommunity`, `NotificationNexus.loadInbox`
+
+Avoid “refresh everything” handlers in UI or hooks when the event could carry (or imply) a single authoritative target. Cross-domain work belongs in `routeRealtimeEvent` or HavenCore commands (`applyAccessRevoked`, `syncViewerMessagePolicy`), not in a reusable `useX` that calls multiple nexuses after every mutation.
 
 Event types currently handled by `routeRealtimeEvent`:
 
 - `MESSAGE_INSERT` / `MESSAGE_UPDATE` / `MESSAGE_DELETE` — fan out to `CommunityMessageNexus`
 - `CHANNEL_INSERT` / `CHANNEL_UPDATE` / `CHANNEL_DELETE` — apply to `ChannelNexus` (refetch when payload is partial)
+- `CHANNEL_GROUP_CHANGE` — `ChannelNexus.loadForCommunity(communityId)`
+- `PROFILE_IDENTITY_CHANGE` — `ProfileNexus.upsert/remove`
+- `COMMUNITY_MEMBERSHIP_CHANGE` — `CommunityNexus.load(userId)`
 - `member_channel_access_revoked` — evict from `ChannelNexus` and the message nexus
 - `ROLE_CHANGE` — `core.onRoleChange(communityId)` (hydrates permissions; PermissionsNexus is post-v1)
 - `NOTIFICATION` — refresh `NotificationNexus`
@@ -133,18 +153,20 @@ idle → rehydrating → loading_communities → connecting_realtime → ready
 
 Splash UI subscribes via `core.useBootstrapPhase()` and shows honest labels for each phase. **Phase 1** wires this end to end and unifies the web + mobile auth bootstrap onto one path.
 
-## Onboarding rules
+## Rules (reads, writes, hooks)
 
 1. **Reads** → Nexus selector via `useHavenCore()`. Never Zustand for domain entities.
 2. **Domain focus** → `communities.activeId` / `channels.activeChannelId`. Never `navigationStore`.
 3. **Screen context** → Router owns the stack/URL; on focus it syncs to the nexus. External opens go through `AppHost`.
 4. **UI state** → `uiStore` or local component state only (modals, panels, workspace layout). Never in a Nexus.
-5. **Writes from UI** → Nexus action method or backend for admin; never hook-local domain state.
-6. **Realtime** → `core/routeRealtimeEvent.ts` is the only mutator of nexuses from events.
-7. **Load** → Nexus `load*` / `ensureLoaded`; triggered by core bootstrap or navigation focus — not by screen `useEffect` fetch chains.
-8. **Platform** → AppHost for OS + imperative shell nav; NexusPersistence for disk.
-9. **Social** → SocialNexus holds graph/block/count data only; friends panel UI in `uiStore`.
-10. **New entity type** → New Nexus + register on HavenCore + `routeEvent` cases + thin hook + tests.
+5. **Writes from UI** → One nexus method (or backend RPC) per gesture; optimistic patch on that nexus when appropriate. Realtime confirms or evicts — do not manually refresh sibling nexuses in the handler unless HavenCore has no event yet.
+6. **Realtime** → `routeRealtimeEvent.ts` is the only mutator of nexuses from events.
+7. **Orchestration** → Cross-nexus invariants (`syncViewerMessagePolicy`, access revoked, session clear) on HavenCore or `core/commands/*`. Not in feature hooks.
+8. **Load** → Nexus `load*` / `ensureLoaded` / `ensureInitialLoaded`; text-channel focus prep via `core.prepareTextChannelMessages` (from `syncFocusFromRoute` or landing `useEffect`) — not god-hook `useEffect` chains.
+9. **Hooks** → Lifecycle + platform only. If it does not need `useEffect`/focus/auth, it is probably a nexus method or inline handler at the landing file.
+10. **Reuse** → Colocate composition in the file that handles the click/focus. Extract a shared **function** (or HavenCore method) only at the second identical workflow — not a hook module “for reuse.”
+11. **Platform** → AppHost for OS + imperative shell nav; NexusPersistence for disk.
+12. **New entity type** → New Nexus + register on HavenCore + `routeEvent` cases + tests. Add a feature hook only if React lifecycle truly requires it.
 
 ## Package layout
 
@@ -169,9 +191,10 @@ packages/shared/src/
       CommunityNexus.ts
       ChannelNexus.ts
       CommunityMessageNexus.ts
+      CommunityAdminNexus.ts
   lib/backend/        # HTTP/RPC clients only
   infrastructure/platform/appHost.ts   # OS + navigateToCommunity / navigateToDm
-  features/*/hooks/   # thin nexus readers + action wrappers
+  features/*/hooks/   # shrinking allowlist — lifecycle/platform only; prefer core.*
   stores/uiStore.ts   # modals, panels, workspaceMode — UI only
 docs/architecture/HAVEN_CORE.md
 ```
@@ -194,8 +217,22 @@ class HavenCore {
   readonly messages: MessageNexusRegistry     // .for(communityId) → CommunityMessageNexus
   readonly directMessages: DirectMessageNexus
   readonly notifications: NotificationNexus
+  readonly admin: CommunityAdminNexus
+  readonly social: SocialNexus
+  readonly permissions: PermissionsNexus
+  readonly profiles: ProfileNexus
+  readonly voice: VoiceNexus
 
   bootstrapSession(userId): Promise<void>     // idempotent
+  syncViewerMessagePolicy(communityId?): void
+  refreshCommunities(userId): Promise<void>
+  createCommunity(userId, name): Promise<{ id: string }>
+  setCommunityDisplayOrder(ids): void
+  resetCommunityDisplayOrder(): void
+  syncActiveCommunityAccess(): void
+  prepareTextChannelMessages(communityId, channelId): Promise<void>
+  prepareDirectMessageConversation(conversationId, options?): Promise<void>
+  syncFocusFromRoute(...): void
   clearSession(): Promise<void>
   routeEvent(evt): void
   subscribeRealtime(userId): () => void
@@ -213,17 +250,43 @@ class HavenCore {
 - **Phase 0** — Core shell, persistence port, `routeEvent`, registry, doc skeleton, foundation tests. ✓
 - **Phase 1** — Session lifecycle, navigation contract, AppHost shell bridge, unified AuthContext, `navigationStore` deprecated. ✓
 - **Phase 2** — Communities + channels via nexus reads; `useCommunityWorkspace` reduced to a delegator; `serversStore` mirrored from nexus. ✓
-- **Phase 3** — Community messages via nexus; `useMessages` god-hook reduced to a thin reader; per-channel Supabase subs removed; single realtime path. ✓
+- **Phase 3** — Community messages via nexus; `useMessages` deleted; per-channel Supabase subs removed; single realtime path. ✓
 - **Phase 4** — `DirectMessageNexus` and `NotificationNexus` introduced; `routeEvent` refreshes them on DM/notification events. ✓
 - **Phase 5** — Runtime + bootstrap + `HavenEventBus` shims deleted; duplicate `@shared/src/app/` deleted; ESLint boundary rules added. ✓
 - **Phase 6** — Finality gate, v1 surface frozen. ✓
 
 ## Known follow-ups (post-v1)
 
-- Web-client chat-app orchestration still wraps the new nexuses behind a 900-line `useChatAppOrchestration` glue layer. The nexuses are the source of truth; the orchestration is a UI artifact that will be unwound screen-by-screen in a follow-up.
-- `messagesStore` and `serversStore` are still written-through by their hooks for legacy readers. They contain no domain data the nexuses don't already own; deletion is a mechanical follow-up.
-- `SocialNexus` is post-v1; the social store still drives the friends panel.
+- Shrink web `useChatAppSessionState` to lifecycle/platform glue; surfaces read `core.*` directly (see **Rules** above).
+- Mobile: wire settings through `core.admin` where needed.
+- Close reaction/attachment/link-preview realtime holes (see realtime audit).
+
+### Hooks (`features/*/hooks` + host glue)
+
+Full inventory and verdicts: **[HAVEN_CORE_HOOKS_AUDIT.md](./HAVEN_CORE_HOOKS_AUDIT.md)**.
+
+**Keep** when the hook is mostly React lifecycle or platform:
+
+| Hook | Why it stays (for now) |
+|------|-------------------------|
+| `useVoiceSessionController` / `useVoice` / `useVoiceMemberVolumes` | WebRTC + media session (voice room channels are the documented realtime exception) |
+| `usePlatformSession` | Auth-adjacent profile bootstrap — candidate for `ProfileNexus` |
+| `useFeatureFlags` | Session flags — candidate for `PlatformNexus` |
+| `useNotificationInteractions` / `useDirectMessageInteractions` | Shell navigation + toast glue — keep thin; no domain state |
+
+**Deleted (domain hooks):** `useMessages`, `useDirectMessages`, `useNotifications`, `useServers`, `useServerOrder`, `useServerAdmin`, `useChannelManagement`, `useChannelGroups`, `useMessageNexus`, `useLiveProfiles`, `useCurrentServerPermissionUi`, `useChatAppOrchestration`; web transitional `useCommunityChannelMessaging`, `useWebDirectMessages`, `useWebNotificationSession`.
+
+**Legacy stores deleted:** `dmStore`, `notificationsStore`, `socialStore`, `voiceStore`, `liveProfilesStore`.
+
+**Anti-patterns:**
+
+- Hook that re-exports nexus selectors for prop drilling → read `core.*` at the landing component.
+- Hook that calls `load*` on multiple nexuses after a write → one nexus write + realtime/HavenCore command.
+- New `useFoo` file created before a second call site exists → inline handler or HavenCore method first.
+
+Web host glue (`useChatAppSessionState`, desktop settings, deep links) should shrink toward lifecycle-only; domain reads belong on nexuses at each surface.
 
 ## See also
 
+- [HavenCore hook audit](./HAVEN_CORE_HOOKS_AUDIT.md) — post-migration hook inventory and migration queue
 - [HavenCore Finality Plan](.cursor/plans/havencore_finality_plan_50cacd2b.plan.md) — the parent implementation plan.

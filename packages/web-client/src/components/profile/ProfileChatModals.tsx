@@ -1,26 +1,20 @@
 import React, { useMemo } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AccountSettingsModal } from "@web-client/components/profile/AccountSettingsModal";
-import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
-import type { ChatAppModalUiState } from "@web-client/chat-app/modals/useChatAppModalUiState";
+import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
+import { useChatAppModalUiState } from "@web-client/chat-app/modals/chatAppModalUiState";
 import { computeEffectiveShellTheme } from "@shared/themes/computeEffectiveShellTheme";
 import { featureFlagsToEntitlementKeys } from "@shared/themes/themeEntitlements";
 import { listSelectableBuiltinThemes } from "@shared/themes/selectableBuiltinThemes";
 
 type ProfileChatModalsProps = {
-  app: ChatAppOrchestrationApi;
   user: User;
-  ui: Pick<
-    ChatAppModalUiState,
-    | "showAccountModal"
-    | "setShowAccountModal"
-    | "setShowVoiceSettingsModal"
-  >;
 };
 
-export function ProfileChatModals({ app, user, ui }: ProfileChatModalsProps) {
+export function ProfileChatModals({ user }: ProfileChatModalsProps) {
+  const app = useChatAppSession();
   const { showAccountModal, setShowAccountModal, setShowVoiceSettingsModal } =
-    ui;
+    useChatAppModalUiState();
 
   const shellThemeOptions = useMemo(() => {
     const granted = new Set(featureFlagsToEntitlementKeys(app.featureFlags));

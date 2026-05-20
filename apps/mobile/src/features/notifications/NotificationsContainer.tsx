@@ -7,7 +7,6 @@ import { useNotificationInteractions } from "@shared/features/notifications/hook
 import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
 import { getNotificationBackend, getSocialBackend } from "@shared/lib/backend";
 import type { NotificationItem } from "@shared/lib/backend/types";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
 import { syncFocusFromRoute, useHavenCore } from "@shared/core";
 import { useUiStore } from "@shared/stores/uiStore";
 import type { RootStackParamList } from "@/navigation/types";
@@ -41,8 +40,8 @@ export default function NotificationsContainer({
   onOpenDirectMessages,
 }: NotificationsContainerProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const liveProfiles = useLiveProfilesStore((s) => s.profiles);
   const core = useHavenCore();
+  const liveProfiles = core.profiles.useProfilesRecord();
   const communities = core.communities.useCommunities();
   const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);

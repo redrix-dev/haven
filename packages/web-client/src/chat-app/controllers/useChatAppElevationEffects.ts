@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useHavenCore } from "@shared/core";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import { usePermissionsStore } from "@shared/stores/permissionsStore";
 
@@ -6,7 +7,6 @@ type UseChatAppElevationEffectsInput = {
   currentServerId: string | null;
   userId: string | undefined;
   activeVoiceCommunityId: string | null;
-  membersModalCommunityId: string | null;
   setIsCurrentUserElevatedInCurrentServer: (value: boolean) => void;
   setIsCurrentUserElevatedInActiveVoiceServer: (value: boolean) => void;
   setIsCurrentUserElevatedInMembersModalServer: (value: boolean) => void;
@@ -16,11 +16,12 @@ export function useChatAppElevationEffects({
   currentServerId,
   userId,
   activeVoiceCommunityId,
-  membersModalCommunityId,
   setIsCurrentUserElevatedInCurrentServer,
   setIsCurrentUserElevatedInActiveVoiceServer,
   setIsCurrentUserElevatedInMembersModalServer,
 }: UseChatAppElevationEffectsInput) {
+  const membersModalCommunityId =
+    useHavenCore().admin.useMembersModalState().membersModalCommunityId;
   const ensureElevatedInServer = usePermissionsStore(
     (s) => s.ensureElevatedInServer,
   );

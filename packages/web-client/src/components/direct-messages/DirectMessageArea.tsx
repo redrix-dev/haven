@@ -57,7 +57,7 @@ import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
 } from "@shared/infrastructure/liveProfiles";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useHavenCore } from "@shared/core";
 
 type DirectMessageAreaProps = {
   conversation: DirectMessageConversationSummary | null;
@@ -154,7 +154,8 @@ export function DirectMessageArea({
   onReportMessage,
   enableRichComposer = false,
 }: DirectMessageAreaProps) {
-  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const core = useHavenCore();
+  const liveProfiles = core.profiles.useProfilesRecord();
   const [draft, setDraft] = React.useState("");
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [actionNotice, setActionNotice] = React.useState<string | null>(null);

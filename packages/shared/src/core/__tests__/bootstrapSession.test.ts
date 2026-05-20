@@ -86,6 +86,7 @@ const makeFakeCore = (input: {
     onSocialChange: vi.fn() as never,
     bootstrapSession: vi.fn(async () => {}),
     clearSession: vi.fn(async () => {}),
+    prepareTextChannelMessages: vi.fn(async () => {}),
   } as unknown as HavenCore;
 
   // Provide a real bootstrapSession that drives the same phases as production.

@@ -74,7 +74,7 @@ import {
   type MessageListAuthorProfile,
 } from "@shared/features/profile/utils/profileTombstone";
 import { getLiveProfile } from "@shared/infrastructure/liveProfiles";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useHavenCore } from "@shared/core";
 
 function getReplyToMessageIdFromBundle(bundle: MessageBundle): string | null {
   const direct = bundle.replyToMessageId?.trim();
@@ -1216,7 +1216,8 @@ export function MessageList({
   isLoadingOlderMessages = false,
   bottomInset = 96,
 }: MessageListProps) {
-  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const core = useHavenCore();
+  const liveProfiles = core.profiles.useProfilesRecord();
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);
   const isAtBottomRef = useRef(true);
   const previousChannelIdRef = useRef(channelId);

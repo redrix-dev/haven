@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import type { VoicePopoutState } from "@shared/infrastructure/platform/desktop/types";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
-import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
+import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
 import { useHavenCore } from "@shared/core";
 import { useUiStore } from "@shared/stores/uiStore";
@@ -12,7 +12,8 @@ import {
   filterBlockedUsersFromParticipantRecord,
 } from "@shared/features/voice/utils/voiceParticipantVisibility";
 
-export function useChatAppVoiceIntegration(app: ChatAppOrchestrationApi) {
+export function useChatAppVoiceIntegration() {
+  const app = useChatAppSession();
   const core = useHavenCore();
   const currentServerId = core.communities.useActiveId();
   const currentServer = useMemo(

@@ -9,25 +9,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/app/ui/alert-dialog";
-import type { ChatAppOrchestrationApi } from "@web-client/hooks/useChatAppOrchestration";
-import type { ChatAppModalUiState } from "@web-client/chat-app/modals/useChatAppModalUiState";
+import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
+import { useChatAppModalUiState } from "@web-client/chat-app/modals/chatAppModalUiState";
 
-type ChatAppShellDialogsProps = {
-  app: ChatAppOrchestrationApi;
-  ui: Pick<
-    ChatAppModalUiState,
-    | "pendingUiConfirmation"
-    | "setPendingUiConfirmation"
-    | "pendingUiConfirmationCopy"
-  >;
-};
-
-export function ChatAppShellDialogs({ app, ui }: ChatAppShellDialogsProps) {
+export function ChatAppShellDialogs() {
+  const app = useChatAppSession();
   const {
     pendingUiConfirmation,
     setPendingUiConfirmation,
     pendingUiConfirmationCopy,
-  } = ui;
+  } = useChatAppModalUiState();
 
   return (
     <>

@@ -18,7 +18,7 @@ import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
 } from "@shared/infrastructure/liveProfiles";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
+import { useHavenCore } from "@shared/core";
 
 export interface ProfileActionSurfaceProps {
   userId: string;
@@ -53,7 +53,8 @@ export function ProfileActionSurface({
   resolveBanServers,
   children,
 }: ProfileActionSurfaceProps) {
-  const liveProfiles = useLiveProfilesStore((state) => state.profiles);
+  const core = useHavenCore();
+  const liveProfiles = core.profiles.useProfilesRecord();
   const [open, setOpen] = React.useState(false);
   const [banServers, setBanServers] = React.useState<BanEligibleServer[]>([]);
   const [banServersLoading, setBanServersLoading] = React.useState(false);
