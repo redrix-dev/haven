@@ -8,15 +8,22 @@ import { ProfileChatModals } from "@web-client/components/profile/ProfileChatMod
 import { VoiceChatModals } from "@web-client/components/voice/VoiceChatModals";
 import { CommunityChatModals } from "@web-client/components/community/CommunityChatModals";
 import { ChatAppShellDialogs } from "@web-client/chat-app/modals/ChatAppShellDialogs";
-import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
+import type {
+  VoiceSessionControllerState,
+  VoiceSessionControllerActions,
+  VoiceParticipant,
+} from "@shared/features/voice/types";
 
-type VoiceSessionApi = ReturnType<typeof useVoiceSessionController>;
+type VoiceSessionApi = {
+  state: VoiceSessionControllerState;
+  actions: VoiceSessionControllerActions;
+};
 
 export type ChatAppModalLayerProps = {
   user: User;
   managedReportServers: Array<{ id: string; name: string }>;
   voiceSession: VoiceSessionApi;
-  visibleActiveVoiceParticipants: VoiceSessionApi["state"]["participants"];
+  visibleActiveVoiceParticipants: VoiceParticipant[];
   canOpenVoicePopout: boolean;
   canKickVoiceParticipants: boolean;
   handleOpenVoicePopout: () => void;

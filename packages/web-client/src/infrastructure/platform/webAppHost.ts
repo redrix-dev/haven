@@ -101,17 +101,13 @@ export const webAppHost: AppHost = {
       window.localStorage.removeItem(key);
     },
   },
+  // Minimal VoiceRuntimeBridge: device enumeration only.
+  // LiveKit handles media capture, VAD, and PTT directly via browser APIs.
   voiceRuntime: {
     enumerateDevices: async () => {
       if (typeof navigator === "undefined") return [];
       if (!navigator.mediaDevices?.enumerateDevices) return [];
       return navigator.mediaDevices.enumerateDevices();
-    },
-    getUserMedia: async (constraints: MediaStreamConstraints) => {
-      if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-        throw new Error("Media devices are unavailable on this host.");
-      }
-      return navigator.mediaDevices.getUserMedia(constraints);
     },
     addDeviceChangeListener: (listener: () => void) => {
       if (
@@ -123,47 +119,6 @@ export const webAppHost: AppHost = {
       navigator.mediaDevices.addEventListener("devicechange", listener);
       return () => {
         navigator.mediaDevices.removeEventListener("devicechange", listener);
-      };
-    },
-    createAudioContext: () => {
-      if (typeof window === "undefined") return null;
-      const AudioContextCtor =
-        window.AudioContext ??
-        (window as typeof window & { webkitAudioContext?: typeof AudioContext })
-          .webkitAudioContext;
-      if (!AudioContextCtor) return null;
-      return new AudioContextCtor();
-    },
-    requestAnimationFrame: (callback: FrameRequestCallback) => {
-      if (typeof window === "undefined") return -1;
-      return window.requestAnimationFrame(callback);
-    },
-    cancelAnimationFrame: (handle: number) => {
-      if (typeof window === "undefined") return;
-      window.cancelAnimationFrame(handle);
-    },
-    setTimeout: (callback: () => void, delayMs: number) =>
-      setTimeout(callback, delayMs),
-    clearTimeout: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
-    setInterval: (callback: () => void, delayMs: number) =>
-      setInterval(callback, delayMs),
-    clearInterval: (handle: ReturnType<typeof setInterval>) =>
-      clearInterval(handle),
-    addKeyDownListener: (
-      listener: (event: KeyboardEvent) => void,
-      capture = false,
-    ) => {
-      if (typeof window === "undefined") return () => {};
-      window.addEventListener("keydown", listener, capture);
-      return () => {
-        window.removeEventListener("keydown", listener, capture);
-      };
-    },
-    addKeyUpListener: (listener: (event: KeyboardEvent) => void, capture = false) => {
-      if (typeof window === "undefined") return () => {};
-      window.addEventListener("keyup", listener, capture);
-      return () => {
-        window.removeEventListener("keyup", listener, capture);
       };
     },
   },

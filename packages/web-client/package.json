@@ -2,5 +2,10 @@
   "name": "@haven/web-client",
   "private": true,
   "version": "0.0.0",
-  "description": "DOM-only UI primitives and shells used by web and Electron renderer (not React Native)."
+  "description": "DOM-only UI primitives and shells used by web and Electron renderer (not React Native).",
+  "dependencies": {
+    "@livekit/components-react": "^2.9.21",
+    "@livekit/components-styles": "^1.2.0",
+    "livekit-client": "^2.19.0"
+  }
 }

@@ -6,13 +6,20 @@ import { VoiceHardwareDebugPanel } from "@web-client/components/voice/VoiceHardw
 import { VoiceSettingsModal } from "@web-client/components/voice/VoiceSettingsModal";
 import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 import { useChatAppModalUiState } from "@web-client/chat-app/modals/chatAppModalUiState";
-import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
+import type {
+  VoiceSessionControllerState,
+  VoiceSessionControllerActions,
+  VoiceParticipant,
+} from "@shared/features/voice/types";
 
-type VoiceSessionApi = ReturnType<typeof useVoiceSessionController>;
+type VoiceSessionApi = {
+  state: VoiceSessionControllerState;
+  actions: VoiceSessionControllerActions;
+};
 
 type VoiceChatModalsProps = {
   voiceSession: VoiceSessionApi;
-  visibleActiveVoiceParticipants: VoiceSessionApi["state"]["participants"];
+  visibleActiveVoiceParticipants: VoiceParticipant[];
   canOpenVoicePopout: boolean;
   canKickVoiceParticipants: boolean;
   handleOpenVoicePopout: () => void;

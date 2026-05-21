@@ -12,7 +12,6 @@ import {
   isEditableKeyboardTarget,
 } from "@shared/infrastructure/utils/appUtils";
 import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
-import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import {
   createInitialVoiceSessionStoreState,
   reduceVoiceSessionStoreState,
@@ -285,9 +284,9 @@ export function useVoice({
       setVoiceHardwareDebugPanelOpen((prev) => !prev);
     };
 
-    return (
-      getAppHost().voiceRuntime?.addKeyDownListener(handleKeyDown) ?? (() => {})
-    );
+    if (typeof window === 'undefined') return;
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentUserId, voiceHardwareDebugPanelEnabled]);
 
   React.useEffect(() => {

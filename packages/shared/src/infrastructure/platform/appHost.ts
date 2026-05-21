@@ -57,28 +57,14 @@ export type BrowserRuntimeBridge = {
   storageRemoveItem: (key: string) => void;
 };
 
+/**
+ * Minimal voice runtime bridge — only device enumeration remains after LiveKit
+ * took over media capture, VAD, and PTT in web-client. The Electron host
+ * implements these; web uses browser APIs directly.
+ */
 export type VoiceRuntimeBridge = {
   enumerateDevices: () => Promise<MediaDeviceInfo[]>;
-  getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   addDeviceChangeListener: (listener: () => void) => () => void;
-  createAudioContext: () => AudioContext | null;
-  requestAnimationFrame: (callback: FrameRequestCallback) => number;
-  cancelAnimationFrame: (handle: number) => void;
-  setTimeout: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
-  clearTimeout: (handle: ReturnType<typeof setTimeout>) => void;
-  setInterval: (
-    callback: () => void,
-    delayMs: number,
-  ) => ReturnType<typeof setInterval>;
-  clearInterval: (handle: ReturnType<typeof setInterval>) => void;
-  addKeyDownListener: (
-    listener: (event: KeyboardEvent) => void,
-    capture?: boolean,
-  ) => () => void;
-  addKeyUpListener: (
-    listener: (event: KeyboardEvent) => void,
-    capture?: boolean,
-  ) => () => void;
 };
 
 /**

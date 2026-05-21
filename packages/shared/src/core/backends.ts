@@ -26,6 +26,10 @@ import {
   type ServerModmailBackend,
 } from "@shared/lib/backend/serverModmailBackend";
 import {
+  createVoiceTokenBackend,
+  type VoiceTokenBackend,
+} from "@shared/lib/backend/voiceTokenBackend";
+import {
   createSocialBackend,
   type SocialBackend,
 } from "@shared/lib/backend/socialBackend";
@@ -51,6 +55,7 @@ export type HavenBackends = {
   notifications: NotificationBackend;
   social: SocialBackend;
   serverModmail: ServerModmailBackend;
+  voiceToken: VoiceTokenBackend;
 };
 
 /**
@@ -78,6 +83,7 @@ export function createHavenBackends(
   const notifications = createNotificationBackend(client);
   const social = createSocialBackend(client);
   const serverModmail = createServerModmailBackend(client, communityData);
+  const voiceToken = createVoiceTokenBackend(client);
 
   return {
     client,
@@ -89,5 +95,6 @@ export function createHavenBackends(
     notifications,
     social,
     serverModmail,
+    voiceToken,
   };
 }

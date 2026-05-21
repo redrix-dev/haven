@@ -20,12 +20,12 @@ const conditionalReporters = markdownOutputFile
 
 export default defineConfig({
   resolve: {
-      alias: {
-        '@electron': path.resolve(__dirname, 'apps/electron/src'),
-        '@web': path.resolve(__dirname, 'apps/web/src'),
-        '@web-client': path.resolve(__dirname, 'packages/web-client/src'),
-        '@shared/app/ui': path.resolve(__dirname, 'packages/web-client/src/app-ui'),
-        '@shared': path.resolve(__dirname, 'packages/shared/src'),
+    alias: {
+      '@electron': path.resolve(__dirname, 'apps/electron/src'),
+      '@web': path.resolve(__dirname, 'apps/web/src'),
+      '@web-client': path.resolve(__dirname, 'packages/web-client/src'),
+      '@shared/app/ui': path.resolve(__dirname, 'packages/web-client/src/app-ui'),
+      '@shared': path.resolve(__dirname, 'packages/shared/src'),
       '@client': path.resolve(__dirname, 'packages/shared/src/client'),
       '@platform/assets/runtimeAudio': path.resolve(__dirname, 'packages/web-client/src/infrastructure/platform/assets/runtimeAudio'),
       '@platform': path.resolve(__dirname, 'packages/shared/src/platform'),
@@ -43,7 +43,7 @@ export default defineConfig({
       'packages/**/*.test.ts',
       'packages/**/*.test.tsx',
     ],
-    exclude: ['node_modules/**', 'out/**', '.webpack/**'],
+    exclude: ['node_modules/**', '**/node_modules/**', 'out/**', '.webpack/**'],
     ...(conditionalReporters ? { reporters: conditionalReporters } : {}),
   },
 });

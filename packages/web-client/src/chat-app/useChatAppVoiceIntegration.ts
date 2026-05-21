@@ -4,7 +4,7 @@ import type { VoicePopoutState } from "@shared/infrastructure/platform/desktop/t
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
-import { useVoiceSessionController } from "@shared/features/voice/hooks/useVoiceSessionController";
+import { useLiveKitVoiceSession } from "@web-client/features/voice/useLiveKitVoiceSession";
 import { useHavenCore } from "@shared/core";
 import { useUiStore } from "@shared/stores/uiStore";
 import {
@@ -136,7 +136,7 @@ export function useChatAppVoiceIntegration() {
     },
     [app.setVoiceSettings],
   );
-  const voiceController = useVoiceSessionController({
+  const { state: voiceControllerState, actions: voiceControllerActions, livekitRoom } = useLiveKitVoiceSession({
     activeChannel: activeVoiceControllerChannel,
     currentUserId: app.user?.id,
     currentUserDisplayName: app.userDisplayName,
@@ -153,6 +153,8 @@ export function useChatAppVoiceIntegration() {
     onSessionError: handleVoiceSessionError,
     onVoiceKick: handleVoiceKickReceived,
   });
+  // Reconstitute voiceController shape for downstream usage
+  const voiceController = { state: voiceControllerState, actions: voiceControllerActions };
   const visibleActiveVoiceParticipants = useMemo(
     () =>
       filterBlockedUsersFromParticipantList(
@@ -343,6 +345,7 @@ export function useChatAppVoiceIntegration() {
 
   return {
     voiceController,
+    livekitRoom,
     visibleVoiceChannelParticipants,
     visibleActiveVoiceParticipantPreview,
     visibleActiveVoiceParticipants,
