@@ -2354,6 +2354,56 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       console.warn('Failed to capture support report message snapshot:', snapshotError);
     }
 
+    if (target === 'both') {
+      // Fan-out: insert server_admins row first, then haven_staff row with source_report_id link.
+      // 'both' is never stored — each side gets an independent row.
+      const serverAdminsId = createPortableUuid();
+      const havenStaffId = createPortableUuid();
+
+      const { error: saError } = await havenCommunitySb().from('support_reports').insert({
+        id: serverAdminsId,
+        community_id: communityId,
+        destination: 'server_admins',
+        reporter_user_id: reporterUserId,
+        title: reportTitle,
+        notes: reportNotes,
+        snapshot,
+        include_last_n_messages: null,
+      });
+      if (saError) throw saError;
+
+      const { error: hsError } = await havenCommunitySb().from('support_reports').insert({
+        id: havenStaffId,
+        community_id: communityId,
+        destination: 'haven_staff',
+        reporter_user_id: reporterUserId,
+        title: reportTitle,
+        notes: reportNotes,
+        snapshot,
+        include_last_n_messages: null,
+        source_report_id: serverAdminsId,
+      });
+      if (hsError) throw hsError;
+
+      // Link both rows to the same channel and message for context
+      for (const reportId of [serverAdminsId, havenStaffId]) {
+        const { error: channelLinkError } = await havenCommunitySb().from('support_report_channels').insert({
+          report_id: reportId,
+          community_id: communityId,
+          channel_id: channelId,
+        });
+        if (channelLinkError) throw channelLinkError;
+
+        const { error: messageLinkError } = await havenCommunitySb().from('support_report_messages').insert({
+          report_id: reportId,
+          message_id: messageId,
+        });
+        if (messageLinkError) throw messageLinkError;
+      }
+      return;
+    }
+
+    // Single destination: server_admins or haven_staff
     const reportId = createPortableUuid();
 
     const { error: reportError } = await havenCommunitySb().from('support_reports')

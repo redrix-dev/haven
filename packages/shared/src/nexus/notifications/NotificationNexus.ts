@@ -52,7 +52,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     | UseBoundStore<StoreApi<NotificationNexusState>>
     | null = null
 
-  private backend: NotificationBackend | null = null
+  private readonly backend: NotificationBackend
   private listInflight: Promise<void> | null = null
   private notificationsSnapshot: NotificationItem[] = EMPTY_NOTIFICATIONS
 
@@ -71,11 +71,8 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     return next
   }
 
-  constructor(persistence: NexusPersistence) {
+  constructor(persistence: NexusPersistence, backend: NotificationBackend) {
     super('notifications', 'global', persistence)
-  }
-
-  setBackend(backend: NotificationBackend): void {
     this.backend = backend
   }
 

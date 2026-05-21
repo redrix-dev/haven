@@ -23,11 +23,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@shared/app/ui/alert-dialog';
-import { getCommunityDataBackend, getServerModmailBackend } from '@shared/lib/backend';
+import { getCommunityDataBackend } from '@shared/lib/backend';
+import { useHavenCore } from '@shared/core';
 import type {
   ServerPermissions,
-  ServerReportDetail,
-  ServerReportSummary,
   SupportReportDestination,
   SupportReportKind,
   SupportReportSnapshotMessage,
@@ -43,7 +42,6 @@ type Props = {
   currentUserDisplayName: string;
   managedServers: Array<{ id: string; name: string }>;
   serverPermissionsById: Record<string, ServerPermissions>;
-  reportStatusRefreshVersion: number;
   onBanUserFromServer: (input: {
     targetUserId: string;
     communityId: string;
@@ -136,6 +134,8 @@ const statusLabel = (status: SupportReportStatus) => {
       return 'Dismissed';
     case 'escalated':
       return 'Escalated';
+    case 'resolved_by_platform':
+      return 'Resolved by Platform';
   }
 };
 
@@ -150,6 +150,8 @@ const statusBadgeClass = (status: SupportReportStatus) => {
     case 'dismissed':
       return 'border-mod-tier-gray-border text-mod-tier-gray-text';
     case 'escalated':
+      return 'border-mod-tier-purple-border text-mod-tier-purple-text';
+    case 'resolved_by_platform':
       return 'border-mod-tier-purple-border text-mod-tier-purple-text';
   }
 };
@@ -185,72 +187,37 @@ export function ServerModmailPanel({
   currentUserDisplayName,
   managedServers,
   serverPermissionsById,
-  reportStatusRefreshVersion,
   onBanUserFromServer,
   onKickUserFromServer,
 }: Props) {
+  const core = useHavenCore();
   const [serverFilter, setServerFilter] = React.useState<'all' | string>('all');
   const [statusFilter, setStatusFilter] = React.useState<VisibleStatusFilter>('all');
-  const [reports, setReports] = React.useState<ServerReportSummary[]>([]);
-  const [selectedReportId, setSelectedReportId] = React.useState<string | null>(null);
-  const [detail, setDetail] = React.useState<ServerReportDetail | null>(null);
-  const [loadingReports, setLoadingReports] = React.useState(false);
-  const [loadingDetail, setLoadingDetail] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [internalNoteDraft, setInternalNoteDraft] = React.useState('');
   const [actionConfirm, setActionConfirm] = React.useState<ActionConfirmState | null>(null);
   const [escalateConfirmOpen, setEscalateConfirmOpen] = React.useState(false);
-  const serverModmailBackend = React.useMemo(() => getServerModmailBackend(), []);
 
-  const visibleServerIds = React.useMemo(
-    () =>
-      serverFilter === 'all'
-        ? managedServers.map((server) => server.id)
-        : managedServers.some((server) => server.id === serverFilter)
-          ? [serverFilter]
-          : [],
-    [managedServers, serverFilter]
+  // Nexus-driven state — no local entity state
+  const reports = core.moderation.useReports(
+    serverFilter !== 'all' ? serverFilter : undefined,
+    statusFilter !== 'all' ? statusFilter : undefined,
+  );
+  const detail = core.moderation.useDetail();
+  const selectedReportId = core.moderation.useSelectedReportId();
+  const loadingReports = core.moderation.useIsLoadingReports();
+  const loadingDetail = core.moderation.useIsLoadingDetail();
+
+  const managedServerIds = React.useMemo(
+    () => managedServers.map((s) => s.id),
+    [managedServers],
   );
 
-  const refreshReports = React.useCallback(async () => {
-    if (!open) return;
-    setLoadingReports(true);
-    setError(null);
-    try {
-      const nextReports = await serverModmailBackend.listServerReports(visibleServerIds);
-      setReports(nextReports);
-    } catch (nextError) {
-      setError(getErrorMessage(nextError, 'Failed to load server reports.'));
-    } finally {
-      setLoadingReports(false);
-    }
-  }, [open, visibleServerIds, serverModmailBackend]);
-
-  const refreshDetail = React.useCallback(
-    async (reportId: string) => {
-      if (!open || !reportId) return;
-      setLoadingDetail(true);
-      setError(null);
-      try {
-        const nextDetail = await serverModmailBackend.getServerReport(reportId);
-        setDetail(nextDetail);
-      } catch (nextError) {
-        setError(getErrorMessage(nextError, 'Failed to load report detail.'));
-      } finally {
-        setLoadingDetail(false);
-      }
-    },
-    [open, serverModmailBackend]
-  );
-
+  // Load reports when panel opens; reset UI on close
   React.useEffect(() => {
     if (!open) {
-      setReports([]);
-      setSelectedReportId(null);
-      setDetail(null);
-      setLoadingReports(false);
-      setLoadingDetail(false);
+      core.moderation.clearSelection();
       setBusy(false);
       setError(null);
       setInternalNoteDraft('');
@@ -258,48 +225,35 @@ export function ServerModmailPanel({
       setEscalateConfirmOpen(false);
       return;
     }
-    void refreshReports();
-  }, [open, refreshReports]);
+    void core.moderation.load(managedServerIds);
+  }, [open, core, managedServerIds]);
 
-  React.useEffect(() => {
-    if (!open || reportStatusRefreshVersion === 0) return;
-    void refreshReports();
-    if (selectedReportId) {
-      void refreshDetail(selectedReportId);
-    }
-  }, [open, refreshDetail, refreshReports, reportStatusRefreshVersion, selectedReportId]);
+  // reports from the nexus hook is already filtered — alias for clarity
+  const visibleReports = reports;
 
-  const visibleReports = React.useMemo(
-    () => reports.filter((report) => statusMatchesFilter(report.status, statusFilter)),
-    [reports, statusFilter]
-  );
-
+  // Auto-select the first visible report when the list changes
   React.useEffect(() => {
     if (!open) return;
     if (visibleReports.length === 0) {
-      setSelectedReportId(null);
-      setDetail(null);
+      core.moderation.clearSelection();
       return;
     }
     if (!selectedReportId || !visibleReports.some((report) => report.reportId === selectedReportId)) {
-      setSelectedReportId(visibleReports[0].reportId);
+      void core.moderation.selectReport(visibleReports[0].reportId);
     }
-  }, [open, selectedReportId, visibleReports]);
+  }, [open, core, selectedReportId, visibleReports]);
 
+  // Fetch detail when a report is selected
   React.useEffect(() => {
     if (!open || !selectedReportId) return;
-    void refreshDetail(selectedReportId);
-  }, [open, refreshDetail, selectedReportId]);
+    void core.moderation.selectReport(selectedReportId);
+  }, [open, core, selectedReportId]);
 
   const runAction = async (task: () => Promise<void>, successMessage: string) => {
     setBusy(true);
     setError(null);
     try {
       await task();
-      await refreshReports();
-      if (selectedReportId) {
-        await refreshDetail(selectedReportId);
-      }
       toast.success(successMessage);
     } catch (nextError) {
       setError(getErrorMessage(nextError, 'Failed moderation action.'));
@@ -337,8 +291,8 @@ export function ServerModmailPanel({
                   variant="outline"
                   className="border-border text-white"
                   onClick={() => {
-                    void refreshReports();
-                    if (selectedReportId) void refreshDetail(selectedReportId);
+                    void core.moderation.load(managedServerIds);
+                    if (selectedReportId) void core.moderation.selectReport(selectedReportId);
                   }}
                   disabled={loadingReports || loadingDetail}
                 >
@@ -425,7 +379,7 @@ export function ServerModmailPanel({
                       <button
                         key={report.reportId}
                         type="button"
-                        onClick={() => setSelectedReportId(report.reportId)}
+                        onClick={() => void core.moderation.selectReport(report.reportId)}
                         className={`w-full rounded-md border px-3 py-3 text-left ${
                           report.reportId === selectedReportId
                             ? 'border-border-selected bg-surface-row-active'
@@ -495,6 +449,45 @@ export function ServerModmailPanel({
                         </p>
                       </div>
 
+                      {/* Platform action notice — shown when Haven staff has acted on this report */}
+                      {detail.platformAction && (
+                        <div className="rounded-md border border-mod-tier-purple-border bg-mod-tier-warn-bg p-3 space-y-2">
+                          <p className="text-sm font-semibold text-mod-tier-purple-text">
+                            Haven Platform Moderation has acted on this report
+                          </p>
+                          <div className="space-y-1 text-sm text-banner">
+                            {detail.platformAction.user_banned === true && (
+                              <p>✓ User has been platform banned</p>
+                            )}
+                            {detail.platformAction.content_removed === true && (
+                              <p>✓ Reported content has been removed</p>
+                            )}
+                            {detail.platformAction.user_banned !== true && (
+                              <p className="text-mod-tier-gold-text">⚠ User has not been platform banned — community action may still be appropriate</p>
+                            )}
+                            {detail.platformAction.content_removed !== true && (
+                              <p className="text-mod-tier-gold-text">⚠ Content has not been removed by platform — community action may still be required</p>
+                            )}
+                          </div>
+                          {detail.status === 'resolved_by_platform' && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="border-mod-tier-green-border text-mod-tier-green-text mt-2"
+                              disabled={busy}
+                              onClick={() => {
+                                void runAction(
+                                  () => core.moderation.acknowledge(detail.reportId),
+                                  'Report acknowledged.'
+                                );
+                              }}
+                            >
+                              Acknowledge & Close
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
                       <div className="rounded-md border border-border bg-surface-panel p-3 space-y-3">
                         <div className="flex flex-wrap gap-2">
                           {STATUS_ACTIONS.map((action) => (
@@ -511,11 +504,7 @@ export function ServerModmailPanel({
                               disabled={busy || detail.status === action.value}
                               onClick={() => {
                                 void runAction(
-                                  () =>
-                                    serverModmailBackend.updateReportStatus(
-                                      detail.reportId,
-                                      action.value
-                                    ),
+                                  () => core.moderation.updateStatus(detail.reportId, action.value),
                                   `Report marked ${action.label.toLowerCase()}.`
                                 );
                               }}
@@ -719,10 +708,7 @@ export function ServerModmailPanel({
                             onClick={() => {
                               void runAction(
                                 async () => {
-                                  await serverModmailBackend.addInternalNote(
-                                    detail.reportId,
-                                    internalNoteDraft
-                                  );
+                                  await core.moderation.addNote(detail.reportId, internalNoteDraft);
                                   setInternalNoteDraft('');
                                 },
                                 'Internal note added.'
@@ -795,10 +781,7 @@ export function ServerModmailPanel({
                         communityId: actionConfirm.communityId,
                         username: actionConfirm.username,
                       });
-                      await serverModmailBackend.updateReportStatus(
-                        actionConfirm.reportId,
-                        'resolved'
-                      );
+                      await core.moderation.updateStatus(actionConfirm.reportId, 'resolved');
                       setActionConfirm(null);
                       return;
                     }
@@ -808,10 +791,7 @@ export function ServerModmailPanel({
                       communityId: actionConfirm.communityId,
                       reason: `Actioned from server report ${actionConfirm.reportId}.`,
                     });
-                    await serverModmailBackend.updateReportStatus(
-                      actionConfirm.reportId,
-                      'resolved'
-                    );
+                    await core.moderation.updateStatus(actionConfirm.reportId, 'resolved');
                     setActionConfirm(null);
                   },
                   actionConfirm.kind === 'delete_message'
@@ -864,7 +844,7 @@ export function ServerModmailPanel({
 
                 void runAction(
                   async () => {
-                    await serverModmailBackend.escalateReport(detail.reportId);
+                    await core.moderation.escalate(detail.reportId);
                     setEscalateConfirmOpen(false);
                   },
                   'Report shared with Haven Moderation Staff.'

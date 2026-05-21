@@ -27,6 +27,7 @@ type SupportReportRow = Pick<
   | 'updated_at'
   | 'reporter_user_id'
   | 'include_last_n_messages'
+  | 'platform_action'
 > & {
   reporter:
     | Pick<Database['public']['Tables']['profiles']['Row'], 'username' | 'avatar_url'>
@@ -62,13 +63,14 @@ type RoleNameRow = Pick<Database['public']['Tables']['roles']['Row'], 'id' | 'na
 
 type MemberRoleRow = Pick<Database['public']['Tables']['member_roles']['Row'], 'role_id'>;
 
-const SERVER_VISIBLE_DESTINATIONS: SupportReportDestination[] = ['server_admins', 'both'];
+const SERVER_VISIBLE_DESTINATIONS: SupportReportDestination[] = ['server_admins'];
 const VALID_REPORT_STATUSES: SupportReportStatus[] = [
   'pending',
   'under_review',
   'resolved',
   'dismissed',
   'escalated',
+  'resolved_by_platform',
 ];
 
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
@@ -260,7 +262,7 @@ const fetchSupportReportRow = async (sb: HavenSupabaseClient, reportId: string) 
   const { data, error } = await sb
     .from('support_reports')
     .select(
-      'id, community_id, destination, status, title, notes, snapshot, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
+      'id, community_id, destination, status, title, notes, snapshot, platform_action, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
     )
     .eq('id', reportId)
     .in('destination', SERVER_VISIBLE_DESTINATIONS)
@@ -289,7 +291,7 @@ export function createServerModmailBackend(
     const { data, error } = await client
       .from('support_reports')
       .select(
-        'id, community_id, destination, status, title, notes, snapshot, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
+        'id, community_id, destination, status, title, notes, snapshot, platform_action, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
       )
       .in('community_id', uniqueCommunityIds)
       .in('destination', SERVER_VISIBLE_DESTINATIONS)
@@ -367,6 +369,7 @@ export function createServerModmailBackend(
       internalNotes: parseInternalNotes(notes),
       targetUserId: getTargetUserId(summary.reportType, notes, summary.snapshot),
       targetDisplayName: getTargetDisplayName(summary.reportType, notes, summary.snapshot),
+      platformAction: asObjectRecord(reportRow.platform_action),
     };
   },
 

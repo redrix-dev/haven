@@ -28,6 +28,3 @@ export function useChatAppSession(): ChatAppSessionState {
   }
   return session;
 }
-
-/** @deprecated Use useChatAppSession() — removed prop-drilled ChatAppOrchestrationApi. */
-export type ChatAppOrchestrationApi = ChatAppSessionState;

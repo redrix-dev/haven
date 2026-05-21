@@ -210,9 +210,7 @@ export function useChatAppSessionState() {
     [havenChannels],
   );
   const [channelsError, setChannelsError] = useState<string | null>(null);
-  const reportStatusRefreshVersion = useUiStore(
-    (state) => state.reportStatusRevision,
-  );
+
 
   useEffect(() => {
     if (!user?.id || servers.length === 0 || currentServerId) return;
@@ -885,7 +883,6 @@ export function useChatAppSessionState() {
     canManageCurrentServer,
     isCurrentUserElevatedInCurrentServer,
     isCurrentUserElevatedInMembersModalServer,
-    reportStatusRefreshVersion,
     // voice
     activeVoiceChannelId,
     voicePanelOpen,

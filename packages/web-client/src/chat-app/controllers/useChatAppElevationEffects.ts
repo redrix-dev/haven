@@ -1,7 +1,5 @@
 import { useEffect } from "react";
 import { useHavenCore } from "@shared/core";
-import { getCommunityDataBackend } from "@shared/lib/backend";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
 
 type UseChatAppElevationEffectsInput = {
   currentServerId: string | null;
@@ -20,23 +18,18 @@ export function useChatAppElevationEffects({
   setIsCurrentUserElevatedInActiveVoiceServer,
   setIsCurrentUserElevatedInMembersModalServer,
 }: UseChatAppElevationEffectsInput) {
+  const core = useHavenCore();
   const membersModalCommunityId =
-    useHavenCore().admin.useMembersModalState().membersModalCommunityId;
-  const ensureElevatedInServer = usePermissionsStore(
-    (s) => s.ensureElevatedInServer,
-  );
-  const invalidateAllElevated = usePermissionsStore(
-    (s) => s.invalidateAllElevated,
-  );
+    core.admin.useMembersModalState().membersModalCommunityId;
 
+  // Reset local elevation flags when the active server changes.
+  // PermissionsNexus tracks elevation per-community and handles its own cache.
   useEffect(() => {
-    invalidateAllElevated();
     setIsCurrentUserElevatedInCurrentServer(false);
     setIsCurrentUserElevatedInActiveVoiceServer(false);
     setIsCurrentUserElevatedInMembersModalServer(false);
   }, [
     currentServerId,
-    invalidateAllElevated,
     setIsCurrentUserElevatedInActiveVoiceServer,
     setIsCurrentUserElevatedInCurrentServer,
     setIsCurrentUserElevatedInMembersModalServer,
@@ -51,11 +44,8 @@ export function useChatAppElevationEffects({
       };
     }
 
-    void ensureElevatedInServer(
-      currentServerId,
-      userId,
-      getCommunityDataBackend(currentServerId),
-    )
+    void core
+      .ensureElevated(currentServerId)
       .then((isElevated) => {
         if (!cancelled) {
           setIsCurrentUserElevatedInCurrentServer(isElevated);
@@ -74,8 +64,8 @@ export function useChatAppElevationEffects({
       cancelled = true;
     };
   }, [
+    core,
     currentServerId,
-    ensureElevatedInServer,
     setIsCurrentUserElevatedInCurrentServer,
     userId,
   ]);
@@ -89,11 +79,8 @@ export function useChatAppElevationEffects({
       };
     }
 
-    void ensureElevatedInServer(
-      activeVoiceCommunityId,
-      userId,
-      getCommunityDataBackend(activeVoiceCommunityId),
-    )
+    void core
+      .ensureElevated(activeVoiceCommunityId)
       .then((isElevated) => {
         if (!cancelled) {
           setIsCurrentUserElevatedInActiveVoiceServer(isElevated);
@@ -110,7 +97,7 @@ export function useChatAppElevationEffects({
     };
   }, [
     activeVoiceCommunityId,
-    ensureElevatedInServer,
+    core,
     setIsCurrentUserElevatedInActiveVoiceServer,
     userId,
   ]);
@@ -124,11 +111,8 @@ export function useChatAppElevationEffects({
       };
     }
 
-    void ensureElevatedInServer(
-      membersModalCommunityId,
-      userId,
-      getCommunityDataBackend(membersModalCommunityId),
-    )
+    void core
+      .ensureElevated(membersModalCommunityId)
       .then((isElevated) => {
         if (!cancelled) {
           setIsCurrentUserElevatedInMembersModalServer(isElevated);
@@ -147,7 +131,7 @@ export function useChatAppElevationEffects({
       cancelled = true;
     };
   }, [
-    ensureElevatedInServer,
+    core,
     membersModalCommunityId,
     setIsCurrentUserElevatedInMembersModalServer,
     userId,

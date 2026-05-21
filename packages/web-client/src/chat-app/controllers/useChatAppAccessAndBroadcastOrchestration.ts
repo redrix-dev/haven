@@ -1,6 +1,5 @@
 import { useCallback, useEffect, type MutableRefObject } from "react";
 import { toast } from "sonner";
-import { getCommunityDataBackend } from "@shared/lib/backend";
 import { registerCommunityAccessHandlers } from "@shared/core/communityAccessHandlers";
 import { requireHavenCore } from "@shared/core";
 import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
@@ -11,7 +10,6 @@ import type {
   ServerSummary,
 } from "@shared/lib/backend/types";
 import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useUiStore } from "@shared/stores/uiStore";
 
 type VoiceChannelLike = { id: string; community_id: string } | null;
@@ -73,7 +71,6 @@ export function useChatAppAccessAndBroadcastOrchestration({
       resetChannelGroups();
       resetChannelsWorkspace();
       core.permissions.invalidate(serverId);
-      usePermissionsStore.getState().clearPermissions(serverId);
       purgeMessageBundleCacheForServer(serverId);
       setWorkspaceMode("community");
     },
@@ -196,7 +193,6 @@ export function useChatAppAccessAndBroadcastOrchestration({
     async (channelId: string, channelName: string) => {
       if (!channelId || !currentServerId) return;
 
-      const communityBackend = getCommunityDataBackend(currentServerId);
       const nextChannelId =
         channels.find(
           (channel) =>
@@ -221,7 +217,7 @@ export function useChatAppAccessAndBroadcastOrchestration({
           revokedUserId: userId,
         });
         try {
-          await communityBackend.broadcastMemberChannelAccessRevoked({
+          await requireHavenCore().broadcastChannelAccessRevoked({
             communityId: currentServerId,
             channelId,
             revokedUserId: userId,

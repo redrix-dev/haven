@@ -170,6 +170,14 @@ export class PermissionsNexus {
     return promise;
   }
 
+  async ensureElevated(
+    communityId: string,
+    communityBackend: CommunityDataBackend,
+  ): Promise<boolean> {
+    await this.ensureLoaded(communityId, communityBackend);
+    return this.isElevated(communityId);
+  }
+
   async loadRevokedAuthorIdsForChannel(
     communityId: string,
     channelId: string,

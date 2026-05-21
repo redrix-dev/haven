@@ -44,7 +44,6 @@ const createDefaultUiState = () => ({
   friendsPanelRequestedTab: null as import("@shared/types/types").FriendsPanelTab | null,
   friendsPanelHighlightedRequestId: null as string | null,
   notificationsPanelOpen: false,
-  reportStatusRevision: 0,
 });
 
 export type UiStoreState = ReturnType<typeof createDefaultUiState> & {
@@ -71,7 +70,6 @@ export type UiStoreState = ReturnType<typeof createDefaultUiState> & {
   ) => void;
   setFriendsPanelHighlightedRequestId: (id: string | null) => void;
   setNotificationsPanelOpen: (open: boolean) => void;
-  bumpReportStatusRevision: () => void;
   reset: () => void;
 };
 
@@ -109,7 +107,5 @@ export const useUiStore = create<UiStoreState>()((set) => ({
     set({ friendsPanelHighlightedRequestId }),
   setNotificationsPanelOpen: (notificationsPanelOpen) =>
     set({ notificationsPanelOpen }),
-  bumpReportStatusRevision: () =>
-    set((state) => ({ reportStatusRevision: state.reportStatusRevision + 1 })),
   reset: () => set(createDefaultUiState()),
 }));

@@ -86,17 +86,11 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
   private channelsSnapshots = new Map<string, HavenChannel[]>()
   private groupStateSnapshots = new Map<string, ChannelGroupState>()
 
-  private communityData: CommunityDataBackend | null = null
+  private readonly communityData: CommunityDataBackend
   private inflight = new Map<string, Promise<void>>()
 
-  constructor(persistence: NexusPersistence) {
+  constructor(persistence: NexusPersistence, communityData: CommunityDataBackend) {
     super('channels', 'global', persistence)
-  }
-
-  /**
-   * Wire the backend used by `loadForCommunity`. Called once by HavenCore.
-   */
-  setCommunityData(communityData: CommunityDataBackend): void {
     this.communityData = communityData
   }
 

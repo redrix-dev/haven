@@ -27,8 +27,8 @@ const buildFakeCore = (
   listChannelMessages: HavenBackends['communityData']['listChannelMessages'],
 ): FakeCore => {
   const persistence = createMemoryPersistence();
-  const communities = new CommunityNexus(persistence);
-  const channels = new ChannelNexus(persistence);
+  const communities = new CommunityNexus(persistence, {} as never);
+  const channels = new ChannelNexus(persistence, {} as never);
   const profiles = new ProfileNexus(persistence);
   const messageNexuses = new Map<string, CommunityMessageNexus>();
 

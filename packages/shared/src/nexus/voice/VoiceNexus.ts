@@ -2,7 +2,6 @@ import { create } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
-import { createViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
 import type { StoreApi, UseBoundStore } from "zustand";
 
@@ -31,11 +30,11 @@ const defaultSession = (): VoiceSessionSnapshot => ({
 
 export class VoiceNexus {
   private readonly store: UseBoundStore<StoreApi<VoiceNexusState>>;
-  private viewerPolicyStore: ViewerMessagePolicyStore;
+  private readonly viewerPolicyStore: ViewerMessagePolicyStore;
 
-  constructor(_persistence: NexusPersistence) {
+  constructor(_persistence: NexusPersistence, viewerPolicyStore: ViewerMessagePolicyStore) {
     void _persistence;
-    this.viewerPolicyStore = createViewerMessagePolicyStore();
+    this.viewerPolicyStore = viewerPolicyStore;
     this.store = create<VoiceNexusState>()(() => ({
       joined: false,
       isMuted: false,
@@ -46,10 +45,6 @@ export class VoiceNexus {
       sessionState: null,
       revision: 0,
     }));
-  }
-
-  setViewerPolicyStore(store: ViewerMessagePolicyStore): void {
-    this.viewerPolicyStore = store;
   }
 
   private bump(): void {

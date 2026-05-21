@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { installPromptTrap } from "@shared/infrastructure/contextMenu/debugTrace";
 import { requireHavenCore } from "@shared/core";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
 import { useUiStore } from "@shared/stores/uiStore";
 
 type UseChatAppLifecycleEffectsInput = {
@@ -156,7 +155,7 @@ export function useChatAppLifecycleEffects({
     actions.resetSocialWorkspace();
     actions.resetDirectMessages();
     actions.resetChannelsWorkspace();
-    usePermissionsStore.getState().reset();
+    requireHavenCore().permissions.clear();
     actions.resetServerSettingsState();
     actions.resetServerInvites();
     actions.resetServerRoleManagement();

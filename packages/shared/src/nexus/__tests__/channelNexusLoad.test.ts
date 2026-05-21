@@ -26,18 +26,10 @@ const emptyGroups: ChannelGroupState = {
 };
 
 describe('ChannelNexus.loadForCommunity', () => {
-  it('throws when backend not attached', async () => {
-    const nexus = new ChannelNexus(createMemoryPersistence());
-    await expect(nexus.loadForCommunity('s1')).rejects.toThrow(
-      /communityData was attached/,
-    );
-  });
-
   it('fetches channels and groups and dedupes concurrent calls', async () => {
-    const nexus = new ChannelNexus(createMemoryPersistence());
     const listChannels = vi.fn(async () => [channel()]);
     const listChannelGroups = vi.fn(async () => emptyGroups);
-    nexus.setCommunityData({
+    const nexus = new ChannelNexus(createMemoryPersistence(), {
       listChannels,
       listChannelGroups,
     } as never);
@@ -50,9 +42,8 @@ describe('ChannelNexus.loadForCommunity', () => {
   });
 
   it('ensureLoaded skips when already cached', async () => {
-    const nexus = new ChannelNexus(createMemoryPersistence());
     const listChannels = vi.fn(async () => [channel()]);
-    nexus.setCommunityData({
+    const nexus = new ChannelNexus(createMemoryPersistence(), {
       listChannels,
       listChannelGroups: vi.fn(async () => emptyGroups),
     } as never);
@@ -64,14 +55,13 @@ describe('ChannelNexus.loadForCommunity', () => {
   });
 
   it('upsertChannel adds a single channel from realtime', () => {
-    const nexus = new ChannelNexus(createMemoryPersistence());
+    const nexus = new ChannelNexus(createMemoryPersistence(), {} as never);
     nexus.upsertChannel(channel({ id: 'cNew' }));
     expect(nexus.getChannelsSnapshot('s1').map((c) => c.id)).toEqual(['cNew']);
   });
 
   it('falls back to empty groups when listChannelGroups rejects', async () => {
-    const nexus = new ChannelNexus(createMemoryPersistence());
-    nexus.setCommunityData({
+    const nexus = new ChannelNexus(createMemoryPersistence(), {
       listChannels: vi.fn(async () => [channel()]),
       listChannelGroups: vi.fn(async () => {
         throw new Error('boom');
@@ -84,14 +74,8 @@ describe('ChannelNexus.loadForCommunity', () => {
 });
 
 describe('CommunityNexus.load', () => {
-  it('throws when control plane not attached', async () => {
-    const nexus = new CommunityNexus(createMemoryPersistence());
-    await expect(nexus.load('u1')).rejects.toThrow(/controlPlane was attached/);
-  });
-
   it('replaces the community list from the backend', async () => {
-    const nexus = new CommunityNexus(createMemoryPersistence());
-    nexus.setControlPlane({
+    const nexus = new CommunityNexus(createMemoryPersistence(), {
       listUserCommunities: vi.fn(async () => [
         { id: 's1', name: 'haven', created_at: '2024-01-01T00:00:00Z' },
         { id: 's2', name: 'beta', created_at: '2024-01-02T00:00:00Z' },

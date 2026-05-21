@@ -44,9 +44,8 @@ const message = (overrides: Partial<DirectMessage> = {}): DirectMessage => ({
 
 describe('DirectMessageNexus', () => {
   it('loads conversations and dedupes concurrent calls', async () => {
-    const nexus = new DirectMessageNexus(createMemoryPersistence());
     const listConversations = vi.fn(async () => [conversation()]);
-    nexus.setBackend({ listConversations } as never);
+    const nexus = new DirectMessageNexus(createMemoryPersistence(), { listConversations } as never);
 
     await Promise.all([nexus.loadConversations(), nexus.loadConversations()]);
 
@@ -55,12 +54,11 @@ describe('DirectMessageNexus', () => {
   });
 
   it('loadMessages reverses the response into ascending order', async () => {
-    const nexus = new DirectMessageNexus(createMemoryPersistence());
     const desc = [
       message({ messageId: 'm2', createdAt: '2026-01-01T00:00:01.000Z' }),
       message({ messageId: 'm1', createdAt: '2026-01-01T00:00:00.000Z' }),
     ];
-    nexus.setBackend({ listMessages: vi.fn(async () => desc) } as never);
+    const nexus = new DirectMessageNexus(createMemoryPersistence(), { listMessages: vi.fn(async () => desc) } as never);
 
     await nexus.loadMessages('dm1');
 
@@ -69,7 +67,7 @@ describe('DirectMessageNexus', () => {
   });
 
   it('upsertMessage adds a new entry to its conversation', () => {
-    const nexus = new DirectMessageNexus(createMemoryPersistence());
+    const nexus = new DirectMessageNexus(createMemoryPersistence(), {} as never);
     nexus.upsertMessage(message({ messageId: 'm10' }));
 
     const state = nexus.getReactiveStore().getState();
@@ -78,8 +76,7 @@ describe('DirectMessageNexus', () => {
   });
 
   it('markRead resets unreadCount in the cached conversation', async () => {
-    const nexus = new DirectMessageNexus(createMemoryPersistence());
-    nexus.setBackend({
+    const nexus = new DirectMessageNexus(createMemoryPersistence(), {
       markConversationRead: vi.fn(async () => true),
     } as never);
     nexus.setConversations([conversation({ unreadCount: 5 })]);

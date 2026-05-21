@@ -3,10 +3,6 @@ import { toast } from "sonner";
 import { getErrorMessage } from "@platform/lib/errors";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { requireHavenCore } from "@shared/core";
-import {
-  getCommunityDataBackend,
-  getControlPlaneBackend,
-} from "@shared/lib/backend";
 import { useUiStore } from "@shared/stores/uiStore";
 import type {
   BanEligibleServer,
@@ -47,34 +43,20 @@ export function useChatAppBusinessActions({
   profileUsername,
   profileAvatarUrl,
 }: UseChatAppBusinessActionsInput) {
-  const controlPlaneBackend = getControlPlaneBackend();
   const admin = requireHavenCore().admin;
   const showServerSettingsModal = useUiStore(
     (state) => state.showServerSettingsModal,
   );
-  const refreshServers = useCallback(async () => {
-    if (!user) return;
-    await requireHavenCore().refreshCommunities(user.id);
-  }, [user]);
-  const setCurrentServerId = useCallback((id: string) => {
-    requireHavenCore().communities.setActiveId(id);
-  }, []);
+
   const joinServerByInvite = useCallback(
     async (
       inviteInput: string,
     ): Promise<{ communityName: string; joined: boolean }> => {
       const code = normalizeInviteCode(inviteInput);
       if (!code) throw new Error("Invite code is required.");
-      const redeemedInvite =
-        await controlPlaneBackend.redeemCommunityInvite(code);
-      await refreshServers();
-      setCurrentServerId(redeemedInvite.communityId);
-      return {
-        communityName: redeemedInvite.communityName,
-        joined: redeemedInvite.joined,
-      };
+      return requireHavenCore().joinCommunityByInvite(code);
     },
-    [controlPlaneBackend, refreshServers, setCurrentServerId],
+    [],
   );
 
   const saveAttachment = useCallback(async (attachment: MessageAttachment) => {
@@ -98,8 +80,7 @@ export function useChatAppBusinessActions({
       if (!user) throw new Error("Not authenticated.");
       const targetCommunityId = input.communityId ?? currentServerId;
       if (!targetCommunityId) throw new Error("No server selected.");
-      const communityBackend = getCommunityDataBackend(targetCommunityId);
-      await communityBackend.reportUserProfile({
+      await requireHavenCore().admin.reportMember({
         communityId: targetCommunityId,
         targetUserId: input.targetUserId,
         reporterUserId: user.id,
@@ -115,22 +96,11 @@ export function useChatAppBusinessActions({
       communityId: string;
       reason: string;
     }) => {
-      const communityBackend = getCommunityDataBackend(input.communityId);
-      const banResult = await communityBackend.banCommunityMember({
+      await admin.banMember({
         communityId: input.communityId,
         targetUserId: input.targetUserId,
         reason: input.reason,
       });
-      try {
-        await communityBackend.broadcastMemberBanned(banResult);
-      } catch (error) {
-        console.error("Failed to broadcast member ban:", error);
-      }
-      try {
-        await admin.refreshMembersModalMembersIfOpen(input.communityId);
-      } catch (error) {
-        console.error("Failed to refresh members after ban:", error);
-      }
       if (showServerSettingsModal && currentServerId === input.communityId) {
         try {
           await admin.loadCommunityBans(input.communityId);
@@ -149,16 +119,10 @@ export function useChatAppBusinessActions({
       username: string;
     }) => {
       try {
-        const communityBackend = getCommunityDataBackend(input.communityId);
-        await communityBackend.kickCommunityMember({
+        await admin.kickMember({
           communityId: input.communityId,
           targetUserId: input.targetUserId,
         });
-        try {
-          await admin.refreshMembersModalMembersIfOpen(input.communityId);
-        } catch (error) {
-          console.error("Failed to refresh members after kick:", error);
-        }
         toast(`${input.username} has been removed from the server.`, {
           id: `server-kick:${input.communityId}:${input.targetUserId}`,
           action: {
@@ -205,9 +169,9 @@ export function useChatAppBusinessActions({
   const resolveBanEligibleServers = useCallback(
     async (targetUserId: string): Promise<BanEligibleServer[]> => {
       if (!targetUserId) return [];
-      return controlPlaneBackend.listBanEligibleServersForUser(targetUserId);
+      return requireHavenCore().getBanEligibleServers(targetUserId);
     },
-    [controlPlaneBackend],
+    [],
   );
 
   const saveAccountSettings = useCallback(
@@ -217,7 +181,7 @@ export function useChatAppBusinessActions({
       avatarFile?: File | null;
     }) => {
       if (!user) throw new Error("Not authenticated");
-      const updatedProfile = await controlPlaneBackend.updateUserProfile({
+      const updatedProfile = await requireHavenCore().updateUserProfile({
         userId: user.id,
         username: values.username,
         avatarUrl: values.avatarUrl,
@@ -235,7 +199,7 @@ export function useChatAppBusinessActions({
         updatedAt: new Date().toISOString(),
       });
     },
-    [user, controlPlaneBackend, applyLocalProfileUpdate, upsertLiveProfile],
+    [user, applyLocalProfileUpdate, upsertLiveProfile],
   );
 
   const saveThemePreference = useCallback(
@@ -245,7 +209,7 @@ export function useChatAppBusinessActions({
       if (!trimmedUsername) {
         throw new Error("Username is required before changing theme.");
       }
-      const updatedProfile = await controlPlaneBackend.updateUserProfile({
+      const updatedProfile = await requireHavenCore().updateUserProfile({
         userId: user.id,
         username: trimmedUsername,
         avatarUrl: profileAvatarUrl,
@@ -263,14 +227,7 @@ export function useChatAppBusinessActions({
         updatedAt: new Date().toISOString(),
       });
     },
-    [
-      user,
-      controlPlaneBackend,
-      profileUsername,
-      profileAvatarUrl,
-      applyLocalProfileUpdate,
-      upsertLiveProfile,
-    ],
+    [user, profileUsername, profileAvatarUrl, applyLocalProfileUpdate, upsertLiveProfile],
   );
 
   return {

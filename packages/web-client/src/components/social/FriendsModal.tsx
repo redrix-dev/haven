@@ -32,21 +32,17 @@ import {
   TabsList,
   TabsTrigger,
 } from "@shared/app/ui/tabs";
-import { getSocialBackend } from "@shared/lib/backend";
 import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
 } from "@shared/infrastructure/liveProfiles";
 import type {
-  BlockedUserSummary,
   FriendRequestSummary,
   FriendSearchResult,
   FriendSummary,
-  SocialCounts,
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useHavenCore } from "@shared/core";
-import { useSocialGraphRealtimeStore } from "@shared/stores/socialGraphRealtimeStore";
 import { RefreshCcw, UserPlus, Users } from "lucide-react";
 
 type FriendsModalProps = {
@@ -63,13 +59,6 @@ type FriendsTab = "friends" | "add" | "requests" | "blocked";
 type FriendsConfirmState =
   | { kind: "removeFriend"; friendUserId: string; username: string }
   | { kind: "blockUser"; userId: string; username: string };
-
-const DEFAULT_SOCIAL_COUNTS: SocialCounts = {
-  friendsCount: 0,
-  incomingPendingRequestCount: 0,
-  outgoingPendingRequestCount: 0,
-  blockedUserCount: 0,
-};
 
 const formatTimestamp = (value: string) => {
   const date = new Date(value);
@@ -99,32 +88,26 @@ export function FriendsModal({
 }: FriendsModalProps) {
   const core = useHavenCore();
   const liveProfiles = core.profiles.useProfilesRecord();
+
+  // Entity data from SocialNexus — auto-updates on realtime social events
+  const counts = core.social.useCounts();
+  const friends = core.social.useFriends();
+  const requests = core.social.useRequests();
+  const blockedUsers = core.social.useBlockedUsers();
+  const loading = core.social.useIsLoading();
+
   const [activeTab, setActiveTab] = React.useState<FriendsTab>("friends");
-  const [counts, setCounts] = React.useState<SocialCounts>(
-    DEFAULT_SOCIAL_COUNTS,
-  );
-  const [friends, setFriends] = React.useState<FriendSummary[]>([]);
-  const [requests, setRequests] = React.useState<FriendRequestSummary[]>([]);
-  const [blockedUsers, setBlockedUsers] = React.useState<BlockedUserSummary[]>(
-    [],
-  );
-  const [loading, setLoading] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [busyActionKey, setBusyActionKey] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [searchResults, setSearchResults] = React.useState<
-    FriendSearchResult[]
-  >([]);
+  const [searchResults, setSearchResults] = React.useState<FriendSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = React.useState(false);
   const [searchError, setSearchError] = React.useState<string | null>(null);
   const [pendingConfirm, setPendingConfirm] =
     React.useState<FriendsConfirmState | null>(null);
   const searchRequestIdRef = React.useRef(0);
-  const lastProcessedSocialGraphRevisionRef = React.useRef<number | null>(null);
-  const socialGraphRevision = useSocialGraphRealtimeStore((s) => s.revision);
-  const socialBackend = React.useMemo(() => getSocialBackend(), []);
 
   const incomingRequests = requests.filter(
     (request) => request.direction === "incoming",
@@ -133,73 +116,37 @@ export function FriendsModal({
     (request) => request.direction === "outgoing",
   );
 
-  const refreshData = React.useCallback(
-    async (options?: { suppressLoadingState?: boolean }) => {
-      if (!open || !currentUserId) return;
+  const handleRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    setLoadError(null);
+    try {
+      await core.social.load();
+    } catch (error) {
+      setLoadError(getErrorMessage(error, "Failed to load friends data."));
+    } finally {
+      setRefreshing(false);
+    }
+  }, [core]);
 
-      if (options?.suppressLoadingState) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      setLoadError(null);
-
-      try {
-        const [nextCounts, nextFriends, nextRequests, nextBlockedUsers] =
-          await Promise.all([
-            socialBackend.getSocialCounts(),
-            socialBackend.listFriends(),
-            socialBackend.listFriendRequests(),
-            socialBackend.listBlockedUsers(),
-          ]);
-
-        setCounts(nextCounts);
-        setFriends(nextFriends);
-        setRequests(nextRequests);
-        setBlockedUsers(nextBlockedUsers);
-      } catch (error) {
-        setLoadError(getErrorMessage(error, "Failed to load friends data."));
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [currentUserId, open, socialBackend],
-  );
-
+  // Trigger a fresh load on open; reset transient UI state on close.
+  // SocialNexus.load() is deduped — safe to call every open.
   React.useEffect(() => {
     if (!open) {
-      lastProcessedSocialGraphRevisionRef.current = null;
       setActionError(null);
       setSearchError(null);
       setSearchLoading(false);
       setPendingConfirm(null);
       return;
     }
-
-    void refreshData();
-  }, [open, refreshData]);
+    void core.social.load();
+  }, [open, core]);
 
   React.useEffect(() => {
     if (!open || !requestedTab) return;
     setActiveTab(requestedTab);
   }, [open, requestedTab]);
 
-  React.useEffect(() => {
-    if (!open || !currentUserId) return;
-
-    if (lastProcessedSocialGraphRevisionRef.current === null) {
-      lastProcessedSocialGraphRevisionRef.current = socialGraphRevision;
-      return;
-    }
-    if (lastProcessedSocialGraphRevisionRef.current === socialGraphRevision) {
-      return;
-    }
-    lastProcessedSocialGraphRevisionRef.current = socialGraphRevision;
-    void refreshData({ suppressLoadingState: true });
-  }, [currentUserId, open, refreshData, socialGraphRevision]);
-
+  // Search with 150ms debounce
   React.useEffect(() => {
     if (!open || activeTab !== "add") return;
 
@@ -217,8 +164,8 @@ export function FriendsModal({
     setSearchError(null);
 
     const timeoutId = window.setTimeout(() => {
-      void socialBackend
-        .searchUsersForFriendAdd(trimmedQuery)
+      void core.social
+        .searchUsers(trimmedQuery)
         .then((results) => {
           if (searchRequestIdRef.current !== requestId) return;
           setSearchResults(results);
@@ -237,7 +184,7 @@ export function FriendsModal({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [activeTab, open, searchQuery, socialBackend]);
+  }, [activeTab, open, searchQuery, core]);
 
   const runMutation = async (
     actionKey: string,
@@ -249,15 +196,14 @@ export function FriendsModal({
     setSearchError(null);
     try {
       await task();
-      await refreshData({ suppressLoadingState: true });
+      // Nexus mutations call load() internally — no manual refresh needed.
+      // Only refresh search results if the caller requests it.
       if (
         options?.refreshSearch &&
         activeTab === "add" &&
         searchQuery.trim().length >= 2
       ) {
-        const results = await socialBackend.searchUsersForFriendAdd(
-          searchQuery.trim(),
-        );
+        const results = await core.social.searchUsers(searchQuery.trim());
         setSearchResults(results);
       }
     } catch (error) {
@@ -275,24 +221,24 @@ export function FriendsModal({
     runMutation(
       `send-request:${username.toLowerCase()}`,
       async () => {
-        await socialBackend.sendFriendRequest(username);
+        await core.social.sendFriendRequest(username);
       },
       { refreshSearch: true },
     );
 
   const handleAcceptRequest = (requestId: string) =>
     runMutation(`accept-request:${requestId}`, async () => {
-      await socialBackend.acceptFriendRequest(requestId);
+      await core.social.acceptFriendRequest(requestId);
     });
 
   const handleDeclineRequest = (requestId: string) =>
     runMutation(`decline-request:${requestId}`, async () => {
-      await socialBackend.declineFriendRequest(requestId);
+      await core.social.declineFriendRequest(requestId);
     });
 
   const handleCancelRequest = (requestId: string) =>
     runMutation(`cancel-request:${requestId}`, async () => {
-      await socialBackend.cancelFriendRequest(requestId);
+      await core.social.cancelFriendRequest(requestId);
     });
 
   const handleRemoveFriend = (friend: FriendSummary) => {
@@ -325,20 +271,20 @@ export function FriendsModal({
       void runMutation(
         `remove-friend:${nextConfirm.friendUserId}`,
         async () => {
-          await socialBackend.removeFriend(nextConfirm.friendUserId);
+          await core.social.removeFriend(nextConfirm.friendUserId);
         },
       );
       return;
     }
 
     void runMutation(`block-user:${nextConfirm.userId}`, async () => {
-      await socialBackend.blockUser(nextConfirm.userId);
+      await core.social.blockUser(nextConfirm.userId);
     });
   };
 
   const handleUnblockUser = (blockedUserId: string) =>
     runMutation(`unblock-user:${blockedUserId}`, async () => {
-      await socialBackend.unblockUser(blockedUserId);
+      await core.social.unblockUser(blockedUserId);
     });
 
   const handleMessageFriend = (friendUserId: string) => {
@@ -444,7 +390,7 @@ export function FriendsModal({
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      void refreshData({ suppressLoadingState: true });
+                      void handleRefresh();
                     }}
                     disabled={refreshing || loading}
                     className="border-border text-white"
@@ -641,8 +587,8 @@ export function FriendsModal({
                           searchRequestIdRef.current += 1;
                           setSearchLoading(true);
                           setSearchError(null);
-                          void socialBackend
-                            .searchUsersForFriendAdd(searchQuery.trim())
+                          void core.social
+                            .searchUsers(searchQuery.trim())
                             .then((results) => {
                               setSearchResults(results);
                             })

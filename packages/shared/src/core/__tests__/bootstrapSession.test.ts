@@ -27,8 +27,8 @@ const makeFakeCore = (input: {
   ) => () => void;
 }): HavenCore => {
   const persistence = createMemoryPersistence();
-  const communities = new CommunityNexus(persistence);
-  const channels = new ChannelNexus(persistence);
+  const communities = new CommunityNexus(persistence, {} as never);
+  const channels = new ChannelNexus(persistence, {} as never);
   const messageNexuses = new Map<string, CommunityMessageNexus>();
 
   const phase = {

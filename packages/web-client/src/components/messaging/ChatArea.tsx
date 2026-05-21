@@ -137,9 +137,8 @@ export function ChatArea({
   const handleHiddenMessagesToggle = React.useCallback(
     (checked: boolean) => {
       setShowHiddenMessages(checked);
-      core.syncViewerMessagePolicy(communityId);
     },
-    [communityId, core, setShowHiddenMessages],
+    [setShowHiddenMessages],
   );
 
   const handleSendMessage = React.useCallback(

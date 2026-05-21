@@ -5,6 +5,7 @@ import type { SocialBackend } from "@shared/lib/backend/socialBackend";
 import type {
   BlockedUserSummary,
   FriendRequestSummary,
+  FriendSearchResult,
   FriendSummary,
   SocialCounts,
 } from "@shared/lib/backend/types";
@@ -70,7 +71,7 @@ const blockedEqual = (
 };
 
 export class SocialNexus {
-  private backend: SocialBackend | null = null;
+  private readonly backend: SocialBackend;
   private policySync: (() => void) | null = null;
   private loadInflight: Promise<void> | null = null;
   private blockListsInflight: Promise<void> | null = null;
@@ -81,8 +82,9 @@ export class SocialNexus {
 
   private readonly store: UseBoundStore<StoreApi<SocialNexusState>>;
 
-  constructor(_persistence: NexusPersistence) {
+  constructor(_persistence: NexusPersistence, backend: SocialBackend) {
     void _persistence;
+    this.backend = backend;
     this.store = create<SocialNexusState>()(() => ({
       myBlockedUserIds: [],
       usersBlockingMeIds: [],
@@ -94,10 +96,6 @@ export class SocialNexus {
       isLoading: false,
       revision: 0,
     }));
-  }
-
-  setBackend(backend: SocialBackend): void {
-    this.backend = backend;
   }
 
   setPolicySyncCallback(callback: (() => void) | null): void {
@@ -263,6 +261,10 @@ export class SocialNexus {
     if (!this.backend) throw new Error("SocialNexus backend not attached.");
     await this.backend.removeFriend(otherUserId);
     void this.load();
+  }
+
+  async searchUsers(query: string): Promise<FriendSearchResult[]> {
+    return this.backend.searchUsersForFriendAdd(query);
   }
 
   useCounts(): SocialCounts {

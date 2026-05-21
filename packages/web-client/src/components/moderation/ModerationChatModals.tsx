@@ -28,7 +28,6 @@ export function ModerationChatModals({
       currentUserDisplayName={app.userDisplayName}
       managedServers={managedReportServers}
       serverPermissionsById={serverPermissionsById}
-      reportStatusRefreshVersion={app.reportStatusRefreshVersion}
       onBanUserFromServer={app.banUserFromServer}
       onKickUserFromServer={app.kickUserFromServer}
     />

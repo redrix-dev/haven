@@ -126,8 +126,8 @@ const voiceMocks = vi.hoisted(() => {
 
 function registerTestHavenCore() {
   const persistence = createMemoryPersistence();
-  const voice = new VoiceNexus(persistence);
-  const social = new SocialNexus(persistence);
+  const voice = new VoiceNexus(persistence, {} as never);
+  const social = new SocialNexus(persistence, {} as never);
   registerHavenCore({
     backends: {
       client: {

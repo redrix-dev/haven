@@ -64,7 +64,7 @@ function seedNotifications(items: NotificationItem[]) {
 describe("NotificationCenterModal", () => {
   beforeEach(() => {
     resetHavenCore();
-    notificationNexus = new NotificationNexus(createMemoryPersistence());
+    notificationNexus = new NotificationNexus(createMemoryPersistence(), {} as never);
     profileNexus = new ProfileNexus(createMemoryPersistence());
     registerHavenCore({
       notifications: notificationNexus,

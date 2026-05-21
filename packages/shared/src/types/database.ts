@@ -1522,6 +1522,8 @@ export type Database = {
           id: string
           is_hidden: boolean
           metadata: Json
+          platform_expunged_at: string | null
+          platform_quarantined_at: string | null
         }
         Insert: {
           author_type?: Database["public"]["Enums"]["message_author_type"]
@@ -1535,6 +1537,8 @@ export type Database = {
           id?: string
           is_hidden?: boolean
           metadata?: Json
+          platform_expunged_at?: string | null
+          platform_quarantined_at?: string | null
         }
         Update: {
           author_type?: Database["public"]["Enums"]["message_author_type"]
@@ -1548,6 +1552,8 @@ export type Database = {
           id?: string
           is_hidden?: boolean
           metadata?: Json
+          platform_expunged_at?: string | null
+          platform_quarantined_at?: string | null
         }
         Relationships: [
           {
@@ -1836,8 +1842,10 @@ export type Database = {
           id: string
           include_last_n_messages: number | null
           notes: string | null
+          platform_action: Json | null
           reporter_user_id: string
           snapshot: Json | null
+          source_report_id: string | null
           status: Database["public"]["Enums"]["support_report_status"]
           title: string
           updated_at: string
@@ -1849,8 +1857,10 @@ export type Database = {
           id?: string
           include_last_n_messages?: number | null
           notes?: string | null
+          platform_action?: Json | null
           reporter_user_id: string
           snapshot?: Json | null
+          source_report_id?: string | null
           status?: Database["public"]["Enums"]["support_report_status"]
           title: string
           updated_at?: string
@@ -1862,8 +1872,10 @@ export type Database = {
           id?: string
           include_last_n_messages?: number | null
           notes?: string | null
+          platform_action?: Json | null
           reporter_user_id?: string
           snapshot?: Json | null
+          source_report_id?: string | null
           status?: Database["public"]["Enums"]["support_report_status"]
           title?: string
           updated_at?: string
@@ -2407,6 +2419,7 @@ export type Database = {
         | "resolved"
         | "dismissed"
         | "escalated"
+        | "resolved_by_platform"
     }
     CompositeTypes: {
       [_ in never]: never

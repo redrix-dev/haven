@@ -151,15 +151,12 @@ const selectServerAdminState = (
 
 export class CommunityAdminNexus {
   private readonly store: UseBoundStore<StoreApi<CommunityAdminNexusState>>
-  private controlPlane: ControlPlaneBackend | null = null
+  private readonly controlPlane: ControlPlaneBackend
 
-  constructor(_persistence: NexusPersistence) {
+  constructor(_persistence: NexusPersistence, controlPlane: ControlPlaneBackend) {
     void _persistence
-    this.store = create<CommunityAdminNexusState>()(() => createInitialState())
-  }
-
-  setControlPlane(controlPlane: ControlPlaneBackend): void {
     this.controlPlane = controlPlane
+    this.store = create<CommunityAdminNexusState>()(() => createInitialState())
   }
 
   getReactiveStore(): UseBoundStore<StoreApi<CommunityAdminNexusState>> {
@@ -716,6 +713,52 @@ export class CommunityAdminNexus {
     })
 
     await this.loadServerRoleManagement(communityId)
+  }
+
+  banMember = async (input: {
+    communityId: string;
+    targetUserId: string;
+    reason: string;
+  }): Promise<void> => {
+    const communityBackend = getCommunityDataBackend(input.communityId)
+    const banResult = await communityBackend.banCommunityMember({
+      communityId: input.communityId,
+      targetUserId: input.targetUserId,
+      reason: input.reason,
+    })
+    try {
+      await communityBackend.broadcastMemberBanned(banResult)
+    } catch (err) {
+      console.error('[CommunityAdminNexus] broadcastMemberBanned failed', err)
+    }
+    await this.refreshMembersModalMembersIfOpen(input.communityId)
+  }
+
+  kickMember = async (input: {
+    communityId: string;
+    targetUserId: string;
+  }): Promise<void> => {
+    const communityBackend = getCommunityDataBackend(input.communityId)
+    await communityBackend.kickCommunityMember({
+      communityId: input.communityId,
+      targetUserId: input.targetUserId,
+    })
+    await this.refreshMembersModalMembersIfOpen(input.communityId)
+  }
+
+  reportMember = async (input: {
+    communityId: string;
+    targetUserId: string;
+    reporterUserId: string;
+    reason: string;
+  }): Promise<void> => {
+    const communityBackend = getCommunityDataBackend(input.communityId)
+    await communityBackend.reportUserProfile({
+      communityId: input.communityId,
+      targetUserId: input.targetUserId,
+      reporterUserId: input.reporterUserId,
+      reason: input.reason,
+    })
   }
 
   leaveServer = async (communityId: string): Promise<void> => {

@@ -7,6 +7,7 @@ import {
   ChannelNexus,
 } from "@shared/nexus/community/ChannelNexus";
 import { CommunityAdminNexus } from "@shared/nexus/community/CommunityAdminNexus";
+import { CommunityModerationNexus } from "@shared/nexus/community/CommunityModerationNexus";
 import { CommunityMessageNexus } from "@shared/nexus/community/CommunityMessageNexus";
 import { DirectMessageNexus } from "@shared/nexus/direct-messages/DirectMessageNexus";
 import { NotificationNexus } from "@shared/nexus/notifications/NotificationNexus";
@@ -16,6 +17,7 @@ import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
 import { VoiceNexus } from "@shared/nexus/voice/VoiceNexus";
 import { useUiStore } from "@shared/stores/uiStore";
 import { getCommunityDataBackend } from "@shared/lib/backend";
+import type { BanEligibleServer } from "@shared/lib/backend/types";
 import { createHavenBackends, type HavenBackends, type HavenSupabasePublicConfig } from "./backends";
 import { notifyActiveServerAccessLost } from "./communityAccessHandlers";
 import { BootstrapPhase, type BootstrapPhaseSnapshot, type BootstrapPhaseListener } from "./bootstrapPhase";
@@ -97,6 +99,7 @@ export class HavenCore {
   readonly communities: CommunityNexus;
   readonly channels: ChannelNexus;
   readonly admin: CommunityAdminNexus;
+  readonly moderation: CommunityModerationNexus;
   readonly messages: MessageNexusRegistry;
   readonly directMessages: DirectMessageNexus;
   readonly notifications: NotificationNexus;
@@ -117,27 +120,22 @@ export class HavenCore {
     this.backends = createHavenBackends(options.client, options.publicConfig);
     this.viewerMessagePolicyStore = createViewerMessagePolicyStore();
 
-    this.communities = new CommunityNexus(options.persistence);
-    this.channels = new ChannelNexus(options.persistence);
-    this.admin = new CommunityAdminNexus(options.persistence);
+    this.communities = new CommunityNexus(options.persistence, this.backends.controlPlane);
+    this.channels = new ChannelNexus(options.persistence, this.backends.communityData);
+    this.admin = new CommunityAdminNexus(options.persistence, this.backends.controlPlane);
+    this.moderation = new CommunityModerationNexus(options.persistence, this.backends.serverModmail);
     this.messages = new MessageNexusRegistry(
       options.persistence,
       this.viewerMessagePolicyStore,
     );
-    this.directMessages = new DirectMessageNexus(options.persistence);
-    this.notifications = new NotificationNexus(options.persistence);
-    this.social = new SocialNexus(options.persistence);
+    this.directMessages = new DirectMessageNexus(options.persistence, this.backends.directMessages);
+    this.notifications = new NotificationNexus(options.persistence, this.backends.notifications);
+    this.social = new SocialNexus(options.persistence, this.backends.social);
     this.permissions = new PermissionsNexus(options.persistence);
     this.profiles = new ProfileNexus(options.persistence);
-    this.voice = new VoiceNexus(options.persistence);
+    this.voice = new VoiceNexus(options.persistence, this.viewerMessagePolicyStore);
 
-    this.communities.setControlPlane(this.backends.controlPlane);
-    this.admin.setControlPlane(this.backends.controlPlane);
-    this.channels.setCommunityData(this.backends.communityData);
     this.messages.setBackends(this.backends);
-    this.directMessages.setBackend(this.backends.directMessages);
-    this.notifications.setBackend(this.backends.notifications);
-    this.social.setBackend(this.backends.social);
 
     this.social.setPolicySyncCallback(() => {
       this.syncViewerMessagePolicy();
@@ -145,10 +143,17 @@ export class HavenCore {
     this.permissions.setPolicySyncCallback((communityId) => {
       this.syncViewerMessagePolicy(communityId);
     });
-    this.voice.setViewerPolicyStore(this.viewerMessagePolicyStore);
 
     this.communities.setOnListChanged(() => {
       this.syncActiveCommunityAccess();
+    });
+
+    // Auto-sync policy when the mod "show hidden messages" toggle changes.
+    // This eliminates the need for call sites to manually invoke syncViewerMessagePolicy.
+    useUiStore.subscribe((state, prevState) => {
+      if (state.showHiddenMessages !== prevState.showHiddenMessages) {
+        this.syncViewerMessagePolicy();
+      }
     });
   }
 
@@ -341,6 +346,7 @@ export class HavenCore {
     this.communities.clear();
     this.channels.clear();
     this.admin.clear();
+    this.moderation.clear();
     this.messages.clearAll();
     this.directMessages.clear();
     this.notifications.clear();
@@ -447,5 +453,55 @@ export class HavenCore {
     if (options?.markRead !== false) {
       await this.directMessages.markRead(conversationId);
     }
+  }
+
+  /**
+   * Ensure the viewer is elevated in a community (uses PermissionsNexus cache).
+   */
+  async ensureElevated(communityId: string): Promise<boolean> {
+    return this.permissions.ensureElevated(communityId, this.backends.communityData);
+  }
+
+  /**
+   * Broadcast a channel access revocation to realtime subscribers.
+   */
+  async broadcastChannelAccessRevoked(input: {
+    communityId: string;
+    channelId: string;
+    revokedUserId: string;
+  }): Promise<void> {
+    await this.backends.communityData.broadcastMemberChannelAccessRevoked(input);
+  }
+
+  /**
+   * Redeem an invite code, reload communities, and activate the joined community.
+   */
+  async joinCommunityByInvite(
+    code: string,
+  ): Promise<{ communityName: string; joined: boolean }> {
+    const result = await this.backends.controlPlane.redeemCommunityInvite(code);
+    await this.communities.load(this.sessionUserId!);
+    this.communities.setActiveId(result.communityId);
+    return { communityName: result.communityName, joined: result.joined };
+  }
+
+  /**
+   * Update the authenticated user's profile via the control plane.
+   */
+  async updateUserProfile(input: {
+    userId: string;
+    username: string;
+    avatarUrl: string | null;
+    avatarFile?: File | null;
+    theme?: string;
+  }): Promise<{ username: string; avatarUrl: string | null; theme?: string }> {
+    return this.backends.controlPlane.updateUserProfile(input);
+  }
+
+  /**
+   * Resolve which servers the caller can ban a target user from.
+   */
+  async getBanEligibleServers(targetUserId: string): Promise<BanEligibleServer[]> {
+    return this.backends.controlPlane.listBanEligibleServersForUser(targetUserId);
   }
 }

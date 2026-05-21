@@ -706,6 +706,8 @@ export type ServerReportDetail = ServerReportSummary & {
   internalNotes: SupportReportInternalNote[];
   targetUserId: string | null;
   targetDisplayName: string | null;
+  /** Written by haven staff when they act on the linked haven_staff row. Propagated via DB trigger. */
+  platformAction: Record<string, unknown> | null;
 };
 
 export type ReportStatusUpdatedBroadcastPayload = {

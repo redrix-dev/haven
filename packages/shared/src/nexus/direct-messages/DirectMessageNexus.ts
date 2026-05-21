@@ -6,6 +6,7 @@ import type { DirectMessageBackend } from '@shared/lib/backend/directMessageBack
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
+  DirectMessageReportKind,
 } from '@shared/lib/backend/types'
 import type { StoreApi, UseBoundStore } from 'zustand'
 
@@ -81,7 +82,7 @@ export class DirectMessageNexus extends Nexus<
     | UseBoundStore<StoreApi<DirectMessageNexusState>>
     | null = null
 
-  private backend: DirectMessageBackend | null = null
+  private readonly backend: DirectMessageBackend
   private conversationsInflight: Promise<void> | null = null
   private messagesInflight = new Map<string, Promise<void>>()
 
@@ -109,11 +110,8 @@ export class DirectMessageNexus extends Nexus<
     (state: DirectMessageNexusState) => DirectMessage[]
   >()
 
-  constructor(persistence: NexusPersistence) {
+  constructor(persistence: NexusPersistence, backend: DirectMessageBackend) {
     super('direct-messages', 'global', persistence)
-  }
-
-  setBackend(backend: DirectMessageBackend): void {
     this.backend = backend
   }
 
@@ -665,6 +663,14 @@ export class DirectMessageNexus extends Nexus<
     this.messagesSelectors.clear()
     this.messageSnapshots.clear()
     this.persistence.remove(STORAGE_KEY)
+  }
+
+  async reportMessage(input: {
+    messageId: string;
+    kind: DirectMessageReportKind;
+    comment: string;
+  }): Promise<string> {
+    return this.backend.reportMessage(input);
   }
 
   private markMessagesLoadComplete(conversationId: string): void {

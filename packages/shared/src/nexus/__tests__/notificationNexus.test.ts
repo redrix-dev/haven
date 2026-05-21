@@ -18,8 +18,7 @@ const item = (overrides: Partial<NotificationItem> = {}): NotificationItem =>
 
 describe('NotificationNexus', () => {
   it('loads the inbox and updates counts', async () => {
-    const nexus = new NotificationNexus(createMemoryPersistence());
-    nexus.setBackend({
+    const nexus = new NotificationNexus(createMemoryPersistence(), {
       listNotifications: vi.fn(async () => [item()]),
       getNotificationCounts: vi.fn(async () => ({
         unseenCount: 1,
@@ -34,9 +33,8 @@ describe('NotificationNexus', () => {
   });
 
   it('dedupes concurrent inbox loads', async () => {
-    const nexus = new NotificationNexus(createMemoryPersistence());
     const list = vi.fn(async () => [item()]);
-    nexus.setBackend({
+    const nexus = new NotificationNexus(createMemoryPersistence(), {
       listNotifications: list,
       getNotificationCounts: vi.fn(async () => ({
         unseenCount: 0,
@@ -50,13 +48,12 @@ describe('NotificationNexus', () => {
   });
 
   it('markSeen delegates and refreshes counts', async () => {
-    const nexus = new NotificationNexus(createMemoryPersistence());
     const markSeen = vi.fn(async () => 1);
     const getCounts = vi.fn(async () => ({
       unseenCount: 0,
       unreadCount: 0,
     }));
-    nexus.setBackend({
+    const nexus = new NotificationNexus(createMemoryPersistence(), {
       markNotificationsSeen: markSeen,
       getNotificationCounts: getCounts,
     } as never);

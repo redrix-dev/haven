@@ -1,8 +1,7 @@
 import type { HavenCore } from "./HavenCore";
 import { mapLiveProfileIdentity } from "@shared/lib/backend/controlPlaneBackend";
-import type { MessageBundle } from "@shared/lib/backend/types";
+import type { MessageBundle, ReportStatusUpdatedBroadcastPayload } from "@shared/lib/backend/types";
 import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
-import { useUiStore } from "@shared/stores/uiStore";
 import {
   notifyMemberBanned,
   notifyMemberChannelAccessRevoked,
@@ -279,7 +278,17 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
     }
 
     case "report_status_updated": {
-      useUiStore.getState().bumpReportStatusRevision();
+      const reportPayload = evt.payload as ReportStatusUpdatedBroadcastPayload;
+      core.moderation.handleReportChange(reportPayload);
+      return;
+    }
+
+    case "USER_PLATFORM_BANNED": {
+      const userId =
+        typeof evt.payload.user_id === "string" ? evt.payload.user_id : null;
+      if (userId) {
+        core.moderation.handleUserPlatformBanned(userId);
+      }
       return;
     }
 

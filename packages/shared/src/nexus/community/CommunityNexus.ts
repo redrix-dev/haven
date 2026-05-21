@@ -76,17 +76,11 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
     return next
   }
 
-  private controlPlane: ControlPlaneBackend | null = null
+  private readonly controlPlane: ControlPlaneBackend
   private onListChanged: (() => void) | null = null
 
-  constructor(persistence: NexusPersistence) {
+  constructor(persistence: NexusPersistence, controlPlane: ControlPlaneBackend) {
     super('communities', 'global', persistence)
-  }
-
-  /**
-   * Wire the backend used by `load`. Called by HavenCore once during construction.
-   */
-  setControlPlane(controlPlane: ControlPlaneBackend): void {
     this.controlPlane = controlPlane
   }
 

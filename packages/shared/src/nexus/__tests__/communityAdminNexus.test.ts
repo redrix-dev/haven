@@ -30,9 +30,9 @@ describe('CommunityAdminNexus', () => {
 
   beforeEach(() => {
     const persistence = createMemoryPersistence();
-    admin = new CommunityAdminNexus(persistence);
-    channels = new ChannelNexus(persistence);
-    communities = new CommunityNexus(persistence);
+    admin = new CommunityAdminNexus(persistence, {} as never);
+    channels = new ChannelNexus(persistence, {} as never);
+    communities = new CommunityNexus(persistence, {} as never);
 
     communities.setCommunities([
       {
@@ -93,10 +93,6 @@ describe('CommunityAdminNexus', () => {
   });
 
   it('openServerMembersModal resolves the server name from CommunityNexus', async () => {
-    admin.setControlPlane({
-      listActiveCommunityInvites: vi.fn(),
-    } as never);
-
     const listCommunityMembers = vi.fn(async () => []);
     const getMyPermissions = vi.fn(async () => ({
       canCreateReports: false,

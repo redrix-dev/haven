@@ -66,7 +66,7 @@ import { VoiceNexus } from '@shared/nexus/voice/VoiceNexus';
 
 function registerTestHavenCore() {
   const persistence = createMemoryPersistence();
-  const voice = new VoiceNexus(persistence);
+  const voice = new VoiceNexus(persistence, {} as never);
   registerHavenCore({ voice } as unknown as HavenCore);
 }
 

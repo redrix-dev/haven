@@ -170,9 +170,9 @@ export function ChatAppDmWorkspace({ user }: ChatAppDmWorkspaceProps) {
       kind: DirectMessageReportKind;
       comment: string;
     }) => {
-      await core.backends.directMessages.reportMessage(input);
+      await core.directMessages.reportMessage(input);
     },
-    [core.backends.directMessages],
+    [core.directMessages],
   );
 
   const selectedDmConversation = useMemo(
