@@ -18,6 +18,7 @@
       "@shared/app/ui/*": ["./packages/web-client/src/app-ui/*"],
       "@shared/*": ["./packages/shared/src/*"],
       "@client/app/*": ["./packages/shared/src/app/*"],
+      "@platform/assets/runtimeAudio": ["./packages/web-client/src/infrastructure/platform/assets/runtimeAudio"],
       "@platform/*": ["./packages/shared/src/platform/*"],
       "@test-support/*": ["./tooling/test-support/*"]
     }

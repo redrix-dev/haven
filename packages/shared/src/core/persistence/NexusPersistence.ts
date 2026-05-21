@@ -2,7 +2,7 @@
  * Platform-agnostic key/value port used by every Nexus for persist/rehydrate.
  *
  * Implementations:
- *   - createMmkvPersistence — mobile (react-native-mmkv)
+ *   - createMmkvPersistence — mobile (apps/mobile/src/lib/createMmkvPersistence.ts)
  *   - createMemoryPersistence — tests and any host without a disk adapter
  *
  * Hosts inject the appropriate implementation when constructing HavenCore.

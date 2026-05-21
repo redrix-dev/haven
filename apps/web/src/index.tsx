@@ -5,12 +5,14 @@ import { createHavenCore, createMemoryPersistence } from '@shared/core';
 import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppRoot } from '@web-client/AppRoot';
+import { registerWebAppHost } from '@web-client/infrastructure/platform/webAppHost';
 import '@shared/styles/globals.css';
 import { applyShellThemeTokens, setShellThemeApplier } from '@web-client/shellThemeRegistry';
 import { readSessionStoredThemeId } from '@shared/themes/sessionThemeStorage';
 import { getTheme } from '@shared/themes/registry';
 import { applyThemeWeb } from './lib/theme';
 
+registerWebAppHost();
 setShellThemeApplier(applyThemeWeb);
 applyShellThemeTokens(getTheme(readSessionStoredThemeId() ?? 'default').tokens);
 

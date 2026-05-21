@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
         "@shared/app/ui": path.resolve(__dirname, "./packages/web-client/src/app-ui"),
         "@shared": path.resolve(__dirname, "./packages/shared/src"),
         "@client": path.resolve(__dirname, "./packages/shared/src/client"),
+        "@platform/assets/runtimeAudio": path.resolve(__dirname, "./packages/web-client/src/infrastructure/platform/assets/runtimeAudio"),
         "@platform": path.resolve(__dirname, "./packages/shared/src/platform"),
         "@test-support": path.resolve(__dirname, "./tooling/test-support"),
       },

@@ -1,5 +1,5 @@
 import { createMMKV, type MMKV } from "react-native-mmkv";
-import type { NexusPersistence } from "./NexusPersistence";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 
 const DEFAULT_STORAGE_ID = "haven-nexus-storage";
 

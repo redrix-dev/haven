@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { createHavenCore } from "@shared/core"
-import { createMmkvPersistence } from "@shared/core/persistence/createMmkvPersistence"
+import { createMmkvPersistence } from "@/lib/createMmkvPersistence"
 import { registerMobileAppHost } from "@/lib/registerMobileAppHost";
 import {
   getMobileSupabase,

@@ -21,10 +21,8 @@ export {
 export type { HavenBackends, HavenSupabasePublicConfig } from "./backends";
 export type { NexusPersistence } from "./persistence/NexusPersistence";
 export { createMemoryPersistence } from "./persistence/createMemoryPersistence";
-// Note: createMmkvPersistence is intentionally NOT re-exported here because it
-// imports react-native-mmkv, which is only available on React Native hosts.
-// Mobile entry points must import it explicitly from
-// @shared/core/persistence/createMmkvPersistence.
+// Note: createMmkvPersistence lives in apps/mobile/src/lib/createMmkvPersistence.ts
+// and is not part of the shared package (it imports react-native-mmkv).
 export { applyAccessRevoked } from "./commands/applyAccessRevoked";
 export { applyModerationEvent } from "./commands/applyModerationEvent";
 export { syncFocusFromRoute, applyCommunityFocus } from "./syncFocusFromRoute";
