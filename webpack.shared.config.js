@@ -40,6 +40,12 @@ function readEnvFile(filePath) {
 
 const sharedResolve = {
   extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
+  // Allow webpack to find packages installed inside workspace package directories
+  // (e.g. livekit-client installed via `npm install` in packages/web-client)
+  modules: [
+    'node_modules',
+    path.resolve(__dirname, 'packages/web-client/node_modules'),
+  ],
   alias: {
     '@electron': path.resolve(__dirname, 'apps/electron/src'),
     '@web': path.resolve(__dirname, 'apps/web/src'),
@@ -47,6 +53,8 @@ const sharedResolve = {
     '@shared/app/ui': path.resolve(__dirname, 'packages/web-client/src/app-ui'),
     '@shared': path.resolve(__dirname, 'packages/shared/src'),
     '@client': path.resolve(__dirname, 'packages/shared/src/client'),
+    // Specific alias must come before the glob to take precedence
+    '@platform/assets/runtimeAudio': path.resolve(__dirname, 'packages/web-client/src/infrastructure/platform/assets/runtimeAudio'),
     '@platform': path.resolve(__dirname, 'packages/shared/src/platform'),
     '@test-support': path.resolve(__dirname, 'tooling/test-support'),
   },
