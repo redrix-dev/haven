@@ -34,7 +34,7 @@
     "test:report": "node tooling/scripts/test/generate-test-report.mjs",
     "typecheck": "tsc --noEmit --project tsconfig.web.json && tsc --noEmit --project tsconfig.node.json",
     "test:all": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run test:unit && npm run test:db && npm run test:backend",
-    "test:ci": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run test:unit && npm run test:db && npm run test:backend",
+    "test:ci": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run mobile:typecheck && npm run test:unit && npm run test:db && npm run test:backend",
     "ci:verify": "npm run test:ci",
     "dev:web": "npm run assets:generate && vite",
     "build:web": "npm run assets:generate && vite build",
