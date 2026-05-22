@@ -47,6 +47,11 @@ const sharedResolve = {
     path.resolve(__dirname, 'packages/web-client/node_modules'),
   ],
   alias: {
+    // Force all React imports to resolve to the same root copy, preventing
+    // duplicate React when sub-packages (e.g. @livekit/components-react) have
+    // their own node_modules/react installed locally.
+    'react': path.resolve(__dirname, 'node_modules/react'),
+    'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     '@electron': path.resolve(__dirname, 'apps/electron/src'),
     '@web': path.resolve(__dirname, 'apps/web/src'),
     '@web-client': path.resolve(__dirname, 'packages/web-client/src'),

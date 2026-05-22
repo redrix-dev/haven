@@ -24,6 +24,9 @@ function buildRendererCsp({ rendererOrigin, extraConnectSrc = [] }) {
     'wss://*.supabase.co',
     'https://*.supabase.in',
     'wss://*.supabase.in',
+    // LiveKit Cloud: HTTPS for region-settings + token validation, WSS for signal channel
+    'https://*.livekit.cloud',
+    'wss://*.livekit.cloud',
     'stun:',
     'turn:',
   ];
