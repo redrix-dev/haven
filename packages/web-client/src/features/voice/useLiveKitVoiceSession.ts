@@ -513,6 +513,24 @@ export function useLiveKitVoiceSession({
           JSON.stringify({ avatarUrl: currentUserAvatarUrl ?? null }),
         );
 
+        // Explicitly request mic access from the renderer process so macOS
+        // shows the permission dialog if needed. The OS grants permission
+        // per-process and the Electron Helper (Renderer) is separate from the
+        // main process, so systemPreferences.askForMediaAccess alone is not
+        // enough. If permission is denied we surface a clear error early.
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((t) => t.stop());
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'NotAllowedError') {
+            throw new Error(
+              'Microphone access was denied. Please grant microphone permission in System Settings → Privacy & Security → Microphone, then restart the app.',
+            );
+          }
+          // Any other error (no mic attached, etc.) — let LiveKit attempt anyway
+          console.warn('Pre-check getUserMedia failed, attempting LiveKit mic enable anyway:', err);
+        }
+
         // Enable microphone
         await room.localParticipant.setMicrophoneEnabled(true);
 
