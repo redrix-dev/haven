@@ -2,7 +2,7 @@
  * Swipe actions: dismiss + mark read only. There is no `mark_notifications_unread` RPC yet (Phase B),
  * so we do not expose “Mark unread” in the UI.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -21,7 +21,9 @@ import {
   getNotificationTitle,
 } from "@shared/features/notifications/notificationCopy";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
-import type { LiveProfileIdentity } from "@shared/lib/backend/types";
+import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
+import { useHavenCore } from "@shared/core";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 function formatShortTime(iso: string): string {
   const d = new Date(iso);
@@ -35,29 +37,58 @@ function formatShortTime(iso: string): string {
 }
 
 type NotificationInboxListProps = {
-  items: NotificationItem[];
-  liveProfiles: Record<string, LiveProfileIdentity>;
-  refreshing: boolean;
-  loading: boolean;
-  error: string | null;
-  onRefresh: () => void;
-  onDismiss: (recipientId: string) => void;
-  onMarkRead: (recipientId: string) => void;
-  onNavigate: (notification: NotificationItem) => void;
+  navigationError?: string | null;
+  onNavigate: (notification: NotificationItem) => void | Promise<void>;
 };
 
 export function NotificationInboxList({
-  items,
-  liveProfiles,
-  refreshing,
-  loading,
-  error,
-  onRefresh,
-  onDismiss,
-  onMarkRead,
+  navigationError,
   onNavigate,
 }: NotificationInboxListProps) {
+  const core = useHavenCore();
+  const notificationItems = core.notifications.useNotifications();
+  const items = useMemo(
+    () => filterNotificationsForInbox(notificationItems),
+    [notificationItems],
+  );
+  const liveProfiles = core.profiles.useProfilesRecord();
+  const loading = core.notifications.useIsLoading();
+  const [refreshing, setRefreshing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const withNotificationAction = useCallback(
+    async (action: () => Promise<void>) => {
+      setActionError(null);
+      try {
+        await action();
+      } catch (err) {
+        setActionError(getErrorMessage(err, "Failed to update notifications."));
+      }
+    },
+    [],
+  );
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    setActionError(null);
+    await withNotificationAction(() => core.notifications.refreshInbox());
+    setRefreshing(false);
+  }, [core.notifications, withNotificationAction]);
+
+  const dismiss = useCallback(
+    (recipientId: string) => {
+      void withNotificationAction(() => core.notifications.dismiss([recipientId]));
+    },
+    [core.notifications, withNotificationAction],
+  );
+
+  const markRead = useCallback(
+    (recipientId: string) => {
+      void withNotificationAction(() => core.notifications.markRead([recipientId]));
+    },
+    [core.notifications, withNotificationAction],
+  );
 
   const toggleExpanded = useCallback((recipientId: string) => {
     setExpandedIds((prev) => {
@@ -68,6 +99,8 @@ export function NotificationInboxList({
     });
   }, []);
 
+  const visibleError = actionError ?? navigationError ?? null;
+
   const renderRightActions = useCallback(
     (notification: NotificationItem) => {
       const unread = notification.readAt == null;
@@ -77,7 +110,7 @@ export function NotificationInboxList({
             <Pressable
               accessibilityRole="button"
               className="w-24 items-center justify-center bg-accent-slider"
-              onPress={() => onMarkRead(notification.recipientId)}
+              onPress={() => markRead(notification.recipientId)}
             >
               <Text className="text-center text-xs font-semibold text-white">Read</Text>
             </Pressable>
@@ -85,14 +118,14 @@ export function NotificationInboxList({
           <Pressable
             accessibilityRole="button"
             className="w-24 items-center justify-center bg-red-900/90"
-            onPress={() => onDismiss(notification.recipientId)}
+            onPress={() => dismiss(notification.recipientId)}
           >
             <Text className="text-center text-xs font-semibold text-white">Dismiss</Text>
           </Pressable>
         </View>
       );
     },
-    [onDismiss, onMarkRead],
+    [dismiss, markRead],
   );
 
   const renderItem: ListRenderItem<NotificationItem> = useCallback(
@@ -186,11 +219,11 @@ export function NotificationInboxList({
       keyExtractor={(n) => n.recipientId}
       renderItem={renderItem}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e6edf7" />
+        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor="#e6edf7" />
       }
       ListHeaderComponent={
-        error ? (
-          <Text className="mb-3 text-sm text-red-400">{error}</Text>
+        visibleError ? (
+          <Text className="mb-3 text-sm text-red-400">{visibleError}</Text>
         ) : null
       }
       ListEmptyComponent={

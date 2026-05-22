@@ -63,10 +63,10 @@ function HavenTabNavigator({
     state: { notificationItems },
   } = useMobileNotifications();
 
-  const {
-    state: { socialCounts },
-    actions: { refreshSocialCounts },
-  } = useMobileSocialWorkspace();
+  const socialCounts = core.social.useCounts();
+  const refreshSocialCounts = useCallback(async () => {
+    await core.social.load();
+  }, [core.social]);
 
   const {
     state: { dmConversations },

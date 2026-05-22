@@ -1,17 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Switch, Text, View } from "react-native";
 import type {
   NotificationPreferences,
   NotificationPreferenceUpdate,
 } from "@shared/lib/backend/types";
-
-type NotificationPreferencesPanelProps = {
-  preferences: NotificationPreferences | null;
-  loading: boolean;
-  saving: boolean;
-  error: string | null;
-  onSave: (next: NotificationPreferenceUpdate) => Promise<void>;
-};
+import { useHavenCore } from "@shared/core";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 function buildUpdateFromPreferences(
   prefs: NotificationPreferences,
@@ -62,17 +56,34 @@ function ToggleRow({
   );
 }
 
-export function NotificationPreferencesPanel({
-  preferences,
-  loading,
-  saving,
-  error,
-  onSave,
-}: NotificationPreferencesPanelProps) {
-  const prefs = preferences;
+export function NotificationPreferencesPanel() {
+  const core = useHavenCore();
+  const inbox = core.notifications;
+
+  const preferences = inbox.usePreferences();
+  const loading = inbox.usePreferencesLoading();
+  const saving = inbox.usePreferencesSaving();
+
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setError(null);
+    void inbox.loadPreferences().catch((error) => {
+      setError(getErrorMessage(error, "Failed to load notification preferences."));
+    });
+  }, [inbox]);
+
+  const onSave = async (values: NotificationPreferenceUpdate) => {
+    setError(null);
+    try {
+      await inbox.savePreferences(values);
+    } catch (error) {
+      setError(getErrorMessage(error, "Failed to save notification preferences."));
+    }
+  };
 
   const groups = useMemo(() => {
-    if (!prefs) return [];
+    if (!preferences) return [];
     return [
       {
         title: "Friend requests",
@@ -80,26 +91,26 @@ export function NotificationPreferencesPanel({
           {
             key: "friendRequestInAppEnabled",
             label: "In-app",
-            value: prefs.friendRequestInAppEnabled,
+            value: preferences.friendRequestInAppEnabled,
           },
           {
             key: "friendRequestSoundEnabled",
             label: "Sound",
-            value: prefs.friendRequestSoundEnabled,
+            value: preferences.friendRequestSoundEnabled,
           },
           {
             key: "friendRequestPushEnabled",
             label: "Push",
-            value: prefs.friendRequestPushEnabled,
+            value: preferences.friendRequestPushEnabled,
           },
         ] as const,
       },
       {
         title: "Direct messages",
         rows: [
-          { key: "dmInAppEnabled", label: "In-app", value: prefs.dmInAppEnabled },
-          { key: "dmSoundEnabled", label: "Sound", value: prefs.dmSoundEnabled },
-          { key: "dmPushEnabled", label: "Push", value: prefs.dmPushEnabled },
+          { key: "dmInAppEnabled", label: "In-app", value: preferences.dmInAppEnabled },
+          { key: "dmSoundEnabled", label: "Sound", value: preferences.dmSoundEnabled },
+          { key: "dmPushEnabled", label: "Push", value: preferences.dmPushEnabled },
         ] as const,
       },
       {
@@ -108,24 +119,24 @@ export function NotificationPreferencesPanel({
           {
             key: "mentionInAppEnabled",
             label: "In-app",
-            value: prefs.mentionInAppEnabled,
+            value: preferences.mentionInAppEnabled,
           },
           {
             key: "mentionSoundEnabled",
             label: "Sound",
-            value: prefs.mentionSoundEnabled,
+            value: preferences.mentionSoundEnabled,
           },
           {
             key: "mentionPushEnabled",
             label: "Push",
-            value: prefs.mentionPushEnabled,
+            value: preferences.mentionPushEnabled,
           },
         ] as const,
       },
     ];
-  }, [prefs]);
+  }, [preferences]);
 
-  if (loading && !prefs) {
+  if (loading && !preferences) {
     return (
       <View className="items-center py-10">
         <ActivityIndicator color="#e6edf7" />
@@ -134,7 +145,7 @@ export function NotificationPreferencesPanel({
     );
   }
 
-  if (!prefs) {
+  if (!preferences) {
     return (
       <Text className="text-sm text-muted-foreground">
         Preferences could not be loaded.
@@ -160,7 +171,7 @@ export function NotificationPreferencesPanel({
                 value={row.value}
                 disabled={saving}
                 onValueChange={(next) => {
-                  void onSave(buildUpdateFromPreferences(prefs, { [row.key]: next }));
+                  void onSave(buildUpdateFromPreferences(preferences, { [row.key]: next }));
                 }}
               />
             ))}

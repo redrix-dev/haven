@@ -1,18 +1,13 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackHandler, Pressable, Text, View } from "react-native";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { useNotificationInteractions } from "@shared/features/notifications/hooks/useNotificationInteractions";
-import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
-import { getNotificationBackend, getSocialBackend } from "@shared/lib/backend";
 import type { NotificationItem } from "@shared/lib/backend/types";
 import { syncFocusFromRoute, useHavenCore } from "@shared/core";
 import { useUiStore } from "@shared/stores/uiStore";
 import type { RootStackParamList } from "@/navigation/types";
-import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
-import { useMobileNotifications } from "@/contexts/MobileNotificationsContext";
-import { useMobileSocialWorkspace } from "@/contexts/MobileSocialWorkspaceContext";
 import { NotificationInboxList } from "@/features/notifications/NotificationInboxList";
 import { NotificationPreferencesPanel } from "@/features/notifications/NotificationPreferencesPanel";
 import { MobileModmailPanel } from "@/features/moderation/MobileModmailPanel";
@@ -41,10 +36,13 @@ export default function NotificationsContainer({
 }: NotificationsContainerProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const core = useHavenCore();
-  const liveProfiles = core.profiles.useProfilesRecord();
   const communities = core.communities.useCommunities();
   const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
+  const [
+    notificationNavigationError,
+    setNotificationNavigationError,
+  ] = useState<string | null>(null);
 
   const modmailCommunityIds = useMemo(
     () =>
@@ -58,49 +56,27 @@ export default function NotificationsContainer({
   );
   const modmailEnabled = modmailCommunityIds.length > 0;
 
-  const {
-    state: {
-      notificationItems,
-      notificationsRefreshing,
-      notificationsError,
-      notificationsLoading,
-      notificationPreferences,
-      notificationPreferencesLoading,
-      notificationPreferencesSaving,
-      notificationPreferencesError,
-    },
-    actions: {
-      refreshNotificationsManually,
-      markNotificationRead,
-      dismissNotification,
-      saveNotificationPreferences,
-      setNotificationsError,
-      refreshNotificationInbox,
-    },
-  } = useMobileNotifications();
+  const refreshSocialCounts = useCallback(async () => {
+    await core.social.load();
+  }, [core.social]);
 
-  const {
-    actions: { refreshSocialCounts },
-  } = useMobileSocialWorkspace();
-
-  const {
-    actions: { openDirectMessageConversation },
-  } = useMobileDirectMessages();
-
-  const notificationBackend = useMemo(() => getNotificationBackend(), []);
-  const socialBackend = useMemo(() => getSocialBackend(), []);
+  const refreshNotificationInbox = useCallback(async () => {
+    await core.notifications.refreshInbox();
+  }, [core.notifications]);
 
   const {
     actions: { openNotificationItem },
   } = useNotificationInteractions({
-    notificationBackend,
-    socialBackend,
+    notificationBackend: core.backends.notifications,
+    socialBackend: core.backends.social,
     refreshNotificationInbox,
     refreshSocialCounts,
-    setNotificationsError: setNotificationsError as React.Dispatch<React.SetStateAction<string | null>>,
+    setNotificationsError: setNotificationNavigationError,
     onOpenDmConversation: async (conversationId) => {
       setWorkspaceMode("dm");
-      await openDirectMessageConversation(conversationId);
+      await core.directMessages.openConversation(conversationId, {
+        markRead: true,
+      });
       onOpenDirectMessages();
     },
     onOpenFriendsPanel: ({ tab, highlightedRequestId }) => {
@@ -121,13 +97,9 @@ export default function NotificationsContainer({
     },
   });
 
-  const inboxItems = useMemo(
-    () => filterNotificationsForInbox(notificationItems),
-    [notificationItems],
-  );
-
   const handleNavigate = useCallback(
     async (notification: NotificationItem) => {
+      setNotificationNavigationError(null);
       await openNotificationItem(notification);
       onCloseModal();
     },
@@ -191,29 +163,10 @@ export default function NotificationsContainer({
       {subScreen === "modmail" ? (
         <MobileModmailPanel managedCommunityIds={modmailCommunityIds} />
       ) : subScreen === "preferences" ? (
-        <NotificationPreferencesPanel
-          preferences={notificationPreferences}
-          loading={notificationPreferencesLoading}
-          saving={notificationPreferencesSaving}
-          error={notificationPreferencesError}
-          onSave={saveNotificationPreferences}
-        />
+        <NotificationPreferencesPanel />
       ) : subScreen === "list" ? (
         <NotificationInboxList
-          items={inboxItems}
-          liveProfiles={liveProfiles}
-          refreshing={notificationsRefreshing}
-          loading={notificationsLoading}
-          error={notificationsError}
-          onRefresh={() => {
-            void refreshNotificationsManually();
-          }}
-          onDismiss={(recipientId) => {
-            void dismissNotification(recipientId);
-          }}
-          onMarkRead={(recipientId) => {
-            void markNotificationRead(recipientId);
-          }}
+          navigationError={notificationNavigationError}
           onNavigate={(n) => {
             void handleNavigate(n);
           }}

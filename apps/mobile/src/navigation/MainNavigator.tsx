@@ -69,7 +69,6 @@ export function MainNavigator() {
 
   return (
     <MobileNotificationsProvider userId={userId} audioSettings={MOBILE_DEFAULT_NOTIFICATION_AUDIO}>
-      <MobileSocialWorkspaceProvider userId={userId}>
         <MobileDirectMessagesProvider userId={userId}>
           <MobileMainSessionProvider userId={userId}>
             <MainNavigationDelegateBridge />
@@ -91,7 +90,6 @@ export function MainNavigator() {
             </Stack.Navigator>
           </MobileMainSessionProvider>
         </MobileDirectMessagesProvider>
-      </MobileSocialWorkspaceProvider>
     </MobileNotificationsProvider>
   );
 }

@@ -21,7 +21,6 @@ import type {
 import { resolveLiveUsername } from "@shared/infrastructure/liveProfiles";
 import { useHavenCore } from "@shared/core";
 import { useFriendsModalData } from "@/features/friends/useFriendsModalData";
-import { useMobileSocialWorkspace } from "@/contexts/MobileSocialWorkspaceContext";
 
 type FriendsModalContainerProps = {
   visible: boolean;
@@ -48,11 +47,6 @@ export function FriendsModalContainer({
   const core = useHavenCore();
   const liveProfiles = core.profiles.useProfilesRecord();
   const [activeTab, setActiveTab] = useState<FriendsPanelTab>("friends");
-
-  const {
-    actions: { refreshSocialCounts },
-  } = useMobileSocialWorkspace();
-
   const data = useFriendsModalData(visible, userId);
 
   useEffect(() => {
