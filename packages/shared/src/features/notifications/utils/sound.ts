@@ -91,10 +91,20 @@ const playSoundEvent = async ({
     return { played: false, reasonCode: "sound_pref_disabled" };
   if (!soundConfig.enabledWhen(audioSettings))
     return { played: false, reasonCode: "sound_pref_disabled" };
+  // Access browser globals via globalThis so this module compiles in non-DOM
+  // contexts (Electron main, backend tests) without requiring lib.dom.d.ts.
+  // Structural types avoid any reference to lib.dom.d.ts names.
+  type BrowserLike = {
+    document?: { hasFocus: () => boolean };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    AudioContext?: new () => any;
+  };
+  const browser = globalThis as typeof globalThis & BrowserLike;
+
   if (
     suppressWhenUnfocused &&
-    typeof document !== "undefined" &&
-    !document.hasFocus()
+    browser.document != null &&
+    !browser.document.hasFocus()
   ) {
     return {
       played: false,
@@ -102,8 +112,8 @@ const playSoundEvent = async ({
     };
   }
   if (
-    typeof document !== "undefined" &&
-    document.hasFocus() &&
+    browser.document != null &&
+    browser.document.hasFocus() &&
     audioSettings.playSoundsWhenFocused === false
   ) {
     return { played: false, reasonCode: "sound_pref_disabled" };
@@ -120,8 +130,10 @@ const playSoundEvent = async ({
   );
   if (volume === 0) return { played: false, reasonCode: "sound_pref_disabled" };
 
+  if (!browser.AudioContext) return { played: false, reasonCode: "sound_pref_disabled" };
+
   try {
-    const audioContext = new AudioContext();
+    const audioContext = new browser.AudioContext();
     const response = await fetch(soundConfig.url);
     const arrayBuffer = await response.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);

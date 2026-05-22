@@ -3,7 +3,18 @@
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2020"]
+    "lib": ["ES2020"],
+    "paths": {
+      "@electron/*": ["./apps/electron/src/*"],
+      "@web/*": ["./apps/web/src/*"],
+      "@web-client/*": ["./packages/web-client/src/*"],
+      "@shared/app/ui/*": ["./packages/web-client/src/app-ui/*"],
+      "@shared/*": ["./packages/shared/src/*"],
+      "@client/app/*": ["./packages/shared/src/app/*"],
+      "@platform/assets/runtimeAudio": ["./packages/shared/src/platform/assets/runtimeAudio"],
+      "@platform/*": ["./packages/shared/src/platform/*"],
+      "@test-support/*": ["./tooling/test-support/*"]
+    }
   },
   "include": [
     "forge.config.js",

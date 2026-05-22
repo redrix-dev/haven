@@ -58,12 +58,24 @@ export type BrowserRuntimeBridge = {
 };
 
 /**
+ * Portable device info — structurally matches the browser MediaDeviceInfo
+ * interface but defined here so it's usable in non-DOM compilation contexts
+ * (Electron main, backend tests) without requiring lib.dom.d.ts.
+ */
+export type AudioDeviceInfo = {
+  deviceId: string;
+  groupId: string;
+  kind: "audioinput" | "audiooutput" | "videoinput";
+  label: string;
+};
+
+/**
  * Minimal voice runtime bridge — only device enumeration remains after LiveKit
  * took over media capture, VAD, and PTT in web-client. The Electron host
  * implements these; web uses browser APIs directly.
  */
 export type VoiceRuntimeBridge = {
-  enumerateDevices: () => Promise<MediaDeviceInfo[]>;
+  enumerateDevices: () => Promise<AudioDeviceInfo[]>;
   addDeviceChangeListener: (listener: () => void) => () => void;
 };
 

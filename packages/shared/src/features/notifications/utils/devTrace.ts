@@ -20,8 +20,13 @@ export type LocalNotificationDeliveryTraceRecord = {
 const STORAGE_KEY = 'haven:notifications:dev-traces';
 const MAX_TRACES = 250;
 
+// Access localStorage via globalThis so this module compiles in non-DOM contexts
+// (Electron main, backend tests) without requiring lib.dom.d.ts.
+type BrowserLike = { window?: { localStorage?: Storage } };
+const g = globalThis as typeof globalThis & BrowserLike;
+
 const canUseLocalStorage = (): boolean =>
-  typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  g.window !== undefined && g.window.localStorage !== undefined;
 
 const safeParseTraceArray = (raw: string | null): LocalNotificationDeliveryTraceRecord[] => {
   if (!raw) return [];
@@ -36,7 +41,7 @@ const safeParseTraceArray = (raw: string | null): LocalNotificationDeliveryTrace
 const readTraces = (): LocalNotificationDeliveryTraceRecord[] => {
   if (!canUseLocalStorage()) return [];
   try {
-    return safeParseTraceArray(window.localStorage.getItem(STORAGE_KEY));
+    return safeParseTraceArray(g.window!.localStorage!.getItem(STORAGE_KEY));
   } catch {
     return [];
   }
@@ -45,7 +50,7 @@ const readTraces = (): LocalNotificationDeliveryTraceRecord[] => {
 const writeTraces = (items: LocalNotificationDeliveryTraceRecord[]): void => {
   if (!canUseLocalStorage()) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_TRACES)));
+    g.window!.localStorage!.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_TRACES)));
   } catch {
     // Ignore storage quota/private mode errors.
   }
@@ -92,7 +97,7 @@ export const listLocalNotificationDeliveryTraces = (
 export const clearLocalNotificationDeliveryTraces = (): void => {
   if (!canUseLocalStorage()) return;
   try {
-    window.localStorage.removeItem(STORAGE_KEY);
+    g.window!.localStorage!.removeItem(STORAGE_KEY);
   } catch {
     // Ignore storage errors.
   }
