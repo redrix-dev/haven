@@ -63,7 +63,8 @@ export function ChatComposer({
           <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/8 pr-1">
             <EnrichedMarkdownTextInput
               ref={inputRef}
-              nativeID={CHAT_COMPOSER_NATIVE_ID}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              {...({ nativeID: CHAT_COMPOSER_NATIVE_ID } as any)}
               multiline
               editable={!isSending}
               scrollEnabled

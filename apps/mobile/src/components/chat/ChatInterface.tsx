@@ -95,7 +95,7 @@ export function ChatInterface<T>({
     (props: ScrollViewProps) => (
       <ChatScrollView
         {...props}
-        inverted={props.inverted ?? true}
+        inverted={(props as { inverted?: boolean }).inverted ?? true}
         extraContentPadding={extraContentPadding}
         {...keyboardScrollProps}
       />

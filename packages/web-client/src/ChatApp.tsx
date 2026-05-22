@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { RoomAudioRenderer } from "@livekit/components-react";
+import { LiveKitAudioRenderer } from "@web-client/features/voice/LiveKitAudioRenderer";
 import { LoginScreen } from "@web-client/components/auth/LoginScreen";
 import { ServerList } from "@web-client/components/ServerList";
 import { ChatAppModals } from "@web-client/components/ChatAppModals";
@@ -163,10 +163,8 @@ function ChatAppInner() {
         handleOpenVoicePopout={voice.handleOpenVoicePopout}
         handleKickVoiceParticipant={voice.handleKickVoiceParticipant}
       />
-      {/* LiveKit manages remote audio internally — RoomAudioRenderer renders
-          one <audio> per remote participant and respects track volume / output
-          device selection set via room.switchActiveDevice('audiooutput', ...) */}
-      <RoomAudioRenderer room={voice.livekitRoom} />
+      {/* Renders one hidden <audio> per subscribed remote participant. */}
+      <LiveKitAudioRenderer room={voice.livekitRoom} />
     </>
   );
 }

@@ -15,6 +15,7 @@ import type { MainStackParamList } from "@/navigation/types";
 import { NAV_THEME } from "@/lib/theme";
 import { setMobileNavigationDelegate } from "@/lib/registerMobileAppHost";
 import { requireHavenCore } from "@shared/core";
+import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -67,13 +68,12 @@ export function MainNavigator() {
   }
 
   return (
-    <MobileNotificationsProvider userId={userId}>
+    <MobileNotificationsProvider userId={userId} audioSettings={MOBILE_DEFAULT_NOTIFICATION_AUDIO}>
       <MobileSocialWorkspaceProvider userId={userId}>
         <MobileDirectMessagesProvider userId={userId}>
           <MobileMainSessionProvider userId={userId}>
             <MainNavigationDelegateBridge />
             <Stack.Navigator
-              detachInactiveScreens={false}
               screenOptions={{
                 headerShown: false,
                 contentStyle: { backgroundColor: mainStackScreenBackground },

@@ -180,7 +180,7 @@ function HavenTabNavigator({
       refreshUrgentSurfaces: () => {
         void refreshDmConversations({ suppressLoadingState: true });
         void refreshSocialCounts();
-        void refreshNotificationInbox({ playSoundsForNew: false });
+        void refreshNotificationInbox();
       },
     });
 

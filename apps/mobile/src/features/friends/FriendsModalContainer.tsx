@@ -218,7 +218,6 @@ export function FriendsModalContainer({
                   async () => {
                     await data.core.social.sendFriendRequest(item.username);
                   },
-                  true,
                 )
               }
             >

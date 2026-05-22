@@ -97,7 +97,7 @@ export default function NotificationsContainer({
     socialBackend,
     refreshNotificationInbox,
     refreshSocialCounts,
-    setNotificationsError,
+    setNotificationsError: setNotificationsError as React.Dispatch<React.SetStateAction<string | null>>,
     onOpenDmConversation: async (conversationId) => {
       setWorkspaceMode("dm");
       await openDirectMessageConversation(conversationId);

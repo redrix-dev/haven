@@ -7,7 +7,7 @@ function Textarea({
   numberOfLines = Platform.select({ web: 2, native: 8 }), // On web, numberOfLines also determines initial height. On native, it determines the maximum height.
   placeholderClassName,
   ...props
-}: React.ComponentProps<typeof TextInput> & React.RefAttributes<TextInput>) {
+}: React.ComponentProps<typeof TextInput> & { placeholderClassName?: string } & React.RefAttributes<TextInput>) {
   return (
     <TextInput
       className={cn(
@@ -18,7 +18,8 @@ function Textarea({
         props.editable === false && 'opacity-50',
         className
       )}
-      placeholderClassName={cn('text-muted-foreground', placeholderClassName)}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {...({ placeholderClassName: cn('text-muted-foreground', placeholderClassName) } as any)}
       multiline={multiline}
       numberOfLines={numberOfLines}
       textAlignVertical="top"
