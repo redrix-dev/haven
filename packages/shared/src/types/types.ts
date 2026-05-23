@@ -12,6 +12,12 @@ export type VoiceSidebarParticipant = {
   isSpeaking?: boolean;
 };
 
+export type VoiceChannelReference = {
+  id: string;
+  name: string;
+  community_id: string;
+};
+
 export type VoicePresenceStateRow = {
   user_id?: string | null;
   display_name?: string | null;

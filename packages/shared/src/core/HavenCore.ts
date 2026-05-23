@@ -14,7 +14,11 @@ import { NotificationNexus } from "@shared/nexus/notifications/NotificationNexus
 import { SocialNexus } from "@shared/nexus/social/SocialNexus";
 import { PermissionsNexus } from "@shared/nexus/permissions/PermissionsNexus";
 import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
-import { VoiceNexus } from "@shared/nexus/voice/VoiceNexus";
+import {
+  VoiceNexus,
+  type VoiceRealtimeChannel,
+  type VoiceRealtimeTransport,
+} from "@shared/nexus/voice/VoiceNexus";
 import { useUiStore } from "@shared/stores/uiStore";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import type { BanEligibleServer } from "@shared/lib/backend/types";
@@ -140,7 +144,20 @@ export class HavenCore {
     this.social = new SocialNexus(options.persistence, this.backends.social);
     this.permissions = new PermissionsNexus(options.persistence);
     this.profiles = new ProfileNexus(options.persistence, this.backends.controlPlane);
-    this.voice = new VoiceNexus(options.persistence, this.viewerMessagePolicyStore);
+    const voiceRealtime: VoiceRealtimeTransport = {
+      channel: (topic) =>
+        this.backends.client.channel(topic) as unknown as VoiceRealtimeChannel,
+      removeChannel: (channel) =>
+        this.backends.client.removeChannel(channel as never),
+      getChannels: () =>
+        this.backends.client.getChannels() as unknown as VoiceRealtimeChannel[],
+    };
+    this.voice = new VoiceNexus(
+      options.persistence,
+      this.viewerMessagePolicyStore,
+      this.backends.voiceToken,
+      voiceRealtime,
+    );
 
     this.messages.setBackends(this.backends);
 

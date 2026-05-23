@@ -2,8 +2,24 @@ import { create } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
-import type { VoiceSidebarParticipant } from "@shared/types/types";
+import type {
+  VoiceChannelReference,
+  VoicePresenceStateRow,
+  VoiceSidebarParticipant,
+} from "@shared/types/types";
+import type {
+  VoiceTokenBackend,
+  VoiceTokenResponse,
+} from "@shared/lib/backend/voiceTokenBackend";
 import type { StoreApi, UseBoundStore } from "zustand";
+
+export type VoiceConnectionPhase =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "switching"
+  | "disconnecting"
+  | "error";
 
 type VoiceSessionSnapshot = {
   joined: boolean;
@@ -11,15 +27,72 @@ type VoiceSessionSnapshot = {
   isDeafened: boolean;
 };
 
+type VoiceKickPayload = {
+  targetUserId: string;
+  channelId: string;
+  kickedBy: string;
+};
+
+type VoiceRealtimeStatus =
+  | "SUBSCRIBED"
+  | "CHANNEL_ERROR"
+  | "TIMED_OUT"
+  | "CLOSED"
+  | string;
+
+type VoiceRealtimeEventPayload = {
+  payload?: unknown;
+};
+
+export type VoiceRealtimeChannel = {
+  topic?: string;
+  on: (
+    type: "broadcast" | "presence",
+    filter: { event: string },
+    callback: (payload: VoiceRealtimeEventPayload) => void,
+  ) => VoiceRealtimeChannel;
+  subscribe: (callback?: (status: VoiceRealtimeStatus) => void) => unknown;
+  send: (payload: {
+    type: "broadcast";
+    event: string;
+    payload: unknown;
+  }) => Promise<string>;
+  presenceState: () => Record<string, VoicePresenceStateRow[]>;
+};
+
+export type VoiceRealtimeTransport = {
+  channel: (topic: string) => VoiceRealtimeChannel;
+  removeChannel: (channel: VoiceRealtimeChannel) => Promise<unknown> | unknown;
+  getChannels?: () => VoiceRealtimeChannel[];
+};
+
 export type VoiceNexusState = {
+  phase: VoiceConnectionPhase;
+  activeChannel: VoiceChannelReference | null;
+  pendingChannel: VoiceChannelReference | null;
+  error: string | null;
   joined: boolean;
   isMuted: boolean;
   isDeafened: boolean;
   currentChannelId: string | null;
   participants: VoiceSidebarParticipant[];
+  participantsByChannelId: Record<string, VoiceSidebarParticipant[]>;
   voiceConnected: boolean;
   sessionState: VoiceSessionSnapshot | null;
   revision: number;
+};
+
+type ConnectKickChannelInput = {
+  communityId: string;
+  channelId: string;
+  currentUserId: string;
+  onKick: (payload: VoiceKickPayload) => void;
+};
+
+type SubscribePresenceChannelsInput = {
+  communityId: string;
+  channelIds: string[];
+  activeChannelId?: string | null;
 };
 
 const defaultSession = (): VoiceSessionSnapshot => ({
@@ -28,21 +101,131 @@ const defaultSession = (): VoiceSessionSnapshot => ({
   isDeafened: false,
 });
 
+const defaultState = (): Omit<VoiceNexusState, "revision"> => ({
+  phase: "idle",
+  activeChannel: null,
+  pendingChannel: null,
+  error: null,
+  joined: false,
+  isMuted: false,
+  isDeafened: false,
+  currentChannelId: null,
+  participants: [],
+  participantsByChannelId: {},
+  voiceConnected: false,
+  sessionState: null,
+});
+
+const voiceParticipantListsEqual = (
+  left: VoiceSidebarParticipant[],
+  right: VoiceSidebarParticipant[],
+): boolean =>
+  left.length === right.length &&
+  left.every(
+    (entry, index) =>
+      entry.userId === right[index]?.userId &&
+      entry.displayName === right[index]?.displayName &&
+      entry.avatarUrl === right[index]?.avatarUrl &&
+      entry.isSpeaking === right[index]?.isSpeaking,
+  );
+
+const voiceParticipantRecordsEqual = (
+  left: Record<string, VoiceSidebarParticipant[]>,
+  right: Record<string, VoiceSidebarParticipant[]>,
+): boolean => {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) =>
+    voiceParticipantListsEqual(left[key] ?? [], right[key] ?? []),
+  );
+};
+
+const hiddenAuthorIdsEqual = (
+  left: ReadonlySet<string>,
+  right: ReadonlySet<string>,
+): boolean => {
+  if (left === right) return true;
+  if (left.size !== right.size) return false;
+  for (const id of left) {
+    if (!right.has(id)) return false;
+  }
+  return true;
+};
+
+const normalizePresenceRows = (
+  presenceState: Record<string, VoicePresenceStateRow[]>,
+): VoiceSidebarParticipant[] => {
+  const participantsByUserId = new Map<string, VoiceSidebarParticipant>();
+
+  for (const [presenceKey, presenceRows] of Object.entries(presenceState)) {
+    const latestPresence = presenceRows[presenceRows.length - 1];
+    if (!latestPresence) continue;
+
+    const userId = latestPresence.user_id ?? presenceKey;
+    if (!userId) continue;
+
+    const trimmedDisplayName = latestPresence.display_name?.trim() ?? "";
+    const displayName =
+      trimmedDisplayName.length > 0 ? trimmedDisplayName : userId.slice(0, 12);
+
+    if (!participantsByUserId.has(userId)) {
+      participantsByUserId.set(userId, {
+        userId,
+        displayName,
+        avatarUrl: latestPresence.avatar_url ?? null,
+        isSpeaking: Boolean(latestPresence.is_speaking),
+      });
+    }
+  }
+
+  return Array.from(participantsByUserId.values()).sort((left, right) =>
+    left.displayName.localeCompare(right.displayName),
+  );
+};
+
+const resolveKickPayload = (
+  eventPayload: VoiceRealtimeEventPayload,
+): VoiceKickPayload | null => {
+  const payload = eventPayload.payload;
+  if (typeof payload !== "object" || payload === null) return null;
+  const record = payload as Record<string, unknown>;
+  const targetUserId = record.targetUserId;
+  const channelId = record.channelId;
+  const kickedBy = record.kickedBy;
+  if (
+    typeof targetUserId !== "string" ||
+    typeof channelId !== "string" ||
+    typeof kickedBy !== "string"
+  ) {
+    return null;
+  }
+  return { targetUserId, channelId, kickedBy };
+};
+
 export class VoiceNexus {
   private readonly store: UseBoundStore<StoreApi<VoiceNexusState>>;
   private readonly viewerPolicyStore: ViewerMessagePolicyStore;
+  private readonly tokenBackend: VoiceTokenBackend | null;
+  private readonly realtime: VoiceRealtimeTransport | null;
+  private kickChannel: VoiceRealtimeChannel | null = null;
+  private kickContext: {
+    currentUserId: string;
+    channelId: string;
+  } | null = null;
 
-  constructor(_persistence: NexusPersistence, viewerPolicyStore: ViewerMessagePolicyStore) {
+  constructor(
+    _persistence: NexusPersistence,
+    viewerPolicyStore: ViewerMessagePolicyStore,
+    tokenBackend?: VoiceTokenBackend,
+    realtime?: VoiceRealtimeTransport,
+  ) {
     void _persistence;
     this.viewerPolicyStore = viewerPolicyStore;
+    this.tokenBackend = tokenBackend ?? null;
+    this.realtime = realtime ?? null;
     this.store = create<VoiceNexusState>()(() => ({
-      joined: false,
-      isMuted: false,
-      isDeafened: false,
-      currentChannelId: null,
-      participants: [],
-      voiceConnected: false,
-      sessionState: null,
+      ...defaultState(),
       revision: 0,
     }));
   }
@@ -51,48 +234,149 @@ export class VoiceNexus {
     this.store.setState((state) => ({ revision: state.revision + 1 }));
   }
 
-  setJoined(joined: boolean): void {
-    this.store.setState({ joined });
+  private setPartial(next: Partial<VoiceNexusState>): void {
+    this.store.setState(next);
     this.bump();
+  }
+
+  startConnect(channel: VoiceChannelReference): void {
+    this.setPartial({
+      phase: "connecting",
+      activeChannel: channel,
+      pendingChannel: null,
+      currentChannelId: channel.id,
+      error: null,
+    });
+  }
+
+  markConnected(): void {
+    this.setPartial({
+      phase: "connected",
+      voiceConnected: true,
+      error: null,
+    });
+  }
+
+  startSwitch(channel: VoiceChannelReference): void {
+    this.setPartial({
+      phase: "switching",
+      pendingChannel: channel,
+      error: null,
+    });
+  }
+
+  startDisconnect(): void {
+    this.setPartial({
+      phase: "disconnecting",
+      error: null,
+    });
+  }
+
+  completeDisconnect(): void {
+    const pendingChannel = this.store.getState().pendingChannel;
+    if (pendingChannel) {
+      this.setPartial({
+        phase: "connecting",
+        activeChannel: pendingChannel,
+        pendingChannel: null,
+        currentChannelId: pendingChannel.id,
+        voiceConnected: false,
+        error: null,
+      });
+      return;
+    }
+
+    this.setPartial({
+      phase: "idle",
+      activeChannel: null,
+      pendingChannel: null,
+      currentChannelId: null,
+      voiceConnected: false,
+      error: null,
+    });
+  }
+
+  setError(message: string): void {
+    this.setPartial({
+      phase: "error",
+      error: message,
+    });
+  }
+
+  clearError(): void {
+    const state = this.store.getState();
+    this.setPartial({
+      phase: state.activeChannel ? "connected" : "idle",
+      error: null,
+    });
+  }
+
+  setJoined(joined: boolean): void {
+    if (this.store.getState().joined === joined) return;
+    this.setPartial({ joined });
+  }
+
+  setMuted(isMuted: boolean): void {
+    if (this.store.getState().isMuted === isMuted) return;
+    this.setPartial({ isMuted });
   }
 
   setIsMuted(isMuted: boolean): void {
-    this.store.setState({ isMuted });
-    this.bump();
+    this.setMuted(isMuted);
+  }
+
+  setDeafened(isDeafened: boolean): void {
+    const updates: Partial<VoiceNexusState> = { isDeafened };
+    if (isDeafened) updates.isMuted = true;
+    this.setPartial(updates);
   }
 
   setIsDeafened(isDeafened: boolean): void {
-    this.store.setState({ isDeafened });
-    this.bump();
+    this.setDeafened(isDeafened);
   }
 
   setCurrentChannelId(currentChannelId: string | null): void {
-    this.store.setState({ currentChannelId });
-    this.bump();
+    if (this.store.getState().currentChannelId === currentChannelId) return;
+    this.setPartial({ currentChannelId });
   }
 
   setParticipants(participants: VoiceSidebarParticipant[]): void {
     const previous = this.store.getState().participants;
-    if (
-      previous.length === participants.length &&
-      previous.every(
-        (entry, index) =>
-          entry.userId === participants[index]?.userId &&
-          entry.displayName === participants[index]?.displayName &&
-          entry.avatarUrl === participants[index]?.avatarUrl &&
-          entry.isSpeaking === participants[index]?.isSpeaking,
-      )
-    ) {
-      return;
-    }
-    this.store.setState({ participants });
-    this.bump();
+    if (voiceParticipantListsEqual(previous, participants)) return;
+    this.setPartial({ participants });
+  }
+
+  setChannelParticipants(
+    channelId: string,
+    participants: VoiceSidebarParticipant[],
+  ): void {
+    const previous = this.store.getState().participantsByChannelId[channelId] ?? [];
+    if (voiceParticipantListsEqual(previous, participants)) return;
+    this.setPartial({
+      participantsByChannelId: {
+        ...this.store.getState().participantsByChannelId,
+        [channelId]: participants,
+      },
+    });
+  }
+
+  retainChannelParticipants(channelIds: string[]): void {
+    const keep = new Set(channelIds);
+    const current = this.store.getState().participantsByChannelId;
+    const next = Object.fromEntries(
+      Object.entries(current).filter(([channelId]) => keep.has(channelId)),
+    );
+    if (voiceParticipantRecordsEqual(current, next)) return;
+    this.setPartial({ participantsByChannelId: next });
   }
 
   setVoiceConnected(voiceConnected: boolean): void {
-    if (this.store.getState().voiceConnected === voiceConnected) return;
-    this.store.setState({ voiceConnected });
-    this.bump();
+    const state = this.store.getState();
+    if (state.voiceConnected === voiceConnected) return;
+    this.setPartial({
+      voiceConnected,
+      phase: voiceConnected ? "connected" : state.phase,
+    });
   }
 
   setSessionState(sessionState: VoiceSessionSnapshot | null): void {
@@ -104,8 +388,155 @@ export class VoiceNexus {
     ) {
       return;
     }
-    this.store.setState({ sessionState });
-    this.bump();
+    this.setPartial({ sessionState });
+  }
+
+  async fetchJoinCredentials(
+    communityId: string,
+    channelId: string,
+  ): Promise<VoiceTokenResponse> {
+    if (!this.tokenBackend) {
+      throw new Error("Voice token backend is not configured.");
+    }
+    return this.tokenBackend.fetchToken(communityId, channelId);
+  }
+
+  async connectKickChannel(input: ConnectKickChannelInput): Promise<void> {
+    if (!this.realtime) {
+      throw new Error("Voice realtime transport is not configured.");
+    }
+
+    await this.disconnectKickChannel();
+
+    const channel = this.realtime.channel(
+      `voice:kick:${input.communityId}:${input.channelId}`,
+    );
+    channel.on("broadcast", { event: "voice_kick" }, (eventPayload) => {
+      const payload = resolveKickPayload(eventPayload);
+      if (!payload) return;
+      if (payload.targetUserId !== input.currentUserId) return;
+      if (payload.channelId !== input.channelId) return;
+      input.onKick(payload);
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Timed out connecting to voice."));
+      }, 12_000);
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          clearTimeout(timeoutId);
+          resolve();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          clearTimeout(timeoutId);
+          reject(new Error("Voice kick channel connection failed."));
+        }
+      });
+    });
+
+    this.kickChannel = channel;
+    this.kickContext = {
+      currentUserId: input.currentUserId,
+      channelId: input.channelId,
+    };
+  }
+
+  async disconnectKickChannel(): Promise<void> {
+    const channel = this.kickChannel;
+    this.kickChannel = null;
+    this.kickContext = null;
+    if (!channel || !this.realtime) return;
+    await this.realtime.removeChannel(channel);
+  }
+
+  async kickParticipant(targetUserId: string, channelId: string): Promise<void> {
+    const channel = this.kickChannel;
+    const context = this.kickContext;
+    if (!channel || !context) {
+      throw new Error("Not connected to a voice channel.");
+    }
+
+    const sendStatus = await channel.send({
+      type: "broadcast",
+      event: "voice_kick",
+      payload: {
+        targetUserId,
+        channelId,
+        kickedBy: context.currentUserId,
+      } satisfies VoiceKickPayload,
+    });
+    if (sendStatus !== "ok") {
+      throw new Error("Failed to remove member from the voice channel.");
+    }
+  }
+
+  cleanupPresenceChannel(communityId: string, channelId: string): Promise<void> {
+    const realtime = this.realtime;
+    if (!realtime?.getChannels) return Promise.resolve();
+
+    const expectedTopic = `voice:presence:${communityId}:${channelId}`;
+    const channels = realtime.getChannels().filter((channel) => {
+      const topic = channel.topic ?? "";
+      return (
+        topic === expectedTopic ||
+        topic === `realtime:${expectedTopic}` ||
+        topic.endsWith(expectedTopic)
+      );
+    });
+
+    return Promise.all(channels.map((channel) => realtime.removeChannel(channel))).then(
+      () => undefined,
+    );
+  }
+
+  subscribePresenceChannels(input: SubscribePresenceChannelsInput): () => void {
+    if (!this.realtime) return () => {};
+
+    const channelIds = input.channelIds.filter(
+      (channelId) => channelId && channelId !== input.activeChannelId,
+    );
+    this.retainChannelParticipants(channelIds);
+
+    if (channelIds.length === 0) return () => {};
+
+    let disposed = false;
+    const subscriptionChannels = channelIds.map((voiceChannelId) => {
+      const subscriptionChannel = this.realtime!.channel(
+        `voice:presence:${input.communityId}:${voiceChannelId}`,
+      );
+
+      const syncPresenceState = () => {
+        if (disposed) return;
+        this.setChannelParticipants(
+          voiceChannelId,
+          normalizePresenceRows(subscriptionChannel.presenceState()),
+        );
+      };
+
+      subscriptionChannel
+        .on("presence", { event: "sync" }, syncPresenceState)
+        .on("presence", { event: "join" }, syncPresenceState)
+        .on("presence", { event: "leave" }, syncPresenceState);
+
+      subscriptionChannel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          syncPresenceState();
+          return;
+        }
+        if (status !== "CHANNEL_ERROR" && status !== "TIMED_OUT") return;
+        if (disposed) return;
+        this.setChannelParticipants(voiceChannelId, []);
+      });
+
+      return subscriptionChannel;
+    });
+
+    return () => {
+      disposed = true;
+      for (const subscriptionChannel of subscriptionChannels) {
+        void this.realtime?.removeChannel(subscriptionChannel);
+      }
+    };
   }
 
   useSession(): VoiceNexusState {
@@ -115,46 +546,75 @@ export class VoiceNexus {
     });
   }
 
-  useVisibleParticipants(_channelId: string): VoiceSidebarParticipant[] {
-    const participants = useStoreWithEqualityFn(
+  useParticipantsByChannel(): Record<string, VoiceSidebarParticipant[]> {
+    return useStoreWithEqualityFn(
       this.store,
-      (state) => state.participants,
+      (state) => state.participantsByChannelId,
+      voiceParticipantRecordsEqual,
+    );
+  }
+
+  useVisibleParticipants(channelId: string): VoiceSidebarParticipant[] {
+    const participants = useStoreWithEqualityFn(this.store, (state) =>
+      this.getParticipantsForChannel(state, channelId),
     );
     const hiddenAuthorIds = useStoreWithEqualityFn(
       this.viewerPolicyStore,
       (s) => s.hiddenAuthorIds,
-      (a, b) => {
-        if (a === b) return true;
-        if (a.size !== b.size) return false;
-        for (const id of a) {
-          if (!b.has(id)) return false;
-        }
-        return true;
-      },
+      hiddenAuthorIdsEqual,
     );
 
-    if (hiddenAuthorIds.size === 0) {
-      return participants;
-    }
-    return participants.filter((p) => !hiddenAuthorIds.has(p.userId));
+    return this.filterVisibleParticipants(participants, hiddenAuthorIds);
   }
 
   getSnapshot(): VoiceNexusState {
     return this.store.getState();
   }
 
+  getParticipantsByChannelSnapshot(): Record<string, VoiceSidebarParticipant[]> {
+    return this.store.getState().participantsByChannelId;
+  }
+
+  getVisibleParticipantsSnapshot(channelId: string): VoiceSidebarParticipant[] {
+    const hiddenAuthorIds = this.viewerPolicyStore.getState().hiddenAuthorIds;
+    return this.filterVisibleParticipants(
+      this.getParticipantsForChannel(this.store.getState(), channelId),
+      hiddenAuthorIds,
+    );
+  }
+
+  private getParticipantsForChannel(
+    state: VoiceNexusState,
+    channelId: string,
+  ): VoiceSidebarParticipant[] {
+    if (state.participantsByChannelId[channelId]) {
+      return state.participantsByChannelId[channelId];
+    }
+    if (
+      state.activeChannel?.id === channelId ||
+      state.currentChannelId === channelId
+    ) {
+      return state.participants;
+    }
+    return [];
+  }
+
+  private filterVisibleParticipants(
+    participants: VoiceSidebarParticipant[],
+    hiddenAuthorIds: ReadonlySet<string>,
+  ): VoiceSidebarParticipant[] {
+    if (hiddenAuthorIds.size === 0) return participants;
+    return participants.filter((p) => !hiddenAuthorIds.has(p.userId));
+  }
+
   rehydrate(): void {}
 
   clear(): void {
     this.store.setState({
-      joined: false,
-      isMuted: false,
-      isDeafened: false,
-      currentChannelId: null,
-      participants: [],
-      voiceConnected: false,
+      ...defaultState(),
       sessionState: defaultSession(),
       revision: 0,
     });
+    void this.disconnectKickChannel();
   }
 }

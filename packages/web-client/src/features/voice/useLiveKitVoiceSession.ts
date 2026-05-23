@@ -1,5 +1,4 @@
 import React from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   Room,
   RoomEvent,
@@ -8,7 +7,7 @@ import {
   type RemoteAudioTrack,
   type RemoteParticipant,
 } from 'livekit-client';
-import { requireHavenCore, useHavenCore } from '@shared/core';
+import { useHavenCore } from '@shared/core';
 import { matchesVoicePushToTalkBinding } from '@shared/features/voice/utils/pushToTalk';
 import { useVoiceMemberVolumes } from '@shared/features/voice/hooks/useVoiceMemberVolumes';
 import { isEditableKeyboardTarget } from '@shared/infrastructure/utils/appUtils';
@@ -150,7 +149,6 @@ export function useLiveKitVoiceSession({
     });
   }
 
-  const kickChannelRef = React.useRef<RealtimeChannel | null>(null);
   const isIntentionalDisconnectRef = React.useRef(false);
 
   // VAD refs
@@ -194,15 +192,15 @@ export function useLiveKitVoiceSession({
 
   const setStoredJoined = React.useCallback((value: boolean) => {
     core.voice.setJoined(value);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const setStoredIsMuted = React.useCallback((value: boolean) => {
     core.voice.setIsMuted(value);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const setStoredIsDeafened = React.useCallback((value: boolean) => {
     core.voice.setIsDeafened(value);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Audio presence sounds ──────────────────────────────────────────────────
 
@@ -408,8 +406,6 @@ export function useLiveKitVoiceSession({
   const cleanupVoiceSession = React.useCallback(async () => {
     const wasJoined = core.voice.getSnapshot().joined;
     const room = roomRef.current;
-    const kickChannel = kickChannelRef.current;
-    kickChannelRef.current = null;
     isIntentionalDisconnectRef.current = true;
 
     if (room && room.state !== ConnectionState.Disconnected) {
@@ -441,13 +437,7 @@ export function useLiveKitVoiceSession({
       playDebouncedVoicePresenceSound('voice_presence_leave');
     }
 
-    if (kickChannel) {
-      try {
-        await requireHavenCore().backends.client.removeChannel(kickChannel);
-      } catch {
-        // ignore
-      }
-    }
+    await core.voice.disconnectKickChannel();
 
     isIntentionalDisconnectRef.current = false;
   }, [
@@ -472,7 +462,7 @@ export function useLiveKitVoiceSession({
       setStoredIsDeafened(false);
 
       try {
-        const { token, serverUrl } = await core.backends.voiceToken.fetchToken(
+        const { token, serverUrl } = await core.voice.fetchJoinCredentials(
           targetChannel.communityId,
           targetChannel.channelId,
         );
@@ -541,32 +531,14 @@ export function useLiveKitVoiceSession({
 
         // ── Kick broadcast channel ─────────────────────────────────────────
 
-        const client = requireHavenCore().backends.client;
-        const kickChannel = client.channel(
-          `voice:kick:${targetChannel.communityId}:${targetChannel.channelId}`,
-        );
-        kickChannel.on('broadcast', { event: 'voice_kick' }, ({ payload }) => {
-          const kickPayload = payload as VoiceKickPayload;
-          if (kickPayload.targetUserId !== currentUserId) return;
-          if (kickPayload.channelId !== targetChannel.channelId) return;
-          onVoiceKick?.(kickPayload);
+        await core.voice.connectKickChannel({
+          communityId: targetChannel.communityId,
+          channelId: targetChannel.channelId,
+          currentUserId,
+          onKick: (payload) => {
+            onVoiceKick?.(payload);
+          },
         });
-
-        await new Promise<void>((resolve, reject) => {
-          const timeoutId = setTimeout(() => {
-            reject(new Error('Timed out connecting to voice.'));
-          }, 12_000);
-          kickChannel.subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-              clearTimeout(timeoutId);
-              resolve();
-            } else if (status === 'CHANNEL_ERROR') {
-              clearTimeout(timeoutId);
-              reject(new Error('Voice kick channel connection failed.'));
-            }
-          });
-        });
-        kickChannelRef.current = kickChannel;
 
         // Apply preferred output device
         const currentOutputId = selectedOutputDeviceId;
@@ -594,7 +566,7 @@ export function useLiveKitVoiceSession({
       activeChannel,
       applyParticipants,
       cleanupVoiceSession,
-      core.backends.voiceToken,
+      core.voice,
       currentUserId,
       currentUserAvatarUrl,
       joined,
@@ -675,24 +647,9 @@ export function useLiveKitVoiceSession({
 
   const kickFromVoice = React.useCallback(
     async (targetUserId: string, channelId: string) => {
-      const kickChannel = kickChannelRef.current;
-      if (!kickChannel || !currentUserId) {
-        throw new Error('Not connected to a voice channel.');
-      }
-      const sendStatus = await kickChannel.send({
-        type: 'broadcast',
-        event: 'voice_kick',
-        payload: {
-          targetUserId,
-          channelId,
-          kickedBy: currentUserId,
-        } satisfies VoiceKickPayload,
-      });
-      if (sendStatus !== 'ok') {
-        throw new Error('Failed to remove member from the voice channel.');
-      }
+      await core.voice.kickParticipant(targetUserId, channelId);
     },
-    [currentUserId],
+    [core.voice],
   );
 
   // ── Effects: keep refs fresh ───────────────────────────────────────────────

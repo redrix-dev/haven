@@ -15,6 +15,9 @@ import {
 export function useChatAppVoiceIntegration() {
   const app = useChatAppSession();
   const core = useHavenCore();
+  // VOICE_NEXUS_RESHAPE_TODO: this keeps the existing web/electron integration
+  // shape while VoiceNexus absorbs the boundary work. Later, read voice state
+  // directly from core.voice in consumers and keep only platform adapter logic.
   const currentServerId = core.communities.useActiveId();
   const currentServer = useMemo(
     () => app.servers.find((server) => server.id === currentServerId) ?? null,

@@ -1,22 +1,12 @@
 import React from "react";
-import { requireHavenCore, useHavenCore } from "@shared/core";
-
-const voiceRt = () => requireHavenCore().backends.client;
+import { useHavenCore } from "@shared/core";
 import type { Channel } from "@shared/lib/backend/types";
 import type {
-  VoicePresenceStateRow,
+  VoiceChannelReference,
   VoiceSidebarParticipant,
 } from "@shared/types/types";
-import {
-  areVoiceParticipantListsEqual,
-  isEditableKeyboardTarget,
-} from "@shared/infrastructure/utils/appUtils";
+import { isEditableKeyboardTarget } from "@shared/infrastructure/utils/appUtils";
 import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
-import {
-  createInitialVoiceSessionStoreState,
-  reduceVoiceSessionStoreState,
-  type VoiceChannelReference,
-} from "@shared/features/voice/store/voiceSessionStore";
 
 type VoiceControlActions = {
   join: () => void;
@@ -66,13 +56,8 @@ export function useVoice({
 }: UseVoiceInput) {
   const core = useHavenCore();
   const voiceSession = core.voice.useSession();
-  const [voiceSessionStoreState, dispatchVoiceSessionStoreEvent] =
-    React.useReducer(
-      reduceVoiceSessionStoreState,
-      undefined,
-      createInitialVoiceSessionStoreState,
-    );
-  const activeVoiceChannel = voiceSessionStoreState.activeChannel;
+  const voicePresenceByChannelId = core.voice.useParticipantsByChannel();
+  const activeVoiceChannel = voiceSession.activeChannel;
   const activeVoiceChannelId = activeVoiceChannel?.id ?? null;
   const [voicePanelOpen, setVoicePanelOpen] = React.useState(false);
   const [voiceHardwareDebugPanelOpen, setVoiceHardwareDebugPanelOpen] =
@@ -80,8 +65,6 @@ export function useVoice({
   const voiceConnected = voiceSession.voiceConnected;
   const voiceParticipants = voiceSession.participants;
   const storedVoiceSessionState = voiceSession.sessionState;
-  const [voicePresenceByChannelId, setVoicePresenceByChannelId] =
-    React.useState<Record<string, VoiceSidebarParticipant[]>>({});
   const [voiceControlActions, setVoiceControlActions] =
     React.useState<VoiceControlActions | null>(null);
   const [voiceJoinPrompt, setVoiceJoinPrompt] =
@@ -91,6 +74,10 @@ export function useVoice({
     [],
   );
   const voiceSessionState = storedVoiceSessionState ?? defaultVoiceSessionState;
+
+  // VOICE_NEXUS_RESHAPE_TODO: this wrapper preserves the app-shaped
+  // state/derived/actions contract for now. Later, move callers to direct
+  // core.voice selectors/actions and split browser/RN adapter concerns.
 
   const setStoredVoiceConnected = React.useCallback(
     (connected: boolean) => {
@@ -110,8 +97,8 @@ export function useVoice({
     (nextState: VoiceSessionState) => {
       core.voice.setSessionState(nextState);
       core.voice.setJoined(nextState.joined);
-      core.voice.setIsMuted(nextState.isMuted);
-      core.voice.setIsDeafened(nextState.isDeafened);
+      core.voice.setMuted(nextState.isMuted);
+      core.voice.setDeafened(nextState.isDeafened);
     },
     [core],
   );
@@ -128,30 +115,19 @@ export function useVoice({
   }, [core]);
 
   const resetVoiceState = React.useCallback(() => {
-    dispatchVoiceSessionStoreEvent({ type: "COMPLETE_DISCONNECT" });
     setVoicePanelOpen(false);
     resetStoredVoiceState();
-    setVoicePresenceByChannelId({});
     setVoiceControlActions(null);
     setVoiceJoinPrompt(null);
   }, [resetStoredVoiceState]);
 
   const cleanupStaleVoicePresenceChannels = React.useCallback(async () => {
     if (!activeVoiceChannel) return;
-
-    const expectedTopic = `voice:presence:${activeVoiceChannel.community_id}:${activeVoiceChannel.id}`;
-    const channels = voiceRt().getChannels().filter((channel) => {
-      const topic = channel.topic ?? "";
-      return (
-        topic === expectedTopic ||
-        topic === `realtime:${expectedTopic}` ||
-        topic.endsWith(expectedTopic)
-      );
-    });
-    await Promise.all(
-      channels.map((channel) => voiceRt().removeChannel(channel)),
+    await core.voice.cleanupPresenceChannel(
+      activeVoiceChannel.community_id,
+      activeVoiceChannel.id,
     );
-  }, [activeVoiceChannel]);
+  }, [activeVoiceChannel, core]);
 
   const requestVoiceChannelJoin = React.useCallback(
     (channelId: string) => {
@@ -195,23 +171,18 @@ export function useVoice({
       activeVoiceChannelId &&
       voiceControlActions
     ) {
-      dispatchVoiceSessionStoreEvent({
-        type: "START_SWITCH",
-        channel: voiceJoinPrompt.channel,
-      });
+      core.voice.startSwitch(voiceJoinPrompt.channel);
       await voiceControlActions.leave();
       await cleanupStaleVoicePresenceChannels();
-      dispatchVoiceSessionStoreEvent({ type: "COMPLETE_DISCONNECT" });
+      core.voice.completeDisconnect();
     }
 
-    dispatchVoiceSessionStoreEvent({
-      type: "START_CONNECT",
-      channel: voiceJoinPrompt.channel,
-    });
+    core.voice.startConnect(voiceJoinPrompt.channel);
     setVoiceJoinPrompt(null);
   }, [
     activeVoiceChannelId,
     cleanupStaleVoicePresenceChannels,
+    core,
     voiceControlActions,
     voiceJoinPrompt,
   ]);
@@ -222,18 +193,19 @@ export function useVoice({
 
   const disconnectVoiceSession = React.useCallback(
     async (options?: { triggerPaneLeave?: boolean }) => {
-      dispatchVoiceSessionStoreEvent({ type: "START_DISCONNECT" });
+      core.voice.startDisconnect();
       if (options?.triggerPaneLeave !== false) {
         await voiceControlActions?.leave();
       }
       await cleanupStaleVoicePresenceChannels();
-      dispatchVoiceSessionStoreEvent({ type: "COMPLETE_DISCONNECT" });
+      core.voice.completeDisconnect();
       resetStoredVoiceState();
       setVoiceControlActions(null);
       setVoicePanelOpen(false);
     },
     [
       cleanupStaleVoicePresenceChannels,
+      core,
       resetStoredVoiceState,
       voiceControlActions,
     ],
@@ -251,14 +223,14 @@ export function useVoice({
     (connected: boolean) => {
       setStoredVoiceConnected(connected);
       if (connected) {
-        dispatchVoiceSessionStoreEvent({ type: "CONNECTED" });
+        core.voice.markConnected();
         return;
       }
       if (!activeVoiceChannelId) {
-        dispatchVoiceSessionStoreEvent({ type: "COMPLETE_DISCONNECT" });
+        core.voice.completeDisconnect();
       }
     },
-    [activeVoiceChannelId, setStoredVoiceConnected],
+    [activeVoiceChannelId, core, setStoredVoiceConnected],
   );
 
   React.useEffect(() => {
@@ -273,25 +245,40 @@ export function useVoice({
   React.useEffect(() => {
     if (!currentUserId || !voiceHardwareDebugPanelEnabled) return;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) return;
-      if (!(event.ctrlKey || event.metaKey) || !event.altKey || !event.shiftKey)
-        return;
-      if (event.key.toLowerCase() !== "v") return;
-      if (isEditableKeyboardTarget(event.target)) return;
+    const keyboardTarget = globalThis as unknown as {
+      addEventListener?: (type: string, listener: EventListener) => void;
+      removeEventListener?: (type: string, listener: EventListener) => void;
+    };
+    if (
+      typeof keyboardTarget.addEventListener !== "function" ||
+      typeof keyboardTarget.removeEventListener !== "function"
+    ) {
+      return;
+    }
 
-      event.preventDefault();
+    const handleKeyDown: EventListener = (event) => {
+      const keyboardEvent = event as KeyboardEvent;
+      if (keyboardEvent.repeat) return;
+      if (
+        !(keyboardEvent.ctrlKey || keyboardEvent.metaKey) ||
+        !keyboardEvent.altKey ||
+        !keyboardEvent.shiftKey
+      )
+        return;
+      if (keyboardEvent.key.toLowerCase() !== "v") return;
+      if (isEditableKeyboardTarget(keyboardEvent.target)) return;
+
+      keyboardEvent.preventDefault();
       setVoiceHardwareDebugPanelOpen((prev) => !prev);
     };
 
-    if (typeof window === 'undefined') return;
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    keyboardTarget.addEventListener("keydown", handleKeyDown);
+    return () => keyboardTarget.removeEventListener?.("keydown", handleKeyDown);
   }, [currentUserId, voiceHardwareDebugPanelEnabled]);
 
   React.useEffect(() => {
     if (!currentServerId || !currentUserId) {
-      setVoicePresenceByChannelId({});
+      core.voice.retainChannelParticipants([]);
       return;
     }
 
@@ -300,117 +287,17 @@ export function useVoice({
       .map((channel) => channel.id)
       .filter((channelId) => channelId !== activeVoiceChannelId);
 
-    setVoicePresenceByChannelId((prev) => {
-      const nextEntries = Object.entries(prev).filter(([channelId]) =>
-        voiceChannelIds.includes(channelId),
-      );
-      if (nextEntries.length === Object.keys(prev).length) return prev;
-      return Object.fromEntries(nextEntries);
-    });
-
     if (voiceChannelIds.length === 0) {
+      core.voice.retainChannelParticipants([]);
       return;
     }
 
-    let disposed = false;
-
-    const subscriptionChannels = voiceChannelIds.map((voiceChannelId) => {
-      const subscriptionChannel = voiceRt().channel(
-        `voice:presence:${currentServerId}:${voiceChannelId}`,
-      );
-
-      const syncPresenceState = () => {
-        if (disposed) return;
-
-        const presenceState = subscriptionChannel.presenceState() as Record<
-          string,
-          VoicePresenceStateRow[]
-        >;
-        const participantsByUserId = new Map<string, VoiceSidebarParticipant>();
-
-        for (const [presenceKey, presenceRows] of Object.entries(
-          presenceState,
-        )) {
-          const latestPresence = presenceRows[presenceRows.length - 1];
-          if (!latestPresence) continue;
-
-          const userId = latestPresence.user_id ?? presenceKey;
-          if (!userId) continue;
-
-          const trimmedDisplayName = latestPresence.display_name?.trim() ?? "";
-          const displayName =
-            trimmedDisplayName.length > 0
-              ? trimmedDisplayName
-              : userId.slice(0, 12);
-
-          if (!participantsByUserId.has(userId)) {
-            participantsByUserId.set(userId, {
-              userId,
-              displayName,
-              avatarUrl: latestPresence.avatar_url ?? null,
-              isSpeaking: Boolean(latestPresence.is_speaking),
-            });
-          }
-        }
-
-        const nextParticipants = Array.from(participantsByUserId.values()).sort(
-          (left, right) => left.displayName.localeCompare(right.displayName),
-        );
-
-        setVoicePresenceByChannelId((prev) => {
-          const previousParticipants = prev[voiceChannelId] ?? [];
-          if (
-            areVoiceParticipantListsEqual(
-              previousParticipants,
-              nextParticipants,
-            )
-          ) {
-            return prev;
-          }
-          return {
-            ...prev,
-            [voiceChannelId]: nextParticipants,
-          };
-        });
-      };
-
-      subscriptionChannel
-        .on("presence", { event: "sync" }, syncPresenceState)
-        .on("presence", { event: "join" }, syncPresenceState)
-        .on("presence", { event: "leave" }, syncPresenceState);
-
-      subscriptionChannel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          syncPresenceState();
-          return;
-        }
-        if (status !== "CHANNEL_ERROR" && status !== "TIMED_OUT") {
-          return;
-        }
-
-        if (disposed) return;
-        setVoicePresenceByChannelId((prev) => {
-          const previousParticipants = prev[voiceChannelId];
-          if (!previousParticipants || previousParticipants.length === 0) {
-            return prev;
-          }
-          return {
-            ...prev,
-            [voiceChannelId]: [],
-          };
-        });
-      });
-
-      return subscriptionChannel;
+    return core.voice.subscribePresenceChannels({
+      communityId: currentServerId,
+      channelIds: voiceChannelIds,
+      activeChannelId: activeVoiceChannelId,
     });
-
-    return () => {
-      disposed = true;
-      for (const subscriptionChannel of subscriptionChannels) {
-        void voiceRt().removeChannel(subscriptionChannel);
-      }
-    };
-  }, [activeVoiceChannelId, channels, currentServerId, currentUserId]);
+  }, [activeVoiceChannelId, channels, core, currentServerId, currentUserId]);
 
   React.useEffect(() => {
     if (!currentChannelId) return;
@@ -465,7 +352,7 @@ export function useVoice({
   return {
     state: {
       activeVoiceChannelId,
-      voiceConnectionState: voiceSessionStoreState.phase,
+      voiceConnectionState: voiceSession.phase,
       voicePanelOpen,
       voiceHardwareDebugPanelOpen,
       voiceConnected,

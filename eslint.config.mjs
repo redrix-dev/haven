@@ -119,12 +119,9 @@ const havenCoreWebConsumerFiles = [
 const havenCoreConsumerBoundaryIgnores = [
   '**/__tests__/**',
   '**/*.test.{ts,tsx,js,jsx}',
-  'packages/shared/src/features/voice/hooks/**',
-  'packages/shared/src/features/voice/store/**',
   'packages/shared/src/features/community/communityPermissionsHydration.ts',
   'packages/shared/src/features/community/utils/communityPermissionsHydration.ts',
   'packages/web-client/src/chat-app/useChatAppSessionState.ts',
-  'packages/web-client/src/features/voice/useLiveKitVoiceSession.ts',
   'packages/web-client/src/components/moderation/DmReportReviewPanel.tsx',
   'packages/web-client/src/components/moderation/ServerModmailPanel.tsx',
   'apps/mobile/src/haven-rev2/**',
