@@ -119,8 +119,6 @@ const havenCoreWebConsumerFiles = [
 const havenCoreConsumerBoundaryIgnores = [
   '**/__tests__/**',
   '**/*.test.{ts,tsx,js,jsx}',
-  'packages/web-client/src/components/moderation/DmReportReviewPanel.tsx',
-  'packages/web-client/src/components/moderation/ServerModmailPanel.tsx',
   'apps/mobile/src/haven-rev2/**',
   'apps/mobile/src/auth/mobileAuthService.ts',
   'apps/mobile/src/lib/createMmkvPersistence.ts',

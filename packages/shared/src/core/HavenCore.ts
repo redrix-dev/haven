@@ -590,6 +590,17 @@ export class HavenCore {
   }
 
   /**
+   * Delete a community message as part of community moderation.
+   * Report status remains a separate community modmail action.
+   */
+  async deleteCommunityMessageForModeration(input: {
+    communityId: string;
+    messageId: string;
+  }): Promise<void> {
+    await this.backends.communityData.deleteMessage(input);
+  }
+
+  /**
    * Resolve which servers the caller can ban a target user from.
    */
   async getBanEligibleServers(targetUserId: string): Promise<BanEligibleServer[]> {

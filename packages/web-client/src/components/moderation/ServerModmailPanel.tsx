@@ -23,7 +23,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@shared/app/ui/alert-dialog';
-import { getCommunityDataBackend } from '@shared/lib/backend';
 import { useHavenCore } from '@shared/core';
 import type {
   ServerPermissions,
@@ -766,8 +765,7 @@ export function ServerModmailPanel({
                 void runAction(
                   async () => {
                     if (actionConfirm.kind === 'delete_message') {
-                      const communityBackend = getCommunityDataBackend(actionConfirm.communityId);
-                      await communityBackend.deleteMessage({
+                      await core.deleteCommunityMessageForModeration({
                         communityId: actionConfirm.communityId,
                         messageId: actionConfirm.messageId,
                       });

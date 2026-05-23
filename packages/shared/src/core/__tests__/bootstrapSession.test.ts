@@ -292,3 +292,24 @@ describe('prepareCommunityEntry', () => {
     expect(prepareTextChannelMessages).toHaveBeenCalledWith('s1', 'c2');
   });
 });
+
+describe('deleteCommunityMessageForModeration', () => {
+  it('delegates community message deletion to the community data backend', async () => {
+    const deleteMessage = vi.fn(async () => {});
+    const core = {
+      backends: {
+        communityData: { deleteMessage },
+      },
+    } as unknown as HavenCore;
+
+    await HavenCore.prototype.deleteCommunityMessageForModeration.call(core, {
+      communityId: 's1',
+      messageId: 'm1',
+    });
+
+    expect(deleteMessage).toHaveBeenCalledWith({
+      communityId: 's1',
+      messageId: 'm1',
+    });
+  });
+});
