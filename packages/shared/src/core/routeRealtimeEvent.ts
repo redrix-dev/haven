@@ -1,7 +1,6 @@
 import type { HavenCore } from "./HavenCore";
 import { mapLiveProfileIdentity } from "@shared/lib/backend/controlPlaneBackend";
 import type { MessageBundle, ReportStatusUpdatedBroadcastPayload } from "@shared/lib/backend/types";
-import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import {
   notifyMemberBanned,
   notifyMemberChannelAccessRevoked,
@@ -273,7 +272,7 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       if (!communityId || !bannedUserId) return;
 
       notifyMemberBanned({ communityId, bannedUserId });
-      void hydrateCommunityPermissions(communityId);
+      void core.ensureCommunityPermissions(communityId);
       return;
     }
 

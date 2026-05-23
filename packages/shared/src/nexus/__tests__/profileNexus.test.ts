@@ -54,4 +54,42 @@ describe('ProfileNexus', () => {
     expect(nexus.getViewerProfile('u1')?.username).toBe('next-cody');
     expect(nexus.getProfile('u1')?.username).toBe('next-cody');
   });
+
+  it('loads platform staff info through the control plane', async () => {
+    const fetchPlatformStaff = vi.fn(async () => ({
+      isActive: true,
+      displayPrefix: 'Staff',
+    }));
+    const nexus = new ProfileNexus(createMemoryPersistence(), {
+      fetchPlatformStaff,
+    } as never);
+
+    const staff = await nexus.loadPlatformStaff('u1');
+
+    expect(fetchPlatformStaff).toHaveBeenCalledWith('u1');
+    expect(staff?.displayPrefix).toBe('Staff');
+    expect(nexus.getPlatformStaff('u1')?.isActive).toBe(true);
+  });
+
+  it('tracks platform staff load errors and clears session profile state', async () => {
+    const fetchPlatformStaff = vi.fn(async () => {
+      throw new Error('staff unavailable');
+    });
+    const nexus = new ProfileNexus(createMemoryPersistence(), {
+      fetchPlatformStaff,
+    } as never);
+
+    await expect(nexus.loadPlatformStaff('u1')).rejects.toThrow(
+      'staff unavailable',
+    );
+
+    expect(nexus.getPlatformStaff('u1')).toBeUndefined();
+    expect(nexus.getPlatformStaffError('u1')).toBe('staff unavailable');
+
+    nexus.clear();
+
+    expect(nexus.getViewerProfile('u1')).toBeUndefined();
+    expect(nexus.getPlatformStaff('u1')).toBeUndefined();
+    expect(nexus.getPlatformStaffError('u1')).toBeNull();
+  });
 });

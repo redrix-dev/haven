@@ -53,6 +53,26 @@ describe('DirectMessageNexus', () => {
     expect(nexus.getSnapshot('dm1')).toBeDefined();
   });
 
+  it('can load conversations without toggling the loading state', async () => {
+    let resolveList: (value: DirectMessageConversationSummary[]) => void = () => {};
+    const listConversations = vi.fn(
+      () =>
+        new Promise<DirectMessageConversationSummary[]>((resolve) => {
+          resolveList = resolve;
+        }),
+    );
+    const nexus = new DirectMessageNexus(createMemoryPersistence(), { listConversations } as never);
+
+    const promise = nexus.loadConversations({ suppressLoadingState: true });
+
+    expect(nexus.getReactiveStore().getState().isLoadingConversations).toBe(false);
+    resolveList([conversation()]);
+    await promise;
+
+    expect(nexus.getSnapshot('dm1')).toBeDefined();
+    expect(nexus.getReactiveStore().getState().isLoadingConversations).toBe(false);
+  });
+
   it('loadMessages reverses the response into ascending order', async () => {
     const desc = [
       message({ messageId: 'm2', createdAt: '2026-01-01T00:00:01.000Z' }),

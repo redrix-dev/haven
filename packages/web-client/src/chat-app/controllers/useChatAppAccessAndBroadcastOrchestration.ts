@@ -2,7 +2,6 @@ import { useCallback, useEffect, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import { registerCommunityAccessHandlers } from "@shared/core/communityAccessHandlers";
 import { requireHavenCore } from "@shared/core";
-import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
 import type {
   Channel,
   MemberBannedBroadcastPayload,
@@ -260,7 +259,7 @@ export function useChatAppAccessAndBroadcastOrchestration({
   const handleMemberBannedBroadcast = useCallback(
     (payload: MemberBannedBroadcastPayload) => {
       if (!payload.communityId || !payload.bannedUserId) return;
-      void hydrateCommunityPermissions(payload.communityId);
+      void requireHavenCore().ensureCommunityPermissions(payload.communityId);
       if (payload.bannedUserId === userId) return;
     },
     [userId],
@@ -270,7 +269,7 @@ export function useChatAppAccessAndBroadcastOrchestration({
     (payload: MemberChannelAccessRevokedBroadcastPayload) => {
       if (!payload.communityId || !payload.channelId || !payload.revokedUserId)
         return;
-      void hydrateCommunityPermissions(payload.communityId);
+      void requireHavenCore().ensureCommunityPermissions(payload.communityId);
       if (payload.revokedUserId === userId) return;
       applyChannelAccessRevokedContentVisibility(payload);
     },

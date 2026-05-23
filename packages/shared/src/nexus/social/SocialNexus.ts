@@ -214,6 +214,7 @@ export class SocialNexus {
       ]),
       usersBlockingMeIds: state.usersBlockingMeIds,
     });
+    await this.load();
   }
 
   async unblockUser(targetUserId: string): Promise<void> {
@@ -230,37 +231,38 @@ export class SocialNexus {
       ),
       usersBlockingMeIds: state.usersBlockingMeIds,
     });
+    await this.load();
   }
 
   async sendFriendRequest(username: string): Promise<string> {
     if (!this.backend) throw new Error("SocialNexus backend not attached.");
     const requestId = await this.backend.sendFriendRequest(username);
-    void this.load();
+    await this.load();
     return requestId;
   }
 
   async acceptFriendRequest(requestId: string): Promise<void> {
     if (!this.backend) throw new Error("SocialNexus backend not attached.");
     await this.backend.acceptFriendRequest(requestId);
-    void this.load();
+    await this.load();
   }
 
   async declineFriendRequest(requestId: string): Promise<void> {
     if (!this.backend) throw new Error("SocialNexus backend not attached.");
     await this.backend.declineFriendRequest(requestId);
-    void this.load();
+    await this.load();
   }
 
   async cancelFriendRequest(requestId: string): Promise<void> {
     if (!this.backend) throw new Error("SocialNexus backend not attached.");
     await this.backend.cancelFriendRequest(requestId);
-    void this.load();
+    await this.load();
   }
 
   async removeFriend(otherUserId: string): Promise<void> {
     if (!this.backend) throw new Error("SocialNexus backend not attached.");
     await this.backend.removeFriend(otherUserId);
-    void this.load();
+    await this.load();
   }
 
   async searchUsers(query: string): Promise<FriendSearchResult[]> {

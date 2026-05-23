@@ -1,5 +1,4 @@
 import type { HavenSupabaseClient } from "@shared/infrastructure/client/createHavenSupabaseClient";
-import { hydrateCommunityPermissionsForMany } from "@shared/features/community/communityPermissionsHydration";
 import {
   CommunityNexus,
 } from "@shared/nexus/community/CommunityNexus";
@@ -14,6 +13,7 @@ import { NotificationNexus } from "@shared/nexus/notifications/NotificationNexus
 import { SocialNexus } from "@shared/nexus/social/SocialNexus";
 import { PermissionsNexus } from "@shared/nexus/permissions/PermissionsNexus";
 import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
+import { FeatureFlagNexus } from "@shared/nexus/feature-flags/FeatureFlagNexus";
 import {
   VoiceNexus,
   type VoiceRealtimeChannel,
@@ -117,6 +117,7 @@ export class HavenCore {
   readonly social: SocialNexus;
   readonly permissions: PermissionsNexus;
   readonly profiles: ProfileNexus;
+  readonly featureFlags: FeatureFlagNexus;
   readonly voice: VoiceNexus;
 
   readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
@@ -144,6 +145,10 @@ export class HavenCore {
     this.social = new SocialNexus(options.persistence, this.backends.social);
     this.permissions = new PermissionsNexus(options.persistence);
     this.profiles = new ProfileNexus(options.persistence, this.backends.controlPlane);
+    this.featureFlags = new FeatureFlagNexus(
+      options.persistence,
+      this.backends.controlPlane,
+    );
     const voiceRealtime: VoiceRealtimeTransport = {
       channel: (topic) =>
         this.backends.client.channel(topic) as unknown as VoiceRealtimeChannel,
@@ -339,12 +344,17 @@ export class HavenCore {
         }
       }
       if (joinedIds.size > 0) {
-        await hydrateCommunityPermissionsForMany(Array.from(joinedIds));
+        await Promise.allSettled(
+          Array.from(joinedIds).map((id) => this.ensureCommunityPermissions(id)),
+        );
       }
 
       this.phase.set("loading_session_data");
       const activeCommunityId = this.communities.getActiveId();
       await Promise.allSettled([
+        this.profiles.loadViewerProfile(userId),
+        this.profiles.loadPlatformStaff(userId),
+        this.featureFlags.load(),
         this.directMessages.loadConversations(),
         this.notifications.loadInbox().then(() =>
           this.notifications.refreshCounts(),
@@ -385,6 +395,7 @@ export class HavenCore {
     this.social.clear();
     this.permissions.clear();
     this.profiles.clear();
+    this.featureFlags.reset();
     this.voice.clear();
     this.viewerMessagePolicyStore.setState(
       createDefaultViewerMessagePolicyState(),

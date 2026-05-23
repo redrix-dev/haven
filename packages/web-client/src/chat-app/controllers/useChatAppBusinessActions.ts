@@ -19,27 +19,14 @@ type UseChatAppBusinessActionsInput = {
     channelId: string;
     revokedUserId: string;
   }) => void;
-  applyLocalProfileUpdate: (profile: {
-    username: string;
-    avatarUrl: string | null;
-    theme?: string;
-  }) => void;
   profileUsername: string;
   profileAvatarUrl: string | null;
-  upsertLiveProfile: (input: {
-    userId: string;
-    username: string;
-    avatarUrl: string | null;
-    updatedAt: string;
-  }) => void;
 };
 
 export function useChatAppBusinessActions({
   user,
   currentServerId,
   applyChannelAccessRevokedContentVisibility,
-  applyLocalProfileUpdate,
-  upsertLiveProfile,
   profileUsername,
   profileAvatarUrl,
 }: UseChatAppBusinessActionsInput) {
@@ -181,25 +168,14 @@ export function useChatAppBusinessActions({
       avatarFile?: File | null;
     }) => {
       if (!user) throw new Error("Not authenticated");
-      const updatedProfile = await requireHavenCore().updateUserProfile({
+      await requireHavenCore().updateUserProfile({
         userId: user.id,
         username: values.username,
         avatarUrl: values.avatarUrl,
         avatarFile: values.avatarFile ?? null,
       });
-      applyLocalProfileUpdate({
-        username: updatedProfile.username,
-        avatarUrl: updatedProfile.avatarUrl,
-        theme: updatedProfile.theme,
-      });
-      upsertLiveProfile({
-        userId: user.id,
-        username: updatedProfile.username,
-        avatarUrl: updatedProfile.avatarUrl,
-        updatedAt: new Date().toISOString(),
-      });
     },
-    [user, applyLocalProfileUpdate, upsertLiveProfile],
+    [user],
   );
 
   const saveThemePreference = useCallback(
@@ -209,25 +185,14 @@ export function useChatAppBusinessActions({
       if (!trimmedUsername) {
         throw new Error("Username is required before changing theme.");
       }
-      const updatedProfile = await requireHavenCore().updateUserProfile({
+      await requireHavenCore().updateUserProfile({
         userId: user.id,
         username: trimmedUsername,
         avatarUrl: profileAvatarUrl,
         theme: themeId,
       });
-      applyLocalProfileUpdate({
-        username: updatedProfile.username,
-        avatarUrl: updatedProfile.avatarUrl,
-        theme: updatedProfile.theme,
-      });
-      upsertLiveProfile({
-        userId: user.id,
-        username: updatedProfile.username,
-        avatarUrl: updatedProfile.avatarUrl,
-        updatedAt: new Date().toISOString(),
-      });
     },
-    [user, profileUsername, profileAvatarUrl, applyLocalProfileUpdate, upsertLiveProfile],
+    [user, profileUsername, profileAvatarUrl],
   );
 
   return {

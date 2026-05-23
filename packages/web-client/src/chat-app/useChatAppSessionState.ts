@@ -11,28 +11,21 @@ import {
   resetNotificationSoundSyncState,
   syncNotificationSounds,
 } from "@shared/core";
-import { hydrateCommunityPermissions } from "@shared/features/community/utils/communityPermissionsHydration";
-import {
-  getControlPlaneBackend,
-  getNotificationBackend,
-  getSocialBackend,
-} from "@shared/lib/backend";
 import { getPlatformInviteBaseUrl } from "@platform/urls";
 import {
   ENABLE_CHANNEL_RELOAD_DIAGNOSTICS,
   VOICE_HARDWARE_DEBUG_PANEL_FLAG,
 } from "@shared/infrastructure/constants";
+import type { NotificationItem } from "@shared/lib/backend/types";
 import type { FriendsPanelTab } from "@shared/types/types";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useDesktopSettings } from "@web-client/hooks/useDesktopSettings";
 import { useDeepLinks } from "@web-client/hooks/useDeepLinks";
-import { useDirectMessageInteractions } from "@shared/features/direct-messages/hooks/useDirectMessageInteractions";
-import { useNotificationInteractions } from "@shared/features/notifications/hooks/useNotificationInteractions";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";
-import { useFeatureFlags } from "@shared/infrastructure/useFeatureFlags";
-import { usePlatformSession } from "@shared/features/profile/hooks/usePlatformSession";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import { useUiStore } from "@shared/stores/uiStore";
+import { getNotificationPayloadString } from "@shared/infrastructure/utils/appUtils";
+import { getTheme } from "@shared/themes/registry";
 import { useChatAppAccessAndBroadcastOrchestration } from "@web-client/chat-app/controllers/useChatAppAccessAndBroadcastOrchestration";
 import { useChatAppElevationEffects } from "@web-client/chat-app/controllers/useChatAppElevationEffects";
 import { useChatAppBusinessActions } from "@web-client/chat-app/controllers/useChatAppBusinessActions";
@@ -54,11 +47,6 @@ export function useChatAppSessionState() {
     isCurrentUserElevatedInMembersModalServer,
     setIsCurrentUserElevatedInMembersModalServer,
   ] = useState(false);
-  // ── Backend singletons ────────────────────────────────────────────────────
-  const controlPlaneBackend = getControlPlaneBackend();
-  const notificationBackend = getNotificationBackend();
-  const socialBackend = getSocialBackend();
-
   // ── Auth ──────────────────────────────────────────────────────────────────
   const {
     user,
@@ -102,11 +90,15 @@ export function useChatAppSessionState() {
   );
 
   // ── Feature flags ─────────────────────────────────────────────────────────
-  const {
-    state: { featureFlags, featureFlagsLoaded },
-    derived: { hasFeatureFlag },
-    actions: { resetFeatureFlags },
-  } = useFeatureFlags({ controlPlaneBackend, userId: user?.id });
+  const featureFlags = core.featureFlags.useFlags();
+  const featureFlagsLoaded = core.featureFlags.useLoaded();
+  const hasFeatureFlag = useCallback(
+    (flagKey: string) => Boolean(featureFlags[flagKey]),
+    [featureFlags],
+  );
+  const resetFeatureFlags = useCallback(() => {
+    core.featureFlags.reset();
+  }, [core.featureFlags]);
 
   const debugChannelReloads =
     ENABLE_CHANNEL_RELOAD_DIAGNOSTICS ||
@@ -117,14 +109,21 @@ export function useChatAppSessionState() {
   const richComposerEnabled =
     hasFeatureFlag("rich_markdown_composer") || hasFeatureFlag("rich_composer");
   // ── Platform session ──────────────────────────────────────────────────────
-  const {
-    state: { profileUsername, profileAvatarUrl, profileThemeId, isPlatformStaff },
-    actions: { resetPlatformSession, applyLocalProfileUpdate },
-  } = usePlatformSession({
-    controlPlaneBackend,
-    userId: user?.id,
-    userEmail: user?.email,
-  });
+  const viewerProfile = core.profiles.useViewerProfile(user?.id);
+  const viewerProfileLoaded = core.profiles.useViewerProfileLoaded(user?.id);
+  const viewerProfileError = core.profiles.useViewerProfileError(user?.id);
+  const platformStaff = core.profiles.usePlatformStaff(user?.id);
+  const profileUsername =
+    viewerProfile?.username ?? user?.email?.split("@")[0] ?? "User";
+  const profileAvatarUrl = viewerProfile?.avatarUrl ?? null;
+  const profileThemeId =
+    user?.id && (viewerProfileLoaded || viewerProfileError)
+      ? getTheme(viewerProfile?.theme ?? "default").id
+      : null;
+  const isPlatformStaff = Boolean(platformStaff?.isActive);
+  const resetPlatformSession = useCallback(() => {
+    core.profiles.clear();
+  }, [core.profiles]);
   const notificationsPanelOpen = useUiStore(
     (state) => state.notificationsPanelOpen,
   );
@@ -160,18 +159,6 @@ export function useChatAppSessionState() {
       updatedAt: new Date().toISOString(),
     });
   }, [baseUserDisplayName, core.profiles, profileAvatarUrl, user?.id]);
-
-  const upsertLiveProfile = useCallback(
-    (input: {
-      userId: string;
-      username: string;
-      avatarUrl: string | null;
-      updatedAt: string;
-    }) => {
-      core.profiles.upsertProfile(input);
-    },
-    [core.profiles],
-  );
 
   // ── UI / workspace state ──────────────────────────────────────────────────
   const workspaceMode = useUiStore((state) => state.workspaceMode);
@@ -219,8 +206,8 @@ export function useChatAppSessionState() {
 
   useEffect(() => {
     if (!user?.id || !currentServerId) return;
-    void hydrateCommunityPermissions(currentServerId);
-  }, [currentServerId, user?.id]);
+    void core.ensureCommunityPermissions(currentServerId);
+  }, [core, currentServerId, user?.id]);
 
   useEffect(() => {
     if (!currentServerId) return;
@@ -430,9 +417,6 @@ export function useChatAppSessionState() {
     (state) => state.setFriendsPanelHighlightedRequestId,
   );
   const socialCounts = core.social.useCounts();
-  const refreshSocialCounts = useCallback(async () => {
-    await core.social.load();
-  }, [core]);
   const resetSocialWorkspace = useCallback(() => {
     setFriendsPanelOpen(false);
     setFriendsPanelRequestedTab(null);
@@ -563,11 +547,10 @@ export function useChatAppSessionState() {
 
   const refreshDmConversations = useCallback(
     async (options?: { suppressLoadingState?: boolean }) => {
-      void options;
       if (!user?.id) return;
       setDmConversationsError(null);
       try {
-        await core.directMessages.loadConversations();
+        await core.directMessages.loadConversations(options);
       } catch (error) {
         setDmConversationsError(
           getErrorMessage(error, "Failed to load direct messages."),
@@ -676,36 +659,84 @@ export function useChatAppSessionState() {
   }, [core.notifications]);
 
   // ── DM interactions ───────────────────────────────────────────────────────
-  const {
-    actions: {
-      openDirectMessagesWorkspace,
-      directMessageUser,
-      blockDirectMessageUser,
-    },
-  } = useDirectMessageInteractions({
-    currentUserId: user?.id,
-    setDmConversationsError,
+  const openDirectMessagesWorkspace = useCallback(() => {
+    setWorkspaceMode("dm");
+    setNotificationsPanelOpen(false);
+    setFriendsPanelOpen(false);
+    setFriendsPanelRequestedTab(null);
+    setFriendsPanelHighlightedRequestId(null);
+    setDmConversationsError(null);
+
+    void refreshDmConversations({ suppressLoadingState: true }).catch((error) => {
+      const message = getErrorMessage(error, "Failed to load direct messages.");
+      console.error("Failed to open direct messages workspace:", error);
+      setDmConversationsError(message);
+    });
+  }, [
     refreshDmConversations,
-    openDirectMessageWithUser,
-    socialBackend,
-    refreshSocialCounts,
-    refreshNotificationInbox,
-    onOpenDmWorkspace: () => {
+    setFriendsPanelHighlightedRequestId,
+    setFriendsPanelOpen,
+    setFriendsPanelRequestedTab,
+    setNotificationsPanelOpen,
+    setWorkspaceMode,
+  ]);
+
+  const directMessageUser = useCallback(
+    (targetUserId: string) => {
+      setDmConversationsError(null);
+
+      if (!targetUserId) {
+        setDmConversationsError("Invalid DM target.");
+        return;
+      }
+
+      if (user?.id && targetUserId === user.id) {
+        setDmConversationsError("You cannot direct message yourself.");
+        return;
+      }
+
       setWorkspaceMode("dm");
-      setNotificationsPanelOpen(false);
-      setFriendsPanelOpen(false);
-      setFriendsPanelRequestedTab(null);
-      setFriendsPanelHighlightedRequestId(null);
+      void openDirectMessageWithUser(targetUserId).catch((error) => {
+        const message = getErrorMessage(error, "Failed to open direct message.");
+        const errorCode =
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          typeof (error as { code?: unknown }).code === "string"
+            ? ((error as { code: string }).code ?? null)
+            : null;
+
+        console.error("Failed to open direct message:", error);
+        setDmConversationsError(message);
+
+        if (errorCode === "P0001" && message.includes("friends list")) {
+          setFriendsPanelRequestedTab("add");
+          setFriendsPanelHighlightedRequestId(null);
+          setFriendsPanelOpen(true);
+        }
+      });
     },
-    onEnterDmWorkspace: () => {
-      setWorkspaceMode("dm");
+    [
+      openDirectMessageWithUser,
+      setFriendsPanelHighlightedRequestId,
+      setFriendsPanelOpen,
+      setFriendsPanelRequestedTab,
+      setWorkspaceMode,
+      user?.id,
+    ],
+  );
+
+  const blockDirectMessageUser = useCallback(
+    async (input: { userId: string; username: string }) => {
+      void input.username;
+      await core.social.blockUser(input.userId);
+      await Promise.all([
+        refreshDmConversations({ suppressLoadingState: true }),
+        refreshNotificationInbox(),
+      ]);
     },
-    onOpenFriendsAddPanel: () => {
-      setFriendsPanelRequestedTab("add");
-      setFriendsPanelHighlightedRequestId(null);
-      setFriendsPanelOpen(true);
-    },
-  });
+    [core.social, refreshDmConversations, refreshNotificationInbox],
+  );
 
   // ── Notification interactions ─────────────────────────────────────────────
   useChatAppElevationEffects({
@@ -717,37 +748,129 @@ export function useChatAppSessionState() {
     setIsCurrentUserElevatedInMembersModalServer,
   });
 
-  const {
-    actions: {
-      openNotificationItem,
-      acceptFriendRequestFromNotification,
-      declineFriendRequestFromNotification,
-      dismissFriendRequestNotification,
+  const openNotificationItem = useCallback(
+    async (notification: NotificationItem) => {
+      try {
+        switch (notification.kind) {
+          case "dm_message": {
+            const conversationId = getNotificationPayloadString(
+              notification,
+              "conversationId",
+            );
+            if (!conversationId) {
+              throw new Error(
+                "This notification does not include a DM conversation target.",
+              );
+            }
+            setWorkspaceMode("dm");
+            await openDirectMessageConversation(conversationId);
+            setNotificationsPanelOpen(false);
+            break;
+          }
+          case "friend_request_received": {
+            setFriendsPanelRequestedTab("requests" as FriendsPanelTab);
+            setFriendsPanelHighlightedRequestId(
+              getNotificationPayloadString(notification, "friendRequestId"),
+            );
+            setFriendsPanelOpen(true);
+            setNotificationsPanelOpen(false);
+            break;
+          }
+          case "friend_request_accepted": {
+            setFriendsPanelRequestedTab("friends" as FriendsPanelTab);
+            setFriendsPanelHighlightedRequestId(null);
+            setFriendsPanelOpen(true);
+            setNotificationsPanelOpen(false);
+            break;
+          }
+          case "channel_mention": {
+            const communityId = getNotificationPayloadString(
+              notification,
+              "communityId",
+            );
+            const channelId = getNotificationPayloadString(
+              notification,
+              "channelId",
+            );
+            if (!communityId || !channelId) {
+              throw new Error(
+                "This mention notification does not include a channel target.",
+              );
+            }
+            setWorkspaceMode("community");
+            setCurrentServerId(communityId);
+            setCurrentChannelId(channelId);
+            setNotificationsPanelOpen(false);
+            break;
+          }
+          default:
+            break;
+        }
+
+        await core.notifications.markRead([notification.recipientId]);
+      } catch (error) {
+        setNotificationsError(
+          getErrorMessage(error, "Failed to open notification."),
+        );
+      }
     },
-  } = useNotificationInteractions({
-    notificationBackend,
-    socialBackend,
-    refreshNotificationInbox,
-    refreshSocialCounts,
-    setNotificationsError,
-    onOpenDmConversation: async (conversationId) => {
-      setWorkspaceMode("dm");
-      await openDirectMessageConversation(conversationId);
-      setNotificationsPanelOpen(false);
+    [
+      core.notifications,
+      openDirectMessageConversation,
+      setCurrentChannelId,
+      setCurrentServerId,
+      setFriendsPanelHighlightedRequestId,
+      setFriendsPanelOpen,
+      setFriendsPanelRequestedTab,
+      setNotificationsPanelOpen,
+      setWorkspaceMode,
+    ],
+  );
+
+  const acceptFriendRequestFromNotification = useCallback(
+    async (input: { recipientId: string; friendRequestId: string }) => {
+      try {
+        await core.social.acceptFriendRequest(input.friendRequestId);
+        await core.notifications.dismiss([input.recipientId]);
+      } catch (error) {
+        setNotificationsError(
+          getErrorMessage(error, "Failed to accept friend request."),
+        );
+      }
     },
-    onOpenFriendsPanel: ({ tab, highlightedRequestId }) => {
-      setFriendsPanelRequestedTab(tab as FriendsPanelTab);
-      setFriendsPanelHighlightedRequestId(highlightedRequestId);
-      setFriendsPanelOpen(true);
-      setNotificationsPanelOpen(false);
+    [core.notifications, core.social],
+  );
+
+  const declineFriendRequestFromNotification = useCallback(
+    async (input: { recipientId: string; friendRequestId: string }) => {
+      try {
+        await core.social.declineFriendRequest(input.friendRequestId);
+        await core.notifications.dismiss([input.recipientId]);
+      } catch (error) {
+        setNotificationsError(
+          getErrorMessage(error, "Failed to decline friend request."),
+        );
+      }
     },
-    onOpenChannelMention: ({ communityId, channelId }) => {
-      setWorkspaceMode("community");
-      setCurrentServerId(communityId);
-      setCurrentChannelId(channelId);
-      setNotificationsPanelOpen(false);
+    [core.notifications, core.social],
+  );
+
+  const dismissFriendRequestNotification = useCallback(
+    async (input: { recipientId: string; friendRequestId: string }) => {
+      void input.friendRequestId;
+      try {
+        await core.notifications.dismiss([input.recipientId]);
+      } catch (error) {
+        setNotificationsError(
+          getErrorMessage(
+            error,
+            "Failed to dismiss friend request notification.",
+          ),
+        );
+      }
     },
-  });
+    [core.notifications],
+  );
 
   const {
     joinServerByInvite,
@@ -763,8 +886,6 @@ export function useChatAppSessionState() {
     user,
     currentServerId,
     applyChannelAccessRevokedContentVisibility,
-    applyLocalProfileUpdate,
-    upsertLiveProfile,
     profileUsername,
     profileAvatarUrl,
   });
@@ -857,7 +978,6 @@ export function useChatAppSessionState() {
     isPlatformStaff,
     userDisplayName,
     baseUserDisplayName,
-    applyLocalProfileUpdate,
     userStatus,
     setUserStatus,
     rainbowMode,

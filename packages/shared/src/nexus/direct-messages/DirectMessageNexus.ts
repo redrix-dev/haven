@@ -151,19 +151,23 @@ export class DirectMessageNexus extends Nexus<
 
   // ---- Load methods ----
 
-  async loadConversations(): Promise<void> {
+  async loadConversations(options?: { suppressLoadingState?: boolean }): Promise<void> {
     if (!this.backend) {
       throw new Error('DirectMessageNexus.loadConversations called before backend attached.')
     }
     if (this.conversationsInflight) return this.conversationsInflight
 
     this.conversationsInflight = (async () => {
-      this.setIsLoadingConversations(true)
+      if (!options?.suppressLoadingState) {
+        this.setIsLoadingConversations(true)
+      }
       try {
         const conversations = await this.backend!.listConversations()
         this.setConversations(conversations)
       } finally {
-        this.setIsLoadingConversations(false)
+        if (!options?.suppressLoadingState) {
+          this.setIsLoadingConversations(false)
+        }
       }
     })().finally(() => {
       this.conversationsInflight = null

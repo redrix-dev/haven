@@ -17,3 +17,5 @@ export { DirectMessageNexus } from "./direct-messages/DirectMessageNexus";
 export type { DirectMessageNexusState } from "./direct-messages/DirectMessageNexus";
 export { NotificationNexus } from "./notifications/NotificationNexus";
 export type { NotificationNexusState } from "./notifications/NotificationNexus";
+export { FeatureFlagNexus } from "./feature-flags/FeatureFlagNexus";
+export type { FeatureFlagNexusState } from "./feature-flags/FeatureFlagNexus";

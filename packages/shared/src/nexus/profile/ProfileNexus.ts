@@ -1,7 +1,11 @@
 import { create } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
-import type { ControlPlaneBackend, UserProfileInfo } from "@shared/lib/backend/controlPlaneBackend.interface";
+import type {
+  ControlPlaneBackend,
+  PlatformStaffInfo,
+  UserProfileInfo,
+} from "@shared/lib/backend/controlPlaneBackend.interface";
 import type { LiveProfileIdentity } from "@shared/lib/backend/types";
 import type { StoreApi, UseBoundStore } from "zustand";
 
@@ -10,6 +14,9 @@ export type ProfileNexusState = {
   viewerProfiles: Record<string, UserProfileInfo | null>;
   viewerProfileLoading: Record<string, boolean>;
   viewerProfileErrors: Record<string, string | null>;
+  platformStaff: Record<string, PlatformStaffInfo | null>;
+  platformStaffLoading: Record<string, boolean>;
+  platformStaffErrors: Record<string, string | null>;
   revision: number;
 };
 
@@ -26,6 +33,7 @@ export class ProfileNexus {
   private readonly store: UseBoundStore<StoreApi<ProfileNexusState>>;
   private readonly controlPlane: ControlPlaneBackend | null;
   private viewerProfileInflight = new Map<string, Promise<UserProfileInfo | null>>();
+  private platformStaffInflight = new Map<string, Promise<PlatformStaffInfo | null>>();
 
   constructor(_persistence: NexusPersistence, controlPlane?: ControlPlaneBackend) {
     void _persistence;
@@ -35,6 +43,9 @@ export class ProfileNexus {
       viewerProfiles: {},
       viewerProfileLoading: {},
       viewerProfileErrors: {},
+      platformStaff: {},
+      platformStaffLoading: {},
+      platformStaffErrors: {},
       revision: 0,
     }));
   }
@@ -60,6 +71,13 @@ export class ProfileNexus {
         updatedAt: new Date().toISOString(),
       });
     }
+  }
+
+  private setPlatformStaff(userId: string, staff: PlatformStaffInfo | null): void {
+    this.store.setState((state) => ({
+      platformStaff: { ...state.platformStaff, [userId]: staff },
+      revision: state.revision + 1,
+    }));
   }
 
   async loadViewerProfile(userId: string): Promise<UserProfileInfo | null> {
@@ -119,6 +137,57 @@ export class ProfileNexus {
     return result;
   }
 
+  async loadPlatformStaff(userId: string): Promise<PlatformStaffInfo | null> {
+    if (!userId.trim()) return null;
+    const existing = this.platformStaffInflight.get(userId);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      this.store.setState((state) => ({
+        platformStaffLoading: {
+          ...state.platformStaffLoading,
+          [userId]: true,
+        },
+        platformStaffErrors: {
+          ...state.platformStaffErrors,
+          [userId]: null,
+        },
+        revision: state.revision + 1,
+      }));
+
+      try {
+        const staff = await this.requireControlPlane().fetchPlatformStaff(userId);
+        this.setPlatformStaff(userId, staff);
+        return staff;
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message.trim().length > 0
+            ? error.message
+            : "Failed to load platform staff info.";
+        this.store.setState((state) => ({
+          platformStaffErrors: {
+            ...state.platformStaffErrors,
+            [userId]: message,
+          },
+          revision: state.revision + 1,
+        }));
+        throw error;
+      } finally {
+        this.store.setState((state) => ({
+          platformStaffLoading: {
+            ...state.platformStaffLoading,
+            [userId]: false,
+          },
+          revision: state.revision + 1,
+        }));
+        this.platformStaffInflight.delete(userId);
+      }
+    })();
+
+    this.platformStaffInflight.set(userId, promise);
+    return promise;
+  }
+
   upsertProfile(profile: LiveProfileIdentity): void {
     this.store.setState((state) => ({
       profiles: { ...state.profiles, [profile.userId]: profile },
@@ -159,6 +228,18 @@ export class ProfileNexus {
     return this.store.getState().viewerProfiles[userId];
   }
 
+  getViewerProfileError(userId: string): string | null {
+    return this.store.getState().viewerProfileErrors[userId] ?? null;
+  }
+
+  getPlatformStaff(userId: string): PlatformStaffInfo | null | undefined {
+    return this.store.getState().platformStaff[userId];
+  }
+
+  getPlatformStaffError(userId: string): string | null {
+    return this.store.getState().platformStaffErrors[userId] ?? null;
+  }
+
   useProfilesRecord(): Record<string, LiveProfileIdentity> {
     return useStoreWithEqualityFn(this.store, (state) => {
       void state.revision;
@@ -184,6 +265,14 @@ export class ProfileNexus {
     );
   }
 
+  useViewerProfileLoaded(userId: string | null | undefined): boolean {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId
+        ? Object.prototype.hasOwnProperty.call(state.viewerProfiles, userId)
+        : false,
+    );
+  }
+
   useViewerProfileLoading(userId: string | null | undefined): boolean {
     return useStoreWithEqualityFn(this.store, (state) =>
       userId ? Boolean(state.viewerProfileLoading[userId]) : false,
@@ -196,15 +285,37 @@ export class ProfileNexus {
     );
   }
 
+  usePlatformStaff(userId: string | null | undefined): PlatformStaffInfo | null {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? (state.platformStaff[userId] ?? null) : null,
+    );
+  }
+
+  usePlatformStaffLoading(userId: string | null | undefined): boolean {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? Boolean(state.platformStaffLoading[userId]) : false,
+    );
+  }
+
+  usePlatformStaffError(userId: string | null | undefined): string | null {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? (state.platformStaffErrors[userId] ?? null) : null,
+    );
+  }
+
   rehydrate(): void {}
 
   clear(): void {
     this.viewerProfileInflight.clear();
+    this.platformStaffInflight.clear();
     this.store.setState({
       profiles: {},
       viewerProfiles: {},
       viewerProfileLoading: {},
       viewerProfileErrors: {},
+      platformStaff: {},
+      platformStaffLoading: {},
+      platformStaffErrors: {},
       revision: 0,
     });
   }
