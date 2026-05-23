@@ -1,6 +1,6 @@
 # Platform Injection Cutover Ruleset
 
-Timestamp: 2026-05-23 15:10:43 EDT
+Timestamp: 2026-05-23 18:00:31 EDT
 
 This is a current working refactor guide. Its purpose is to keep the web/electron/mobile cutover aligned with the HavenCore -> Nexus -> UI Consumer pattern while preserving the platform injection that still belongs at the host boundary.
 
@@ -16,6 +16,8 @@ The migration did not remove platform injection; it narrowed what platform injec
 - UI consumes Core/Nexus directly.
 
 The target is not "no injection." The target is "no domain behavior hidden inside platform bridges, controller hooks, or backend imports in UI."
+
+As of this audit, the active web/electron UI quarantine has been cleared. The remaining active exceptions are host/bootstrap/mobile platform files, plus a stale mobile ignore for a deleted folder that can be removed next.
 
 ## Current Host Shape
 
@@ -189,7 +191,7 @@ Not allowed:
 - Web/mobile/electron UI calling `requireHavenCore().backends.*`.
 - Feature hooks using `core.backends` as a shortcut around a missing Nexus command.
 
-The comment in `packages/shared/src/core/backends.ts` that says consumers should normally read through `requireHavenCore().backends.*` is stale for the target pattern and should be updated during the web/electron cutover.
+Current note: `packages/shared/src/core/backends.ts` now marks `core.backends` as Core/Nexus wiring and tells UI/feature consumers to add a HavenCore/Nexus command instead.
 
 ### 9. Auth Is A Bounded Exception
 
@@ -211,6 +213,27 @@ The eslint consumer boundary should continue pushing toward:
 - No persistence adapter imports in consumers.
 - No domain realtime subscriptions outside HavenCore.
 - No new files added to quarantine unless they are explicitly time-boxed migration debt.
+
+Current quarantine should stay limited to:
+
+- tests
+- mobile auth/bootstrap
+- mobile persistence
+- mobile Supabase bootstrap
+- the stale `apps/mobile/src/haven-rev2/**` ignore until it is removed
+
+No active web/electron UI file should be in `havenCoreConsumerBoundaryIgnores`.
+
+## Current Remaining Punch List
+
+The repo is now in the intended consumer-facing Nexus shape. Remaining work is cleanup and internal hardening:
+
+- Remove the stale mobile `haven-rev2` eslint ignore and deleted-folder rule.
+- Delete `apps/mobile/src/screens/main/CommunityScreen.tsx` if the deprecated alias is no longer useful.
+- Gradually flatten `packages/web-client/src/chat-app/useChatAppSessionState.ts` by moving edited web components to direct `useHavenCore()` reads. This is readability debt, not a boundary violation.
+- Optionally inject community-data backend access into `CommunityAdminNexus` instead of having that Nexus call `getCommunityDataBackend(...)` internally.
+- Optionally replace internal Core helper backend reach-throughs, such as notification sound sync and revoked-author hydration, with explicit Nexus/Core commands.
+- Keep DM/platform report review out of this repo unless the off-repo admin panel is intentionally moved here.
 
 ## Anti-Patterns To Avoid
 
