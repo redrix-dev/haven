@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { DataCacheDebugModal } from "@/debug/DataCacheDebugModal";
+import { MobileDevSideRailMenu } from "@/dev/MobileDevSideRailMenu";
 import { MobileDevThemeMenu } from "@/dev/MobileDevThemeMenu";
 
 /**
@@ -25,6 +26,7 @@ export function MobileDevToolsOverlay() {
       </View>
 
       <MobileDevThemeMenu />
+      <MobileDevSideRailMenu />
 
       <DataCacheDebugModal visible={dataDebugOpen} onClose={() => setDataDebugOpen(false)} />
     </>
