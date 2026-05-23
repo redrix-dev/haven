@@ -8,6 +8,9 @@ import React, {
 } from "react";
 import { requireHavenCore } from "@shared/core";
 
+// Bounded bootstrap exception: auth may touch the raw Supabase client to
+// establish, recover, refresh, and end a session. Domain reads/writes belong in
+// HavenCore/Nexus after the session exists.
 const havenAuthClient = () => requireHavenCore().backends.client;
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
@@ -190,6 +193,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPasswordRecoveryRequired(false);
       }
 
+      // Auth's only handoff into the domain runtime is bootstrap/clear. Keep
+      // domain loading, realtime routing, and Nexus coordination inside Core.
       const core = requireHavenCore();
 
       if (event === "SIGNED_OUT") {

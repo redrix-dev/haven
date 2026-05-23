@@ -432,6 +432,15 @@ export class CommunityAdminNexus {
           isActive: invite.isActive,
         })),
       })
+    } catch (error: unknown) {
+      this.patch({
+        serverInvites: [],
+        serverInvitesError: getErrorMessage(
+          error,
+          'Failed to load invites.',
+        ),
+      })
+      throw error
     } finally {
       this.patch({ serverInvitesLoading: false })
     }
@@ -464,6 +473,17 @@ export class CommunityAdminNexus {
         serverMembers: snapshot.members,
         serverPermissionCatalog: snapshot.permissionsCatalog,
       })
+    } catch (error: unknown) {
+      this.patch({
+        serverRoles: [],
+        serverMembers: [],
+        serverPermissionCatalog: [],
+        serverRoleManagementError: getErrorMessage(
+          error,
+          'Failed to load community roles and members.',
+        ),
+      })
+      throw error
     } finally {
       this.patch({ serverRoleManagementLoading: false })
     }
@@ -489,6 +509,15 @@ export class CommunityAdminNexus {
           requireReportReason: snapshot.requireReportReason,
         },
       })
+    } catch (error: unknown) {
+      this.patch({
+        serverSettingsInitialValues: null,
+        serverSettingsLoadError: getErrorMessage(
+          error,
+          'Failed to load community settings.',
+        ),
+      })
+      throw error
     } finally {
       this.patch({ serverSettingsLoading: false })
     }
@@ -497,8 +526,8 @@ export class CommunityAdminNexus {
   createServerInvite = async (values: {
     maxUses: number | null
     expiresInHours: number | null
-  }): Promise<ServerInvite> => {
-    const communityId = this.requireCommunityId()
+  }, communityIdOverride?: string | null): Promise<ServerInvite> => {
+    const communityId = this.requireCommunityId(communityIdOverride)
 
     const invite = await this.requireControlPlane().createCommunityInvite({
       communityId,
@@ -518,8 +547,11 @@ export class CommunityAdminNexus {
     }
   }
 
-  saveServerSettings = async (values: ServerSettingsUpdate): Promise<void> => {
-    const communityId = this.requireCommunityId()
+  saveServerSettings = async (
+    values: ServerSettingsUpdate,
+    communityIdOverride?: string | null,
+  ): Promise<void> => {
+    const communityId = this.requireCommunityId(communityIdOverride)
     const userId = useAuthStore.getState().user?.id
     if (!userId) throw new Error('Not authenticated')
 
@@ -610,8 +642,11 @@ export class CommunityAdminNexus {
     }
   }
 
-  revokeServerInvite = async (inviteId: string): Promise<void> => {
-    const communityId = this.requireCommunityId()
+  revokeServerInvite = async (
+    inviteId: string,
+    communityIdOverride?: string | null,
+  ): Promise<void> => {
+    const communityId = this.requireCommunityId(communityIdOverride)
     await this.requireControlPlane().revokeCommunityInvite(
       communityId,
       inviteId,
@@ -622,8 +657,8 @@ export class CommunityAdminNexus {
   unbanUserFromCurrentServer = async (input: {
     targetUserId: string
     reason?: string | null
-  }): Promise<void> => {
-    const communityId = this.requireCommunityId()
+  }, communityIdOverride?: string | null): Promise<void> => {
+    const communityId = this.requireCommunityId(communityIdOverride)
     const communityBackend = getCommunityDataBackend(communityId)
     await communityBackend.unbanCommunityMember({
       communityId,
@@ -669,6 +704,30 @@ export class CommunityAdminNexus {
     })
 
     await this.loadServerRoleManagement(communityId)
+  }
+
+  reorderServerRoles = async (
+    orderedRoles: ServerRoleItem[],
+    communityId?: string | null,
+  ): Promise<void> => {
+    const resolvedId = this.requireCommunityId(communityId)
+    const communityBackend = getCommunityDataBackend(resolvedId)
+    const n = orderedRoles.length
+
+    for (let i = 0; i < n; i++) {
+      const role = orderedRoles[i]
+      const newPosition = n - 1 - i
+      if (role.position === newPosition) continue
+      await communityBackend.updateServerRole({
+        communityId: resolvedId,
+        roleId: role.id,
+        name: role.name,
+        color: role.color,
+        position: newPosition,
+      })
+    }
+
+    await this.loadServerRoleManagement(resolvedId)
   }
 
   deleteServerRole = async (roleId: string): Promise<void> => {
@@ -830,9 +889,10 @@ export class CommunityAdminNexus {
   saveChannelSettings = async (
     values: { name: string; topic: string | null },
     communityId?: string | null,
+    channelId?: string | null,
   ): Promise<void> => {
     const resolvedId = this.requireCommunityId(communityId)
-    const channelIdToUpdate = this.resolveTargetChannelId()
+    const channelIdToUpdate = this.resolveTargetChannelId(channelId)
     if (!channelIdToUpdate) throw new Error('No channel selected.')
 
     const communityBackend = getCommunityDataBackend(resolvedId)
@@ -953,6 +1013,17 @@ export class CommunityAdminNexus {
         channelMemberPermissions: snapshot.memberPermissions,
         channelPermissionMemberOptions: snapshot.memberOptions,
       })
+    } catch (error: unknown) {
+      this.patch({
+        channelRolePermissions: [],
+        channelMemberPermissions: [],
+        channelPermissionMemberOptions: [],
+        channelPermissionsLoadError: getErrorMessage(
+          error,
+          'Failed to load channel permissions.',
+        ),
+      })
+      throw error
     } finally {
       this.patch({ channelPermissionsLoading: false })
     }
@@ -983,9 +1054,11 @@ export class CommunityAdminNexus {
   saveRoleChannelPermissions = async (
     roleId: string,
     permissions: ChannelPermissionState,
+    communityId?: string | null,
+    channelId?: string | null,
   ): Promise<void> => {
-    const communityId = this.requireCommunityId()
-    const targetChannelId = this.resolveTargetChannelId()
+    const resolvedId = this.requireCommunityId(communityId)
+    const targetChannelId = this.resolveTargetChannelId(channelId)
     if (!targetChannelId) throw new Error('No channel selected.')
 
     const roleRow = this.store
@@ -997,9 +1070,9 @@ export class CommunityAdminNexus {
       )
     }
 
-    const communityBackend = getCommunityDataBackend(communityId)
+    const communityBackend = getCommunityDataBackend(resolvedId)
     await communityBackend.saveRoleChannelPermissions({
-      communityId,
+      communityId: resolvedId,
       channelId: targetChannelId,
       roleId,
       permissions,
@@ -1024,15 +1097,17 @@ export class CommunityAdminNexus {
   saveMemberChannelPermissions = async (
     memberId: string,
     permissions: ChannelPermissionState,
+    communityId?: string | null,
+    channelId?: string | null,
   ): Promise<ChannelAccessRevokedResult | null> => {
-    const communityId = this.requireCommunityId()
-    const targetChannelId = this.resolveTargetChannelId()
+    const resolvedId = this.requireCommunityId(communityId)
+    const targetChannelId = this.resolveTargetChannelId(channelId)
     if (!targetChannelId) throw new Error('No channel selected.')
 
-    const communityBackend = getCommunityDataBackend(communityId)
+    const communityBackend = getCommunityDataBackend(resolvedId)
     const accessRevokedResult =
       await communityBackend.saveMemberChannelPermissions({
-        communityId,
+        communityId: resolvedId,
         channelId: targetChannelId,
         memberId,
         permissions,

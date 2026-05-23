@@ -13,7 +13,12 @@ import {
 } from "react-native-enriched-markdown";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
-import { useHavenCore } from "@shared/core";
+import {
+  deriveCommunitiesLoadStatus,
+  toChannel,
+  toServerSummaries,
+  useHavenCore,
+} from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   buildChatListItemsFromChatMessages,
@@ -37,10 +42,6 @@ import {
   loadPickedCommunityMediaForUpload,
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
-import {
-  useMobileCommunityWorkspace,
-  useMobileServersFromSession,
-} from "@/contexts/MobileMainSessionContext";
 import { useDataCacheComponentProbe } from "@shared/debug";
 
 type CommunityChatScreenProps = {
@@ -53,18 +54,61 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
 
   const core = useHavenCore();
   const { setRainbowMode } = useUserStatusStore();
+  const user = useAuthStore((state) => state.user);
   const communityId = core.communities.useActiveId() ?? serverId;
   const navigationChannelId = core.channels.useActiveChannelId();
   const messageNexus = core.messages.for(communityId ?? "__none__");
-  const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
-
-  const { servers, status: serversStatus, error: serversError, refreshServers } =
-    useMobileServersFromSession();
-  const {
-    state: { channels, channelsLoading },
-    derived: { currentRenderableChannel },
-  } = useMobileCommunityWorkspace();
+  const nexusCommunities = core.communities.useCommunities();
+  const serversLoading = core.communities.useIsLoading();
+  const serversError = core.communities.useLoadError();
+  const servers = useMemo(
+    () => toServerSummaries(nexusCommunities),
+    [nexusCommunities],
+  );
+  const serversStatus = deriveCommunitiesLoadStatus({
+    hasUser: Boolean(currentUserId),
+    isLoading: serversLoading,
+    loadError: serversError,
+    communityCount: nexusCommunities.length,
+  });
+  const refreshServers = useCallback(async () => {
+    if (!currentUserId) return;
+    await core.refreshCommunities(currentUserId);
+  }, [core, currentUserId]);
+  const havenChannels = core.channels.useChannels(communityId ?? serverId);
+  const channelsLoading = core.channels.useIsLoading(communityId ?? serverId);
+  const channels = useMemo(() => havenChannels.map(toChannel), [havenChannels]);
+  const currentChannel = useMemo(
+    () =>
+      navigationChannelId
+        ? (channels.find((channel) => channel.id === navigationChannelId) ?? null)
+        : null,
+    [channels, navigationChannelId],
+  );
+  const currentChannelBelongsToCurrentServer = Boolean(
+    currentChannel &&
+      communityId &&
+      currentChannel.community_id === communityId,
+  );
+  const currentRenderableChannel = useMemo(
+    () =>
+      currentChannel &&
+      currentChannelBelongsToCurrentServer &&
+      currentChannel.kind === "text"
+        ? currentChannel
+        : (channels.find(
+            (channel) =>
+              channel.kind === "text" &&
+              (!communityId || channel.community_id === communityId),
+          ) ?? (currentChannelBelongsToCurrentServer ? currentChannel : null)),
+    [
+      channels,
+      communityId,
+      currentChannel,
+      currentChannelBelongsToCurrentServer,
+    ],
+  );
 
   const activeChannelId = useMemo(() => {
     if (currentRenderableChannel?.id) return currentRenderableChannel.id;

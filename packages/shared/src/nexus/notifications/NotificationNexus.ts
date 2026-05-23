@@ -5,6 +5,8 @@ import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence
 import type { NotificationBackend } from '@shared/lib/backend/notificationBackend'
 import type {
   NotificationCounts,
+  ExpoPushSubscriptionRecord,
+  ExpoPushSubscriptionUpsertInput,
   NotificationItem,
   NotificationPreferenceUpdate,
   NotificationPreferences,
@@ -207,6 +209,22 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     } catch (err) {
       console.warn('[NotificationNexus] refreshCounts failed', err)
     }
+  }
+
+  async upsertExpoPushSubscription(
+    input: ExpoPushSubscriptionUpsertInput,
+  ): Promise<ExpoPushSubscriptionRecord> {
+    if (!this.backend) {
+      throw new Error('NotificationNexus.upsertExpoPushSubscription called before backend attached.')
+    }
+    return this.backend.upsertExpoPushSubscription(input)
+  }
+
+  async deleteExpoPushSubscription(expoPushToken: string): Promise<boolean> {
+    if (!this.backend) {
+      throw new Error('NotificationNexus.deleteExpoPushSubscription called before backend attached.')
+    }
+    return this.backend.deleteExpoPushSubscription(expoPushToken)
   }
 
   async markSeen(recipientIds: string[]): Promise<void> {

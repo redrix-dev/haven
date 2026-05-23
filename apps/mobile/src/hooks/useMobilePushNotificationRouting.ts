@@ -21,7 +21,7 @@ function routeNotificationResponse(response: Notifications.NotificationResponse)
   const { handlers, setPendingParsedPayload } = useMobilePushNavigationStore.getState();
   if (!handlers) {
     // Handlers aren't registered yet (e.g. cold-start race). Store the payload so
-    // it's dispatched as soon as setHandlers is called in HavenTabNavigator.
+    // it's dispatched as soon as setHandlers is called in MainNavigationShell.
     setPendingParsedPayload(parsed);
     return;
   }

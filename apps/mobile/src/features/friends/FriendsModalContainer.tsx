@@ -20,7 +20,7 @@ import type {
 } from "@shared/lib/backend/types";
 import { resolveLiveUsername } from "@shared/infrastructure/liveProfiles";
 import { useHavenCore } from "@shared/core";
-import { useFriendsModalData } from "@/features/friends/useFriendsModalData";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 type FriendsModalContainerProps = {
   visible: boolean;
@@ -45,21 +45,115 @@ export function FriendsModalContainer({
   onStartDirectMessage,
 }: FriendsModalContainerProps) {
   const core = useHavenCore();
+  const social = core.social;
   const liveProfiles = core.profiles.useProfilesRecord();
+  const counts = social.useCounts();
+  const friends = social.useFriends();
+  const requests = social.useFriendRequests();
+  const blockedUsers = social.useBlockedUsers();
+  const nexusLoading = social.useIsLoading();
   const [activeTab, setActiveTab] = useState<FriendsPanelTab>("friends");
-  const data = useFriendsModalData(visible, userId);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busyActionKey, setBusyActionKey] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<FriendSearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  const refreshData = useCallback(
+    async (options?: { suppressLoadingState?: boolean }) => {
+      if (!visible || !userId) return;
+      if (options?.suppressLoadingState) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setLoadError(null);
+
+      try {
+        await social.load();
+      } catch (error) {
+        setLoadError(getErrorMessage(error, "Failed to load friends data."));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [social, userId, visible],
+  );
+
+  const runMutation = useCallback(
+    async (actionKey: string, fn: () => Promise<void>) => {
+      setBusyActionKey(actionKey);
+      setActionError(null);
+      try {
+        await fn();
+        await social.load();
+      } catch (error) {
+        setActionError(getErrorMessage(error, "Action failed."));
+      } finally {
+        setBusyActionKey(null);
+      }
+    },
+    [social],
+  );
 
   useEffect(() => {
     if (visible) setActiveTab(initialTab);
   }, [initialTab, visible]);
 
+  useEffect(() => {
+    if (!visible) {
+      setActionError(null);
+      setSearchError(null);
+      setSearchLoading(false);
+      return;
+    }
+    void refreshData();
+  }, [refreshData, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSearchResults([]);
+      setSearchError(null);
+      setSearchLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearchLoading(true);
+    setSearchError(null);
+    void social
+      .searchUsers(query)
+      .then((results) => {
+        if (!cancelled) setSearchResults(results);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setSearchError(getErrorMessage(error, "Search failed."));
+        setSearchResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSearchLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery, social, visible]);
+
   const incomingRequests = useMemo(
-    () => data.requests.filter((r) => r.direction === "incoming"),
-    [data.requests],
+    () => requests.filter((r) => r.direction === "incoming"),
+    [requests],
   );
   const outgoingRequests = useMemo(
-    () => data.requests.filter((r) => r.direction === "outgoing"),
-    [data.requests],
+    () => requests.filter((r) => r.direction === "outgoing"),
+    [requests],
   );
 
   const labelForFriend = useCallback(
@@ -99,8 +193,8 @@ export function FriendsModalContainer({
                     text: "Remove",
                     style: "destructive",
                     onPress: () =>
-                      void data.runMutation(`remove:${item.friendUserId}`, async () => {
-                        await data.core.social.removeFriend(item.friendUserId);
+                      void runMutation(`remove:${item.friendUserId}`, async () => {
+                        await social.removeFriend(item.friendUserId);
                       }),
                   },
                 ],
@@ -112,7 +206,7 @@ export function FriendsModalContainer({
         </View>
       </View>
     ),
-    [data, labelForFriend, onStartDirectMessage],
+    [labelForFriend, onStartDirectMessage, runMutation, social],
   );
 
   const renderIncomingRequest = useCallback(
@@ -126,10 +220,10 @@ export function FriendsModalContainer({
         <View className="mt-2 flex-row gap-2">
           <Pressable
             className="rounded-lg bg-accent-slider px-3 py-2"
-            disabled={data.busyActionKey !== null}
+            disabled={busyActionKey !== null}
             onPress={() =>
-              void data.runMutation(`accept:${item.requestId}`, async () => {
-                await data.core.social.acceptFriendRequest(item.requestId);
+              void runMutation(`accept:${item.requestId}`, async () => {
+                await social.acceptFriendRequest(item.requestId);
               })
             }
           >
@@ -137,10 +231,10 @@ export function FriendsModalContainer({
           </Pressable>
           <Pressable
             className="rounded-lg bg-surface-panel px-3 py-2"
-            disabled={data.busyActionKey !== null}
+            disabled={busyActionKey !== null}
             onPress={() =>
-              void data.runMutation(`decline:${item.requestId}`, async () => {
-                await data.core.social.declineFriendRequest(item.requestId);
+              void runMutation(`decline:${item.requestId}`, async () => {
+                await social.declineFriendRequest(item.requestId);
               })
             }
           >
@@ -149,7 +243,7 @@ export function FriendsModalContainer({
         </View>
       </View>
     ),
-    [data, highlightedRequestId],
+    [busyActionKey, highlightedRequestId, runMutation, social],
   );
 
   const renderOutgoingRequest = useCallback(
@@ -158,10 +252,10 @@ export function FriendsModalContainer({
         <Text className="text-base text-foreground">{item.recipientUsername}</Text>
         <Pressable
           className="rounded-lg bg-surface-panel px-3 py-2"
-          disabled={data.busyActionKey !== null}
+          disabled={busyActionKey !== null}
           onPress={() =>
-            void data.runMutation(`cancel:${item.requestId}`, async () => {
-              await data.core.social.cancelFriendRequest(item.requestId);
+            void runMutation(`cancel:${item.requestId}`, async () => {
+              await social.cancelFriendRequest(item.requestId);
             })
           }
         >
@@ -169,7 +263,7 @@ export function FriendsModalContainer({
         </Pressable>
       </View>
     ),
-    [data],
+    [busyActionKey, runMutation, social],
   );
 
   const renderBlocked: ListRenderItem<BlockedUserSummary> = useCallback(
@@ -178,10 +272,10 @@ export function FriendsModalContainer({
         <Text className="text-base text-foreground">{item.username}</Text>
         <Pressable
           className="rounded-lg bg-surface-panel px-3 py-2"
-          disabled={data.busyActionKey !== null}
+          disabled={busyActionKey !== null}
           onPress={() =>
-            void data.runMutation(`unblock:${item.blockedUserId}`, async () => {
-              await data.core.social.unblockUser(item.blockedUserId);
+            void runMutation(`unblock:${item.blockedUserId}`, async () => {
+              await social.unblockUser(item.blockedUserId);
             })
           }
         >
@@ -189,13 +283,13 @@ export function FriendsModalContainer({
         </Pressable>
       </View>
     ),
-    [data],
+    [busyActionKey, runMutation, social],
   );
 
   const renderSearchResult: ListRenderItem<FriendSearchResult> = useCallback(
     ({ item }) => {
       const busy =
-        data.busyActionKey?.startsWith(`send:${item.username}`) ?? false;
+        busyActionKey?.startsWith(`send:${item.username}`) ?? false;
       return (
         <View className="flex-row items-center justify-between border-b border-border py-3">
           <View className="min-w-0 flex-1">
@@ -205,12 +299,12 @@ export function FriendsModalContainer({
           {item.relationshipState === "none" ? (
             <Pressable
               className="rounded-lg bg-accent-slider px-3 py-2"
-              disabled={busy || data.busyActionKey !== null}
+              disabled={busy || busyActionKey !== null}
               onPress={() =>
-                void data.runMutation(
+                void runMutation(
                   `send:${item.username}`,
                   async () => {
-                    await data.core.social.sendFriendRequest(item.username);
+                    await social.sendFriendRequest(item.username);
                   },
                 )
               }
@@ -221,7 +315,7 @@ export function FriendsModalContainer({
         </View>
       );
     },
-    [data],
+    [busyActionKey, runMutation, social],
   );
 
   if (!visible) {
@@ -245,32 +339,32 @@ export function FriendsModalContainer({
               }`}
             >
               {tab.label}
-              {tab.id === "requests" && data.counts.incomingPendingRequestCount > 0
-                ? ` (${data.counts.incomingPendingRequestCount})`
+              {tab.id === "requests" && counts.incomingPendingRequestCount > 0
+                ? ` (${counts.incomingPendingRequestCount})`
                 : ""}
             </Text>
           </Pressable>
         ))}
       </View>
 
-      {data.loadError ? (
-        <Text className="mb-2 text-sm text-red-400">{data.loadError}</Text>
+      {loadError ? (
+        <Text className="mb-2 text-sm text-red-400">{loadError}</Text>
       ) : null}
-      {data.actionError ? (
-        <Text className="mb-2 text-sm text-red-400">{data.actionError}</Text>
+      {actionError ? (
+        <Text className="mb-2 text-sm text-red-400">{actionError}</Text>
       ) : null}
 
-      {data.loading && !data.refreshing ? (
+      {(loading || nexusLoading) && !refreshing ? (
         <ActivityIndicator color="#e6edf7" />
       ) : null}
 
       {activeTab === "friends" ? (
         <FlatList
-          data={data.friends}
+          data={friends}
           keyExtractor={(item) => item.friendUserId}
           renderItem={renderFriend}
-          refreshing={data.refreshing}
-          onRefresh={() => void data.refreshData({ suppressLoadingState: true })}
+          refreshing={refreshing}
+          onRefresh={() => void refreshData({ suppressLoadingState: true })}
           ListEmptyComponent={
             <Text className="py-6 text-center text-muted-foreground">No friends yet.</Text>
           }
@@ -282,8 +376,8 @@ export function FriendsModalContainer({
           className="flex-1"
           refreshControl={
             <RefreshControl
-              refreshing={data.refreshing}
-              onRefresh={() => void data.refreshData({ suppressLoadingState: true })}
+              refreshing={refreshing}
+              onRefresh={() => void refreshData({ suppressLoadingState: true })}
               tintColor="#e6edf7"
             />
           }
@@ -319,22 +413,22 @@ export function FriendsModalContainer({
             className="mb-3 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
             placeholder="Search by username"
             placeholderTextColor="#8b9cbb"
-            value={data.searchQuery}
-            onChangeText={data.setSearchQuery}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {data.searchLoading ? <ActivityIndicator color="#e6edf7" /> : null}
-          {data.searchError ? (
-            <Text className="mb-2 text-sm text-red-400">{data.searchError}</Text>
+          {searchLoading ? <ActivityIndicator color="#e6edf7" /> : null}
+          {searchError ? (
+            <Text className="mb-2 text-sm text-red-400">{searchError}</Text>
           ) : null}
           <FlatList
-            data={data.searchResults}
+            data={searchResults}
             keyExtractor={(item) => item.userId}
             renderItem={renderSearchResult}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
-              data.searchQuery.trim().length >= 2 ? (
+              searchQuery.trim().length >= 2 ? (
                 <Text className="py-4 text-center text-muted-foreground">No results.</Text>
               ) : (
                 <Text className="py-4 text-center text-muted-foreground">
@@ -348,11 +442,11 @@ export function FriendsModalContainer({
 
       {activeTab === "blocked" ? (
         <FlatList
-          data={data.blockedUsers}
+          data={blockedUsers}
           keyExtractor={(item) => item.blockedUserId}
           renderItem={renderBlocked}
-          refreshing={data.refreshing}
-          onRefresh={() => void data.refreshData({ suppressLoadingState: true })}
+          refreshing={refreshing}
+          onRefresh={() => void refreshData({ suppressLoadingState: true })}
           ListEmptyComponent={
             <Text className="py-6 text-center text-muted-foreground">No blocked users.</Text>
           }

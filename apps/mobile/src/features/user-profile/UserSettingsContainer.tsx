@@ -1,15 +1,15 @@
 // apps/mobile/src/features/user-profile/UserSettingsContainer.tsx
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { Alert, View } from "react-native";
-import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { useHavenCore } from "@shared/core";
+import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
+import { useAuthStore } from "@shared/stores/authStore";
 import UserAccountCard from "@/features/user-profile/UserAccountCard";
 import AppUpdatesCard from "@/features/user-profile/AppUpdatesCard";
 import DeleteAccountConfirmationModal from "@/features/user-profile/DeleteAccountConfirmationModal";
 import UserSettingsCard from "@/features/user-profile/UserSettingsCard";
 import { ThemeBuiltinPickerCard } from "@/features/user-profile/ThemeBuiltinPickerCard";
-import { useCurrentUserIdentity } from "@/features/user-profile/useCurrentUserIdentity";
 import { loadPickedAvatarForUpload } from "@/features/user-profile/loadPickedAvatarForUpload";
 import {
   useProfileAvatarPicker,
@@ -26,7 +26,32 @@ export default function UserSettingsContainer({
   onDeleteAccount,
 }: UserSettingsContainerProps) {
   const core = useHavenCore();
-  const identity = useCurrentUserIdentity();
+  const user = useAuthStore((state) => state.user);
+  const userId = user?.id ?? null;
+  const viewerProfile = core.profiles.useViewerProfile(userId);
+  const loadingBaseProfile = core.profiles.useViewerProfileLoading(userId);
+  const liveProfiles = core.profiles.useProfilesRecord();
+  const identity = useMemo(() => {
+    const email = user?.email ?? null;
+    const emailLocalPart = email?.split("@")[0]?.trim() ?? "";
+    const fallbackUsername =
+      (viewerProfile?.username ?? emailLocalPart) || "User";
+    const username =
+      resolveLiveUsername(liveProfiles, userId, fallbackUsername) ?? fallbackUsername;
+    const avatarUrl =
+      resolveLiveAvatarUrl(liveProfiles, userId, viewerProfile?.avatarUrl ?? null) ??
+      viewerProfile?.avatarUrl ??
+      null;
+
+    return {
+      userId,
+      email,
+      username,
+      avatarUrl,
+      avatarInitial: username.trim().charAt(0).toUpperCase() || "U",
+      loadingBaseProfile,
+    };
+  }, [liveProfiles, loadingBaseProfile, user?.email, userId, viewerProfile]);
 
   const [draftUsername, setDraftUsername] = useState(identity.username);
   const [isUsernameDirty, setIsUsernameDirty] = useState(false);
@@ -37,6 +62,13 @@ export default function UserSettingsContainer({
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountModalVisible, setDeleteAccountModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    void core.profiles.loadViewerProfile(userId).catch(() => {
+      // The card has graceful auth/email fallbacks; keep settings usable.
+    });
+  }, [core.profiles, userId]);
 
   useEffect(() => {
     if (!isUsernameDirty) {
@@ -68,20 +100,12 @@ export default function UserSettingsContainer({
           throw new Error("Prepared image is empty; try another photo.");
         }
 
-        const backend = getControlPlaneBackend();
-        const result = await backend.updateUserProfile({
+        await core.updateUserProfile({
           userId,
           username,
           avatarUrl: identity.avatarUrl,
           avatarFile: body,
           avatarContentType: contentType,
-        });
-
-        core.profiles.upsertProfile({
-          userId,
-          username: result.username,
-          avatarUrl: result.avatarUrl,
-          updatedAt: new Date().toISOString(),
         });
       } catch (err) {
         const message =
@@ -93,7 +117,7 @@ export default function UserSettingsContainer({
         setPendingAvatarPreviewUri(null);
       }
     },
-    [core.profiles, identity.avatarUrl, identity.userId, identity.username],
+    [core, identity.avatarUrl, identity.userId, identity.username],
   );
 
   const { pickAvatar, isPicking } = useProfileAvatarPicker({
@@ -121,18 +145,10 @@ export default function UserSettingsContainer({
 
     setIsSavingAccount(true);
     try {
-      const backend = getControlPlaneBackend();
-      const result = await backend.updateUserProfile({
+      await core.updateUserProfile({
         userId,
         username: nextUsername,
         avatarUrl: identity.avatarUrl,
-      });
-
-      core.profiles.upsertProfile({
-        userId,
-        username: result.username,
-        avatarUrl: result.avatarUrl,
-        updatedAt: new Date().toISOString(),
       });
 
       setIsUsernameDirty(false);
@@ -145,7 +161,7 @@ export default function UserSettingsContainer({
     } finally {
       setIsSavingAccount(false);
     }
-  }, [core.profiles, draftUsername, identity.avatarUrl, identity.userId, identity.username]);
+  }, [core, draftUsername, identity.avatarUrl, identity.userId, identity.username]);
 
   const handleSignOut = useCallback(async () => {
     if (!onSignOut) return;

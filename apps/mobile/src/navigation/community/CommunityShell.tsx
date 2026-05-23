@@ -1,10 +1,12 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { Channel } from "@shared/lib/backend/types";
 import {
-  useMobileCommunityWorkspace,
-  useMobileServersFromSession,
-} from "@/contexts/MobileMainSessionContext";
-import { applyCommunityFocus, useHavenCore } from "@shared/core";
+  applyCommunityFocus,
+  resolvePreferredChannelIdForServer,
+  toChannel,
+  toServerSummaries,
+  useHavenCore,
+} from "@shared/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackHandler, Dimensions, Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -48,11 +50,59 @@ export function CommunityShell({ route, navigation }: Props) {
     applyCommunityFocus(core, serverId);
   }, [core, serverId]);
 
-  const { servers } = useMobileServersFromSession();
-  const {
-    state: { channels },
-    derived: { currentRenderableChannel },
-  } = useMobileCommunityWorkspace();
+  const nexusCommunities = core.communities.useCommunities();
+  const servers = useMemo(
+    () => toServerSummaries(nexusCommunities),
+    [nexusCommunities],
+  );
+  const currentChannelId = core.channels.useActiveChannelId();
+  const havenChannels = core.channels.useChannels(serverId);
+  const channels = useMemo(() => havenChannels.map(toChannel), [havenChannels]);
+
+  useEffect(() => {
+    void core.channels.ensureLoaded(serverId).catch((error) => {
+      console.warn("[CommunityShell] ensureLoaded failed", error);
+    });
+    void core.ensureCommunityPermissions(serverId).catch((error) => {
+      console.warn("[CommunityShell] ensureCommunityPermissions failed", error);
+    });
+  }, [core, serverId]);
+
+  useEffect(() => {
+    if (channels.length === 0) return;
+    const valid =
+      currentChannelId != null &&
+      channels.some((channel) => channel.id === currentChannelId);
+    if (valid) return;
+    const preferred = resolvePreferredChannelIdForServer(
+      core,
+      serverId,
+      channels,
+      { previousChannelId: currentChannelId },
+    );
+    core.communities.setActiveId(serverId);
+    core.channels.setActiveChannelId(preferred);
+  }, [channels, core, currentChannelId, serverId]);
+
+  const currentChannel = useMemo(
+    () => channels.find((channel) => channel.id === currentChannelId) ?? null,
+    [channels, currentChannelId],
+  );
+  const currentChannelBelongsToCurrentServer = Boolean(
+    currentChannel && currentChannel.community_id === serverId,
+  );
+  const currentRenderableChannel = useMemo(
+    () =>
+      currentChannel &&
+      currentChannelBelongsToCurrentServer &&
+      currentChannel.kind === "text"
+        ? currentChannel
+        : (channels.find(
+            (channel) =>
+              channel.kind === "text" && channel.community_id === serverId,
+          ) ?? (currentChannelBelongsToCurrentServer ? currentChannel : null)),
+    [channels, currentChannel, currentChannelBelongsToCurrentServer, serverId],
+  );
 
   const community = useMemo(
     () => servers.find((s) => s.id === serverId) ?? null,

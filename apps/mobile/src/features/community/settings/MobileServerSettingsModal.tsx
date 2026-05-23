@@ -16,13 +16,18 @@ import DraggableFlatList, {
   type RenderItemParams,
 } from "react-native-draggable-flatlist";
 import type { ServerRoleItem, ServerSettingsUpdate } from "@shared/lib/backend/types";
+import { useHavenCore } from "@shared/core";
 import { getPlatformInviteBaseUrl } from "@shared/platform/urls";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import {
-  loadMobileServerSnapshots,
-  useMobileServerAdminActions,
-  type MobileServerSnapshots,
-} from "@/features/community/settings/useMobileServerAdminActions";
+
+type MobileServerSnapshots = {
+  settings: ServerSettingsUpdate | null;
+  roles: ServerRoleItem[];
+  members: import("@shared/lib/backend/types").ServerMemberRoleItem[];
+  invites: import("@shared/lib/backend/types").ServerInvite[];
+  bans: import("@shared/lib/backend/types").CommunityBanItem[];
+  permissionsCatalog: import("@shared/lib/backend/types").PermissionCatalogItem[];
+};
 
 type TabKey = "general" | "roles" | "members" | "invites" | "bans";
 
@@ -53,10 +58,10 @@ export function MobileServerSettingsModal({
   canManageInvites,
   refreshServers,
 }: MobileServerSettingsModalProps) {
+  const core = useHavenCore();
+  const admin = core.admin;
+  const serverPanel = admin.useServerPanelState();
   const [tab, setTab] = useState<TabKey>("general");
-  const [loading, setLoading] = useState(false);
-  const [snapshots, setSnapshots] = useState<MobileServerSnapshots | null>(null);
-  const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
 
   const [draftName, setDraftName] = useState("");
   const [draftDesc, setDraftDesc] = useState("");
@@ -66,40 +71,76 @@ export function MobileServerSettingsModal({
 
   const [customRolesOrder, setCustomRolesOrder] = useState<ServerRoleItem[]>([]);
 
+  const loading =
+    serverPanel.serverSettingsLoading ||
+    serverPanel.serverRoleManagementLoading ||
+    serverPanel.serverInvitesLoading ||
+    serverPanel.communityBansLoading;
+
+  const snapshots = useMemo<MobileServerSnapshots>(
+    () => ({
+      settings: serverPanel.serverSettingsInitialValues,
+      roles: serverPanel.serverRoles,
+      members: serverPanel.serverMembers,
+      invites: serverPanel.serverInvites,
+      bans: serverPanel.communityBans,
+      permissionsCatalog: serverPanel.serverPermissionCatalog,
+    }),
+    [serverPanel],
+  );
+
+  const loadErrors = useMemo(
+    () => ({
+      ...(serverPanel.serverSettingsLoadError
+        ? { settings: serverPanel.serverSettingsLoadError }
+        : {}),
+      ...(serverPanel.serverRoleManagementError
+        ? { roles: serverPanel.serverRoleManagementError }
+        : {}),
+      ...(serverPanel.serverInvitesError
+        ? { invites: serverPanel.serverInvitesError }
+        : {}),
+      ...(serverPanel.communityBansError
+        ? { bans: serverPanel.communityBansError }
+        : {}),
+    }),
+    [
+      serverPanel.communityBansError,
+      serverPanel.serverInvitesError,
+      serverPanel.serverRoleManagementError,
+      serverPanel.serverSettingsLoadError,
+    ],
+  );
+
   const reloadSnapshots = useCallback(async () => {
     if (!communityId || !currentUserId) return;
-    setLoading(true);
-    try {
-      const { snapshots: snap, errors } = await loadMobileServerSnapshots(communityId, canManageInvites);
-      setSnapshots(snap);
-      setLoadErrors({
-        ...(errors.settings ? { settings: errors.settings } : {}),
-        ...(errors.roles ? { roles: errors.roles } : {}),
-        ...(errors.invites ? { invites: errors.invites } : {}),
-        ...(errors.bans ? { bans: errors.bans } : {}),
-      });
-      if (snap.settings) {
-        setDraftName(snap.settings.name);
-        setDraftDesc(snap.settings.description ?? "");
-        setDraftPublicInvites(snap.settings.allowPublicInvites);
-        setDraftReportReason(snap.settings.requireReportReason);
-      }
-      const custom = snap.roles
-        .filter((r) => !r.isSystem)
-        .sort((a, b) => b.position - a.position);
-      setCustomRolesOrder(custom);
-    } finally {
-      setLoading(false);
-    }
-  }, [canManageInvites, communityId, currentUserId]);
+    await Promise.allSettled([
+      admin.loadServerSettings(communityId),
+      admin.loadServerRoleManagement(communityId),
+      canManageInvites ? admin.loadServerInvites(communityId) : Promise.resolve(admin.resetServerInvites()),
+      canManageBans ? admin.loadCommunityBans(communityId) : Promise.resolve(admin.resetCommunityBans()),
+    ]);
+  }, [admin, canManageBans, canManageInvites, communityId, currentUserId]);
 
   useEffect(() => {
     if (!visible || !communityId) return;
     void reloadSnapshots();
   }, [visible, communityId, reloadSnapshots]);
 
-  const { saveServerSettings, updateRolePositionBatch, createInvite, revokeInvite, unbanUser } =
-    useMobileServerAdminActions(communityId, currentUserId, refreshServers, reloadSnapshots);
+  useEffect(() => {
+    if (!snapshots.settings) return;
+    setDraftName(snapshots.settings.name);
+    setDraftDesc(snapshots.settings.description ?? "");
+    setDraftPublicInvites(snapshots.settings.allowPublicInvites);
+    setDraftReportReason(snapshots.settings.requireReportReason);
+  }, [snapshots.settings]);
+
+  useEffect(() => {
+    const custom = snapshots.roles
+      .filter((r) => !r.isSystem)
+      .sort((a, b) => b.position - a.position);
+    setCustomRolesOrder(custom);
+  }, [snapshots.roles]);
 
   const systemRoles = useMemo(() => {
     if (!snapshots) return [];
@@ -107,15 +148,16 @@ export function MobileServerSettingsModal({
   }, [snapshots]);
 
   const handleSaveGeneral = async () => {
-    if (!snapshots?.settings) return;
+    if (!snapshots.settings) return;
     setSavingSettings(true);
     try {
-      await saveServerSettings({
+      await admin.saveServerSettings({
         name: draftName,
         description: draftDesc.trim() || null,
         allowPublicInvites: draftPublicInvites,
         requireReportReason: draftReportReason,
-      });
+      }, communityId);
+      await refreshServers();
       Alert.alert("Saved", "Community settings updated.");
     } catch (e) {
       Alert.alert("Error", getErrorMessage(e, "Could not save settings."));
@@ -129,7 +171,7 @@ export function MobileServerSettingsModal({
     if (!snapshots || !canManageRoles) return;
     try {
       const merged = [...systemRoles, ...data];
-      await updateRolePositionBatch(merged);
+      await admin.reorderServerRoles(merged, communityId);
     } catch (e) {
       Alert.alert("Reorder failed", getErrorMessage(e, "Could not update role order."));
       void reloadSnapshots();
@@ -321,8 +363,8 @@ export function MobileServerSettingsModal({
                 communityId={communityId}
                 invites={snapshots?.invites ?? []}
                 loadError={loadErrors.invites}
-                onCreateInvite={createInvite}
-                onRevoke={revokeInvite}
+                onCreateInvite={(input) => admin.createServerInvite(input, communityId)}
+                onRevoke={(id) => admin.revokeServerInvite(id, communityId)}
               />
             ) : null}
 
@@ -336,7 +378,7 @@ export function MobileServerSettingsModal({
                     {
                       text: "Unban",
                       onPress: () =>
-                        void unbanUser({ targetUserId: bannedUserId }).catch((e) =>
+                        void admin.unbanUserFromCurrentServer({ targetUserId: bannedUserId }, communityId).catch((e) =>
                           Alert.alert("Error", getErrorMessage(e, "Unban failed.")),
                         ),
                     },

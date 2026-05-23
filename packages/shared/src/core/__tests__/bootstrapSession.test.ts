@@ -7,7 +7,7 @@ import {
 import { CommunityNexus } from '@shared/nexus/community/CommunityNexus';
 import { ChannelNexus } from '@shared/nexus/community/ChannelNexus';
 import { CommunityMessageNexus } from '@shared/nexus/community/CommunityMessageNexus';
-import type { HavenCore } from '@shared/core/HavenCore';
+import { HavenCore } from '@shared/core/HavenCore';
 import type { ServerSummary } from '@shared/lib/backend/types';
 
 /**
@@ -237,5 +237,58 @@ describe('syncFocusFromRoute', () => {
     syncFocusFromRoute(core, { communityId: null });
 
     expect(core.channels.getLastChannelId('s1')).toBe('c1');
+  });
+});
+
+describe('prepareCommunityEntry', () => {
+  it('loads channel focus through the Nexus and prepares the selected text channel', async () => {
+    const persistence = createMemoryPersistence();
+    const communities = new CommunityNexus(persistence, {} as never);
+    const channels = new ChannelNexus(persistence, {} as never);
+    channels.setChannels(
+      's1',
+      [
+        {
+          id: 'c1',
+          community_id: 's1',
+          name: 'general',
+          kind: 'text',
+          position: 0,
+          topic: null,
+          created_at: '2026-01-01T00:00:00.000Z',
+        } as never,
+        {
+          id: 'c2',
+          community_id: 's1',
+          name: 'random',
+          kind: 'text',
+          position: 1,
+          topic: null,
+          created_at: '2026-01-01T00:00:00.000Z',
+        } as never,
+      ],
+      { groups: [], ungroupedChannelIds: ['c1', 'c2'], collapsedGroupIds: [] },
+    );
+
+    const ensureCommunityPermissions = vi.fn(async () => {});
+    const prepareTextChannelMessages = vi.fn(async () => {});
+    const core = {
+      communities,
+      channels,
+      ensureCommunityPermissions,
+      prepareTextChannelMessages,
+    } as unknown as HavenCore;
+
+    const result = await HavenCore.prototype.prepareCommunityEntry.call(
+      core,
+      's1',
+      { lastVisitedChannelId: 'c2' },
+    );
+
+    expect(result.channelId).toBe('c2');
+    expect(communities.getActiveId()).toBe('s1');
+    expect(channels.getActiveChannelId()).toBe('c2');
+    expect(ensureCommunityPermissions).toHaveBeenCalledWith('s1');
+    expect(prepareTextChannelMessages).toHaveBeenCalledWith('s1', 'c2');
   });
 });

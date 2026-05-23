@@ -62,4 +62,51 @@ describe('NotificationNexus', () => {
 
     expect(markSeen).toHaveBeenCalledWith(['r1']);
   });
+
+  it('delegates Expo push subscription registration through the notification backend', async () => {
+    const upsertExpoPushSubscription = vi.fn(async () => ({
+      id: 'sub1',
+      userId: 'u1',
+      expoPushToken: 'ExponentPushToken[test]',
+      platform: 'ios',
+      installationId: 'install1',
+      metadata: { source: 'test' },
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      lastSeenAt: '2026-01-01T00:00:00.000Z',
+    }));
+    const nexus = new NotificationNexus(createMemoryPersistence(), {
+      upsertExpoPushSubscription,
+    } as never);
+
+    const result = await nexus.upsertExpoPushSubscription({
+      expoPushToken: 'ExponentPushToken[test]',
+      platform: 'ios',
+      installationId: 'install1',
+      metadata: { source: 'test' },
+    });
+
+    expect(upsertExpoPushSubscription).toHaveBeenCalledWith({
+      expoPushToken: 'ExponentPushToken[test]',
+      platform: 'ios',
+      installationId: 'install1',
+      metadata: { source: 'test' },
+    });
+    expect(result.id).toBe('sub1');
+  });
+
+  it('delegates Expo push subscription deletion through the notification backend', async () => {
+    const deleteExpoPushSubscription = vi.fn(async () => true);
+    const nexus = new NotificationNexus(createMemoryPersistence(), {
+      deleteExpoPushSubscription,
+    } as never);
+
+    await expect(
+      nexus.deleteExpoPushSubscription('ExponentPushToken[test]'),
+    ).resolves.toBe(true);
+
+    expect(deleteExpoPushSubscription).toHaveBeenCalledWith(
+      'ExponentPushToken[test]',
+    );
+  });
 });

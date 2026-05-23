@@ -83,8 +83,8 @@ const MORPH_MS = 220;
 // ---------------------------------------------------------------------------
 // Public props (package-ready). Parent can pass real channels + handlers later;
 // UX lab uses PLACEHOLDER_CHANNELS when `channels` is omitted.
-// Inferred from: HavenTabNavigator DM shell (visible, onDismiss, title, body) +
-// MobileDirectMessagesProvider / useDirectMessages shape (conversations, selection).
+// Inferred from: MainNavigationShell DM sheet (visible, onDismiss, title, body)
+// plus DirectMessageNexus state (conversations, selection).
 // ---------------------------------------------------------------------------
 
 function resolveChannels(

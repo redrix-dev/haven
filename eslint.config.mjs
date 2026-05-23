@@ -107,6 +107,131 @@ const havenCoreNexusBoundary = [
   },
 ];
 
+const havenCoreWebConsumerFiles = [
+  'packages/web-client/src/**/*.{ts,tsx,js,jsx}',
+];
+
+/**
+ * Temporary quarantine for known pre-finality migration seams. New UI/feature
+ * files are held to the HavenCore -> Nexus -> UI Consumer boundary; remove
+ * entries here as each existing seam is migrated.
+ */
+const havenCoreConsumerBoundaryIgnores = [
+  '**/__tests__/**',
+  '**/*.test.{ts,tsx,js,jsx}',
+  'packages/shared/src/features/voice/hooks/**',
+  'packages/shared/src/features/voice/store/**',
+  'packages/shared/src/features/community/communityPermissionsHydration.ts',
+  'packages/shared/src/features/community/utils/communityPermissionsHydration.ts',
+  'packages/web-client/src/chat-app/useChatAppSessionState.ts',
+  'packages/web-client/src/features/voice/useLiveKitVoiceSession.ts',
+  'packages/web-client/src/components/moderation/DmReportReviewPanel.tsx',
+  'packages/web-client/src/components/moderation/ServerModmailPanel.tsx',
+  'apps/mobile/src/haven-rev2/**',
+  'apps/mobile/src/auth/mobileAuthService.ts',
+  'apps/mobile/src/lib/createMmkvPersistence.ts',
+  'apps/mobile/src/lib/react-native-mmkv.d.ts',
+  'apps/mobile/src/supabase/**',
+];
+
+const havenCoreBackendFactoryImportNames = [
+  'getCommunityDataBackend',
+  'getControlPlaneBackend',
+  'getDirectMessageBackend',
+  'getModerationBackend',
+  'getNotificationBackend',
+  'getServerModmailBackend',
+  'getSocialBackend',
+  'getVoiceTokenBackend',
+];
+
+const havenCoreConsumerRestrictedImportPaths = [
+  {
+    name: '@shared/lib/backend',
+    importNames: havenCoreBackendFactoryImportNames,
+    message:
+      'UI/features must not import backend factories directly. Route reads/writes through useHavenCore()/requireHavenCore() and a domain Nexus/HavenCore command.',
+  },
+  {
+    name: '@shared/infrastructure/client/createHavenSupabaseClient',
+    message:
+      'Supabase client construction belongs to host bootstrap. UI/features consume the registered HavenCore instead.',
+  },
+  {
+    name: '@shared/lib/createHavenSupabaseClient',
+    message:
+      'Supabase client construction belongs to host bootstrap. UI/features consume the registered HavenCore instead.',
+  },
+  {
+    name: '@supabase/supabase-js',
+    importNames: ['createClient'],
+    message:
+      'UI/features must not create Supabase clients. Construct HavenCore at host bootstrap and consume it through @shared/core.',
+  },
+];
+
+const havenCoreConsumerRestrictedImportPatterns = [
+  ...havenCoreDeprecatedImports,
+  {
+    group: ['@shared/core/persistence/*'],
+    message:
+      'Persistence adapters are injected into HavenCore/Nexus construction. UI/features must not import persistence directly.',
+  },
+  {
+    group: ['@shared/nexus', '@shared/nexus/*'],
+    message:
+      'UI/features must access domain nexuses through useHavenCore()/requireHavenCore(), not by importing or constructing nexus classes.',
+  },
+];
+
+const havenCoreConsumerRestrictedSyntax = [
+  {
+    selector: "Literal[value='postgres_changes']",
+    message:
+      'Domain realtime must use HavenCore.subscribeRealtime -> routeRealtimeEvent. Voice hooks are the documented exception.',
+  },
+  {
+    selector: "CallExpression[callee.name='createClient']",
+    message:
+      'UI/features must not create Supabase clients. Use the registered HavenCore from @shared/core.',
+  },
+  {
+    selector: "CallExpression[callee.name='createHavenSupabaseClient']",
+    message:
+      'UI/features must not create Haven Supabase clients. Use host bootstrap + the registered HavenCore.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='rpc'][callee.object.name='supabase']",
+    message:
+      'UI/features must not call Supabase RPC directly. Put the RPC behind a backend/Nexus/HavenCore command.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='rpc'][callee.object.name='client']",
+    message:
+      'UI/features must not call Supabase RPC directly. Put the RPC behind a backend/Nexus/HavenCore command.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='from'][callee.object.name='supabase']",
+    message:
+      'UI/features must not query Supabase directly. Put the query behind a backend/Nexus/HavenCore command.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='from'][callee.object.name='client']",
+    message:
+      'UI/features must not query Supabase directly. Put the query behind a backend/Nexus/HavenCore command.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='channel'][callee.object.name='supabase']",
+    message:
+      'UI/features must not subscribe to Supabase channels directly. Use HavenCore.subscribeRealtime -> routeRealtimeEvent.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='channel'][callee.object.name='client']",
+    message:
+      'UI/features must not subscribe to Supabase channels directly. Use HavenCore.subscribeRealtime -> routeRealtimeEvent.',
+  },
+];
+
 const mobileBoundaryRestrictions = [
   {
     group: ['@web/*', '**/apps/web/src/*'],
@@ -132,7 +257,13 @@ const mobileBoundaryRestrictions = [
 
 export default [
   {
-    ignores: ['node_modules/**', '.webpack/**', 'out/**', 'dist/**'],
+    ignores: [
+      'node_modules/**',
+      '.webpack/**',
+      'out/**',
+      'dist/**',
+      '**/dist/**',
+    ],
   },
   {
     files: [
@@ -174,41 +305,26 @@ export default [
     },
   },
   {
-    files: ['packages/shared/src/platform/desktop/client.ts'],
+    files: [
+      'packages/shared/src/platform/desktop/client.ts',
+      'packages/shared/src/infrastructure/platform/desktop/client.ts',
+    ],
     rules: {
       'no-restricted-properties': 'off',
     },
   },
   {
-    files: [
-      'apps/web-client/**/*.{ts,tsx,js,jsx}',
-      'apps/mobile/**/*.{ts,tsx,js,jsx}',
-      'packages/shared/src/features/**/*.{ts,tsx,js,jsx}',
-    ],
+    files: havenCoreWebConsumerFiles,
+    ignores: havenCoreConsumerBoundaryIgnores,
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          patterns: havenCoreDeprecatedImports,
+          paths: havenCoreConsumerRestrictedImportPaths,
+          patterns: havenCoreConsumerRestrictedImportPatterns,
         },
       ],
-    },
-  },
-  {
-    files: [
-      'packages/shared/src/features/**/*.{ts,tsx,js,jsx}',
-      'apps/web-client/**/*.{ts,tsx,js,jsx}',
-    ],
-    ignores: ['packages/shared/src/features/voice/hooks/**'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "Literal[value='postgres_changes']",
-          message:
-            'Domain realtime must use HavenCore.subscribeRealtime → routeRealtimeEvent. Voice hooks are exempt.',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...havenCoreConsumerRestrictedSyntax],
     },
   },
   {
@@ -216,6 +332,7 @@ export default [
     ignores: [
       'packages/shared/src/core/persistence/createMmkvPersistence.ts',
       'packages/shared/src/platform/desktop/client.ts',
+      'packages/shared/src/infrastructure/platform/desktop/client.ts',
     ],
     rules: {
       'no-restricted-imports': [
@@ -231,6 +348,30 @@ export default [
           patterns: [...havenCoreNexusBoundary, ...havenCoreDeprecatedImports],
         },
       ],
+    },
+  },
+  {
+    files: ['packages/shared/src/features/**/*.{ts,tsx,js,jsx}'],
+    ignores: havenCoreConsumerBoundaryIgnores,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@platform/desktop/client',
+              message:
+                'Import getAppHost from @shared/platform/appHost instead. Electron registers the real bridge in apps/electron/src/renderer/registerElectronAppHost.ts.',
+            },
+            ...havenCoreConsumerRestrictedImportPaths,
+          ],
+          patterns: [
+            ...havenCoreNexusBoundary,
+            ...havenCoreConsumerRestrictedImportPatterns,
+          ],
+        },
+      ],
+      'no-restricted-syntax': ['error', ...havenCoreConsumerRestrictedSyntax],
     },
   },
   {
@@ -296,6 +437,23 @@ export default [
           message: 'Mobile code cannot use localStorage; use AsyncStorage-backed abstractions.',
         },
       ],
+    },
+  },
+  {
+    files: ['apps/mobile/src/**/*.{ts,tsx,js,jsx}'],
+    ignores: havenCoreConsumerBoundaryIgnores,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: havenCoreConsumerRestrictedImportPaths,
+          patterns: [
+            ...mobileBoundaryRestrictions,
+            ...havenCoreConsumerRestrictedImportPatterns,
+          ],
+        },
+      ],
+      'no-restricted-syntax': ['error', ...havenCoreConsumerRestrictedSyntax],
     },
   },
 ];

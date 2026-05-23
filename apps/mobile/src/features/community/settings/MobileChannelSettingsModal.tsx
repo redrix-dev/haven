@@ -10,8 +10,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { getCommunityDataBackend } from "@shared/lib/backend";
 import type { Channel, ChannelPermissionState } from "@shared/lib/backend/types";
+import { useHavenCore } from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 type MobileChannelSettingsModalProps = {
@@ -19,7 +19,6 @@ type MobileChannelSettingsModalProps = {
   onDismiss: () => void;
   communityId: string | null;
   channel: Channel | null;
-  currentUserId: string | null;
   canManageChannelStructure: boolean;
   canManageChannelPermissions: boolean;
 };
@@ -29,11 +28,12 @@ export function MobileChannelSettingsModal({
   onDismiss,
   communityId,
   channel,
-  currentUserId,
   canManageChannelStructure,
   canManageChannelPermissions,
 }: MobileChannelSettingsModalProps) {
-  const [loading, setLoading] = useState(false);
+  const core = useHavenCore();
+  const admin = core.admin;
+  const channelPermissions = admin.useChannelPermissionsState();
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
   const [roleRows, setRoleRows] = useState<
@@ -48,48 +48,40 @@ export function MobileChannelSettingsModal({
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (!communityId || !channel?.id || !currentUserId) return;
-    setLoading(true);
+    if (!communityId || !channel?.id) return;
     try {
-      const backend = getCommunityDataBackend(communityId);
-      const snap = await backend.fetchChannelPermissions({
-        communityId,
-        channelId: channel.id,
-        userId: currentUserId,
-      });
       setName(channel.name);
       setTopic(channel.topic ?? "");
-      setRoleRows(
-        snap.rolePermissions.map((r) => ({
-          roleId: r.roleId,
-          name: r.name,
-          color: r.color,
-          canView: r.canView,
-          canSend: r.canSend,
-        })),
-      );
+      await admin.loadChannelPermissions(channel.id, communityId);
     } catch (e) {
       Alert.alert("Error", getErrorMessage(e, "Failed to load channel settings."));
-    } finally {
-      setLoading(false);
     }
-  }, [channel, communityId, currentUserId]);
+  }, [admin, channel, communityId]);
 
   useEffect(() => {
     if (visible && channel) void load();
   }, [visible, channel, load]);
 
+  useEffect(() => {
+    setRoleRows(
+      channelPermissions.channelRolePermissions.map((r) => ({
+        roleId: r.roleId,
+        name: r.name,
+        color: r.color,
+        canView: r.canView,
+        canSend: r.canSend,
+      })),
+    );
+  }, [channelPermissions.channelRolePermissions]);
+
   const saveGeneral = async () => {
     if (!communityId || !channel) return;
     setSaving(true);
     try {
-      const backend = getCommunityDataBackend(communityId);
-      await backend.updateChannel({
-        communityId,
-        channelId: channel.id,
+      await admin.saveChannelSettings({
         name: name.trim(),
         topic: topic.trim() || null,
-      });
+      }, communityId, channel.id);
       Alert.alert("Saved", "Channel updated.");
       onDismiss();
     } catch (e) {
@@ -102,13 +94,7 @@ export function MobileChannelSettingsModal({
   const saveRoleRow = async (roleId: string, next: ChannelPermissionState) => {
     if (!communityId || !channel) return;
     try {
-      const backend = getCommunityDataBackend(communityId);
-      await backend.saveRoleChannelPermissions({
-        communityId,
-        channelId: channel.id,
-        roleId,
-        permissions: next,
-      });
+      await admin.saveRoleChannelPermissions(roleId, next, communityId, channel.id);
       await load();
     } catch (e) {
       Alert.alert("Error", getErrorMessage(e, "Could not update permissions."));
@@ -133,7 +119,7 @@ export function MobileChannelSettingsModal({
           </Pressable>
         </View>
 
-        {loading ? (
+        {channelPermissions.channelPermissionsLoading ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator color="#e6edf7" />
           </View>

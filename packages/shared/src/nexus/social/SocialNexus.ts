@@ -301,6 +301,10 @@ export class SocialNexus {
     );
   }
 
+  useFriendRequests(): FriendRequestSummary[] {
+    return this.useRequests();
+  }
+
   useBlockedUsers(): BlockedUserSummary[] {
     return useStoreWithEqualityFn(
       this.store,

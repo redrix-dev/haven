@@ -38,9 +38,18 @@ import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useHavenCore } from "@shared/core";
 import { useAuthStore } from "@shared/stores/authStore";
-import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
+
+type RefreshDmConversationsOptions = { suppressLoadingState?: boolean };
+
+type SendDirectMessageOptions = {
+  imageBody?: Blob;
+  imageArrayBuffer?: ArrayBuffer;
+  imageContentType?: string;
+  imageFilename?: string;
+  imageExpiresInHours?: number;
+};
 
 function formatDmTime(iso: string): string {
   const d = new Date(iso);
@@ -52,8 +61,15 @@ export function DirectMessagesContainer() {
   const composerColors = useChatComposerColors();
   const { width: windowWidth } = useWindowDimensions();
   const core = useHavenCore();
+  const dm = core.directMessages;
   const liveProfiles = core.profiles.useProfilesRecord();
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
+  const dmConversations = dm.useConversations();
+  const dmConversationsLoading = dm.useIsLoadingConversations();
+  const selectedDmConversationId = dm.useActiveConversationId();
+  const dmComposeDraftPeer = dm.useComposeDraftPeer();
+  const dmMessages = dm.useMessages(selectedDmConversationId ?? "");
+  const dmMessagesLoading = dm.useIsLoadingMessages(selectedDmConversationId ?? "");
   const [draft, setDraft] = useState("");
   const [isPickingDmMedia, setIsPickingDmMedia] = useState(false);
   const [isSendingDm, setIsSendingDm] = useState(false);
@@ -61,30 +77,130 @@ export function DirectMessagesContainer() {
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
   const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(null);
   const [dmMessageActionsTarget, setDmMessageActionsTarget] = useState<DirectMessage | null>(null);
+  const [dmConversationsRefreshing, setDmConversationsRefreshing] = useState(false);
+  const [dmConversationsError, setDmConversationsError] = useState<string | null>(null);
+  const [dmMessagesError, setDmMessagesError] = useState<string | null>(null);
 
-  const {
-    state: {
-      dmConversations,
-      dmConversationsLoading,
-      dmConversationsRefreshing,
-      dmConversationsError,
-      selectedDmConversationId,
-      dmComposeDraftPeer,
-      dmMessages,
-      dmMessagesLoading,
-      dmMessagesError,
+  const selectedDmConversation = useMemo(
+    () =>
+      selectedDmConversationId
+        ? (dmConversations.find((c) => c.conversationId === selectedDmConversationId) ??
+          null)
+        : null,
+    [dmConversations, selectedDmConversationId],
+  );
+
+  const refreshDmConversations = useCallback(
+    async (options?: RefreshDmConversationsOptions) => {
+      if (options?.suppressLoadingState) setDmConversationsRefreshing(true);
+      setDmConversationsError(null);
+      try {
+        await dm.loadConversations();
+      } catch (error) {
+        setDmConversationsError(getErrorMessage(error, "Failed to load direct messages."));
+      } finally {
+        setDmConversationsRefreshing(false);
+      }
     },
-    derived: { selectedDmConversation },
-    actions: {
-      openDirectMessageConversation,
-      clearSelectedDmConversation,
-      clearDirectMessageDraft,
-      sendDirectMessage,
-      refreshDmConversations,
-      toggleSelectedDmConversationMuted,
-      reportDirectMessage,
+    [dm],
+  );
+
+  const openDirectMessageConversation = useCallback(
+    async (conversationId: string) => {
+      if (!conversationId) throw new Error("DM conversation id is required.");
+      setDmMessagesError(null);
+      try {
+        await dm.openConversation(conversationId, { markRead: true });
+      } catch (error) {
+        const message = getErrorMessage(error, "Failed to load direct messages.");
+        setDmMessagesError(message);
+        throw new Error(message);
+      }
     },
-  } = useMobileDirectMessages();
+    [dm],
+  );
+
+  const clearSelectedDmConversation = useCallback(() => {
+    dm.clearFocusedConversation();
+    setDmMessagesError(null);
+  }, [dm]);
+
+  const clearDirectMessageDraft = useCallback(() => {
+    dm.setComposeDraftPeer(null);
+    setDmMessagesError(null);
+  }, [dm]);
+
+  const sendDirectMessage = useCallback(
+    async (content: string, options?: SendDirectMessageOptions) => {
+      let activeConversationId = selectedDmConversationId;
+      const draftPeer = dmComposeDraftPeer;
+      if (!activeConversationId && draftPeer) {
+        activeConversationId = await dm.getOrCreateDirectConversation(draftPeer.userId);
+        dm.setComposeDraftPeer(null);
+        dm.setActiveConversationId(activeConversationId);
+        await refreshDmConversations({ suppressLoadingState: true });
+      }
+      if (!activeConversationId) throw new Error("No direct message conversation selected.");
+
+      setDmMessagesError(null);
+      try {
+        const hasBlob = options?.imageBody != null;
+        const hasBuffer = options?.imageArrayBuffer != null;
+        if (hasBlob && hasBuffer) {
+          throw new Error("Cannot send both imageBody and imageArrayBuffer.");
+        }
+        if (hasBuffer && !options.imageContentType?.trim()) {
+          throw new Error("imageContentType is required when sending imageArrayBuffer.");
+        }
+        const inferredFilename =
+          options?.imageFilename ??
+          (options?.imageBody && "name" in options.imageBody
+            ? String(options.imageBody.name)
+            : undefined) ??
+          `upload-${Date.now()}`;
+
+        await dm.sendMessage(activeConversationId, content, {
+          imageUpload: hasBuffer
+            ? {
+                body: options.imageArrayBuffer as ArrayBuffer,
+                filename: inferredFilename,
+                expiresInHours: options.imageExpiresInHours,
+                contentType: options.imageContentType?.trim(),
+              }
+            : hasBlob
+              ? {
+                  body: options.imageBody as Blob,
+                  filename: inferredFilename,
+                  expiresInHours: options.imageExpiresInHours,
+                }
+              : undefined,
+        });
+      } catch (error) {
+        const message = getErrorMessage(error, "Failed to send direct message.");
+        setDmMessagesError(message);
+        throw new Error(message);
+      }
+    },
+    [dm, dmComposeDraftPeer, refreshDmConversations, selectedDmConversationId],
+  );
+
+  const toggleSelectedDmConversationMuted = useCallback(
+    async (nextMuted: boolean) => {
+      if (!selectedDmConversationId) {
+        throw new Error("No direct message conversation selected.");
+      }
+      await dm.setMuted(selectedDmConversationId, nextMuted);
+      await refreshDmConversations({ suppressLoadingState: true });
+    },
+    [dm, refreshDmConversations, selectedDmConversationId],
+  );
+
+  const reportDirectMessage = useCallback(
+    async (input: Parameters<typeof dm.reportMessage>[0]) => {
+      await dm.reportMessage(input);
+    },
+    [dm],
+  );
 
   const dmComposeDraftPeerRef = useRef(dmComposeDraftPeer);
   dmComposeDraftPeerRef.current = dmComposeDraftPeer;
@@ -96,6 +212,24 @@ export function DirectMessagesContainer() {
       }
     });
   }, [clearDirectMessageDraft]);
+
+  useEffect(() => {
+    if (!selectedDmConversationId) return;
+    void core
+      .prepareDirectMessageConversation(selectedDmConversationId, { markRead: false })
+      .catch((error) => {
+        console.error("Failed to load selected DM conversation:", error);
+        setDmMessagesError(getErrorMessage(error, "Failed to load direct messages."));
+      });
+  }, [core, selectedDmConversationId]);
+
+  useEffect(() => {
+    if (!selectedDmConversationId) return;
+    const stillExists = dmConversations.some(
+      (conversation) => conversation.conversationId === selectedDmConversationId,
+    );
+    if (!stillExists) dm.setActiveConversationId(null);
+  }, [dm, dmConversations, selectedDmConversationId]);
 
   const dismissDmComposerKeyboard = useCallback(() => {
     composerInputRef.current?.blur();

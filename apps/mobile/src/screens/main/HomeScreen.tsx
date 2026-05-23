@@ -12,11 +12,15 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode";
 import type { ServerSummary } from "@shared/lib/backend/types";
-import { getControlPlaneBackend } from "@shared/lib/backend";
 import { getPlatformInviteInputPlaceholder } from "@shared/infrastructure/platform/urls";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import { applyCommunityFocus, useHavenCore } from "@shared/core";
-import { useMobileMainSession } from "@/contexts/MobileMainSessionContext";
+import {
+  applyCommunityFocus,
+  deriveCommunitiesLoadStatus,
+  toServerSummaries,
+  useHavenCore,
+} from "@shared/core";
+import { useAuthStore } from "@shared/stores/authStore";
 import { getLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
 import { useMemo, useState, useCallback } from "react";
 import { HavenFormSheet } from "@/components/HavenFormSheet";
@@ -44,16 +48,21 @@ function buildGridItems(servers: ServerSummary[]): GridItem[] {
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
-  const {
-    servers,
-    serversStatus: status,
-    serversError: loadError,
-    refreshServers,
-    createServer,
-    warmCommunityForEntry,
-  } = useMobileMainSession();
   const core = useHavenCore();
-  const controlPlaneBackend = useMemo(() => getControlPlaneBackend(), []);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const nexusCommunities = core.communities.useCommunities();
+  const serversLoading = core.communities.useIsLoading();
+  const loadError = core.communities.useLoadError();
+  const servers = useMemo(
+    () => toServerSummaries(nexusCommunities),
+    [nexusCommunities],
+  );
+  const status = deriveCommunitiesLoadStatus({
+    hasUser: Boolean(userId),
+    isLoading: serversLoading,
+    loadError,
+    communityCount: nexusCommunities.length,
+  });
   const themeTokens = useMobileThemeTokens();
   const { placeholderMuted, spinnerFg } = useMemo(
     () => ({
@@ -77,19 +86,44 @@ export function HomeScreen() {
 
   const items = buildGridItems(servers);
 
+  const refreshServers = useCallback(async () => {
+    if (!userId) return;
+    await core.refreshCommunities(userId);
+  }, [core, userId]);
+
+  const createServer = useCallback(
+    async (name: string) => {
+      if (!userId) throw new Error("Not authenticated.");
+      return core.createCommunity(userId, name);
+    },
+    [core, userId],
+  );
+
+  const warmCommunityForEntry = useCallback(
+    async (serverId: string) => {
+      const lastVisited = await getLastTextChannelIdForCommunity(serverId);
+      return core.prepareCommunityEntry(serverId, {
+        lastVisitedChannelId: lastVisited,
+      });
+    },
+    [core],
+  );
+
   const openCommunityForServer = useCallback(
     async (serverId: string) => {
+      const lastVisited = await getLastTextChannelIdForCommunity(serverId);
       await Promise.race([
-        warmCommunityForEntry(serverId),
+        core.prepareCommunityEntry(serverId, {
+          lastVisitedChannelId: lastVisited,
+        }),
         new Promise<void>((resolve) => {
           setTimeout(resolve, 350);
         }),
       ]);
-      const lastVisited = await getLastTextChannelIdForCommunity(serverId);
       applyCommunityFocus(core, serverId, { lastVisitedChannelId: lastVisited });
       navigation.navigate("Community", { serverId, openDrawer: true });
     },
-    [core, navigation, warmCommunityForEntry],
+    [core, navigation],
   );
 
   const primeCommunityForServer = useCallback(
@@ -127,8 +161,7 @@ export function HomeScreen() {
     setJoinLoading(true);
     setJoinError(null);
     try {
-      const redeemed = await controlPlaneBackend.redeemCommunityInvite(code);
-      await refreshServers();
+      const redeemed = await core.joinCommunityByInvite(code);
       setJoinModalOpen(false);
       setJoinInvite("");
       const communityId = redeemed.communityId;
@@ -143,7 +176,7 @@ export function HomeScreen() {
     } finally {
       setJoinLoading(false);
     }
-  }, [controlPlaneBackend, core, joinInvite, navigation, refreshServers, warmCommunityForEntry]);
+  }, [core, joinInvite, navigation, warmCommunityForEntry]);
 
   if (status === "loading" && servers.length === 0) {
     return (

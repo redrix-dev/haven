@@ -2,19 +2,23 @@ import { useNavigation } from "@react-navigation/native";
 import type { NavigationProp } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
-import { MobileNotificationsProvider } from "@/contexts/MobileNotificationsContext";
-import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesContext";
-import { MobileMainSessionProvider } from "@/contexts/MobileMainSessionContext";
-import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
 import { HomeScreen } from "@/screens/main/HomeScreen";
 import { CommunityShell } from "@/navigation/community/CommunityShell";
-import type { MainStackParamList } from "@/navigation/types";
+import type { MainStackParamList, RootStackParamList } from "@/navigation/types";
 import { NAV_THEME } from "@/lib/theme";
 import { setMobileNavigationDelegate } from "@/lib/registerMobileAppHost";
-import { requireHavenCore } from "@shared/core";
+import {
+  bootstrapNotificationSoundSync,
+  createNotificationSoundSyncState,
+  requireHavenCore,
+  resetNotificationSoundSyncState,
+  syncFocusFromRoute,
+  syncNotificationSounds,
+  useHavenCore,
+} from "@shared/core";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
 import { HavenFormSheet } from "@/components/HavenFormSheet";
 import { HavenListSheet } from "@/components/HavenListSheet";
@@ -26,6 +30,9 @@ import { SideRail } from "@/navigation/shell/SideRail";
 import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
 import { useUiStore } from "@shared/stores/uiStore";
 import type { FriendsPanelTab } from "@shared/types/types";
+import type { NotificationAudioSettings } from "@shared/types/settings";
+import { useMobilePushNotificationRouting } from "@/hooks/useMobilePushNotificationRouting";
+import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -38,7 +45,7 @@ const mainStackScreenBackground = NAV_THEME.dark.colors.background;
  */
 function MainNavigationDelegateBridge() {
   const navigation =
-    useNavigation<NavigationProp<MainStackParamList>>();
+    useNavigation<NavigationProp<RootStackParamList>>();
 
   useEffect(() => {
     setMobileNavigationDelegate({
@@ -51,11 +58,14 @@ function MainNavigationDelegateBridge() {
         } catch {
           // HavenCore may not be ready during cold-start race; navigation alone is fine.
         }
-        navigation.navigate("Community", { serverId });
+        navigation.navigate("Main", {
+          screen: "Community",
+          params: { serverId },
+        });
       },
       navigateToDm: (_conversationId) => {
         // DM workspace is Phase 4 — for now route to Home where DMs live.
-        navigation.navigate("Home");
+        navigation.navigate("Main", { screen: "Home" });
       },
     });
     return () => setMobileNavigationDelegate(null);
@@ -64,11 +74,49 @@ function MainNavigationDelegateBridge() {
   return null;
 }
 
+function MobileNotificationSoundSync({
+  userId,
+  audioSettings,
+}: {
+  userId: string;
+  audioSettings: NotificationAudioSettings;
+}) {
+  const core = useHavenCore();
+  const notificationItems = core.notifications.useNotifications();
+  const soundSyncRef = useRef(createNotificationSoundSyncState());
+  const audioRef = useRef(audioSettings);
+
+  useEffect(() => {
+    audioRef.current = audioSettings;
+  }, [audioSettings]);
+
+  useEffect(() => {
+    if (!userId) {
+      resetNotificationSoundSyncState(soundSyncRef.current);
+      return;
+    }
+    void bootstrapNotificationSoundSync(core, soundSyncRef.current);
+  }, [core, userId]);
+
+  useEffect(() => {
+    if (!userId || !soundSyncRef.current.bootstrapped) return;
+    void syncNotificationSounds(core, audioRef.current, soundSyncRef.current).catch(
+      (error) => {
+        console.error("Failed to play notification sounds:", error);
+      },
+    );
+  }, [core, notificationItems.length, userId]);
+
+  return null;
+}
+
 function MainNavigationShell({ userId }: { userId: string }) {
+  const navigation =
+    useNavigation<NavigationProp<RootStackParamList>>();
+  const core = useHavenCore();
+  const dm = core.directMessages;
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
-  const {
-    actions: { openDirectMessageWithUser },
-  } = useMobileDirectMessages();
+  useMobilePushNotificationRouting();
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const handleOpenSettings = useCallback(() => {
@@ -128,10 +176,49 @@ function MainNavigationShell({ userId }: { userId: string }) {
       setIsFriendsModalOpen(false);
       setWorkspaceMode("dm");
       setIsDirectMessagesModalOpen(true);
-      void openDirectMessageWithUser(friendUserId);
+      void dm.openWithUser(friendUserId);
     },
-    [openDirectMessageWithUser, setWorkspaceMode],
+    [dm, setWorkspaceMode],
   );
+
+  useEffect(() => {
+    useMobilePushNavigationStore.getState().setHandlers({
+      openDm: (conversationId) => {
+        setWorkspaceMode("dm");
+        setIsDirectMessagesModalOpen(true);
+        void dm.openConversation(conversationId, { markRead: true });
+      },
+      openFriends: (input) => {
+        handleOpenFriendsFromNotification(input);
+      },
+      openMention: (communityId, channelId) => {
+        setWorkspaceMode("community");
+        syncFocusFromRoute(core, { communityId, channelId });
+        navigation.navigate("Main", {
+          screen: "Community",
+          params: { serverId: communityId, openDrawer: false },
+        });
+      },
+      openNotifications: () => {
+        setIsNotificationsModalOpen(true);
+      },
+      refreshUrgentSurfaces: () => {
+        void dm.loadConversations();
+        void core.social.load();
+        void core.notifications.refreshInbox();
+      },
+    });
+
+    return () => {
+      useMobilePushNavigationStore.getState().setHandlers(null);
+    };
+  }, [
+    core,
+    dm,
+    handleOpenFriendsFromNotification,
+    navigation,
+    setWorkspaceMode,
+  ]);
 
   return (
     <>
@@ -231,12 +318,12 @@ export function MainNavigator() {
   }
 
   return (
-    <MobileNotificationsProvider userId={userId} audioSettings={MOBILE_DEFAULT_NOTIFICATION_AUDIO}>
-        <MobileDirectMessagesProvider userId={userId}>
-          <MobileMainSessionProvider userId={userId}>
-            <MainNavigationShell userId={userId} />
-          </MobileMainSessionProvider>
-        </MobileDirectMessagesProvider>
-    </MobileNotificationsProvider>
+    <>
+      <MobileNotificationSoundSync
+        userId={userId}
+        audioSettings={MOBILE_DEFAULT_NOTIFICATION_AUDIO}
+      />
+      <MainNavigationShell userId={userId} />
+    </>
   );
 }

@@ -41,9 +41,10 @@ export type HavenSupabasePublicConfig = {
 };
 
 /**
- * All backend API clients exposed by HavenCore.backends.
- * Consumers should normally read these via `requireHavenCore().backends.*`,
- * not by importing factories directly.
+ * Backend API clients composed once for HavenCore internals and Nexus wiring.
+ * UI/feature consumers should not reach through `core.backends`; add a
+ * HavenCore/Nexus command instead. Auth/bootstrap is the bounded exception
+ * because it establishes the session Core depends on.
  */
 export type HavenBackends = {
   client: HavenSupabaseClient;

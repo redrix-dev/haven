@@ -3,10 +3,11 @@ import { BackHandler, Pressable, Text, View } from "react-native";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { useNotificationInteractions } from "@shared/features/notifications/hooks/useNotificationInteractions";
 import type { NotificationItem } from "@shared/lib/backend/types";
 import { syncFocusFromRoute, useHavenCore } from "@shared/core";
 import { useUiStore } from "@shared/stores/uiStore";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { getNotificationPayloadString } from "@shared/infrastructure/utils/appUtils";
 import type { RootStackParamList } from "@/navigation/types";
 import { NotificationInboxList } from "@/features/notifications/NotificationInboxList";
 import { NotificationPreferencesPanel } from "@/features/notifications/NotificationPreferencesPanel";
@@ -56,54 +57,77 @@ export default function NotificationsContainer({
   );
   const modmailEnabled = modmailCommunityIds.length > 0;
 
-  const refreshSocialCounts = useCallback(async () => {
-    await core.social.load();
-  }, [core.social]);
-
-  const refreshNotificationInbox = useCallback(async () => {
-    await core.notifications.refreshInbox();
-  }, [core.notifications]);
-
-  const {
-    actions: { openNotificationItem },
-  } = useNotificationInteractions({
-    notificationBackend: core.backends.notifications,
-    socialBackend: core.backends.social,
-    refreshNotificationInbox,
-    refreshSocialCounts,
-    setNotificationsError: setNotificationNavigationError,
-    onOpenDmConversation: async (conversationId) => {
-      setWorkspaceMode("dm");
-      await core.directMessages.openConversation(conversationId, {
-        markRead: true,
-      });
-      onOpenDirectMessages();
-    },
-    onOpenFriendsPanel: ({ tab, highlightedRequestId }) => {
-      onOpenFriendsPanel({ tab, highlightedRequestId });
-    },
-    onOpenChannelMention: ({ communityId, channelId }) => {
-      setWorkspaceMode("community");
-      syncFocusFromRoute(core, { communityId, channelId });
-      navigation.dispatch(
-        CommonActions.navigate({
-          name: "Main",
-          params: {
-            screen: "Community",
-            params: { serverId: communityId, openDrawer: false },
-          },
-        }),
-      );
-    },
-  });
-
   const handleNavigate = useCallback(
     async (notification: NotificationItem) => {
       setNotificationNavigationError(null);
-      await openNotificationItem(notification);
+      try {
+        switch (notification.kind) {
+          case "dm_message": {
+            const conversationId = getNotificationPayloadString(notification, "conversationId");
+            if (!conversationId) {
+              throw new Error("This notification does not include a DM conversation target.");
+            }
+            setWorkspaceMode("dm");
+            await core.directMessages.openConversation(conversationId, {
+              markRead: true,
+            });
+            onOpenDirectMessages();
+            break;
+          }
+          case "friend_request_received": {
+            onOpenFriendsPanel({
+              tab: "requests",
+              highlightedRequestId: getNotificationPayloadString(notification, "friendRequestId"),
+            });
+            break;
+          }
+          case "friend_request_accepted": {
+            onOpenFriendsPanel({
+              tab: "friends",
+              highlightedRequestId: null,
+            });
+            break;
+          }
+          case "channel_mention": {
+            const communityId = getNotificationPayloadString(notification, "communityId");
+            const channelId = getNotificationPayloadString(notification, "channelId");
+            if (!communityId || !channelId) {
+              throw new Error("This mention notification does not include a channel target.");
+            }
+            setWorkspaceMode("community");
+            syncFocusFromRoute(core, { communityId, channelId });
+            navigation.dispatch(
+              CommonActions.navigate({
+                name: "Main",
+                params: {
+                  screen: "Community",
+                  params: { serverId: communityId, openDrawer: false },
+                },
+              }),
+            );
+            break;
+          }
+          default:
+            break;
+        }
+
+        await core.notifications.markRead([notification.recipientId]);
+      } catch (error) {
+        setNotificationNavigationError(
+          getErrorMessage(error, "Failed to open notification."),
+        );
+        return;
+      }
       onCloseModal();
     },
-    [onCloseModal, openNotificationItem],
+    [
+      core,
+      navigation,
+      onCloseModal,
+      onOpenDirectMessages,
+      onOpenFriendsPanel,
+      setWorkspaceMode,
+    ],
   );
 
   useEffect(() => {

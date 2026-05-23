@@ -255,9 +255,8 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
             </Text>
             <Text className="mt-4 text-xs font-semibold text-foreground">Instrumented hooks</Text>
             <Text className="text-xs text-muted-foreground">
-              MobileMainSessionContext, prefetchCommunityChannelMessages,
-              MobileMainSession warmCommunityForEntry, servers realtime bootstrap, auth session cache
-              clears
+              HavenCore prepareCommunityEntry, prefetchCommunityChannelMessages,
+              servers realtime bootstrap, auth session cache clears
             </Text>
           </ScrollView>
         ) : null}

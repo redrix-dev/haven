@@ -1,23 +1,122 @@
 import { create } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { ControlPlaneBackend, UserProfileInfo } from "@shared/lib/backend/controlPlaneBackend.interface";
 import type { LiveProfileIdentity } from "@shared/lib/backend/types";
 import type { StoreApi, UseBoundStore } from "zustand";
 
 export type ProfileNexusState = {
   profiles: Record<string, LiveProfileIdentity>;
+  viewerProfiles: Record<string, UserProfileInfo | null>;
+  viewerProfileLoading: Record<string, boolean>;
+  viewerProfileErrors: Record<string, string | null>;
   revision: number;
+};
+
+export type ViewerProfileUpdateInput = {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  avatarFile?: Blob | ArrayBuffer | null;
+  avatarContentType?: string;
+  theme?: string;
 };
 
 export class ProfileNexus {
   private readonly store: UseBoundStore<StoreApi<ProfileNexusState>>;
+  private readonly controlPlane: ControlPlaneBackend | null;
+  private viewerProfileInflight = new Map<string, Promise<UserProfileInfo | null>>();
 
-  constructor(_persistence: NexusPersistence) {
+  constructor(_persistence: NexusPersistence, controlPlane?: ControlPlaneBackend) {
     void _persistence;
+    this.controlPlane = controlPlane ?? null;
     this.store = create<ProfileNexusState>()(() => ({
       profiles: {},
+      viewerProfiles: {},
+      viewerProfileLoading: {},
+      viewerProfileErrors: {},
       revision: 0,
     }));
+  }
+
+  private requireControlPlane(): ControlPlaneBackend {
+    if (!this.controlPlane) {
+      throw new Error("ProfileNexus called before controlPlane was attached.");
+    }
+    return this.controlPlane;
+  }
+
+  private setViewerProfile(userId: string, profile: UserProfileInfo | null): void {
+    this.store.setState((state) => ({
+      viewerProfiles: { ...state.viewerProfiles, [userId]: profile },
+      revision: state.revision + 1,
+    }));
+
+    if (profile) {
+      this.upsertProfile({
+        userId,
+        username: profile.username,
+        avatarUrl: profile.avatarUrl,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  async loadViewerProfile(userId: string): Promise<UserProfileInfo | null> {
+    if (!userId.trim()) return null;
+    const existing = this.viewerProfileInflight.get(userId);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      this.store.setState((state) => ({
+        viewerProfileLoading: {
+          ...state.viewerProfileLoading,
+          [userId]: true,
+        },
+        viewerProfileErrors: {
+          ...state.viewerProfileErrors,
+          [userId]: null,
+        },
+        revision: state.revision + 1,
+      }));
+
+      try {
+        const profile = await this.requireControlPlane().fetchUserProfile(userId);
+        this.setViewerProfile(userId, profile);
+        return profile;
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message.trim().length > 0
+            ? error.message
+            : "Failed to load profile.";
+        this.store.setState((state) => ({
+          viewerProfileErrors: {
+            ...state.viewerProfileErrors,
+            [userId]: message,
+          },
+          revision: state.revision + 1,
+        }));
+        throw error;
+      } finally {
+        this.store.setState((state) => ({
+          viewerProfileLoading: {
+            ...state.viewerProfileLoading,
+            [userId]: false,
+          },
+          revision: state.revision + 1,
+        }));
+        this.viewerProfileInflight.delete(userId);
+      }
+    })();
+
+    this.viewerProfileInflight.set(userId, promise);
+    return promise;
+  }
+
+  async updateViewerProfile(input: ViewerProfileUpdateInput): Promise<UserProfileInfo> {
+    const result = await this.requireControlPlane().updateUserProfile(input);
+    this.setViewerProfile(input.userId, result);
+    return result;
   }
 
   upsertProfile(profile: LiveProfileIdentity): void {
@@ -56,6 +155,10 @@ export class ProfileNexus {
     return this.store.getState().profiles[userId];
   }
 
+  getViewerProfile(userId: string): UserProfileInfo | null | undefined {
+    return this.store.getState().viewerProfiles[userId];
+  }
+
   useProfilesRecord(): Record<string, LiveProfileIdentity> {
     return useStoreWithEqualityFn(this.store, (state) => {
       void state.revision;
@@ -75,9 +178,34 @@ export class ProfileNexus {
     });
   }
 
+  useViewerProfile(userId: string | null | undefined): UserProfileInfo | null {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? (state.viewerProfiles[userId] ?? null) : null,
+    );
+  }
+
+  useViewerProfileLoading(userId: string | null | undefined): boolean {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? Boolean(state.viewerProfileLoading[userId]) : false,
+    );
+  }
+
+  useViewerProfileError(userId: string | null | undefined): string | null {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? (state.viewerProfileErrors[userId] ?? null) : null,
+    );
+  }
+
   rehydrate(): void {}
 
   clear(): void {
-    this.store.setState({ profiles: {}, revision: 0 });
+    this.viewerProfileInflight.clear();
+    this.store.setState({
+      profiles: {},
+      viewerProfiles: {},
+      viewerProfileLoading: {},
+      viewerProfileErrors: {},
+      revision: 0,
+    });
   }
 }

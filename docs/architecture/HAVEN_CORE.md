@@ -168,6 +168,20 @@ Splash UI subscribes via `core.useBootstrapPhase()` and shows honest labels for 
 11. **Platform** → AppHost for OS + imperative shell nav; NexusPersistence for disk.
 12. **New entity type** → New Nexus + register on HavenCore + `routeEvent` cases + tests. Add a feature hook only if React lifecycle truly requires it.
 
+## Enforcement
+
+`eslint.config.mjs` is the mechanical gate for the HavenCore → Nexus → UI Consumer pattern.
+
+Consumer files are:
+
+- `packages/web-client/src/**/*`
+- `apps/mobile/src/**/*`
+- `packages/shared/src/features/**/*`
+
+Those files may consume domain state through `useHavenCore()` / `requireHavenCore()` and Nexus public selectors/commands. They may not import backend factories, construct Supabase clients, import Nexus classes directly, import persistence adapters, open domain realtime subscriptions, or call Supabase RPC/table/channel APIs directly.
+
+Known pre-finality seams are listed in `havenCoreConsumerBoundaryIgnores` in `eslint.config.mjs`. Treat that list as the migration punch list: each completed migration should remove its file from the quarantine list. New files should not be added there unless they are explicitly time-boxed as part of a migration PR.
+
 ## Package layout
 
 ```

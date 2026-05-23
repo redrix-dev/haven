@@ -21,6 +21,10 @@ import type { BanEligibleServer } from "@shared/lib/backend/types";
 import { createHavenBackends, type HavenBackends, type HavenSupabasePublicConfig } from "./backends";
 import { notifyActiveServerAccessLost } from "./communityAccessHandlers";
 import { BootstrapPhase, type BootstrapPhaseSnapshot, type BootstrapPhaseListener } from "./bootstrapPhase";
+import {
+  resolvePreferredChannelIdForServer,
+  toChannel,
+} from "./communityChannelUtils";
 import type { NexusPersistence } from "./persistence/NexusPersistence";
 import { routeRealtimeEvent, type RealtimeEvent } from "./routeRealtimeEvent";
 import {
@@ -92,6 +96,9 @@ class MessageNexusRegistry {
 
 /**
  * The single session-scoped composition root.
+ *
+ * HavenCore assumes auth has already established a Supabase session. It owns
+ * the authenticated domain runtime, not sign-in/sign-out/recovery flows.
  */
 export class HavenCore {
   readonly backends: HavenBackends;
@@ -132,7 +139,7 @@ export class HavenCore {
     this.notifications = new NotificationNexus(options.persistence, this.backends.notifications);
     this.social = new SocialNexus(options.persistence, this.backends.social);
     this.permissions = new PermissionsNexus(options.persistence);
-    this.profiles = new ProfileNexus(options.persistence);
+    this.profiles = new ProfileNexus(options.persistence, this.backends.controlPlane);
     this.voice = new VoiceNexus(options.persistence, this.viewerMessagePolicyStore);
 
     this.messages.setBackends(this.backends);
@@ -284,6 +291,10 @@ export class HavenCore {
     });
   }
 
+  /**
+   * Called by the auth boundary after a session exists. This is where the
+   * authenticated domain graph starts: rehydrate, load, subscribe, route events.
+   */
   async bootstrapSession(userId: string): Promise<void> {
     if (!userId) {
       throw new Error("bootstrapSession requires a userId");
@@ -339,6 +350,10 @@ export class HavenCore {
     }
   }
 
+  /**
+   * Clears session-scoped domain state. The auth boundary owns ending the
+   * Supabase session itself and calls this as the domain cleanup handoff.
+   */
   async clearSession(): Promise<void> {
     this.lastNotifiedAccessLostCommunityId = null;
     this.unsubscribeRealtime();
@@ -456,10 +471,53 @@ export class HavenCore {
   }
 
   /**
+   * Prepare a community before navigating into it: channels, permissions,
+   * preferred focus, and the initial text message page.
+   */
+  async prepareCommunityEntry(
+    communityId: string,
+    options?: { lastVisitedChannelId?: string | null },
+  ): Promise<{ channelId: string | null }> {
+    await this.channels.ensureLoaded(communityId);
+    try {
+      await this.ensureCommunityPermissions(communityId);
+    } catch (error) {
+      console.warn("[HavenCore] ensureCommunityPermissions failed", error);
+    }
+
+    const channelList = this.channels
+      .getChannelsSnapshot(communityId)
+      .map(toChannel);
+    const channelId = resolvePreferredChannelIdForServer(
+      this,
+      communityId,
+      channelList,
+      {
+        lastVisitedChannelId: options?.lastVisitedChannelId,
+        previousChannelId: this.channels.getActiveChannelId(),
+      },
+    );
+
+    this.communities.setActiveId(communityId);
+    this.channels.setActiveChannelId(channelId);
+
+    if (channelId) {
+      await this.prepareTextChannelMessages(communityId, channelId);
+    }
+
+    return { channelId };
+  }
+
+  /**
    * Ensure the viewer is elevated in a community (uses PermissionsNexus cache).
    */
   async ensureElevated(communityId: string): Promise<boolean> {
     return this.permissions.ensureElevated(communityId, this.backends.communityData);
+  }
+
+  async ensureCommunityPermissions(communityId: string): Promise<void> {
+    await this.permissions.ensureLoaded(communityId, this.backends.communityData);
+    this.syncViewerMessagePolicy(communityId);
   }
 
   /**
@@ -478,11 +536,15 @@ export class HavenCore {
    */
   async joinCommunityByInvite(
     code: string,
-  ): Promise<{ communityName: string; joined: boolean }> {
+  ): Promise<{ communityId: string; communityName: string; joined: boolean }> {
     const result = await this.backends.controlPlane.redeemCommunityInvite(code);
     await this.communities.load(this.sessionUserId!);
     this.communities.setActiveId(result.communityId);
-    return { communityName: result.communityName, joined: result.joined };
+    return {
+      communityId: result.communityId,
+      communityName: result.communityName,
+      joined: result.joined,
+    };
   }
 
   /**
@@ -492,10 +554,11 @@ export class HavenCore {
     userId: string;
     username: string;
     avatarUrl: string | null;
-    avatarFile?: File | null;
+    avatarFile?: Blob | ArrayBuffer | null;
+    avatarContentType?: string;
     theme?: string;
   }): Promise<{ username: string; avatarUrl: string | null; theme?: string }> {
-    return this.backends.controlPlane.updateUserProfile(input);
+    return this.profiles.updateViewerProfile(input);
   }
 
   /**

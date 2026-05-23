@@ -8,7 +8,7 @@ import type { HavenCore } from '@shared/core/HavenCore';
 import { ChannelNexus } from '@shared/nexus/community/ChannelNexus';
 import { CommunityAdminNexus } from '@shared/nexus/community/CommunityAdminNexus';
 import { CommunityNexus } from '@shared/nexus/community/CommunityNexus';
-import type { Channel } from '@shared/lib/backend/types';
+import type { Channel, ServerRoleItem } from '@shared/lib/backend/types';
 import { useAuthStore } from '@shared/stores/authStore';
 
 const textChannel = (overrides: Partial<Channel> = {}): Channel =>
@@ -138,4 +138,71 @@ describe('CommunityAdminNexus', () => {
     expect(channels.getChannel('ch-new')?.name).toBe('new-channel');
     expect(channels.getActiveChannelId()).toBe('ch-new');
   });
+
+  it('reorders server roles through the community backend and refreshes role state once', async () => {
+    const updateServerRole = vi.fn(async () => {});
+    const fetchServerRoleManagement = vi.fn(async () => ({
+      roles: [
+        role({ id: 'r2', name: 'Beta', position: 1 }),
+        role({ id: 'r1', name: 'Alpha', position: 0 }),
+      ],
+      members: [],
+      permissionsCatalog: [],
+    }));
+
+    registerHavenCore({
+      communities,
+      channels,
+      permissions: {
+        getPermissions: () => ({ canManageInvites: true }),
+      },
+      backends: {
+        communityData: {
+          updateServerRole,
+          fetchServerRoleManagement,
+        },
+      },
+    } as unknown as HavenCore);
+
+    await admin.reorderServerRoles(
+      [
+        role({ id: 'r2', name: 'Beta', position: 0 }),
+        role({ id: 'r1', name: 'Alpha', position: 1 }),
+      ],
+      'c1',
+    );
+
+    expect(updateServerRole).toHaveBeenCalledTimes(2);
+    expect(updateServerRole).toHaveBeenCalledWith({
+      communityId: 'c1',
+      roleId: 'r2',
+      name: 'Beta',
+      color: '#ffffff',
+      position: 1,
+    });
+    expect(updateServerRole).toHaveBeenCalledWith({
+      communityId: 'c1',
+      roleId: 'r1',
+      name: 'Alpha',
+      color: '#ffffff',
+      position: 0,
+    });
+    expect(fetchServerRoleManagement).toHaveBeenCalledTimes(1);
+    expect(admin.getReactiveStore().getState().serverRoles.map((r) => r.id)).toEqual([
+      'r2',
+      'r1',
+    ]);
+  });
+});
+
+const role = (overrides: Partial<ServerRoleItem> = {}): ServerRoleItem => ({
+  id: 'r1',
+  name: 'Role',
+  color: '#ffffff',
+  position: 0,
+  isDefault: false,
+  isSystem: false,
+  permissionKeys: [],
+  memberCount: 0,
+  ...overrides,
 });

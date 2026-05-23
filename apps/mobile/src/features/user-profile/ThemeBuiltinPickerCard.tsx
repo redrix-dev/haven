@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
-import { getControlPlaneBackend } from "@shared/lib/backend";
+import { useHavenCore } from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { listSelectableBuiltinThemes } from "@shared/themes/selectableBuiltinThemes";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
@@ -18,6 +18,7 @@ export function ThemeBuiltinPickerCard({
   username,
   avatarUrl,
 }: ThemeBuiltinPickerCardProps) {
+  const core = useHavenCore();
   const selectedThemeId = useMobileThemePreferenceStore((s) => s.selectedThemeId);
   const setSelectedThemeId = useMobileThemePreferenceStore((s) => s.setSelectedThemeId);
 
@@ -42,8 +43,7 @@ export function ThemeBuiltinPickerCard({
     applyMobileTheme(themeId);
 
     try {
-      const backend = getControlPlaneBackend();
-      await backend.updateUserProfile({
+      await core.updateUserProfile({
         userId,
         username: trimmedName,
         avatarUrl,
