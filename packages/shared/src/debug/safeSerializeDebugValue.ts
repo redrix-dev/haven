@@ -7,9 +7,15 @@ const REDACTED_KEYS = new Set([
   "password",
   "token",
   "access_token",
+  "accesstoken",
   "refresh_token",
+  "refreshtoken",
+  "idtoken",
+  "jwt",
   "secret",
   "authorization",
+  "email",
+  "phone",
 ]);
 
 function truncateString(value: string): string {

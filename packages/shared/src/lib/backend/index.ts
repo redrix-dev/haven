@@ -1,4 +1,4 @@
-import { requireHavenCore } from "@shared/core";
+import { requireHavenCore } from "@shared/core/havenCoreRef";
 import type { CommunityDataBackend } from './communityDataBackend.interface';
 import type { ControlPlaneBackend } from './controlPlaneBackend';
 import type { DirectMessageBackend } from './directMessageBackend';

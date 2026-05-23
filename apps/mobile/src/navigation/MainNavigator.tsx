@@ -3,7 +3,6 @@ import type { NavigationProp } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAuthSession } from "@/hooks/useAuthSession";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
 import { HomeScreen } from "@/screens/main/HomeScreen";
 import { CommunityShell } from "@/navigation/community/CommunityShell";
@@ -29,6 +28,7 @@ import UserSettingsContainer from "@/features/user-profile/UserSettingsContainer
 import { SideRail } from "@/navigation/shell/SideRail";
 import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
 import { useUiStore } from "@shared/stores/uiStore";
+import { useAuthStore } from "@shared/stores/authStore";
 import type { FriendsPanelTab } from "@shared/types/types";
 import type { NotificationAudioSettings } from "@shared/types/settings";
 import { useMobilePushNotificationRouting } from "@/hooks/useMobilePushNotificationRouting";
@@ -305,8 +305,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
 }
 
 export function MainNavigator() {
-  const session = useAuthSession();
-  const userId = session?.user?.id;
+  const userId = useAuthStore((s) => s.user?.id ?? null);
   useHydrateMobileThemeFromProfile(userId);
 
   if (!userId) {

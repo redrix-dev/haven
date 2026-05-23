@@ -7,11 +7,11 @@ import {
 } from "@/navigation/shell/sideRailChromeStore";
 
 const colorOptions = [
-  { label: "Sky", value: "#38bdf8" },
-  { label: "Violet", value: "#a78bfa" },
-  { label: "Emerald", value: "#34d399" },
-  { label: "Amber", value: "#f59e0b" },
-  { label: "Rose", value: "#fb7185" },
+  { label: "Sky", hex: "#38bdf8" },
+  { label: "Violet", hex: "#a78bfa" },
+  { label: "Emerald", hex: "#34d399" },
+  { label: "Amber", hex: "#f59e0b" },
+  { label: "Rose", hex: "#fb7185" },
 ];
 
 const patternOptions: { label: string; value: SideRailGlowPattern }[] = [
@@ -41,7 +41,7 @@ export function MobileDevSideRailMenu() {
   const toggleSegment = useSideRailChromeStore((s) => s.toggleEdgeGlowSegment);
 
   const selectedColorLabel = useMemo(
-    () => colorOptions.find((option) => option.value === color)?.label ?? color,
+    () => colorOptions.find((option) => option.hex === color)?.label ?? color,
     [color],
   );
 
@@ -126,11 +126,11 @@ export function MobileDevSideRailMenu() {
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
                   {colorOptions.map((option) => {
-                    const selected = option.value === color;
+                    const selected = option.hex === color;
                     return (
                       <Pressable
-                        key={option.value}
-                        onPress={() => setColor(option.value)}
+                        key={option.hex}
+                        onPress={() => setColor(option.hex)}
                         className={`min-w-[88px] rounded-xl border px-3 py-3 ${
                           selected ? "border-primary" : "border-border"
                         }`}
@@ -138,7 +138,7 @@ export function MobileDevSideRailMenu() {
                         <View className="flex-row items-center gap-2">
                           <View
                             className="h-4 w-4 rounded-full"
-                            style={{ backgroundColor: option.value }}
+                            style={{ backgroundColor: option.hex }}
                           />
                           <Text className="text-sm font-medium text-foreground">
                             {option.label}

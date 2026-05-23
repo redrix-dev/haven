@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
-import { requireHavenCore } from '@shared/core'
+import { requireHavenCore } from '@shared/core/havenCoreRef'
 import { getCommunityDataBackend } from '@shared/lib/backend'
 import type { ControlPlaneBackend } from '@shared/lib/backend/controlPlaneBackend.interface'
 import type {

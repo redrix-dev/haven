@@ -18,7 +18,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { setLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
-import { CommunityChatScreen } from "@/screens/main/CommunityChatScreen";
 import type { MainStackParamList } from "@/navigation/types";
 import { CommunityChannelDrawer } from "@/navigation/community/CommunityChannelDrawer";
 import { CommunityTopBar } from "@/navigation/community/CommunityTopBar";
@@ -240,8 +239,6 @@ export function CommunityShell({ route, navigation }: Props) {
 
         <GestureDetector gesture={panGesture}>
           <Animated.View className="flex-1" style={mainShiftStyle}>
-            <CommunityChatScreen serverId={serverId} />
-
             <Animated.View
               pointerEvents={drawerOpen ? "auto" : "none"}
               style={[
@@ -256,7 +253,10 @@ export function CommunityShell({ route, navigation }: Props) {
                 scrimStyle,
               ]}
             >
-              <Pressable className="flex-1" onPress={() => setDrawerOpenAnimated(false)} />
+              <Pressable
+                className="flex-1"
+                onPress={() => setDrawerOpenAnimated(false)}
+              />
             </Animated.View>
           </Animated.View>
         </GestureDetector>
