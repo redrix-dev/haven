@@ -220,7 +220,6 @@ Current quarantine should stay limited to:
 - mobile auth/bootstrap
 - mobile persistence
 - mobile Supabase bootstrap
-- the stale `apps/mobile/src/haven-rev2/**` ignore until it is removed
 
 No active web/electron UI file should be in `havenCoreConsumerBoundaryIgnores`.
 

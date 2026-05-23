@@ -27,19 +27,6 @@ Clean now:
 
 ## Remaining Consumer Work
 
-### Remove Stale Mobile Quarantine
-
-- `apps/mobile/src/haven-rev2/**`
-  - Current state: the folder no longer exists.
-  - Next step: remove this stale ignore from `havenCoreConsumerBoundaryIgnores` and the mobile-specific eslint rule block that targets the deleted folder.
-
-### Delete Deprecated Mobile Alias
-
-- `apps/mobile/src/screens/main/CommunityScreen.tsx`
-  - Current state: deprecated alias to `CommunityChatScreen`.
-  - Search result: no active imports besides itself.
-  - Next step: delete once comfortable with the navigation file history.
-
 ### Flatten Web Session Ergonomics
 
 `packages/web-client/src/chat-app/useChatAppSessionState.ts` is now boundary-aligned, but still functions as a large compatibility shell that passes many values/actions to older web components.
