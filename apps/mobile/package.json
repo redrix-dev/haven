@@ -24,6 +24,7 @@
     "eas:submit": "npm run preflight && npx eas-cli submit",
     "eas:credentials": "npm run preflight && npx eas-cli credentials",
     "typecheck": "tsc --noEmit",
+    "check:uniwind": "node ../../tooling/scripts/mobile/check-uniwind-theme-usage.mjs",
     "doctor": "node ../../tooling/scripts/mobile/doctor.mjs",
     "revalidate:ios-delegate": "node ../../tooling/scripts/mobile/revalidate-ios-delegate.mjs",
     "start": "npm run dev:metro",
