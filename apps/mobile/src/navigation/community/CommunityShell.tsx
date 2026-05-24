@@ -211,8 +211,11 @@ export function CommunityShell({ route, navigation }: Props) {
       <CommunityTopBar
         communityName={community?.name ?? "Community"}
         selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
+        drawerOpen={drawerOpen}
+        drawerOffset={drawerOffset}
         onPressCommunity={() => setDrawerOpenAnimated(true)}
         onPressChannel={() => setDrawerOpenAnimated(true)}
+        onPressBack={() => navigation.goBack()}
       />
 
       <View className="flex-1 overflow-hidden">
@@ -230,11 +233,11 @@ export function CommunityShell({ route, navigation }: Props) {
           ]}
         >
           <CommunityChannelDrawer
+            serverId={serverId}
             communityName={community?.name ?? "Community"}
             channels={channels}
             selectedChannelId={currentRenderableChannel?.id ?? null}
             onSelectTextChannel={handleSelectTextChannel}
-            onPressAllCommunities={() => navigation.goBack()}
           />
         </Animated.View>
 

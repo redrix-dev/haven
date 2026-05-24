@@ -230,7 +230,9 @@ function MainNavigationShell({ userId }: { userId: string }) {
             contentStyle: { backgroundColor: mainStackScreenBackground },
           }}
         >
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Home">
+            {() => <HomeScreen onOpenSettings={handleOpenSettings} />}
+          </Stack.Screen>
           <Stack.Screen
             name="Community"
             component={CommunityShell}

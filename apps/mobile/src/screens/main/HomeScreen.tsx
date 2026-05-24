@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  Image,
   Text,
   TextInput,
   View,
@@ -45,11 +46,16 @@ function buildGridItems(servers: ServerSummary[]): GridItem[] {
 }
 
 
-export function HomeScreen() {
+type HomeScreenProps = {
+  onOpenSettings?: () => void;
+};
+
+export function HomeScreen({ onOpenSettings }: HomeScreenProps) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const core = useHavenCore();
   const userId = useAuthStore((state) => state.user?.id ?? null);
+  const viewerProfile = core.profiles.useViewerProfile(userId);
   const nexusCommunities = core.communities.useCommunities();
   const serversLoading = core.communities.useIsLoading();
   const loadError = core.communities.useLoadError();
@@ -186,17 +192,40 @@ export function HomeScreen() {
     );
   }
 
+  const avatarInitial = (viewerProfile?.username ?? "?").charAt(0).toUpperCase();
+
   return (
     <View className="flex-1 bg-surface-modal">
+      <View
+        style={{ paddingTop: insets.top }}
+        className="flex-row items-center justify-between px-4 pb-3 pt-0"
+      >
+        <Text className="text-xl font-bold text-foreground">Communities</Text>
+        <Pressable
+          onPress={onOpenSettings}
+          className="h-9 w-9 items-center justify-center rounded-full bg-surface-panel active:bg-surface-hover"
+          accessibilityLabel="Open settings"
+        >
+          {viewerProfile?.avatarUrl ? (
+            <Image
+              source={{ uri: viewerProfile.avatarUrl }}
+              className="h-9 w-9 rounded-full"
+            />
+          ) : (
+            <Text className="text-sm font-semibold text-foreground">{avatarInitial}</Text>
+          )}
+        </Pressable>
+      </View>
+
       {loadError ? (
-        <Text className="px-4 pt-4 text-center text-sm text-destructive">{loadError}</Text>
+        <Text className="px-4 pb-2 text-center text-sm text-destructive">{loadError}</Text>
       ) : null}
 
       <FlatList
         className="flex-1"
         contentContainerStyle={{
           paddingHorizontal: H_PAD,
-          paddingTop: insets.top + GAP * 2,
+          paddingTop: GAP,
           paddingBottom: insets.bottom + 24,
         }}
         columnWrapperStyle={{ gap: GAP, marginBottom: GAP }}
