@@ -1,16 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, Platform, Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
-import {
-  type EnrichedMarkdownTextInputInstance,
-} from "react-native-enriched-markdown";
+import { type EnrichedMarkdownTextInputInstance } from "react-native-enriched-markdown";
 import { useAuthStore } from "@shared/stores/authStore";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import {
@@ -50,7 +42,9 @@ type CommunityChatScreenProps = {
 
 export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
   const composerColors = useChatComposerColors();
-  const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
+  const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(
+    null,
+  );
 
   const core = useHavenCore();
   const { setRainbowMode } = useUserStatusStore();
@@ -82,14 +76,15 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
   const currentChannel = useMemo(
     () =>
       navigationChannelId
-        ? (channels.find((channel) => channel.id === navigationChannelId) ?? null)
+        ? (channels.find((channel) => channel.id === navigationChannelId) ??
+          null)
         : null,
     [channels, navigationChannelId],
   );
   const currentChannelBelongsToCurrentServer = Boolean(
     currentChannel &&
-      communityId &&
-      currentChannel.community_id === communityId,
+    communityId &&
+    currentChannel.community_id === communityId,
   );
   const currentRenderableChannel = useMemo(
     () =>
@@ -138,7 +133,9 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     void core.prepareTextChannelMessages(communityId, activeChannelIdForLoad);
   }, [core, communityId, activeChannelIdForLoad]);
 
-  const channelMeta = messageNexus.useChannelMeta(activeChannelId ?? "__none__");
+  const channelMeta = messageNexus.useChannelMeta(
+    activeChannelId ?? "__none__",
+  );
   const hasOlderMessages = channelMeta.hasMore;
   const isLoadingOlderMessages = messageNexus.useIsLoadingOlder(
     activeChannelId ?? "__none__",
@@ -181,7 +178,9 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     [activeChannelId, currentUserId, messageNexus, setRainbowMode],
   );
 
-  const visibleMessages = messageNexus.useVisibleChannel(activeChannelId ?? "__none__");
+  const visibleMessages = messageNexus.useVisibleChannel(
+    activeChannelId ?? "__none__",
+  );
 
   useDataCacheComponentProbe("CommunityChatScreen", {
     serverId,
@@ -202,11 +201,15 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
   const liveProfiles = core.profiles.useProfilesRecord();
 
   const community = useMemo(
-    () => (communityId ? servers.find((s) => s.id === communityId) ?? null : null),
+    () =>
+      communityId ? (servers.find((s) => s.id === communityId) ?? null) : null,
     [communityId, servers],
   );
 
-  const messageById = useMemo(() => buildMessageBundleById(visibleMessages), [visibleMessages]);
+  const messageById = useMemo(
+    () => buildMessageBundleById(visibleMessages),
+    [visibleMessages],
+  );
 
   const messages = useMemo<ChatMessage[]>(
     () => mapBundlesToChatMessages(visibleMessages, liveProfiles),
@@ -221,15 +224,20 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isPickingCommunityMedia, setIsPickingCommunityMedia] = useState(false);
-  const [pendingCommunityMedia, setPendingCommunityMedia] = useState<CommunityMediaUploadPayload | null>(
-    null,
-  );
-  const [pendingReplyToMessageId, setPendingReplyToMessageId] = useState<string | null>(null);
+  const [pendingCommunityMedia, setPendingCommunityMedia] =
+    useState<CommunityMediaUploadPayload | null>(null);
+  const [pendingReplyToMessageId, setPendingReplyToMessageId] = useState<
+    string | null
+  >(null);
 
   const pendingReplyTargetLabel = useMemo(
     () =>
       pendingReplyToMessageId
-        ? getReplyTargetLabel(pendingReplyToMessageId, messageById, liveProfiles)
+        ? getReplyTargetLabel(
+            pendingReplyToMessageId,
+            messageById,
+            liveProfiles,
+          )
         : null,
     [messageById, pendingReplyToMessageId, liveProfiles],
   );
@@ -238,9 +246,13 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     if (isSending || isPickingCommunityMedia) return;
     setIsPickingCommunityMedia(true);
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("Permission needed", "Allow Photos access to attach images or videos.");
+        Alert.alert(
+          "Permission needed",
+          "Allow Photos access to attach images or videos.",
+        );
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -251,7 +263,8 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
         ...(Platform.OS === "ios"
           ? {
               preferredAssetRepresentationMode:
-                ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+                ImagePicker.UIImagePickerPreferredAssetRepresentationMode
+                  .Compatible,
             }
           : {}),
       });
@@ -261,7 +274,10 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
       const payload = await loadPickedCommunityMediaForUpload(asset);
       setPendingCommunityMedia(payload);
     } catch (e) {
-      Alert.alert("Could not add media", getErrorMessage(e, "Choose a different file."));
+      Alert.alert(
+        "Could not add media",
+        getErrorMessage(e, "Choose a different file."),
+      );
     } finally {
       setIsPickingCommunityMedia(false);
     }
@@ -299,7 +315,13 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
     } finally {
       setIsSending(false);
     }
-  }, [draft, messageById, pendingCommunityMedia, pendingReplyToMessageId, sendMessage]);
+  }, [
+    draft,
+    messageById,
+    pendingCommunityMedia,
+    pendingReplyToMessageId,
+    sendMessage,
+  ]);
 
   const renderChatItem = useCallback(({ item }: { item: ChatListItem }) => {
     if (item.kind === "divider") {
@@ -326,10 +348,17 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
           : "missing";
 
   if (phase !== "ready") {
-    return <CommunityPhaseGate phase={phase} error={serversError} onRetry={refreshServers} />;
+    return (
+      <CommunityPhaseGate
+        phase={phase}
+        error={serversError}
+        onRetry={refreshServers}
+      />
+    );
   }
 
-  const canSendCommunityMessage = draft.trim().length > 0 || pendingCommunityMedia != null;
+  const canSendCommunityMessage =
+    draft.trim().length > 0 || pendingCommunityMedia != null;
 
   const isMessagesBootstrapping =
     Boolean(activeChannelId) &&
@@ -338,16 +367,18 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
 
   const listEmptyContent =
     !activeChannelId && channelsLoading ? (
-      <View className="min-h-[120px] items-center justify-center pt-8">
+      <View className="min-h-30 items-center justify-center pt-8">
         <ActivityIndicator color={composerColors.spinner} />
       </View>
     ) : isMessagesBootstrapping ? (
-      <View className="min-h-[120px] items-center justify-center pt-8">
+      <View className="min-h-30 items-center justify-center pt-8">
         <ActivityIndicator color={composerColors.spinner} />
       </View>
     ) : (
-      <View className="min-h-[120px] items-center justify-center pt-8">
-        <Text className="text-muted-foreground text-[13px]">No messages yet.</Text>
+      <View className="min-h-30 items-center justify-center pt-8">
+        <Text className="text-muted-foreground text-[13px]">
+          No messages yet.
+        </Text>
       </View>
     );
 
@@ -361,55 +392,57 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
         className="flex-1"
         style={{ flex: 1 }}
       >
-      <ChatInterface
-        data={chatListItems}
-        keyExtractor={(item) => (item.kind === "message" ? item.message.id : item.id)}
-        renderItem={renderChatItem}
-        onEndReachedThreshold={0.3}
-        onEndReached={() => {
-          if (hasOlderMessages && !isLoadingOlderMessages) {
-            void requestOlderMessages();
+        <ChatInterface
+          data={chatListItems}
+          keyExtractor={(item) =>
+            item.kind === "message" ? item.message.id : item.id
           }
-        }}
-        ListEmptyComponent={listEmptyContent}
-        ListFooterComponent={
-          isLoadingOlderMessages ? (
-            <View className="py-2.5">
-              <ActivityIndicator color={composerColors.spinner} />
-            </View>
-          ) : null
-        }
-        composer={
-          <ChatComposer
-            inputRef={composerInputRef}
-            colors={composerColors}
-            isSending={isSending}
-            isPickingMedia={isPickingCommunityMedia}
-            canSend={canSendCommunityMessage}
-            onChangeMarkdown={setDraft}
-            onSend={() => void handleSend()}
-            onPickMedia={() => void handlePickCommunityMedia()}
-            strips={
-              <>
-                {pendingReplyToMessageId ? (
-                  <ChatReplyStrip
-                    label={`Replying to ${pendingReplyTargetLabel ?? "a message"}`}
-                    onCancel={() => setPendingReplyToMessageId(null)}
-                  />
-                ) : null}
-                {pendingCommunityMedia ? (
-                  <ChatMediaAttachmentStrip
-                    fileName={pendingCommunityMedia.fileName}
-                    iconColor={composerColors.iconMuted}
-                    disabled={isSending}
-                    onRemove={() => setPendingCommunityMedia(null)}
-                  />
-                ) : null}
-              </>
+          renderItem={renderChatItem}
+          onEndReachedThreshold={0.3}
+          onEndReached={() => {
+            if (hasOlderMessages && !isLoadingOlderMessages) {
+              void requestOlderMessages();
             }
-          />
-        }
-      />
+          }}
+          ListEmptyComponent={listEmptyContent}
+          ListFooterComponent={
+            isLoadingOlderMessages ? (
+              <View className="py-2.5">
+                <ActivityIndicator color={composerColors.spinner} />
+              </View>
+            ) : null
+          }
+          composer={
+            <ChatComposer
+              inputRef={composerInputRef}
+              colors={composerColors}
+              isSending={isSending}
+              isPickingMedia={isPickingCommunityMedia}
+              canSend={canSendCommunityMessage}
+              onChangeMarkdown={setDraft}
+              onSend={() => void handleSend()}
+              onPickMedia={() => void handlePickCommunityMedia()}
+              strips={
+                <>
+                  {pendingReplyToMessageId ? (
+                    <ChatReplyStrip
+                      label={`Replying to ${pendingReplyTargetLabel ?? "a message"}`}
+                      onCancel={() => setPendingReplyToMessageId(null)}
+                    />
+                  ) : null}
+                  {pendingCommunityMedia ? (
+                    <ChatMediaAttachmentStrip
+                      fileName={pendingCommunityMedia.fileName}
+                      iconColor={composerColors.iconMuted}
+                      disabled={isSending}
+                      onRemove={() => setPendingCommunityMedia(null)}
+                    />
+                  ) : null}
+                </>
+              }
+            />
+          }
+        />
       </Animated.View>
     </View>
   );
