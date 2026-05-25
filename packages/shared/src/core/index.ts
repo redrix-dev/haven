@@ -35,6 +35,10 @@ export {
   getCachedChannelsForServer,
   resolvePreferredChannelIdForServer,
 } from "./communityChannelUtils";
+export {
+  resolveCommunityEntrypointTarget,
+  type CommunityEntrypointTarget,
+} from "./communityEntrypoint";
 export { toServerSummary, toServerSummaries, deriveCommunitiesLoadStatus } from "./communitySummaries";
 export type { CommunitiesLoadStatus } from "./communitySummaries";
 export {

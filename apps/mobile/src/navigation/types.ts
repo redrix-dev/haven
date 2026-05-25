@@ -1,13 +1,13 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
 
 export type MainStackParamList = {
-  Home: undefined;
-  Community: { serverId: string; openDrawer?: boolean };
+  CommunityEntry: undefined;
+  Community: { serverId: string | null; openDrawer?: boolean };
 };
 
 /** @deprecated Use MainStackParamList — kept for gradual migration. */
 export type MainTabParamList = {
-  Home: undefined;
+  CommunityEntry: undefined;
   Community: undefined;
 };
 

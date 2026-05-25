@@ -17,22 +17,39 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { setLastTextChannelIdForCommunity } from "@/storage/communityChannelPrefs";
 import { CommunityChatScreen } from "@/screens/main/CommunityChatScreen";
 import type { MainStackParamList } from "@/navigation/types";
 import { CommunityChannelDrawer } from "@/navigation/community/CommunityChannelDrawer";
 import { CommunityTopBar } from "@/navigation/community/CommunityTopBar";
 import { useDataCacheComponentProbe } from "@shared/debug";
+import { CommunityRail } from "./CommunityRail";
+import { CommunityActionSheets } from "./CommunityActionSheets";
+import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
+import { useAuthStore } from "@shared/stores/authStore";
 
-const DRAWER_WIDTH = Math.min(320, Dimensions.get("window").width * 0.86);
+const CHANNEL_DRAWER_WIDTH = Math.min(
+  320,
+  Dimensions.get("window").width * 0.86,
+);
+const RAIL_WIDTH = 72;
+const DRAWER_SURFACE_WIDTH = RAIL_WIDTH + CHANNEL_DRAWER_WIDTH;
 const DRAWER_TIMING = { duration: 220, easing: Easing.out(Easing.cubic) };
 const EDGE_WIDTH = 28;
 
 type Props = NativeStackScreenProps<MainStackParamList, "Community">;
+type CommunityShellProps = Props & {
+  onOpenProfile: () => void;
+};
 
-export function CommunityShell({ route, navigation }: Props) {
-  const { serverId, openDrawer: openDrawerOnEnter = false } = route.params;
+export function CommunityShell({
+  route,
+  navigation,
+  onOpenProfile,
+}: CommunityShellProps) {
+  const serverId = route.params?.serverId ?? null;
+  const openDrawerOnEnter = route.params?.openDrawer ?? !serverId;
   const core = useHavenCore();
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const setCurrentChannelId = useCallback(
     (id: string | null) => {
       core.channels.setActiveChannelId(id);
@@ -40,26 +57,35 @@ export function CommunityShell({ route, navigation }: Props) {
     [core],
   );
   const [drawerOpen, setDrawerOpen] = useState(openDrawerOnEnter);
-  const drawerOffset = useSharedValue(openDrawerOnEnter ? 0 : -DRAWER_WIDTH);
+  const drawerOffset = useSharedValue(
+    openDrawerOnEnter ? 0 : -DRAWER_SURFACE_WIDTH,
+  );
   const dragStartOffset = useSharedValue(0);
 
   useEffect(() => {
+    if (!serverId) {
+      core.communities.setActiveId(null);
+      core.channels.setActiveChannelId(null);
+      return;
+    }
     const activeCommunityId = core.communities.getActiveId();
     const activeChannelId = core.channels.getActiveChannelId();
     if (activeCommunityId === serverId && activeChannelId) return;
     applyCommunityFocus(core, serverId);
   }, [core, serverId]);
 
-  const nexusCommunities = core.communities.useCommunities();
+  const nexusCommunities = core.communities.useOrderedCommunities();
+  const communitiesLoading = core.communities.useIsLoading();
   const servers = useMemo(
     () => toServerSummaries(nexusCommunities),
     [nexusCommunities],
   );
   const currentChannelId = core.channels.useActiveChannelId();
-  const havenChannels = core.channels.useChannels(serverId);
+  const havenChannels = core.channels.useChannels(serverId ?? "__empty__");
   const channels = useMemo(() => havenChannels.map(toChannel), [havenChannels]);
 
   useEffect(() => {
+    if (!serverId) return;
     void core.channels.ensureLoaded(serverId).catch((error) => {
       console.warn("[CommunityShell] ensureLoaded failed", error);
     });
@@ -69,6 +95,7 @@ export function CommunityShell({ route, navigation }: Props) {
   }, [core, serverId]);
 
   useEffect(() => {
+    if (!serverId) return;
     if (channels.length === 0) return;
     const valid =
       currentChannelId != null &&
@@ -89,7 +116,7 @@ export function CommunityShell({ route, navigation }: Props) {
     [channels, currentChannelId],
   );
   const currentChannelBelongsToCurrentServer = Boolean(
-    currentChannel && currentChannel.community_id === serverId,
+    serverId && currentChannel && currentChannel.community_id === serverId,
   );
   const currentRenderableChannel = useMemo(
     () =>
@@ -105,7 +132,7 @@ export function CommunityShell({ route, navigation }: Props) {
   );
 
   const community = useMemo(
-    () => servers.find((s) => s.id === serverId) ?? null,
+    () => (serverId ? servers.find((s) => s.id === serverId) ?? null : null),
     [serverId, servers],
   );
 
@@ -119,34 +146,82 @@ export function CommunityShell({ route, navigation }: Props) {
 
   const setDrawerOpenAnimated = useCallback(
     (open: boolean) => {
+      if (!serverId && !open) return;
       setDrawerOpen(open);
-      drawerOffset.value = withTiming(open ? 0 : -DRAWER_WIDTH, DRAWER_TIMING);
+      void setLastCommunitySurface(open ? "drawer" : "chat");
+      drawerOffset.value = withTiming(
+        open ? 0 : -DRAWER_SURFACE_WIDTH,
+        DRAWER_TIMING,
+      );
     },
-    [drawerOffset],
+    [drawerOffset, serverId],
   );
 
   useEffect(() => {
-    if (openDrawerOnEnter) {
-      setDrawerOpen(true);
-      drawerOffset.value = 0;
+    const shouldOpen = openDrawerOnEnter || !serverId;
+    setDrawerOpen(shouldOpen);
+    void setLastCommunitySurface(shouldOpen ? "drawer" : "chat");
+    drawerOffset.value = withTiming(
+      shouldOpen ? 0 : -DRAWER_SURFACE_WIDTH,
+      DRAWER_TIMING,
+    );
+  }, [drawerOffset, openDrawerOnEnter, serverId]);
+
+  useEffect(() => {
+    if (!serverId || communitiesLoading) return;
+    if (servers.some((server) => server.id === serverId)) return;
+
+    const fallbackId = servers[0]?.id ?? null;
+    if (fallbackId) {
+      navigation.setParams({ serverId: fallbackId, openDrawer: true });
+      void core.prepareCommunityEntry(fallbackId).catch((error) => {
+        console.warn("[CommunityShell] prepare fallback failed", error);
+        applyCommunityFocus(core, fallbackId);
+      });
+    } else {
+      core.communities.setActiveId(null);
+      core.channels.setActiveChannelId(null);
+      navigation.setParams({ serverId: null, openDrawer: true });
     }
-  }, [drawerOffset, openDrawerOnEnter]);
+    setDrawerOpenAnimated(true);
+  }, [
+    communitiesLoading,
+    core,
+    navigation,
+    serverId,
+    servers,
+    setDrawerOpenAnimated,
+  ]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (drawerOpen) {
-        setDrawerOpenAnimated(false);
+        if (serverId) setDrawerOpenAnimated(false);
         return true;
       }
       return false;
     });
     return () => sub.remove();
-  }, [drawerOpen, setDrawerOpenAnimated]);
+  }, [drawerOpen, serverId, setDrawerOpenAnimated]);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const openCreateCommunity = useCallback(() => setCreateOpen(true), []);
+  const openJoinCommunity = useCallback(() => setJoinOpen(true), []);
+
+  const handleCommunityReady = useCallback(
+    (communityId: string) => {
+      navigation.setParams({ serverId: communityId, openDrawer: true });
+      setDrawerOpenAnimated(true);
+    },
+    [navigation, setDrawerOpenAnimated],
+  );
 
   const handleSelectChannel = useCallback(
     async (channel: Channel) => {
+      if (!serverId) return;
       setCurrentChannelId(channel.id);
-      await setLastTextChannelIdForCommunity(serverId, channel.id);
+      await setLastCommunitySurface("chat");
       setDrawerOpenAnimated(false);
     },
     [serverId, setCurrentChannelId, setDrawerOpenAnimated],
@@ -160,7 +235,29 @@ export function CommunityShell({ route, navigation }: Props) {
     [channels, handleSelectChannel],
   );
 
+  const handleSelectCommunity = useCallback(
+    (nextServerId: string) => {
+      if (nextServerId === serverId) {
+        setDrawerOpenAnimated(true);
+        return;
+      }
+
+      applyCommunityFocus(core, nextServerId);
+      navigation.setParams({
+        serverId: nextServerId,
+        openDrawer: true,
+      });
+      setDrawerOpenAnimated(true);
+      void core.prepareCommunityEntry(nextServerId).catch((error) => {
+        console.warn("[CommunityShell] prepare selected community failed", error);
+        applyCommunityFocus(core, nextServerId);
+      });
+    },
+    [core, navigation, serverId, setDrawerOpenAnimated],
+  );
+
   const panGesture = Gesture.Pan()
+    .enabled(Boolean(serverId))
     .activeOffsetX([-18, 18])
     .failOffsetY([-12, 12])
     .onStart(() => {
@@ -168,15 +265,16 @@ export function CommunityShell({ route, navigation }: Props) {
     })
     .onUpdate((event) => {
       const next = dragStartOffset.value + event.translationX;
-      drawerOffset.value = Math.min(0, Math.max(-DRAWER_WIDTH, next));
+      drawerOffset.value = Math.min(0, Math.max(-DRAWER_SURFACE_WIDTH, next));
     })
     .onEnd((event) => {
       const projected = drawerOffset.value + event.velocityX * 0.12;
-      const shouldOpen = projected > -DRAWER_WIDTH / 2;
+      const shouldOpen = projected > -DRAWER_SURFACE_WIDTH / 2;
       runOnJS(setDrawerOpenAnimated)(shouldOpen);
     });
 
   const edgeOpenGesture = Gesture.Pan()
+    .enabled(Boolean(serverId))
     .activeOffsetX([-8, 8])
     .failOffsetY([-12, 12])
     .onStart(() => {
@@ -185,11 +283,11 @@ export function CommunityShell({ route, navigation }: Props) {
     .onUpdate((event) => {
       if (event.translationX <= 0) return;
       const next = dragStartOffset.value + event.translationX;
-      drawerOffset.value = Math.min(0, Math.max(-DRAWER_WIDTH, next));
+      drawerOffset.value = Math.min(0, Math.max(-DRAWER_SURFACE_WIDTH, next));
     })
     .onEnd((event) => {
       const projected = drawerOffset.value + event.velocityX * 0.12;
-      const shouldOpen = projected > -DRAWER_WIDTH / 2;
+      const shouldOpen = projected > -DRAWER_SURFACE_WIDTH / 2;
       runOnJS(setDrawerOpenAnimated)(shouldOpen);
     });
 
@@ -198,24 +296,31 @@ export function CommunityShell({ route, navigation }: Props) {
   }));
 
   const scrimStyle = useAnimatedStyle(() => {
-    const progress = 1 + drawerOffset.value / DRAWER_WIDTH;
+    const progress = Math.max(
+      0,
+      Math.min(1, 1 + drawerOffset.value / DRAWER_SURFACE_WIDTH),
+    );
     return { opacity: progress * 0.45 };
   });
 
   const mainShiftStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: drawerOffset.value + DRAWER_WIDTH }],
+    transform: [{ translateX: drawerOffset.value + DRAWER_SURFACE_WIDTH }],
   }));
 
   return (
     <View className="flex-1 bg-background">
       <CommunityTopBar
-        communityName={community?.name ?? "Community"}
-        selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
+        communityName={community?.name ?? "Communities"}
+        selectedChannelName={
+          currentRenderableChannel?.name ??
+          (serverId ? "Select channel" : "Create or join")
+        }
         drawerOpen={drawerOpen}
         drawerOffset={drawerOffset}
+        drawerWidth={DRAWER_SURFACE_WIDTH}
         onPressCommunity={() => setDrawerOpenAnimated(true)}
         onPressChannel={() => setDrawerOpenAnimated(true)}
-        onPressBack={() => navigation.goBack()}
+        onPressDrawerToggle={() => setDrawerOpenAnimated(!drawerOpen)}
       />
 
       <View className="flex-1 overflow-hidden">
@@ -226,24 +331,41 @@ export function CommunityShell({ route, navigation }: Props) {
               left: 0,
               top: 0,
               bottom: 0,
-              width: DRAWER_WIDTH,
+              width: DRAWER_SURFACE_WIDTH,
               zIndex: 2,
+              flexDirection: "row",
             },
             drawerStyle,
           ]}
         >
-          <CommunityChannelDrawer
-            serverId={serverId}
-            communityName={community?.name ?? "Community"}
-            channels={channels}
-            selectedChannelId={currentRenderableChannel?.id ?? null}
-            onSelectTextChannel={handleSelectTextChannel}
+          <CommunityRail
+            communities={servers}
+            activeCommunityId={serverId}
+            onSelectCommunity={handleSelectCommunity}
+            onOpenProfile={onOpenProfile}
+            onCreateCommunity={openCreateCommunity}
+            onJoinCommunity={openJoinCommunity}
           />
+          <View style={{ width: CHANNEL_DRAWER_WIDTH }}>
+            <CommunityChannelDrawer
+              serverId={serverId}
+              communityName={community?.name ?? "Communities"}
+              channels={channels}
+              selectedChannelId={currentRenderableChannel?.id ?? null}
+              onSelectTextChannel={handleSelectTextChannel}
+              onCreateCommunity={openCreateCommunity}
+              onJoinCommunity={openJoinCommunity}
+            />
+          </View>
         </Animated.View>
 
         <GestureDetector gesture={panGesture}>
           <Animated.View className="flex-1" style={mainShiftStyle}>
-            <CommunityChatScreen serverId={serverId} />
+            {serverId ? (
+              <CommunityChatScreen serverId={serverId} />
+            ) : (
+              <View className="flex-1 bg-background" />
+            )}
 
             <Animated.View
               pointerEvents={drawerOpen ? "auto" : "none"}
@@ -254,7 +376,7 @@ export function CommunityShell({ route, navigation }: Props) {
                   right: 0,
                   top: 0,
                   bottom: 0,
-                  backgroundColor: "#000",
+                  backgroundColor: "rgba(0, 0, 0, 1)",
                 },
                 scrimStyle,
               ]}
@@ -267,7 +389,7 @@ export function CommunityShell({ route, navigation }: Props) {
           </Animated.View>
         </GestureDetector>
 
-        {!drawerOpen ? (
+        {!drawerOpen && serverId ? (
           <GestureDetector gesture={edgeOpenGesture}>
             <View
               style={{
@@ -282,6 +404,14 @@ export function CommunityShell({ route, navigation }: Props) {
           </GestureDetector>
         ) : null}
       </View>
+      <CommunityActionSheets
+        createOpen={createOpen}
+        joinOpen={joinOpen}
+        userId={userId}
+        onCloseCreate={() => setCreateOpen(false)}
+        onCloseJoin={() => setJoinOpen(false)}
+        onCommunityReady={handleCommunityReady}
+      />
     </View>
   );
 }

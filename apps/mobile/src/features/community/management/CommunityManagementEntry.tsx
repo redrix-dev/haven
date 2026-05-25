@@ -1,10 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Channel } from "@shared/lib/backend/types";
 import { useHavenCore } from "@shared/core";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { CommunityManagementSheet } from "./CommunityManagementSheet";
+import { ThemedIonicons } from "@/theme-rn";
 
 type Props = {
   serverId: string;
@@ -15,7 +20,6 @@ type Props = {
 export function CommunityManagementEntry({ serverId, communityName, channels }: Props) {
   const core = useHavenCore();
   const perms = core.permissions.usePermissions(serverId);
-  const [popOpen, setPopOpen] = useState(false);
   const [sheetTab, setSheetTab] = useState<"community" | "channels" | null>(null);
 
   const canManageAnything =
@@ -32,41 +36,55 @@ export function CommunityManagementEntry({ serverId, communityName, channels }: 
   return (
     <>
       <View className="border-t border-border-panel px-3 pb-2 pt-3">
-        <Popover open={popOpen} onOpenChange={setPopOpen}>
+        <Popover>
           <PopoverTrigger asChild>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Community management"
               className="flex-row items-center gap-2.5 rounded-xl px-3 py-2.5 active:bg-surface-hover"
             >
-              <Ionicons name="settings-outline" size={16} color="#6b7a90" />
+              <ThemedIonicons
+                name="settings-outline"
+                size={16}
+                colorClassName="accent-text-dim"
+              />
               <Text className="flex-1 text-sm font-medium text-muted-foreground">Management</Text>
-              <Ionicons name="chevron-up" size={14} color="#6b7a90" />
+              <ThemedIonicons
+                name="chevron-up"
+                size={14}
+                colorClassName="accent-text-dim"
+              />
             </Pressable>
           </PopoverTrigger>
 
           <PopoverContent side="top" align="start" className="w-52 p-1">
-            <Pressable
-              className="flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-surface-hover"
-              onPress={() => {
-                setPopOpen(false);
-                setSheetTab("community");
-              }}
-            >
-              <Ionicons name="business-outline" size={16} color="#a9b8cf" />
-              <Text className="text-sm text-foreground">Community settings</Text>
-            </Pressable>
+            <PopoverClose asChild>
+              <Pressable
+                className="flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-surface-hover"
+                onPress={() => setSheetTab("community")}
+              >
+                <ThemedIonicons
+                  name="business-outline"
+                  size={16}
+                  colorClassName="accent-muted-foreground"
+                />
+                <Text className="text-sm text-foreground">Community settings</Text>
+              </Pressable>
+            </PopoverClose>
 
-            <Pressable
-              className="flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-surface-hover"
-              onPress={() => {
-                setPopOpen(false);
-                setSheetTab("channels");
-              }}
-            >
-              <Ionicons name="list-outline" size={16} color="#a9b8cf" />
-              <Text className="text-sm text-foreground">Channel settings</Text>
-            </Pressable>
+            <PopoverClose asChild>
+              <Pressable
+                className="flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-surface-hover"
+                onPress={() => setSheetTab("channels")}
+              >
+                <ThemedIonicons
+                  name="list-outline"
+                  size={16}
+                  colorClassName="accent-muted-foreground"
+                />
+                <Text className="text-sm text-foreground">Channel settings</Text>
+              </Pressable>
+            </PopoverClose>
           </PopoverContent>
         </Popover>
       </View>

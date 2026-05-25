@@ -1,14 +1,16 @@
-import { Ionicons } from "@expo/vector-icons";
 import type { Channel } from "@shared/lib/backend/types";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { CommunityManagementEntry } from "@/features/community/management/CommunityManagementEntry";
+import { ThemedIonicons } from "@/theme-rn";
 
 type CommunityChannelDrawerProps = {
-  serverId: string;
+  serverId: string | null;
   communityName: string;
   channels: Channel[];
   selectedChannelId: string | null;
   onSelectTextChannel: (channelId: string) => void;
+  onCreateCommunity: () => void;
+  onJoinCommunity: () => void;
 };
 
 export function CommunityChannelDrawer({
@@ -17,8 +19,46 @@ export function CommunityChannelDrawer({
   channels,
   selectedChannelId,
   onSelectTextChannel,
+  onCreateCommunity,
+  onJoinCommunity,
 }: CommunityChannelDrawerProps) {
   const initial = communityName.trim().charAt(0).toUpperCase() || "?";
+
+  if (!serverId) {
+    return (
+      <View className="flex-1 border-r border-border-panel bg-surface-modal">
+        <View className="border-b border-border-panel px-4 pb-4 pt-4">
+          <Text className="text-base font-semibold text-foreground">Communities</Text>
+        </View>
+        <View className="flex-1 justify-center px-5">
+          <Text className="text-xl font-bold text-foreground">Start with a community</Text>
+          <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+            Create your own server or join one with an invite to see channels here.
+          </Text>
+          <View className="mt-5 gap-3">
+            <Pressable
+              accessibilityRole="button"
+              onPress={onCreateCommunity}
+              className="rounded-xl bg-primary px-4 py-3 active:bg-primary-hover"
+            >
+              <Text className="text-center font-semibold text-primary-foreground">
+                Create community
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onJoinCommunity}
+              className="rounded-xl border border-border-control bg-surface-panel px-4 py-3 active:bg-surface-hover"
+            >
+              <Text className="text-center font-semibold text-foreground">
+                Join community
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 border-r border-border-panel bg-surface-modal">
@@ -64,10 +104,10 @@ export function CommunityChannelDrawer({
                   onSelectTextChannel(channel.id);
                 }}
               >
-                <Ionicons
+                <ThemedIonicons
                   name={isVoice ? "volume-medium-outline" : "chatbox-outline"}
                   size={16}
-                  color={active ? "#e6edf7" : "#6b7a90"}
+                  colorClassName={active ? "accent-foreground" : "accent-text-dim"}
                 />
                 <Text
                   className={`flex-1 text-sm font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}
@@ -75,7 +115,13 @@ export function CommunityChannelDrawer({
                 >
                   {channel.name}
                 </Text>
-                {active ? <Ionicons name="checkmark" size={15} color="#e6edf7" /> : null}
+                {active ? (
+                  <ThemedIonicons
+                    name="checkmark"
+                    size={15}
+                    colorClassName="accent-foreground"
+                  />
+                ) : null}
               </Pressable>
             );
           })

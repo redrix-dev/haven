@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
-import { HomeScreen } from "@/screens/main/HomeScreen";
+import { CommunityEntry } from "@/navigation/community/CommunityEntry";
 import { CommunityShell } from "@/navigation/community/CommunityShell";
 import type { MainStackParamList, RootStackParamList } from "@/navigation/types";
 import { NAV_THEME } from "@/lib/theme";
@@ -33,6 +33,8 @@ import type { FriendsPanelTab } from "@shared/types/types";
 import type { NotificationAudioSettings } from "@shared/types/settings";
 import { useMobilePushNotificationRouting } from "@/hooks/useMobilePushNotificationRouting";
 import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
+import { resolveColorProp } from "@shared/themes";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -43,7 +45,11 @@ const mainStackScreenBackground = NAV_THEME.dark.colors.background;
  * events (notification taps, deep links, access-revoked redirects) can move
  * the user without a navigation ref reaching into shared code.
  */
-function MainNavigationDelegateBridge() {
+function MainNavigationDelegateBridge({
+  onNavigateToDm,
+}: {
+  onNavigateToDm: (conversationId: string) => void;
+}) {
   const navigation =
     useNavigation<NavigationProp<RootStackParamList>>();
 
@@ -63,13 +69,12 @@ function MainNavigationDelegateBridge() {
           params: { serverId },
         });
       },
-      navigateToDm: (_conversationId) => {
-        // DM workspace is Phase 4 — for now route to Home where DMs live.
-        navigation.navigate("Main", { screen: "Home" });
+      navigateToDm: (conversationId) => {
+        onNavigateToDm(conversationId);
       },
     });
     return () => setMobileNavigationDelegate(null);
-  }, [navigation]);
+  }, [navigation, onNavigateToDm]);
 
   return null;
 }
@@ -150,6 +155,14 @@ function MainNavigationShell({ userId }: { userId: string }) {
     setWorkspaceMode("dm");
     setIsDirectMessagesModalOpen(true);
   }, [setWorkspaceMode]);
+  const handleOpenDirectMessageConversation = useCallback(
+    (conversationId: string) => {
+      setWorkspaceMode("dm");
+      setIsDirectMessagesModalOpen(true);
+      void dm.openConversation(conversationId, { markRead: true });
+    },
+    [dm, setWorkspaceMode],
+  );
   const handleCloseDirectMessages = useCallback(() => {
     setIsDirectMessagesModalOpen(false);
     setWorkspaceMode("community");
@@ -184,9 +197,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
   useEffect(() => {
     useMobilePushNavigationStore.getState().setHandlers({
       openDm: (conversationId) => {
-        setWorkspaceMode("dm");
-        setIsDirectMessagesModalOpen(true);
-        void dm.openConversation(conversationId, { markRead: true });
+        handleOpenDirectMessageConversation(conversationId);
       },
       openFriends: (input) => {
         handleOpenFriendsFromNotification(input);
@@ -215,6 +226,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
   }, [
     core,
     dm,
+    handleOpenDirectMessageConversation,
     handleOpenFriendsFromNotification,
     navigation,
     setWorkspaceMode,
@@ -222,25 +234,32 @@ function MainNavigationShell({ userId }: { userId: string }) {
 
   return (
     <>
-      <MainNavigationDelegateBridge />
+      <MainNavigationDelegateBridge
+        onNavigateToDm={handleOpenDirectMessageConversation}
+      />
       <View className="flex-1">
         <Stack.Navigator
+          initialRouteName="CommunityEntry"
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: mainStackScreenBackground },
           }}
         >
-          <Stack.Screen name="Home">
-            {() => <HomeScreen onOpenSettings={handleOpenSettings} />}
-          </Stack.Screen>
+          <Stack.Screen name="CommunityEntry" component={CommunityEntry} />
           <Stack.Screen
             name="Community"
-            component={CommunityShell}
             options={{
               animation: "slide_from_right",
               gestureEnabled: true,
             }}
-          />
+          >
+            {(props) => (
+              <CommunityShell
+                {...props}
+                onOpenProfile={handleOpenSettings}
+              />
+            )}
+          </Stack.Screen>
         </Stack.Navigator>
         <SideRail
           onOpenNotifications={handleOpenNotifications}
@@ -308,12 +327,14 @@ function MainNavigationShell({ userId }: { userId: string }) {
 
 export function MainNavigator() {
   const userId = useAuthStore((s) => s.user?.id ?? null);
+  const themeTokens = useMobileThemeTokens();
+  const spinnerFg = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   useHydrateMobileThemeFromProfile(userId);
 
   if (!userId) {
     return (
       <View className="flex-1 items-center justify-center bg-surface-app">
-        <ActivityIndicator color="#e6edf7" size="large" />
+        <ActivityIndicator color={spinnerFg} size="large" />
       </View>
     );
   }

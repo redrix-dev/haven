@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Dimensions, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
@@ -7,9 +6,9 @@ import Animated, {
   useAnimatedStyle,
 } from "react-native-reanimated";
 import type { SharedValue } from "react-native-reanimated";
+import { ThemedIonicons } from "@/theme-rn";
 
-// Must match DRAWER_WIDTH in CommunityShell.
-const DRAWER_WIDTH = Math.min(320, Dimensions.get("window").width * 0.86);
+const FALLBACK_DRAWER_WIDTH = Math.min(320, Dimensions.get("window").width * 0.86);
 const HEADER_ROW_HEIGHT = 44;
 
 type CommunityTopBarProps = {
@@ -17,9 +16,10 @@ type CommunityTopBarProps = {
   selectedChannelName: string;
   drawerOpen: boolean;
   drawerOffset: SharedValue<number>;
+  drawerWidth?: number;
   onPressCommunity: () => void;
   onPressChannel: () => void;
-  onPressBack: () => void;
+  onPressDrawerToggle: () => void;
 };
 
 export function CommunityTopBar({
@@ -27,9 +27,10 @@ export function CommunityTopBar({
   selectedChannelName,
   drawerOpen,
   drawerOffset,
+  drawerWidth = FALLBACK_DRAWER_WIDTH,
   onPressCommunity,
   onPressChannel,
-  onPressBack,
+  onPressDrawerToggle,
 }: CommunityTopBarProps) {
   const insets = useSafeAreaInsets();
 
@@ -38,13 +39,13 @@ export function CommunityTopBar({
     "worklet";
     const opacity = interpolate(
       drawerOffset.value,
-      [-DRAWER_WIDTH, -DRAWER_WIDTH * 0.4],
+      [-drawerWidth, -drawerWidth * 0.4],
       [1, 0],
       Extrapolation.CLAMP,
     );
     const translateY = interpolate(
       drawerOffset.value,
-      [-DRAWER_WIDTH, -DRAWER_WIDTH * 0.4],
+      [-drawerWidth, -drawerWidth * 0.4],
       [0, 14],
       Extrapolation.CLAMP,
     );
@@ -56,13 +57,13 @@ export function CommunityTopBar({
     "worklet";
     const opacity = interpolate(
       drawerOffset.value,
-      [-DRAWER_WIDTH * 0.6, 0],
+      [-drawerWidth * 0.6, 0],
       [0, 1],
       Extrapolation.CLAMP,
     );
     const translateY = interpolate(
       drawerOffset.value,
-      [-DRAWER_WIDTH * 0.6, 0],
+      [-drawerWidth * 0.6, 0],
       [-14, 0],
       Extrapolation.CLAMP,
     );
@@ -117,11 +118,15 @@ export function CommunityTopBar({
             >
               {selectedChannelName}
             </Text>
-            <Ionicons name="chevron-down" size={16} color="#a9b8cf" />
+            <ThemedIonicons
+              name="chevron-down"
+              size={16}
+              colorClassName="accent-muted-foreground"
+            />
           </Pressable>
         </Animated.View>
 
-        {/* Open state — back affordance left, room for future right action */}
+        {/* Open state — drawer toggle left, room for future right action */}
         <Animated.View
           pointerEvents={drawerOpen ? "auto" : "none"}
           style={[
@@ -140,12 +145,16 @@ export function CommunityTopBar({
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Back to all communities"
+            accessibilityLabel="Close community drawer"
             className="flex-row items-center gap-1 rounded-lg px-2 py-2 active:bg-surface-hover"
-            onPress={onPressBack}
+            onPress={onPressDrawerToggle}
           >
-            <Ionicons name="chevron-back" size={18} color="#a9b8cf" />
-            <Text className="text-sm font-medium text-muted-foreground">Communities</Text>
+            <ThemedIonicons
+              name="chevron-back"
+              size={18}
+              colorClassName="accent-muted-foreground"
+            />
+            <Text className="text-sm font-medium text-muted-foreground">Close</Text>
           </Pressable>
         </Animated.View>
       </View>
