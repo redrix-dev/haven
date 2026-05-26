@@ -1,4 +1,5 @@
 import * as Linking from "expo-linking";
+import { createMMKV, type MMKV } from "react-native-mmkv";
 import { setAppHost, type AppHost } from "@shared/infrastructure/platform/appHost";
 
 /**
@@ -12,6 +13,14 @@ export type MobileNavigationDelegate = {
 };
 
 let activeNavigationDelegate: MobileNavigationDelegate | null = null;
+let runtimeStorage: MMKV | null = null;
+
+function getRuntimeStorage(): MMKV {
+  if (!runtimeStorage) {
+    runtimeStorage = createMMKV({ id: "haven-mobile-runtime-storage" });
+  }
+  return runtimeStorage;
+}
 
 export function setMobileNavigationDelegate(
   delegate: MobileNavigationDelegate | null,
@@ -35,9 +44,9 @@ export function registerMobileAppHost(): void {
       getLocationOrigin: () => null,
       replaceHistoryUrl: () => {},
       getDocumentTitle: () => "",
-      storageGetItem: () => null,
-      storageSetItem: () => {},
-      storageRemoveItem: () => {},
+      storageGetItem: (key) => getRuntimeStorage().getString(key) ?? null,
+      storageSetItem: (key, value) => getRuntimeStorage().set(key, value),
+      storageRemoveItem: (key) => getRuntimeStorage().remove(key),
     },
     openExternalUrl: async (url: string) => {
       try {

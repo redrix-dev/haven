@@ -1,8 +1,8 @@
 import { useNavigation } from "@react-navigation/native";
 import type { NavigationProp } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, View } from "react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
 import { CommunityEntry } from "@/navigation/community/CommunityEntry";
 import { CommunityShell } from "@/navigation/community/CommunityShell";
@@ -16,6 +16,8 @@ import {
   resetNotificationSoundSyncState,
   syncFocusFromRoute,
   syncNotificationSounds,
+  toChannel,
+  toServerSummaries,
   useHavenCore,
 } from "@shared/core";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
@@ -25,16 +27,28 @@ import { DirectMessagesContainer } from "@/features/direct-messages/DirectMessag
 import { FriendsModalContainer } from "@/features/friends/FriendsModalContainer";
 import NotificationsContainer from "@/features/notifications/NotificationsContainer";
 import UserSettingsContainer from "@/features/user-profile/UserSettingsContainer";
-import { SideRail } from "@/navigation/shell/SideRail";
 import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
 import { useUiStore } from "@shared/stores/uiStore";
 import { useAuthStore } from "@shared/stores/authStore";
 import type { FriendsPanelTab } from "@shared/types/types";
 import type { NotificationAudioSettings } from "@shared/types/settings";
+import { useVoice } from "@shared/features/voice/hooks/useVoice";
+import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useMobilePushNotificationRouting } from "@/hooks/useMobilePushNotificationRouting";
 import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { resolveColorProp } from "@shared/themes";
+import { countFilteredUnreadInInbox } from "@shared/features/notifications/inboxNotificationFilter";
+import { VoiceJoinPromptSheet } from "@/features/voice/VoiceJoinPromptSheet";
+import { VoiceReturnPill } from "@/features/voice/VoiceReturnPill";
+import { VoiceSessionSheet } from "@/features/voice/VoiceSessionSheet";
+import {
+  loadSkipVoiceSwitchPrompt,
+  saveSkipVoiceSwitchPrompt,
+  useMobileVoiceSettings,
+} from "@/features/voice/mobileVoicePreferences";
+import { addVoiceNotificationOpenListener } from "@/features/voice/mobileVoiceForegroundService";
+import { useMobileLiveKitVoiceSession } from "@/features/voice/useMobileLiveKitVoiceSession";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -120,8 +134,233 @@ function MainNavigationShell({ userId }: { userId: string }) {
     useNavigation<NavigationProp<RootStackParamList>>();
   const core = useHavenCore();
   const dm = core.directMessages;
+  const authUser = useAuthStore((s) => s.user);
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
+  const notificationItems = core.notifications.useNotifications();
+  const dmConversations = dm.useConversations();
+  const currentServerId = core.communities.useActiveId();
+  const currentChannelId = core.channels.useActiveChannelId();
+  const activeCommunityChannels = core.channels.useChannels(currentServerId ?? "__none__");
+  const channels = useMemo(
+    () => activeCommunityChannels.map(toChannel),
+    [activeCommunityChannels],
+  );
+  const setCurrentChannelId = useCallback(
+    (id: string | null) => {
+      core.channels.setActiveChannelId(id);
+    },
+    [core],
+  );
+  const viewerProfile = core.profiles.useViewerProfile(userId);
+  const liveProfiles = core.profiles.useProfilesRecord();
+  const orderedCommunities = core.communities.useOrderedCommunities();
+  const servers = useMemo(
+    () => toServerSummaries(orderedCommunities),
+    [orderedCommunities],
+  );
   useMobilePushNotificationRouting();
+
+  useEffect(() => {
+    void core.profiles.loadViewerProfile(userId).catch(() => {
+      // The auth email fallback keeps voice usable if profile hydration fails.
+    });
+  }, [core.profiles, userId]);
+
+  const currentUserIdentity = useMemo(() => {
+    const email = authUser?.email ?? null;
+    const fallbackName =
+      viewerProfile?.username ?? email?.split("@")[0]?.trim() ?? "User";
+    const displayName =
+      resolveLiveUsername(liveProfiles, userId, fallbackName) ?? fallbackName;
+    const avatarUrl =
+      resolveLiveAvatarUrl(liveProfiles, userId, viewerProfile?.avatarUrl ?? null) ??
+      viewerProfile?.avatarUrl ??
+      null;
+
+    return {
+      id: userId,
+      displayName,
+      avatarUrl,
+    };
+  }, [authUser?.email, liveProfiles, userId, viewerProfile]);
+
+  const notificationsUnreadCount = useMemo(
+    () => countFilteredUnreadInInbox(notificationItems),
+    [notificationItems],
+  );
+  const dmUnreadCount = useMemo(
+    () =>
+      dmConversations.reduce(
+        (total, conversation) => total + conversation.unreadCount,
+        0,
+      ),
+    [dmConversations],
+  );
+
+  const mobileVoiceSettings = useMobileVoiceSettings();
+  const voice = useVoice({
+    currentServerId,
+    currentUserId: userId,
+    currentUserDisplayName: currentUserIdentity.displayName,
+    currentUserAvatarUrl: currentUserIdentity.avatarUrl,
+    currentChannelId,
+    setCurrentChannelId,
+    voiceHardwareDebugPanelEnabled: false,
+    channels,
+  });
+  const voiceState = voice.state;
+  const voiceDerived = voice.derived;
+  const {
+    cancelVoiceChannelJoinPrompt,
+    confirmVoiceChannelJoin,
+    disconnectVoiceSession,
+    forceDisconnectVoice,
+    requestVoiceChannelJoin,
+    setVoiceControlActions,
+  } = voice.actions;
+  const [voiceSheetOpen, setVoiceSheetOpen] = useState(false);
+  const [interruptionNoticeVisible, setInterruptionNoticeVisible] = useState(false);
+  const [skipVoiceSwitchPrompt, setSkipVoiceSwitchPrompt] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadSkipVoiceSwitchPrompt().then((skip) => {
+      if (!cancelled) setSkipVoiceSwitchPrompt(skip);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSkipVoiceSwitchPromptChange = useCallback((skip: boolean) => {
+    setSkipVoiceSwitchPrompt(skip);
+    void saveSkipVoiceSwitchPrompt(skip);
+  }, []);
+
+  const openVoiceSheet = useCallback(() => {
+    setVoiceSheetOpen(true);
+  }, []);
+
+  useEffect(
+    () => addVoiceNotificationOpenListener(openVoiceSheet),
+    [openVoiceSheet],
+  );
+
+  const activeVoiceControllerChannel = useMemo(() => {
+    const activeVoiceChannel = voiceDerived.activeVoiceChannel;
+    if (!activeVoiceChannel) return null;
+    return {
+      communityId: activeVoiceChannel.community_id,
+      channelId: activeVoiceChannel.id,
+      channelName: activeVoiceChannel.name,
+    };
+  }, [voiceDerived.activeVoiceChannel]);
+
+  const handleVoiceSessionError = useCallback(
+    (message: string) => {
+      Alert.alert("Voice connection failed", message);
+      void disconnectVoiceSession({ triggerPaneLeave: false })
+        .catch((error: unknown) => {
+          console.warn("[voice] Failed to reset after session error.", error);
+        });
+    },
+    [disconnectVoiceSession],
+  );
+
+  const handleVoiceKick = useCallback(() => {
+    void forceDisconnectVoice("kicked")
+      .then(() => {
+        Alert.alert("Removed from voice", "You were removed from the voice channel.");
+      })
+      .catch((error: unknown) => {
+        console.warn("[voice] Failed to disconnect after kick.", error);
+      });
+  }, [forceDisconnectVoice]);
+
+  const handleVoiceInterrupted = useCallback(() => {
+    setInterruptionNoticeVisible(true);
+  }, []);
+
+  const voiceController = useMobileLiveKitVoiceSession({
+    activeChannel: activeVoiceControllerChannel,
+    currentUserId: userId,
+    currentUserDisplayName: currentUserIdentity.displayName,
+    currentUserAvatarUrl: currentUserIdentity.avatarUrl,
+    voiceSettings: mobileVoiceSettings.settings,
+    onUpdateVoiceSettings: mobileVoiceSettings.updateVoiceSettingsPatch,
+    onSessionError: handleVoiceSessionError,
+    onVoiceKick: handleVoiceKick,
+    onInterrupted: handleVoiceInterrupted,
+  });
+
+  const {
+    joinVoiceChannel,
+    leaveVoiceChannel,
+    toggleMute,
+    toggleDeafen,
+  } = voiceController.actions;
+
+  useEffect(() => {
+    setVoiceControlActions({
+      join: () => {
+        void joinVoiceChannel();
+      },
+      leave: () => {
+        void leaveVoiceChannel();
+      },
+      toggleMute,
+      toggleDeafen,
+    });
+    return () => setVoiceControlActions(null);
+  }, [
+    joinVoiceChannel,
+    leaveVoiceChannel,
+    setVoiceControlActions,
+    toggleDeafen,
+    toggleMute,
+  ]);
+
+  useEffect(() => {
+    const prompt = voiceState.voiceJoinPrompt;
+    if (prompt?.mode !== "switch" || !skipVoiceSwitchPrompt) return;
+    void confirmVoiceChannelJoin().then(openVoiceSheet);
+  }, [
+    confirmVoiceChannelJoin,
+    openVoiceSheet,
+    skipVoiceSwitchPrompt,
+    voiceState.voiceJoinPrompt,
+  ]);
+
+  const handleConfirmVoiceJoin = useCallback(() => {
+    void confirmVoiceChannelJoin().then(openVoiceSheet);
+  }, [confirmVoiceChannelJoin, openVoiceSheet]);
+
+  const handleSelectVoiceChannel = useCallback(
+    (channelId: string) => {
+      if (channelId === voiceState.activeVoiceChannelId) {
+        if (!voiceController.state.joined && !voiceController.state.joining) {
+          void voiceController.actions.joinVoiceChannel();
+        }
+        openVoiceSheet();
+        return;
+      }
+      requestVoiceChannelJoin(channelId);
+    },
+    [
+      openVoiceSheet,
+      requestVoiceChannelJoin,
+      voiceState.activeVoiceChannelId,
+      voiceController.actions,
+      voiceController.state.joined,
+      voiceController.state.joining,
+    ],
+  );
+
+  const activeVoiceCommunityName = useMemo(() => {
+    const communityId = voiceDerived.activeVoiceChannel?.community_id;
+    if (!communityId) return null;
+    return servers.find((server) => server.id === communityId)?.name ?? null;
+  }, [servers, voiceDerived.activeVoiceChannel]);
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const handleOpenSettings = useCallback(() => {
@@ -257,16 +496,21 @@ function MainNavigationShell({ userId }: { userId: string }) {
               <CommunityShell
                 {...props}
                 onOpenProfile={handleOpenSettings}
+                onOpenNotifications={handleOpenNotifications}
+                onOpenInbox={handleOpenDirectMessages}
+                notificationsUnreadCount={notificationsUnreadCount}
+                inboxUnreadCount={dmUnreadCount}
+                activeVoiceChannelId={voiceState.activeVoiceChannelId}
+                voiceChannelParticipants={voiceDerived.voiceChannelParticipants}
+                onSelectVoiceChannel={handleSelectVoiceChannel}
+                onOpenVoiceSession={openVoiceSheet}
               />
             )}
           </Stack.Screen>
         </Stack.Navigator>
-        <SideRail
-          onOpenNotifications={handleOpenNotifications}
-          onOpenInbox={handleOpenDirectMessages}
-          onOpenProfile={handleOpenSettings}
-          onOpenSettings={handleOpenSettings}
-        />
+        {!voiceSheetOpen ? (
+          <VoiceReturnPill state={voiceController.state} onPress={openVoiceSheet} />
+        ) : null}
       </View>
 
       <HavenFormSheet
@@ -320,6 +564,46 @@ function MainNavigationShell({ userId }: { userId: string }) {
           highlightedRequestId={friendsHighlightedRequestId}
           onStartDirectMessage={handleStartDmFromFriend}
         />
+      </HavenListSheet>
+      <VoiceJoinPromptSheet
+        prompt={voiceState.voiceJoinPrompt}
+        currentChannelName={voiceDerived.activeVoiceChannel?.name ?? null}
+        skipSwitchPrompt={skipVoiceSwitchPrompt}
+        onSkipSwitchPromptChange={handleSkipVoiceSwitchPromptChange}
+        onCancel={cancelVoiceChannelJoinPrompt}
+        onConfirm={handleConfirmVoiceJoin}
+      />
+      <VoiceSessionSheet
+        visible={voiceSheetOpen}
+        communityName={activeVoiceCommunityName}
+        currentUser={currentUserIdentity}
+        voiceSettings={mobileVoiceSettings.settings}
+        state={voiceController.state}
+        actions={voiceController.actions}
+        onDismiss={() => setVoiceSheetOpen(false)}
+      />
+      <HavenListSheet
+        visible={interruptionNoticeVisible}
+        onDismiss={() => setInterruptionNoticeVisible(false)}
+        title="Voice paused"
+      >
+        <View className="gap-4">
+          <Text className="text-sm leading-5 text-muted-foreground">
+            We kept you connected to your friends but muted and deafened the voice session. You can unmute and undeafen whenever you're ready to be back in the conversation.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            className="rounded-lg bg-primary px-4 py-3 active:bg-primary-hover"
+            onPress={() => {
+              setInterruptionNoticeVisible(false);
+              setVoiceSheetOpen(true);
+            }}
+          >
+            <Text className="text-center font-semibold text-primary-foreground">
+              Return to voice
+            </Text>
+          </Pressable>
+        </View>
       </HavenListSheet>
     </>
   );

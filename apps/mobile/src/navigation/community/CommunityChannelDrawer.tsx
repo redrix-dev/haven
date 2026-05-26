@@ -1,5 +1,7 @@
 import type { Channel } from "@shared/lib/backend/types";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import type { VoiceSidebarParticipant } from "@shared/types/types";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CommunityManagementEntry } from "@/features/community/management/CommunityManagementEntry";
 import { ThemedIonicons } from "@/theme-rn";
 
@@ -8,7 +10,11 @@ type CommunityChannelDrawerProps = {
   communityName: string;
   channels: Channel[];
   selectedChannelId: string | null;
+  activeVoiceChannelId: string | null;
+  voiceChannelParticipants: Record<string, VoiceSidebarParticipant[]>;
   onSelectTextChannel: (channelId: string) => void;
+  onSelectVoiceChannel: (channelId: string) => void;
+  onOpenVoiceSession: () => void;
   onCreateCommunity: () => void;
   onJoinCommunity: () => void;
 };
@@ -18,16 +24,24 @@ export function CommunityChannelDrawer({
   communityName,
   channels,
   selectedChannelId,
+  activeVoiceChannelId,
+  voiceChannelParticipants,
   onSelectTextChannel,
+  onSelectVoiceChannel,
+  onOpenVoiceSession,
   onCreateCommunity,
   onJoinCommunity,
 }: CommunityChannelDrawerProps) {
+  const insets = useSafeAreaInsets();
   const initial = communityName.trim().charAt(0).toUpperCase() || "?";
 
   if (!serverId) {
     return (
       <View className="flex-1 border-r border-border-panel bg-surface-modal">
-        <View className="border-b border-border-panel px-4 pb-4 pt-4">
+        <View
+          className="border-b border-border-panel px-4 pb-4"
+          style={{ paddingTop: insets.top + 16 }}
+        >
           <Text className="text-base font-semibold text-foreground">Communities</Text>
         </View>
         <View className="flex-1 justify-center px-5">
@@ -62,8 +76,10 @@ export function CommunityChannelDrawer({
 
   return (
     <View className="flex-1 border-r border-border-panel bg-surface-modal">
-      {/* Community identity header — no safe-area padding; the persistent top bar above owns that */}
-      <View className="border-b border-border-panel px-4 pb-4 pt-4">
+      <View
+        className="border-b border-border-panel px-4 pb-4"
+        style={{ paddingTop: insets.top + 16 }}
+      >
         <View className="flex-row items-center gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-2xl bg-surface-panel">
             <Text className="text-base font-bold text-foreground">{initial}</Text>
@@ -83,8 +99,11 @@ export function CommunityChannelDrawer({
           <Text className="py-4 text-sm text-muted-foreground">No channels yet.</Text>
         ) : (
           channels.map((channel) => {
-            const active = selectedChannelId === channel.id;
             const isVoice = channel.kind === "voice";
+            const active = isVoice
+              ? activeVoiceChannelId === channel.id
+              : selectedChannelId === channel.id;
+            const participantCount = voiceChannelParticipants[channel.id]?.length ?? 0;
             return (
               <Pressable
                 key={channel.id}
@@ -94,11 +113,11 @@ export function CommunityChannelDrawer({
                 }`}
                 onPress={() => {
                   if (isVoice) {
-                    Alert.alert(
-                      "Voice on mobile",
-                      "We're not there yet, but soon enough you'll be voice chatting on mobile! We appreciate your patience.",
-                      [{ text: "OK" }],
-                    );
+                    if (activeVoiceChannelId === channel.id) {
+                      onOpenVoiceSession();
+                    } else {
+                      onSelectVoiceChannel(channel.id);
+                    }
                     return;
                   }
                   onSelectTextChannel(channel.id);
@@ -115,6 +134,11 @@ export function CommunityChannelDrawer({
                 >
                   {channel.name}
                 </Text>
+                {isVoice && participantCount > 0 ? (
+                  <Text className="text-xs font-semibold text-muted-foreground">
+                    {participantCount}
+                  </Text>
+                ) : null}
                 {active ? (
                   <ThemedIonicons
                     name="checkmark"

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { DataCacheDebugModal } from "@/debug/DataCacheDebugModal";
-import { MobileDevSideRailMenu } from "@/dev/MobileDevSideRailMenu";
 import { MobileDevThemeMenu } from "@/dev/MobileDevThemeMenu";
 
 /**
@@ -17,16 +16,15 @@ export function MobileDevToolsOverlay() {
       <View className="absolute bottom-24 right-5">
         <Pressable
           onPress={() => setDataDebugOpen(true)}
-          className="rounded-full bg-amber-600 px-4 py-3"
+          className="rounded-full bg-primary px-4 py-3 active:bg-primary-hover"
           accessibilityRole="button"
           accessibilityLabel="Data cache debug"
         >
-          <Text className="text-sm font-semibold text-white">Data</Text>
+          <Text className="text-sm font-semibold text-primary-foreground">Data</Text>
         </Pressable>
       </View>
 
       <MobileDevThemeMenu />
-      <MobileDevSideRailMenu />
 
       <DataCacheDebugModal visible={dataDebugOpen} onClose={() => setDataDebugOpen(false)} />
     </>

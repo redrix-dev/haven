@@ -2,6 +2,7 @@ import "react-native-gesture-handler";
 import { PortalHost } from "@rn-primitives/portal";
 import "./global.css";
 
+import { registerGlobals } from "@livekit/react-native";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -23,6 +24,7 @@ import { bootstrapDataCacheDebug } from "./src/debug/bootstrapDataCacheDebug";
 import { MobileDevToolsOverlay } from "./src/dev/MobileDevToolsOverlay";
 
 registerMobileAppHost();
+registerGlobals();
 bootstrapDataCacheDebug();
 
 const mobileClient = getMobileSupabase();

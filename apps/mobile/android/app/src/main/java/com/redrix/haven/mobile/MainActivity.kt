@@ -1,12 +1,15 @@
 package com.redrix.haven.mobile
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.facebook.react.modules.core.DeviceEventManagerModule
 
 import expo.modules.ReactActivityDelegateWrapper
 
@@ -17,6 +20,17 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+  }
+
+  override fun onStart() {
+    super.onStart()
+    emitForegroundNotificationPress(intent)
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    emitForegroundNotificationPress(intent)
   }
 
   /**
@@ -57,5 +71,23 @@ class MainActivity : ReactActivity() {
       // Use the default back button implementation on Android S
       // because it's doing more than [Activity.moveTaskToBack] in fact.
       super.invokeDefaultOnBackPressed()
+  }
+
+  private fun emitForegroundNotificationPress(intent: Intent?) {
+    val mainAction = intent?.getStringExtra("mainOnPress")
+    val buttonAction = intent?.getStringExtra("buttonOnPress")
+    val secondButtonAction = intent?.getStringExtra("button2OnPress")
+    if (mainAction == null && buttonAction == null && secondButtonAction == null) {
+      return
+    }
+
+    val reactContext = reactInstanceManager.currentReactContext ?: return
+    val payload = Arguments.createMap()
+    mainAction?.let { payload.putString("main", it) }
+    buttonAction?.let { payload.putString("button", it) }
+    secondButtonAction?.let { payload.putString("button2", it) }
+    reactContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      .emit("notificationClickHandle", payload)
   }
 }

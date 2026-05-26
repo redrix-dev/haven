@@ -1,6 +1,6 @@
-import { Ionicons } from "@expo/vector-icons";
 import type { Channel } from "@shared/lib/backend/types";
-import { Alert, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { ThemedIonicons } from "@/theme-rn";
 
 type ChannelSwitcherModalProps = {
   visible: boolean;
@@ -8,6 +8,7 @@ type ChannelSwitcherModalProps = {
   channels: Channel[];
   selectedChannelId: string | null;
   onSelectTextChannel: (channelId: string) => void;
+  onSelectVoiceChannel?: (channelId: string) => void;
   onRequestClose: () => void;
   /** Opens mobile channel settings for a text channel (gear icon). */
   onOpenChannelSettings?: (channelId: string) => void;
@@ -19,6 +20,7 @@ export function ChannelSwitcherModal({
   channels,
   selectedChannelId,
   onSelectTextChannel,
+  onSelectVoiceChannel,
   onRequestClose,
   onOpenChannelSettings,
 }: ChannelSwitcherModalProps) {
@@ -30,7 +32,7 @@ export function ChannelSwitcherModal({
       visible={visible}
       onRequestClose={onRequestClose}
     >
-      <View className="flex-1 justify-end bg-black/50">
+      <View className="flex-1 justify-end bg-background/75">
         <Pressable className="flex-1" onPress={onRequestClose} />
         <View className="max-h-[70%] rounded-t-2xl border-t border-border-panel bg-surface-modal px-4 pb-6 pt-3">
           <View className="mb-3 flex-row items-center justify-between">
@@ -42,7 +44,7 @@ export function ChannelSwitcherModal({
               className="h-9 w-9 items-center justify-center rounded-lg bg-surface-panel active:bg-surface-hover"
               onPress={onRequestClose}
             >
-              <Ionicons name="close" size={18} color="#e6edf7" />
+              <ThemedIonicons name="close" size={18} colorClassName="accent-foreground" />
             </Pressable>
           </View>
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -62,21 +64,33 @@ export function ChannelSwitcherModal({
                     }`}
                     onPress={() => {
                       if (channel.kind === "voice") {
-                        Alert.alert(
-                          "Voice on mobile",
-                          "We're not there yet, but soon enough you'll be voice chatting on mobile! We appreciate your patience.",
-                          [{ text: "OK" }],
-                        );
+                        onSelectVoiceChannel?.(channel.id);
+                        onRequestClose();
                         return;
                       }
                       onSelectTextChannel(channel.id);
                       onRequestClose();
                     }}
                   >
-                    <Text className={active ? "text-foreground" : "text-muted-foreground"}>
-                      {channel.kind === "voice" ? "🔊 " : "# "}
-                      {channel.name}
-                    </Text>
+                    <View className="min-w-0 flex-1 flex-row items-center gap-2">
+                      {channel.kind === "voice" ? (
+                        <ThemedIonicons
+                          name="volume-medium-outline"
+                          size={16}
+                          colorClassName={active ? "accent-foreground" : "accent-text-dim"}
+                        />
+                      ) : (
+                        <Text className={active ? "text-foreground" : "text-muted-foreground"}>
+                          #
+                        </Text>
+                      )}
+                      <Text
+                        className={active ? "text-foreground" : "text-muted-foreground"}
+                        numberOfLines={1}
+                      >
+                        {channel.name}
+                      </Text>
+                    </View>
                     <View className="flex-row items-center gap-2">
                       {channel.kind === "text" && onOpenChannelSettings ? (
                         <Pressable
@@ -85,10 +99,20 @@ export function ChannelSwitcherModal({
                           hitSlop={8}
                           onPress={() => onOpenChannelSettings(channel.id)}
                         >
-                          <Ionicons name="settings-outline" size={18} color="#a9b8cf" />
+                          <ThemedIonicons
+                            name="settings-outline"
+                            size={18}
+                            colorClassName="accent-text-dim"
+                          />
                         </Pressable>
                       ) : null}
-                      {active ? <Ionicons name="checkmark" size={18} color="#e6edf7" /> : null}
+                      {active ? (
+                        <ThemedIonicons
+                          name="checkmark"
+                          size={18}
+                          colorClassName="accent-foreground"
+                        />
+                      ) : null}
                     </View>
                   </Pressable>
                 );

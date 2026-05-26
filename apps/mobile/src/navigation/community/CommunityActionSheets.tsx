@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { HavenFormSheet } from "@/components/HavenFormSheet";
+import { HavenListSheet } from "@/components/HavenListSheet";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
+import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { getPlatformInviteInputPlaceholder } from "@shared/infrastructure/platform/urls";
 import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode";
@@ -10,18 +12,26 @@ import { useHavenCore } from "@shared/core";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
 
 type CommunityActionSheetsProps = {
+  actionsOpen: boolean;
   createOpen: boolean;
   joinOpen: boolean;
   userId: string | null;
+  onCloseActions: () => void;
+  onChooseCreate: () => void;
+  onChooseJoin: () => void;
   onCloseCreate: () => void;
   onCloseJoin: () => void;
   onCommunityReady: (communityId: string) => void;
 };
 
 export function CommunityActionSheets({
+  actionsOpen,
   createOpen,
   joinOpen,
   userId,
+  onCloseActions,
+  onChooseCreate,
+  onChooseJoin,
   onCloseCreate,
   onCloseJoin,
   onCommunityReady,
@@ -39,6 +49,29 @@ export function CommunityActionSheets({
   const [joinInvite, setJoinInvite] = useState("");
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+
+  const renderActionOption = (
+    icon: ThemedIoniconsProps["name"],
+    title: string,
+    description: string,
+    onPress: () => void,
+  ) => (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      className="flex-row items-center gap-3 rounded-xl bg-surface-panel px-4 py-4 active:bg-surface-hover"
+    >
+      <View className="h-10 w-10 items-center justify-center rounded-xl bg-surface-hover">
+        <ThemedIonicons name={icon} size={22} colorClassName="accent-foreground" />
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text className="text-base font-semibold text-foreground">{title}</Text>
+        <Text className="mt-0.5 text-sm leading-5 text-muted-foreground">
+          {description}
+        </Text>
+      </View>
+    </Pressable>
+  );
 
   const closeCreate = useCallback(() => {
     onCloseCreate();
@@ -96,6 +129,27 @@ export function CommunityActionSheets({
 
   return (
     <>
+      <HavenListSheet
+        visible={actionsOpen}
+        onDismiss={onCloseActions}
+        title="Community"
+      >
+        <View className="gap-3 pt-1">
+          {renderActionOption(
+            "add",
+            "Create community",
+            "Start a new server and invite people when you are ready.",
+            onChooseCreate,
+          )}
+          {renderActionOption(
+            "enter-outline",
+            "Join community",
+            "Use an invite code or link to join an existing server.",
+            onChooseJoin,
+          )}
+        </View>
+      </HavenListSheet>
+
       <HavenFormSheet visible={createOpen} onDismiss={closeCreate} title="Create community">
         <View className="mt-2 gap-4">
           <Text className="text-sm text-muted-foreground">

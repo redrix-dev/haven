@@ -1,18 +1,68 @@
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { ThemedIonicons } from "@/theme-rn";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
 
 type CommunityRailProps = {
   communities: ServerSummary[];
   activeCommunityId: string | null;
   onSelectCommunity: (communityId: string) => void;
   onOpenProfile: () => void;
-  onCreateCommunity: () => void;
-  onJoinCommunity: () => void;
+  onOpenNotifications: () => void;
+  onOpenInbox: () => void;
+  notificationsUnreadCount: number;
+  inboxUnreadCount: number;
+  onOpenCommunityActions: () => void;
+};
+
+type RailActionButtonProps = {
+  accessibilityLabel: string;
+  icon: ThemedIoniconsProps["name"];
+  iconSize?: number;
+  badgeCount?: number;
+  onPress: () => void;
 };
 
 function getCommunityInitial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || "?";
+}
+
+function formatBadgeCount(count: number): string {
+  return count > 99 ? "99+" : String(count);
+}
+
+function RailActionButton({
+  accessibilityLabel,
+  icon,
+  iconSize = 24,
+  badgeCount = 0,
+  onPress,
+}: RailActionButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        badgeCount > 0 ? `${accessibilityLabel}, ${badgeCount} unread` : accessibilityLabel
+      }
+      onPress={onPress}
+      className="h-11 w-11 items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
+    >
+      <View className="relative">
+        <ThemedIonicons
+          name={icon}
+          size={iconSize}
+          colorClassName="accent-foreground"
+        />
+        {badgeCount > 0 ? (
+          <View className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full bg-accent-slider px-1 py-0.5">
+            <Text className="text-center text-[9px] font-bold leading-none text-primary-foreground">
+              {formatBadgeCount(badgeCount)}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
 }
 
 export function CommunityRail({
@@ -20,15 +70,21 @@ export function CommunityRail({
   activeCommunityId,
   onSelectCommunity,
   onOpenProfile,
-  onCreateCommunity,
-  onJoinCommunity,
+  onOpenNotifications,
+  onOpenInbox,
+  notificationsUnreadCount,
+  inboxUnreadCount,
+  onOpenCommunityActions,
 }: CommunityRailProps) {
+  const insets = useSafeAreaInsets();
+
   return (
     <View className="w-18 border-r border-border-panel bg-surface-modal">
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
-          paddingVertical: 12,
+          paddingTop: insets.top + 12,
+          paddingBottom: 12,
           alignItems: "center",
           gap: 10,
         }}
@@ -63,39 +119,33 @@ export function CommunityRail({
         })}
       </ScrollView>
 
-      <View className="items-center gap-3 border-t border-border-panel py-3">
-        <Pressable
-          accessibilityRole="button"
+      <View
+        className="items-center gap-2 border-t border-border-panel pt-3"
+        style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+      >
+        <RailActionButton
+          accessibilityLabel="Notifications"
+          icon="notifications-outline"
+          badgeCount={notificationsUnreadCount}
+          onPress={onOpenNotifications}
+        />
+        <RailActionButton
+          accessibilityLabel="Direct messages"
+          icon="chatbubble-outline"
+          badgeCount={inboxUnreadCount}
+          onPress={onOpenInbox}
+        />
+        <RailActionButton
           accessibilityLabel="Open profile"
+          icon="person-circle-outline"
+          iconSize={25}
           onPress={onOpenProfile}
-          className="h-11 w-11 items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
-        >
-          <ThemedIonicons
-            name="person-circle-outline"
-            size={25}
-            colorClassName="accent-foreground"
-          />
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Create community"
-          onPress={onCreateCommunity}
-          className="h-11 w-11 items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
-        >
-          <ThemedIonicons name="add" size={24} colorClassName="accent-foreground" />
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Join community"
-          onPress={onJoinCommunity}
-          className="h-11 w-11 items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
-        >
-          <ThemedIonicons
-            name="enter-outline"
-            size={22}
-            colorClassName="accent-foreground"
-          />
-        </Pressable>
+        />
+        <RailActionButton
+          accessibilityLabel="Create or join community"
+          icon="add"
+          onPress={onOpenCommunityActions}
+        />
       </View>
     </View>
   );

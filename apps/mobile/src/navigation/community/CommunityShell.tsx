@@ -26,6 +26,7 @@ import { CommunityRail } from "./CommunityRail";
 import { CommunityActionSheets } from "./CommunityActionSheets";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
 import { useAuthStore } from "@shared/stores/authStore";
+import type { VoiceSidebarParticipant } from "@shared/types/types";
 
 const CHANNEL_DRAWER_WIDTH = Math.min(
   320,
@@ -39,12 +40,28 @@ const EDGE_WIDTH = 28;
 type Props = NativeStackScreenProps<MainStackParamList, "Community">;
 type CommunityShellProps = Props & {
   onOpenProfile: () => void;
+  onOpenNotifications: () => void;
+  onOpenInbox: () => void;
+  notificationsUnreadCount: number;
+  inboxUnreadCount: number;
+  activeVoiceChannelId: string | null;
+  voiceChannelParticipants: Record<string, VoiceSidebarParticipant[]>;
+  onSelectVoiceChannel: (channelId: string) => void;
+  onOpenVoiceSession: () => void;
 };
 
 export function CommunityShell({
   route,
   navigation,
   onOpenProfile,
+  onOpenNotifications,
+  onOpenInbox,
+  notificationsUnreadCount,
+  inboxUnreadCount,
+  activeVoiceChannelId,
+  voiceChannelParticipants,
+  onSelectVoiceChannel,
+  onOpenVoiceSession,
 }: CommunityShellProps) {
   const serverId = route.params?.serverId ?? null;
   const openDrawerOnEnter = route.params?.openDrawer ?? !serverId;
@@ -206,8 +223,19 @@ export function CommunityShell({
 
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [communityActionsOpen, setCommunityActionsOpen] = useState(false);
+  const openCommunityActions = useCallback(() => setCommunityActionsOpen(true), []);
+  const closeCommunityActions = useCallback(() => setCommunityActionsOpen(false), []);
   const openCreateCommunity = useCallback(() => setCreateOpen(true), []);
   const openJoinCommunity = useCallback(() => setJoinOpen(true), []);
+  const chooseCreateCommunity = useCallback(() => {
+    setCommunityActionsOpen(false);
+    setCreateOpen(true);
+  }, []);
+  const chooseJoinCommunity = useCallback(() => {
+    setCommunityActionsOpen(false);
+    setJoinOpen(true);
+  }, []);
 
   const handleCommunityReady = useCallback(
     (communityId: string) => {
@@ -291,6 +319,25 @@ export function CommunityShell({
       runOnJS(setDrawerOpenAnimated)(shouldOpen);
     });
 
+  const drawerCloseGesture = Gesture.Pan()
+    .enabled(Boolean(serverId && drawerOpen))
+    .activeOffsetX([-18, 18])
+    .failOffsetY([-12, 12])
+    .onStart(() => {
+      dragStartOffset.value = drawerOffset.value;
+    })
+    .onUpdate((event) => {
+      if (event.translationX > 0) return;
+      const next = dragStartOffset.value + event.translationX;
+      drawerOffset.value = Math.min(0, Math.max(-DRAWER_SURFACE_WIDTH, next));
+    })
+    .onEnd((event) => {
+      const projected = drawerOffset.value + event.velocityX * 0.12;
+      const shouldOpen =
+        event.velocityX > -350 && projected > -DRAWER_SURFACE_WIDTH / 2;
+      runOnJS(setDrawerOpenAnimated)(shouldOpen);
+    });
+
   const drawerStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: drawerOffset.value }],
   }));
@@ -309,58 +356,62 @@ export function CommunityShell({
 
   return (
     <View className="flex-1 bg-background">
-      <CommunityTopBar
-        communityName={community?.name ?? "Communities"}
-        selectedChannelName={
-          currentRenderableChannel?.name ??
-          (serverId ? "Select channel" : "Create or join")
-        }
-        drawerOpen={drawerOpen}
-        drawerOffset={drawerOffset}
-        drawerWidth={DRAWER_SURFACE_WIDTH}
-        onPressCommunity={() => setDrawerOpenAnimated(true)}
-        onPressChannel={() => setDrawerOpenAnimated(true)}
-        onPressDrawerToggle={() => setDrawerOpenAnimated(!drawerOpen)}
-      />
-
       <View className="flex-1 overflow-hidden">
-        <Animated.View
-          style={[
-            {
-              position: "absolute",
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: DRAWER_SURFACE_WIDTH,
-              zIndex: 2,
-              flexDirection: "row",
-            },
-            drawerStyle,
-          ]}
-        >
-          <CommunityRail
-            communities={servers}
-            activeCommunityId={serverId}
-            onSelectCommunity={handleSelectCommunity}
-            onOpenProfile={onOpenProfile}
-            onCreateCommunity={openCreateCommunity}
-            onJoinCommunity={openJoinCommunity}
-          />
-          <View style={{ width: CHANNEL_DRAWER_WIDTH }}>
-            <CommunityChannelDrawer
-              serverId={serverId}
-              communityName={community?.name ?? "Communities"}
-              channels={channels}
-              selectedChannelId={currentRenderableChannel?.id ?? null}
-              onSelectTextChannel={handleSelectTextChannel}
-              onCreateCommunity={openCreateCommunity}
-              onJoinCommunity={openJoinCommunity}
+        <GestureDetector gesture={drawerCloseGesture}>
+          <Animated.View
+            style={[
+              {
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: DRAWER_SURFACE_WIDTH,
+                zIndex: 2,
+                flexDirection: "row",
+              },
+              drawerStyle,
+            ]}
+          >
+            <CommunityRail
+              communities={servers}
+              activeCommunityId={serverId}
+              onSelectCommunity={handleSelectCommunity}
+              onOpenProfile={onOpenProfile}
+              onOpenNotifications={onOpenNotifications}
+              onOpenInbox={onOpenInbox}
+              notificationsUnreadCount={notificationsUnreadCount}
+              inboxUnreadCount={inboxUnreadCount}
+              onOpenCommunityActions={openCommunityActions}
             />
-          </View>
-        </Animated.View>
+            <View style={{ width: CHANNEL_DRAWER_WIDTH }}>
+              <CommunityChannelDrawer
+                serverId={serverId}
+                communityName={community?.name ?? "Communities"}
+                channels={channels}
+                selectedChannelId={currentRenderableChannel?.id ?? null}
+                activeVoiceChannelId={activeVoiceChannelId}
+                voiceChannelParticipants={voiceChannelParticipants}
+                onSelectTextChannel={handleSelectTextChannel}
+                onSelectVoiceChannel={onSelectVoiceChannel}
+                onOpenVoiceSession={onOpenVoiceSession}
+                onCreateCommunity={openCreateCommunity}
+                onJoinCommunity={openJoinCommunity}
+              />
+            </View>
+          </Animated.View>
+        </GestureDetector>
 
         <GestureDetector gesture={panGesture}>
           <Animated.View className="flex-1" style={mainShiftStyle}>
+            {serverId ? (
+              <CommunityTopBar
+                communityName={community?.name ?? "Communities"}
+                selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
+                onPressCommunity={() => setDrawerOpenAnimated(true)}
+                onPressChannel={() => setDrawerOpenAnimated(true)}
+              />
+            ) : null}
+
             {serverId ? (
               <CommunityChatScreen serverId={serverId} />
             ) : (
@@ -405,9 +456,13 @@ export function CommunityShell({
         ) : null}
       </View>
       <CommunityActionSheets
+        actionsOpen={communityActionsOpen}
         createOpen={createOpen}
         joinOpen={joinOpen}
         userId={userId}
+        onCloseActions={closeCommunityActions}
+        onChooseCreate={chooseCreateCommunity}
+        onChooseJoin={chooseJoinCommunity}
         onCloseCreate={() => setCreateOpen(false)}
         onCloseJoin={() => setJoinOpen(false)}
         onCommunityReady={handleCommunityReady}
