@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { BackHandler, Pressable, Text, View } from "react-native";
-import { CommonActions, useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import type { NotificationItem } from "@shared/lib/backend/types";
@@ -8,7 +8,7 @@ import { syncFocusFromRoute, useHavenCore } from "@shared/core";
 import { useUiStore } from "@shared/stores/uiStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { getNotificationPayloadString } from "@shared/infrastructure/utils/appUtils";
-import type { RootStackParamList } from "@/navigation/types";
+import type { MainStackParamList } from "@/navigation/types";
 import { NotificationInboxList } from "@/features/notifications/NotificationInboxList";
 import { NotificationPreferencesPanel } from "@/features/notifications/NotificationPreferencesPanel";
 import { MobileModmailPanel } from "@/features/moderation/MobileModmailPanel";
@@ -19,43 +19,41 @@ export type NotificationsFriendsPanelOpenInput = {
 };
 
 type NotificationsContainerProps = {
-  subScreen: "list" | "preferences" | "modmail";
-  onSubScreenChange: (next: "list" | "preferences" | "modmail") => void;
-  modalVisible: boolean;
-  onCloseModal: () => void;
   onOpenFriendsPanel: (input: NotificationsFriendsPanelOpenInput) => void;
-  onOpenDirectMessages: () => void;
 };
 
 export default function NotificationsContainer({
-  subScreen,
-  onSubScreenChange,
-  modalVisible,
-  onCloseModal,
   onOpenFriendsPanel,
-  onOpenDirectMessages,
 }: NotificationsContainerProps) {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const core = useHavenCore();
   const communities = core.communities.useCommunities();
   const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
-  const [
-    notificationNavigationError,
-    setNotificationNavigationError,
-  ] = useState<string | null>(null);
+  const [subScreen, setSubScreen] = useState<"list" | "preferences" | "modmail">("list");
+  const [notificationNavigationError, setNotificationNavigationError] = useState<string | null>(null);
 
   const modmailCommunityIds = useMemo(
     () =>
       communities
-        .filter(
-          (community) =>
-            permissionsByCommunityId[community.id]?.canManageReports,
-        )
-        .map((community) => community.id),
+        .filter((c) => permissionsByCommunityId[c.id]?.canManageReports)
+        .map((c) => c.id),
     [communities, permissionsByCommunityId],
   );
   const modmailEnabled = modmailCommunityIds.length > 0;
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+        if (subScreen === "preferences" || subScreen === "modmail") {
+          setSubScreen("list");
+          return true;
+        }
+        return false;
+      });
+      return () => sub.remove();
+    }, [subScreen]),
+  );
 
   const handleNavigate = useCallback(
     async (notification: NotificationItem) => {
@@ -67,12 +65,9 @@ export default function NotificationsContainer({
             if (!conversationId) {
               throw new Error("This notification does not include a DM conversation target.");
             }
-            setWorkspaceMode("dm");
-            await core.directMessages.openConversation(conversationId, {
-              markRead: true,
-            });
-            onOpenDirectMessages();
-            break;
+            void core.notifications.markRead([notification.recipientId]).catch(() => {});
+            navigation.navigate("DirectMessages", { openConversationId: conversationId });
+            return;
           }
           case "friend_request_received": {
             onOpenFriendsPanel({
@@ -82,10 +77,7 @@ export default function NotificationsContainer({
             break;
           }
           case "friend_request_accepted": {
-            onOpenFriendsPanel({
-              tab: "friends",
-              highlightedRequestId: null,
-            });
+            onOpenFriendsPanel({ tab: "friends", highlightedRequestId: null });
             break;
           }
           case "channel_mention": {
@@ -96,16 +88,9 @@ export default function NotificationsContainer({
             }
             setWorkspaceMode("community");
             syncFocusFromRoute(core, { communityId, channelId });
-            navigation.dispatch(
-              CommonActions.navigate({
-                name: "Main",
-                params: {
-                  screen: "Community",
-                  params: { serverId: communityId, openDrawer: false },
-                },
-              }),
-            );
-            break;
+            void core.notifications.markRead([notification.recipientId]).catch(() => {});
+            navigation.replace("Community", { serverId: communityId, openDrawer: false });
+            return;
           }
           default:
             break;
@@ -116,31 +101,10 @@ export default function NotificationsContainer({
         setNotificationNavigationError(
           getErrorMessage(error, "Failed to open notification."),
         );
-        return;
       }
-      onCloseModal();
     },
-    [
-      core,
-      navigation,
-      onCloseModal,
-      onOpenDirectMessages,
-      onOpenFriendsPanel,
-      setWorkspaceMode,
-    ],
+    [core, navigation, onOpenFriendsPanel, setWorkspaceMode],
   );
-
-  useEffect(() => {
-    if (!modalVisible) return;
-    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (subScreen === "preferences" || subScreen === "modmail") {
-        onSubScreenChange("list");
-        return true;
-      }
-      return false;
-    });
-    return () => sub.remove();
-  }, [modalVisible, onSubScreenChange, subScreen]);
 
   return (
     <View className="min-h-0 flex-1">
@@ -149,7 +113,7 @@ export default function NotificationsContainer({
           <Pressable
             accessibilityRole="button"
             hitSlop={10}
-            onPress={() => onSubScreenChange("list")}
+            onPress={() => setSubScreen("list")}
             className="flex-row items-center gap-2 active:opacity-80"
           >
             <Ionicons name="chevron-back" size={22} color="#e6edf7" />
@@ -165,7 +129,7 @@ export default function NotificationsContainer({
                 <Pressable
                   accessibilityRole="button"
                   hitSlop={10}
-                  onPress={() => onSubScreenChange("modmail")}
+                  onPress={() => setSubScreen("modmail")}
                   className="rounded-xl border border-amber-600/50 bg-amber-950/35 p-2 active:bg-amber-950/55"
                 >
                   <Ionicons name="shield-outline" size={22} color="#fbbf24" />
@@ -174,7 +138,7 @@ export default function NotificationsContainer({
               <Pressable
                 accessibilityRole="button"
                 hitSlop={10}
-                onPress={() => onSubScreenChange("preferences")}
+                onPress={() => setSubScreen("preferences")}
                 className="rounded-xl bg-surface-panel p-2 active:bg-surface-hover"
               >
                 <Ionicons name="settings-outline" size={22} color="#e6edf7" />
@@ -188,14 +152,14 @@ export default function NotificationsContainer({
         <MobileModmailPanel managedCommunityIds={modmailCommunityIds} />
       ) : subScreen === "preferences" ? (
         <NotificationPreferencesPanel />
-      ) : subScreen === "list" ? (
+      ) : (
         <NotificationInboxList
           navigationError={notificationNavigationError}
           onNavigate={(n) => {
             void handleNavigate(n);
           }}
         />
-      ) : null}
+      )}
     </View>
   );
 }

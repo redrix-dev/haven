@@ -24,16 +24,10 @@ import {
   useHavenCore,
 } from "@shared/core";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
-import { HavenFormSheet } from "@/components/HavenFormSheet";
-import { HavenListSheet } from "@/components/HavenListSheet";
-import { DirectMessagesContainer } from "@/features/direct-messages/DirectMessagesContainer";
 import { FriendsModalContainer } from "@/features/friends/FriendsModalContainer";
-import NotificationsContainer from "@/features/notifications/NotificationsContainer";
-import UserSettingsContainer from "@/features/user-profile/UserSettingsContainer";
 import UserProfileModal, {
   type UserProfileModalTarget,
 } from "@/features/user-profile/UserProfileModal";
-import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
 import { useUiStore } from "@shared/stores/uiStore";
 import { useAuthStore } from "@shared/stores/authStore";
 import type { FriendsPanelTab } from "@shared/types/types";
@@ -58,6 +52,11 @@ import {
 } from "@/features/voice/mobileVoicePreferences";
 import { addVoiceNotificationOpenListener } from "@/features/voice/mobileVoiceForegroundService";
 import { useMobileLiveKitVoiceSession } from "@/features/voice/useMobileLiveKitVoiceSession";
+import { HavenListSheet } from "@/components/HavenListSheet";
+import { DirectMessagesScreen } from "@/screens/main/DirectMessagesScreen";
+import { NotificationsScreen } from "@/screens/main/NotificationsScreen";
+import { ProfileScreen } from "@/screens/main/ProfileScreen";
+import { SettingsScreen } from "@/screens/main/SettingsScreen";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -442,53 +441,6 @@ function MainNavigationShell({ userId }: { userId: string }) {
     return servers.find((server) => server.id === communityId)?.name ?? null;
   }, [servers, voiceDerived.activeVoiceChannel]);
 
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const handleOpenSettings = useCallback(() => {
-    setIsSettingsModalOpen(true);
-  }, []);
-  const handleCloseSettings = useCallback(() => {
-    setIsSettingsModalOpen(false);
-  }, []);
-
-  const [isNotificationsModalOpen, setIsNotificationsModalOpen] =
-    useState(false);
-  const [notificationsSubScreen, setNotificationsSubScreen] = useState<
-    "list" | "preferences" | "modmail"
-  >("list");
-  const handleOpenNotifications = useCallback(() => {
-    setIsNotificationsModalOpen(true);
-  }, []);
-  const handleCloseNotifications = useCallback(() => {
-    setNotificationsSubScreen("list");
-    setIsNotificationsModalOpen(false);
-  }, []);
-
-  useEffect(() => {
-    useUiStore.getState().setNotificationsPanelOpen(isNotificationsModalOpen);
-    return () => {
-      useUiStore.getState().setNotificationsPanelOpen(false);
-    };
-  }, [isNotificationsModalOpen]);
-
-  const [isDirectMessagesModalOpen, setIsDirectMessagesModalOpen] =
-    useState(false);
-  const handleOpenDirectMessages = useCallback(() => {
-    setWorkspaceMode("dm");
-    setIsDirectMessagesModalOpen(true);
-  }, [setWorkspaceMode]);
-  const handleOpenDirectMessageConversation = useCallback(
-    (conversationId: string) => {
-      setWorkspaceMode("dm");
-      setIsDirectMessagesModalOpen(true);
-      void dm.openConversation(conversationId, { markRead: true });
-    },
-    [dm, setWorkspaceMode],
-  );
-  const handleCloseDirectMessages = useCallback(() => {
-    setIsDirectMessagesModalOpen(false);
-    setWorkspaceMode("community");
-  }, [setWorkspaceMode]);
-
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
   const [friendsInitialTab, setFriendsInitialTab] =
     useState<FriendsPanelTab>("friends");
@@ -512,11 +464,10 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const handleStartDmFromFriend = useCallback(
     (friendUserId: string) => {
       setIsFriendsModalOpen(false);
-      setWorkspaceMode("dm");
-      setIsDirectMessagesModalOpen(true);
       void dm.openWithUser(friendUserId);
+      navigation.navigate("Main", { screen: "DirectMessages" });
     },
-    [dm, setWorkspaceMode],
+    [dm, navigation],
   );
 
   const [profileCardTarget, setProfileCardTarget] =
@@ -528,10 +479,23 @@ function MainNavigationShell({ userId }: { userId: string }) {
     setProfileCardTarget(null);
   }, []);
 
+  const handleNavigateToDm = useCallback(
+    (conversationId: string) => {
+      navigation.navigate("Main", {
+        screen: "DirectMessages",
+        params: { openConversationId: conversationId },
+      });
+    },
+    [navigation],
+  );
+
   useEffect(() => {
     useMobilePushNavigationStore.getState().setHandlers({
       openDm: (conversationId) => {
-        handleOpenDirectMessageConversation(conversationId);
+        navigation.navigate("Main", {
+          screen: "DirectMessages",
+          params: { openConversationId: conversationId },
+        });
       },
       openFriends: (input) => {
         handleOpenFriendsFromNotification(input);
@@ -545,7 +509,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
         });
       },
       openNotifications: () => {
-        setIsNotificationsModalOpen(true);
+        navigation.navigate("Main", { screen: "Notifications" });
       },
       refreshUrgentSurfaces: () => {
         void dm.loadConversations();
@@ -560,7 +524,6 @@ function MainNavigationShell({ userId }: { userId: string }) {
   }, [
     core,
     dm,
-    handleOpenDirectMessageConversation,
     handleOpenFriendsFromNotification,
     navigation,
     setWorkspaceMode,
@@ -568,9 +531,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
 
   return (
     <>
-      <MainNavigationDelegateBridge
-        onNavigateToDm={handleOpenDirectMessageConversation}
-      />
+      <MainNavigationDelegateBridge onNavigateToDm={handleNavigateToDm} />
       <View className="flex-1">
         <Stack.Navigator
           initialRouteName="CommunityEntry"
@@ -590,10 +551,16 @@ function MainNavigationShell({ userId }: { userId: string }) {
             {(props) => (
               <CommunityShell
                 {...props}
-                onOpenProfile={handleOpenSettings}
+                onOpenProfile={() =>
+                  navigation.navigate("Main", { screen: "Profile" })
+                }
                 onOpenProfileCard={handleOpenProfileCard}
-                onOpenNotifications={handleOpenNotifications}
-                onOpenInbox={handleOpenDirectMessages}
+                onOpenNotifications={() =>
+                  navigation.navigate("Main", { screen: "Notifications" })
+                }
+                onOpenInbox={() =>
+                  navigation.navigate("Main", { screen: "DirectMessages" })
+                }
                 notificationsUnreadCount={notificationsUnreadCount}
                 inboxUnreadCount={dmUnreadCount}
                 activeVoiceChannelId={voiceState.activeVoiceChannelId}
@@ -603,6 +570,26 @@ function MainNavigationShell({ userId }: { userId: string }) {
               />
             )}
           </Stack.Screen>
+          <Stack.Screen
+            name="DirectMessages"
+            component={DirectMessagesScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
         </Stack.Navigator>
         {!voiceSheetOpen ? (
           <VoiceReturnPill
@@ -612,44 +599,6 @@ function MainNavigationShell({ userId }: { userId: string }) {
         ) : null}
       </View>
 
-      <HavenFormSheet
-        visible={isSettingsModalOpen}
-        onDismiss={handleCloseSettings}
-        title="Settings"
-      >
-        <UserSettingsContainer
-          onSignOut={async () => {
-            await signOutFromAuth();
-            handleCloseSettings();
-          }}
-          onDeleteAccount={async () => {
-            await deleteOwnAccount();
-            handleCloseSettings();
-          }}
-        />
-      </HavenFormSheet>
-      <HavenListSheet
-        visible={isNotificationsModalOpen}
-        onDismiss={handleCloseNotifications}
-        bodyScrollable={false}
-      >
-        <NotificationsContainer
-          subScreen={notificationsSubScreen}
-          onSubScreenChange={setNotificationsSubScreen}
-          modalVisible={isNotificationsModalOpen}
-          onCloseModal={handleCloseNotifications}
-          onOpenFriendsPanel={handleOpenFriendsFromNotification}
-          onOpenDirectMessages={handleOpenDirectMessages}
-        />
-      </HavenListSheet>
-      <HavenListSheet
-        visible={isDirectMessagesModalOpen}
-        onDismiss={handleCloseDirectMessages}
-        title="Direct messages"
-        bodyScrollable={false}
-      >
-        <DirectMessagesContainer />
-      </HavenListSheet>
       <HavenListSheet
         visible={isFriendsModalOpen}
         onDismiss={handleCloseFriends}
