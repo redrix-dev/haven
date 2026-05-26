@@ -27,6 +27,7 @@ type VoiceSessionSheetProps = {
   voiceSettings: VoiceSettings;
   state: MobileVoiceControllerState;
   actions: MobileVoiceControllerActions;
+  onLeave: () => void;
   onDismiss: () => void;
 };
 
@@ -182,6 +183,7 @@ export function VoiceSessionSheet({
   voiceSettings,
   state,
   actions,
+  onLeave,
   onDismiss,
 }: VoiceSessionSheetProps) {
   const channelName = state.activeChannel?.channelName ?? "Voice";
@@ -256,7 +258,7 @@ export function VoiceSessionSheet({
               label="Leave"
               icon="call-outline"
               destructive
-              onPress={() => void actions.leaveVoiceChannel()}
+              onPress={onLeave}
             />
           </View>
 

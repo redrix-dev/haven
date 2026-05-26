@@ -272,6 +272,17 @@ function MainNavigationShell({ userId }: { userId: string }) {
     }, VOICE_PROMPT_CLOSE_DELAY_MS);
   }, []);
 
+  const clearPendingVoiceSheetOpen = useCallback(() => {
+    if (!voiceSheetOpenTimeoutRef.current) return;
+    clearTimeout(voiceSheetOpenTimeoutRef.current);
+    voiceSheetOpenTimeoutRef.current = null;
+  }, []);
+
+  const closeVoiceSheet = useCallback(() => {
+    clearPendingVoiceSheetOpen();
+    setVoiceSheetOpen(false);
+  }, [clearPendingVoiceSheetOpen]);
+
   useEffect(() => {
     return () => {
       if (voiceSheetOpenTimeoutRef.current) {
@@ -300,6 +311,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
 
   const handleVoiceSessionError = useCallback(
     (message: string) => {
+      closeVoiceSheet();
       Alert.alert("Voice connection failed", message);
       void disconnectVoiceSession({ triggerPaneLeave: false }).catch(
         (error: unknown) => {
@@ -307,10 +319,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
         },
       );
     },
-    [disconnectVoiceSession],
+    [closeVoiceSheet, disconnectVoiceSession],
   );
 
   const handleVoiceKick = useCallback(() => {
+    closeVoiceSheet();
     void forceDisconnectVoice("kicked")
       .then(() => {
         Alert.alert(
@@ -321,7 +334,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
       .catch((error: unknown) => {
         console.warn("[voice] Failed to disconnect after kick.", error);
       });
-  }, [forceDisconnectVoice]);
+  }, [closeVoiceSheet, forceDisconnectVoice]);
 
   const handleVoiceInterrupted = useCallback(() => {
     setInterruptionNoticeVisible(true);
@@ -341,6 +354,22 @@ function MainNavigationShell({ userId }: { userId: string }) {
 
   const { joinVoiceChannel, leaveVoiceChannel, toggleMute, toggleDeafen } =
     voiceController.actions;
+
+  const handleLeaveVoiceSession = useCallback(() => {
+    closeVoiceSheet();
+    void (async () => {
+      try {
+        await leaveVoiceChannel();
+      } catch (error: unknown) {
+        console.warn("[voice] Failed to stop mobile voice transport.", error);
+      }
+      try {
+        await disconnectVoiceSession({ triggerPaneLeave: false });
+      } catch (error: unknown) {
+        console.warn("[voice] Failed to clear voice session state.", error);
+      }
+    })();
+  }, [closeVoiceSheet, disconnectVoiceSession, leaveVoiceChannel]);
 
   useEffect(() => {
     if (!activeVoiceControllerChannelKey) {
@@ -637,7 +666,8 @@ function MainNavigationShell({ userId }: { userId: string }) {
         voiceSettings={mobileVoiceSettings.settings}
         state={voiceController.state}
         actions={voiceController.actions}
-        onDismiss={() => setVoiceSheetOpen(false)}
+        onLeave={handleLeaveVoiceSession}
+        onDismiss={closeVoiceSheet}
       />
       <HavenListSheet
         visible={interruptionNoticeVisible}

@@ -1,6 +1,6 @@
 import type { Channel } from "@shared/lib/backend/types";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CommunityManagementEntry } from "@/features/community/management/CommunityManagementEntry";
 import { ThemedIonicons } from "@/theme-rn";
@@ -18,6 +18,41 @@ type CommunityChannelDrawerProps = {
   onCreateCommunity: () => void;
   onJoinCommunity: () => void;
 };
+
+function participantInitial(displayName: string): string {
+  return displayName.trim().charAt(0).toUpperCase() || "?";
+}
+
+function VoiceParticipantRow({
+  participant,
+}: {
+  participant: VoiceSidebarParticipant;
+}) {
+  return (
+    <View className="flex-row items-center gap-2 rounded-lg px-2 py-1.5">
+      <View
+        className={[
+          "h-6 w-6 items-center justify-center overflow-hidden rounded-full border bg-surface-panel",
+          participant.isSpeaking ? "border-primary" : "border-border-panel",
+        ].join(" ")}
+      >
+        {participant.avatarUrl ? (
+          <Image source={{ uri: participant.avatarUrl }} className="h-full w-full rounded-full" />
+        ) : (
+          <Text className="text-[10px] font-bold text-foreground">
+            {participantInitial(participant.displayName)}
+          </Text>
+        )}
+      </View>
+      <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+        {participant.displayName}
+      </Text>
+      {participant.isSpeaking ? (
+        <View className="h-2 w-2 rounded-full bg-primary" />
+      ) : null}
+    </View>
+  );
+}
 
 export function CommunityChannelDrawer({
   serverId,
@@ -103,50 +138,62 @@ export function CommunityChannelDrawer({
             const active = isVoice
               ? activeVoiceChannelId === channel.id
               : selectedChannelId === channel.id;
-            const participantCount = voiceChannelParticipants[channel.id]?.length ?? 0;
+            const participants = isVoice ? (voiceChannelParticipants[channel.id] ?? []) : [];
+            const participantCount = participants.length;
             return (
-              <Pressable
-                key={channel.id}
-                accessibilityRole="button"
-                className={`flex-row items-center gap-2.5 rounded-xl px-3 py-2.5 ${
-                  active ? "bg-surface-panel" : "active:bg-surface-hover"
-                }`}
-                onPress={() => {
-                  if (isVoice) {
-                    if (activeVoiceChannelId === channel.id) {
-                      onOpenVoiceSession();
-                    } else {
-                      onSelectVoiceChannel(channel.id);
+              <View key={channel.id} className="mb-1">
+                <Pressable
+                  accessibilityRole="button"
+                  className={`flex-row items-center gap-2.5 rounded-xl px-3 py-2.5 ${
+                    active ? "bg-surface-panel" : "active:bg-surface-hover"
+                  }`}
+                  onPress={() => {
+                    if (isVoice) {
+                      if (activeVoiceChannelId === channel.id) {
+                        onOpenVoiceSession();
+                      } else {
+                        onSelectVoiceChannel(channel.id);
+                      }
+                      return;
                     }
-                    return;
-                  }
-                  onSelectTextChannel(channel.id);
-                }}
-              >
-                <ThemedIonicons
-                  name={isVoice ? "volume-medium-outline" : "chatbox-outline"}
-                  size={16}
-                  colorClassName={active ? "accent-foreground" : "accent-text-dim"}
-                />
-                <Text
-                  className={`flex-1 text-sm font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}
-                  numberOfLines={1}
+                    onSelectTextChannel(channel.id);
+                  }}
                 >
-                  {channel.name}
-                </Text>
-                {isVoice && participantCount > 0 ? (
-                  <Text className="text-xs font-semibold text-muted-foreground">
-                    {participantCount}
-                  </Text>
-                ) : null}
-                {active ? (
                   <ThemedIonicons
-                    name="checkmark"
-                    size={15}
-                    colorClassName="accent-foreground"
+                    name={isVoice ? "volume-medium-outline" : "chatbox-outline"}
+                    size={16}
+                    colorClassName={active ? "accent-foreground" : "accent-text-dim"}
                   />
+                  <Text
+                    className={`flex-1 text-sm font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}
+                    numberOfLines={1}
+                  >
+                    {channel.name}
+                  </Text>
+                  {isVoice && participantCount > 0 ? (
+                    <Text className="text-xs font-semibold text-muted-foreground">
+                      {participantCount}
+                    </Text>
+                  ) : null}
+                  {active ? (
+                    <ThemedIonicons
+                      name="checkmark"
+                      size={15}
+                      colorClassName="accent-foreground"
+                    />
+                  ) : null}
+                </Pressable>
+                {isVoice && participants.length > 0 ? (
+                  <View className="ml-8 mt-1 gap-0.5">
+                    {participants.map((participant) => (
+                      <VoiceParticipantRow
+                        key={participant.userId}
+                        participant={participant}
+                      />
+                    ))}
+                  </View>
                 ) : null}
-              </Pressable>
+              </View>
             );
           })
         )}

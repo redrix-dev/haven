@@ -32,6 +32,8 @@ export type SaveFileFromUrlResult = {
 export type VoicePopoutMemberState = {
   userId: string;
   displayName: string;
+  avatarUrl?: string | null;
+  isSpeaking?: boolean;
   isMuted: boolean;
   isDeafened: boolean;
   volume: number;

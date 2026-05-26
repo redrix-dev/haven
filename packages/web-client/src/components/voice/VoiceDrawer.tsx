@@ -1,6 +1,11 @@
 import React from "react";
 import { Button } from "@shared/app/ui/button";
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@shared/app/ui/avatar";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -37,10 +42,17 @@ interface VoiceDrawerProps {
   serverName: string;
   channelName: string;
   participantCount: number;
-  participantPreview: Array<{ userId: string; displayName: string }>;
+  participantPreview: Array<{
+    userId: string;
+    displayName: string;
+    avatarUrl?: string | null;
+    isSpeaking?: boolean;
+  }>;
   memberControls?: Array<{
     userId: string;
     displayName: string;
+    avatarUrl?: string | null;
+    isSpeaking?: boolean;
     isMuted?: boolean;
     isDeafened?: boolean;
     volume: number;
@@ -84,6 +96,38 @@ const TRANSMISSION_MODE_LABELS: Record<
   push_to_talk: "Push to Talk",
   open_mic: "Open Mic",
 };
+
+function avatarInitial(displayName: string): string {
+  return displayName.trim().charAt(0).toUpperCase() || "?";
+}
+
+function VoiceMemberAvatar({
+  displayName,
+  avatarUrl,
+  isSpeaking,
+  className,
+}: {
+  displayName: string;
+  avatarUrl?: string | null;
+  isSpeaking?: boolean;
+  className?: string;
+}) {
+  return (
+    <Avatar
+      title={displayName}
+      className={[
+        "border bg-border",
+        isSpeaking ? "border-primary" : "border-border",
+        className ?? "size-5",
+      ].join(" ")}
+    >
+      {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
+      <AvatarFallback className="bg-border text-[10px] font-semibold text-white">
+        {avatarInitial(displayName)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
 
 export function VoiceDrawer({
   surface = "sidebar",
@@ -345,16 +389,24 @@ export function VoiceDrawer({
                             className="rounded-md border border-border bg-surface-panel px-2.5 py-2"
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p
-                                  className="truncate text-xs font-medium text-white"
-                                  title={member.displayName}
-                                >
-                                  {member.displayName}
-                                </p>
-                                <p className="text-[10px] text-auxiliary">
-                                  {statusLabel}
-                                </p>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <VoiceMemberAvatar
+                                  displayName={member.displayName}
+                                  avatarUrl={member.avatarUrl}
+                                  isSpeaking={member.isSpeaking}
+                                  className="size-7"
+                                />
+                                <div className="min-w-0">
+                                  <p
+                                    className="truncate text-xs font-medium text-white"
+                                    title={member.displayName}
+                                  >
+                                    {member.displayName}
+                                  </p>
+                                  <p className="text-[10px] text-auxiliary">
+                                    {statusLabel}
+                                  </p>
+                                </div>
                               </div>
                               <span className="shrink-0 text-[11px] font-medium text-row-heading">
                                 {member.volume}%
@@ -515,21 +567,16 @@ export function VoiceDrawer({
         </div>
 
         <div className="mt-3 flex min-h-5 items-center gap-1 pl-0.5">
-          {participantPreview.slice(0, 4).map((participant) => {
-            const initial =
-              participant.displayName.trim().charAt(0).toUpperCase() || "?";
-            return (
-              <span
-                key={participant.userId}
-                title={participant.displayName}
-                className="size-5 rounded-full bg-border text-[10px] font-semibold text-white flex items-center justify-center"
-              >
-                {initial}
-              </span>
-            );
-          })}
+          {participantPreview.slice(0, 4).map((participant) => (
+            <VoiceMemberAvatar
+              key={participant.userId}
+              displayName={participant.displayName}
+              avatarUrl={participant.avatarUrl}
+              isSpeaking={participant.isSpeaking}
+            />
+          ))}
           {participantPreview.length > 4 && (
-            <span className="size-5 rounded-full bg-surface-hover text-[10px] font-semibold text-avatar-fallback flex items-center justify-center">
+            <span className="flex size-5 items-center justify-center rounded-full bg-surface-hover text-[10px] font-semibold text-avatar-fallback">
               +{participantPreview.length - 4}
             </span>
           )}

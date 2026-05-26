@@ -239,6 +239,8 @@ export function CommunityWorkspaceShell({
                 (participant) => ({
                   userId: participant.userId,
                   displayName: participant.displayName,
+                  avatarUrl: participant.avatarUrl ?? null,
+                  isSpeaking: participant.isSpeaking,
                   isMuted: participant.muted,
                   isDeafened: participant.deafened,
                   volume:

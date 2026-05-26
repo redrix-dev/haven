@@ -225,6 +225,8 @@ export function useChatAppVoiceIntegration() {
           return {
             userId: participant.userId,
             displayName: participant.displayName,
+            avatarUrl: participant.avatarUrl ?? null,
+            isSpeaking: participant.isSpeaking,
             isMuted: controllerParticipant?.muted ?? false,
             isDeafened: controllerParticipant?.deafened ?? false,
             volume:

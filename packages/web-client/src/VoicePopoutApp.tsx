@@ -52,10 +52,14 @@ export function VoicePopoutApp() {
         participantPreview={state.members.map((member) => ({
           userId: member.userId,
           displayName: member.displayName,
+          avatarUrl: member.avatarUrl ?? null,
+          isSpeaking: member.isSpeaking,
         }))}
         memberControls={state.members.map((member) => ({
           userId: member.userId,
           displayName: member.displayName,
+          avatarUrl: member.avatarUrl ?? null,
+          isSpeaking: member.isSpeaking,
           isMuted: member.isMuted,
           isDeafened: member.isDeafened,
           volume: member.volume,
