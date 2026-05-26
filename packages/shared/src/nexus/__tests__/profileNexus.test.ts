@@ -8,6 +8,8 @@ describe('ProfileNexus', () => {
       username: 'cody',
       avatarUrl: 'https://example.com/avatar.png',
       theme: 'default',
+      profileVisibility: 'private' as const,
+      profileBio: null,
     }));
     const nexus = new ProfileNexus(createMemoryPersistence(), {
       fetchUserProfile,
@@ -28,6 +30,8 @@ describe('ProfileNexus', () => {
       username: 'next-cody',
       avatarUrl: null,
       theme: 'midnight',
+      profileVisibility: 'public' as const,
+      profileBio: 'Hello there',
     }));
     const nexus = new ProfileNexus(createMemoryPersistence(), {
       updateUserProfile,
@@ -51,8 +55,53 @@ describe('ProfileNexus', () => {
       theme: 'midnight',
     });
     expect(result.theme).toBe('midnight');
+    expect(result.profileVisibility).toBe('public');
     expect(nexus.getViewerProfile('u1')?.username).toBe('next-cody');
     expect(nexus.getProfile('u1')?.username).toBe('next-cody');
+    expect(nexus.getProfileCard('u1')?.details?.bio).toBe('Hello there');
+  });
+
+  it('loads profile cards separately from live identity state', async () => {
+    const fetchProfileCard = vi.fn(async () => ({
+      userId: 'u2',
+      username: 'visible-user',
+      avatarUrl: 'https://example.com/card.png',
+      profileVisibility: 'friends_only' as const,
+      canViewDetails: false,
+      details: null,
+    }));
+    const nexus = new ProfileNexus(createMemoryPersistence(), {
+      fetchProfileCard,
+    } as never);
+
+    const card = await nexus.loadProfileCard('u2');
+
+    expect(fetchProfileCard).toHaveBeenCalledWith('u2');
+    expect(card?.profileVisibility).toBe('friends_only');
+    expect(card?.canViewDetails).toBe(false);
+    expect(nexus.getProfileCard('u2')?.username).toBe('visible-user');
+    expect(nexus.getProfile('u2')?.avatarUrl).toBe('https://example.com/card.png');
+  });
+
+  it('tracks profile card load errors and clears them', async () => {
+    const fetchProfileCard = vi.fn(async () => {
+      throw new Error('profile card unavailable');
+    });
+    const nexus = new ProfileNexus(createMemoryPersistence(), {
+      fetchProfileCard,
+    } as never);
+
+    await expect(nexus.loadProfileCard('u2')).rejects.toThrow(
+      'profile card unavailable',
+    );
+
+    expect(nexus.getProfileCard('u2')).toBeUndefined();
+    expect(nexus.getProfileCardError('u2')).toBe('profile card unavailable');
+
+    nexus.clear();
+
+    expect(nexus.getProfileCard('u2')).toBeUndefined();
+    expect(nexus.getProfileCardError('u2')).toBeNull();
   });
 
   it('loads platform staff info through the control plane', async () => {

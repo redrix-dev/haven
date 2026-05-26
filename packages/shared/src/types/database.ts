@@ -1643,6 +1643,8 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           id: string
+          profile_bio: string | null
+          profile_visibility: string
           theme: string
           updated_at: string
           username: string
@@ -1651,6 +1653,8 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           id: string
+          profile_bio?: string | null
+          profile_visibility?: string
           theme?: string
           updated_at?: string
           username: string
@@ -1659,6 +1663,8 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           id?: string
+          profile_bio?: string | null
+          profile_visibility?: string
           theme?: string
           updated_at?: string
           username?: string
@@ -2089,6 +2095,17 @@ export type Database = {
         }[]
       }
       extract_first_http_url: { Args: { p_content: string }; Returns: string }
+      get_profile_card: {
+        Args: { p_user_id: string }
+        Returns: {
+          avatar_url: string | null
+          can_view_details: boolean
+          profile_bio: string | null
+          profile_visibility: string
+          user_id: string
+          username: string
+        }[]
+      }
       get_message_author_profiles: {
         Args: { p_author_user_ids: string[]; p_community_id: string }
         Returns: {

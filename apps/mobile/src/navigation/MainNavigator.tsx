@@ -30,6 +30,9 @@ import { DirectMessagesContainer } from "@/features/direct-messages/DirectMessag
 import { FriendsModalContainer } from "@/features/friends/FriendsModalContainer";
 import NotificationsContainer from "@/features/notifications/NotificationsContainer";
 import UserSettingsContainer from "@/features/user-profile/UserSettingsContainer";
+import UserProfileModal, {
+  type UserProfileModalTarget,
+} from "@/features/user-profile/UserProfileModal";
 import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
 import { useUiStore } from "@shared/stores/uiStore";
 import { useAuthStore } from "@shared/stores/authStore";
@@ -516,6 +519,15 @@ function MainNavigationShell({ userId }: { userId: string }) {
     [dm, setWorkspaceMode],
   );
 
+  const [profileCardTarget, setProfileCardTarget] =
+    useState<UserProfileModalTarget | null>(null);
+  const handleOpenProfileCard = useCallback((target: UserProfileModalTarget) => {
+    setProfileCardTarget(target);
+  }, []);
+  const handleCloseProfileCard = useCallback(() => {
+    setProfileCardTarget(null);
+  }, []);
+
   useEffect(() => {
     useMobilePushNavigationStore.getState().setHandlers({
       openDm: (conversationId) => {
@@ -579,6 +591,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
               <CommunityShell
                 {...props}
                 onOpenProfile={handleOpenSettings}
+                onOpenProfileCard={handleOpenProfileCard}
                 onOpenNotifications={handleOpenNotifications}
                 onOpenInbox={handleOpenDirectMessages}
                 notificationsUnreadCount={notificationsUnreadCount}
@@ -651,6 +664,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
           onStartDirectMessage={handleStartDmFromFriend}
         />
       </HavenListSheet>
+      <UserProfileModal
+        visible={Boolean(profileCardTarget)}
+        target={profileCardTarget}
+        onDismiss={handleCloseProfileCard}
+      />
       <VoiceJoinPromptSheet
         prompt={voiceState.voiceJoinPrompt}
         currentChannelName={voiceDerived.activeVoiceChannel?.name ?? null}

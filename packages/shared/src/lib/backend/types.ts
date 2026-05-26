@@ -136,6 +136,21 @@ export type LiveProfileIdentity = {
   updatedAt: string;
 };
 
+export type ProfileVisibility = 'public' | 'friends_only' | 'private';
+
+export type ProfileDetails = {
+  bio: string | null;
+};
+
+export type UserProfileCard = {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  profileVisibility: ProfileVisibility;
+  canViewDetails: boolean;
+  details: ProfileDetails | null;
+};
+
 export type ServerPermissions = {
   isOwner: boolean;
   canManageServer: boolean;

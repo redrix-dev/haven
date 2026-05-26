@@ -1,9 +1,11 @@
 import type {
   BanEligibleServer,
   FeatureFlagsSnapshot,
+  ProfileVisibility,
   RedeemedInvite,
   ServerInvite,
   ServerSummary,
+  UserProfileCard,
 } from './types';
 
 export type PlatformStaffInfo = {
@@ -16,10 +18,13 @@ export type UserProfileInfo = {
   avatarUrl: string | null;
   /** Normalized theme id (see `getTheme`). */
   theme: string;
+  profileVisibility: ProfileVisibility;
+  profileBio: string | null;
 };
 
 export interface ControlPlaneBackend {
   fetchUserProfile(userId: string): Promise<UserProfileInfo | null>;
+  fetchProfileCard(userId: string): Promise<UserProfileCard | null>;
   fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
   listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
   /** Pass `ArrayBuffer` on React Native; `Blob`/`File` on web (see Supabase RN upload guidance). */
@@ -37,6 +42,8 @@ export interface ControlPlaneBackend {
     avatarContentType?: string;
     /** When set, updates `profiles.theme` (normalized via `getTheme`). */
     theme?: string;
+    profileVisibility?: ProfileVisibility;
+    profileBio?: string | null;
   }): Promise<UserProfileInfo>;
   listUserCommunities(userId: string): Promise<ServerSummary[]>;
   renameCommunity(input: { communityId: string; name: string }): Promise<void>;

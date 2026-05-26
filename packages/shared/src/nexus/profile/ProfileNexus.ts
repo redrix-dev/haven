@@ -6,7 +6,11 @@ import type {
   PlatformStaffInfo,
   UserProfileInfo,
 } from "@shared/lib/backend/controlPlaneBackend.interface";
-import type { LiveProfileIdentity } from "@shared/lib/backend/types";
+import type {
+  LiveProfileIdentity,
+  ProfileVisibility,
+  UserProfileCard,
+} from "@shared/lib/backend/types";
 import type { StoreApi, UseBoundStore } from "zustand";
 
 export type ProfileNexusState = {
@@ -14,6 +18,9 @@ export type ProfileNexusState = {
   viewerProfiles: Record<string, UserProfileInfo | null>;
   viewerProfileLoading: Record<string, boolean>;
   viewerProfileErrors: Record<string, string | null>;
+  profileCards: Record<string, UserProfileCard | null>;
+  profileCardLoading: Record<string, boolean>;
+  profileCardErrors: Record<string, string | null>;
   platformStaff: Record<string, PlatformStaffInfo | null>;
   platformStaffLoading: Record<string, boolean>;
   platformStaffErrors: Record<string, string | null>;
@@ -27,12 +34,15 @@ export type ViewerProfileUpdateInput = {
   avatarFile?: Blob | ArrayBuffer | null;
   avatarContentType?: string;
   theme?: string;
+  profileVisibility?: ProfileVisibility;
+  profileBio?: string | null;
 };
 
 export class ProfileNexus {
   private readonly store: UseBoundStore<StoreApi<ProfileNexusState>>;
   private readonly controlPlane: ControlPlaneBackend | null;
   private viewerProfileInflight = new Map<string, Promise<UserProfileInfo | null>>();
+  private profileCardInflight = new Map<string, Promise<UserProfileCard | null>>();
   private platformStaffInflight = new Map<string, Promise<PlatformStaffInfo | null>>();
 
   constructor(_persistence: NexusPersistence, controlPlane?: ControlPlaneBackend) {
@@ -43,6 +53,9 @@ export class ProfileNexus {
       viewerProfiles: {},
       viewerProfileLoading: {},
       viewerProfileErrors: {},
+      profileCards: {},
+      profileCardLoading: {},
+      profileCardErrors: {},
       platformStaff: {},
       platformStaffLoading: {},
       platformStaffErrors: {},
@@ -68,6 +81,30 @@ export class ProfileNexus {
         userId,
         username: profile.username,
         avatarUrl: profile.avatarUrl,
+        updatedAt: new Date().toISOString(),
+      });
+      this.setProfileCard(userId, {
+        userId,
+        username: profile.username,
+        avatarUrl: profile.avatarUrl,
+        profileVisibility: profile.profileVisibility,
+        canViewDetails: true,
+        details: { bio: profile.profileBio },
+      });
+    }
+  }
+
+  private setProfileCard(userId: string, card: UserProfileCard | null): void {
+    this.store.setState((state) => ({
+      profileCards: { ...state.profileCards, [userId]: card },
+      revision: state.revision + 1,
+    }));
+
+    if (card) {
+      this.upsertProfile({
+        userId,
+        username: card.username,
+        avatarUrl: card.avatarUrl,
         updatedAt: new Date().toISOString(),
       });
     }
@@ -135,6 +172,57 @@ export class ProfileNexus {
     const result = await this.requireControlPlane().updateUserProfile(input);
     this.setViewerProfile(input.userId, result);
     return result;
+  }
+
+  async loadProfileCard(userId: string): Promise<UserProfileCard | null> {
+    if (!userId.trim()) return null;
+    const existing = this.profileCardInflight.get(userId);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      this.store.setState((state) => ({
+        profileCardLoading: {
+          ...state.profileCardLoading,
+          [userId]: true,
+        },
+        profileCardErrors: {
+          ...state.profileCardErrors,
+          [userId]: null,
+        },
+        revision: state.revision + 1,
+      }));
+
+      try {
+        const card = await this.requireControlPlane().fetchProfileCard(userId);
+        this.setProfileCard(userId, card);
+        return card;
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message.trim().length > 0
+            ? error.message
+            : "Failed to load profile card.";
+        this.store.setState((state) => ({
+          profileCardErrors: {
+            ...state.profileCardErrors,
+            [userId]: message,
+          },
+          revision: state.revision + 1,
+        }));
+        throw error;
+      } finally {
+        this.store.setState((state) => ({
+          profileCardLoading: {
+            ...state.profileCardLoading,
+            [userId]: false,
+          },
+          revision: state.revision + 1,
+        }));
+        this.profileCardInflight.delete(userId);
+      }
+    })();
+
+    this.profileCardInflight.set(userId, promise);
+    return promise;
   }
 
   async loadPlatformStaff(userId: string): Promise<PlatformStaffInfo | null> {
@@ -232,6 +320,14 @@ export class ProfileNexus {
     return this.store.getState().viewerProfileErrors[userId] ?? null;
   }
 
+  getProfileCard(userId: string): UserProfileCard | null | undefined {
+    return this.store.getState().profileCards[userId];
+  }
+
+  getProfileCardError(userId: string): string | null {
+    return this.store.getState().profileCardErrors[userId] ?? null;
+  }
+
   getPlatformStaff(userId: string): PlatformStaffInfo | null | undefined {
     return this.store.getState().platformStaff[userId];
   }
@@ -285,6 +381,24 @@ export class ProfileNexus {
     );
   }
 
+  useProfileCard(userId: string | null | undefined): UserProfileCard | null {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? (state.profileCards[userId] ?? null) : null,
+    );
+  }
+
+  useProfileCardLoading(userId: string | null | undefined): boolean {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? Boolean(state.profileCardLoading[userId]) : false,
+    );
+  }
+
+  useProfileCardError(userId: string | null | undefined): string | null {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? (state.profileCardErrors[userId] ?? null) : null,
+    );
+  }
+
   usePlatformStaff(userId: string | null | undefined): PlatformStaffInfo | null {
     return useStoreWithEqualityFn(this.store, (state) =>
       userId ? (state.platformStaff[userId] ?? null) : null,
@@ -307,12 +421,16 @@ export class ProfileNexus {
 
   clear(): void {
     this.viewerProfileInflight.clear();
+    this.profileCardInflight.clear();
     this.platformStaffInflight.clear();
     this.store.setState({
       profiles: {},
       viewerProfiles: {},
       viewerProfileLoading: {},
       viewerProfileErrors: {},
+      profileCards: {},
+      profileCardLoading: {},
+      profileCardErrors: {},
       platformStaff: {},
       platformStaffLoading: {},
       platformStaffErrors: {},

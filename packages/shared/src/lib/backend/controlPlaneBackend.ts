@@ -7,9 +7,11 @@ import type {
   BanEligibleServer,
   FeatureFlagsSnapshot,
   LiveProfileIdentity,
+  ProfileVisibility,
   RedeemedInvite,
   ServerInvite,
   ServerSummary,
+  UserProfileCard,
 } from './types';
 
 export type { ControlPlaneBackend, PlatformStaffInfo, UserProfileInfo } from './controlPlaneBackend.interface';
@@ -70,12 +72,44 @@ type ProfileIdentityRow = {
   updated_at: string;
 };
 
+type ProfileCardRow = {
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  profile_visibility: string | null;
+  can_view_details: boolean | null;
+  profile_bio: string | null;
+};
+
+const PROFILE_VISIBILITIES: readonly ProfileVisibility[] = [
+  'public',
+  'friends_only',
+  'private',
+];
+
+const normalizeProfileVisibility = (value: unknown): ProfileVisibility =>
+  PROFILE_VISIBILITIES.includes(value as ProfileVisibility)
+    ? (value as ProfileVisibility)
+    : 'private';
+
 export const mapLiveProfileIdentity = (row: ProfileIdentityRow): LiveProfileIdentity => ({
   userId: row.user_id,
   username: row.username,
   avatarUrl: row.avatar_url ?? null,
   updatedAt: row.updated_at,
 });
+
+const mapUserProfileCard = (row: ProfileCardRow): UserProfileCard => {
+  const canViewDetails = Boolean(row.can_view_details);
+  return {
+    userId: row.user_id,
+    username: row.username,
+    avatarUrl: row.avatar_url ?? null,
+    profileVisibility: normalizeProfileVisibility(row.profile_visibility),
+    canViewDetails,
+    details: canViewDetails ? { bio: row.profile_bio ?? null } : null,
+  };
+};
 
 const mapInvite = (invite: InviteRecord): ServerInvite => ({
   id: invite.id,
@@ -105,7 +139,7 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
   async fetchUserProfile(userId) {
     const { data, error } = await client
       .from('profiles')
-      .select('username, avatar_url, theme')
+      .select('username, avatar_url, theme, profile_visibility, profile_bio')
       .eq('id', userId)
       .maybeSingle();
 
@@ -115,7 +149,23 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       username: data.username,
       avatarUrl: data.avatar_url,
       theme: getTheme(data.theme ?? 'default').id,
+      profileVisibility: normalizeProfileVisibility(data.profile_visibility),
+      profileBio: data.profile_bio ?? null,
     };
+  },
+
+  async fetchProfileCard(userId) {
+    const { data, error } = await client.rpc('get_profile_card' as never, {
+      p_user_id: userId,
+    } as never);
+
+    if (error) throw error;
+
+    const row = Array.isArray(data)
+      ? ((data[0] ?? null) as ProfileCardRow | null)
+      : ((data ?? null) as ProfileCardRow | null);
+
+    return row ? mapUserProfileCard(row) : null;
   },
 
   async fetchPlatformStaff(userId) {
@@ -193,16 +243,22 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     avatarFile = null,
     avatarContentType,
     theme,
+    profileVisibility,
+    profileBio,
   }) {
     const { data: existingProfile, error: existingProfileError } = await client
       .from('profiles')
-      .select('avatar_url, theme')
+      .select('avatar_url, theme, profile_visibility, profile_bio')
       .eq('id', userId)
       .maybeSingle();
 
     if (existingProfileError) throw existingProfileError;
 
     const priorThemeId = getTheme(existingProfile?.theme ?? 'default').id;
+    const priorProfileVisibility = normalizeProfileVisibility(
+      existingProfile?.profile_visibility,
+    );
+    const priorProfileBio = existingProfile?.profile_bio ?? null;
 
     const existingAvatarUrl = existingProfile?.avatar_url ?? null;
     let nextAvatarUrl = avatarUrl;
@@ -224,6 +280,8 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       username: string;
       avatar_url: string | null;
       theme?: string;
+      profile_visibility?: ProfileVisibility;
+      profile_bio?: string | null;
     } = {
       username,
       avatar_url: nextAvatarUrl,
@@ -231,17 +289,30 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
     if (theme !== undefined) {
       updatePayload.theme = getTheme(theme).id;
     }
+    if (profileVisibility !== undefined) {
+      updatePayload.profile_visibility = normalizeProfileVisibility(profileVisibility);
+    }
+    if (profileBio !== undefined) {
+      updatePayload.profile_bio = profileBio;
+    }
 
     const { error } = await client.from('profiles').update(updatePayload).eq('id', userId);
 
     if (error) throw error;
 
     const effectiveThemeId = theme !== undefined ? getTheme(theme).id : priorThemeId;
+    const effectiveProfileVisibility =
+      profileVisibility !== undefined
+        ? normalizeProfileVisibility(profileVisibility)
+        : priorProfileVisibility;
+    const effectiveProfileBio = profileBio !== undefined ? profileBio : priorProfileBio;
 
     return {
       username,
       avatarUrl: nextAvatarUrl,
       theme: effectiveThemeId,
+      profileVisibility: effectiveProfileVisibility,
+      profileBio: effectiveProfileBio,
     };
   },
 
@@ -439,4 +510,3 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
 
   return backend;
 }
-

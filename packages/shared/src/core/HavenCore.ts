@@ -21,7 +21,7 @@ import {
 } from "@shared/nexus/voice/VoiceNexus";
 import { useUiStore } from "@shared/stores/uiStore";
 import { getCommunityDataBackend } from "@shared/lib/backend";
-import type { BanEligibleServer } from "@shared/lib/backend/types";
+import type { BanEligibleServer, ProfileVisibility } from "@shared/lib/backend/types";
 import { createHavenBackends, type HavenBackends, type HavenSupabasePublicConfig } from "./backends";
 import { notifyActiveServerAccessLost } from "./communityAccessHandlers";
 import { BootstrapPhase, type BootstrapPhaseSnapshot, type BootstrapPhaseListener } from "./bootstrapPhase";
@@ -585,7 +585,15 @@ export class HavenCore {
     avatarFile?: Blob | ArrayBuffer | null;
     avatarContentType?: string;
     theme?: string;
-  }): Promise<{ username: string; avatarUrl: string | null; theme?: string }> {
+    profileVisibility?: ProfileVisibility;
+    profileBio?: string | null;
+  }): Promise<{
+    username: string;
+    avatarUrl: string | null;
+    theme?: string;
+    profileVisibility?: ProfileVisibility;
+    profileBio?: string | null;
+  }> {
     return this.profiles.updateViewerProfile(input);
   }
 

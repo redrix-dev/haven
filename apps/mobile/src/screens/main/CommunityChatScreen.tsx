@@ -29,6 +29,7 @@ import {
   type ChatListItem,
   type ChatMessage,
 } from "@/features/community/CommunityMessageBubble";
+import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
 import { CommunityPhaseGate } from "@/features/community/CommunityPhaseGate";
 import {
   loadPickedCommunityMediaForUpload,
@@ -38,9 +39,13 @@ import { useDataCacheComponentProbe } from "@shared/debug";
 
 type CommunityChatScreenProps = {
   serverId: string;
+  onOpenProfileCard?: (target: UserProfileModalTarget) => void;
 };
 
-export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
+export function CommunityChatScreen({
+  serverId,
+  onOpenProfileCard,
+}: CommunityChatScreenProps) {
   const composerColors = useChatComposerColors();
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(
     null,
@@ -328,15 +333,32 @@ export function CommunityChatScreen({ serverId }: CommunityChatScreenProps) {
       return <MessageDateDivider label={item.label} />;
     }
 
+    const canOpenAuthorProfile =
+      Boolean(item.message.authorUserId) &&
+      item.message.authorName !== "Banned User" &&
+      item.message.authorName !== "Unknown User";
+
     return (
       <CommunityMessageBubble
         {...item.message}
         attachments={item.message.attachments ?? []}
         isCondensed={item.isCondensed}
         onPress={() => composerInputRef.current?.blur()}
+        onPressAuthor={
+          canOpenAuthorProfile && item.message.authorUserId
+            ? () => {
+                composerInputRef.current?.blur();
+                onOpenProfileCard?.({
+                  userId: item.message.authorUserId!,
+                  username: item.message.authorName ?? "User",
+                  avatarUrl: item.message.authorAvatarUrl ?? null,
+                });
+              }
+            : undefined
+        }
       />
     );
-  }, []);
+  }, [onOpenProfileCard]);
 
   const phase: "loading" | "ready" | "missing" | "error" =
     serversStatus === "loading" && servers.length === 0

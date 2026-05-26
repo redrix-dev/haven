@@ -1,5 +1,13 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from "react-native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import type { MessageAttachment, MessageLinkPreview } from "@shared/lib/backend/types";
 import { getFallbackEmbedUrl } from "@shared/features/messaging/utils/embedUtils";
@@ -65,6 +73,7 @@ export function formatTime(timestamp: string): string {
 type CommunityMessageBubbleProps = ChatMessage & {
   isCondensed?: boolean;
   onPress?: () => void;
+  onPressAuthor?: () => void;
   onLongPress?: () => void;
 };
 
@@ -80,6 +89,7 @@ export function CommunityMessageBubble({
   attachments,
   isCondensed,
   onPress,
+  onPressAuthor,
   onLongPress,
   linkPreview,
 }: CommunityMessageBubbleProps) {
@@ -89,6 +99,10 @@ export function CommunityMessageBubble({
   const siteName = linkPreview?.snapshot?.siteName ?? "Link preview";
   const thumbnailUrl = linkPreview?.snapshot?.thumbnail?.signedUrl ?? null;
   const showHeader = !isCondensed;
+  const handleAuthorPress = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    onPressAuthor?.();
+  };
 
   return (
     <Pressable
@@ -100,7 +114,15 @@ export function CommunityMessageBubble({
       onLongPress={onLongPress}
     >
       {showHeader ? (
-        <View style={styles.avatarShell}>
+        <Pressable
+          style={styles.avatarShell}
+          onPress={onPressAuthor ? handleAuthorPress : undefined}
+          disabled={!onPressAuthor}
+          accessibilityRole={onPressAuthor ? "button" : undefined}
+          accessibilityLabel={
+            onPressAuthor ? `Open ${authorName ?? "user"} profile` : undefined
+          }
+        >
           {authorAvatarUrl ? (
             <Image
               source={{ uri: authorAvatarUrl }}
@@ -113,7 +135,7 @@ export function CommunityMessageBubble({
               <Text style={styles.avatarFallbackText}>{authorInitial ?? "U"}</Text>
             </View>
           )}
-        </View>
+        </Pressable>
       ) : (
         <View style={styles.compactSpacer} />
       )}
@@ -122,9 +144,19 @@ export function CommunityMessageBubble({
         {showHeader ? (
           <View style={styles.metaRow}>
             <View style={styles.metaNameRow}>
-              <Text style={styles.authorName} numberOfLines={1}>
-                {authorName ?? "Unknown User"}
-              </Text>
+              <Pressable
+                style={styles.authorNameButton}
+                onPress={onPressAuthor ? handleAuthorPress : undefined}
+                disabled={!onPressAuthor}
+                accessibilityRole={onPressAuthor ? "button" : undefined}
+                accessibilityLabel={
+                  onPressAuthor ? `Open ${authorName ?? "user"} profile` : undefined
+                }
+              >
+                <Text style={styles.authorName} numberOfLines={1}>
+                  {authorName ?? "Unknown User"}
+                </Text>
+              </Pressable>
               {isAuthorStaff ? (
                 <View style={styles.staffBadge}>
                   <Text style={styles.staffBadgeText}>Staff</Text>
@@ -334,6 +366,9 @@ const styles = StyleSheet.create({
     color: "#F2F3F5",
     fontSize: 16,
     fontWeight: "500",
+  },
+  authorNameButton: {
+    flexShrink: 1,
   },
   staffBadge: {
     borderRadius: 4,

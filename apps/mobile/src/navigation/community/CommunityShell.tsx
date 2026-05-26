@@ -18,6 +18,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { CommunityChatScreen } from "@/screens/main/CommunityChatScreen";
+import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
 import type { MainStackParamList } from "@/navigation/types";
 import { CommunityChannelDrawer } from "@/navigation/community/CommunityChannelDrawer";
 import { CommunityTopBar } from "@/navigation/community/CommunityTopBar";
@@ -40,6 +41,7 @@ const EDGE_WIDTH = 28;
 type Props = NativeStackScreenProps<MainStackParamList, "Community">;
 type CommunityShellProps = Props & {
   onOpenProfile: () => void;
+  onOpenProfileCard: (target: UserProfileModalTarget) => void;
   onOpenNotifications: () => void;
   onOpenInbox: () => void;
   notificationsUnreadCount: number;
@@ -54,6 +56,7 @@ export function CommunityShell({
   route,
   navigation,
   onOpenProfile,
+  onOpenProfileCard,
   onOpenNotifications,
   onOpenInbox,
   notificationsUnreadCount,
@@ -413,7 +416,10 @@ export function CommunityShell({
             ) : null}
 
             {serverId ? (
-              <CommunityChatScreen serverId={serverId} />
+              <CommunityChatScreen
+                serverId={serverId}
+                onOpenProfileCard={onOpenProfileCard}
+              />
             ) : (
               <View className="flex-1 bg-background" />
             )}
