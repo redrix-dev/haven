@@ -1,15 +1,41 @@
 import { Platform } from "react-native";
-import ReactNativeForegroundService from "@supersami/rn-foreground-service";
 
 const VOICE_NOTIFICATION_ID = 48031;
 const VOICE_NOTIFICATION_ACTION = "haven.voice.open";
 
-let registered = false;
+type ReactNativeForegroundService =
+  typeof import("@supersami/rn-foreground-service").default;
 
-function registerForegroundService(): void {
-  if (registered || Platform.OS !== "android") return;
+let registered = false;
+let foregroundServicePromise: Promise<ReactNativeForegroundService | null> | null =
+  null;
+
+function loadForegroundService(): Promise<ReactNativeForegroundService | null> {
+  if (Platform.OS !== "android") return Promise.resolve(null);
+  foregroundServicePromise ??= new Promise((resolve) => {
+    try {
+      const module = require("@supersami/rn-foreground-service") as {
+        default: ReactNativeForegroundService;
+      };
+      resolve(module.default);
+    } catch (error) {
+      foregroundServicePromise = null;
+      console.warn(
+        "[voice] Android foreground service module unavailable.",
+        error,
+      );
+      resolve(null);
+    }
+  });
+  return foregroundServicePromise;
+}
+
+async function registerForegroundService(): Promise<ReactNativeForegroundService | null> {
+  const service = await loadForegroundService();
+  if (!service) return null;
+  if (registered) return service;
   registered = true;
-  ReactNativeForegroundService.register({
+  service.register({
     config: {
       alert: false,
       onServiceErrorCallBack: () => {
@@ -17,22 +43,38 @@ function registerForegroundService(): void {
       },
     },
   });
+  return service;
 }
 
-export function addVoiceNotificationOpenListener(onOpen: () => void): () => void {
+export function addVoiceNotificationOpenListener(
+  onOpen: () => void,
+): () => void {
   if (Platform.OS !== "android") return () => {};
-  registerForegroundService();
-  return ReactNativeForegroundService.eventListener((event: unknown) => {
-    const payload = event as { main?: string; button?: string } | null;
-    if (payload?.main === VOICE_NOTIFICATION_ACTION) {
-      onOpen();
-    }
+  let disposed = false;
+  let unsubscribe: (() => void) | null = null;
+
+  void registerForegroundService().then((service) => {
+    if (!service || disposed) return;
+    unsubscribe = service.eventListener((event: unknown) => {
+      const payload = event as { main?: string; button?: string } | null;
+      if (payload?.main === VOICE_NOTIFICATION_ACTION) {
+        onOpen();
+      }
+    });
   });
+
+  return () => {
+    disposed = true;
+    unsubscribe?.();
+  };
 }
 
-export async function startVoiceForegroundService(channelName: string | null): Promise<void> {
+export async function startVoiceForegroundService(
+  channelName: string | null,
+): Promise<void> {
   if (Platform.OS !== "android") return;
-  registerForegroundService();
+  const service = await registerForegroundService();
+  if (!service) return;
 
   const message = channelName
     ? `Connected to ${channelName}`
@@ -52,11 +94,11 @@ export async function startVoiceForegroundService(channelName: string | null): P
   };
 
   try {
-    if (ReactNativeForegroundService.is_running()) {
-      await ReactNativeForegroundService.update(payload);
+    if (service.is_running()) {
+      await service.update(payload);
       return;
     }
-    await ReactNativeForegroundService.start(payload);
+    await service.start(payload);
   } catch (error) {
     console.warn("[voice] Failed to start Android foreground service.", error);
   }
@@ -64,9 +106,11 @@ export async function startVoiceForegroundService(channelName: string | null): P
 
 export async function stopVoiceForegroundService(): Promise<void> {
   if (Platform.OS !== "android") return;
+  const service = await loadForegroundService();
+  if (!service) return;
   try {
-    if (ReactNativeForegroundService.is_running()) {
-      await ReactNativeForegroundService.stopAll();
+    if (service.is_running()) {
+      await service.stopAll();
     }
   } catch (error) {
     console.warn("[voice] Failed to stop Android foreground service.", error);

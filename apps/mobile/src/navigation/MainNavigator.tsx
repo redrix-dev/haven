@@ -6,7 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
 import { CommunityEntry } from "@/navigation/community/CommunityEntry";
 import { CommunityShell } from "@/navigation/community/CommunityShell";
-import type { MainStackParamList, RootStackParamList } from "@/navigation/types";
+import type {
+  MainStackParamList,
+  RootStackParamList,
+} from "@/navigation/types";
 import { NAV_THEME } from "@/lib/theme";
 import { setMobileNavigationDelegate } from "@/lib/registerMobileAppHost";
 import {
@@ -33,7 +36,10 @@ import { useAuthStore } from "@shared/stores/authStore";
 import type { FriendsPanelTab } from "@shared/types/types";
 import type { NotificationAudioSettings } from "@shared/types/settings";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";
-import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
 import { useMobilePushNotificationRouting } from "@/hooks/useMobilePushNotificationRouting";
 import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
@@ -53,6 +59,7 @@ import { useMobileLiveKitVoiceSession } from "@/features/voice/useMobileLiveKitV
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const mainStackScreenBackground = NAV_THEME.dark.colors.background;
+const VOICE_PROMPT_CLOSE_DELAY_MS = 380;
 
 /**
  * Bridges React Navigation imperative API into the shared AppHost so external
@@ -64,8 +71,7 @@ function MainNavigationDelegateBridge({
 }: {
   onNavigateToDm: (conversationId: string) => void;
 }) {
-  const navigation =
-    useNavigation<NavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   useEffect(() => {
     setMobileNavigationDelegate({
@@ -119,19 +125,20 @@ function MobileNotificationSoundSync({
 
   useEffect(() => {
     if (!userId || !soundSyncRef.current.bootstrapped) return;
-    void syncNotificationSounds(core, audioRef.current, soundSyncRef.current).catch(
-      (error) => {
-        console.error("Failed to play notification sounds:", error);
-      },
-    );
+    void syncNotificationSounds(
+      core,
+      audioRef.current,
+      soundSyncRef.current,
+    ).catch((error) => {
+      console.error("Failed to play notification sounds:", error);
+    });
   }, [core, notificationItems.length, userId]);
 
   return null;
 }
 
 function MainNavigationShell({ userId }: { userId: string }) {
-  const navigation =
-    useNavigation<NavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const core = useHavenCore();
   const dm = core.directMessages;
   const authUser = useAuthStore((s) => s.user);
@@ -140,7 +147,9 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const dmConversations = dm.useConversations();
   const currentServerId = core.communities.useActiveId();
   const currentChannelId = core.channels.useActiveChannelId();
-  const activeCommunityChannels = core.channels.useChannels(currentServerId ?? "__none__");
+  const activeCommunityChannels = core.channels.useChannels(
+    currentServerId ?? "__none__",
+  );
   const channels = useMemo(
     () => activeCommunityChannels.map(toChannel),
     [activeCommunityChannels],
@@ -173,7 +182,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
     const displayName =
       resolveLiveUsername(liveProfiles, userId, fallbackName) ?? fallbackName;
     const avatarUrl =
-      resolveLiveAvatarUrl(liveProfiles, userId, viewerProfile?.avatarUrl ?? null) ??
+      resolveLiveAvatarUrl(
+        liveProfiles,
+        userId,
+        viewerProfile?.avatarUrl ?? null,
+      ) ??
       viewerProfile?.avatarUrl ??
       null;
 
@@ -219,8 +232,12 @@ function MainNavigationShell({ userId }: { userId: string }) {
     setVoiceControlActions,
   } = voice.actions;
   const [voiceSheetOpen, setVoiceSheetOpen] = useState(false);
-  const [interruptionNoticeVisible, setInterruptionNoticeVisible] = useState(false);
+  const [interruptionNoticeVisible, setInterruptionNoticeVisible] =
+    useState(false);
   const [skipVoiceSwitchPrompt, setSkipVoiceSwitchPrompt] = useState(false);
+  const voiceSheetOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -238,7 +255,29 @@ function MainNavigationShell({ userId }: { userId: string }) {
   }, []);
 
   const openVoiceSheet = useCallback(() => {
+    if (voiceSheetOpenTimeoutRef.current) {
+      clearTimeout(voiceSheetOpenTimeoutRef.current);
+      voiceSheetOpenTimeoutRef.current = null;
+    }
     setVoiceSheetOpen(true);
+  }, []);
+
+  const openVoiceSheetAfterPromptClose = useCallback(() => {
+    if (voiceSheetOpenTimeoutRef.current) {
+      clearTimeout(voiceSheetOpenTimeoutRef.current);
+    }
+    voiceSheetOpenTimeoutRef.current = setTimeout(() => {
+      voiceSheetOpenTimeoutRef.current = null;
+      setVoiceSheetOpen(true);
+    }, VOICE_PROMPT_CLOSE_DELAY_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (voiceSheetOpenTimeoutRef.current) {
+        clearTimeout(voiceSheetOpenTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(
@@ -255,14 +294,18 @@ function MainNavigationShell({ userId }: { userId: string }) {
       channelName: activeVoiceChannel.name,
     };
   }, [voiceDerived.activeVoiceChannel]);
+  const activeVoiceControllerChannelKey = activeVoiceControllerChannel
+    ? `${activeVoiceControllerChannel.communityId}:${activeVoiceControllerChannel.channelId}`
+    : null;
 
   const handleVoiceSessionError = useCallback(
     (message: string) => {
       Alert.alert("Voice connection failed", message);
-      void disconnectVoiceSession({ triggerPaneLeave: false })
-        .catch((error: unknown) => {
+      void disconnectVoiceSession({ triggerPaneLeave: false }).catch(
+        (error: unknown) => {
           console.warn("[voice] Failed to reset after session error.", error);
-        });
+        },
+      );
     },
     [disconnectVoiceSession],
   );
@@ -270,7 +313,10 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const handleVoiceKick = useCallback(() => {
     void forceDisconnectVoice("kicked")
       .then(() => {
-        Alert.alert("Removed from voice", "You were removed from the voice channel.");
+        Alert.alert(
+          "Removed from voice",
+          "You were removed from the voice channel.",
+        );
       })
       .catch((error: unknown) => {
         console.warn("[voice] Failed to disconnect after kick.", error);
@@ -293,14 +339,15 @@ function MainNavigationShell({ userId }: { userId: string }) {
     onInterrupted: handleVoiceInterrupted,
   });
 
-  const {
-    joinVoiceChannel,
-    leaveVoiceChannel,
-    toggleMute,
-    toggleDeafen,
-  } = voiceController.actions;
+  const { joinVoiceChannel, leaveVoiceChannel, toggleMute, toggleDeafen } =
+    voiceController.actions;
 
   useEffect(() => {
+    if (!activeVoiceControllerChannelKey) {
+      setVoiceControlActions(null);
+      return;
+    }
+
     setVoiceControlActions({
       join: () => {
         void joinVoiceChannel();
@@ -313,6 +360,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
     });
     return () => setVoiceControlActions(null);
   }, [
+    activeVoiceControllerChannelKey,
     joinVoiceChannel,
     leaveVoiceChannel,
     setVoiceControlActions,
@@ -323,23 +371,23 @@ function MainNavigationShell({ userId }: { userId: string }) {
   useEffect(() => {
     const prompt = voiceState.voiceJoinPrompt;
     if (prompt?.mode !== "switch" || !skipVoiceSwitchPrompt) return;
-    void confirmVoiceChannelJoin().then(openVoiceSheet);
+    void confirmVoiceChannelJoin().then(openVoiceSheetAfterPromptClose);
   }, [
     confirmVoiceChannelJoin,
-    openVoiceSheet,
+    openVoiceSheetAfterPromptClose,
     skipVoiceSwitchPrompt,
     voiceState.voiceJoinPrompt,
   ]);
 
   const handleConfirmVoiceJoin = useCallback(() => {
-    void confirmVoiceChannelJoin().then(openVoiceSheet);
-  }, [confirmVoiceChannelJoin, openVoiceSheet]);
+    void confirmVoiceChannelJoin().then(openVoiceSheetAfterPromptClose);
+  }, [confirmVoiceChannelJoin, openVoiceSheetAfterPromptClose]);
 
   const handleSelectVoiceChannel = useCallback(
     (channelId: string) => {
       if (channelId === voiceState.activeVoiceChannelId) {
         if (!voiceController.state.joined && !voiceController.state.joining) {
-          void voiceController.actions.joinVoiceChannel();
+          void joinVoiceChannel();
         }
         openVoiceSheet();
         return;
@@ -350,7 +398,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
       openVoiceSheet,
       requestVoiceChannelJoin,
       voiceState.activeVoiceChannelId,
-      voiceController.actions,
+      joinVoiceChannel,
       voiceController.state.joined,
       voiceController.state.joining,
     ],
@@ -370,7 +418,8 @@ function MainNavigationShell({ userId }: { userId: string }) {
     setIsSettingsModalOpen(false);
   }, []);
 
-  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] =
+    useState(false);
   const [notificationsSubScreen, setNotificationsSubScreen] = useState<
     "list" | "preferences" | "modmail"
   >("list");
@@ -389,7 +438,8 @@ function MainNavigationShell({ userId }: { userId: string }) {
     };
   }, [isNotificationsModalOpen]);
 
-  const [isDirectMessagesModalOpen, setIsDirectMessagesModalOpen] = useState(false);
+  const [isDirectMessagesModalOpen, setIsDirectMessagesModalOpen] =
+    useState(false);
   const handleOpenDirectMessages = useCallback(() => {
     setWorkspaceMode("dm");
     setIsDirectMessagesModalOpen(true);
@@ -408,11 +458,15 @@ function MainNavigationShell({ userId }: { userId: string }) {
   }, [setWorkspaceMode]);
 
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
-  const [friendsInitialTab, setFriendsInitialTab] = useState<FriendsPanelTab>("friends");
+  const [friendsInitialTab, setFriendsInitialTab] =
+    useState<FriendsPanelTab>("friends");
   const [friendsHighlightedRequestId, setFriendsHighlightedRequestId] =
     useState<string | null>(null);
   const handleOpenFriendsFromNotification = useCallback(
-    (input: { tab: "requests" | "friends"; highlightedRequestId: string | null }) => {
+    (input: {
+      tab: "requests" | "friends";
+      highlightedRequestId: string | null;
+    }) => {
       setFriendsInitialTab(input.tab === "requests" ? "requests" : "friends");
       setFriendsHighlightedRequestId(input.highlightedRequestId);
       setIsFriendsModalOpen(true);
@@ -509,7 +563,10 @@ function MainNavigationShell({ userId }: { userId: string }) {
           </Stack.Screen>
         </Stack.Navigator>
         {!voiceSheetOpen ? (
-          <VoiceReturnPill state={voiceController.state} onPress={openVoiceSheet} />
+          <VoiceReturnPill
+            state={voiceController.state}
+            onPress={openVoiceSheet}
+          />
         ) : null}
       </View>
 
@@ -589,7 +646,9 @@ function MainNavigationShell({ userId }: { userId: string }) {
       >
         <View className="gap-4">
           <Text className="text-sm leading-5 text-muted-foreground">
-            We kept you connected to your friends but muted and deafened the voice session. You can unmute and undeafen whenever you're ready to be back in the conversation.
+            We kept you connected to your friends but muted and deafened the
+            voice session. You can unmute and undeafen whenever you're ready to
+            be back in the conversation.
           </Text>
           <Pressable
             accessibilityRole="button"

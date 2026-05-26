@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, PermissionsAndroid, Platform } from "react-native";
-import {
-  AndroidAudioTypePresets,
-  AudioSession,
-} from "@livekit/react-native";
+import { PermissionsAndroid, Platform } from "react-native";
+import { AndroidAudioTypePresets, AudioSession } from "@livekit/react-native";
 import {
   ConnectionState,
   Room,
@@ -145,7 +142,6 @@ export function useMobileLiveKitVoiceSession({
   onUpdateVoiceSettings,
   onSessionError,
   onVoiceKick,
-  onInterrupted,
 }: UseMobileLiveKitVoiceSessionInput): {
   state: MobileVoiceControllerState;
   actions: MobileVoiceControllerActions;
@@ -162,9 +158,9 @@ export function useMobileLiveKitVoiceSession({
   const [notice, setNotice] = useState<string | null>(null);
   const [localInputLevel, setLocalInputLevel] = useState(0);
   const [voiceActivityGateOpen, setVoiceActivityGateOpen] = useState(false);
-  const [outputDevices, setOutputDevices] = useState<MobileVoiceOutputOption[]>([
-    { id: "default", label: "Auto" },
-  ]);
+  const [outputDevices, setOutputDevices] = useState<MobileVoiceOutputOption[]>(
+    [{ id: "default", label: "Auto" }],
+  );
   const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState(
     voiceSettings.preferredOutputDeviceId || "default",
   );
@@ -179,18 +175,20 @@ export function useMobileLiveKitVoiceSession({
 
   const activeChannelRef = useRef(activeChannel);
   const voiceSettingsRef = useRef(voiceSettings);
+  const onUpdateVoiceSettingsRef = useRef(onUpdateVoiceSettings);
+  const onSessionErrorRef = useRef(onSessionError);
+  const onVoiceKickRef = useRef(onVoiceKick);
   const currentUserRef = useRef({
     id: currentUserId,
     displayName: currentUserDisplayName,
     avatarUrl: currentUserAvatarUrl ?? null,
   });
-  const inputLevelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const inputLevelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const lastVoiceActivityAtRef = useRef(0);
   const previousChannelKeyRef = useRef<string | null>(null);
   const intentionalDisconnectRef = useRef(false);
-  const iOSInactiveInterruptionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
 
   const remoteParticipantIds = useMemo(
     () => participants.map((participant) => participant.userId),
@@ -208,24 +206,29 @@ export function useMobileLiveKitVoiceSession({
     remoteParticipantIds,
   );
 
-  const buildParticipantsFromRoom = useCallback((room: Room): VoiceParticipant[] => {
-    const activeSpeakerIds = new Set(
-      room.activeSpeakers.map((participant) => participant.identity),
-    );
-    return Array.from(room.remoteParticipants.values()).map(
-      (participant: RemoteParticipant) => {
-        const micPublication = participant.getTrackPublication(Track.Source.Microphone);
-        return {
-          userId: participant.identity,
-          displayName: participant.name || participant.identity,
-          avatarUrl: tryParseAvatarUrl(participant.metadata),
-          isSpeaking: activeSpeakerIds.has(participant.identity),
-          muted: !micPublication || micPublication.isMuted,
-          deafened: false,
-        };
-      },
-    );
-  }, []);
+  const buildParticipantsFromRoom = useCallback(
+    (room: Room): VoiceParticipant[] => {
+      const activeSpeakerIds = new Set(
+        room.activeSpeakers.map((participant) => participant.identity),
+      );
+      return Array.from(room.remoteParticipants.values()).map(
+        (participant: RemoteParticipant) => {
+          const micPublication = participant.getTrackPublication(
+            Track.Source.Microphone,
+          );
+          return {
+            userId: participant.identity,
+            displayName: participant.name || participant.identity,
+            avatarUrl: tryParseAvatarUrl(participant.metadata),
+            isSpeaking: activeSpeakerIds.has(participant.identity),
+            muted: !micPublication || micPublication.isMuted,
+            deafened: false,
+          };
+        },
+      );
+    },
+    [],
+  );
 
   const applyParticipants = useCallback(
     (room: Room) => {
@@ -246,7 +249,9 @@ export function useMobileLiveKitVoiceSession({
   const applyRemoteVolumes = useCallback(
     (room: Room, volumes: Record<string, number>, deafened: boolean) => {
       room.remoteParticipants.forEach((participant) => {
-        const volume = deafened ? 0 : (volumes[participant.identity] ?? 100) / 100;
+        const volume = deafened
+          ? 0
+          : (volumes[participant.identity] ?? 100) / 100;
         participant.setVolume(volume, Track.Source.Microphone);
       });
     },
@@ -277,7 +282,10 @@ export function useMobileLiveKitVoiceSession({
     inputLevelIntervalRef.current = setInterval(() => {
       const room = roomRef.current;
       if (!room) return;
-      const level = Math.max(0, Math.min(1, room.localParticipant.audioLevel ?? 0));
+      const level = Math.max(
+        0,
+        Math.min(1, room.localParticipant.audioLevel ?? 0),
+      );
       const threshold = Math.max(
         0,
         Math.min(1, voiceSettingsRef.current.voiceActivationThreshold / 100),
@@ -337,7 +345,12 @@ export function useMobileLiveKitVoiceSession({
   const joinVoiceChannel = useCallback(async () => {
     const targetChannel = activeChannelRef.current;
     const user = currentUserRef.current;
-    if (!targetChannel || !user.id || joining || core.voice.getSnapshot().joined) {
+    if (
+      !targetChannel ||
+      !user.id ||
+      joining ||
+      core.voice.getSnapshot().joined
+    ) {
       return;
     }
 
@@ -376,14 +389,16 @@ export function useMobileLiveKitVoiceSession({
       ]);
       await room.localParticipant.setMicrophoneEnabled(true);
       if (selectedOutputDeviceId !== "default" || Platform.OS === "ios") {
-        await AudioSession.selectAudioOutput(selectedOutputDeviceId).catch(() => {});
+        await AudioSession.selectAudioOutput(selectedOutputDeviceId).catch(
+          () => {},
+        );
       }
 
       await core.voice.connectKickChannel({
         communityId: targetChannel.communityId,
         channelId: targetChannel.channelId,
         currentUserId: user.id,
-        onKick: (payload) => onVoiceKick?.(payload),
+        onKick: (payload) => onVoiceKickRef.current?.(payload),
       });
 
       core.voice.setJoined(true);
@@ -397,11 +412,14 @@ export function useMobileLiveKitVoiceSession({
       applyParticipants(room);
       startInputLevelPolling();
     } catch (joinError) {
-      const message = getErrorMessage(joinError, "Failed to join voice channel.");
+      const message = getErrorMessage(
+        joinError,
+        "Failed to join voice channel.",
+      );
       core.voice.setError(message);
       await cleanupVoiceSession();
       setError(message);
-      onSessionError?.(message);
+      onSessionErrorRef.current?.(message);
     } finally {
       setJoining(false);
     }
@@ -410,8 +428,6 @@ export function useMobileLiveKitVoiceSession({
     cleanupVoiceSession,
     core.voice,
     joining,
-    onSessionError,
-    onVoiceKick,
     refreshAudioOutputs,
     selectedOutputDeviceId,
     startInputLevelPolling,
@@ -427,17 +443,24 @@ export function useMobileLiveKitVoiceSession({
     core.voice.setIsDeafened(next);
   }, [core.voice]);
 
+  const updateVoiceSettingsPatch = useCallback(
+    (patch: Partial<VoiceSettings>) => {
+      onUpdateVoiceSettingsRef.current(patch);
+    },
+    [],
+  );
+
   const setOutputDevice = useCallback(
     (deviceId: string) => {
       setSelectedOutputDeviceId(deviceId);
-      onUpdateVoiceSettings({ preferredOutputDeviceId: deviceId });
+      onUpdateVoiceSettingsRef.current({ preferredOutputDeviceId: deviceId });
       if (!core.voice.getSnapshot().joined) return;
       if (deviceId === "default" && Platform.OS !== "ios") return;
       void AudioSession.selectAudioOutput(deviceId).catch((outputError) => {
         console.warn("[voice] Failed to select audio output.", outputError);
       });
     },
-    [core.voice, onUpdateVoiceSettings],
+    [core.voice],
   );
 
   const showSystemRoutePicker = useCallback(() => {
@@ -453,8 +476,16 @@ export function useMobileLiveKitVoiceSession({
 
   useEffect(() => {
     voiceSettingsRef.current = voiceSettings;
-    setSelectedOutputDeviceId(voiceSettings.preferredOutputDeviceId || "default");
+    setSelectedOutputDeviceId(
+      voiceSettings.preferredOutputDeviceId || "default",
+    );
   }, [voiceSettings]);
+
+  useEffect(() => {
+    onUpdateVoiceSettingsRef.current = onUpdateVoiceSettings;
+    onSessionErrorRef.current = onSessionError;
+    onVoiceKickRef.current = onVoiceKick;
+  }, [onSessionError, onUpdateVoiceSettings, onVoiceKick]);
 
   useEffect(() => {
     currentUserRef.current = {
@@ -545,29 +576,6 @@ export function useMobileLiveKitVoiceSession({
     core.voice.setSessionState({ joined, isMuted, isDeafened });
   }, [core.voice, isDeafened, isMuted, joined]);
 
-  useEffect(() => {
-    if (Platform.OS !== "ios") return;
-    const subscription = AppState.addEventListener("change", (nextState) => {
-      if (iOSInactiveInterruptionTimeoutRef.current) {
-        clearTimeout(iOSInactiveInterruptionTimeoutRef.current);
-        iOSInactiveInterruptionTimeoutRef.current = null;
-      }
-      if (nextState === "inactive" && core.voice.getSnapshot().joined) {
-        iOSInactiveInterruptionTimeoutRef.current = setTimeout(() => {
-          if (!core.voice.getSnapshot().joined) return;
-          core.voice.setIsDeafened(true);
-          onInterrupted?.();
-        }, 900);
-      }
-    });
-    return () => {
-      if (iOSInactiveInterruptionTimeoutRef.current) {
-        clearTimeout(iOSInactiveInterruptionTimeoutRef.current);
-      }
-      subscription.remove();
-    };
-  }, [core.voice, onInterrupted]);
-
   const activeChannelKey = activeChannel
     ? `${activeChannel.communityId}:${activeChannel.channelId}`
     : null;
@@ -579,7 +587,8 @@ export function useMobileLiveKitVoiceSession({
     let cancelled = false;
     const syncChannel = async () => {
       await cleanupVoiceSession();
-      if (cancelled || !activeChannelRef.current || !currentUserRef.current.id) return;
+      if (cancelled || !activeChannelRef.current || !currentUserRef.current.id)
+        return;
       await joinVoiceChannel();
     };
 
@@ -618,7 +627,7 @@ export function useMobileLiveKitVoiceSession({
       leaveVoiceChannel: cleanupVoiceSession,
       toggleMute,
       toggleDeafen,
-      updateVoiceSettingsPatch: onUpdateVoiceSettings,
+      updateVoiceSettingsPatch,
       setMemberVolume,
       resetMemberVolume,
       resetAllMemberVolumes,
