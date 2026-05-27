@@ -178,6 +178,7 @@ export function CommunityChatScreen({
         mediaArrayBuffer: options?.mediaArrayBuffer,
         mediaContentType: options?.mediaContentType,
         mediaFilename: options?.mediaFilename,
+        senderUserId: currentUserId,
       });
     },
     [activeChannelId, currentUserId, messageNexus, setRainbowMode],

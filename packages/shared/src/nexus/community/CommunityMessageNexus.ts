@@ -34,6 +34,7 @@ export type SendCommunityMessageMediaOptions = {
   mediaContentType?: string
   mediaFilename?: string
   mediaExpiresInHours?: number
+  senderUserId?: string | null
 }
 
 export type ChannelMeta = {
@@ -231,25 +232,43 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     return promise
   }
 
-  /**
-   * Send a user message in this community. Returns the new message id.
-   * The realtime stream is the source of truth; we don't optimistically
-   * insert here, the routeEvent pipeline does it on MESSAGE_INSERT.
-   */
   async send(
     channelId: string,
     content: string,
-    options?: { replyToMessageId?: string | null },
+    options?: { replyToMessageId?: string | null; senderUserId?: string | null },
   ): Promise<{ id: string }> {
     if (!this.communityData) {
       throw new Error('CommunityMessageNexus.send called before backend attached.')
     }
-    return this.communityData.sendUserMessage({
+    const result = await this.communityData.sendUserMessage({
       communityId: this.communityId,
       channelId,
       content,
       replyToMessageId: options?.replyToMessageId ?? null,
     })
+    // Optimistically insert the sent message immediately so it appears in the
+    // UI without waiting for the realtime MESSAGE_INSERT event. The event
+    // handler will deduplicate the insert and then enrich the entry via
+    // updateMessage once the full bundle is fetched.
+    this.insertMessage({
+      id: result.id,
+      channelId,
+      authorUserId: options?.senderUserId ?? null,
+      displayName: '…',
+      avatarSnapshotUrl: null,
+      content,
+      metadata: {},
+      replyToMessageId: options?.replyToMessageId ?? null,
+      createdAt: new Date().toISOString(),
+      editedAt: null,
+      deletedAt: null,
+      isHidden: false,
+      isPlatformStaff: false,
+      reactions: [],
+      attachment: null,
+      linkPreview: null,
+    })
+    return result
   }
 
   async sendWithMedia(
@@ -273,6 +292,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     if (!hasBlob && !hasBuffer) {
       await this.send(channelId, content, {
         replyToMessageId: options?.replyToMessageId ?? null,
+        senderUserId: options?.senderUserId ?? null,
       })
       return
     }
@@ -308,6 +328,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
 
     const { id } = await this.send(channelId, content, {
       replyToMessageId: options?.replyToMessageId ?? null,
+      senderUserId: options?.senderUserId ?? null,
     })
 
     try {
@@ -323,6 +344,9 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
         expiresAt: upload.expiresAt,
       })
     } catch (error) {
+      // Remove the optimistic local insert since the message will be deleted
+      // from the DB. Supabase won't echo MESSAGE_DELETE back to the sender.
+      this.removeMessage(id, channelId)
       await this.deleteMessageRpc(id)
       throw error
     }
