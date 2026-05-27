@@ -78,14 +78,12 @@ export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
   }, [dm]);
 
   const handleSelectConversation = useCallback(
-    async (conversationId: string) => {
+    (conversationId: string) => {
       setError(null);
-      try {
-        await dm.openConversation(conversationId, { markRead: true });
-        onConversationSelected();
-      } catch (err) {
+      onConversationSelected();
+      void dm.openConversation(conversationId, { markRead: true }).catch((err) => {
         setError(getErrorMessage(err, "Failed to open conversation."));
-      }
+      });
     },
     [dm, onConversationSelected],
   );
