@@ -44,6 +44,9 @@ export const desktopClient = {
   async checkForUpdates(): Promise<UpdaterStatus> {
     return getDesktopApi().checkForUpdates();
   },
+  async installUpdate(): Promise<void> {
+    return getDesktopApi().installUpdate();
+  },
   async saveFileFromUrl(input: {
     url: string;
     suggestedName?: string | null;

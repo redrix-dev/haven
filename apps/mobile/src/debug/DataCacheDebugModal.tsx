@@ -109,6 +109,7 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
               className="rounded-lg bg-surface-panel px-3 py-2"
             >
               {exporting ? (
+                // uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground
                 <ActivityIndicator size="small" color="#e6edf7" />
               ) : (
                 <Text className="text-xs font-semibold text-foreground">Export log</Text>

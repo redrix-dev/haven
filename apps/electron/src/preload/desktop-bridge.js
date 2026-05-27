@@ -11,6 +11,7 @@ const exposeDesktopBridge = ({ contextBridge, ipcRenderer }) => {
       ipcRenderer.invoke(DESKTOP_IPC_KEYS.SETTINGS_SET_VOICE, payload),
     getUpdaterStatus: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_STATUS_GET),
     checkForUpdates: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_CHECK_NOW),
+    installUpdate: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.UPDATER_INSTALL_NOW),
     saveFileFromUrl: (payload) => ipcRenderer.invoke(DESKTOP_IPC_KEYS.MEDIA_SAVE_FROM_URL, payload),
     openExternalUrl: (url) => ipcRenderer.invoke(DESKTOP_IPC_KEYS.EXTERNAL_URL_OPEN, url),
     consumeNextProtocolUrl: () => ipcRenderer.invoke(DESKTOP_IPC_KEYS.PROTOCOL_URL_CONSUME_NEXT),

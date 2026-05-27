@@ -53,7 +53,6 @@ import {
 import { addVoiceNotificationOpenListener } from "@/features/voice/mobileVoiceForegroundService";
 import { useMobileLiveKitVoiceSession } from "@/features/voice/useMobileLiveKitVoiceSession";
 import { HavenListSheet } from "@/components/HavenListSheet";
-import { DirectMessagesScreen } from "@/screens/main/DirectMessagesScreen";
 import { NotificationsScreen } from "@/screens/main/NotificationsScreen";
 import { ProfileScreen } from "@/screens/main/ProfileScreen";
 import { SettingsScreen } from "@/screens/main/SettingsScreen";
@@ -465,7 +464,9 @@ function MainNavigationShell({ userId }: { userId: string }) {
     (friendUserId: string) => {
       setIsFriendsModalOpen(false);
       void dm.openWithUser(friendUserId);
-      navigation.navigate("Main", { screen: "DirectMessages" });
+      // Navigate to Community — dm.openWithUser already primed the store;
+      // CommunityShell will show the conversation when the user taps the DM icon.
+      navigation.navigate("Main", { screen: "Community", params: { serverId: null } });
     },
     [dm, navigation],
   );
@@ -482,8 +483,8 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const handleNavigateToDm = useCallback(
     (conversationId: string) => {
       navigation.navigate("Main", {
-        screen: "DirectMessages",
-        params: { openConversationId: conversationId },
+        screen: "Community",
+        params: { pendingDmConversationId: conversationId, serverId: null },
       });
     },
     [navigation],
@@ -493,8 +494,8 @@ function MainNavigationShell({ userId }: { userId: string }) {
     useMobilePushNavigationStore.getState().setHandlers({
       openDm: (conversationId) => {
         navigation.navigate("Main", {
-          screen: "DirectMessages",
-          params: { openConversationId: conversationId },
+          screen: "Community",
+          params: { pendingDmConversationId: conversationId, serverId: null },
         });
       },
       openFriends: (input) => {
@@ -558,9 +559,6 @@ function MainNavigationShell({ userId }: { userId: string }) {
                 onOpenNotifications={() =>
                   navigation.navigate("Main", { screen: "Notifications" })
                 }
-                onOpenInbox={() =>
-                  navigation.navigate("Main", { screen: "DirectMessages" })
-                }
                 notificationsUnreadCount={notificationsUnreadCount}
                 inboxUnreadCount={dmUnreadCount}
                 activeVoiceChannelId={voiceState.activeVoiceChannelId}
@@ -570,11 +568,6 @@ function MainNavigationShell({ userId }: { userId: string }) {
               />
             )}
           </Stack.Screen>
-          <Stack.Screen
-            name="DirectMessages"
-            component={DirectMessagesScreen}
-            options={{ animation: "slide_from_right", gestureEnabled: true }}
-          />
           <Stack.Screen
             name="Notifications"
             component={NotificationsScreen}

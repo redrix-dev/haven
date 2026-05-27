@@ -2,8 +2,7 @@ import type { NavigatorScreenParams } from "@react-navigation/native";
 
 export type MainStackParamList = {
   CommunityEntry: undefined;
-  Community: { serverId: string | null; openDrawer?: boolean };
-  DirectMessages: { openConversationId?: string } | undefined;
+  Community: { serverId?: string | null; openDrawer?: boolean; pendingDmConversationId?: string };
   Notifications: undefined;
   Profile: undefined;
   Settings: undefined;

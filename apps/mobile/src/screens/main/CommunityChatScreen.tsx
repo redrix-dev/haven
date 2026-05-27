@@ -455,7 +455,6 @@ export function CommunityChatScreen({
                   {pendingCommunityMedia ? (
                     <ChatMediaAttachmentStrip
                       fileName={pendingCommunityMedia.fileName}
-                      iconColor={composerColors.iconMuted}
                       disabled={isSending}
                       onRemove={() => setPendingCommunityMedia(null)}
                     />

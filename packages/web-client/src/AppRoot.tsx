@@ -19,7 +19,9 @@ export function AppRoot() {
       {showDesktopTitleBar ? (
         <div className="desktop-app-shell">
           <TitleBar />
-          <ChatApp />
+          <div className="desktop-app-shell-content">
+            <ChatApp />
+          </div>
         </div>
       ) : (
         <ChatApp />

@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -192,7 +192,7 @@ export function MobileServerSettingsModal({
             <View className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
             <Text className="text-base text-foreground">{item.name}</Text>
           </View>
-          <Ionicons name="reorder-three" size={22} color="#8e8e93" />
+          <ThemedIonicons name="reorder-three" size={22} colorClassName="accent-muted-foreground" />
         </Pressable>
       </ScaleDecorator>
     ),
@@ -233,7 +233,7 @@ export function MobileServerSettingsModal({
               onPress={() => setTab(t.key)}
               className={`rounded-full px-4 py-1.5 ${tab === t.key ? "bg-primary" : "bg-surface-panel"}`}
             >
-              <Text className={`text-sm font-medium ${tab === t.key ? "text-white" : "text-foreground"}`}>
+              <Text className={`text-sm font-medium ${tab === t.key ? "text-primary-foreground" : "text-foreground"}`}>
                 {t.label}
               </Text>
             </Pressable>
@@ -242,6 +242,7 @@ export function MobileServerSettingsModal({
 
         {loading ? (
           <View className="flex-1 items-center justify-center py-12">
+            {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
             <ActivityIndicator color="#e6edf7" />
           </View>
         ) : tab === "roles" && canManageRoles ? (
@@ -256,13 +257,13 @@ export function MobileServerSettingsModal({
                 }
                 hitSlop={8}
               >
-                <Ionicons name="information-circle-outline" size={22} color="#c9b458" />
+                <ThemedIonicons name="information-circle-outline" size={22} colorClassName="accent-muted-foreground" />
               </Pressable>
               <Text className="flex-1 text-sm text-muted-foreground">
                 Long-press a row to drag. System roles are fixed above custom roles.
               </Text>
             </View>
-            {loadErrors.roles ? <Text className="mb-2 text-sm text-red-400">{loadErrors.roles}</Text> : null}
+            {loadErrors.roles ? <Text className="mb-2 text-sm text-destructive">{loadErrors.roles}</Text> : null}
             {systemRoles.length > 0 ? (
               <View className="mb-3">
                 <Text className="mb-2 text-xs font-semibold uppercase text-muted-foreground">System roles</Text>
@@ -273,7 +274,7 @@ export function MobileServerSettingsModal({
                   >
                     <View className="h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
                     <Text className="flex-1 text-foreground">{r.name}</Text>
-                    <Ionicons name="lock-closed" size={16} color="#8e8e93" />
+                    <ThemedIonicons name="lock-closed" size={16} colorClassName="accent-muted-foreground" />
                   </View>
                 ))}
               </View>
@@ -293,7 +294,7 @@ export function MobileServerSettingsModal({
             {tab === "general" ? (
               <View className="gap-4 pb-24">
                 {loadErrors.settings ? (
-                  <Text className="text-sm text-red-400">{loadErrors.settings}</Text>
+                  <Text className="text-sm text-destructive">{loadErrors.settings}</Text>
                 ) : null}
                 <Text className="text-xs uppercase text-muted-foreground">Community name</Text>
                 <TextInput
@@ -308,7 +309,7 @@ export function MobileServerSettingsModal({
                   onChangeText={setDraftDesc}
                   multiline
                   editable={canManageServer}
-                  className="min-h-[88px] rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+                  className="min-h-22 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
                 />
                 <View className="flex-row items-center justify-between">
                   <Text className="text-foreground">Allow public invites</Text>
@@ -332,7 +333,7 @@ export function MobileServerSettingsModal({
                     disabled={savingSettings}
                     className="rounded-xl bg-primary py-3"
                   >
-                    <Text className="text-center font-semibold text-white">
+                    <Text className="text-center font-semibold text-primary-foreground">
                       {savingSettings ? "Saving…" : "Save changes"}
                     </Text>
                   </Pressable>
@@ -429,19 +430,19 @@ function MobileInvitesSection({
 
   return (
     <View className="pb-24">
-      {loadError ? <Text className="mb-2 text-sm text-red-400">{loadError}</Text> : null}
+      {loadError ? <Text className="mb-2 text-sm text-destructive">{loadError}</Text> : null}
       <Pressable
         onPress={() => void handleCreate()}
         disabled={creating}
         className="mb-4 rounded-xl bg-primary py-3"
       >
-        <Text className="text-center font-semibold text-white">{creating ? "Creating…" : "Create invite (24h)"}</Text>
+        <Text className="text-center font-semibold text-primary-foreground">{creating ? "Creating…" : "Create invite (24h)"}</Text>
       </Pressable>
       {invites.map((inv) => (
         <View key={inv.id} className="mb-2 flex-row items-center justify-between rounded-xl border border-border px-3 py-2">
           <Text className="font-mono text-xs text-foreground">{inv.code}</Text>
           <Pressable onPress={() => void onRevoke(inv.id)}>
-            <Text className="text-sm text-red-400">Revoke</Text>
+            <Text className="text-sm text-destructive">Revoke</Text>
           </Pressable>
         </View>
       ))}
@@ -460,7 +461,7 @@ function MobileBansSection({
 }) {
   return (
     <View className="pb-24">
-      {loadError ? <Text className="mb-2 text-sm text-red-400">{loadError}</Text> : null}
+      {loadError ? <Text className="mb-2 text-sm text-destructive">{loadError}</Text> : null}
       {bans.map((b) => (
         <View key={b.id} className="mb-2 rounded-xl border border-border bg-surface-panel px-3 py-3">
           <Text className="font-medium text-foreground">{b.username ?? b.bannedUserId}</Text>

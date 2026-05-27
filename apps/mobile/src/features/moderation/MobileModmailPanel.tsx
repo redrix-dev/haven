@@ -60,21 +60,23 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
   }
 
   return (
+    // uniwind-theme-allow mobile-theme/no-raw-palette-class - intentional ModMail amber brand palette, invariant across themes
     <View className="min-h-0 flex-1 rounded-xl border border-amber-700/40 bg-amber-950/25 p-3">
+      {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - ModMail amber brand text */}
       <Text className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-amber-200">
         Moderation inbox
       </Text>
       {loading ? (
+        // uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; amber matches ModMail brand
         <ActivityIndicator color="#fbbf24" />
       ) : (
         <FlatList
           data={reports}
           keyExtractor={(r) => r.reportId}
           renderItem={({ item }) => (
-            <Pressable
-              className="mb-2 rounded-xl border border-amber-700/50 bg-amber-950/40 px-3 py-3 active:opacity-90"
-              onPress={() => openDetail(item.reportId)}
-            >
+            // uniwind-theme-allow mobile-theme/no-raw-palette-class - ModMail amber brand palette
+            <Pressable className="mb-2 rounded-xl border border-amber-700/50 bg-amber-950/40 px-3 py-3 active:opacity-90" onPress={() => openDetail(item.reportId)}>
+              {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - ModMail amber brand text */}
               <Text className="text-xs uppercase text-amber-200/80">{item.serverName}</Text>
               <Text className="mt-1 font-medium text-foreground">{item.title}</Text>
               <Text className="mt-1 text-[11px] text-muted-foreground">
@@ -99,6 +101,7 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
             </Pressable>
           </View>
           {loadingDetail ? (
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground
             <ActivityIndicator color="#e6edf7" />
           ) : detail ? (
             <ScrollView keyboardShouldPersistTaps="handled">
@@ -109,7 +112,9 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
                 <Text className="mt-2 text-sm text-foreground">Target: {detail.targetDisplayName}</Text>
               ) : null}
               {detail.platformAction ? (
+                // uniwind-theme-allow mobile-theme/no-raw-palette-class - Haven platform action badge; intentional purple brand palette
                 <View className="mt-4 rounded-xl border border-purple-500/50 bg-purple-900/20 p-3">
+                  {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - Haven platform purple brand text */}
                   <Text className="text-sm font-semibold text-purple-300">
                     Haven Platform Moderation has acted on this report
                   </Text>
@@ -120,9 +125,8 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
                     <Text className="mt-1 text-sm text-foreground">✓ Content removed</Text>
                   )}
                   {detail.status === 'resolved_by_platform' && (
-                    <Pressable
-                      className="mt-3 rounded-xl bg-green-700 py-2"
-                      onPress={() => {
+                    // uniwind-theme-allow mobile-theme/no-raw-palette-class - acknowledge action green; intentional positive-action indicator
+                    <Pressable className="mt-3 rounded-xl bg-green-700 py-2" onPress={() => {
                         void core.moderation
                           .acknowledge(detail.reportId)
                           .then(() => {
@@ -132,7 +136,7 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
                           .catch((e) => Alert.alert("Error", getErrorMessage(e, "Acknowledge failed.")));
                       }}
                     >
-                      <Text className="text-center font-semibold text-white">Acknowledge & Close</Text>
+                      <Text className="text-center font-semibold text-primary-foreground">Acknowledge & Close</Text>
                     </Pressable>
                   )}
                 </View>
@@ -142,7 +146,7 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
                   className="mt-6 rounded-xl bg-primary py-3"
                   onPress={handleEscalate}
                 >
-                  <Text className="text-center font-semibold text-white">Escalate to Haven</Text>
+                  <Text className="text-center font-semibold text-primary-foreground">Escalate to Haven</Text>
                 </Pressable>
               )}
             </ScrollView>

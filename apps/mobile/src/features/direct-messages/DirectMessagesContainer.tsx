@@ -20,7 +20,7 @@ import {
   EnrichedMarkdownText,
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { ChatMediaAttachmentStrip } from "@/components/chat/ChatMediaAttachmentStrip";
@@ -274,7 +274,7 @@ export function DirectMessagesContainer() {
             </Text>
           </View>
           {unread ? (
-            <View className="min-w-[22px] rounded-full bg-primary px-2 py-0.5">
+            <View className="min-w-5.5 rounded-full bg-primary px-2 py-0.5">
               <Text className="text-center text-xs font-bold text-primary-foreground">{item.unreadCount}</Text>
             </View>
           ) : null}
@@ -471,9 +471,10 @@ export function DirectMessagesContainer() {
     return (
       <View className="min-h-0 flex-1">
         {dmConversationsError ? (
-          <Text className="mb-2 text-sm text-red-400">{dmConversationsError}</Text>
+          <Text className="mb-2 text-sm text-destructive">{dmConversationsError}</Text>
         ) : null}
         {dmConversationsLoading && dmConversations.length === 0 ? (
+          // uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground
           <ActivityIndicator color="#e6edf7" />
         ) : (
           <FlatList
@@ -510,7 +511,7 @@ export function DirectMessagesContainer() {
           onPress={() => clearSelectedDmConversation()}
           className="flex-row items-center gap-1 active:opacity-80"
         >
-          <Ionicons name="chevron-back" size={24} color="#e6edf7" />
+          <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
           <Text className="text-sm text-foreground">Inbox</Text>
         </Pressable>
         <Text className="max-w-[50%] flex-1 text-center text-base font-semibold text-foreground" numberOfLines={1}>
@@ -524,6 +525,7 @@ export function DirectMessagesContainer() {
               onValueChange={(v) => {
                 void toggleSelectedDmConversationMuted(v);
               }}
+              // uniwind-theme-allow mobile-theme/no-raw-color-prop - Switch trackColor requires raw values; false=border-panel, true=primary
               trackColor={{ false: "#3d4f6a", true: "#4f8df5" }}
             />
           </View>
@@ -533,7 +535,7 @@ export function DirectMessagesContainer() {
       </View>
 
       {dmMessagesError ? (
-        <Text className="mb-2 text-sm text-red-400">{dmMessagesError}</Text>
+        <Text className="mb-2 text-sm text-destructive">{dmMessagesError}</Text>
       ) : null}
 
       <ChatInterface
@@ -578,7 +580,6 @@ export function DirectMessagesContainer() {
               pendingDmMedia ? (
                 <ChatMediaAttachmentStrip
                   fileName={pendingDmMedia.fileName}
-                  iconColor={composerColors.iconMuted}
                   disabled={isSendingDm}
                   onRemove={() => setPendingDmMedia(null)}
                 />
@@ -619,6 +620,7 @@ export function DirectMessagesContainer() {
 const styles = StyleSheet.create({
   attachmentUnavailable: {
     marginTop: 8,
+    // uniwind-theme-allow mobile-theme/no-raw-style-color - muted text color for unavailable attachment label
     color: "#9ba9bf",
     fontSize: 12,
   },
@@ -627,6 +629,7 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 12,
     marginTop: 8,
+    // uniwind-theme-allow mobile-theme/no-raw-style-color - image loading placeholder; semi-transparent black is intentional
     backgroundColor: "rgba(0,0,0,0.22)",
   },
 });

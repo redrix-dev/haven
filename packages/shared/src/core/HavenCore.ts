@@ -31,6 +31,7 @@ import {
 } from "./communityChannelUtils";
 import type { NexusPersistence } from "./persistence/NexusPersistence";
 import { routeRealtimeEvent, type RealtimeEvent } from "./routeRealtimeEvent";
+import { bootLogger } from "@shared/debug/bootLogger";
 import {
   createDefaultViewerMessagePolicyState,
   createViewerMessagePolicyStore,
@@ -331,9 +332,12 @@ export class HavenCore {
       this.channels.rehydrate();
       this.directMessages.rehydrate();
       this.notifications.rehydrate();
+      bootLogger.mark("bootstrap-rehydrated");
 
       this.phase.set("loading_communities");
+      bootLogger.mark("bootstrap-communities-start");
       await this.communities.load(userId);
+      bootLogger.mark("bootstrap-communities-done");
 
       const joinedIds = new Set(this.communities.getCommunityIds());
       for (const id of Object.keys(
@@ -344,12 +348,15 @@ export class HavenCore {
         }
       }
       if (joinedIds.size > 0) {
+        bootLogger.mark("bootstrap-permissions-start", { count: joinedIds.size });
         await Promise.allSettled(
           Array.from(joinedIds).map((id) => this.ensureCommunityPermissions(id)),
         );
+        bootLogger.mark("bootstrap-permissions-done");
       }
 
       this.phase.set("loading_session_data");
+      bootLogger.mark("bootstrap-session-data-start");
       const activeCommunityId = this.communities.getActiveId();
       await Promise.allSettled([
         this.profiles.loadViewerProfile(userId),
@@ -362,12 +369,16 @@ export class HavenCore {
         this.notifications.loadPreferences(),
         this.social.load(),
       ]);
+      bootLogger.mark("bootstrap-session-data-done");
       this.syncViewerMessagePolicy(activeCommunityId);
 
       this.phase.set("connecting_realtime");
+      bootLogger.mark("bootstrap-realtime-start");
       this.subscribeRealtime(userId);
+      bootLogger.mark("bootstrap-realtime-done");
 
       this.phase.set("ready");
+      bootLogger.mark("bootstrap-ready");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error ?? "unknown");

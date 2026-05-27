@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -179,7 +179,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
             <View className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
             <Text className="text-base text-foreground">{item.name}</Text>
           </View>
-          <Ionicons name="reorder-three" size={22} color="#8e8e93" />
+          <ThemedIonicons name="reorder-three" size={22} colorClassName="accent-muted-foreground" />
         </Pressable>
       </ScaleDecorator>
     ),
@@ -210,7 +210,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
             className={`rounded-full px-4 py-1 ${tab === t.key ? "bg-primary" : "bg-surface-panel"}`}
           >
             <Text
-              className={`text-sm font-medium ${tab === t.key ? "text-white" : "text-foreground"}`}
+              className={`text-sm font-medium ${tab === t.key ? "text-primary-foreground" : "text-foreground"}`}
             >
               {t.label}
             </Text>
@@ -220,6 +220,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
 
       {loading ? (
         <View className="flex-1 items-center justify-center py-8">
+          {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
           <ActivityIndicator color="#e6edf7" />
         </View>
       ) : tab === "roles" && canManageRoles ? (
@@ -234,14 +235,14 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
               }
               hitSlop={8}
             >
-              <Ionicons name="information-circle-outline" size={20} color="#c9b458" />
+              <ThemedIonicons name="information-circle-outline" size={20} colorClassName="accent-muted-foreground" />
             </Pressable>
             <Text className="flex-1 text-sm text-muted-foreground">
               Long-press to reorder. System roles are fixed.
             </Text>
           </View>
           {loadErrors.roles ? (
-            <Text className="mb-2 text-sm text-red-400">{loadErrors.roles}</Text>
+            <Text className="mb-2 text-sm text-destructive">{loadErrors.roles}</Text>
           ) : null}
           {systemRoles.length > 0 ? (
             <View className="mb-3">
@@ -255,7 +256,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                 >
                   <View className="h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
                   <Text className="flex-1 text-foreground">{r.name}</Text>
-                  <Ionicons name="lock-closed" size={16} color="#8e8e93" />
+                  <ThemedIonicons name="lock-closed" size={16} colorClassName="accent-muted-foreground" />
                 </View>
               ))}
             </View>
@@ -281,7 +282,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
           {tab === "general" ? (
             <View className="gap-4 pb-24">
               {loadErrors.settings ? (
-                <Text className="text-sm text-red-400">{loadErrors.settings}</Text>
+                <Text className="text-sm text-destructive">{loadErrors.settings}</Text>
               ) : null}
               <Text className="text-xs uppercase text-muted-foreground">Community name</Text>
               <TextInput
@@ -296,7 +297,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                 onChangeText={setDraftDesc}
                 multiline
                 editable={canManageServer}
-                className="min-h-[88px] rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+                className="min-h-22 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
               />
               <View className="flex-row items-center justify-between">
                 <Text className="text-foreground">Allow public invites</Text>
@@ -320,7 +321,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                   disabled={savingSettings}
                   className="rounded-xl bg-primary py-3"
                 >
-                  <Text className="text-center font-semibold text-white">
+                  <Text className="text-center font-semibold text-primary-foreground">
                     {savingSettings ? "Saving…" : "Save changes"}
                   </Text>
                 </Pressable>
@@ -410,13 +411,13 @@ function InvitesTab({
 
   return (
     <View className="pb-24">
-      {loadError ? <Text className="mb-2 text-sm text-red-400">{loadError}</Text> : null}
+      {loadError ? <Text className="mb-2 text-sm text-destructive">{loadError}</Text> : null}
       <Pressable
         onPress={() => void handleCreate()}
         disabled={creating}
         className="mb-4 rounded-xl bg-primary py-3"
       >
-        <Text className="text-center font-semibold text-white">
+        <Text className="text-center font-semibold text-primary-foreground">
           {creating ? "Creating…" : "Create invite (24h)"}
         </Text>
       </Pressable>
@@ -427,7 +428,7 @@ function InvitesTab({
         >
           <Text className="font-mono text-xs text-foreground">{inv.code}</Text>
           <Pressable onPress={() => void onRevoke(inv.id)}>
-            <Text className="text-sm text-red-400">Revoke</Text>
+            <Text className="text-sm text-destructive">Revoke</Text>
           </Pressable>
         </View>
       ))}
@@ -446,7 +447,7 @@ function BansTab({
 }) {
   return (
     <View className="pb-24">
-      {loadError ? <Text className="mb-2 text-sm text-red-400">{loadError}</Text> : null}
+      {loadError ? <Text className="mb-2 text-sm text-destructive">{loadError}</Text> : null}
       {bans.length === 0 ? (
         <Text className="py-6 text-center text-sm text-muted-foreground">No bans.</Text>
       ) : null}

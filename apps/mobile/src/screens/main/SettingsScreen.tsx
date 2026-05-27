@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHavenCore } from "@shared/core";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
@@ -81,7 +81,7 @@ export function SettingsScreen({ navigation }: Props) {
             accessibilityLabel="Go back"
             className="rounded-xl p-2 active:bg-surface-hover"
           >
-            <Ionicons name="chevron-back" size={24} color="#e6edf7" />
+            <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
           </Pressable>
           <Text className="text-lg font-semibold text-foreground">Settings</Text>
         </View>
@@ -108,11 +108,11 @@ export function SettingsScreen({ navigation }: Props) {
             disabled={isSigningOut}
             className={`flex-row items-center gap-3 px-4 py-3.5 ${isSigningOut ? "opacity-50" : "opacity-100"} border-b border-border-panel`}
           >
-            <Ionicons name="log-out-outline" size={18} color="#a9b8cf" />
+            <ThemedIonicons name="log-out-outline" size={18} colorClassName="accent-muted-foreground" />
             <Text className="flex-1 text-base font-medium text-foreground">
               {isSigningOut ? "Signing out…" : "Sign Out"}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color="#a9b8cf" />
+            <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -121,7 +121,7 @@ export function SettingsScreen({ navigation }: Props) {
             disabled={isDeletingAccount}
             className={`flex-row items-center gap-3 px-4 py-3.5 ${isDeletingAccount ? "opacity-50" : "opacity-100"}`}
           >
-            <Ionicons name="trash-outline" size={18} color="#b74a56" />
+            <ThemedIonicons name="trash-outline" size={18} colorClassName="accent-destructive" />
             <View className="flex-1">
               <Text className="text-base font-medium text-destructive">
                 {isDeletingAccount ? "Deleting…" : "Delete Account"}
@@ -130,7 +130,7 @@ export function SettingsScreen({ navigation }: Props) {
                 Permanently remove your account
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color="#a9b8cf" />
+            <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
           </Pressable>
         </View>
       </ScrollView>

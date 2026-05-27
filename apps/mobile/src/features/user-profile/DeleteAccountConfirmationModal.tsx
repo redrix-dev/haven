@@ -102,11 +102,8 @@ export default function DeleteAccountConfirmationModal({
       animationType="fade"
       onRequestClose={isDeleting ? undefined : onDismiss}
     >
-      <Pressable
-        className="flex-1 justify-end bg-black/60"
-        onPress={isDeleting ? undefined : onDismiss}
-        accessibilityLabel="Dismiss delete account dialog backdrop"
-      >
+      {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - full-screen modal scrim overlay, invariant across themes */}
+      <Pressable className="flex-1 justify-end bg-black/60" onPress={isDeleting ? undefined : onDismiss} accessibilityLabel="Dismiss delete account dialog backdrop">
         <Pressable
           onPress={(e) => e.stopPropagation()}
           className="rounded-t-3xl bg-[#1C1C1E] px-5 pt-4"
@@ -133,6 +130,7 @@ export default function DeleteAccountConfirmationModal({
             </View>
           ) : (
             <View className="mb-5 items-center">
+              {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; iOS destructive red matches intent */}
               <ActivityIndicator color="#FF453A" size="small" />
             </View>
           )}

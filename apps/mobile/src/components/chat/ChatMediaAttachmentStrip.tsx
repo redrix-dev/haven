@@ -1,22 +1,20 @@
 import { Pressable, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 
 type ChatMediaAttachmentStripProps = {
   fileName: string;
-  iconColor: string;
   disabled?: boolean;
   onRemove: () => void;
 };
 
 export function ChatMediaAttachmentStrip({
   fileName,
-  iconColor,
   disabled,
   onRemove,
 }: ChatMediaAttachmentStripProps) {
   return (
-    <View className="flex-row items-center gap-2 border-t border-white/8 bg-surface-modal/90 px-3 py-2">
-      <Ionicons name="attach" size={16} color={iconColor} />
+    <View className="flex-row items-center gap-2 border-t border-foreground/8 bg-surface-modal/90 px-3 py-2">
+      <ThemedIonicons name="attach" size={16} colorClassName="accent-muted-foreground" />
       <Text className="min-w-0 flex-1 text-xs text-foreground/90" numberOfLines={1}>
         {fileName}
       </Text>

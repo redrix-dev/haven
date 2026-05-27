@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHavenCore } from "@shared/core";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
@@ -138,7 +138,7 @@ export function ProfileScreen({ navigation }: Props) {
             accessibilityLabel="Go back"
             className="rounded-xl p-2 active:bg-surface-hover"
           >
-            <Ionicons name="chevron-back" size={24} color="#e6edf7" />
+            <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
           </Pressable>
           <Text className="text-lg font-semibold text-foreground">Profile</Text>
         </View>
@@ -188,10 +188,10 @@ export function ProfileScreen({ navigation }: Props) {
           className="flex-row items-center justify-between rounded-2xl bg-surface-card-deep px-4 py-4 active:bg-surface-hover"
         >
           <View className="flex-row items-center gap-3">
-            <Ionicons name="settings-outline" size={20} color="#a9b8cf" />
+            <ThemedIonicons name="settings-outline" size={20} colorClassName="accent-muted-foreground" />
             <Text className="text-base font-medium text-foreground">Settings</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#a9b8cf" />
+          <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
         </Pressable>
       </ScrollView>
     </View>

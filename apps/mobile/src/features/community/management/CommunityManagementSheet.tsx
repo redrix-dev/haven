@@ -50,7 +50,7 @@ export function CommunityManagementSheet({
           >
             <Text
               className={`text-center text-sm font-semibold ${
-                tab === t.key ? "text-white" : "text-muted-foreground"
+                tab === t.key ? "text-primary-foreground" : "text-muted-foreground"
               }`}
             >
               {t.label}

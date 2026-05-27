@@ -14,7 +14,7 @@ import {
   type ListRenderItem,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import type { NotificationItem } from "@shared/lib/backend/types";
 import {
   getNotificationSummary,
@@ -112,15 +112,15 @@ export function NotificationInboxList({
               className="w-24 items-center justify-center bg-accent-slider"
               onPress={() => markRead(notification.recipientId)}
             >
-              <Text className="text-center text-xs font-semibold text-white">Read</Text>
+              <Text className="text-center text-xs font-semibold text-primary-foreground">Read</Text>
             </Pressable>
           ) : null}
           <Pressable
             accessibilityRole="button"
-            className="w-24 items-center justify-center bg-red-900/90"
+            className="w-24 items-center justify-center bg-destructive/90"
             onPress={() => dismiss(notification.recipientId)}
           >
-            <Text className="text-center text-xs font-semibold text-white">Dismiss</Text>
+            <Text className="text-center text-xs font-semibold text-primary-foreground">Dismiss</Text>
           </Pressable>
         </View>
       );
@@ -194,7 +194,7 @@ export function NotificationInboxList({
                 className="mt-3 self-start rounded-lg bg-accent-slider px-3 py-2 active:opacity-90"
                 onPress={() => onNavigate(item)}
               >
-                <Text className="text-sm font-semibold text-white">Navigate</Text>
+                <Text className="text-sm font-semibold text-primary-foreground">Navigate</Text>
               </Pressable>
             ) : null}
           </View>
@@ -207,6 +207,7 @@ export function NotificationInboxList({
   if (loading && items.length === 0) {
     return (
       <View className="items-center py-12">
+        {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
         <ActivityIndicator color="#e6edf7" />
         <Text className="mt-3 text-sm text-muted-foreground">Loading notifications…</Text>
       </View>
@@ -219,16 +220,17 @@ export function NotificationInboxList({
       keyExtractor={(n) => n.recipientId}
       renderItem={renderItem}
       refreshControl={
+        // uniwind-theme-allow mobile-theme/no-raw-color-prop - RefreshControl tintColor requires raw color; resolves to --foreground
         <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor="#e6edf7" />
       }
       ListHeaderComponent={
         visibleError ? (
-          <Text className="mb-3 text-sm text-red-400">{visibleError}</Text>
+          <Text className="mb-3 text-sm text-destructive">{visibleError}</Text>
         ) : null
       }
       ListEmptyComponent={
         <View className="items-center py-10">
-          <Ionicons name="notifications-off-outline" size={40} color="#8b9cbb" />
+          <ThemedIonicons name="notifications-off-outline" size={40} colorClassName="accent-muted-foreground" />
           <Text className="mt-3 text-center text-sm text-muted-foreground">
             No notifications here. Mentions and updates show up once you start chatting.
           </Text>

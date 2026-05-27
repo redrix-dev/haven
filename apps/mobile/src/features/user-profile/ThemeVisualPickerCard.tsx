@@ -1,5 +1,5 @@
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { useCallback, useState } from "react";
 import { useHavenCore } from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
@@ -135,10 +135,10 @@ export function ThemeVisualPickerCard({ userId, username, avatarUrl }: ThemeVisu
         <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Appearance
         </Text>
-        <Ionicons
+        <ThemedIonicons
           name={isOpen ? "chevron-up" : "chevron-down"}
           size={16}
-          color="#a9b8cf"
+          colorClassName="accent-muted-foreground"
         />
       </Pressable>
       {isOpen ? (

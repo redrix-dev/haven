@@ -7,16 +7,8 @@ import {
   toServerSummaries,
   useHavenCore,
 } from "@shared/core";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { BackHandler, Dimensions, Pressable, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  Easing,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BackHandler, View } from "react-native";
 import { CommunityChatScreen } from "@/screens/main/CommunityChatScreen";
 import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
 import type { MainStackParamList } from "@/navigation/types";
@@ -28,22 +20,17 @@ import { CommunityActionSheets } from "./CommunityActionSheets";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
 import { useAuthStore } from "@shared/stores/authStore";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
-
-const CHANNEL_DRAWER_WIDTH = Math.min(
-  320,
-  Dimensions.get("window").width * 0.86,
-);
-const RAIL_WIDTH = 72;
-const DRAWER_SURFACE_WIDTH = RAIL_WIDTH + CHANNEL_DRAWER_WIDTH;
-const DRAWER_TIMING = { duration: 220, easing: Easing.out(Easing.cubic) };
-const EDGE_WIDTH = 28;
+import { HavenShell, type HavenShellHandle } from "@/navigation/HavenShell";
+import { useUiStore } from "@shared/stores/uiStore";
+import { DmInboxDrawer } from "@/features/direct-messages/DmInboxDrawer";
+import { DmChatSurface } from "@/features/direct-messages/DmChatSurface";
+import { DmTopBar } from "@/features/direct-messages/DmTopBar";
 
 type Props = NativeStackScreenProps<MainStackParamList, "Community">;
 type CommunityShellProps = Props & {
   onOpenProfile: () => void;
   onOpenProfileCard: (target: UserProfileModalTarget) => void;
   onOpenNotifications: () => void;
-  onOpenInbox: () => void;
   notificationsUnreadCount: number;
   inboxUnreadCount: number;
   activeVoiceChannelId: string | null;
@@ -58,7 +45,6 @@ export function CommunityShell({
   onOpenProfile,
   onOpenProfileCard,
   onOpenNotifications,
-  onOpenInbox,
   notificationsUnreadCount,
   inboxUnreadCount,
   activeVoiceChannelId,
@@ -68,19 +54,67 @@ export function CommunityShell({
 }: CommunityShellProps) {
   const serverId = route.params?.serverId ?? null;
   const openDrawerOnEnter = route.params?.openDrawer ?? !serverId;
+  const pendingDmConversationId = route.params?.pendingDmConversationId;
   const core = useHavenCore();
+  const dm = core.directMessages;
   const userId = useAuthStore((state) => state.user?.id ?? null);
+  const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
+
+  const shellRef = useRef<HavenShellHandle>(null);
+
+  // ── DM mode ──────────────────────────────────────────────────────────────
+  const [mode, setMode] = useState<"community" | "dm">("community");
+
+  const switchToDm = useCallback(() => {
+    setMode("dm");
+    setWorkspaceMode("dm");
+  }, [setWorkspaceMode]);
+
+  const switchToCommunity = useCallback(() => {
+    setMode("community");
+    setWorkspaceMode("community");
+    shellRef.current?.setDrawerOpen(false);
+  }, [setWorkspaceMode]);
+
+  // Handle pendingDmConversationId from route params (push notifications / deep links).
+  const handledDmConversationIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!pendingDmConversationId) return;
+    if (handledDmConversationIdRef.current === pendingDmConversationId) return;
+    handledDmConversationIdRef.current = pendingDmConversationId;
+    void dm.openConversation(pendingDmConversationId, { markRead: true }).catch(() => {});
+    switchToDm();
+    navigation.setParams({ pendingDmConversationId: undefined });
+  }, [pendingDmConversationId, dm, switchToDm, navigation]);
+
+  // Track drawer state locally — used by the DM back handler and the debug probe.
+  const [drawerOpen, setDrawerOpen] = useState(openDrawerOnEnter || !serverId);
+
+  const handleDrawerStateChange = useCallback((open: boolean) => {
+    setDrawerOpen(open);
+    void setLastCommunitySurface(open ? "drawer" : "chat");
+  }, []);
+
+  // Hardware back in DM mode (drawer closed) → switch back to community in-place.
+  // HavenShell's own BackHandler fires first and handles "drawer open → close drawer".
+  // This handler fires only when the drawer is already closed and we're in DM mode.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (mode === "dm" && !drawerOpen) {
+        switchToCommunity();
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [mode, drawerOpen, switchToCommunity]);
+
   const setCurrentChannelId = useCallback(
     (id: string | null) => {
       core.channels.setActiveChannelId(id);
     },
     [core],
   );
-  const [drawerOpen, setDrawerOpen] = useState(openDrawerOnEnter);
-  const drawerOffset = useSharedValue(
-    openDrawerOnEnter ? 0 : -DRAWER_SURFACE_WIDTH,
-  );
-  const dragStartOffset = useSharedValue(0);
 
   useEffect(() => {
     if (!serverId) {
@@ -164,29 +198,13 @@ export function CommunityShell({
     communityName: community?.name ?? null,
   });
 
-  const setDrawerOpenAnimated = useCallback(
-    (open: boolean) => {
-      if (!serverId && !open) return;
-      setDrawerOpen(open);
-      void setLastCommunitySurface(open ? "drawer" : "chat");
-      drawerOffset.value = withTiming(
-        open ? 0 : -DRAWER_SURFACE_WIDTH,
-        DRAWER_TIMING,
-      );
-    },
-    [drawerOffset, serverId],
-  );
-
+  // Sync drawer open state when route params (serverId / openDrawer) change.
   useEffect(() => {
     const shouldOpen = openDrawerOnEnter || !serverId;
-    setDrawerOpen(shouldOpen);
-    void setLastCommunitySurface(shouldOpen ? "drawer" : "chat");
-    drawerOffset.value = withTiming(
-      shouldOpen ? 0 : -DRAWER_SURFACE_WIDTH,
-      DRAWER_TIMING,
-    );
-  }, [drawerOffset, openDrawerOnEnter, serverId]);
+    shellRef.current?.setDrawerOpen(shouldOpen);
+  }, [openDrawerOnEnter, serverId]);
 
+  // Navigate to a fallback community when the current serverId disappears from the list.
   useEffect(() => {
     if (!serverId || communitiesLoading) return;
     if (servers.some((server) => server.id === serverId)) return;
@@ -203,26 +221,14 @@ export function CommunityShell({
       core.channels.setActiveChannelId(null);
       navigation.setParams({ serverId: null, openDrawer: true });
     }
-    setDrawerOpenAnimated(true);
+    shellRef.current?.setDrawerOpen(true);
   }, [
     communitiesLoading,
     core,
     navigation,
     serverId,
     servers,
-    setDrawerOpenAnimated,
   ]);
-
-  useEffect(() => {
-    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (drawerOpen) {
-        if (serverId) setDrawerOpenAnimated(false);
-        return true;
-      }
-      return false;
-    });
-    return () => sub.remove();
-  }, [drawerOpen, serverId, setDrawerOpenAnimated]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
@@ -243,33 +249,38 @@ export function CommunityShell({
   const handleCommunityReady = useCallback(
     (communityId: string) => {
       navigation.setParams({ serverId: communityId, openDrawer: true });
-      setDrawerOpenAnimated(true);
+      shellRef.current?.setDrawerOpen(true);
     },
-    [navigation, setDrawerOpenAnimated],
+    [navigation],
   );
 
   const handleSelectChannel = useCallback(
-    async (channel: Channel) => {
+    (channel: Channel) => {
       if (!serverId) return;
       setCurrentChannelId(channel.id);
-      await setLastCommunitySurface("chat");
-      setDrawerOpenAnimated(false);
+      shellRef.current?.setDrawerOpen(false);
     },
-    [serverId, setCurrentChannelId, setDrawerOpenAnimated],
+    [serverId, setCurrentChannelId],
   );
 
   const handleSelectTextChannel = useCallback(
     (channelId: string) => {
       const ch = channels.find((c) => c.id === channelId);
-      if (ch && ch.kind === "text") void handleSelectChannel(ch);
+      if (ch && ch.kind === "text") handleSelectChannel(ch);
     },
     [channels, handleSelectChannel],
   );
 
   const handleSelectCommunity = useCallback(
     (nextServerId: string) => {
+      // Always switch back to community mode when selecting a server.
+      if (mode === "dm") {
+        setMode("community");
+        setWorkspaceMode("community");
+      }
+
       if (nextServerId === serverId) {
-        setDrawerOpenAnimated(true);
+        shellRef.current?.setDrawerOpen(true);
         return;
       }
 
@@ -278,189 +289,82 @@ export function CommunityShell({
         serverId: nextServerId,
         openDrawer: true,
       });
-      setDrawerOpenAnimated(true);
+      shellRef.current?.setDrawerOpen(true);
       void core.prepareCommunityEntry(nextServerId).catch((error) => {
         console.warn("[CommunityShell] prepare selected community failed", error);
         applyCommunityFocus(core, nextServerId);
       });
     },
-    [core, navigation, serverId, setDrawerOpenAnimated],
+    [core, mode, navigation, serverId, setWorkspaceMode],
   );
-
-  const panGesture = Gesture.Pan()
-    .enabled(Boolean(serverId))
-    .activeOffsetX([-18, 18])
-    .failOffsetY([-12, 12])
-    .onStart(() => {
-      dragStartOffset.value = drawerOffset.value;
-    })
-    .onUpdate((event) => {
-      const next = dragStartOffset.value + event.translationX;
-      drawerOffset.value = Math.min(0, Math.max(-DRAWER_SURFACE_WIDTH, next));
-    })
-    .onEnd((event) => {
-      const projected = drawerOffset.value + event.velocityX * 0.12;
-      const shouldOpen = projected > -DRAWER_SURFACE_WIDTH / 2;
-      runOnJS(setDrawerOpenAnimated)(shouldOpen);
-    });
-
-  const edgeOpenGesture = Gesture.Pan()
-    .enabled(Boolean(serverId))
-    .activeOffsetX([-8, 8])
-    .failOffsetY([-12, 12])
-    .onStart(() => {
-      dragStartOffset.value = drawerOffset.value;
-    })
-    .onUpdate((event) => {
-      if (event.translationX <= 0) return;
-      const next = dragStartOffset.value + event.translationX;
-      drawerOffset.value = Math.min(0, Math.max(-DRAWER_SURFACE_WIDTH, next));
-    })
-    .onEnd((event) => {
-      const projected = drawerOffset.value + event.velocityX * 0.12;
-      const shouldOpen = projected > -DRAWER_SURFACE_WIDTH / 2;
-      runOnJS(setDrawerOpenAnimated)(shouldOpen);
-    });
-
-  const drawerCloseGesture = Gesture.Pan()
-    .enabled(Boolean(serverId && drawerOpen))
-    .activeOffsetX([-18, 18])
-    .failOffsetY([-12, 12])
-    .onStart(() => {
-      dragStartOffset.value = drawerOffset.value;
-    })
-    .onUpdate((event) => {
-      if (event.translationX > 0) return;
-      const next = dragStartOffset.value + event.translationX;
-      drawerOffset.value = Math.min(0, Math.max(-DRAWER_SURFACE_WIDTH, next));
-    })
-    .onEnd((event) => {
-      const projected = drawerOffset.value + event.velocityX * 0.12;
-      const shouldOpen =
-        event.velocityX > -350 && projected > -DRAWER_SURFACE_WIDTH / 2;
-      runOnJS(setDrawerOpenAnimated)(shouldOpen);
-    });
-
-  const drawerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: drawerOffset.value }],
-  }));
-
-  const scrimStyle = useAnimatedStyle(() => {
-    const progress = Math.max(
-      0,
-      Math.min(1, 1 + drawerOffset.value / DRAWER_SURFACE_WIDTH),
-    );
-    return { opacity: progress * 0.45 };
-  });
-
-  const mainShiftStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: drawerOffset.value + DRAWER_SURFACE_WIDTH }],
-  }));
 
   return (
     <View className="flex-1 bg-background">
-      <View className="flex-1 overflow-hidden">
-        <GestureDetector gesture={drawerCloseGesture}>
-          <Animated.View
-            style={[
-              {
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: DRAWER_SURFACE_WIDTH,
-                zIndex: 2,
-                flexDirection: "row",
-              },
-              drawerStyle,
-            ]}
-          >
-            <CommunityRail
-              communities={servers}
-              activeCommunityId={serverId}
-              onSelectCommunity={handleSelectCommunity}
-              onOpenProfile={onOpenProfile}
-              onOpenNotifications={onOpenNotifications}
-              onOpenInbox={onOpenInbox}
-              notificationsUnreadCount={notificationsUnreadCount}
-              inboxUnreadCount={inboxUnreadCount}
-              onOpenCommunityActions={openCommunityActions}
+      <HavenShell
+        ref={shellRef}
+        hasContent={mode === "dm" ? true : Boolean(serverId)}
+        openDrawerOnMount={openDrawerOnEnter || !serverId}
+        onDrawerStateChange={handleDrawerStateChange}
+        rail={
+          <CommunityRail
+            communities={servers}
+            activeCommunityId={serverId}
+            onSelectCommunity={handleSelectCommunity}
+            onOpenProfile={onOpenProfile}
+            onOpenNotifications={onOpenNotifications}
+            onOpenInbox={switchToDm}
+            notificationsUnreadCount={notificationsUnreadCount}
+            inboxUnreadCount={inboxUnreadCount}
+            isDmActive={mode === "dm"}
+            onOpenCommunityActions={openCommunityActions}
+          />
+        }
+        drawerContent={
+          mode === "dm" ? (
+            <DmInboxDrawer
+              onConversationSelected={() => shellRef.current?.setDrawerOpen(false)}
             />
-            <View style={{ width: CHANNEL_DRAWER_WIDTH }}>
-              <CommunityChannelDrawer
-                serverId={serverId}
-                communityName={community?.name ?? "Communities"}
-                channels={channels}
-                selectedChannelId={currentRenderableChannel?.id ?? null}
-                activeVoiceChannelId={activeVoiceChannelId}
-                voiceChannelParticipants={voiceChannelParticipants}
-                onSelectTextChannel={handleSelectTextChannel}
-                onSelectVoiceChannel={onSelectVoiceChannel}
-                onOpenVoiceSession={onOpenVoiceSession}
-                onCreateCommunity={openCreateCommunity}
-                onJoinCommunity={openJoinCommunity}
-              />
-            </View>
-          </Animated.View>
-        </GestureDetector>
-
-        <GestureDetector gesture={panGesture}>
-          <Animated.View className="flex-1" style={mainShiftStyle}>
-            {serverId ? (
-              <CommunityTopBar
-                communityName={community?.name ?? "Communities"}
-                selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
-                onPressCommunity={() => setDrawerOpenAnimated(true)}
-                onPressChannel={() => setDrawerOpenAnimated(true)}
-              />
-            ) : null}
-
-            {serverId ? (
-              <CommunityChatScreen
-                serverId={serverId}
-                onOpenProfileCard={onOpenProfileCard}
-              />
-            ) : (
-              <View className="flex-1 bg-background" />
-            )}
-
-            <Animated.View
-              pointerEvents={drawerOpen ? "auto" : "none"}
-              style={[
-                {
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  backgroundColor: "rgba(0, 0, 0, 1)",
-                },
-                scrimStyle,
-              ]}
-            >
-              <Pressable
-                className="flex-1"
-                onPress={() => setDrawerOpenAnimated(false)}
-              />
-            </Animated.View>
-          </Animated.View>
-        </GestureDetector>
-
-        {!drawerOpen && serverId ? (
-          <GestureDetector gesture={edgeOpenGesture}>
-            <View
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: EDGE_WIDTH,
-                zIndex: 3,
-              }}
+          ) : (
+            <CommunityChannelDrawer
+              serverId={serverId}
+              communityName={community?.name ?? "Communities"}
+              channels={channels}
+              selectedChannelId={currentRenderableChannel?.id ?? null}
+              activeVoiceChannelId={activeVoiceChannelId}
+              voiceChannelParticipants={voiceChannelParticipants}
+              onSelectTextChannel={handleSelectTextChannel}
+              onSelectVoiceChannel={onSelectVoiceChannel}
+              onOpenVoiceSession={onOpenVoiceSession}
+              onCreateCommunity={openCreateCommunity}
+              onJoinCommunity={openJoinCommunity}
             />
-          </GestureDetector>
-        ) : null}
-      </View>
+          )
+        }
+        topBar={
+          mode === "dm" ? (
+            <DmTopBar onOpenDrawer={() => shellRef.current?.setDrawerOpen(true)} />
+          ) : serverId ? (
+            <CommunityTopBar
+              communityName={community?.name ?? "Communities"}
+              selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
+              onPressCommunity={() => shellRef.current?.setDrawerOpen(true)}
+              onPressChannel={() => shellRef.current?.setDrawerOpen(true)}
+            />
+          ) : null
+        }
+        chatContent={
+          mode === "dm" ? (
+            <DmChatSurface />
+          ) : serverId ? (
+            <CommunityChatScreen
+              serverId={serverId}
+              onOpenProfileCard={onOpenProfileCard}
+            />
+          ) : (
+            <View className="flex-1 bg-background" />
+          )
+        }
+      />
       <CommunityActionSheets
         actionsOpen={communityActionsOpen}
         createOpen={createOpen}

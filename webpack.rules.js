@@ -70,6 +70,16 @@ function createWebpackRules(tsconfigFile) {
       },
     },
 
+    // Image assets
+    {
+      test: /\.(png|jpg|jpeg|gif|webp|ico|svg)$/i,
+      exclude: /node_modules/,
+      type: 'asset/resource',
+      generator: {
+        filename: 'assets/images/[name][contenthash:8][ext]',
+      },
+    },
+
     // CSS processing with PostCSS
     {
       test: /\.css$/,

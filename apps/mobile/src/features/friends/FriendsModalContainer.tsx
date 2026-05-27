@@ -179,7 +179,7 @@ export function FriendsModalContainer({
             className="rounded-lg bg-accent-slider px-3 py-2"
             onPress={() => onStartDirectMessage(item.friendUserId, labelForFriend(item))}
           >
-            <Text className="text-xs font-semibold text-white">Message</Text>
+            <Text className="text-xs font-semibold text-primary-foreground">Message</Text>
           </Pressable>
           <Pressable
             className="rounded-lg bg-surface-panel px-3 py-2"
@@ -227,7 +227,7 @@ export function FriendsModalContainer({
               })
             }
           >
-            <Text className="text-xs font-semibold text-white">Accept</Text>
+            <Text className="text-xs font-semibold text-primary-foreground">Accept</Text>
           </Pressable>
           <Pressable
             className="rounded-lg bg-surface-panel px-3 py-2"
@@ -309,7 +309,7 @@ export function FriendsModalContainer({
                 )
               }
             >
-              <Text className="text-xs font-semibold text-white">Add</Text>
+              <Text className="text-xs font-semibold text-primary-foreground">Add</Text>
             </Pressable>
           ) : null}
         </View>
@@ -335,7 +335,7 @@ export function FriendsModalContainer({
           >
             <Text
               className={`text-sm font-medium ${
-                activeTab === tab.id ? "text-white" : "text-foreground"
+                activeTab === tab.id ? "text-primary-foreground" : "text-foreground"
               }`}
             >
               {tab.label}
@@ -348,13 +348,14 @@ export function FriendsModalContainer({
       </View>
 
       {loadError ? (
-        <Text className="mb-2 text-sm text-red-400">{loadError}</Text>
+        <Text className="mb-2 text-sm text-destructive">{loadError}</Text>
       ) : null}
       {actionError ? (
-        <Text className="mb-2 text-sm text-red-400">{actionError}</Text>
+        <Text className="mb-2 text-sm text-destructive">{actionError}</Text>
       ) : null}
 
       {(loading || nexusLoading) && !refreshing ? (
+        // uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground
         <ActivityIndicator color="#e6edf7" />
       ) : null}
 
@@ -375,11 +376,8 @@ export function FriendsModalContainer({
         <ScrollView
           className="flex-1"
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => void refreshData({ suppressLoadingState: true })}
-              tintColor="#e6edf7"
-            />
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - RefreshControl tintColor requires raw color; resolves to --foreground
+            <RefreshControl refreshing={refreshing} onRefresh={() => void refreshData({ suppressLoadingState: true })} tintColor="#e6edf7" />
           }
         >
           {outgoingRequests.length > 0 ? (
@@ -412,15 +410,17 @@ export function FriendsModalContainer({
           <TextInput
             className="mb-3 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
             placeholder="Search by username"
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
             placeholderTextColor="#8b9cbb"
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
           {searchLoading ? <ActivityIndicator color="#e6edf7" /> : null}
           {searchError ? (
-            <Text className="mb-2 text-sm text-red-400">{searchError}</Text>
+            <Text className="mb-2 text-sm text-destructive">{searchError}</Text>
           ) : null}
           <FlatList
             data={searchResults}

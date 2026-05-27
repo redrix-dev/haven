@@ -61,10 +61,8 @@ export function MobileDevThemeMenu() {
         transparent
         onRequestClose={() => setIsOpen(false)}
       >
-        <Pressable
-          className="flex-1 justify-end bg-black/50"
-          onPress={() => setIsOpen(false)}
-        >
+        {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - dev-only modal scrim overlay */}
+        <Pressable className="flex-1 justify-end bg-black/50" onPress={() => setIsOpen(false)}>
           <Pressable
             className="max-h-[70%] rounded-t-2xl bg-surface-modal pb-8"
             onPress={(e) => e.stopPropagation()}

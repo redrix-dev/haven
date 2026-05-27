@@ -822,6 +822,7 @@ const styles = StyleSheet.create({
     height: BUBBLE_SIZE,
     borderRadius: BUBBLE_SIZE / 2,
     overflow: "hidden",
+    // uniwind-theme-allow mobile-theme/no-raw-style-color - bubble drop shadow; invariant black across all themes
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

@@ -13,6 +13,8 @@ type CommunityRailProps = {
   notificationsUnreadCount: number;
   inboxUnreadCount: number;
   onOpenCommunityActions: () => void;
+  /** Highlight the DM icon when the inbox surface is currently active. */
+  isDmActive?: boolean;
 };
 
 type RailActionButtonProps = {
@@ -20,6 +22,7 @@ type RailActionButtonProps = {
   icon: ThemedIoniconsProps["name"];
   iconSize?: number;
   badgeCount?: number;
+  isActive?: boolean;
   onPress: () => void;
 };
 
@@ -36,6 +39,7 @@ function RailActionButton({
   icon,
   iconSize = 24,
   badgeCount = 0,
+  isActive = false,
   onPress,
 }: RailActionButtonProps) {
   return (
@@ -44,17 +48,21 @@ function RailActionButton({
       accessibilityLabel={
         badgeCount > 0 ? `${accessibilityLabel}, ${badgeCount} unread` : accessibilityLabel
       }
+      accessibilityState={{ selected: isActive }}
       onPress={onPress}
-      className="h-11 w-11 items-center justify-center rounded-2xl bg-surface-panel active:bg-surface-hover"
+      className={[
+        "h-11 w-11 items-center justify-center rounded-2xl",
+        isActive ? "bg-primary active:bg-primary/80" : "bg-surface-panel active:bg-surface-hover",
+      ].join(" ")}
     >
       <View className="relative">
         <ThemedIonicons
           name={icon}
           size={iconSize}
-          colorClassName="accent-foreground"
+          colorClassName={isActive ? "accent-primary-foreground" : "accent-foreground"}
         />
         {badgeCount > 0 ? (
-          <View className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full bg-accent-slider px-1 py-0.5">
+          <View className="absolute -right-1.5 -top-1.5 min-w-4.5 rounded-full bg-accent-slider px-1 py-0.5">
             <Text className="text-center text-[9px] font-bold leading-none text-primary-foreground">
               {formatBadgeCount(badgeCount)}
             </Text>
@@ -75,6 +83,7 @@ export function CommunityRail({
   notificationsUnreadCount,
   inboxUnreadCount,
   onOpenCommunityActions,
+  isDmActive = false,
 }: CommunityRailProps) {
   const insets = useSafeAreaInsets();
 
@@ -133,6 +142,7 @@ export function CommunityRail({
           accessibilityLabel="Direct messages"
           icon="chatbubble-outline"
           badgeCount={inboxUnreadCount}
+          isActive={isDmActive}
           onPress={onOpenInbox}
         />
         <RailActionButton

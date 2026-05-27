@@ -1,3 +1,6 @@
+import { bootLogger } from '@shared/debug/bootLogger';
+bootLogger.mark('js-entry');
+
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
@@ -6,6 +9,7 @@ import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { registerElectronAppHost } from './registerElectronAppHost';
 import { AppRoot } from '@web-client/AppRoot';
+import { BootLogPanel } from '@web-client/debug/BootLogPanel';
 import '@shared/styles/globals.css';
 import { applyShellThemeTokens, setShellThemeApplier } from '@web-client/shellThemeRegistry';
 import { readSessionStoredThemeId } from '@shared/themes/sessionThemeStorage';
@@ -15,14 +19,17 @@ import { ElectronThemeDemoMenu } from './dev/ElectronThemeDemoMenu';
 import { ElectronThemeLab } from './dev/ElectronThemeLab';
 
 registerElectronAppHost();
+bootLogger.mark('app-host-registered');
 setShellThemeApplier(applyThemeWeb);
 applyShellThemeTokens(getTheme(readSessionStoredThemeId() ?? 'default').tokens);
+bootLogger.mark('theme-applied');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing SUPABASE_URL / SUPABASE_ANON_KEY for electron renderer bootstrap.');
 }
+bootLogger.mark('supabase-client-created');
 const havenElectronClient = createHavenSupabaseClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
@@ -34,13 +41,16 @@ createHavenCore({
   publicConfig: { supabaseUrl, supabaseAnonKey },
   persistence: createMemoryPersistence(),
 });
+bootLogger.mark('core-created');
 
+bootLogger.mark('react-render-start');
 const root = createRoot(document.body);
 
 root.render(
   <TooltipProvider>
     <>
       <AppRoot />
+      <BootLogPanel />
       {process.env.NODE_ENV !== 'production' && (
         <>
           <ElectronThemeDemoMenu />

@@ -17,6 +17,7 @@ export type DesktopSettingsBridge = {
   ) => Promise<{ settings: AppSettings }>;
   setVoiceSettings: (values: VoiceSettings) => Promise<{ settings: AppSettings }>;
   checkForUpdates: () => Promise<UpdaterStatus>;
+  installUpdate: () => Promise<void>;
 };
 
 export type DesktopAuthBridge = {

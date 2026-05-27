@@ -41,6 +41,7 @@ export function BanUserModal({ visible, username, onDismiss, onConfirm }: BanUse
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+      {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - full-screen modal scrim, intentionally darker (60%) than standard 50% */}
       <Pressable className="flex-1 justify-center bg-black/60 px-4" onPress={onDismiss}>
         <Pressable
           className="rounded-2xl bg-card border border-border p-4"
@@ -55,12 +56,13 @@ export function BanUserModal({ visible, username, onDismiss, onConfirm }: BanUse
             value={reason}
             onChangeText={setReason}
             placeholder="Reason (required)"
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
             placeholderTextColor="#8e8e93"
             multiline
             maxLength={1000}
-            className="mt-4 min-h-[100px] rounded-xl border border-border bg-surface-panel px-3 py-2 text-sm text-foreground"
+            className="mt-4 min-h-25 rounded-xl border border-border bg-surface-panel px-3 py-2 text-sm text-foreground"
           />
-          {error ? <Text className="mt-2 text-sm text-red-400">{error}</Text> : null}
+          {error ? <Text className="mt-2 text-sm text-destructive">{error}</Text> : null}
           <View className="mt-4 flex-row justify-end gap-3">
             <Pressable onPress={onDismiss} disabled={submitting}>
               <Text className="py-2 text-muted-foreground">Cancel</Text>
@@ -68,9 +70,9 @@ export function BanUserModal({ visible, username, onDismiss, onConfirm }: BanUse
             <Pressable
               onPress={() => void submit()}
               disabled={submitting}
-              className="rounded-xl bg-red-600 px-5 py-2.5"
+              className="rounded-xl bg-destructive px-5 py-2.5"
             >
-              <Text className="font-semibold text-white">
+              <Text className="font-semibold text-destructive-foreground">
                 {submitting ? "Banning…" : "Ban user"}
               </Text>
             </Pressable>

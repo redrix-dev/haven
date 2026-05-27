@@ -89,6 +89,7 @@ export type DesktopAPI = {
   }>;
   getUpdaterStatus: () => Promise<UpdaterStatus>;
   checkForUpdates: () => Promise<UpdaterStatus>;
+  installUpdate: () => Promise<void>;
   saveFileFromUrl: (input: {
     url: string;
     suggestedName?: string | null;

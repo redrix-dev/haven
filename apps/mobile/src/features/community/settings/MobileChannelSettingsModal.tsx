@@ -121,6 +121,7 @@ export function MobileChannelSettingsModal({
 
         {channelPermissions.channelPermissionsLoading ? (
           <View className="flex-1 items-center justify-center">
+            {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
             <ActivityIndicator color="#e6edf7" />
           </View>
         ) : (
@@ -138,7 +139,7 @@ export function MobileChannelSettingsModal({
               onChangeText={setTopic}
               multiline
               editable={canManageChannelStructure}
-              className="mb-6 min-h-[72px] rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+              className="mb-6 min-h-18 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
             />
             {canManageChannelStructure ? (
               <Pressable
@@ -146,7 +147,7 @@ export function MobileChannelSettingsModal({
                 disabled={saving}
                 className="mb-8 rounded-xl bg-primary py-3"
               >
-                <Text className="text-center font-semibold text-white">{saving ? "Saving…" : "Save"}</Text>
+                <Text className="text-center font-semibold text-primary-foreground">{saving ? "Saving…" : "Save"}</Text>
               </Pressable>
             ) : null}
 

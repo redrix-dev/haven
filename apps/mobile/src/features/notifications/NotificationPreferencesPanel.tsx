@@ -49,7 +49,9 @@ function ToggleRow({
         disabled={disabled}
         value={value}
         onValueChange={onValueChange}
+        // uniwind-theme-allow mobile-theme/no-raw-color-prop - Switch trackColor requires raw values; false=border-panel, true=primary
         trackColor={{ false: "#3d4f6a", true: "#4f8df5" }}
+        // uniwind-theme-allow mobile-theme/no-raw-color-prop - Switch thumbColor requires raw value; resolves to --foreground
         thumbColor="#e6edf7"
       />
     </View>
@@ -139,6 +141,7 @@ export function NotificationPreferencesPanel() {
   if (loading && !preferences) {
     return (
       <View className="items-center py-10">
+        {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
         <ActivityIndicator color="#e6edf7" />
         <Text className="mt-3 text-sm text-muted-foreground">Loading preferences…</Text>
       </View>
@@ -156,7 +159,7 @@ export function NotificationPreferencesPanel() {
   return (
     <View>
       {error ? (
-        <Text className="mb-3 text-sm text-red-400">{error}</Text>
+        <Text className="mb-3 text-sm text-destructive">{error}</Text>
       ) : null}
       {groups.map((group) => (
         <View key={group.title} className="mb-4">

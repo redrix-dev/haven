@@ -7,6 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { requireHavenCore } from "@shared/core";
+import { bootLogger } from "@shared/debug/bootLogger";
 
 // Bounded bootstrap exception: auth may touch the raw Supabase client to
 // establish, recover, refresh, and end a session. Domain reads/writes belong in
@@ -138,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
 
     const initializeAuth = async () => {
+      bootLogger.mark("auth-check-start");
       useAuthStore.getState().setIsLoading(true);
       try {
         const {
@@ -154,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         setStatus(session?.user ? "authenticated" : "unauthenticated");
         setError(null);
+        bootLogger.mark("auth-check-complete", { authenticated: Boolean(session?.user) });
       } catch (err: unknown) {
         if (!isMounted) return;
         const { setSession, setUser, setIsLoading } = useAuthStore.getState();
@@ -162,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         setStatus("error");
         setError(getErrorMessage(err, "Failed to initialize authentication."));
+        bootLogger.mark("auth-check-error");
       }
     };
 
@@ -212,6 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (activeSessionUserIdRef.current === userId) return;
         activeSessionUserIdRef.current = userId;
+        bootLogger.mark("session-bootstrap-start");
         void core.bootstrapSession(userId).catch((err) => {
           console.warn("[AuthContext] bootstrapSession failed", err);
         });

@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -51,15 +51,15 @@ export function ChannelSettingsSection({ serverId, channels, perms }: Props) {
               className="mb-1 flex-row items-center gap-3 rounded-xl px-3 py-3 active:bg-surface-hover"
               onPress={() => setManagedChannelId(channel.id)}
             >
-              <Ionicons
+              <ThemedIonicons
                 name={isVoice ? "volume-medium-outline" : "chatbox-outline"}
                 size={16}
-                color="#6b7a90"
+                colorClassName="accent-muted-foreground"
               />
               <Text className="flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
                 {channel.name}
               </Text>
-              <Ionicons name="chevron-forward" size={15} color="#6b7a90" />
+              <ThemedIonicons name="chevron-forward" size={15} colorClassName="accent-muted-foreground" />
             </Pressable>
           );
         })
@@ -165,12 +165,13 @@ function ChannelDetail({
         onPress={onBack}
         hitSlop={8}
       >
-        <Ionicons name="chevron-back" size={18} color="#a9b8cf" />
+        <ThemedIonicons name="chevron-back" size={18} colorClassName="accent-muted-foreground" />
         <Text className="text-sm font-medium text-muted-foreground">#{channel.name}</Text>
       </Pressable>
 
       {channelPermissions.channelPermissionsLoading ? (
         <View className="flex-1 items-center justify-center">
+          {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color value; resolves to --foreground */}
           <ActivityIndicator color="#e6edf7" />
         </View>
       ) : (
@@ -193,7 +194,7 @@ function ChannelDetail({
             onChangeText={setTopic}
             multiline
             editable={canManageChannelStructure}
-            className="mb-6 min-h-[64px] rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+            className="mb-6 min-h-16 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
           />
           {canManageChannelStructure ? (
             <Pressable
@@ -201,7 +202,7 @@ function ChannelDetail({
               disabled={saving}
               className="mb-8 rounded-xl bg-primary py-3"
             >
-              <Text className="text-center font-semibold text-white">
+              <Text className="text-center font-semibold text-primary-foreground">
                 {saving ? "Saving…" : "Save"}
               </Text>
             </Pressable>

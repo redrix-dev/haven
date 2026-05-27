@@ -76,6 +76,10 @@ const registerDesktopIpcHandlers = ({
     updaterService.checkForUpdatesNow()
   );
 
+  registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.UPDATER_INSTALL_NOW, async () => {
+    updaterService.installUpdate();
+  });
+
   registerIpcHandler(ipcMain, DESKTOP_IPC_KEYS.MEDIA_SAVE_FROM_URL, async (event, payload) => {
     const { url, suggestedName } = parseSaveFileFromUrlPayload(payload);
     const targetWindow = BrowserWindow.fromWebContents(event.sender) ?? getMainWindow() ?? undefined;

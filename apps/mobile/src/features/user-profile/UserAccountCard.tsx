@@ -1,5 +1,5 @@
 // apps/mobile/src/features/user-profile/UserAccountCard.tsx
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { Image, Pressable, Text, TextInput, View } from "react-native";
 
 type UserAccountCardProps = {
@@ -51,21 +51,21 @@ export default function UserAccountCard({
           className="rounded-full"
         >
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} className="h-[60px] w-[60px] rounded-full" />
+            <Image source={{ uri: avatarUrl }} className="h-15 w-15 rounded-full" />
           ) : (
-            <View className="h-[60px] w-[60px] rounded-full bg-[#2C2C2E] items-center justify-center">
-              <Text className="text-white text-[22px] font-semibold">{avatarInitial}</Text>
+            <View className="h-15 w-15 rounded-full bg-[#2C2C2E] items-center justify-center">
+              <Text className="text-foreground text-[22px] font-semibold">{avatarInitial}</Text>
             </View>
           )}
 
-          <View className="absolute -bottom-[2px] -right-[2px] h-[22px] w-[22px] rounded-full bg-[#0A84FF] border-2 border-[#1C1C1E] items-center justify-center">
-            <Ionicons name="camera" size={12} color="#FFFFFF" />
+          <View className="absolute -bottom-0.5 -right-0.5 h-5.5 w-5.5 rounded-full bg-[#0A84FF] border-2 border-[#1C1C1E] items-center justify-center">
+            <ThemedIonicons name="camera" size={12} colorClassName="accent-primary-foreground" />
           </View>
         </Pressable>
 
         <View className="flex-1">
           <View className="flex-row items-center gap-2">
-            <Text numberOfLines={1} className="flex-1 text-white text-[17px] font-semibold">
+            <Text numberOfLines={1} className="flex-1 text-foreground text-[17px] font-semibold">
               {trimmedDisplayUsername || "User"}
             </Text>
             <Pressable
@@ -74,10 +74,10 @@ export default function UserAccountCard({
               accessibilityRole="button"
               accessibilityLabel={isEditingName ? "Cancel editing username" : "Edit username"}
             >
-              <Ionicons
+              <ThemedIonicons
                 name={isEditingName ? "close-outline" : "pencil-outline"}
                 size={16}
-                color="#8E8E93"
+                colorClassName="accent-muted-foreground"
               />
             </Pressable>
           </View>
@@ -97,9 +97,10 @@ export default function UserAccountCard({
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="Username"
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - iOS muted placeholder; no semantic token for iOS system gray
             placeholderTextColor="#8E8E93"
             editable={!isSaving}
-            className="rounded-xl border border-[#3A3A3C] bg-[#2C2C2E] px-3 py-2.5 text-white text-base"
+            className="rounded-xl border border-[#3A3A3C] bg-[#2C2C2E] px-3 py-2.5 text-foreground text-base"
           />
           <Text className="text-right text-[#8E8E93] text-[11px]">
             {inputUsername.length}/{usernameMaxLength}
@@ -117,7 +118,7 @@ export default function UserAccountCard({
             canSave ? "bg-[#0A84FF]" : "bg-[#3A3A3C] opacity-70"
           }`}
         >
-          <Text className="text-white text-[15px] font-semibold">
+          <Text className="text-foreground text-[15px] font-semibold">
             {isSaving ? "Saving..." : "Save"}
           </Text>
         </Pressable>

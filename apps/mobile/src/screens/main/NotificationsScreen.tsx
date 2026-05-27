@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUiStore } from "@shared/stores/uiStore";
 import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
@@ -39,7 +39,7 @@ export function NotificationsScreen({ navigation }: Props) {
             accessibilityLabel="Go back"
             className="rounded-xl p-2 active:bg-surface-hover"
           >
-            <Ionicons name="chevron-back" size={24} color="#e6edf7" />
+            <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
           </Pressable>
           <Text className="text-lg font-semibold text-foreground">Notifications</Text>
         </View>

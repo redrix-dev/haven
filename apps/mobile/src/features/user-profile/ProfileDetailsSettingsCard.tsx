@@ -155,7 +155,7 @@ export function ProfileDetailsSettingsCard({
             editable={!saving}
             placeholder="Add a short profile bio."
             placeholderTextColor={placeholderColor}
-            className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2.5 text-base text-foreground"
+            className="min-h-24 rounded-xl border border-border bg-background px-3 py-2.5 text-base text-foreground"
           />
           <Text className="text-right text-[11px] text-muted-foreground">
             {draftBio.length}/500

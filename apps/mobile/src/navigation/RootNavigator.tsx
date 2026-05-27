@@ -86,6 +86,7 @@ export function RootNavigator() {
   if (session === undefined) {
     return (
       <View className="flex-1 items-center justify-center bg-surface-app">
+        {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
         <ActivityIndicator color="#e6edf7" size="large" />
       </View>
     );

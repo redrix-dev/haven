@@ -56,6 +56,7 @@ export function DmReportSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal scrim overlay, invariant across themes */}
       <Pressable className="flex-1 justify-center bg-black/60 px-4" onPress={onClose}>
         <Pressable
           className="max-h-[90%] rounded-2xl bg-card border border-border p-4"
@@ -91,11 +92,12 @@ export function DmReportSheet({
               value={comment}
               onChangeText={setComment}
               placeholder="Describe what happened"
+              // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
               placeholderTextColor="#8e8e93"
               multiline
-              className="min-h-[96px] rounded-xl border border-border bg-surface-panel px-3 py-2 text-sm text-foreground"
+              className="min-h-24 rounded-xl border border-border bg-surface-panel px-3 py-2 text-sm text-foreground"
             />
-            {error ? <Text className="mt-2 text-sm text-red-400">{error}</Text> : null}
+            {error ? <Text className="mt-2 text-sm text-destructive">{error}</Text> : null}
           </ScrollView>
 
           <View className="mt-4 flex-row justify-end gap-3">
@@ -107,7 +109,7 @@ export function DmReportSheet({
               disabled={submitting}
               className={`rounded-xl bg-primary px-5 py-2.5 ${submitting ? "opacity-50" : ""}`}
             >
-              <Text className="font-semibold text-white">{submitting ? "Submitting…" : "Submit"}</Text>
+              <Text className="font-semibold text-primary-foreground">{submitting ? "Submitting…" : "Submit"}</Text>
             </Pressable>
           </View>
         </Pressable>

@@ -68,6 +68,7 @@ export function CommunityReportMessageModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+      {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal scrim overlay, invariant across themes */}
       <Pressable className="flex-1 justify-center bg-black/60 px-4" onPress={onDismiss}>
         <Pressable
           className="max-h-[88%] rounded-2xl bg-card border border-border p-4"
@@ -117,12 +118,13 @@ export function CommunityReportMessageModal({
               value={comment}
               onChangeText={setComment}
               placeholder="Add context for moderators"
+              // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
               placeholderTextColor="#8e8e93"
               multiline
               maxLength={1000}
-              className="min-h-[88px] rounded-xl border border-border bg-surface-panel px-3 py-2 text-sm text-foreground"
+              className="min-h-22 rounded-xl border border-border bg-surface-panel px-3 py-2 text-sm text-foreground"
             />
-            {error ? <Text className="mt-2 text-sm text-red-400">{error}</Text> : null}
+            {error ? <Text className="mt-2 text-sm text-destructive">{error}</Text> : null}
           </ScrollView>
 
           <View className="mt-4 flex-row justify-end gap-3">
@@ -134,7 +136,7 @@ export function CommunityReportMessageModal({
               disabled={submitting}
               className={`rounded-xl bg-primary px-5 py-2.5 ${submitting ? "opacity-50" : ""}`}
             >
-              <Text className="font-semibold text-white">
+              <Text className="font-semibold text-primary-foreground">
                 {submitting ? "Submitting…" : "Submit report"}
               </Text>
             </Pressable>

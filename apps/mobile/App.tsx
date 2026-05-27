@@ -1,4 +1,6 @@
 import "react-native-gesture-handler";
+import { bootLogger } from "@shared/debug/bootLogger";
+bootLogger.mark("js-entry");
 import { PortalHost } from "@rn-primitives/portal";
 import "./global.css";
 
@@ -24,10 +26,12 @@ import { bootstrapDataCacheDebug } from "./src/debug/bootstrapDataCacheDebug";
 import { MobileDevToolsOverlay } from "./src/dev/MobileDevToolsOverlay";
 
 registerMobileAppHost();
+bootLogger.mark("app-host-registered");
 registerGlobals();
 bootstrapDataCacheDebug();
 
 const mobileClient = getMobileSupabase();
+bootLogger.mark("supabase-client-created");
 const mobileConfig = resolveMobileSupabaseConfig();
 createHavenCore({
   client: mobileClient,
@@ -37,6 +41,7 @@ createHavenCore({
   },
   persistence: createMmkvPersistence(),
 });
+bootLogger.mark("core-created");
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

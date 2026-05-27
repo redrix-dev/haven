@@ -1,12 +1,13 @@
 // apps/mobile/src/features/user-profile/UserSettingsCard.tsx
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
+import type { ComponentProps } from "react";
 import { Pressable, Text, View } from "react-native";
 
 type SettingsRow = {
   id: string;
   label: string;
   subtitle?: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: ComponentProps<typeof ThemedIonicons>["name"];
   danger?: boolean;
   disabled?: boolean;
   onPress?: () => void | Promise<void>;
@@ -38,9 +39,13 @@ export default function UserSettingsCard({ rows }: UserSettingsCardProps) {
             } ${isLast ? "" : "border-b border-[#2C2C2E]"}`}
           >
             {row.icon ? (
-              <Ionicons name={row.icon} size={18} color={iconColor} />
+              <ThemedIonicons
+                name={row.icon}
+                size={18}
+                colorClassName={row.danger ? "accent-destructive" : "accent-muted-foreground"}
+              />
             ) : (
-              <View className="w-[18px]" />
+              <View className="w-4.5" />
             )}
 
             <View className="flex-1">
@@ -54,7 +59,11 @@ export default function UserSettingsCard({ rows }: UserSettingsCardProps) {
               ) : null}
             </View>
 
-            <Ionicons name="chevron-forward" size={16} color={chevronColor} />
+            <ThemedIonicons
+              name="chevron-forward"
+              size={16}
+              colorClassName={row.danger ? "accent-destructive" : "accent-muted-foreground"}
+            />
           </Pressable>
         );
       })}

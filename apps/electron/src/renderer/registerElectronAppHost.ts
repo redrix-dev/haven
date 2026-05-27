@@ -36,6 +36,7 @@ export function registerElectronAppHost(): void {
         desktopClient.setNotificationAudioSettings(values),
       setVoiceSettings: (values) => desktopClient.setVoiceSettings(values),
       checkForUpdates: () => desktopClient.checkForUpdates(),
+      installUpdate: () => desktopClient.installUpdate(),
     },
     desktopAuth: {
       onProtocolUrl: (listener) => desktopClient.onProtocolUrl(listener),

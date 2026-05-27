@@ -1,6 +1,8 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
+import { bootLogger } from "@shared/debug/bootLogger";
 import { LiveKitAudioRenderer } from "@web-client/features/voice/LiveKitAudioRenderer";
 import { LoginScreen } from "@web-client/components/auth/LoginScreen";
+import { BootSplash } from "@web-client/components/BootSplash";
 import { ServerList } from "@web-client/components/ServerList";
 import { ChatAppModals } from "@web-client/components/ChatAppModals";
 import { ChatAppDmWorkspace } from "@web-client/chat-app/ChatAppDmWorkspace";
@@ -62,17 +64,32 @@ function ChatAppInner() {
   );
   const dmWorkspaceIsActive = useUiStore((state) => state.workspaceMode === "dm");
 
-  if (app.authStatus === "initializing") {
-    return (
-      <div className="flex items-center justify-center h-screen bg-surface-app text-white">
-        Loading...
-      </div>
-    );
-  }
+  // Fire once when the workspace is first fully interactive (auth done + servers loaded).
+  const firedInteractiveRef = useRef(false);
+  useEffect(() => {
+    if (
+      !firedInteractiveRef.current &&
+      app.authStatus === "authenticated" &&
+      !app.isServersLoading
+    ) {
+      firedInteractiveRef.current = true;
+      bootLogger.mark("ui-interactive");
+    }
+  }, [app.authStatus, app.isServersLoading]);
 
+  // ── Splash overlay ───────────────────────────────────────────────────────
+  // Show during the auth check and the subsequent server/cache bootstrap.
+  // A single persistent instance means the auth→loading phase switch is
+  // seamless — no unmount/remount flash between the two message pools.
+  const splashVisible =
+    app.authStatus === "initializing" ||
+    (app.authStatus === "authenticated" && app.isServersLoading);
+  const splashPhase = app.authStatus === "initializing" ? "auth" : "loading";
+
+  // ── Auth error ───────────────────────────────────────────────────────────
   if (app.authStatus === "error") {
     return (
-      <div className="flex items-center justify-center h-screen bg-surface-app text-white">
+      <div className="flex items-center justify-center h-full bg-surface-app text-white">
         <p>
           {app.authError ?? "Authentication failed. Please restart the app."}
         </p>
@@ -80,15 +97,24 @@ function ChatAppInner() {
     );
   }
 
+  // ── Pre-auth / unauthenticated ───────────────────────────────────────────
+  // While initializing: render the splash only (no content underneath).
+  // After initializing with no user: fade the splash out, show login screen.
   if (!app.user) {
-    return <LoginScreen />;
+    return (
+      <>
+        {app.authStatus !== "initializing" && <LoginScreen />}
+        <BootSplash visible={splashVisible} phase={splashPhase} />
+      </>
+    );
   }
 
   const { user } = app;
 
+  // ── Authenticated ────────────────────────────────────────────────────────
   return (
     <>
-      <div className="flex h-screen overflow-hidden bg-surface-app text-foreground">
+      <div className="flex h-full overflow-hidden bg-surface-app text-foreground">
         <ServerList
           servers={orderedServers}
           onReorder={setServerOrder}
@@ -146,13 +172,14 @@ function ChatAppInner() {
         {dmWorkspaceIsActive ? (
           <ChatAppDmWorkspace user={user} />
         ) : app.isServersLoading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <p className="text-muted-foreground">Loading servers...</p>
-          </div>
+          // Splash covers this area during loading — render nothing so the
+          // workspace shell doesn't partially paint beneath the overlay.
+          null
         ) : (
           <CommunityWorkspaceShell user={user} voice={voice} />
         )}
       </div>
+
       <ChatAppModals
         user={user}
         managedReportServers={managedReportServers}
@@ -163,8 +190,12 @@ function ChatAppInner() {
         handleOpenVoicePopout={voice.handleOpenVoicePopout}
         handleKickVoiceParticipant={voice.handleKickVoiceParticipant}
       />
+
       {/* Renders one hidden <audio> per subscribed remote participant. */}
       <LiveKitAudioRenderer room={voice.livekitRoom} />
+
+      {/* Boot splash — fixed overlay, fades out once servers are loaded. */}
+      <BootSplash visible={splashVisible} phase={splashPhase} />
     </>
   );
 }

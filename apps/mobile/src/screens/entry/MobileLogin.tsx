@@ -41,6 +41,7 @@ export function MobileLogin() {
             autoCorrect={false}
             keyboardType="email-address"
             placeholder="you@example.com"
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
             placeholderTextColor="#a9b8cf"
             value={email}
             onChangeText={setEmail}
@@ -50,6 +51,7 @@ export function MobileLogin() {
             className="mb-6 rounded-xl border border-border bg-card px-4 py-3 text-foreground"
             secureTextEntry
             placeholder="••••••••"
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
             placeholderTextColor="#a9b8cf"
             value={password}
             onChangeText={setPassword}

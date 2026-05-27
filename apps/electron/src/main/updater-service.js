@@ -113,7 +113,9 @@ function createUpdaterService({ app, autoUpdater, settingsStore, repository }) {
         repo: repository,
       },
       updateInterval: '30 minutes',
-      notifyUser: true,
+      // Native restart dialog is disabled — the renderer shows an in-app
+      // "Restart to update" badge in the title bar instead.
+      notifyUser: false,
       logger: console,
     });
 
@@ -207,11 +209,16 @@ function createUpdaterService({ app, autoUpdater, settingsStore, repository }) {
     ...state,
   });
 
+  const installUpdate = () => {
+    autoUpdater.quitAndInstall();
+  };
+
   return {
     initialize,
     syncWithSettings,
     checkForUpdatesNow,
     getStatus,
+    installUpdate,
   };
 }
 

@@ -51,7 +51,7 @@ export function CommunityTopBar({
         >
           <Text className="text-sm text-muted-foreground">#</Text>
           <Text
-            className="max-w-[120px] text-sm font-semibold text-foreground"
+            className="max-w-30 text-sm font-semibold text-foreground"
             numberOfLines={1}
           >
             {selectedChannelName}

@@ -5,6 +5,7 @@ const DESKTOP_IPC_KEYS = Object.freeze({
   SETTINGS_SET_VOICE: 'haven:settings:set-voice',
   UPDATER_STATUS_GET: 'haven:updater:status',
   UPDATER_CHECK_NOW: 'haven:updater:check',
+  UPDATER_INSTALL_NOW: 'haven:updater:install',
   MEDIA_SAVE_FROM_URL: 'haven:media:save-from-url',
   EXTERNAL_URL_OPEN: 'haven:external-url:open',
   PROTOCOL_URL_CONSUME_NEXT: 'haven:protocol:consume-next-url',

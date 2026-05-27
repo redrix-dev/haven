@@ -400,16 +400,24 @@
     -webkit-app-region: no-drag;
   }
 
+  #haven-web-root {
+    height: 100%;
+  }
+
   .desktop-app-shell {
-    height: 100vh;
+    height: 100dvh;
     padding-top: 32px;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     background: var(--surface-desktop-shell);
   }
 
-  .desktop-app-shell > *:last-child {
-    height: calc(100vh - 32px) !important;
+  .desktop-app-shell-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .scrollbar-inset {

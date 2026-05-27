@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { Pressable, Text, View } from "react-native";
 
 type CommunityChannelBarProps = {
@@ -35,7 +35,7 @@ export function CommunityChannelBar({
         <Text className="min-w-0 flex-shrink text-sm font-semibold text-foreground" numberOfLines={1}>
           {selectedChannelName}
         </Text>
-        <Ionicons name="chevron-down" size={16} color="#a9b8cf" />
+        <ThemedIonicons name="chevron-down" size={16} colorClassName="accent-muted-foreground" />
       </Pressable>
     </View>
   );

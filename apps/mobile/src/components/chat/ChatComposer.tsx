@@ -5,7 +5,7 @@ import {
   EnrichedMarkdownTextInput,
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import {
   CHAT_COMPOSER_NATIVE_ID,
   COMPOSER_SELECTION_COLOR,
@@ -51,16 +51,16 @@ export function ChatComposer({
             accessibilityLabel="Add media"
             disabled={isSending || isPickingMedia}
             onPress={onPickMedia}
-            className="mb-0.5 h-[34px] w-[34px] items-center justify-center rounded-full bg-white/10 disabled:opacity-50"
+            className="mb-0.5 h-8.5 w-8.5 items-center justify-center rounded-full bg-foreground/10 disabled:opacity-50"
           >
-            <Ionicons name="add" size={20} color={colors.iconOnPrimary} />
+            <ThemedIonicons name="add" size={20} colorClassName="accent-primary-foreground" />
           </Pressable>
         </Animated.View>
 
         <Animated.View
           style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
         >
-          <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/8 pr-1">
+          <View className="flex-1 flex-row items-center rounded-[18px] border border-foreground/10 bg-foreground/8 pr-1">
             <EnrichedMarkdownTextInput
               ref={inputRef}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,7 +103,7 @@ export function ChatComposer({
               }}
               className="h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary"
             >
-              <Ionicons name="arrow-up" size={18} color={colors.iconOnPrimary} />
+              <ThemedIonicons name="arrow-up" size={18} colorClassName="accent-primary-foreground" />
             </Pressable>
           </View>
         </Animated.View>
