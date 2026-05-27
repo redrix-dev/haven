@@ -25,6 +25,7 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { ChatMediaAttachmentStrip } from "@/components/chat/ChatMediaAttachmentStrip";
 import { useChatComposerColors } from "@/components/chat/useChatComposerColors";
+import { toInvertedChatOrder } from "@/components/chat/toInvertedChatOrder";
 import { useDmBubbleShellStore } from "@/features/direct-messages/stores/dmBubbleShellStore";
 import {
   loadPickedCommunityMediaForUpload,
@@ -236,7 +237,9 @@ export function DirectMessagesContainer() {
     Keyboard.dismiss();
   }, []);
 
-  const orderedDmMessages = useMemo(() => [...dmMessages].reverse(), [dmMessages]);
+  // toInvertedChatOrder reverses ascending nexus order to descending for
+  // ChatInterface's inverted FlatList (newest at data[0] = visual bottom).
+  const orderedDmMessages = useMemo(() => toInvertedChatOrder(dmMessages), [dmMessages]);
 
   const otherLabel = useCallback(
     (c: DirectMessageConversationSummary) => {

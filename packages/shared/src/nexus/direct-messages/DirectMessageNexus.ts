@@ -440,9 +440,22 @@ export class DirectMessageNexus extends Nexus<
       }
       const existing =
         state.messagesByConversation[message.conversationId] ?? []
-      const next = existing.includes(message.messageId)
-        ? existing
-        : [...existing, message.messageId]
+      if (existing.includes(message.messageId)) {
+        // Entity updated above; ID array position is already correct.
+        return { ...state, messageEntities, revision: state.revision + 1 }
+      }
+      // Insert at the correct ascending-by-createdAt position so the array
+      // stays sorted regardless of arrival order.
+      const insertAt = existing.findIndex((id) => {
+        const entry = state.messageEntities[id]
+        return entry != null && entry.createdAt > message.createdAt
+      })
+      const next = [...existing]
+      if (insertAt === -1) {
+        next.push(message.messageId)
+      } else {
+        next.splice(insertAt, 0, message.messageId)
+      }
       return {
         ...state,
         messageEntities,
@@ -454,6 +467,20 @@ export class DirectMessageNexus extends Nexus<
       }
     })
     this.persist()
+  }
+
+  async receiveLatest(conversationId: string): Promise<void> {
+    if (!this.backend) return
+    // Fetch only the single newest message for this conversation rather than
+    // reloading the full page. The DM_MESSAGE broadcast carries only
+    // conversation_id, so we have to fetch, but one row is far cheaper than 50.
+    // Known edge case: two messages arriving in rapid succession will both
+    // resolve to the same newest message; the second-oldest will appear on the
+    // next ensureMessagesLoaded (triggered by navigation / focus).
+    const messages = await this.backend.listMessages({ conversationId, limit: 1 })
+    if (messages.length > 0) {
+      this.upsertMessage(messages[0])
+    }
   }
 
   removeMessage(conversationId: string, messageId: string): void {

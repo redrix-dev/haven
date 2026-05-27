@@ -62,7 +62,7 @@ export function mapBundlesToChatMessages(
   liveProfiles: LiveProfilesRecord,
 ): ChatMessage[] {
   const messageById = buildMessageBundleById(storedMessages);
-  return [...storedMessages].reverse().map((bundle) => {
+  return storedMessages.map((bundle) => {
     const cachedProfile = authorProfileFromBundle(bundle, liveProfiles);
     const preserveTombstone = isAuthorProfileTombstone(cachedProfile);
     const liveAvatar =

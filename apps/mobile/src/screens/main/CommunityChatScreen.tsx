@@ -23,6 +23,7 @@ import { ChatInterface } from "@/components/chat/ChatInterface";
 import { ChatMediaAttachmentStrip } from "@/components/chat/ChatMediaAttachmentStrip";
 import { ChatReplyStrip } from "@/components/chat/ChatReplyStrip";
 import { useChatComposerColors } from "@/components/chat/useChatComposerColors";
+import { toInvertedChatOrder } from "@/components/chat/toInvertedChatOrder";
 import {
   CommunityMessageBubble,
   MessageDateDivider,
@@ -218,7 +219,9 @@ export function CommunityChatScreen({
   );
 
   const messages = useMemo<ChatMessage[]>(
-    () => mapBundlesToChatMessages(visibleMessages, liveProfiles),
+    // toInvertedChatOrder reverses ascending nexus order to descending for
+    // ChatInterface's inverted FlatList (newest at data[0] = visual bottom).
+    () => toInvertedChatOrder(mapBundlesToChatMessages(visibleMessages, liveProfiles)),
     [liveProfiles, visibleMessages],
   );
 

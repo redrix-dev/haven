@@ -450,10 +450,12 @@ export class HavenCore {
   onDmMessageEvent(payload: Record<string, unknown>): void {
     const conversationId = payload.conversation_id;
     if (typeof conversationId === "string") {
-      void this.directMessages.loadMessages(conversationId).catch((err) => {
-        console.warn("[HavenCore] directMessages.loadMessages failed", err);
+      void this.directMessages.receiveLatest(conversationId).catch((err) => {
+        console.warn("[HavenCore] directMessages.receiveLatest failed", err);
       });
     }
+    // loadConversations updates inbox metadata (lastMessagePreview, unreadCount,
+    // lastMessageAt) which the message row itself doesn't carry.
     void this.directMessages.loadConversations().catch((err) => {
       console.warn("[HavenCore] directMessages.loadConversations failed", err);
     });
