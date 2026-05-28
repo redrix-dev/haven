@@ -21,7 +21,7 @@ import {
 } from "@shared/nexus/voice/VoiceNexus";
 import { useUiStore } from "@shared/stores/uiStore";
 import { getCommunityDataBackend } from "@shared/lib/backend";
-import type { BanEligibleServer, ProfileVisibility } from "@shared/lib/backend/types";
+import type { BanEligibleServer, DirectMessage, ProfileVisibility } from "@shared/lib/backend/types";
 import { createHavenBackends, type HavenBackends, type HavenSupabasePublicConfig } from "./backends";
 import { notifyActiveServerAccessLost } from "./communityAccessHandlers";
 import { BootstrapPhase, type BootstrapPhaseSnapshot, type BootstrapPhaseListener } from "./bootstrapPhase";
@@ -39,6 +39,43 @@ import {
   viewerPolicyHiddenAuthorIdsEqual,
   type ViewerMessagePolicyStore,
 } from "./viewerMessagePolicy";
+
+const normalizeRealtimeIso = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const timestamp = Date.parse(trimmed);
+  if (!Number.isFinite(timestamp)) return null;
+  return new Date(timestamp).toISOString();
+};
+
+const realtimeMetadata = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const directMessageFromRealtimePayload = (
+  conversationId: string,
+  messageId: string,
+  payload: Record<string, unknown>,
+): DirectMessage | null => {
+  const createdAt = normalizeRealtimeIso(payload.created_at);
+  if (!createdAt || typeof payload.content !== "string") return null;
+  return {
+    messageId,
+    conversationId,
+    authorUserId:
+      typeof payload.author_user_id === "string" ? payload.author_user_id : "",
+    authorUsername: "",
+    authorAvatarUrl: null,
+    content: payload.content,
+    metadata: realtimeMetadata(payload.metadata),
+    createdAt,
+    editedAt: normalizeRealtimeIso(payload.edited_at),
+    deletedAt: normalizeRealtimeIso(payload.deleted_at),
+    attachments: [],
+  };
+};
 
 export type HavenCoreOptions = {
   client: HavenSupabaseClient;
@@ -449,16 +486,26 @@ export class HavenCore {
 
   onDmMessageEvent(payload: Record<string, unknown>): void {
     const conversationId = payload.conversation_id;
+    const messageId = payload.message_id;
     if (typeof conversationId === "string") {
-      void this.directMessages.receiveLatest(conversationId).catch((err) => {
-        console.warn("[HavenCore] directMessages.receiveLatest failed", err);
-      });
+      if (typeof messageId === "string") {
+        const partial = directMessageFromRealtimePayload(
+          conversationId,
+          messageId,
+          payload,
+        );
+        if (partial) {
+          this.directMessages.upsertMessage(partial);
+        }
+        void this.directMessages.receiveMessage(conversationId, messageId).catch((err) => {
+          console.warn("[HavenCore] directMessages.receiveMessage failed", err);
+        });
+      } else {
+        void this.directMessages.receiveLatest(conversationId).catch((err) => {
+          console.warn("[HavenCore] directMessages.receiveLatest failed", err);
+        });
+      }
     }
-    // loadConversations updates inbox metadata (lastMessagePreview, unreadCount,
-    // lastMessageAt) which the message row itself doesn't carry.
-    void this.directMessages.loadConversations().catch((err) => {
-      console.warn("[HavenCore] directMessages.loadConversations failed", err);
-    });
   }
 
   onSocialChange(payload: Record<string, unknown>): void {

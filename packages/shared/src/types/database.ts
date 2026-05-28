@@ -2248,6 +2248,22 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_dm_message: {
+        Args: { p_conversation_id: string; p_message_id: string }
+        Returns: {
+          attachments: Json
+          author_avatar_url: string | null
+          author_user_id: string
+          author_username: string
+          content: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          message_id: string
+          metadata: Json
+        }[]
+      }
       list_dm_messages: {
         Args: {
           p_before_created_at?: string

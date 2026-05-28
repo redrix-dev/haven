@@ -200,6 +200,16 @@ select test_support.assert_eq_int(
   'DM recipient can list text and image messages together'
 );
 
+select test_support.assert_eq_text(
+  (
+    select message_id::text
+    from public.list_dm_messages((select id from dm_ids where key = 'conversation'), 50, null, null)
+    limit 1
+  ),
+  (select id::text from dm_ids where key = 'message_image'),
+  'DM message pages should return newest messages first like community message pages'
+);
+
 select test_support.assert_eq_int(
   (
     select jsonb_array_length(attachments)::bigint

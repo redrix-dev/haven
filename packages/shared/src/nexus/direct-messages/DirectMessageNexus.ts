@@ -3,6 +3,7 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { Nexus, type NexusEntry, type NexusState } from '../Nexus'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
 import type { DirectMessageBackend } from '@shared/lib/backend/directMessageBackend'
+import { getDirectMessagePreviewText } from '@shared/lib/backend/directMessageUtils'
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
@@ -13,9 +14,99 @@ import type { StoreApi, UseBoundStore } from 'zustand'
 const STORAGE_KEY = 'haven:nexus:direct-messages:global'
 const DM_PAGE_SIZE = 50
 const DM_RELOAD_FRESHNESS_WINDOW_MS = 10_000
+const DM_PREVIEW_MAX_LENGTH = 180
 
 const EMPTY_CONVERSATIONS: DirectMessageConversationSummary[] = []
 const EMPTY_MESSAGES: DirectMessage[] = []
+
+const toEpochMs = (value: string | null | undefined): number => {
+  if (!value) return 0
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const conversationActivityAt = (
+  conversation: DirectMessageConversationSummary,
+): string | null =>
+  conversation.lastMessageAt ?? conversation.updatedAt ?? conversation.createdAt
+
+const conversationLastMessageAt = (
+  conversation: DirectMessageConversationSummary,
+): string | null =>
+  conversation.lastMessageCreatedAt ?? conversation.lastMessageAt
+
+const compareConversationSummariesDesc = (
+  a: DirectMessageConversationSummary,
+  b: DirectMessageConversationSummary,
+): number => {
+  const timeDelta =
+    toEpochMs(conversationActivityAt(b)) - toEpochMs(conversationActivityAt(a))
+  if (timeDelta !== 0) return timeDelta
+  return b.conversationId.localeCompare(a.conversationId)
+}
+
+const sortConversationIds = (
+  ids: string[],
+  entities: Record<string, NexusEntry<DirectMessageConversationSummary>>,
+): string[] =>
+  [...ids].sort((a, b) => {
+    const first = entities[a]?.data
+    const second = entities[b]?.data
+    if (!first || !second) return 0
+    return compareConversationSummariesDesc(first, second)
+  })
+
+const isMessageCurrentOrNewerThanSummary = (
+  message: DirectMessage,
+  conversation: DirectMessageConversationSummary,
+): boolean => {
+  if (conversation.lastMessageId === message.messageId) return true
+  const currentAt = conversationLastMessageAt(conversation)
+  if (!currentAt) return true
+  const messageTime = toEpochMs(message.createdAt)
+  const currentTime = toEpochMs(currentAt)
+  if (messageTime !== currentTime) return messageTime > currentTime
+  if (!conversation.lastMessageId) return true
+  return message.messageId > conversation.lastMessageId
+}
+
+const isSummaryNewerThanServerSummary = (
+  local: DirectMessageConversationSummary,
+  server: DirectMessageConversationSummary,
+): boolean => {
+  const localTime = toEpochMs(conversationLastMessageAt(local))
+  const serverTime = toEpochMs(conversationLastMessageAt(server))
+  if (localTime !== serverTime) return localTime > serverTime
+  if (!local.lastMessageId || !server.lastMessageId) {
+    return Boolean(local.lastMessageId && !server.lastMessageId)
+  }
+  return local.lastMessageId > server.lastMessageId
+}
+
+const mergeNewerLocalLatestFields = (
+  server: DirectMessageConversationSummary,
+  local: DirectMessageConversationSummary,
+): DirectMessageConversationSummary => ({
+  ...server,
+  updatedAt: local.updatedAt,
+  lastMessageAt: local.lastMessageAt,
+  lastMessageId: local.lastMessageId,
+  lastMessageAuthorUserId: local.lastMessageAuthorUserId,
+  lastMessagePreview: local.lastMessagePreview,
+  lastMessageCreatedAt: local.lastMessageCreatedAt,
+  unreadCount: local.unreadCount,
+})
+
+const directMessagePreview = (message: DirectMessage): string | null => {
+  const preview = getDirectMessagePreviewText(
+    message.content,
+    message.attachments.length,
+  )
+  if (!preview) return null
+  return preview.length > DM_PREVIEW_MAX_LENGTH
+    ? `${preview.slice(0, DM_PREVIEW_MAX_LENGTH)}...`
+    : preview
+}
 
 export type DmComposeDraftPeer = {
   userId: string
@@ -53,8 +144,15 @@ export const conversationsEqual = (
   for (let i = 0; i < a.length; i++) {
     if (
       a[i].conversationId !== b[i].conversationId ||
+      a[i].updatedAt !== b[i].updatedAt ||
+      a[i].lastMessageAt !== b[i].lastMessageAt ||
       a[i].lastMessageId !== b[i].lastMessageId ||
-      a[i].unreadCount !== b[i].unreadCount
+      a[i].lastMessageAuthorUserId !== b[i].lastMessageAuthorUserId ||
+      a[i].lastMessagePreview !== b[i].lastMessagePreview ||
+      a[i].lastMessageCreatedAt !== b[i].lastMessageCreatedAt ||
+      a[i].unreadCount !== b[i].unreadCount ||
+      a[i].isMuted !== b[i].isMuted ||
+      a[i].mutedUntil !== b[i].mutedUntil
     ) {
       return false
     }
@@ -158,12 +256,13 @@ export class DirectMessageNexus extends Nexus<
     if (this.conversationsInflight) return this.conversationsInflight
 
     this.conversationsInflight = (async () => {
+      const requestedAt = Date.now()
       if (!options?.suppressLoadingState) {
         this.setIsLoadingConversations(true)
       }
       try {
         const conversations = await this.backend!.listConversations()
-        this.setConversations(conversations)
+        this.setConversations(conversations, { preserveLocalUpdatedAfter: requestedAt })
       } finally {
         if (!options?.suppressLoadingState) {
           this.setIsLoadingConversations(false)
@@ -312,6 +411,12 @@ export class DirectMessageNexus extends Nexus<
       imageUpload: options?.imageUpload,
     })
     this.upsertMessage(sent)
+    if (!this.applyLatestMessageToConversation(sent, { unreadCount: 0 })) {
+      void this.refreshConversationsAfterMessageMiss(
+        'sendMessage',
+        sent.conversationId,
+      )
+    }
     return sent
   }
 
@@ -351,24 +456,57 @@ export class DirectMessageNexus extends Nexus<
 
   // ---- Mutators ----
 
-  setConversations(conversations: DirectMessageConversationSummary[]): void {
-    const entities: Record<string, NexusEntry<DirectMessageConversationSummary>> = {}
-    const conversationIds: string[] = []
-    for (const conversation of conversations) {
-      entities[conversation.conversationId] = {
-        data: conversation,
-        partial: false,
-        cachedAt: Date.now(),
+  setConversations(
+    conversations: DirectMessageConversationSummary[],
+    options?: { preserveLocalUpdatedAfter?: number },
+  ): void {
+    this.store.setState((state) => {
+      const entities: Record<
+        string,
+        NexusEntry<DirectMessageConversationSummary>
+      > = {}
+      const conversationIds: string[] = []
+      const seen = new Set<string>()
+      const now = Date.now()
+
+      for (const conversation of conversations) {
+        const existing = state.entities[conversation.conversationId]
+        const data =
+          existing?.data &&
+          isSummaryNewerThanServerSummary(existing.data, conversation)
+            ? mergeNewerLocalLatestFields(conversation, existing.data)
+            : conversation
+        entities[conversation.conversationId] = {
+          data,
+          partial: false,
+          cachedAt: now,
+        }
+        conversationIds.push(conversation.conversationId)
+        seen.add(conversation.conversationId)
       }
-      conversationIds.push(conversation.conversationId)
-    }
-    this.store.setState((state) => ({
-      ...state,
-      entities,
-      conversationIds,
-      isLoadingConversations: false,
-      revision: state.revision + 1,
-    }))
+
+      if (options?.preserveLocalUpdatedAfter != null) {
+        for (const id of state.conversationIds) {
+          const existing = state.entities[id]
+          if (
+            !seen.has(id) &&
+            existing?.data.lastMessageId &&
+            existing.cachedAt > options.preserveLocalUpdatedAfter
+          ) {
+            entities[id] = existing
+            conversationIds.push(id)
+          }
+        }
+      }
+
+      return {
+        ...state,
+        entities,
+        conversationIds: sortConversationIds(conversationIds, entities),
+        isLoadingConversations: false,
+        revision: state.revision + 1,
+      }
+    })
     this.persist()
   }
 
@@ -471,15 +609,34 @@ export class DirectMessageNexus extends Nexus<
 
   async receiveLatest(conversationId: string): Promise<void> {
     if (!this.backend) return
-    // Fetch only the single newest message for this conversation rather than
-    // reloading the full page. The DM_MESSAGE broadcast carries only
-    // conversation_id, so we have to fetch, but one row is far cheaper than 50.
-    // Known edge case: two messages arriving in rapid succession will both
-    // resolve to the same newest message; the second-oldest will appear on the
-    // next ensureMessagesLoaded (triggered by navigation / focus).
+    // Compatibility fallback for older DM_MESSAGE payloads that did not include
+    // a message_id. New payloads should call receiveMessage for exact hydration.
     const messages = await this.backend.listMessages({ conversationId, limit: 1 })
     if (messages.length > 0) {
-      this.upsertMessage(messages[0])
+      const [message] = messages
+      this.upsertMessage(message)
+      if (!this.applyLatestMessageToConversation(message)) {
+        await this.refreshConversationsAfterMessageMiss(
+          'receiveLatest',
+          message.conversationId,
+        )
+      }
+      this.markActiveReceivedMessageRead(message)
+    }
+  }
+
+  async receiveMessage(conversationId: string, messageId: string): Promise<void> {
+    if (!this.backend) return
+    const message = await this.backend.getMessage({ conversationId, messageId })
+    if (message) {
+      this.upsertMessage(message)
+      if (!this.applyLatestMessageToConversation(message)) {
+        await this.refreshConversationsAfterMessageMiss(
+          'receiveMessage',
+          message.conversationId,
+        )
+      }
+      this.markActiveReceivedMessageRead(message)
     }
   }
 
@@ -564,6 +721,99 @@ export class DirectMessageNexus extends Nexus<
       }
     })
     this.persist()
+  }
+
+  private applyLatestMessageToConversation(
+    message: DirectMessage,
+    options?: { unreadCount?: number },
+  ): boolean {
+    let hadConversation = false
+    let changed = false
+    this.store.setState((state) => {
+      const entry = state.entities[message.conversationId]
+      if (!entry) return state
+
+      hadConversation = true
+      const current = entry.data
+      if (!isMessageCurrentOrNewerThanSummary(message, current)) {
+        return state
+      }
+
+      const isDuplicateLatest = current.lastMessageId === message.messageId
+      const isIncomingDirectMessage =
+        current.kind === 'direct' && current.otherUserId === message.authorUserId
+      const unreadCount =
+        options?.unreadCount ??
+        (isIncomingDirectMessage
+          ? state.activeConversationId === message.conversationId
+            ? 0
+            : isDuplicateLatest
+              ? current.unreadCount
+              : current.unreadCount + 1
+          : current.kind === 'direct'
+            ? 0
+            : current.unreadCount)
+
+      const entities = {
+        ...state.entities,
+        [message.conversationId]: {
+          ...entry,
+          data: {
+            ...current,
+            updatedAt: message.createdAt,
+            lastMessageAt: message.createdAt,
+            lastMessageId: message.messageId,
+            lastMessageAuthorUserId: message.authorUserId,
+            lastMessagePreview: directMessagePreview(message),
+            lastMessageCreatedAt: message.createdAt,
+            unreadCount,
+          },
+          cachedAt: Date.now(),
+        },
+      }
+
+      changed = true
+      return {
+        ...state,
+        entities,
+        conversationIds: sortConversationIds(state.conversationIds, entities),
+        revision: state.revision + 1,
+      }
+    })
+    if (changed) this.persist()
+    return hadConversation
+  }
+
+  private markActiveReceivedMessageRead(message: DirectMessage): void {
+    const state = this.store.getState()
+    if (state.activeConversationId !== message.conversationId) return
+    const conversation = state.entities[message.conversationId]?.data
+    if (
+      conversation?.kind !== 'direct' ||
+      conversation.otherUserId !== message.authorUserId
+    ) {
+      return
+    }
+    void this.markRead(message.conversationId).catch((error) => {
+      console.warn('[DirectMessageNexus] markRead after receive failed', error)
+    })
+  }
+
+  private async refreshConversationsAfterMessageMiss(
+    source: string,
+    conversationId: string,
+  ): Promise<void> {
+    try {
+      await this.loadConversations({ suppressLoadingState: true })
+      if (!this.store.getState().entities[conversationId]) {
+        await this.loadConversations({ suppressLoadingState: true })
+      }
+    } catch (error) {
+      console.warn(
+        `[DirectMessageNexus] loadConversations after ${source} failed`,
+        error,
+      )
+    }
   }
 
   // ---- Read selectors ----

@@ -40,11 +40,12 @@ function now(): number {
 // precedes bundle evaluation.  Falls back to 0 (= performance.timeOrigin, i.e.
 // navigation start) so all elapsed values are page-relative even without the
 // HTML shim (e.g. React Native, tests).
+const bootGlobal = globalThis as typeof globalThis & {
+  __havenBootT0?: unknown;
+};
+
 const _pageT0: number =
-  typeof window !== 'undefined' &&
-  typeof (window as unknown as Record<string, unknown>).__havenBootT0 === 'number'
-    ? (window as unknown as { __havenBootT0: number }).__havenBootT0
-    : 0;
+  typeof bootGlobal.__havenBootT0 === 'number' ? bootGlobal.__havenBootT0 : 0;
 
 let t0: number = _pageT0;
 
@@ -87,7 +88,6 @@ function getReport(): string {
 }
 
 function printReport(): void {
-  // eslint-disable-next-line no-console
   console.log('\n%c' + getReport(), 'font-family: monospace; white-space: pre');
 }
 

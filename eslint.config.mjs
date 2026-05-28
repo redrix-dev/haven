@@ -32,21 +32,6 @@ const rendererBoundaryRestrictions = [
   },
 ];
 
-const havenRev2UniwindRestrictions = [
-  {
-    name: "react-native",
-    importNames: ["ActivityIndicator"],
-    message:
-      "Use Spinner from @/components/ui/spinner with colorClassName (accent-*) instead of raw ActivityIndicator.",
-  },
-  {
-    name: "@expo/vector-icons",
-    importNames: ["Ionicons"],
-    message:
-      "Use ThemedIonicons from @/theme-rn with colorClassName (accent-*) instead of raw Ionicons.",
-  },
-];
-
 /**
  * HavenCore architecture boundary restrictions.
  * The Nexus layer is the only authority that may touch backend factories,
@@ -391,35 +376,6 @@ export default [
         "error",
         {
           patterns: mobileBoundaryRestrictions,
-        },
-      ],
-      "no-restricted-globals": [
-        "error",
-        {
-          name: "window",
-          message:
-            "Mobile code should use platform-safe abstractions from @shared/platform/appHost.",
-        },
-        {
-          name: "document",
-          message: "Mobile code cannot rely on DOM globals.",
-        },
-        {
-          name: "localStorage",
-          message:
-            "Mobile code cannot use localStorage; use AsyncStorage-backed abstractions.",
-        },
-      ],
-    },
-  },
-  {
-    files: [],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: mobileBoundaryRestrictions,
-          paths: havenRev2UniwindRestrictions,
         },
       ],
       "no-restricted-globals": [
