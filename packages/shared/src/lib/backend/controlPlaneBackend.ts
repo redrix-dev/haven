@@ -410,7 +410,6 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
           onEvent(parsed);
         })
         .subscribe((status) => {
-          console.log('[private_user_channel] status:', status, channelName);
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.warn(
               `${channelName} did not reach SUBSCRIBED (status: ${status})`,
