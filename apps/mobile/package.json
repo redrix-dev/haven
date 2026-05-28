@@ -74,7 +74,7 @@
     "@supersami/rn-foreground-service": "^2.2.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "expo": "~55.0.23",
+    "expo": "^55.0.26",
     "expo-asset": "~55.0.16",
     "expo-blur": "~55.0.14",
     "expo-brightness": "~55.0.13",
