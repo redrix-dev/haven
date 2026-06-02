@@ -81,8 +81,8 @@ function NotificationsBellButton({
             colorClassName="accent-foreground"
           />
           {unreadCount > 0 ? (
-            <View className="absolute -right-0.5 -top-0.5 min-w-[10px] rounded-full bg-accent-slider px-[3px] py-0.5">
-              <Text className="text-center text-[9px] font-bold leading-none text-primary-foreground">
+            <View className="absolute -right-1 -top-1 min-w-5 rounded-full bg-accent-slider px-1 py-0.5">
+              <Text className="text-center text-xs font-bold leading-4 text-primary-foreground">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </Text>
             </View>
@@ -104,8 +104,8 @@ function IconWithBadge({
     <View>
       {children}
       {count > 0 ? (
-        <View className="absolute -right-0.5 -top-0.5 min-w-[10px] rounded-full bg-accent-slider px-[3px] py-0.5">
-          <Text className="text-center text-[9px] font-bold leading-none text-primary-foreground">
+        <View className="absolute -right-1 -top-1 min-w-5 rounded-full bg-accent-slider px-1 py-0.5">
+          <Text className="text-center text-xs font-bold leading-4 text-primary-foreground">
             {count > 99 ? "99+" : count}
           </Text>
         </View>

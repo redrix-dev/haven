@@ -24,9 +24,11 @@ export type NotificationNexusState = NexusState<NotificationItem> & {
   counts: NotificationCounts
   isLoading: boolean
   hasMore: boolean
+  inboxLastLoadedAt: number
   preferences: NotificationPreferences | null
   preferencesLoading: boolean
   preferencesSaving: boolean
+  preferencesLastLoadedAt: number
 }
 
 const selectCounts = (state: NotificationNexusState) => state.counts
@@ -56,6 +58,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
 
   private readonly backend: NotificationBackend
   private listInflight: Promise<void> | null = null
+  private preferencesInflight: Promise<NotificationPreferences> | null = null
   private notificationsSnapshot: NotificationItem[] = EMPTY_NOTIFICATIONS
 
   private readonly notificationsSelector = (
@@ -97,9 +100,11 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
         counts: DEFAULT_COUNTS,
         isLoading: false,
         hasMore: false,
+        inboxLastLoadedAt: 0,
         preferences: null,
         preferencesLoading: false,
         preferencesSaving: false,
+        preferencesLastLoadedAt: 0,
         revision: 0,
       }))
       this.rehydrate()
@@ -122,6 +127,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
         ])
         this.setNotifications(items, { hasMore: items.length === PAGE_SIZE })
         this.setCounts(counts)
+        this.setInboxLastLoadedAt(Date.now())
       } finally {
         this.setIsLoading(false)
       }
@@ -136,18 +142,50 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     await this.loadInbox()
   }
 
+  async ensureInbox(options?: { freshnessMs?: number }): Promise<void> {
+    if (this.listInflight) return this.listInflight
+    const freshnessMs = options?.freshnessMs ?? 60_000
+    const lastLoadedAt = this.store.getState().inboxLastLoadedAt
+    if (lastLoadedAt > 0 && Date.now() - lastLoadedAt < freshnessMs) return
+    await this.loadInbox()
+  }
+
   async loadPreferences(): Promise<NotificationPreferences> {
     if (!this.backend) {
       throw new Error('NotificationNexus.loadPreferences called before backend attached.')
     }
-    this.setPreferencesLoading(true)
-    try {
-      const preferences = await this.backend.getNotificationPreferences()
-      this.setPreferences(preferences)
-      return preferences
-    } finally {
-      this.setPreferencesLoading(false)
+    if (this.preferencesInflight) return this.preferencesInflight
+
+    this.preferencesInflight = (async () => {
+      this.setPreferencesLoading(true)
+      try {
+        const preferences = await this.backend.getNotificationPreferences()
+        this.setPreferences(preferences)
+        this.setPreferencesLastLoadedAt(Date.now())
+        return preferences
+      } finally {
+        this.setPreferencesLoading(false)
+      }
+    })().finally(() => {
+      this.preferencesInflight = null
+    })
+
+    return this.preferencesInflight
+  }
+
+  async ensurePreferences(
+    options?: { freshnessMs?: number },
+  ): Promise<NotificationPreferences | null> {
+    const freshnessMs = options?.freshnessMs ?? 60_000
+    const state = this.store.getState()
+    if (
+      state.preferences &&
+      state.preferencesLastLoadedAt > 0 &&
+      Date.now() - state.preferencesLastLoadedAt < freshnessMs
+    ) {
+      return state.preferences
     }
+    return this.loadPreferences()
   }
 
   async savePreferences(
@@ -286,6 +324,22 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     this.persist()
   }
 
+  setInboxLastLoadedAt(loadedAt: number): void {
+    this.store.setState((state) => ({
+      ...state,
+      inboxLastLoadedAt: loadedAt,
+      revision: state.revision + 1,
+    }))
+  }
+
+  setPreferencesLastLoadedAt(loadedAt: number): void {
+    this.store.setState((state) => ({
+      ...state,
+      preferencesLastLoadedAt: loadedAt,
+      revision: state.revision + 1,
+    }))
+  }
+
   setPreferencesLoading(loading: boolean): void {
     this.store.setState((state) => ({
       ...state,
@@ -339,6 +393,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
           entities: state.entities,
           recipientOrder: state.recipientOrder,
           counts: state.counts,
+          inboxLastLoadedAt: state.inboxLastLoadedAt,
         }),
       )
     } catch (error) {
@@ -356,6 +411,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
         entities: parsed.entities ?? {},
         recipientOrder: parsed.recipientOrder ?? [],
         counts: parsed.counts ?? DEFAULT_COUNTS,
+        inboxLastLoadedAt: parsed.inboxLastLoadedAt ?? 0,
         revision: 0,
       }))
     } catch (error) {
@@ -365,15 +421,19 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
   }
 
   override clear(): void {
+    this.listInflight = null
+    this.preferencesInflight = null
     this.store.setState({
       entities: {},
       recipientOrder: [],
       counts: DEFAULT_COUNTS,
       isLoading: false,
       hasMore: false,
+      inboxLastLoadedAt: 0,
       preferences: null,
       preferencesLoading: false,
       preferencesSaving: false,
+      preferencesLastLoadedAt: 0,
       revision: 0,
     })
     this.notificationsSnapshot = EMPTY_NOTIFICATIONS

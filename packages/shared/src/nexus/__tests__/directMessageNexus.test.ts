@@ -243,6 +243,18 @@ describe('DirectMessageNexus', () => {
         [conversation({ isMuted: true })],
       ),
     ).toBe(false);
+    expect(
+      conversationsEqual(
+        [conversation({ otherAvatarUrl: 'https://example.com/before.webp' })],
+        [conversation({ otherAvatarUrl: 'https://example.com/after.webp' })],
+      ),
+    ).toBe(false);
+    expect(
+      conversationsEqual(
+        [conversation({ otherUsername: 'bob' })],
+        [conversation({ otherUsername: 'robert' })],
+      ),
+    ).toBe(false);
   });
 
   it('markRead resets unreadCount in the cached conversation', async () => {

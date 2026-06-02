@@ -18,12 +18,14 @@ export type ProfileNexusState = {
   viewerProfiles: Record<string, UserProfileInfo | null>;
   viewerProfileLoading: Record<string, boolean>;
   viewerProfileErrors: Record<string, string | null>;
+  viewerProfileLastLoadedAt: Record<string, number>;
   profileCards: Record<string, UserProfileCard | null>;
   profileCardLoading: Record<string, boolean>;
   profileCardErrors: Record<string, string | null>;
   platformStaff: Record<string, PlatformStaffInfo | null>;
   platformStaffLoading: Record<string, boolean>;
   platformStaffErrors: Record<string, string | null>;
+  platformStaffLastLoadedAt: Record<string, number>;
   revision: number;
 };
 
@@ -53,12 +55,14 @@ export class ProfileNexus {
       viewerProfiles: {},
       viewerProfileLoading: {},
       viewerProfileErrors: {},
+      viewerProfileLastLoadedAt: {},
       profileCards: {},
       profileCardLoading: {},
       profileCardErrors: {},
       platformStaff: {},
       platformStaffLoading: {},
       platformStaffErrors: {},
+      platformStaffLastLoadedAt: {},
       revision: 0,
     }));
   }
@@ -73,6 +77,10 @@ export class ProfileNexus {
   private setViewerProfile(userId: string, profile: UserProfileInfo | null): void {
     this.store.setState((state) => ({
       viewerProfiles: { ...state.viewerProfiles, [userId]: profile },
+      viewerProfileLastLoadedAt: {
+        ...state.viewerProfileLastLoadedAt,
+        [userId]: Date.now(),
+      },
       revision: state.revision + 1,
     }));
 
@@ -113,6 +121,10 @@ export class ProfileNexus {
   private setPlatformStaff(userId: string, staff: PlatformStaffInfo | null): void {
     this.store.setState((state) => ({
       platformStaff: { ...state.platformStaff, [userId]: staff },
+      platformStaffLastLoadedAt: {
+        ...state.platformStaffLastLoadedAt,
+        [userId]: Date.now(),
+      },
       revision: state.revision + 1,
     }));
   }
@@ -166,6 +178,26 @@ export class ProfileNexus {
 
     this.viewerProfileInflight.set(userId, promise);
     return promise;
+  }
+
+  async ensureViewerProfile(
+    userId: string,
+    options?: { freshnessMs?: number },
+  ): Promise<UserProfileInfo | null> {
+    if (!userId.trim()) return null;
+    const existing = this.viewerProfileInflight.get(userId);
+    if (existing) return existing;
+    const freshnessMs = options?.freshnessMs ?? 60_000;
+    const state = this.store.getState();
+    const hasLoaded = Object.prototype.hasOwnProperty.call(
+      state.viewerProfiles,
+      userId,
+    );
+    const lastLoadedAt = state.viewerProfileLastLoadedAt[userId] ?? 0;
+    if (hasLoaded && Date.now() - lastLoadedAt < freshnessMs) {
+      return state.viewerProfiles[userId] ?? null;
+    }
+    return this.loadViewerProfile(userId);
   }
 
   async updateViewerProfile(input: ViewerProfileUpdateInput): Promise<UserProfileInfo> {
@@ -274,6 +306,26 @@ export class ProfileNexus {
 
     this.platformStaffInflight.set(userId, promise);
     return promise;
+  }
+
+  async ensurePlatformStaff(
+    userId: string,
+    options?: { freshnessMs?: number },
+  ): Promise<PlatformStaffInfo | null> {
+    if (!userId.trim()) return null;
+    const existing = this.platformStaffInflight.get(userId);
+    if (existing) return existing;
+    const freshnessMs = options?.freshnessMs ?? 60_000;
+    const state = this.store.getState();
+    const hasLoaded = Object.prototype.hasOwnProperty.call(
+      state.platformStaff,
+      userId,
+    );
+    const lastLoadedAt = state.platformStaffLastLoadedAt[userId] ?? 0;
+    if (hasLoaded && Date.now() - lastLoadedAt < freshnessMs) {
+      return state.platformStaff[userId] ?? null;
+    }
+    return this.loadPlatformStaff(userId);
   }
 
   upsertProfile(profile: LiveProfileIdentity): void {
@@ -428,12 +480,14 @@ export class ProfileNexus {
       viewerProfiles: {},
       viewerProfileLoading: {},
       viewerProfileErrors: {},
+      viewerProfileLastLoadedAt: {},
       profileCards: {},
       profileCardLoading: {},
       profileCardErrors: {},
       platformStaff: {},
       platformStaffLoading: {},
       platformStaffErrors: {},
+      platformStaffLastLoadedAt: {},
       revision: 0,
     });
   }

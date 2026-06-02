@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, Text, View, type ListRenderItem } from "react-native";
+import { ActivityIndicator, FlatList, Image, Pressable, Text, View, type ListRenderItem } from "react-native";
 // uniwind-theme-allow mobile-theme/no-direct-ionicons - Ionicons kept for amber shield icon (ModMail brand color has no semantic token)
 import { Ionicons } from "@expo/vector-icons";
 import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useHavenCore } from "@shared/core";
-import { resolveLiveUsername } from "@shared/lib/liveProfiles";
+import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import type { DirectMessageConversationSummary } from "@shared/lib/backend/types";
 import { MobileModmailPanel } from "@/features/moderation/MobileModmailPanel";
@@ -103,6 +103,12 @@ export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
     ({ item }) => {
       const unread = item.unreadCount > 0;
       const label = getPeerLabel(item);
+      const avatarUrl = resolveLiveAvatarUrl(
+        liveProfiles,
+        item.otherUserId,
+        item.otherAvatarUrl,
+      );
+      const initial = label.slice(0, 1).toUpperCase() || "D";
       return (
         <Pressable
           onPress={() => void handleSelectConversation(item.conversationId)}
@@ -111,24 +117,34 @@ export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
           className="flex-row items-center gap-3 border-b border-border-panel px-4 py-3 active:bg-surface-hover"
         >
           <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
-            <Text className="text-base font-semibold text-foreground">
-              {label.slice(0, 1).toUpperCase()}
-            </Text>
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={{ width: 40, height: 40 }}
+                resizeMode="cover"
+                accessibilityLabel={`${label} avatar`}
+                accessibilityIgnoresInvertColors
+              />
+            ) : (
+              <Text className="text-base font-semibold text-foreground">
+                {initial}
+              </Text>
+            )}
           </View>
           <View className="min-w-0 flex-1">
             <Text
-              className={`text-sm ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-              numberOfLines={1}
+              className={`text-sm leading-5 ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+              numberOfLines={2}
             >
               {label}
             </Text>
-            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+            <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={2}>
               {item.lastMessagePreview ?? "No messages yet"}
             </Text>
           </View>
           {unread ? (
-            <View className="min-w-[20px] rounded-full bg-primary px-1.5 py-0.5">
-              <Text className="text-center text-[10px] font-bold text-primary-foreground">
+            <View className="min-w-6 rounded-full bg-primary px-1.5 py-0.5">
+              <Text className="text-center text-xs font-bold leading-4 text-primary-foreground">
                 {item.unreadCount > 99 ? "99+" : String(item.unreadCount)}
               </Text>
             </View>

@@ -47,6 +47,46 @@ describe('NotificationNexus', () => {
     expect(list).toHaveBeenCalledTimes(1);
   });
 
+  it('skips fresh ensured inbox loads', async () => {
+    const list = vi.fn(async () => [item()]);
+    const getNotificationCounts = vi.fn(async () => ({
+      unseenCount: 1,
+      unreadCount: 1,
+    }));
+    const nexus = new NotificationNexus(createMemoryPersistence(), {
+      listNotifications: list,
+      getNotificationCounts,
+    } as never);
+
+    await nexus.ensureInbox();
+    await nexus.ensureInbox();
+
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(getNotificationCounts).toHaveBeenCalledTimes(1);
+  });
+
+  it('dedupes concurrent preference loads', async () => {
+    const getNotificationPreferences = vi.fn(async () => ({
+      friendRequestInAppEnabled: true,
+      friendRequestSoundEnabled: true,
+      friendRequestPushEnabled: true,
+      dmInAppEnabled: true,
+      dmSoundEnabled: true,
+      dmPushEnabled: true,
+      mentionInAppEnabled: true,
+      mentionSoundEnabled: true,
+      mentionPushEnabled: true,
+    }));
+    const nexus = new NotificationNexus(createMemoryPersistence(), {
+      getNotificationPreferences,
+    } as never);
+
+    await Promise.all([nexus.ensurePreferences(), nexus.ensurePreferences()]);
+    await nexus.ensurePreferences();
+
+    expect(getNotificationPreferences).toHaveBeenCalledTimes(1);
+  });
+
   it('markSeen delegates and refreshes counts', async () => {
     const markSeen = vi.fn(async () => 1);
     const getCounts = vi.fn(async () => ({

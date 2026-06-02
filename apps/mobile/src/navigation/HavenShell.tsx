@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
-import { BackHandler, Dimensions, Pressable, View } from "react-native";
+import { BackHandler, Dimensions, Keyboard, Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -55,6 +55,7 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
       (open: boolean) => {
         // Guard: don't allow closing when there is no content to reveal
         if (!hasContent && !open) return;
+        Keyboard.dismiss();
         setDrawerOpen(open);
         onDrawerStateChange?.(open);
         drawerOffset.value = withTiming(open ? 0 : -DRAWER_SURFACE_WIDTH, DRAWER_TIMING);

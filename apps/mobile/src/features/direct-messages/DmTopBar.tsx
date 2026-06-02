@@ -58,8 +58,8 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
       style={{ paddingTop: insets.top }}
     >
       <View
-        style={{ height: HEADER_ROW_HEIGHT, paddingHorizontal: 12 }}
-        className="flex-row items-center"
+        style={{ minHeight: HEADER_ROW_HEIGHT, paddingHorizontal: 12 }}
+        className="flex-row items-center py-1"
       >
         {/* Tapping the title opens the inbox drawer — mirrors community name in CommunityTopBar */}
         <Pressable
@@ -68,7 +68,7 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
           className="flex-1 rounded-lg px-2 py-2 active:bg-surface-hover"
           onPress={onOpenDrawer}
         >
-          <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+          <Text className="text-sm font-semibold leading-5 text-foreground" numberOfLines={2}>
             {peerName ?? "Messages"}
           </Text>
         </Pressable>

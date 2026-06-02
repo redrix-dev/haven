@@ -69,7 +69,7 @@ export function DmReportSheet({
 
           <ScrollView className="mt-4" keyboardShouldPersistTaps="handled">
             <View className="mb-4 rounded-xl border border-border bg-surface-panel p-3">
-              <Text className="text-[10px] uppercase text-muted-foreground">Reported user</Text>
+              <Text className="text-xs uppercase text-muted-foreground">Reported user</Text>
               <Text className="mt-1 font-semibold text-foreground">{authorUsername}</Text>
               <Text className="mt-2 whitespace-pre-wrap text-sm text-foreground/90">{messagePreview}</Text>
             </View>

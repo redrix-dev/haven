@@ -171,7 +171,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
   useMobilePushNotificationRouting();
 
   useEffect(() => {
-    void core.profiles.loadViewerProfile(userId).catch(() => {
+    void core.profiles.ensureViewerProfile(userId).catch(() => {
       // The auth email fallback keeps voice usable if profile hydration fails.
     });
   }, [core.profiles, userId]);

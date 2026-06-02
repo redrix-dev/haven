@@ -213,6 +213,7 @@ export class VoiceNexus {
     currentUserId: string;
     channelId: string;
   } | null = null;
+  private kickConnectionSerial = 0;
 
   constructor(
     _persistence: NexusPersistence,
@@ -406,7 +407,8 @@ export class VoiceNexus {
       throw new Error("Voice realtime transport is not configured.");
     }
 
-    await this.disconnectKickChannel();
+    const serial = ++this.kickConnectionSerial;
+    await this.removeKickChannel();
 
     const channel = this.realtime.channel(
       `voice:kick:${input.communityId}:${input.channelId}`,
@@ -434,6 +436,11 @@ export class VoiceNexus {
       });
     });
 
+    if (serial !== this.kickConnectionSerial) {
+      await this.realtime.removeChannel(channel);
+      return;
+    }
+
     this.kickChannel = channel;
     this.kickContext = {
       currentUserId: input.currentUserId,
@@ -441,12 +448,17 @@ export class VoiceNexus {
     };
   }
 
-  async disconnectKickChannel(): Promise<void> {
+  private async removeKickChannel(): Promise<void> {
     const channel = this.kickChannel;
     this.kickChannel = null;
     this.kickContext = null;
     if (!channel || !this.realtime) return;
     await this.realtime.removeChannel(channel);
+  }
+
+  async disconnectKickChannel(): Promise<void> {
+    this.kickConnectionSerial += 1;
+    await this.removeKickChannel();
   }
 
   async kickParticipant(targetUserId: string, channelId: string): Promise<void> {

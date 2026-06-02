@@ -24,6 +24,7 @@ import { ThemedIonicons } from "@/theme-rn";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { ChatMediaAttachmentStrip } from "@/components/chat/ChatMediaAttachmentStrip";
+import { createChatMarkdownStyle } from "@/components/chat/chatTypography";
 import { useChatComposerColors } from "@/components/chat/useChatComposerColors";
 import { toInvertedChatOrder } from "@/components/chat/toInvertedChatOrder";
 import { useDmBubbleShellStore } from "@/features/direct-messages/stores/dmBubbleShellStore";
@@ -267,12 +268,12 @@ export function DirectMessagesContainer() {
           </View>
           <View className="min-w-0 flex-1">
             <Text
-              className={`text-base ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-              numberOfLines={1}
+              className={`text-base leading-6 ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+              numberOfLines={2}
             >
               {title}
             </Text>
-            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+            <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={2}>
               {item.lastMessagePreview ?? "No messages yet"}
             </Text>
           </View>
@@ -301,6 +302,12 @@ export function DirectMessagesContainer() {
       const blockSurfaceColor = isSelf ? "rgba(12, 20, 34, 0.35)" : "#1a2235";
       const blockquoteBorderColor = isSelf ? "rgba(255,255,255,0.65)" : "#3F79D8";
       const linkColor = isSelf ? "#ffffff" : "#3F79D8";
+      const markdownStyle = createChatMarkdownStyle({
+        textColor,
+        codeBackgroundColor: blockSurfaceColor,
+        blockquoteBorderColor,
+        linkColor,
+      });
       return (
         <Pressable
           onPress={dismissDmComposerKeyboard}
@@ -324,40 +331,15 @@ export function DirectMessagesContainer() {
               flavor="github"
               md4cFlags={{ underline: true }}
               markdownStyle={{
-                paragraph: { color: textColor, fontSize: 14, lineHeight: 20 },
-                h1: { fontSize: 22, fontWeight: "700", color: textColor, marginTop: 4, marginBottom: 4, lineHeight: 28 },
-                h2: { fontSize: 18, fontWeight: "700", color: textColor, marginTop: 4, marginBottom: 4, lineHeight: 24 },
-                h3: { fontSize: 16, fontWeight: "600", color: textColor, marginTop: 4, marginBottom: 2, lineHeight: 22 },
-                strong: { color: textColor },
-                em: { color: textColor },
+                ...markdownStyle,
                 code: {
+                  ...markdownStyle.code,
                   fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-                  fontSize: 13,
-                  backgroundColor: blockSurfaceColor,
-                  color: textColor,
-                  borderColor: blockSurfaceColor,
                 },
                 codeBlock: {
+                  ...markdownStyle.codeBlock,
                   fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-                  fontSize: 13,
-                  backgroundColor: blockSurfaceColor,
-                  color: textColor,
-                  padding: 10,
-                  borderRadius: 6,
-                  marginTop: 4,
-                  marginBottom: 4,
                 },
-                blockquote: {
-                  backgroundColor: blockSurfaceColor,
-                  borderColor: blockquoteBorderColor,
-                  borderWidth: 3,
-                  gapWidth: 10,
-                  marginTop: 2,
-                  marginBottom: 2,
-                },
-                strikethrough: { color: textColor },
-                list: { marginTop: 2, marginBottom: 2 },
-                link: { color: linkColor, underline: true },
               }}
               onLinkPress={({ url }) => {
                 void Linking.openURL(url);
@@ -384,7 +366,7 @@ export function DirectMessagesContainer() {
               return null;
             })}
             <Text
-              className="mt-1 text-[10px]"
+              className="mt-1 text-xs leading-4"
               style={{ color: mutedTextColor }}
             >
               {formatDmTime(item.createdAt)}
@@ -517,7 +499,7 @@ export function DirectMessagesContainer() {
           <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
           <Text className="text-sm text-foreground">Inbox</Text>
         </Pressable>
-        <Text className="max-w-[50%] flex-1 text-center text-base font-semibold text-foreground" numberOfLines={1}>
+        <Text className="max-w-[50%] flex-1 text-center text-base font-semibold leading-6 text-foreground" numberOfLines={2}>
           {threadTitle}
         </Text>
         {selectedDmConversation ? (

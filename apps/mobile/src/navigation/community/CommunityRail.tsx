@@ -62,8 +62,8 @@ function RailActionButton({
           colorClassName={isActive ? "accent-primary-foreground" : "accent-foreground"}
         />
         {badgeCount > 0 ? (
-          <View className="absolute -right-1.5 -top-1.5 min-w-4.5 rounded-full bg-accent-slider px-1 py-0.5">
-            <Text className="text-center text-[9px] font-bold leading-none text-primary-foreground">
+          <View className="absolute -right-2 -top-2 min-w-5 rounded-full bg-accent-slider px-1 py-0.5">
+            <Text className="text-center text-xs font-bold leading-4 text-primary-foreground">
               {formatBadgeCount(badgeCount)}
             </Text>
           </View>

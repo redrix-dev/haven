@@ -11,6 +11,7 @@ import {
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import type { MessageAttachment, MessageLinkPreview } from "@shared/lib/backend/types";
 import { getFallbackEmbedUrl } from "@shared/features/messaging/utils/embedUtils";
+import { createChatMarkdownStyle } from "@/components/chat/chatTypography";
 import { useCommunityMessageColors } from "@/theme-rn";
 import { CommunityAttachmentVideo } from "./CommunityAttachmentVideo";
 
@@ -95,6 +96,12 @@ export function CommunityMessageBubble({
   linkPreview,
 }: CommunityMessageBubbleProps) {
   const c = useCommunityMessageColors();
+  const markdownStyle = createChatMarkdownStyle({
+    textColor: c.text,
+    codeBackgroundColor: c.codeBg,
+    blockquoteBorderColor: c.blockquoteAccent,
+    linkColor: c.link,
+  });
   const embedUrl = linkPreview ? getFallbackEmbedUrl(linkPreview) : null;
   const sourceUrl = linkPreview?.sourceUrl ?? linkPreview?.snapshot?.sourceUrl ?? "";
   const title = linkPreview?.snapshot?.title ?? sourceUrl;
@@ -178,40 +185,15 @@ export function CommunityMessageBubble({
           flavor="github"
           md4cFlags={{ underline: true }}
           markdownStyle={{
-            paragraph: { color: c.text, fontSize: 14, lineHeight: 20 },
-            h1: { fontSize: 22, fontWeight: "700", color: c.text, marginTop: 4, marginBottom: 4, lineHeight: 28 },
-            h2: { fontSize: 18, fontWeight: "700", color: c.text, marginTop: 4, marginBottom: 4, lineHeight: 24 },
-            h3: { fontSize: 16, fontWeight: "600", color: c.text, marginTop: 4, marginBottom: 2, lineHeight: 22 },
-            strong: { color: c.text },
-            em: { color: c.text },
+            ...markdownStyle,
             code: {
+              ...markdownStyle.code,
               fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-              fontSize: 13,
-              backgroundColor: c.codeBg,
-              color: c.text,
-              borderColor: c.codeBg,
             },
             codeBlock: {
+              ...markdownStyle.codeBlock,
               fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-              fontSize: 13,
-              backgroundColor: c.codeBg,
-              color: c.text,
-              padding: 10,
-              borderRadius: 6,
-              marginTop: 4,
-              marginBottom: 4,
             },
-            blockquote: {
-              backgroundColor: c.codeBg,
-              borderColor: c.blockquoteAccent,
-              borderWidth: 3,
-              gapWidth: 10,
-              marginTop: 2,
-              marginBottom: 2,
-            },
-            strikethrough: { color: c.text },
-            list: { marginTop: 2, marginBottom: 2 },
-            link: { color: c.link, underline: true },
           }}
           onLinkPress={({ url }) => {
             void Linking.openURL(url);
@@ -376,7 +358,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   staffBadgeText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "600",
     letterSpacing: 0.5,
     textTransform: "uppercase",

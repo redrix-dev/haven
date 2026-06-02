@@ -241,7 +241,7 @@ function ChannelDetail({
                         });
                       }}
                     >
-                      <Text className="text-[10px] uppercase text-muted-foreground">View</Text>
+                      <Text className="text-xs uppercase text-muted-foreground">View</Text>
                       <Text className="text-sm text-foreground">
                         {row.canView === null ? "Default" : row.canView ? "Allow" : "Deny"}
                       </Text>
@@ -260,7 +260,7 @@ function ChannelDetail({
                         });
                       }}
                     >
-                      <Text className="text-[10px] uppercase text-muted-foreground">Send</Text>
+                      <Text className="text-xs uppercase text-muted-foreground">Send</Text>
                       <Text className="text-sm text-foreground">
                         {row.canSend === null ? "Default" : row.canSend ? "Allow" : "Deny"}
                       </Text>

@@ -25,6 +25,7 @@ export type SocialNexusState = {
   requests: FriendRequestSummary[];
   blockedUsers: BlockedUserSummary[];
   isLoading: boolean;
+  lastLoadedAt: number;
   revision: number;
 };
 
@@ -94,6 +95,7 @@ export class SocialNexus {
       requests: EMPTY_REQUESTS,
       blockedUsers: EMPTY_BLOCKED,
       isLoading: false,
+      lastLoadedAt: 0,
       revision: 0,
     }));
   }
@@ -140,36 +142,48 @@ export class SocialNexus {
 
     this.store.setState({ isLoading: true });
     const promise = (async () => {
-      const [
-        counts,
-        myBlockedUserIds,
-        usersBlockingMeIds,
-        friends,
-        requests,
-        blockedUsers,
-      ] = await Promise.all([
-        this.backend!.getSocialCounts(),
-        this.backend!.listMyBlocks(),
-        this.backend!.listUsersBlockingMe(),
-        this.backend!.listFriends(),
-        this.backend!.listFriendRequests(),
-        this.backend!.listBlockedUsers(),
-      ]);
+      try {
+        const [
+          counts,
+          myBlockedUserIds,
+          usersBlockingMeIds,
+          friends,
+          requests,
+          blockedUsers,
+        ] = await Promise.all([
+          this.backend!.getSocialCounts(),
+          this.backend!.listMyBlocks(),
+          this.backend!.listUsersBlockingMe(),
+          this.backend!.listFriends(),
+          this.backend!.listFriendRequests(),
+          this.backend!.listBlockedUsers(),
+        ]);
 
-      this.store.setState({
-        counts,
-        friends,
-        requests,
-        blockedUsers,
-        isLoading: false,
-      });
-      this.setBlockLists({ myBlockedUserIds, usersBlockingMeIds });
+        this.store.setState({
+          counts,
+          friends,
+          requests,
+          blockedUsers,
+          lastLoadedAt: Date.now(),
+        });
+        this.setBlockLists({ myBlockedUserIds, usersBlockingMeIds });
+      } finally {
+        this.store.setState({ isLoading: false });
+      }
     })().finally(() => {
       this.loadInflight = null;
     });
 
     this.loadInflight = promise;
     return promise;
+  }
+
+  async ensureLoaded(options?: { freshnessMs?: number }): Promise<void> {
+    if (this.loadInflight) return this.loadInflight;
+    const freshnessMs = options?.freshnessMs ?? 60_000;
+    const lastLoadedAt = this.store.getState().lastLoadedAt;
+    if (lastLoadedAt > 0 && Date.now() - lastLoadedAt < freshnessMs) return;
+    await this.load();
   }
 
   async loadBlockLists(): Promise<void> {
@@ -353,6 +367,7 @@ export class SocialNexus {
       requests: EMPTY_REQUESTS,
       blockedUsers: EMPTY_BLOCKED,
       isLoading: false,
+      lastLoadedAt: 0,
       revision: 0,
     });
     this.friendsSnapshot = EMPTY_FRIENDS;

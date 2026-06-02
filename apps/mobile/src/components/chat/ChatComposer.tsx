@@ -10,6 +10,7 @@ import {
   CHAT_COMPOSER_NATIVE_ID,
   COMPOSER_SELECTION_COLOR,
 } from "@/components/chat/chatSurfaceConstants";
+import { CHAT_COMPOSER_INPUT_STYLE } from "@/components/chat/chatTypography";
 import type { ChatComposerColors } from "@/components/chat/useChatComposerColors";
 
 export type ChatComposerProps = {
@@ -82,14 +83,8 @@ export function ChatComposer({
               }}
               style={{
                 flex: 1,
-                minHeight: 36,
-                maxHeight: 120,
+                ...CHAT_COMPOSER_INPUT_STYLE,
                 color: colors.text,
-                paddingHorizontal: 14,
-                paddingTop: 8,
-                paddingBottom: 8,
-                fontSize: 16,
-                backgroundColor: "transparent",
               }}
             />
             <Pressable
@@ -101,7 +96,7 @@ export function ChatComposer({
                 opacity: canSend ? (isSending ? 0.55 : 1) : 0,
                 pointerEvents: canSend ? "auto" : "none",
               }}
-              className="h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary"
+              className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary"
             >
               <ThemedIonicons name="arrow-up" size={18} colorClassName="accent-primary-foreground" />
             </Pressable>

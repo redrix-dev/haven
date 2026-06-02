@@ -112,7 +112,7 @@ export function NotificationInboxList({
               className="w-24 items-center justify-center bg-accent-slider"
               onPress={() => markRead(notification.recipientId)}
             >
-              <Text className="text-center text-xs font-semibold text-primary-foreground">Read</Text>
+              <Text className="text-center text-sm font-semibold text-primary-foreground">Read</Text>
             </Pressable>
           ) : null}
           <Pressable
@@ -120,7 +120,7 @@ export function NotificationInboxList({
             className="w-24 items-center justify-center bg-destructive/90"
             onPress={() => dismiss(notification.recipientId)}
           >
-            <Text className="text-center text-xs font-semibold text-primary-foreground">Dismiss</Text>
+            <Text className="text-center text-sm font-semibold text-primary-foreground">Dismiss</Text>
           </Pressable>
         </View>
       );

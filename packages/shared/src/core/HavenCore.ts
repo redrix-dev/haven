@@ -54,6 +54,10 @@ const realtimeMetadata = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
+const DEFAULT_WARM_FRESHNESS_MS = 60_000;
+const DEFAULT_DM_WARM_LIMIT = 3;
+const DEFAULT_ADJACENT_CHANNEL_WARM_LIMIT = 2;
+
 const directMessageFromRealtimePayload = (
   conversationId: string,
   messageId: string,
@@ -396,15 +400,13 @@ export class HavenCore {
       bootLogger.mark("bootstrap-session-data-start");
       const activeCommunityId = this.communities.getActiveId();
       await Promise.allSettled([
-        this.profiles.loadViewerProfile(userId),
-        this.profiles.loadPlatformStaff(userId),
+        this.profiles.ensureViewerProfile(userId),
+        this.profiles.ensurePlatformStaff(userId),
         this.featureFlags.load(),
-        this.directMessages.loadConversations(),
-        this.notifications.loadInbox().then(() =>
-          this.notifications.refreshCounts(),
-        ),
-        this.notifications.loadPreferences(),
-        this.social.load(),
+        this.directMessages.ensureConversationsLoaded(),
+        this.notifications.ensureInbox(),
+        this.notifications.ensurePreferences(),
+        this.social.ensureLoaded(),
       ]);
       bootLogger.mark("bootstrap-session-data-done");
       this.syncViewerMessagePolicy(activeCommunityId);
@@ -541,6 +543,154 @@ export class HavenCore {
     }
 
     await messageNexus.ensureInitialLoaded(channelId);
+  }
+
+  private async runWarmTask(
+    label: string,
+    task: () => Promise<unknown>,
+  ): Promise<void> {
+    try {
+      await task();
+    } catch (error) {
+      console.warn(`[HavenCore warmup] ${label} failed`, error);
+    }
+  }
+
+  async warmSessionSurfaces(userId: string): Promise<void> {
+    if (!userId.trim()) return;
+
+    await Promise.all([
+      this.runWarmTask("viewer profile", () =>
+        this.profiles.ensureViewerProfile(userId, {
+          freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+        }),
+      ),
+      this.runWarmTask("platform staff", () =>
+        this.profiles.ensurePlatformStaff(userId, {
+          freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+        }),
+      ),
+    ]);
+
+    await this.runWarmTask("notification inbox", () =>
+      this.notifications.ensureInbox({
+        freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+      }),
+    );
+    await this.runWarmTask("notification preferences", () =>
+      this.notifications.ensurePreferences({
+        freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+      }),
+    );
+    await this.runWarmTask("social state", () =>
+      this.social.ensureLoaded({ freshnessMs: DEFAULT_WARM_FRESHNESS_MS }),
+    );
+    await this.runWarmTask("direct message inbox", () =>
+      this.directMessages.ensureConversationsLoaded({
+        freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+      }),
+    );
+    await this.warmDirectMessageThreads({
+      limit: DEFAULT_DM_WARM_LIMIT,
+      unreadOnly: true,
+    });
+  }
+
+  async warmDirectMessageThreads(options?: {
+    limit?: number;
+    unreadOnly?: boolean;
+    freshnessMs?: number;
+  }): Promise<void> {
+    const limit = Math.max(0, options?.limit ?? DEFAULT_DM_WARM_LIMIT);
+    if (limit === 0) return;
+
+    await this.runWarmTask("direct message conversations", () =>
+      this.directMessages.ensureConversationsLoaded({
+        freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+      }),
+    );
+
+    const conversations = this.directMessages
+      .getConversationsSnapshot()
+      .filter((conversation) =>
+        options?.unreadOnly === false ? true : conversation.unreadCount > 0,
+      )
+      .slice(0, limit);
+
+    await Promise.all(
+      conversations.map((conversation) =>
+        this.runWarmTask(
+          `direct message thread ${conversation.conversationId}`,
+          () =>
+            this.directMessages.ensureMessagesLoaded(
+              conversation.conversationId,
+              { freshnessMs: options?.freshnessMs },
+            ),
+        ),
+      ),
+    );
+  }
+
+  async warmCommunitySurface(
+    communityId: string,
+    options?: { includeAdjacentChannels?: boolean },
+  ): Promise<void> {
+    if (!communityId.trim()) return;
+
+    await this.runWarmTask(`community ${communityId} channels`, () =>
+      this.channels.ensureLoaded(communityId),
+    );
+    await this.runWarmTask(`community ${communityId} permissions`, () =>
+      this.ensureCommunityPermissions(communityId),
+    );
+
+    const channelList = this.channels
+      .getChannelsSnapshot(communityId)
+      .map(toChannel);
+    const activeChannelId = this.channels.getActiveChannelId();
+    const activeBelongsToCommunity =
+      activeChannelId != null &&
+      channelList.some((channel) => channel.id === activeChannelId);
+    const channelId = activeBelongsToCommunity
+      ? activeChannelId
+      : resolvePreferredChannelIdForServer(this, communityId, channelList, {
+          previousChannelId: activeChannelId,
+        });
+
+    this.communities.setActiveId(communityId);
+    this.channels.setActiveChannelId(channelId);
+
+    if (channelId) {
+      await this.runWarmTask(`community ${communityId} active channel`, () =>
+        this.prepareTextChannelMessages(communityId, channelId),
+      );
+    }
+
+    if (options?.includeAdjacentChannels === false || !channelId) return;
+
+    const textChannelIds = channelList
+      .filter((channel) => channel.kind === "text")
+      .map((channel) => channel.id);
+    const activeIndex = textChannelIds.indexOf(channelId);
+    if (activeIndex === -1) return;
+
+    const adjacentIds = [
+      textChannelIds[activeIndex - 1],
+      textChannelIds[activeIndex + 1],
+      textChannelIds[activeIndex - 2],
+      textChannelIds[activeIndex + 2],
+    ].filter((id): id is string => Boolean(id));
+
+    void Promise.all(
+      adjacentIds
+        .slice(0, DEFAULT_ADJACENT_CHANNEL_WARM_LIMIT)
+        .map((adjacentChannelId) =>
+          this.runWarmTask(
+            `community ${communityId} adjacent channel ${adjacentChannelId}`,
+            () => this.prepareTextChannelMessages(communityId, adjacentChannelId),
+          ),
+        ),
+    );
   }
 
   /**

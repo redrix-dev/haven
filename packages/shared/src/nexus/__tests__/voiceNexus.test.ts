@@ -81,6 +81,19 @@ class FakeVoiceRealtimeTransport implements VoiceRealtimeTransport {
   }
 }
 
+class DeferredVoiceRealtimeChannel extends FakeVoiceRealtimeChannel {
+  private subscribeCallback: ((status: string) => void) | null = null;
+
+  subscribe(callback?: (status: string) => void): unknown {
+    this.subscribeCallback = callback ?? null;
+    return this;
+  }
+
+  emitStatus(status: string): void {
+    this.subscribeCallback?.(status);
+  }
+}
+
 const buildNexus = () => {
   const tokenBackend = {
     fetchToken: vi.fn(async () => ({
@@ -234,6 +247,60 @@ describe("VoiceNexus", () => {
 
     await nexus.disconnectKickChannel();
     expect(realtime.removed).toContain(channel);
+  });
+
+  it("discards stale overlapping kick channel connects", async () => {
+    const tokenBackend = {
+      fetchToken: vi.fn(async () => ({
+        token: "voice-token",
+        serverUrl: "wss://voice.example.test",
+      })),
+    };
+    const policy = createViewerMessagePolicyStore();
+    const channels: DeferredVoiceRealtimeChannel[] = [];
+    const removed: DeferredVoiceRealtimeChannel[] = [];
+    const realtime: VoiceRealtimeTransport = {
+      channel: (topic) => {
+        const channel = new DeferredVoiceRealtimeChannel(topic);
+        channels.push(channel);
+        return channel;
+      },
+      removeChannel: async (channel) => {
+        removed.push(channel as DeferredVoiceRealtimeChannel);
+      },
+    };
+    const nexus = new VoiceNexus(
+      createMemoryPersistence(),
+      policy,
+      tokenBackend,
+      realtime,
+    );
+
+    const first = nexus.connectKickChannel({
+      communityId: "server-1",
+      channelId: "voice-a",
+      currentUserId: "target",
+      onKick: vi.fn(),
+    });
+    await Promise.resolve();
+    const second = nexus.connectKickChannel({
+      communityId: "server-1",
+      channelId: "voice-b",
+      currentUserId: "target",
+      onKick: vi.fn(),
+    });
+    await Promise.resolve();
+
+    channels[1]?.emitStatus("SUBSCRIBED");
+    await second;
+    channels[0]?.emitStatus("SUBSCRIBED");
+    await first;
+
+    await nexus.kickParticipant("other", "voice-b");
+
+    expect(channels[0]?.sent).toEqual([]);
+    expect(channels[1]?.sent).toHaveLength(1);
+    expect(removed).toContain(channels[0]);
   });
 
   it("subscribes to presence channels and cleans them up", () => {

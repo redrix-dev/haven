@@ -293,6 +293,178 @@ describe('prepareCommunityEntry', () => {
   });
 });
 
+describe('warmup orchestration', () => {
+  const createWarmCore = (): HavenCore =>
+    Object.create(HavenCore.prototype) as HavenCore;
+
+  it('warms session surfaces and isolates individual failures', async () => {
+    const core = createWarmCore();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ensureViewerProfile = vi.fn(async () => {
+      throw new Error('profile failed');
+    });
+    const ensurePlatformStaff = vi.fn(async () => null);
+    const ensureInbox = vi.fn(async () => {});
+    const ensurePreferences = vi.fn(async () => null);
+    const ensureSocial = vi.fn(async () => {});
+    const ensureConversationsLoaded = vi.fn(async () => {});
+    const ensureMessagesLoaded = vi.fn(async () => {});
+
+    Object.assign(core, {
+      profiles: {
+        ensureViewerProfile,
+        ensurePlatformStaff,
+      },
+      notifications: {
+        ensureInbox,
+        ensurePreferences,
+      },
+      social: {
+        ensureLoaded: ensureSocial,
+      },
+      directMessages: {
+        ensureConversationsLoaded,
+        ensureMessagesLoaded,
+        getConversationsSnapshot: () => [
+          { conversationId: 'dm1', unreadCount: 2 },
+          { conversationId: 'dm2', unreadCount: 0 },
+        ],
+      },
+    });
+
+    await core.warmSessionSurfaces('u1');
+
+    expect(ensureViewerProfile).toHaveBeenCalledWith('u1', {
+      freshnessMs: 60_000,
+    });
+    expect(ensurePlatformStaff).toHaveBeenCalledWith('u1', {
+      freshnessMs: 60_000,
+    });
+    expect(ensureInbox).toHaveBeenCalledTimes(1);
+    expect(ensurePreferences).toHaveBeenCalledTimes(1);
+    expect(ensureSocial).toHaveBeenCalledTimes(1);
+    expect(ensureConversationsLoaded).toHaveBeenCalled();
+    expect(ensureMessagesLoaded).toHaveBeenCalledWith('dm1', {
+      freshnessMs: undefined,
+    });
+    expect(ensureMessagesLoaded).not.toHaveBeenCalledWith('dm2', expect.anything());
+    expect(warn).toHaveBeenCalledWith(
+      '[HavenCore warmup] viewer profile failed',
+      expect.any(Error),
+    );
+
+    warn.mockRestore();
+  });
+
+  it('warms only capped unread DM threads without marking read', async () => {
+    const core = createWarmCore();
+    const ensureMessagesLoaded = vi.fn(async () => {});
+    const markRead = vi.fn(async () => true);
+
+    Object.assign(core, {
+      directMessages: {
+        ensureConversationsLoaded: vi.fn(async () => {}),
+        ensureMessagesLoaded,
+        markRead,
+        getConversationsSnapshot: () => [
+          { conversationId: 'dm1', unreadCount: 1 },
+          { conversationId: 'dm2', unreadCount: 0 },
+          { conversationId: 'dm3', unreadCount: 4 },
+          { conversationId: 'dm4', unreadCount: 2 },
+          { conversationId: 'dm5', unreadCount: 1 },
+        ],
+      },
+    });
+
+    await core.warmDirectMessageThreads({ unreadOnly: true, limit: 3 });
+
+    expect(ensureMessagesLoaded).toHaveBeenCalledTimes(3);
+    expect(ensureMessagesLoaded).toHaveBeenNthCalledWith(1, 'dm1', {
+      freshnessMs: undefined,
+    });
+    expect(ensureMessagesLoaded).toHaveBeenNthCalledWith(2, 'dm3', {
+      freshnessMs: undefined,
+    });
+    expect(ensureMessagesLoaded).toHaveBeenNthCalledWith(3, 'dm4', {
+      freshnessMs: undefined,
+    });
+    expect(markRead).not.toHaveBeenCalled();
+  });
+
+  it('warms the active community channel and bounded adjacent text channels', async () => {
+    const core = createWarmCore();
+    const prepareTextChannelMessages = vi.fn(async () => {});
+
+    Object.assign(core, {
+      channels: {
+        ensureLoaded: vi.fn(async () => {}),
+        getActiveChannelId: () => 'c2',
+        setActiveChannelId: vi.fn(),
+        getChannelsSnapshot: () => [
+          {
+            id: 'c1',
+            communityId: 's1',
+            name: 'one',
+            kind: 'text',
+            position: 0,
+            topic: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'c2',
+            communityId: 's1',
+            name: 'two',
+            kind: 'text',
+            position: 1,
+            topic: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'c3',
+            communityId: 's1',
+            name: 'three',
+            kind: 'text',
+            position: 2,
+            topic: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'c4',
+            communityId: 's1',
+            name: 'voice',
+            kind: 'voice',
+            position: 3,
+            topic: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'c5',
+            communityId: 's1',
+            name: 'five',
+            kind: 'text',
+            position: 4,
+            topic: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+      communities: {
+        setActiveId: vi.fn(),
+      },
+      ensureCommunityPermissions: vi.fn(async () => {}),
+      prepareTextChannelMessages,
+    });
+
+    await core.warmCommunitySurface('s1');
+    await Promise.resolve();
+
+    expect(prepareTextChannelMessages).toHaveBeenCalledWith('s1', 'c2');
+    expect(prepareTextChannelMessages).toHaveBeenCalledWith('s1', 'c1');
+    expect(prepareTextChannelMessages).toHaveBeenCalledWith('s1', 'c3');
+    expect(prepareTextChannelMessages).not.toHaveBeenCalledWith('s1', 'c5');
+  });
+});
+
 describe('deleteCommunityMessageForModeration', () => {
   it('delegates community message deletion to the community data backend', async () => {
     const deleteMessage = vi.fn(async () => {});

@@ -122,6 +122,7 @@ export type DirectMessageNexusState = NexusState<
   hasMoreByConversation: Record<string, boolean>
   activeConversationId: string | null
   isLoadingConversations: boolean
+  conversationsLastLoadedAt: number
   loadingByConversation: Record<string, boolean>
   messagesLoadComplete: Record<string, boolean>
   messagesLastLoadedAt: Record<string, number>
@@ -144,6 +145,9 @@ export const conversationsEqual = (
   for (let i = 0; i < a.length; i++) {
     if (
       a[i].conversationId !== b[i].conversationId ||
+      a[i].otherUserId !== b[i].otherUserId ||
+      a[i].otherUsername !== b[i].otherUsername ||
+      a[i].otherAvatarUrl !== b[i].otherAvatarUrl ||
       a[i].updatedAt !== b[i].updatedAt ||
       a[i].lastMessageAt !== b[i].lastMessageAt ||
       a[i].lastMessageId !== b[i].lastMessageId ||
@@ -236,6 +240,7 @@ export class DirectMessageNexus extends Nexus<
         hasMoreByConversation: {},
         activeConversationId: null,
         isLoadingConversations: false,
+        conversationsLastLoadedAt: 0,
         loadingByConversation: {},
         messagesLoadComplete: {},
         messagesLastLoadedAt: {},
@@ -263,6 +268,7 @@ export class DirectMessageNexus extends Nexus<
       try {
         const conversations = await this.backend!.listConversations()
         this.setConversations(conversations, { preserveLocalUpdatedAfter: requestedAt })
+        this.setConversationsLastLoadedAt(Date.now())
       } finally {
         if (!options?.suppressLoadingState) {
           this.setIsLoadingConversations(false)
@@ -273,6 +279,16 @@ export class DirectMessageNexus extends Nexus<
     })
 
     return this.conversationsInflight
+  }
+
+  async ensureConversationsLoaded(
+    options?: { freshnessMs?: number },
+  ): Promise<void> {
+    if (this.conversationsInflight) return this.conversationsInflight
+    const freshnessMs = options?.freshnessMs ?? 60_000
+    const lastLoadedAt = this.store.getState().conversationsLastLoadedAt
+    if (lastLoadedAt > 0 && Date.now() - lastLoadedAt < freshnessMs) return
+    await this.loadConversations()
   }
 
   async loadMessages(conversationId: string): Promise<void> {
@@ -688,6 +704,14 @@ export class DirectMessageNexus extends Nexus<
     }))
   }
 
+  setConversationsLastLoadedAt(loadedAt: number): void {
+    this.store.setState((state) => ({
+      ...state,
+      conversationsLastLoadedAt: loadedAt,
+      revision: state.revision + 1,
+    }))
+  }
+
   setLoadingForConversation(conversationId: string, loading: boolean): void {
     this.store.setState((state) => ({
       ...state,
@@ -818,6 +842,14 @@ export class DirectMessageNexus extends Nexus<
 
   // ---- Read selectors ----
 
+  getConversationsSnapshot(): DirectMessageConversationSummary[] {
+    const state = this.store.getState()
+    if (state.conversationIds.length === 0) return EMPTY_CONVERSATIONS
+    return state.conversationIds
+      .map((id) => state.entities[id]?.data)
+      .filter((c): c is DirectMessageConversationSummary => c !== undefined)
+  }
+
   useConversations(): DirectMessageConversationSummary[] {
     return useStoreWithEqualityFn(
       this.store,
@@ -897,6 +929,7 @@ export class DirectMessageNexus extends Nexus<
       const persistable = {
         entities: state.entities,
         conversationIds: state.conversationIds,
+        conversationsLastLoadedAt: state.conversationsLastLoadedAt,
         activeConversationId: state.activeConversationId,
         composeDraftPeer: state.composeDraftPeer,
       }
@@ -915,6 +948,7 @@ export class DirectMessageNexus extends Nexus<
         ...state,
         entities: parsed.entities ?? {},
         conversationIds: parsed.conversationIds ?? [],
+        conversationsLastLoadedAt: parsed.conversationsLastLoadedAt ?? 0,
         activeConversationId: parsed.activeConversationId ?? null,
         composeDraftPeer: parsed.composeDraftPeer ?? null,
         revision: 0,
@@ -934,6 +968,7 @@ export class DirectMessageNexus extends Nexus<
       hasMoreByConversation: {},
       activeConversationId: null,
       isLoadingConversations: false,
+      conversationsLastLoadedAt: 0,
       loadingByConversation: {},
       messagesLoadComplete: {},
       messagesLastLoadedAt: {},

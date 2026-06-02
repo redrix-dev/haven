@@ -54,9 +54,14 @@ export function CommunityEntry({ navigation }: Props) {
 
       try {
         await core.prepareCommunityEntry(targetCommunityId);
+        await core.warmCommunitySurface(targetCommunityId);
       } catch (error) {
         console.warn("[CommunityEntry] prepareCommunityEntry failed", error);
         applyCommunityFocus(core, targetCommunityId);
+      }
+
+      if (userId) {
+        await core.warmSessionSurfaces(userId);
       }
 
       const lastSurface = target.restoredActiveCommunity
@@ -69,7 +74,7 @@ export function CommunityEntry({ navigation }: Props) {
     };
 
     void routeToCommunity();
-  }, [bootstrapPhase.phase, communities, communitiesLoading, core, navigation]);
+  }, [bootstrapPhase.phase, communities, communitiesLoading, core, navigation, userId]);
 
   if (bootstrapPhase.phase === "error" || loadError) {
     return (

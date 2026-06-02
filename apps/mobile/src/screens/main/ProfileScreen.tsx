@@ -26,7 +26,7 @@ export function ProfileScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (!userId) return;
-    void core.profiles.loadViewerProfile(userId).catch(() => {});
+    void core.profiles.ensureViewerProfile(userId).catch(() => {});
   }, [core.profiles, userId]);
 
   const viewerProfile = core.profiles.useViewerProfile(userId);

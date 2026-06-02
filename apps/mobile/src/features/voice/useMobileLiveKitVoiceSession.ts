@@ -78,6 +78,8 @@ type UseMobileLiveKitVoiceSessionInput = {
 
 const VOICE_ACTIVITY_GATE_RELEASE_MS = 220;
 const INPUT_LEVEL_INTERVAL_MS = 80;
+const VOICE_CONTROL_CHANNEL_FAILURE_MESSAGE =
+  "We're having trouble connecting you to voice services. Please try again, and contact support if this keeps happening.";
 
 function tryParseAvatarUrl(metadata: string | undefined): string | null {
   if (!metadata) return null;
@@ -189,6 +191,7 @@ export function useMobileLiveKitVoiceSession({
   const lastVoiceActivityAtRef = useRef(0);
   const previousChannelKeyRef = useRef<string | null>(null);
   const intentionalDisconnectRef = useRef(false);
+  const joinGenerationRef = useRef(0);
 
   const remoteParticipantIds = useMemo(
     () => participants.map((participant) => participant.userId),
@@ -308,6 +311,7 @@ export function useMobileLiveKitVoiceSession({
 
   const cleanupVoiceSession = useCallback(async () => {
     const room = roomRef.current;
+    joinGenerationRef.current += 1;
     intentionalDisconnectRef.current = true;
     stopInputLevelPolling();
     setJoining(false);
@@ -358,6 +362,7 @@ export function useMobileLiveKitVoiceSession({
     setError(null);
     setNotice(null);
     intentionalDisconnectRef.current = false;
+    const joinGeneration = (joinGenerationRef.current += 1);
 
     try {
       await ensureAndroidVoicePermissions();
@@ -394,13 +399,6 @@ export function useMobileLiveKitVoiceSession({
         );
       }
 
-      await core.voice.connectKickChannel({
-        communityId: targetChannel.communityId,
-        channelId: targetChannel.channelId,
-        currentUserId: user.id,
-        onKick: (payload) => onVoiceKickRef.current?.(payload),
-      });
-
       core.voice.setJoined(true);
       core.voice.setVoiceConnected(true);
       core.voice.markConnected();
@@ -411,6 +409,43 @@ export function useMobileLiveKitVoiceSession({
       });
       applyParticipants(room);
       startInputLevelPolling();
+
+      void core.voice
+        .connectKickChannel({
+          communityId: targetChannel.communityId,
+          channelId: targetChannel.channelId,
+          currentUserId: user.id,
+          onKick: (payload) => onVoiceKickRef.current?.(payload),
+        })
+        .then(() => {
+          const currentChannel = activeChannelRef.current;
+          if (
+            joinGenerationRef.current !== joinGeneration ||
+            currentChannel?.communityId !== targetChannel.communityId ||
+            currentChannel?.channelId !== targetChannel.channelId
+          ) {
+            return;
+          }
+        })
+        .catch((controlError) => {
+          const currentChannel = activeChannelRef.current;
+          if (
+            joinGenerationRef.current !== joinGeneration ||
+            currentChannel?.communityId !== targetChannel.communityId ||
+            currentChannel?.channelId !== targetChannel.channelId
+          ) {
+            return;
+          }
+          console.warn(
+            "[voice] Voice control channel failed after join.",
+            controlError,
+          );
+          void cleanupVoiceSession().then(() => {
+            core.voice.setError(VOICE_CONTROL_CHANNEL_FAILURE_MESSAGE);
+            setError(VOICE_CONTROL_CHANNEL_FAILURE_MESSAGE);
+            onSessionErrorRef.current?.(VOICE_CONTROL_CHANNEL_FAILURE_MESSAGE);
+          });
+        });
     } catch (joinError) {
       const message = getErrorMessage(
         joinError,

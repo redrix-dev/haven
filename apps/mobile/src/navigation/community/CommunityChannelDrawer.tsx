@@ -39,7 +39,7 @@ function VoiceParticipantRow({
         {participant.avatarUrl ? (
           <Image source={{ uri: participant.avatarUrl }} className="h-full w-full rounded-full" />
         ) : (
-          <Text className="text-[10px] font-bold text-foreground">
+          <Text className="text-xs font-bold text-foreground">
             {participantInitial(participant.displayName)}
           </Text>
         )}

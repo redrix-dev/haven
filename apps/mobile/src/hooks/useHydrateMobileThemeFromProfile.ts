@@ -10,7 +10,7 @@ export function useHydrateMobileThemeFromProfile(userId: string | null | undefin
 
   useEffect(() => {
     if (!userId) return;
-    void core.profiles.loadViewerProfile(userId).catch(() => {
+    void core.profiles.ensureViewerProfile(userId).catch(() => {
       useMobileThemePreferenceStore.getState().resetToDefault();
     });
   }, [core.profiles, userId]);

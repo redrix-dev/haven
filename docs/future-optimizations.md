@@ -18,6 +18,25 @@ belongs to when their identity changes.
 Leave as-is until Haven reaches meaningful scale or this
 becomes a measurable bottleneck.
 
+## Voice moderation: durable kick enforcement
+
+Current voice kick delivery uses a Supabase Realtime broadcast
+channel (`voice:kick:{communityId}:{channelId}`) as the fast
+client-side eject path. That channel is best-effort: if a target
+client is not subscribed when the kick is sent, the broadcast is
+not replayed.
+
+Do not solve this by attempting client-side realtime replay.
+The durable source of truth should be server-side voice entitlement:
+moderator kick writes a durable removal/denial record, voice-token
+minting refuses kicked users, and connected clients periodically or
+on reconnect validate that they are still allowed in the voice
+channel. Realtime broadcast remains the low-latency fast path only.
+
+Immediate mobile behavior requires the kick/control channel after
+join and force-disconnects if it cannot connect, but this does not
+cover missed moderation events while offline or unsubscribed.
+
 ## Realtime: subscribeToUserCommunities (migrate to private channel)
 
 File: packages/shared/src/lib/backend/controlPlaneBackend.ts

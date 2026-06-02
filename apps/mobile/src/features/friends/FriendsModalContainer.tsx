@@ -74,7 +74,11 @@ export function FriendsModalContainer({
       setLoadError(null);
 
       try {
-        await social.load();
+        if (options?.suppressLoadingState) {
+          await social.load();
+        } else {
+          await social.ensureLoaded();
+        }
       } catch (error) {
         setLoadError(getErrorMessage(error, "Failed to load friends data."));
       } finally {
@@ -179,7 +183,7 @@ export function FriendsModalContainer({
             className="rounded-lg bg-accent-slider px-3 py-2"
             onPress={() => onStartDirectMessage(item.friendUserId, labelForFriend(item))}
           >
-            <Text className="text-xs font-semibold text-primary-foreground">Message</Text>
+            <Text className="text-sm font-semibold text-primary-foreground">Message</Text>
           </Pressable>
           <Pressable
             className="rounded-lg bg-surface-panel px-3 py-2"
@@ -201,7 +205,7 @@ export function FriendsModalContainer({
               );
             }}
           >
-            <Text className="text-xs text-foreground">Remove</Text>
+            <Text className="text-sm text-foreground">Remove</Text>
           </Pressable>
         </View>
       </View>
@@ -227,7 +231,7 @@ export function FriendsModalContainer({
               })
             }
           >
-            <Text className="text-xs font-semibold text-primary-foreground">Accept</Text>
+            <Text className="text-sm font-semibold text-primary-foreground">Accept</Text>
           </Pressable>
           <Pressable
             className="rounded-lg bg-surface-panel px-3 py-2"
@@ -238,7 +242,7 @@ export function FriendsModalContainer({
               })
             }
           >
-            <Text className="text-xs text-foreground">Decline</Text>
+            <Text className="text-sm text-foreground">Decline</Text>
           </Pressable>
         </View>
       </View>
@@ -259,7 +263,7 @@ export function FriendsModalContainer({
             })
           }
         >
-          <Text className="text-xs text-foreground">Cancel</Text>
+          <Text className="text-sm text-foreground">Cancel</Text>
         </Pressable>
       </View>
     ),
@@ -279,7 +283,7 @@ export function FriendsModalContainer({
             })
           }
         >
-          <Text className="text-xs text-foreground">Unblock</Text>
+          <Text className="text-sm text-foreground">Unblock</Text>
         </Pressable>
       </View>
     ),
@@ -309,7 +313,7 @@ export function FriendsModalContainer({
                 )
               }
             >
-              <Text className="text-xs font-semibold text-primary-foreground">Add</Text>
+              <Text className="text-sm font-semibold text-primary-foreground">Add</Text>
             </Pressable>
           ) : null}
         </View>

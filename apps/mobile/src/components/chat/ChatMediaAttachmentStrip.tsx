@@ -19,7 +19,7 @@ export function ChatMediaAttachmentStrip({
         {fileName}
       </Text>
       <Pressable hitSlop={8} disabled={disabled} onPress={onRemove} className="shrink-0">
-        <Text className="text-xs font-semibold text-primary">Remove</Text>
+        <Text className="text-sm font-semibold text-primary">Remove</Text>
       </Pressable>
     </View>
   );

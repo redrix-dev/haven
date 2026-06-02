@@ -70,7 +70,7 @@ export function NotificationPreferencesPanel() {
 
   useEffect(() => {
     setError(null);
-    void inbox.loadPreferences().catch((error) => {
+    void inbox.ensurePreferences().catch((error) => {
       setError(getErrorMessage(error, "Failed to load notification preferences."));
     });
   }, [inbox]);
