@@ -128,7 +128,7 @@ npm run typecheck
 
 The text channel composer uses [`react-native-enriched-markdown`](https://github.com/software-mansion-labs/react-native-enriched-markdown) (`EnrichedMarkdownTextInput`), which **requires the New Architecture** and a **development / prebuild** build (not Expo Go). The `react-native-enriched-markdown` config plugin is listed in `app.json`. After adding or upgrading it, run `expo prebuild` and rebuild the dev client. Message bodies in the list may still use `react-native-markdown-display` until migrated to `EnrichedMarkdownText`.
 
-**iOS pods / Reanimated:** The root `ios/Podfile` sets `ENV['RCT_NEW_ARCH_ENABLED']` from `ios/Podfile.properties.json`. If that file has `"newArchEnabled": "false"`, `pod install` fails inside `react-native-reanimated`’s podspec. This repo includes a small config plugin `withNewArchPodfileProperties` that forces `"true"` on each prebuild, and the checked-in `Podfile.properties.json` should stay `"true"`. Also **unset** any shell `RCT_NEW_ARCH_ENABLED=0` (e.g. in `~/.zshrc`) so it cannot override the build.
+**iOS pods / Reanimated / dev launcher:** The root `ios/Podfile` sets `ENV['RCT_NEW_ARCH_ENABLED']` from `ios/Podfile.properties.json`. If that file has `"newArchEnabled": "false"`, `pod install` fails inside `react-native-reanimated`’s podspec. Dev-client builds also need `"ios.buildReactNativeFromSource": "true"` because `expo-dev-launcher` links against React Native dev-support symbols such as `RCTPackagerConnection` that may be omitted from the SDK 55 prebuilt RNCore. This repo includes a small config plugin `withNewArchPodfileProperties` that forces both settings on each prebuild, and the generated `Podfile.properties.json` should keep both as `"true"`. Also **unset** any shell `RCT_NEW_ARCH_ENABLED=0` (e.g. in `~/.zshrc`) so it cannot override the build.
 
 ## Generated artifact policy
 
@@ -167,6 +167,8 @@ Upgrade **one major SDK at a time** (`npx expo install expo@~<next> --fix` from 
 To **temporarily disable** iOS CallKit + VoIP registration (e.g. during a risky native upgrade), set `EXPO_PUBLIC_HAVEN_VOIP_FOUNDATION=0` in the environment for Metro / EAS (see [Expo environment variables](https://docs.expo.dev/guides/environment-variables/)).
 
 ## Diagnostics and troubleshooting
+
+Use Node 24.x LTS for mobile commands. The repo includes `.nvmrc` and `.node-version` pins, and `npm run preflight` rejects other major Node versions before Expo CLI runs device tooling.
 
 Run a quick mobile health check from repo root:
 

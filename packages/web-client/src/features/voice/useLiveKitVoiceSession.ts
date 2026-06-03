@@ -438,6 +438,7 @@ export function useLiveKitVoiceSession({
     }
 
     await core.voice.disconnectKickChannel();
+    await core.voice.disconnectPresenceChannel();
 
     isIntentionalDisconnectRef.current = false;
   }, [
@@ -553,6 +554,17 @@ export function useLiveKitVoiceSession({
         setStoredJoined(true);
         syncParticipants();
         playDebouncedVoicePresenceSound('voice_presence_join');
+        void core.voice
+          .connectPresenceChannel({
+            communityId: targetChannel.communityId,
+            channelId: targetChannel.channelId,
+            currentUserId,
+            displayName: currentUserDisplayName,
+            avatarUrl: currentUserAvatarUrl ?? null,
+          })
+          .catch((presenceError) => {
+            console.warn('Failed to publish voice presence:', presenceError);
+          });
       } catch (joinError: unknown) {
         const message = getErrorMessage(joinError, 'Failed to join voice channel.');
         console.error('Failed to join voice channel:', joinError);
@@ -569,6 +581,7 @@ export function useLiveKitVoiceSession({
       core.voice,
       currentUserId,
       currentUserAvatarUrl,
+      currentUserDisplayName,
       joined,
       joining,
       onSessionError,

@@ -57,11 +57,13 @@ export type VoiceRealtimeChannel = {
     event: string;
     payload: unknown;
   }) => Promise<string>;
+  track?: (payload: VoicePresenceStateRow) => Promise<string>;
+  untrack?: () => Promise<string>;
   presenceState: () => Record<string, VoicePresenceStateRow[]>;
 };
 
 export type VoiceRealtimeTransport = {
-  channel: (topic: string) => VoiceRealtimeChannel;
+  channel: (topic: string, options?: unknown) => VoiceRealtimeChannel;
   removeChannel: (channel: VoiceRealtimeChannel) => Promise<unknown> | unknown;
   getChannels?: () => VoiceRealtimeChannel[];
 };
@@ -87,6 +89,14 @@ type ConnectKickChannelInput = {
   channelId: string;
   currentUserId: string;
   onKick: (payload: VoiceKickPayload) => void;
+};
+
+type ConnectPresenceChannelInput = {
+  communityId: string;
+  channelId: string;
+  currentUserId: string;
+  displayName: string;
+  avatarUrl?: string | null;
 };
 
 type SubscribePresenceChannelsInput = {
@@ -214,6 +224,8 @@ export class VoiceNexus {
     channelId: string;
   } | null = null;
   private kickConnectionSerial = 0;
+  private presenceChannel: VoiceRealtimeChannel | null = null;
+  private presenceConnectionSerial = 0;
 
   constructor(
     _persistence: NexusPersistence,
@@ -482,6 +494,77 @@ export class VoiceNexus {
     }
   }
 
+  async connectPresenceChannel(input: ConnectPresenceChannelInput): Promise<void> {
+    if (!this.realtime) {
+      throw new Error("Voice realtime transport is not configured.");
+    }
+
+    const serial = ++this.presenceConnectionSerial;
+    await this.removePresenceChannel();
+
+    const channel = this.realtime.channel(
+      `voice:presence:${input.communityId}:${input.channelId}`,
+      { config: { presence: { key: input.currentUserId } } },
+    );
+
+    await new Promise<void>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Timed out publishing voice presence."));
+      }, 12_000);
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          clearTimeout(timeoutId);
+          resolve();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          clearTimeout(timeoutId);
+          reject(new Error("Voice presence channel connection failed."));
+        }
+      });
+    });
+
+    if (serial !== this.presenceConnectionSerial) {
+      await this.realtime.removeChannel(channel);
+      return;
+    }
+
+    if (typeof channel.track !== "function") {
+      await this.realtime.removeChannel(channel);
+      throw new Error("Voice presence transport does not support tracking.");
+    }
+
+    const trackStatus = await channel.track({
+      user_id: input.currentUserId,
+      display_name: input.displayName,
+      avatar_url: input.avatarUrl ?? null,
+      is_speaking: false,
+    });
+    if (trackStatus !== "ok") {
+      await this.realtime.removeChannel(channel);
+      throw new Error("Failed to publish voice presence.");
+    }
+
+    if (serial !== this.presenceConnectionSerial) {
+      await channel.untrack?.().catch(() => {});
+      await this.realtime.removeChannel(channel);
+      return;
+    }
+
+    this.presenceChannel = channel;
+  }
+
+  private async removePresenceChannel(): Promise<void> {
+    const channel = this.presenceChannel;
+    this.presenceChannel = null;
+    if (!channel || !this.realtime) return;
+    await channel.untrack?.().catch(() => {});
+    await this.realtime.removeChannel(channel);
+  }
+
+  async disconnectPresenceChannel(): Promise<void> {
+    this.presenceConnectionSerial += 1;
+    await this.removePresenceChannel();
+  }
+
   cleanupPresenceChannel(communityId: string, channelId: string): Promise<void> {
     const realtime = this.realtime;
     if (!realtime?.getChannels) return Promise.resolve();
@@ -628,5 +711,6 @@ export class VoiceNexus {
       revision: 0,
     });
     void this.disconnectKickChannel();
+    void this.disconnectPresenceChannel();
   }
 }

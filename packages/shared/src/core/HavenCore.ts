@@ -192,8 +192,11 @@ export class HavenCore {
       this.backends.controlPlane,
     );
     const voiceRealtime: VoiceRealtimeTransport = {
-      channel: (topic) =>
-        this.backends.client.channel(topic) as unknown as VoiceRealtimeChannel,
+      channel: (topic, options) =>
+        this.backends.client.channel(
+          topic,
+          options as never,
+        ) as unknown as VoiceRealtimeChannel,
       removeChannel: (channel) =>
         this.backends.client.removeChannel(channel as never),
       getChannels: () =>

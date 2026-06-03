@@ -81,6 +81,30 @@ const INPUT_LEVEL_INTERVAL_MS = 80;
 const VOICE_CONTROL_CHANNEL_FAILURE_MESSAGE =
   "We're having trouble connecting you to voice services. Please try again, and contact support if this keeps happening.";
 
+type VoiceJoinTimer = {
+  mark: (label: string, details?: Record<string, unknown>) => void;
+};
+
+function createVoiceJoinTimer(channelName: string): VoiceJoinTimer {
+  const enabled = typeof __DEV__ !== "undefined" && __DEV__;
+  const startedAt = Date.now();
+  let previousAt = startedAt;
+
+  return {
+    mark: (label, details = {}) => {
+      if (!enabled) return;
+      const now = Date.now();
+      console.info("[voice:join]", label, {
+        channelName,
+        elapsedMs: now - startedAt,
+        deltaMs: now - previousAt,
+        ...details,
+      });
+      previousAt = now;
+    },
+  };
+}
+
 function tryParseAvatarUrl(metadata: string | undefined): string | null {
   if (!metadata) return null;
   try {
@@ -332,6 +356,11 @@ export function useMobileLiveKitVoiceSession({
       // The kick channel is best-effort cleanup.
     }
     try {
+      await core.voice.disconnectPresenceChannel();
+    } catch {
+      // Presence cleanup is best-effort; Supabase also removes presence on socket close.
+    }
+    try {
       room?.disconnect();
     } catch {
       // Ignore disconnect races.
@@ -363,9 +392,25 @@ export function useMobileLiveKitVoiceSession({
     setNotice(null);
     intentionalDisconnectRef.current = false;
     const joinGeneration = (joinGenerationRef.current += 1);
+    const timer = createVoiceJoinTimer(targetChannel.channelName);
+    timer.mark("start", { channelId: targetChannel.channelId });
 
     try {
       await ensureAndroidVoicePermissions();
+      timer.mark("permissions ready");
+
+      const credentialsPromise = core.voice
+        .fetchJoinCredentials(
+          targetChannel.communityId,
+          targetChannel.channelId,
+        )
+        .then((credentials) => {
+          timer.mark("token ready");
+          return credentials;
+        });
+      void credentialsPromise.catch(() => {});
+      timer.mark("token request started");
+
       await AudioSession.configureAudio({
         android: {
           preferredOutputList: ["bluetooth", "headset", "speaker", "earpiece"],
@@ -373,31 +418,41 @@ export function useMobileLiveKitVoiceSession({
         },
         ios: { defaultOutput: "speaker" },
       });
+      timer.mark("audio configured");
       await AudioSession.startAudioSession();
+      timer.mark("audio session started");
       await refreshAudioOutputs();
+      timer.mark("audio outputs refreshed");
       await startVoiceForegroundService(targetChannel.channelName);
+      timer.mark("foreground service ready");
 
       const room = roomRef.current ?? createRoom();
       roomRef.current = room;
-      const { token, serverUrl } = await core.voice.fetchJoinCredentials(
-        targetChannel.communityId,
-        targetChannel.channelId,
-      );
+      const { token, serverUrl } = await credentialsPromise;
 
+      timer.mark("room connect started");
       await room.connect(serverUrl, token, { autoSubscribe: true });
+      timer.mark("room connected");
 
-      await Promise.allSettled([
-        room.localParticipant.setName(user.displayName),
-        room.localParticipant.setMetadata(
-          JSON.stringify({ avatarUrl: user.avatarUrl ?? null }),
-        ),
-      ]);
+      void room.localParticipant
+        .setMetadata(JSON.stringify({ avatarUrl: user.avatarUrl ?? null }))
+        .then(() => {
+          timer.mark("local metadata set");
+        })
+        .catch((metadataError: unknown) => {
+          timer.mark("local metadata failed", {
+            message: getErrorMessage(metadataError, "Unknown metadata error."),
+          });
+        });
+      timer.mark("local metadata queued");
       await room.localParticipant.setMicrophoneEnabled(true);
+      timer.mark("microphone enabled");
       if (selectedOutputDeviceId !== "default" || Platform.OS === "ios") {
         await AudioSession.selectAudioOutput(selectedOutputDeviceId).catch(
           () => {},
         );
       }
+      timer.mark("audio output selected");
 
       core.voice.setJoined(true);
       core.voice.setVoiceConnected(true);
@@ -409,6 +464,28 @@ export function useMobileLiveKitVoiceSession({
       });
       applyParticipants(room);
       startInputLevelPolling();
+      timer.mark("joined");
+
+      void core.voice
+        .connectPresenceChannel({
+          communityId: targetChannel.communityId,
+          channelId: targetChannel.channelId,
+          currentUserId: user.id,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl ?? null,
+        })
+        .then(() => {
+          timer.mark("presence published");
+        })
+        .catch((presenceError) => {
+          console.warn("[voice] Failed to publish voice presence.", presenceError);
+          timer.mark("presence publish failed", {
+            message: getErrorMessage(
+              presenceError,
+              "Failed to publish voice presence.",
+            ),
+          });
+        });
 
       void core.voice
         .connectKickChannel({
@@ -451,6 +528,7 @@ export function useMobileLiveKitVoiceSession({
         joinError,
         "Failed to join voice channel.",
       );
+      timer.mark("failed", { message });
       core.voice.setError(message);
       await cleanupVoiceSession();
       setError(message);

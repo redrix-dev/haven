@@ -30,10 +30,14 @@ import UserProfileModal, {
 } from "@/features/user-profile/UserProfileModal";
 import { useUiStore } from "@shared/stores/uiStore";
 import { useAuthStore } from "@shared/stores/authStore";
-import type { FriendsPanelTab } from "@shared/types/types";
+import type {
+  FriendsPanelTab,
+  VoiceSidebarParticipant,
+} from "@shared/types/types";
 import type { NotificationAudioSettings } from "@shared/types/settings";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";
 import {
+  type LiveProfilesRecord,
   resolveLiveAvatarUrl,
   resolveLiveUsername,
 } from "@shared/lib/liveProfiles";
@@ -61,6 +65,60 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const mainStackScreenBackground = NAV_THEME.dark.colors.background;
 const VOICE_PROMPT_CLOSE_DELAY_MS = 380;
+
+function logVoiceJoinPromptTiming(
+  label: string,
+  details?: Record<string, unknown>,
+): void {
+  if (typeof __DEV__ === "undefined" || !__DEV__) return;
+  console.info("[voice:join]", label, details ?? {});
+}
+
+type VoiceParticipantIdentity = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+};
+
+function enrichVoiceParticipant<T extends VoiceParticipantIdentity>(
+  participant: T,
+  liveProfiles: LiveProfilesRecord,
+): T {
+  const displayName =
+    resolveLiveUsername(liveProfiles, participant.userId, participant.displayName) ??
+    participant.displayName;
+  const avatarUrl =
+    resolveLiveAvatarUrl(
+      liveProfiles,
+      participant.userId,
+      participant.avatarUrl ?? null,
+    ) ??
+    participant.avatarUrl ??
+    null;
+
+  if (
+    displayName === participant.displayName &&
+    avatarUrl === (participant.avatarUrl ?? null)
+  ) {
+    return participant;
+  }
+
+  return { ...participant, displayName, avatarUrl };
+}
+
+function enrichVoiceParticipantRecord(
+  participantsByChannelId: Record<string, VoiceSidebarParticipant[]>,
+  liveProfiles: LiveProfilesRecord,
+): Record<string, VoiceSidebarParticipant[]> {
+  return Object.fromEntries(
+    Object.entries(participantsByChannelId).map(([channelId, participants]) => [
+      channelId,
+      participants.map((participant) =>
+        enrichVoiceParticipant(participant, liveProfiles),
+      ),
+    ]),
+  );
+}
 
 /**
  * Bridges React Navigation imperative API into the shared AppHost so external
@@ -410,7 +468,14 @@ function MainNavigationShell({ userId }: { userId: string }) {
   ]);
 
   const handleConfirmVoiceJoin = useCallback(() => {
-    void confirmVoiceChannelJoin().then(openVoiceSheetAfterPromptClose);
+    const startedAt = Date.now();
+    logVoiceJoinPromptTiming("confirm tapped");
+    void confirmVoiceChannelJoin().then(() => {
+      logVoiceJoinPromptTiming("confirm resolved", {
+        elapsedMs: Date.now() - startedAt,
+      });
+      openVoiceSheetAfterPromptClose();
+    });
   }, [confirmVoiceChannelJoin, openVoiceSheetAfterPromptClose]);
 
   const handleSelectVoiceChannel = useCallback(
@@ -439,6 +504,23 @@ function MainNavigationShell({ userId }: { userId: string }) {
     if (!communityId) return null;
     return servers.find((server) => server.id === communityId)?.name ?? null;
   }, [servers, voiceDerived.activeVoiceChannel]);
+  const enrichedVoiceChannelParticipants = useMemo(
+    () =>
+      enrichVoiceParticipantRecord(
+        voiceDerived.voiceChannelParticipants,
+        liveProfiles,
+      ),
+    [liveProfiles, voiceDerived.voiceChannelParticipants],
+  );
+  const enrichedVoiceControllerState = useMemo(
+    () => ({
+      ...voiceController.state,
+      participants: voiceController.state.participants.map((participant) =>
+        enrichVoiceParticipant(participant, liveProfiles),
+      ),
+    }),
+    [liveProfiles, voiceController.state],
+  );
 
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
   const [friendsInitialTab, setFriendsInitialTab] =
@@ -562,7 +644,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
                 notificationsUnreadCount={notificationsUnreadCount}
                 inboxUnreadCount={dmUnreadCount}
                 activeVoiceChannelId={voiceState.activeVoiceChannelId}
-                voiceChannelParticipants={voiceDerived.voiceChannelParticipants}
+                voiceChannelParticipants={enrichedVoiceChannelParticipants}
                 onSelectVoiceChannel={handleSelectVoiceChannel}
                 onOpenVoiceSession={openVoiceSheet}
               />
@@ -624,7 +706,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
         communityName={activeVoiceCommunityName}
         currentUser={currentUserIdentity}
         voiceSettings={mobileVoiceSettings.settings}
-        state={voiceController.state}
+        state={enrichedVoiceControllerState}
         actions={voiceController.actions}
         onLeave={handleLeaveVoiceSession}
         onDismiss={closeVoiceSheet}

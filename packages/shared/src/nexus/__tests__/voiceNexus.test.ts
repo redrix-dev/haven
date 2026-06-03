@@ -13,6 +13,8 @@ class FakeVoiceRealtimeChannel implements VoiceRealtimeChannel {
     event: string;
     payload: unknown;
   }> = [];
+  readonly tracked: VoicePresenceStateRow[] = [];
+  untracked = false;
   private readonly callbacks = new Map<string, (payload: { payload?: unknown }) => void>();
   private presence: Record<string, VoicePresenceStateRow[]> = {};
 
@@ -43,6 +45,17 @@ class FakeVoiceRealtimeChannel implements VoiceRealtimeChannel {
   }): Promise<string> {
     this.sent.push(payload);
     return this.sendStatus;
+  }
+
+  async track(payload: VoicePresenceStateRow): Promise<string> {
+    this.tracked.push(payload);
+    this.presence[payload.user_id ?? this.topic] = [payload];
+    return "ok";
+  }
+
+  async untrack(): Promise<string> {
+    this.untracked = true;
+    return "ok";
   }
 
   presenceState(): Record<string, VoicePresenceStateRow[]> {
@@ -336,6 +349,34 @@ describe("VoiceNexus", () => {
     });
 
     cleanup();
+    expect(realtime.removed).toContain(channel);
+  });
+
+  it("publishes active voice presence and untracks on disconnect", async () => {
+    const { nexus, realtime } = buildNexus();
+
+    await nexus.connectPresenceChannel({
+      communityId: "server-1",
+      channelId: "voice-a",
+      currentUserId: "u1",
+      displayName: "Uma",
+      avatarUrl: "https://example.test/u1.png",
+    });
+
+    const channel = realtime.channels[0];
+    expect(channel.topic).toBe("voice:presence:server-1:voice-a");
+    expect(channel.tracked).toEqual([
+      {
+        user_id: "u1",
+        display_name: "Uma",
+        avatar_url: "https://example.test/u1.png",
+        is_speaking: false,
+      },
+    ]);
+
+    await nexus.disconnectPresenceChannel();
+
+    expect(channel.untracked).toBe(true);
     expect(realtime.removed).toContain(channel);
   });
 });

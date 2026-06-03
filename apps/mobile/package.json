@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "main": "expo/AppEntry.js",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "preflight": "node ../../tooling/scripts/mobile/preflight.mjs --strict",
     "dev:metro": "npm run preflight && expo start --dev-client",
@@ -33,7 +36,7 @@
     "ios:device": "npm run run:ios:device",
     "android": "npm run run:android",
     "prebuild": "npm run native:prebuild",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package && node ../../tooling/scripts/mobile/patch-expo-cli-lockdown-debug.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^14.0.0",
