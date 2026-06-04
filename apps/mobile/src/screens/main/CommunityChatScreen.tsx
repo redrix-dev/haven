@@ -356,6 +356,8 @@ export function CommunityChatScreen({
                   userId: item.message.authorUserId!,
                   username: item.message.authorName ?? "User",
                   avatarUrl: item.message.authorAvatarUrl ?? null,
+                  sourceCommunityId: communityId,
+                  sourceCommunityName: community?.name ?? null,
                 });
               }
             : undefined

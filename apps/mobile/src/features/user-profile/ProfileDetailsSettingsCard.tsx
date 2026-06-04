@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { useHavenCore } from "@shared/core";
-import type { ProfileVisibility } from "@shared/lib/backend/types";
+import type { ProfileVisibility, UserFlairGrant } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { ThemedIonicons } from "@/theme-rn";
+import { UserFlairBadgePill } from "./UserFlairBadgePill";
 
 const VISIBILITY_OPTIONS: Array<{
   value: ProfileVisibility;
@@ -52,6 +53,10 @@ export function ProfileDetailsSettingsCard({
     useState<ProfileVisibility>(profileVisibility);
   const [draftBio, setDraftBio] = useState(profileBio ?? "");
   const [saving, setSaving] = useState(false);
+  const [savingFlairId, setSavingFlairId] = useState<string | null>(null);
+  const flairGrants = core.profiles.useUserFlairGrants(userId);
+  const flairLoading = core.profiles.useUserFlairGrantLoading(userId);
+  const flairError = core.profiles.useUserFlairGrantError(userId);
 
   useEffect(() => {
     setDraftVisibility(profileVisibility);
@@ -60,6 +65,13 @@ export function ProfileDetailsSettingsCard({
   useEffect(() => {
     setDraftBio(profileBio ?? "");
   }, [profileBio]);
+
+  useEffect(() => {
+    if (!userId) return;
+    void core.profiles.ensureMyUserFlairs(userId).catch(() => {
+      // The card renders the local flair error state.
+    });
+  }, [core.profiles, userId]);
 
   const dirty = useMemo(
     () =>
@@ -71,6 +83,26 @@ export function ProfileDetailsSettingsCard({
   const selectedOption = VISIBILITY_OPTIONS.find(
     (option) => option.value === draftVisibility,
   );
+
+  const selectedFlair = flairGrants.find((grant) => grant.isSelected) ?? null;
+
+  const selectFlair = async (grant: UserFlairGrant | null) => {
+    if (!userId || savingFlairId !== null) return;
+    if (grant && (!grant.isAvailable || grant.isSelected)) return;
+    if (!grant && !selectedFlair) return;
+
+    setSavingFlairId(grant?.userFlairId ?? "none");
+    try {
+      await core.setActiveUserFlair(userId, grant?.userFlairId ?? null);
+    } catch (error) {
+      Alert.alert(
+        "Could not update flair",
+        getErrorMessage(error, "Something went wrong. Try again."),
+      );
+    } finally {
+      setSavingFlairId(null);
+    }
+  };
 
   const save = async () => {
     if (!userId || saving || !dirty) return;
@@ -160,6 +192,84 @@ export function ProfileDetailsSettingsCard({
           <Text className="text-right text-[11px] text-muted-foreground">
             {draftBio.length}/500
           </Text>
+        </View>
+
+        <View className="gap-2">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-xs font-semibold text-muted-foreground">
+              Profile flair
+            </Text>
+            {flairLoading ? (
+              <Text className="text-[11px] text-muted-foreground">Loading...</Text>
+            ) : null}
+          </View>
+
+          {flairError ? (
+            <Text className="text-xs leading-4 text-destructive">
+              Could not load flair choices.
+            </Text>
+          ) : null}
+
+          {flairGrants.length === 0 && !flairLoading ? (
+            <Text className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+              No flair yet.
+            </Text>
+          ) : (
+            <View className="gap-2">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: selectedFlair === null }}
+                disabled={savingFlairId !== null}
+                onPress={() => void selectFlair(null)}
+                className="flex-row items-center justify-between rounded-xl border border-border bg-background px-3 py-2.5 active:bg-muted"
+              >
+                <Text className="text-sm font-medium text-foreground">No flair</Text>
+                {selectedFlair === null ? (
+                  <ThemedIonicons
+                    name="checkmark-circle"
+                    size={18}
+                    colorClassName="accent-primary"
+                  />
+                ) : null}
+              </Pressable>
+
+              {flairGrants.map((grant) => {
+                const disabled =
+                  savingFlairId !== null || !grant.isAvailable || grant.isSelected;
+                return (
+                  <Pressable
+                    key={grant.userFlairId}
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      disabled: !grant.isAvailable,
+                      selected: grant.isSelected,
+                    }}
+                    disabled={disabled}
+                    onPress={() => void selectFlair(grant)}
+                    className={`flex-row items-center justify-between rounded-xl border border-border bg-background px-3 py-2.5 active:bg-muted ${
+                      grant.isAvailable ? "" : "opacity-60"
+                    }`}
+                  >
+                    <View className="flex-1 gap-1">
+                      <UserFlairBadgePill flair={grant} />
+                      {grant.description ? (
+                        <Text className="text-xs leading-4 text-muted-foreground">
+                          {grant.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {grant.isSelected ? (
+                      <ThemedIonicons
+                        name="checkmark-circle"
+                        size={18}
+                        colorClassName="accent-primary"
+                      />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         {dirty ? (

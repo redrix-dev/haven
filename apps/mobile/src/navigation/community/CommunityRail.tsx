@@ -9,9 +9,11 @@ type CommunityRailProps = {
   onSelectCommunity: (communityId: string) => void;
   onOpenProfile: () => void;
   onOpenNotifications: () => void;
+  onOpenFriends: () => void;
   onOpenInbox: () => void;
   notificationsUnreadCount: number;
   inboxUnreadCount: number;
+  friendRequestCount: number;
   onOpenCommunityActions: () => void;
   /** Highlight the DM icon when the inbox surface is currently active. */
   isDmActive?: boolean;
@@ -79,9 +81,11 @@ export function CommunityRail({
   onSelectCommunity,
   onOpenProfile,
   onOpenNotifications,
+  onOpenFriends,
   onOpenInbox,
   notificationsUnreadCount,
   inboxUnreadCount,
+  friendRequestCount,
   onOpenCommunityActions,
   isDmActive = false,
 }: CommunityRailProps) {
@@ -137,6 +141,12 @@ export function CommunityRail({
           icon="notifications-outline"
           badgeCount={notificationsUnreadCount}
           onPress={onOpenNotifications}
+        />
+        <RailActionButton
+          accessibilityLabel="Friends"
+          icon="people"
+          badgeCount={friendRequestCount}
+          onPress={onOpenFriends}
         />
         <RailActionButton
           accessibilityLabel="Direct messages"

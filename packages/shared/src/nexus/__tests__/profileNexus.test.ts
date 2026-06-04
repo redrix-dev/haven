@@ -10,6 +10,7 @@ describe('ProfileNexus', () => {
       theme: 'default',
       profileVisibility: 'private' as const,
       profileBio: null,
+      activeFlair: null,
     }));
     const nexus = new ProfileNexus(createMemoryPersistence(), {
       fetchUserProfile,
@@ -32,6 +33,16 @@ describe('ProfileNexus', () => {
       theme: 'midnight',
       profileVisibility: 'public' as const,
       profileBio: 'Hello there',
+      activeFlair: {
+        userFlairId: 'uf1',
+        flairId: 'f1',
+        key: 'alpha_2026',
+        label: 'Alpha',
+        description: null,
+        colorToken: 'primary',
+        backgroundToken: 'surface-card',
+        iconKey: 'sparkles',
+      },
     }));
     const nexus = new ProfileNexus(createMemoryPersistence(), {
       updateUserProfile,
@@ -59,6 +70,86 @@ describe('ProfileNexus', () => {
     expect(nexus.getViewerProfile('u1')?.username).toBe('next-cody');
     expect(nexus.getProfile('u1')?.username).toBe('next-cody');
     expect(nexus.getProfileCard('u1')?.details?.bio).toBe('Hello there');
+    expect(nexus.getProfileCard('u1')?.details?.activeFlair?.key).toBe('alpha_2026');
+  });
+
+  it('loads and changes owned user flairs through the control plane', async () => {
+    const grant = {
+      userFlairId: 'uf1',
+      flairId: 'f1',
+      key: 'alpha_2026',
+      label: 'Alpha',
+      description: null,
+      colorToken: 'primary',
+      backgroundToken: 'surface-card',
+      iconKey: 'sparkles',
+      scope: 'platform' as const,
+      communityId: null,
+      grantSource: 'manual',
+      sourceCommunityId: null,
+      grantedAt: '2026-06-03T00:00:00.000Z',
+      expiresAt: null,
+      isAvailable: true,
+      isSelected: false,
+    };
+    const listMyUserFlairs = vi
+      .fn()
+      .mockResolvedValueOnce([grant])
+      .mockResolvedValueOnce([{ ...grant, isSelected: true }]);
+    const setActiveUserFlair = vi.fn(async () => undefined);
+    const fetchUserProfile = vi.fn(async () => ({
+      username: 'cody',
+      avatarUrl: null,
+      theme: 'default',
+      profileVisibility: 'public' as const,
+      profileBio: null,
+      activeFlair: {
+        userFlairId: 'uf1',
+        flairId: 'f1',
+        key: 'alpha_2026',
+        label: 'Alpha',
+        description: null,
+        colorToken: 'primary',
+        backgroundToken: 'surface-card',
+        iconKey: 'sparkles',
+      },
+    }));
+    const fetchProfileCard = vi.fn(async () => ({
+      userId: 'u1',
+      username: 'cody',
+      avatarUrl: null,
+      profileVisibility: 'public' as const,
+      canViewDetails: true,
+      details: {
+        bio: null,
+        activeFlair: {
+          userFlairId: 'uf1',
+          flairId: 'f1',
+          key: 'alpha_2026',
+          label: 'Alpha',
+          description: null,
+          colorToken: 'primary',
+          backgroundToken: 'surface-card',
+          iconKey: 'sparkles',
+        },
+      },
+    }));
+    const nexus = new ProfileNexus(createMemoryPersistence(), {
+      listMyUserFlairs,
+      setActiveUserFlair,
+      fetchUserProfile,
+      fetchProfileCard,
+    } as never);
+
+    await nexus.loadMyUserFlairs('u1');
+    expect(nexus.getUserFlairGrants('u1')[0]?.key).toBe('alpha_2026');
+
+    await nexus.setActiveUserFlair('u1', 'uf1');
+
+    expect(setActiveUserFlair).toHaveBeenCalledWith('uf1');
+    expect(nexus.getUserFlairGrants('u1')[0]?.isSelected).toBe(true);
+    expect(nexus.getViewerProfile('u1')?.activeFlair?.key).toBe('alpha_2026');
+    expect(nexus.getProfileCard('u1')?.details?.activeFlair?.key).toBe('alpha_2026');
   });
 
   it('loads profile cards separately from live identity state', async () => {

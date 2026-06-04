@@ -8,7 +8,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { useHavenCore } from "@shared/core";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import type { DirectMessageConversationSummary } from "@shared/lib/backend/types";
+import type { DirectMessageConversationSummary, FriendSummary } from "@shared/lib/backend/types";
 import { MobileModmailPanel } from "@/features/moderation/MobileModmailPanel";
 
 type DrawerMode = "conversations" | "modmail";
@@ -20,12 +20,17 @@ const TOGGLE_STEP = TOGGLE_BUTTON_SIZE + TOGGLE_GAP;
 type DmInboxDrawerProps = {
   /** Called after a conversation is opened — signals the shell to close the drawer. */
   onConversationSelected: () => void;
+  onStartDirectMessage: (userId: string) => void;
 };
 
-export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
+export function DmInboxDrawer({
+  onConversationSelected,
+  onStartDirectMessage,
+}: DmInboxDrawerProps) {
   const insets = useSafeAreaInsets();
   const core = useHavenCore();
   const dm = core.directMessages;
+  const social = core.social;
   const liveProfiles = core.profiles.useProfilesRecord();
   const communities = core.communities.useCommunities();
   const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
@@ -42,6 +47,7 @@ export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
 
   // ── Mode toggle ─────────────────────────────────────────────────────────
   const [mode, setMode] = useState<DrawerMode>("conversations");
+  const [newDmOpen, setNewDmOpen] = useState(false);
   const indicatorOffset = useSharedValue(0);
 
   const handleModeSwitch = useCallback(
@@ -61,6 +67,8 @@ export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
 
   // ── Conversation list data ──────────────────────────────────────────────
   const conversations = dm.useConversations();
+  const friends = social.useFriends();
+  const socialLoading = social.useIsLoading();
   const isLoading = dm.useIsLoadingConversations();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +84,14 @@ export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
       setIsRefreshing(false);
     }
   }, [dm]);
+
+  const openNewDm = useCallback(() => {
+    setNewDmOpen(true);
+    setError(null);
+    void social.ensureLoaded().catch((err) => {
+      setError(getErrorMessage(err, "Failed to load friends."));
+    });
+  }, [social]);
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
@@ -155,6 +171,56 @@ export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
     [getPeerLabel, handleSelectConversation],
   );
 
+  const renderFriend: ListRenderItem<FriendSummary> = useCallback(
+    ({ item }) => {
+      const label =
+        resolveLiveUsername(liveProfiles, item.friendUserId, item.username)?.trim() ||
+        item.username;
+      const avatarUrl = resolveLiveAvatarUrl(
+        liveProfiles,
+        item.friendUserId,
+        item.avatarUrl,
+      );
+      const initial = label.slice(0, 1).toUpperCase() || "U";
+
+      return (
+        <Pressable
+          onPress={() => {
+            setNewDmOpen(false);
+            onConversationSelected();
+            onStartDirectMessage(item.friendUserId);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Start direct message with ${label}`}
+          className="flex-row items-center gap-3 border-b border-border-panel px-4 py-3 active:bg-surface-hover"
+        >
+          <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={{ width: 40, height: 40 }}
+                resizeMode="cover"
+                accessibilityLabel={`${label} avatar`}
+                accessibilityIgnoresInvertColors
+              />
+            ) : (
+              <Text className="text-base font-semibold text-foreground">{initial}</Text>
+            )}
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text className="text-sm font-semibold leading-5 text-foreground" numberOfLines={1}>
+              {label}
+            </Text>
+            <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
+              Start a direct message
+            </Text>
+          </View>
+        </Pressable>
+      );
+    },
+    [liveProfiles, onConversationSelected, onStartDirectMessage],
+  );
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -166,11 +232,39 @@ export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
       >
         <View className="flex-row items-center justify-between">
           <Text className="text-base font-semibold text-foreground">
-            {mode === "modmail" ? "ModMail" : "Messages"}
+            {newDmOpen ? "New message" : mode === "modmail" ? "ModMail" : "Messages"}
           </Text>
 
+          {newDmOpen ? (
+            <Pressable
+              onPress={() => setNewDmOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Back to messages"
+              className="h-9 w-9 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
+            >
+              <ThemedIonicons
+                name="arrow-back"
+                size={18}
+                colorClassName="accent-foreground"
+              />
+            </Pressable>
+          ) : mode === "conversations" ? (
+            <Pressable
+              onPress={openNewDm}
+              accessibilityRole="button"
+              accessibilityLabel="Start new direct message"
+              className="h-9 w-9 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
+            >
+              <ThemedIonicons
+                name="add"
+                size={20}
+                colorClassName="accent-foreground"
+              />
+            </Pressable>
+          ) : null}
+
           {/* Mode toggle — only shown when user has modmail communities */}
-          {modmailEnabled ? (
+          {modmailEnabled && !newDmOpen ? (
             <View className="relative flex-row items-center">
               {/* Sliding highlight pill */}
               <Animated.View
@@ -223,7 +317,30 @@ export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
       </View>
 
       {/* ── Content area ── */}
-      {mode === "modmail" ? (
+      {newDmOpen ? (
+        <>
+          {error ? (
+            <Text className="px-4 pt-2 text-xs text-destructive">{error}</Text>
+          ) : null}
+          {socialLoading && friends.length === 0 ? (
+            <View className="flex-1 items-center justify-center">
+              {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
+              <ActivityIndicator color="#e6edf7" />
+            </View>
+          ) : (
+            <FlatList
+              data={friends}
+              keyExtractor={(friend) => friend.friendUserId}
+              renderItem={renderFriend}
+              ListEmptyComponent={
+                <Text className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  Add friends to start a new direct message.
+                </Text>
+              }
+            />
+          )}
+        </>
+      ) : mode === "modmail" ? (
         <MobileModmailPanel managedCommunityIds={modmailCommunityIds} />
       ) : (
         <>

@@ -11,6 +11,8 @@ import type {
   RedeemedInvite,
   ServerInvite,
   ServerSummary,
+  UserFlairBadge,
+  UserFlairGrant,
   UserProfileCard,
 } from './types';
 
@@ -79,6 +81,33 @@ type ProfileCardRow = {
   profile_visibility: string | null;
   can_view_details: boolean | null;
   profile_bio: string | null;
+  active_flair_user_flair_id: string | null;
+  active_flair_id: string | null;
+  active_flair_key: string | null;
+  active_flair_label: string | null;
+  active_flair_description: string | null;
+  active_flair_color_token: string | null;
+  active_flair_background_token: string | null;
+  active_flair_icon_key: string | null;
+};
+
+type UserFlairGrantRow = {
+  user_flair_id: string;
+  flair_id: string;
+  flair_key: string;
+  label: string;
+  description: string | null;
+  color_token: string;
+  background_token: string;
+  icon_key: string | null;
+  scope: string;
+  community_id: string | null;
+  grant_source: string;
+  source_community_id: string | null;
+  granted_at: string;
+  expires_at: string | null;
+  is_available: boolean | null;
+  is_selected: boolean | null;
 };
 
 const PROFILE_VISIBILITIES: readonly ProfileVisibility[] = [
@@ -99,15 +128,59 @@ export const mapLiveProfileIdentity = (row: ProfileIdentityRow): LiveProfileIden
   updatedAt: row.updated_at,
 });
 
+const mapUserFlairBadgeFromProfileCard = (row: ProfileCardRow): UserFlairBadge | null => {
+  if (
+    !row.active_flair_user_flair_id ||
+    !row.active_flair_id ||
+    !row.active_flair_key ||
+    !row.active_flair_label ||
+    !row.active_flair_color_token ||
+    !row.active_flair_background_token
+  ) {
+    return null;
+  }
+
+  return {
+    userFlairId: row.active_flair_user_flair_id,
+    flairId: row.active_flair_id,
+    key: row.active_flair_key,
+    label: row.active_flair_label,
+    description: row.active_flair_description ?? null,
+    colorToken: row.active_flair_color_token,
+    backgroundToken: row.active_flair_background_token,
+    iconKey: row.active_flair_icon_key ?? null,
+  };
+};
+
+const mapUserFlairGrant = (row: UserFlairGrantRow): UserFlairGrant => ({
+  userFlairId: row.user_flair_id,
+  flairId: row.flair_id,
+  key: row.flair_key,
+  label: row.label,
+  description: row.description ?? null,
+  colorToken: row.color_token,
+  backgroundToken: row.background_token,
+  iconKey: row.icon_key ?? null,
+  scope: row.scope === 'community' ? 'community' : 'platform',
+  communityId: row.community_id ?? null,
+  grantSource: row.grant_source,
+  sourceCommunityId: row.source_community_id ?? null,
+  grantedAt: row.granted_at,
+  expiresAt: row.expires_at ?? null,
+  isAvailable: Boolean(row.is_available),
+  isSelected: Boolean(row.is_selected),
+});
+
 const mapUserProfileCard = (row: ProfileCardRow): UserProfileCard => {
   const canViewDetails = Boolean(row.can_view_details);
+  const activeFlair = canViewDetails ? mapUserFlairBadgeFromProfileCard(row) : null;
   return {
     userId: row.user_id,
     username: row.username,
     avatarUrl: row.avatar_url ?? null,
     profileVisibility: normalizeProfileVisibility(row.profile_visibility),
     canViewDetails,
-    details: canViewDetails ? { bio: row.profile_bio ?? null } : null,
+    details: canViewDetails ? { bio: row.profile_bio ?? null, activeFlair } : null,
   };
 };
 
@@ -145,12 +218,14 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
 
     if (error) throw error;
     if (!data) return null;
+    const profileCard = await backend.fetchProfileCard(userId);
     return {
       username: data.username,
       avatarUrl: data.avatar_url,
       theme: getTheme(data.theme ?? 'default').id,
       profileVisibility: normalizeProfileVisibility(data.profile_visibility),
       profileBio: data.profile_bio ?? null,
+      activeFlair: profileCard?.details?.activeFlair ?? null,
     };
   },
 
@@ -181,6 +256,19 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       isActive: Boolean(data.is_active),
       displayPrefix: data.display_prefix ?? null,
     };
+  },
+
+  async listMyUserFlairs() {
+    const { data, error } = await client.rpc('list_my_user_flairs' as never);
+    if (error) throw error;
+    return ((data ?? []) as UserFlairGrantRow[]).map(mapUserFlairGrant);
+  },
+
+  async setActiveUserFlair(userFlairId) {
+    const { error } = await client.rpc('set_active_user_flair' as never, {
+      p_user_flair_id: userFlairId,
+    } as never);
+    if (error) throw error;
   },
 
   async listMyFeatureFlags() {
@@ -313,6 +401,7 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       theme: effectiveThemeId,
       profileVisibility: effectiveProfileVisibility,
       profileBio: effectiveProfileBio,
+      activeFlair: (await backend.fetchProfileCard(userId))?.details?.activeFlair ?? null,
     };
   },
 

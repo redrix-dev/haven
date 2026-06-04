@@ -5,6 +5,8 @@ import type {
   RedeemedInvite,
   ServerInvite,
   ServerSummary,
+  UserFlairBadge,
+  UserFlairGrant,
   UserProfileCard,
 } from './types';
 
@@ -20,12 +22,15 @@ export type UserProfileInfo = {
   theme: string;
   profileVisibility: ProfileVisibility;
   profileBio: string | null;
+  activeFlair: UserFlairBadge | null;
 };
 
 export interface ControlPlaneBackend {
   fetchUserProfile(userId: string): Promise<UserProfileInfo | null>;
   fetchProfileCard(userId: string): Promise<UserProfileCard | null>;
   fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
+  listMyUserFlairs(): Promise<UserFlairGrant[]>;
+  setActiveUserFlair(userFlairId: string | null): Promise<void>;
   listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
   /** Pass `ArrayBuffer` on React Native; `Blob`/`File` on web (see Supabase RN upload guidance). */
   uploadAvatar(

@@ -21,7 +21,13 @@ import {
 } from "@shared/nexus/voice/VoiceNexus";
 import { useUiStore } from "@shared/stores/uiStore";
 import { getCommunityDataBackend } from "@shared/lib/backend";
-import type { BanEligibleServer, DirectMessage, ProfileVisibility } from "@shared/lib/backend/types";
+import type {
+  BanEligibleServer,
+  DirectMessage,
+  ProfileVisibility,
+  UserFlairBadge,
+  UserFlairGrant,
+} from "@shared/lib/backend/types";
 import { createHavenBackends, type HavenBackends, type HavenSupabasePublicConfig } from "./backends";
 import { notifyActiveServerAccessLost } from "./communityAccessHandlers";
 import { BootstrapPhase, type BootstrapPhaseSnapshot, type BootstrapPhaseListener } from "./bootstrapPhase";
@@ -806,8 +812,20 @@ export class HavenCore {
     theme?: string;
     profileVisibility?: ProfileVisibility;
     profileBio?: string | null;
+    activeFlair?: UserFlairBadge | null;
   }> {
     return this.profiles.updateViewerProfile(input);
+  }
+
+  async loadMyUserFlairs(userId: string): Promise<UserFlairGrant[]> {
+    return this.profiles.loadMyUserFlairs(userId);
+  }
+
+  async setActiveUserFlair(
+    userId: string,
+    userFlairId: string | null,
+  ): Promise<void> {
+    await this.profiles.setActiveUserFlair(userId, userFlairId);
   }
 
   /**
@@ -826,5 +844,28 @@ export class HavenCore {
    */
   async getBanEligibleServers(targetUserId: string): Promise<BanEligibleServer[]> {
     return this.backends.controlPlane.listBanEligibleServersForUser(targetUserId);
+  }
+
+  async reportUserProfile(input: {
+    communityId?: string | null;
+    targetUserId: string;
+    reporterUserId: string;
+    reason: string;
+  }): Promise<void> {
+    if (input.communityId) {
+      await this.backends.communityData.reportUserProfile({
+        communityId: input.communityId,
+        targetUserId: input.targetUserId,
+        reporterUserId: input.reporterUserId,
+        reason: input.reason,
+      });
+      return;
+    }
+
+    await this.backends.communityData.reportPlatformUserProfile({
+      targetUserId: input.targetUserId,
+      reporterUserId: input.reporterUserId,
+      reason: input.reason,
+    });
   }
 }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,6 +21,8 @@ import type {
 import { resolveLiveUsername } from "@shared/infrastructure/liveProfiles";
 import { useHavenCore } from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
+import { ThemedIonicons } from "@/theme-rn";
 
 type FriendsModalContainerProps = {
   visible: boolean;
@@ -28,6 +30,7 @@ type FriendsModalContainerProps = {
   initialTab: FriendsPanelTab;
   highlightedRequestId: string | null;
   onStartDirectMessage: (friendUserId: string, displayLabel?: string) => void;
+  onOpenProfile: (target: UserProfileModalTarget) => void;
 };
 
 const TABS: { id: FriendsPanelTab; label: string }[] = [
@@ -43,6 +46,7 @@ export function FriendsModalContainer({
   initialTab,
   highlightedRequestId,
   onStartDirectMessage,
+  onOpenProfile,
 }: FriendsModalContainerProps) {
   const core = useHavenCore();
   const social = core.social;
@@ -167,50 +171,67 @@ export function FriendsModalContainer({
     [liveProfiles],
   );
 
+  const renderAvatar = useCallback((label: string, avatarUrl: string | null) => (
+    <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
+      {avatarUrl ? (
+        <Image
+          source={{ uri: avatarUrl }}
+          className="h-12 w-12"
+          resizeMode="cover"
+          accessibilityLabel={`${label} avatar`}
+        />
+      ) : (
+        <Text className="text-base font-semibold text-foreground">
+          {label.trim().charAt(0).toUpperCase() || "U"}
+        </Text>
+      )}
+    </View>
+  ), []);
+
   const renderFriend: ListRenderItem<FriendSummary> = useCallback(
-    ({ item }) => (
-      <View className="flex-row items-center justify-between border-b border-border py-3">
-        <View className="min-w-0 flex-1">
-          <Text className="text-base font-medium text-foreground">{labelForFriend(item)}</Text>
-          <Text className="text-xs text-muted-foreground">
-            {item.mutualCommunityCount > 0
-              ? `${item.mutualCommunityCount} mutual server${item.mutualCommunityCount === 1 ? "" : "s"}`
-              : "No mutual servers"}
-          </Text>
-        </View>
-        <View className="flex-row gap-2">
+    ({ item }) => {
+      const label = labelForFriend(item);
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${label} profile`}
+          onPress={() => {
+            onOpenProfile({
+              userId: item.friendUserId,
+              username: label,
+              avatarUrl: item.avatarUrl,
+            });
+          }}
+          className="flex-row items-center gap-3 border-b border-border py-4 active:bg-surface-hover"
+        >
+          {renderAvatar(label, item.avatarUrl)}
+          <View className="min-w-0 flex-1">
+            <Text className="text-base font-semibold text-foreground">{label}</Text>
+            <Text className="text-xs text-muted-foreground">
+              {item.mutualCommunityCount > 0
+                ? `${item.mutualCommunityCount} mutual server${item.mutualCommunityCount === 1 ? "" : "s"}`
+                : "No mutual servers"}
+            </Text>
+          </View>
           <Pressable
-            className="rounded-lg bg-accent-slider px-3 py-2"
-            onPress={() => onStartDirectMessage(item.friendUserId, labelForFriend(item))}
-          >
-            <Text className="text-sm font-semibold text-primary-foreground">Message</Text>
-          </Pressable>
-          <Pressable
-            className="rounded-lg bg-surface-panel px-3 py-2"
-            onPress={() => {
-              Alert.alert(
-                "Remove friend",
-                `Remove ${labelForFriend(item)} from your friends?`,
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Remove",
-                    style: "destructive",
-                    onPress: () =>
-                      void runMutation(`remove:${item.friendUserId}`, async () => {
-                        await social.removeFriend(item.friendUserId);
-                      }),
-                  },
-                ],
-              );
+            accessibilityRole="button"
+            accessibilityLabel={`Message ${label}`}
+            className="h-10 w-10 items-center justify-center rounded-xl bg-accent-slider"
+            onPress={(event) => {
+              event.stopPropagation();
+              onStartDirectMessage(item.friendUserId, label);
             }}
           >
-            <Text className="text-sm text-foreground">Remove</Text>
+            <ThemedIonicons
+              name="chatbubble-outline"
+              size={18}
+              colorClassName="accent-primary-foreground"
+            />
           </Pressable>
-        </View>
-      </View>
-    ),
-    [labelForFriend, onStartDirectMessage, runMutation, social],
+        </Pressable>
+      );
+    },
+    [labelForFriend, onOpenProfile, onStartDirectMessage, renderAvatar],
   );
 
   const renderIncomingRequest = useCallback(

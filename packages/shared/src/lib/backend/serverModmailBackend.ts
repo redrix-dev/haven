@@ -181,6 +181,9 @@ const mapSupportReportRowToSummary = (row: SupportReportRow): ServerReportSummar
   const community = takeFirst(row.community);
   const notes = parseJsonRecord(row.notes);
   const snapshot = parseSupportReportSnapshot(row.snapshot);
+  if (!row.community_id) {
+    throw new Error('Server report is missing a community id.');
+  }
 
   return {
     reportId: row.id,
@@ -389,6 +392,9 @@ export function createServerModmailBackend(
     if (!reportRow) {
       throw new Error('Report not found.');
     }
+    if (!reportRow.community_id) {
+      throw new Error('Platform-only reports do not have a community status broadcast.');
+    }
 
     const { error: updateError } = await client
       .from('support_reports')
@@ -470,6 +476,9 @@ export function createServerModmailBackend(
     if (!reportRow) {
       throw new Error('Report not found.');
     }
+    if (!reportRow.community_id) {
+      throw new Error('Platform-only reports cannot be escalated through server modmail.');
+    }
     if (reportRow.destination !== 'server_admins') {
       throw new Error('Only server-staff-only reports can be shared with Haven staff.');
     }
@@ -496,7 +505,8 @@ export function createServerModmailBackend(
     if (messageLinksError) throw messageLinksError;
     if (originalReporterError) throw originalReporterError;
 
-    const escalationContext = await loadEscalationContext(client, reportRow.community_id, user.id);
+    const communityId = reportRow.community_id;
+    const escalationContext = await loadEscalationContext(client, communityId, user.id);
     const escalatedAt = new Date().toISOString();
     const escalatedReportId = createPortableUuid();
 
@@ -515,7 +525,7 @@ export function createServerModmailBackend(
 
     const { error: insertError } = await client.from('support_reports').insert({
       id: escalatedReportId,
-      community_id: reportRow.community_id,
+      community_id: communityId,
       destination: 'haven_staff',
       status: 'pending',
       title: reportRow.title,
@@ -529,7 +539,7 @@ export function createServerModmailBackend(
     const nextChannelLinks = ((originalChannelLinks ?? []) as Array<{ channel_id: string }>).map(
       (row) => ({
         report_id: escalatedReportId,
-        community_id: reportRow.community_id,
+        community_id: communityId,
         channel_id: row.channel_id,
       })
     );
@@ -560,4 +570,3 @@ export function createServerModmailBackend(
 
   return modmail;
 }
-

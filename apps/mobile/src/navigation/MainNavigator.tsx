@@ -204,6 +204,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
   const notificationItems = core.notifications.useNotifications();
   const dmConversations = dm.useConversations();
+  const socialCounts = core.social.useCounts();
   const currentServerId = core.communities.useActiveId();
   const currentChannelId = core.channels.useActiveChannelId();
   const activeCommunityChannels = core.channels.useChannels(
@@ -542,15 +543,25 @@ function MainNavigationShell({ userId }: { userId: string }) {
     setIsFriendsModalOpen(false);
   }, []);
 
+  const handleOpenDmWithUser = useCallback(
+    async (targetUserId: string) => {
+      const conversationId = await dm.openWithUser(targetUserId);
+      navigation.navigate("Main", {
+        screen: "Community",
+        params: { pendingDmConversationId: conversationId, serverId: null, openDrawer: false },
+      });
+    },
+    [dm, navigation],
+  );
+
   const handleStartDmFromFriend = useCallback(
     (friendUserId: string) => {
       setIsFriendsModalOpen(false);
-      void dm.openWithUser(friendUserId);
-      // Navigate to Community — dm.openWithUser already primed the store;
-      // CommunityShell will show the conversation when the user taps the DM icon.
-      navigation.navigate("Main", { screen: "Community", params: { serverId: null } });
+      void handleOpenDmWithUser(friendUserId).catch((error) => {
+        Alert.alert("Message failed", error instanceof Error ? error.message : "Could not open that conversation.");
+      });
     },
-    [dm, navigation],
+    [handleOpenDmWithUser],
   );
 
   const [profileCardTarget, setProfileCardTarget] =
@@ -566,7 +577,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
     (conversationId: string) => {
       navigation.navigate("Main", {
         screen: "Community",
-        params: { pendingDmConversationId: conversationId, serverId: null },
+        params: { pendingDmConversationId: conversationId, serverId: null, openDrawer: false },
       });
     },
     [navigation],
@@ -577,7 +588,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
       openDm: (conversationId) => {
         navigation.navigate("Main", {
           screen: "Community",
-          params: { pendingDmConversationId: conversationId, serverId: null },
+          params: { pendingDmConversationId: conversationId, serverId: null, openDrawer: false },
         });
       },
       openFriends: (input) => {
@@ -643,6 +654,17 @@ function MainNavigationShell({ userId }: { userId: string }) {
                 }
                 notificationsUnreadCount={notificationsUnreadCount}
                 inboxUnreadCount={dmUnreadCount}
+                friendRequestCount={socialCounts.incomingPendingRequestCount}
+                onOpenFriends={() => {
+                  setFriendsInitialTab("friends");
+                  setFriendsHighlightedRequestId(null);
+                  setIsFriendsModalOpen(true);
+                }}
+                onStartDirectMessage={(targetUserId) => {
+                  void handleOpenDmWithUser(targetUserId).catch((error) => {
+                    Alert.alert("Message failed", error instanceof Error ? error.message : "Could not open that conversation.");
+                  });
+                }}
                 activeVoiceChannelId={voiceState.activeVoiceChannelId}
                 voiceChannelParticipants={enrichedVoiceChannelParticipants}
                 onSelectVoiceChannel={handleSelectVoiceChannel}
@@ -686,12 +708,21 @@ function MainNavigationShell({ userId }: { userId: string }) {
           initialTab={friendsInitialTab}
           highlightedRequestId={friendsHighlightedRequestId}
           onStartDirectMessage={handleStartDmFromFriend}
+          onOpenProfile={(target) => {
+            setIsFriendsModalOpen(false);
+            setProfileCardTarget(target);
+          }}
         />
       </HavenListSheet>
       <UserProfileModal
         visible={Boolean(profileCardTarget)}
         target={profileCardTarget}
         onDismiss={handleCloseProfileCard}
+        onStartDirectMessage={(targetUserId) => {
+          void handleOpenDmWithUser(targetUserId).catch((error) => {
+            Alert.alert("Message failed", error instanceof Error ? error.message : "Could not open that conversation.");
+          });
+        }}
       />
       <VoiceJoinPromptSheet
         prompt={voiceState.voiceJoinPrompt}

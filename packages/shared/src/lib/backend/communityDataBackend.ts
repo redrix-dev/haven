@@ -975,6 +975,40 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
+  async reportPlatformUserProfile({ targetUserId, reporterUserId, reason }) {
+    const normalizedReason = reason.trim();
+    if (!normalizedReason) {
+      throw new Error('Report reason is required.');
+    }
+
+    let snapshot: SupportReportProfileSnapshot | null = null;
+    try {
+      snapshot = await fetchSupportReportProfileSnapshot(targetUserId);
+    } catch (snapshotError) {
+      console.warn('Failed to capture support report profile snapshot:', snapshotError);
+    }
+
+    const reportId = createPortableUuid();
+    const reportTitle = 'User Report: Profile';
+    const reportNotes = JSON.stringify({
+      type: 'user_report',
+      targetUserId,
+      reason: normalizedReason,
+    });
+
+    const { error } = await havenCommunitySb().from('support_reports').insert({
+      id: reportId,
+      community_id: null,
+      destination: 'haven_staff',
+      reporter_user_id: reporterUserId,
+      title: reportTitle,
+      notes: reportNotes,
+      snapshot,
+      include_last_n_messages: null,
+    });
+    if (error) throw error;
+  },
+
   async listCommunityBans(communityId) {
     const { data, error } = await havenCommunitySb().rpc('list_community_bans', {
       p_community_id: communityId,

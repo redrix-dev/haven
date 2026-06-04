@@ -54,7 +54,11 @@ export default function NotificationsContainer({
               throw new Error("This notification does not include a DM conversation target.");
             }
             void core.notifications.markRead([notification.recipientId]).catch(() => {});
-            navigation.navigate("Community", { pendingDmConversationId: conversationId, serverId: null });
+            navigation.navigate("Community", {
+              pendingDmConversationId: conversationId,
+              serverId: null,
+              openDrawer: false,
+            });
             return;
           }
           case "friend_request_received": {

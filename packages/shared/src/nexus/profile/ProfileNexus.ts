@@ -9,6 +9,7 @@ import type {
 import type {
   LiveProfileIdentity,
   ProfileVisibility,
+  UserFlairGrant,
   UserProfileCard,
 } from "@shared/lib/backend/types";
 import type { StoreApi, UseBoundStore } from "zustand";
@@ -22,6 +23,10 @@ export type ProfileNexusState = {
   profileCards: Record<string, UserProfileCard | null>;
   profileCardLoading: Record<string, boolean>;
   profileCardErrors: Record<string, string | null>;
+  userFlairGrants: Record<string, UserFlairGrant[]>;
+  userFlairGrantLoading: Record<string, boolean>;
+  userFlairGrantErrors: Record<string, string | null>;
+  userFlairGrantLastLoadedAt: Record<string, number>;
   platformStaff: Record<string, PlatformStaffInfo | null>;
   platformStaffLoading: Record<string, boolean>;
   platformStaffErrors: Record<string, string | null>;
@@ -45,6 +50,7 @@ export class ProfileNexus {
   private readonly controlPlane: ControlPlaneBackend | null;
   private viewerProfileInflight = new Map<string, Promise<UserProfileInfo | null>>();
   private profileCardInflight = new Map<string, Promise<UserProfileCard | null>>();
+  private userFlairGrantInflight = new Map<string, Promise<UserFlairGrant[]>>();
   private platformStaffInflight = new Map<string, Promise<PlatformStaffInfo | null>>();
 
   constructor(_persistence: NexusPersistence, controlPlane?: ControlPlaneBackend) {
@@ -59,6 +65,10 @@ export class ProfileNexus {
       profileCards: {},
       profileCardLoading: {},
       profileCardErrors: {},
+      userFlairGrants: {},
+      userFlairGrantLoading: {},
+      userFlairGrantErrors: {},
+      userFlairGrantLastLoadedAt: {},
       platformStaff: {},
       platformStaffLoading: {},
       platformStaffErrors: {},
@@ -97,7 +107,7 @@ export class ProfileNexus {
         avatarUrl: profile.avatarUrl,
         profileVisibility: profile.profileVisibility,
         canViewDetails: true,
-        details: { bio: profile.profileBio },
+        details: { bio: profile.profileBio, activeFlair: profile.activeFlair },
       });
     }
   }
@@ -123,6 +133,17 @@ export class ProfileNexus {
       platformStaff: { ...state.platformStaff, [userId]: staff },
       platformStaffLastLoadedAt: {
         ...state.platformStaffLastLoadedAt,
+        [userId]: Date.now(),
+      },
+      revision: state.revision + 1,
+    }));
+  }
+
+  private setUserFlairGrants(userId: string, grants: UserFlairGrant[]): void {
+    this.store.setState((state) => ({
+      userFlairGrants: { ...state.userFlairGrants, [userId]: grants },
+      userFlairGrantLastLoadedAt: {
+        ...state.userFlairGrantLastLoadedAt,
         [userId]: Date.now(),
       },
       revision: state.revision + 1,
@@ -204,6 +225,90 @@ export class ProfileNexus {
     const result = await this.requireControlPlane().updateUserProfile(input);
     this.setViewerProfile(input.userId, result);
     return result;
+  }
+
+  async loadMyUserFlairs(userId: string): Promise<UserFlairGrant[]> {
+    if (!userId.trim()) return [];
+    const existing = this.userFlairGrantInflight.get(userId);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      this.store.setState((state) => ({
+        userFlairGrantLoading: {
+          ...state.userFlairGrantLoading,
+          [userId]: true,
+        },
+        userFlairGrantErrors: {
+          ...state.userFlairGrantErrors,
+          [userId]: null,
+        },
+        revision: state.revision + 1,
+      }));
+
+      try {
+        const grants = await this.requireControlPlane().listMyUserFlairs();
+        this.setUserFlairGrants(userId, grants);
+        return grants;
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message.trim().length > 0
+            ? error.message
+            : "Failed to load flair.";
+        this.store.setState((state) => ({
+          userFlairGrantErrors: {
+            ...state.userFlairGrantErrors,
+            [userId]: message,
+          },
+          revision: state.revision + 1,
+        }));
+        throw error;
+      } finally {
+        this.store.setState((state) => ({
+          userFlairGrantLoading: {
+            ...state.userFlairGrantLoading,
+            [userId]: false,
+          },
+          revision: state.revision + 1,
+        }));
+        this.userFlairGrantInflight.delete(userId);
+      }
+    })();
+
+    this.userFlairGrantInflight.set(userId, promise);
+    return promise;
+  }
+
+  async ensureMyUserFlairs(
+    userId: string,
+    options?: { freshnessMs?: number },
+  ): Promise<UserFlairGrant[]> {
+    if (!userId.trim()) return [];
+    const existing = this.userFlairGrantInflight.get(userId);
+    if (existing) return existing;
+    const freshnessMs = options?.freshnessMs ?? 60_000;
+    const state = this.store.getState();
+    const hasLoaded = Object.prototype.hasOwnProperty.call(
+      state.userFlairGrants,
+      userId,
+    );
+    const lastLoadedAt = state.userFlairGrantLastLoadedAt[userId] ?? 0;
+    if (hasLoaded && Date.now() - lastLoadedAt < freshnessMs) {
+      return state.userFlairGrants[userId] ?? [];
+    }
+    return this.loadMyUserFlairs(userId);
+  }
+
+  async setActiveUserFlair(
+    userId: string,
+    userFlairId: string | null,
+  ): Promise<void> {
+    if (!userId.trim()) return;
+    await this.requireControlPlane().setActiveUserFlair(userFlairId);
+    await Promise.all([
+      this.loadMyUserFlairs(userId),
+      this.loadViewerProfile(userId),
+      this.loadProfileCard(userId),
+    ]);
   }
 
   async loadProfileCard(userId: string): Promise<UserProfileCard | null> {
@@ -380,6 +485,14 @@ export class ProfileNexus {
     return this.store.getState().profileCardErrors[userId] ?? null;
   }
 
+  getUserFlairGrants(userId: string): UserFlairGrant[] {
+    return this.store.getState().userFlairGrants[userId] ?? [];
+  }
+
+  getUserFlairGrantError(userId: string): string | null {
+    return this.store.getState().userFlairGrantErrors[userId] ?? null;
+  }
+
   getPlatformStaff(userId: string): PlatformStaffInfo | null | undefined {
     return this.store.getState().platformStaff[userId];
   }
@@ -451,6 +564,24 @@ export class ProfileNexus {
     );
   }
 
+  useUserFlairGrants(userId: string | null | undefined): UserFlairGrant[] {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? (state.userFlairGrants[userId] ?? []) : [],
+    );
+  }
+
+  useUserFlairGrantLoading(userId: string | null | undefined): boolean {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? Boolean(state.userFlairGrantLoading[userId]) : false,
+    );
+  }
+
+  useUserFlairGrantError(userId: string | null | undefined): string | null {
+    return useStoreWithEqualityFn(this.store, (state) =>
+      userId ? (state.userFlairGrantErrors[userId] ?? null) : null,
+    );
+  }
+
   usePlatformStaff(userId: string | null | undefined): PlatformStaffInfo | null {
     return useStoreWithEqualityFn(this.store, (state) =>
       userId ? (state.platformStaff[userId] ?? null) : null,
@@ -474,6 +605,7 @@ export class ProfileNexus {
   clear(): void {
     this.viewerProfileInflight.clear();
     this.profileCardInflight.clear();
+    this.userFlairGrantInflight.clear();
     this.platformStaffInflight.clear();
     this.store.setState({
       profiles: {},
@@ -484,6 +616,10 @@ export class ProfileNexus {
       profileCards: {},
       profileCardLoading: {},
       profileCardErrors: {},
+      userFlairGrants: {},
+      userFlairGrantLoading: {},
+      userFlairGrantErrors: {},
+      userFlairGrantLastLoadedAt: {},
       platformStaff: {},
       platformStaffLoading: {},
       platformStaffErrors: {},

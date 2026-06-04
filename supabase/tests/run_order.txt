@@ -26,3 +26,6 @@ supabase/tests/sql/12_channel_overwrite_permission_split.sql
 supabase/tests/sql/13_recent_schema_alignment.sql
 supabase/tests/sql/14_hidden_message_visibility.sql
 supabase/tests/sql/15_bans_list_profiles.sql
+supabase/tests/sql/16_profile_card_visibility.sql
+supabase/tests/sql/17_profile_flair.sql
+supabase/tests/sql/18_community_flair_grant_rules.sql

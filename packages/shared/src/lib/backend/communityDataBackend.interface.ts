@@ -50,6 +50,11 @@ export interface CommunityDataBackend {
     reporterUserId: string;
     reason: string;
   }): Promise<void>;
+  reportPlatformUserProfile(input: {
+    targetUserId: string;
+    reporterUserId: string;
+    reason: string;
+  }): Promise<void>;
   listCommunityBans(communityId: string): Promise<CommunityBanItem[]>;
   banCommunityMember(input: {
     communityId: string;

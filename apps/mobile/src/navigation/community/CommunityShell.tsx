@@ -31,8 +31,11 @@ type CommunityShellProps = Props & {
   onOpenProfile: () => void;
   onOpenProfileCard: (target: UserProfileModalTarget) => void;
   onOpenNotifications: () => void;
+  onOpenFriends: () => void;
+  onStartDirectMessage: (userId: string) => void;
   notificationsUnreadCount: number;
   inboxUnreadCount: number;
+  friendRequestCount: number;
   activeVoiceChannelId: string | null;
   voiceChannelParticipants: Record<string, VoiceSidebarParticipant[]>;
   onSelectVoiceChannel: (channelId: string) => void;
@@ -45,8 +48,11 @@ export function CommunityShell({
   onOpenProfile,
   onOpenProfileCard,
   onOpenNotifications,
+  onOpenFriends,
+  onStartDirectMessage,
   notificationsUnreadCount,
   inboxUnreadCount,
+  friendRequestCount,
   activeVoiceChannelId,
   voiceChannelParticipants,
   onSelectVoiceChannel,
@@ -84,6 +90,7 @@ export function CommunityShell({
     handledDmConversationIdRef.current = pendingDmConversationId;
     void dm.openConversation(pendingDmConversationId, { markRead: true }).catch(() => {});
     switchToDm();
+    shellRef.current?.setDrawerOpen(false);
     navigation.setParams({ pendingDmConversationId: undefined });
   }, [pendingDmConversationId, dm, switchToDm, navigation]);
 
@@ -312,9 +319,11 @@ export function CommunityShell({
             onSelectCommunity={handleSelectCommunity}
             onOpenProfile={onOpenProfile}
             onOpenNotifications={onOpenNotifications}
+            onOpenFriends={onOpenFriends}
             onOpenInbox={switchToDm}
             notificationsUnreadCount={notificationsUnreadCount}
             inboxUnreadCount={inboxUnreadCount}
+            friendRequestCount={friendRequestCount}
             isDmActive={mode === "dm"}
             onOpenCommunityActions={openCommunityActions}
           />
@@ -323,6 +332,7 @@ export function CommunityShell({
           mode === "dm" ? (
             <DmInboxDrawer
               onConversationSelected={() => shellRef.current?.setDrawerOpen(false)}
+              onStartDirectMessage={onStartDirectMessage}
             />
           ) : (
             <CommunityChannelDrawer

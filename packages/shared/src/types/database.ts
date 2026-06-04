@@ -66,6 +66,62 @@ export type Database = {
         }
         Relationships: []
       }
+      flairs: {
+        Row: {
+          background_token: string
+          color_token: string
+          community_id: string | null
+          created_at: string
+          description: string | null
+          icon_key: string | null
+          id: string
+          is_active: boolean
+          is_retired: boolean
+          key: string
+          label: string
+          scope: string
+          updated_at: string
+        }
+        Insert: {
+          background_token?: string
+          color_token?: string
+          community_id?: string | null
+          created_at?: string
+          description?: string | null
+          icon_key?: string | null
+          id?: string
+          is_active?: boolean
+          is_retired?: boolean
+          key: string
+          label: string
+          scope?: string
+          updated_at?: string
+        }
+        Update: {
+          background_token?: string
+          color_token?: string
+          community_id?: string | null
+          created_at?: string
+          description?: string | null
+          icon_key?: string | null
+          id?: string
+          is_active?: boolean
+          is_retired?: boolean
+          key?: string
+          label?: string
+          scope?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flairs_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_group_channels: {
         Row: {
           channel_id: string
@@ -417,6 +473,51 @@ export type Database = {
             columns: ["community_id"]
             isOneToOne: true
             referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_flair_grant_rules: {
+        Row: {
+          community_id: string
+          created_at: string
+          flair_id: string
+          grant_source: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          community_id: string
+          created_at?: string
+          flair_id: string
+          grant_source?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          community_id?: string
+          created_at?: string
+          flair_id?: string
+          grant_source?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_flair_grant_rules_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_flair_grant_rules_flair_id_fkey"
+            columns: ["flair_id"]
+            isOneToOne: false
+            referencedRelation: "flairs"
             referencedColumns: ["id"]
           },
         ]
@@ -1640,6 +1741,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active_user_flair_id: string | null
           avatar_url: string | null
           created_at: string
           id: string
@@ -1650,6 +1752,7 @@ export type Database = {
           username: string
         }
         Insert: {
+          active_user_flair_id?: string | null
           avatar_url?: string | null
           created_at?: string
           id: string
@@ -1660,6 +1763,7 @@ export type Database = {
           username: string
         }
         Update: {
+          active_user_flair_id?: string | null
           avatar_url?: string | null
           created_at?: string
           id?: string
@@ -1669,7 +1773,15 @@ export type Database = {
           updated_at?: string
           username?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_active_user_flair_id_fkey"
+            columns: ["active_user_flair_id"]
+            isOneToOne: false
+            referencedRelation: "user_flairs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_identities: {
         Row: {
@@ -1842,7 +1954,7 @@ export type Database = {
       }
       support_reports: {
         Row: {
-          community_id: string
+          community_id: string | null
           created_at: string
           destination: string
           id: string
@@ -1857,7 +1969,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          community_id: string
+          community_id?: string | null
           created_at?: string
           destination?: string
           id?: string
@@ -1872,7 +1984,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          community_id?: string
+          community_id?: string | null
           created_at?: string
           destination?: string
           id?: string
@@ -1897,6 +2009,74 @@ export type Database = {
           {
             foreignKeyName: "support_reports_reporter_user_id_fkey"
             columns: ["reporter_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_flairs: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          flair_id: string
+          grant_source: string
+          granted_by_user_id: string | null
+          id: string
+          revoked_at: string | null
+          source_community_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          flair_id: string
+          grant_source: string
+          granted_by_user_id?: string | null
+          id?: string
+          revoked_at?: string | null
+          source_community_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          flair_id?: string
+          grant_source?: string
+          granted_by_user_id?: string | null
+          id?: string
+          revoked_at?: string | null
+          source_community_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_flairs_flair_id_fkey"
+            columns: ["flair_id"]
+            isOneToOne: false
+            referencedRelation: "flairs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_flairs_granted_by_user_id_fkey"
+            columns: ["granted_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_flairs_source_community_id_fkey"
+            columns: ["source_community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_flairs_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2057,11 +2237,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_community_flair_grant_rule: {
+        Args: {
+          p_community_id: string
+          p_flair_key: string
+          p_grant_source?: string
+        }
+        Returns: string
+      }
       current_user_highest_role_position: {
         Args: { p_community_id: string }
         Returns: number
       }
       delete_own_account: { Args: never; Returns: undefined }
+      disable_community_flair_grant_rule: {
+        Args: { p_rule_id: string }
+        Returns: undefined
+      }
       add_dm_message_report_action: {
         Args: {
           p_action_type: string
@@ -2094,10 +2286,37 @@ export type Database = {
           queued: boolean
         }[]
       }
+      ensure_user_flair_grant: {
+        Args: {
+          p_flair_id: string
+          p_grant_source: string
+          p_granted_by_user_id?: string | null
+          p_source_community_id?: string | null
+          p_user_id: string
+        }
+        Returns: string
+      }
       extract_first_http_url: { Args: { p_content: string }; Returns: string }
+      grant_user_flair: {
+        Args: {
+          p_flair_key: string
+          p_grant_source: string
+          p_source_community_id?: string | null
+          p_user_id: string
+        }
+        Returns: string
+      }
       get_profile_card: {
         Args: { p_user_id: string }
         Returns: {
+          active_flair_background_token: string | null
+          active_flair_color_token: string | null
+          active_flair_description: string | null
+          active_flair_icon_key: string | null
+          active_flair_id: string | null
+          active_flair_key: string | null
+          active_flair_label: string | null
+          active_flair_user_flair_id: string | null
           avatar_url: string | null
           can_view_details: boolean
           profile_bio: string | null
@@ -2164,6 +2383,27 @@ export type Database = {
         Returns: boolean
       }
       is_platform_staff: { Args: { p_user_id?: string }; Returns: boolean }
+      list_my_user_flairs: {
+        Args: never
+        Returns: {
+          background_token: string
+          color_token: string
+          community_id: string | null
+          description: string | null
+          expires_at: string | null
+          flair_id: string
+          flair_key: string
+          grant_source: string
+          granted_at: string
+          icon_key: string | null
+          is_available: boolean
+          is_selected: boolean
+          label: string
+          scope: string
+          source_community_id: string | null
+          user_flair_id: string
+        }[]
+      }
       list_bannable_shared_communities: {
         Args: { p_target_user_id: string }
         Returns: {
@@ -2351,6 +2591,10 @@ export type Database = {
           joined: boolean
         }[]
       }
+      revoke_user_flair: {
+        Args: { p_user_flair_id: string }
+        Returns: undefined
+      }
       resolve_dm_notification_delivery_for_user: {
         Args: { p_conversation_id: string; p_recipient_user_id: string }
         Returns: {
@@ -2382,6 +2626,10 @@ export type Database = {
       set_dm_conversation_muted: {
         Args: { p_conversation_id: string; p_muted: boolean }
         Returns: boolean
+      }
+      set_active_user_flair: {
+        Args: { p_user_flair_id: string | null }
+        Returns: undefined
       }
       set_haven_background_cron_config: {
         Args: {

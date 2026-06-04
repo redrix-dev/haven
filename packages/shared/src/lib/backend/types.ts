@@ -138,8 +138,31 @@ export type LiveProfileIdentity = {
 
 export type ProfileVisibility = 'public' | 'friends_only' | 'private';
 
+export type UserFlairBadge = {
+  userFlairId: string;
+  flairId: string;
+  key: string;
+  label: string;
+  description: string | null;
+  colorToken: string;
+  backgroundToken: string;
+  iconKey: string | null;
+};
+
+export type UserFlairGrant = UserFlairBadge & {
+  scope: 'platform' | 'community';
+  communityId: string | null;
+  grantSource: string;
+  sourceCommunityId: string | null;
+  grantedAt: string;
+  expiresAt: string | null;
+  isAvailable: boolean;
+  isSelected: boolean;
+};
+
 export type ProfileDetails = {
   bio: string | null;
+  activeFlair: UserFlairBadge | null;
 };
 
 export type UserProfileCard = {
