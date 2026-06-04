@@ -21,11 +21,12 @@ import type {
 import { resolveLiveUsername } from "@shared/infrastructure/liveProfiles";
 import { useHavenCore } from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { ThemedIonicons } from "@/theme-rn";
 
-type FriendsModalContainerProps = {
-  visible: boolean;
+export type FriendsSurfaceProps = {
   userId: string | null;
   initialTab: FriendsPanelTab;
   highlightedRequestId: string | null;
@@ -40,16 +41,19 @@ const TABS: { id: FriendsPanelTab; label: string }[] = [
   { id: "blocked", label: "Blocked" },
 ];
 
-export function FriendsModalContainer({
-  visible,
+export function FriendsSurface({
   userId,
   initialTab,
   highlightedRequestId,
   onStartDirectMessage,
   onOpenProfile,
-}: FriendsModalContainerProps) {
+}: FriendsSurfaceProps) {
   const core = useHavenCore();
   const social = core.social;
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const placeholderColor =
+    resolveColorProp(themeTokens, "muted-foreground") ?? "#8b9cbb";
   const liveProfiles = core.profiles.useProfilesRecord();
   const counts = social.useCounts();
   const friends = social.useFriends();
@@ -69,7 +73,7 @@ export function FriendsModalContainer({
 
   const refreshData = useCallback(
     async (options?: { suppressLoadingState?: boolean }) => {
-      if (!visible || !userId) return;
+      if (!userId) return;
       if (options?.suppressLoadingState) {
         setRefreshing(true);
       } else {
@@ -90,7 +94,7 @@ export function FriendsModalContainer({
         setRefreshing(false);
       }
     },
-    [social, userId, visible],
+    [social, userId],
   );
 
   const runMutation = useCallback(
@@ -110,21 +114,21 @@ export function FriendsModalContainer({
   );
 
   useEffect(() => {
-    if (visible) setActiveTab(initialTab);
-  }, [initialTab, visible]);
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
-    if (!visible) {
+    if (!userId) {
       setActionError(null);
       setSearchError(null);
       setSearchLoading(false);
       return;
     }
     void refreshData();
-  }, [refreshData, visible]);
+  }, [refreshData, userId]);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!userId) return;
     const query = searchQuery.trim();
     if (query.length < 2) {
       setSearchResults([]);
@@ -153,7 +157,7 @@ export function FriendsModalContainer({
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, social, visible]);
+  }, [searchQuery, social, userId]);
 
   const incomingRequests = useMemo(
     () => requests.filter((r) => r.direction === "incoming"),
@@ -202,7 +206,7 @@ export function FriendsModalContainer({
               avatarUrl: item.avatarUrl,
             });
           }}
-          className="flex-row items-center gap-3 border-b border-border py-4 active:bg-surface-hover"
+          className="flex-row items-center gap-3 border-b border-border-panel py-4 active:bg-surface-hover"
         >
           {renderAvatar(label, item.avatarUrl)}
           <View className="min-w-0 flex-1">
@@ -216,7 +220,7 @@ export function FriendsModalContainer({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Message ${label}`}
-            className="h-10 w-10 items-center justify-center rounded-xl bg-accent-slider"
+            className="h-10 w-10 items-center justify-center rounded-xl bg-primary active:bg-primary-hover"
             onPress={(event) => {
               event.stopPropagation();
               onStartDirectMessage(item.friendUserId, label);
@@ -237,14 +241,14 @@ export function FriendsModalContainer({
   const renderIncomingRequest = useCallback(
     ({ item }: { item: FriendRequestSummary }) => (
       <View
-        className={`border-b border-border py-3 pl-2 ${
-          item.requestId === highlightedRequestId ? "border-l-4 border-l-accent-slider" : ""
+        className={`border-b border-border-panel py-3 pl-2 ${
+          item.requestId === highlightedRequestId ? "border-l-4 border-l-primary" : ""
         }`}
       >
         <Text className="text-base font-medium text-foreground">{item.senderUsername}</Text>
         <View className="mt-2 flex-row gap-2">
           <Pressable
-            className="rounded-lg bg-accent-slider px-3 py-2"
+            className="rounded-lg bg-primary px-3 py-2 active:bg-primary-hover"
             disabled={busyActionKey !== null}
             onPress={() =>
               void runMutation(`accept:${item.requestId}`, async () => {
@@ -255,7 +259,7 @@ export function FriendsModalContainer({
             <Text className="text-sm font-semibold text-primary-foreground">Accept</Text>
           </Pressable>
           <Pressable
-            className="rounded-lg bg-surface-panel px-3 py-2"
+            className="rounded-lg border border-border-control bg-surface-panel px-3 py-2 active:bg-surface-hover"
             disabled={busyActionKey !== null}
             onPress={() =>
               void runMutation(`decline:${item.requestId}`, async () => {
@@ -273,10 +277,10 @@ export function FriendsModalContainer({
 
   const renderOutgoingRequest = useCallback(
     ({ item }: { item: FriendRequestSummary }) => (
-      <View className="flex-row items-center justify-between border-b border-border py-3">
+      <View className="flex-row items-center justify-between border-b border-border-panel py-3">
         <Text className="text-base text-foreground">{item.recipientUsername}</Text>
         <Pressable
-          className="rounded-lg bg-surface-panel px-3 py-2"
+          className="rounded-lg border border-border-control bg-surface-panel px-3 py-2 active:bg-surface-hover"
           disabled={busyActionKey !== null}
           onPress={() =>
             void runMutation(`cancel:${item.requestId}`, async () => {
@@ -293,10 +297,10 @@ export function FriendsModalContainer({
 
   const renderBlocked: ListRenderItem<BlockedUserSummary> = useCallback(
     ({ item }) => (
-      <View className="flex-row items-center justify-between border-b border-border py-3">
+      <View className="flex-row items-center justify-between border-b border-border-panel py-3">
         <Text className="text-base text-foreground">{item.username}</Text>
         <Pressable
-          className="rounded-lg bg-surface-panel px-3 py-2"
+          className="rounded-lg border border-border-control bg-surface-panel px-3 py-2 active:bg-surface-hover"
           disabled={busyActionKey !== null}
           onPress={() =>
             void runMutation(`unblock:${item.blockedUserId}`, async () => {
@@ -316,14 +320,14 @@ export function FriendsModalContainer({
       const busy =
         busyActionKey?.startsWith(`send:${item.username}`) ?? false;
       return (
-        <View className="flex-row items-center justify-between border-b border-border py-3">
+        <View className="flex-row items-center justify-between border-b border-border-panel py-3">
           <View className="min-w-0 flex-1">
             <Text className="text-base text-foreground">{item.username}</Text>
             <Text className="text-xs capitalize text-muted-foreground">{item.relationshipState}</Text>
           </View>
           {item.relationshipState === "none" ? (
             <Pressable
-              className="rounded-lg bg-accent-slider px-3 py-2"
+              className="rounded-lg bg-primary px-3 py-2 active:bg-primary-hover"
               disabled={busy || busyActionKey !== null}
               onPress={() =>
                 void runMutation(
@@ -343,10 +347,6 @@ export function FriendsModalContainer({
     [busyActionKey, runMutation, social],
   );
 
-  if (!visible) {
-    return null;
-  }
-
   return (
     <View className="min-h-0 flex-1">
       <View className="mb-3 flex-row flex-wrap gap-2">
@@ -355,7 +355,7 @@ export function FriendsModalContainer({
             key={tab.id}
             onPress={() => setActiveTab(tab.id)}
             className={`rounded-full px-3 py-1.5 ${
-              activeTab === tab.id ? "bg-accent-slider" : "bg-surface-panel"
+              activeTab === tab.id ? "bg-primary" : "bg-surface-panel"
             }`}
           >
             <Text
@@ -380,8 +380,7 @@ export function FriendsModalContainer({
       ) : null}
 
       {(loading || nexusLoading) && !refreshing ? (
-        // uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground
-        <ActivityIndicator color="#e6edf7" />
+        <ActivityIndicator color={foregroundColor} />
       ) : null}
 
       {activeTab === "friends" ? (
@@ -401,8 +400,7 @@ export function FriendsModalContainer({
         <ScrollView
           className="flex-1"
           refreshControl={
-            // uniwind-theme-allow mobile-theme/no-raw-color-prop - RefreshControl tintColor requires raw color; resolves to --foreground
-            <RefreshControl refreshing={refreshing} onRefresh={() => void refreshData({ suppressLoadingState: true })} tintColor="#e6edf7" />
+            <RefreshControl refreshing={refreshing} onRefresh={() => void refreshData({ suppressLoadingState: true })} tintColor={foregroundColor} />
           }
         >
           {outgoingRequests.length > 0 ? (
@@ -433,17 +431,15 @@ export function FriendsModalContainer({
       {activeTab === "add" ? (
         <View className="min-h-0 flex-1">
           <TextInput
-            className="mb-3 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+            className="mb-3 rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
             placeholder="Search by username"
-            // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
-            placeholderTextColor="#8b9cbb"
+            placeholderTextColor={placeholderColor}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
-          {searchLoading ? <ActivityIndicator color="#e6edf7" /> : null}
+          {searchLoading ? <ActivityIndicator color={foregroundColor} /> : null}
           {searchError ? (
             <Text className="mb-2 text-sm text-destructive">{searchError}</Text>
           ) : null}

@@ -12,6 +12,8 @@ import {
 import { useHavenCore } from "@shared/core";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useAuthStore } from "@shared/stores/authStore";
+import { resolveColorProp } from "@shared/themes";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { ThemedIonicons } from "@/theme-rn";
 import { UserFlairBadgePill } from "./UserFlairBadgePill";
 import { ProfileReportSheet } from "./ProfileReportSheet";
@@ -45,6 +47,8 @@ export default function UserProfileModal({
   onStartDirectMessage,
 }: UserProfileModalProps) {
   const core = useHavenCore();
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const viewerUserId = useAuthStore((state) => state.user?.id ?? null);
   const liveProfiles = core.profiles.useProfilesRecord();
   const profileCard = core.profiles.useProfileCard(target?.userId);
@@ -236,7 +240,7 @@ export default function UserProfileModal({
     if (loading && !profileCard) {
       return (
         <View className="items-center justify-center py-6">
-          <ActivityIndicator />
+          <ActivityIndicator color={foregroundColor} />
         </View>
       );
     }
@@ -268,7 +272,7 @@ export default function UserProfileModal({
         {bio || "No profile details yet."}
       </Text>
     );
-  }, [error, loading, profileCard, target]);
+  }, [error, foregroundColor, loading, profileCard, target]);
 
   return (
     <Modal
@@ -278,7 +282,7 @@ export default function UserProfileModal({
       onRequestClose={onDismiss}
     >
       <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
+        <View className="flex-row items-center justify-between border-b border-border-panel px-4 py-3">
           <Text className="text-base font-semibold text-foreground">Profile</Text>
           <Pressable
             accessibilityRole="button"
@@ -366,7 +370,7 @@ export default function UserProfileModal({
                   accessibilityRole="button"
                   disabled={busyAction !== null}
                   onPress={handleStartDirectMessage}
-                  className="rounded-xl bg-accent-slider px-4 py-2.5 active:opacity-90"
+                  className="rounded-xl bg-primary px-4 py-2.5 active:bg-primary-hover"
                 >
                   <Text className="text-sm font-semibold text-primary-foreground">
                     Send Message
@@ -394,7 +398,7 @@ export default function UserProfileModal({
             <Text className="mt-3 text-center text-sm text-destructive">{actionError}</Text>
           ) : null}
 
-          <View className="mt-6 rounded-2xl border border-border bg-card p-4">
+          <View className="mt-6 rounded-2xl border border-border-panel bg-card p-4">
             <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Details
             </Text>
@@ -411,7 +415,7 @@ export default function UserProfileModal({
         {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal sheet scrim overlay, invariant across themes */}
         <Pressable className="flex-1 justify-end bg-black/55" onPress={() => setActionsOpen(false)}>
           <Pressable
-            className="rounded-t-2xl border-t border-border bg-surface-modal px-4 pb-8 pt-3"
+            className="rounded-t-2xl border-t border-border-panel bg-surface-modal px-4 pb-8 pt-3"
             onPress={(e) => e.stopPropagation()}
           >
             <Text className="mb-3 text-center text-xs text-muted-foreground" numberOfLines={2}>

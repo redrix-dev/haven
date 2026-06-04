@@ -19,13 +19,9 @@ type UserSettingsCardProps = {
 
 export default function UserSettingsCard({ rows }: UserSettingsCardProps) {
   return (
-    <View className="rounded-2xl bg-[#1C1C1E] overflow-hidden">
+    <View className="rounded-2xl bg-surface-panel overflow-hidden">
       {rows.map((row, index) => {
         const isLast = index === rows.length - 1;
-        const labelColor = row.danger ? "#FF453A" : "#FFFFFF";
-        const subtitleColor = row.danger ? "#FF9F99" : "#8E8E93";
-        const iconColor = row.danger ? "#FF453A" : "#8E8E93";
-        const chevronColor = row.danger ? "#FF9F99" : "#8E8E93";
 
         return (
           <Pressable
@@ -36,7 +32,7 @@ export default function UserSettingsCard({ rows }: UserSettingsCardProps) {
             accessibilityLabel={row.label}
             className={`flex-row items-center gap-2.5 px-4 py-3 ${
               row.disabled ? "opacity-50" : "opacity-100"
-            } ${isLast ? "" : "border-b border-[#2C2C2E]"}`}
+            } ${isLast ? "" : "border-b border-border-panel"} active:bg-surface-hover`}
           >
             {row.icon ? (
               <ThemedIonicons
@@ -49,11 +45,11 @@ export default function UserSettingsCard({ rows }: UserSettingsCardProps) {
             )}
 
             <View className="flex-1">
-              <Text style={{ color: labelColor }} className="text-base font-medium">
+              <Text className={`text-base font-medium ${row.danger ? "text-destructive" : "text-foreground"}`}>
                 {row.label}
               </Text>
               {row.subtitle ? (
-                <Text style={{ color: subtitleColor }} className="text-xs mt-0.5">
+                <Text className={`text-xs mt-0.5 ${row.danger ? "text-destructive/80" : "text-muted-foreground"}`}>
                   {row.subtitle}
                 </Text>
               ) : null}

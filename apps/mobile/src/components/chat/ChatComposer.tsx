@@ -46,13 +46,21 @@ export function ChatComposer({
       {strips}
 
       <View className="flex-row items-end gap-2 bg-transparent px-3 pb-3 pt-2.5">
-        <Animated.View style={composerChromeAnimatedStyle}>
+        <Animated.View
+          style={[
+            {
+              minHeight: CHAT_COMPOSER_INPUT_STYLE.minHeight,
+              justifyContent: "center",
+            },
+            composerChromeAnimatedStyle,
+          ]}
+        >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Add media"
             disabled={isSending || isPickingMedia}
             onPress={onPickMedia}
-            className="mb-0.5 h-8.5 w-8.5 items-center justify-center rounded-full bg-foreground/10 disabled:opacity-50"
+            className="h-8.5 w-8.5 items-center justify-center rounded-full bg-foreground/10 disabled:opacity-50"
           >
             <ThemedIonicons name="add" size={20} colorClassName="accent-primary-foreground" />
           </Pressable>

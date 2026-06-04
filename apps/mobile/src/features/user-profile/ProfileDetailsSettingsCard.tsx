@@ -48,7 +48,7 @@ export function ProfileDetailsSettingsCard({
   const core = useHavenCore();
   const themeTokens = useMobileThemeTokens();
   const placeholderColor =
-    resolveColorProp(themeTokens, "muted-foreground") ?? "#8E8E93";
+    resolveColorProp(themeTokens, "muted-foreground") ?? "#8b9cbb";
   const [draftVisibility, setDraftVisibility] =
     useState<ProfileVisibility>(profileVisibility);
   const [draftBio, setDraftBio] = useState(profileBio ?? "");
@@ -132,8 +132,8 @@ export function ProfileDetailsSettingsCard({
   };
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card">
-      <View className="border-b border-border px-4 py-3">
+    <View className="overflow-hidden rounded-2xl border border-border-panel bg-card">
+      <View className="border-b border-border-panel px-4 py-3">
         <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Profile details
         </Text>
@@ -187,7 +187,7 @@ export function ProfileDetailsSettingsCard({
             editable={!saving}
             placeholder="Add a short profile bio."
             placeholderTextColor={placeholderColor}
-            className="min-h-24 rounded-xl border border-border bg-background px-3 py-2.5 text-base text-foreground"
+            className="min-h-24 rounded-xl border border-border-control bg-surface-panel px-3 py-2.5 text-base text-foreground"
           />
           <Text className="text-right text-[11px] text-muted-foreground">
             {draftBio.length}/500
@@ -211,7 +211,7 @@ export function ProfileDetailsSettingsCard({
           ) : null}
 
           {flairGrants.length === 0 && !flairLoading ? (
-            <Text className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+            <Text className="rounded-xl border border-dashed border-border-panel px-3 py-2 text-sm text-muted-foreground">
               No flair yet.
             </Text>
           ) : (
@@ -221,7 +221,7 @@ export function ProfileDetailsSettingsCard({
                 accessibilityState={{ selected: selectedFlair === null }}
                 disabled={savingFlairId !== null}
                 onPress={() => void selectFlair(null)}
-                className="flex-row items-center justify-between rounded-xl border border-border bg-background px-3 py-2.5 active:bg-muted"
+                className="flex-row items-center justify-between rounded-xl border border-border-control bg-surface-panel px-3 py-2.5 active:bg-surface-hover"
               >
                 <Text className="text-sm font-medium text-foreground">No flair</Text>
                 {selectedFlair === null ? (
@@ -246,7 +246,7 @@ export function ProfileDetailsSettingsCard({
                     }}
                     disabled={disabled}
                     onPress={() => void selectFlair(grant)}
-                    className={`flex-row items-center justify-between rounded-xl border border-border bg-background px-3 py-2.5 active:bg-muted ${
+                    className={`flex-row items-center justify-between rounded-xl border border-border-control bg-surface-panel px-3 py-2.5 active:bg-surface-hover ${
                       grant.isAvailable ? "" : "opacity-60"
                     }`}
                   >

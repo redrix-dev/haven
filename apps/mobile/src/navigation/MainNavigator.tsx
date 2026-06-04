@@ -24,16 +24,12 @@ import {
   useHavenCore,
 } from "@shared/core";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
-import { FriendsModalContainer } from "@/features/friends/FriendsModalContainer";
 import UserProfileModal, {
   type UserProfileModalTarget,
 } from "@/features/user-profile/UserProfileModal";
 import { useUiStore } from "@shared/stores/uiStore";
 import { useAuthStore } from "@shared/stores/authStore";
-import type {
-  FriendsPanelTab,
-  VoiceSidebarParticipant,
-} from "@shared/types/types";
+import type { VoiceSidebarParticipant } from "@shared/types/types";
 import type { NotificationAudioSettings } from "@shared/types/settings";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";
 import {
@@ -60,6 +56,7 @@ import { HavenListSheet } from "@/components/HavenListSheet";
 import { NotificationsScreen } from "@/screens/main/NotificationsScreen";
 import { ProfileScreen } from "@/screens/main/ProfileScreen";
 import { SettingsScreen } from "@/screens/main/SettingsScreen";
+import { FriendsScreen } from "@/screens/main/FriendsScreen";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -523,25 +520,21 @@ function MainNavigationShell({ userId }: { userId: string }) {
     [liveProfiles, voiceController.state],
   );
 
-  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
-  const [friendsInitialTab, setFriendsInitialTab] =
-    useState<FriendsPanelTab>("friends");
-  const [friendsHighlightedRequestId, setFriendsHighlightedRequestId] =
-    useState<string | null>(null);
   const handleOpenFriendsFromNotification = useCallback(
     (input: {
       tab: "requests" | "friends";
       highlightedRequestId: string | null;
     }) => {
-      setFriendsInitialTab(input.tab === "requests" ? "requests" : "friends");
-      setFriendsHighlightedRequestId(input.highlightedRequestId);
-      setIsFriendsModalOpen(true);
+      navigation.navigate("Main", {
+        screen: "Friends",
+        params: {
+          initialTab: input.tab === "requests" ? "requests" : "friends",
+          highlightedRequestId: input.highlightedRequestId,
+        },
+      });
     },
-    [],
+    [navigation],
   );
-  const handleCloseFriends = useCallback(() => {
-    setIsFriendsModalOpen(false);
-  }, []);
 
   const handleOpenDmWithUser = useCallback(
     async (targetUserId: string) => {
@@ -552,16 +545,6 @@ function MainNavigationShell({ userId }: { userId: string }) {
       });
     },
     [dm, navigation],
-  );
-
-  const handleStartDmFromFriend = useCallback(
-    (friendUserId: string) => {
-      setIsFriendsModalOpen(false);
-      void handleOpenDmWithUser(friendUserId).catch((error) => {
-        Alert.alert("Message failed", error instanceof Error ? error.message : "Could not open that conversation.");
-      });
-    },
-    [handleOpenDmWithUser],
   );
 
   const [profileCardTarget, setProfileCardTarget] =
@@ -656,9 +639,13 @@ function MainNavigationShell({ userId }: { userId: string }) {
                 inboxUnreadCount={dmUnreadCount}
                 friendRequestCount={socialCounts.incomingPendingRequestCount}
                 onOpenFriends={() => {
-                  setFriendsInitialTab("friends");
-                  setFriendsHighlightedRequestId(null);
-                  setIsFriendsModalOpen(true);
+                  navigation.navigate("Main", {
+                    screen: "Friends",
+                    params: {
+                      initialTab: "friends",
+                      highlightedRequestId: null,
+                    },
+                  });
                 }}
                 onStartDirectMessage={(targetUserId) => {
                   void handleOpenDmWithUser(targetUserId).catch((error) => {
@@ -672,6 +659,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
               />
             )}
           </Stack.Screen>
+          <Stack.Screen
+            name="Friends"
+            component={FriendsScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
           <Stack.Screen
             name="Notifications"
             component={NotificationsScreen}
@@ -696,24 +688,6 @@ function MainNavigationShell({ userId }: { userId: string }) {
         ) : null}
       </View>
 
-      <HavenListSheet
-        visible={isFriendsModalOpen}
-        onDismiss={handleCloseFriends}
-        title="Friends"
-        bodyScrollable={false}
-      >
-        <FriendsModalContainer
-          visible={isFriendsModalOpen}
-          userId={userId}
-          initialTab={friendsInitialTab}
-          highlightedRequestId={friendsHighlightedRequestId}
-          onStartDirectMessage={handleStartDmFromFriend}
-          onOpenProfile={(target) => {
-            setIsFriendsModalOpen(false);
-            setProfileCardTarget(target);
-          }}
-        />
-      </HavenListSheet>
       <UserProfileModal
         visible={Boolean(profileCardTarget)}
         target={profileCardTarget}

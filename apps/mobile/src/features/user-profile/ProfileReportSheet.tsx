@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
+import { resolveColorProp } from "@shared/themes";
 
 type ProfileReportSheetProps = {
   visible: boolean;
@@ -16,6 +18,9 @@ export function ProfileReportSheet({
   onClose,
   onSubmit,
 }: ProfileReportSheetProps) {
+  const themeTokens = useMobileThemeTokens();
+  const placeholderColor =
+    resolveColorProp(themeTokens, "muted-foreground") ?? "#8b9cbb";
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +57,7 @@ export function ProfileReportSheet({
       {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal scrim overlay, invariant across themes */}
       <Pressable className="flex-1 justify-center bg-black/60 px-4" onPress={onClose}>
         <Pressable
-          className="max-h-[90%] rounded-2xl border border-border bg-card p-4"
+          className="max-h-[90%] rounded-2xl border border-border-panel bg-card p-4"
           onPress={(e) => e.stopPropagation()}
         >
           <Text className="text-lg font-semibold text-foreground">Report profile</Text>
@@ -61,7 +66,7 @@ export function ProfileReportSheet({
           </Text>
 
           <ScrollView className="mt-4" keyboardShouldPersistTaps="handled">
-            <View className="mb-4 rounded-xl border border-border bg-surface-panel p-3">
+            <View className="mb-4 rounded-xl border border-border-panel bg-surface-panel p-3">
               <Text className="text-xs uppercase text-muted-foreground">Reported user</Text>
               <Text className="mt-1 font-semibold text-foreground">{username}</Text>
             </View>
@@ -71,11 +76,10 @@ export function ProfileReportSheet({
               value={reason}
               onChangeText={setReason}
               placeholder="Describe why this profile should be reviewed."
-              // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
-              placeholderTextColor="#8e8e93"
+              placeholderTextColor={placeholderColor}
               multiline
               maxLength={1000}
-              className="min-h-24 rounded-xl border border-border bg-surface-panel px-3 py-2 text-sm text-foreground"
+              className="min-h-24 rounded-xl border border-border-control bg-surface-panel px-3 py-2 text-sm text-foreground"
             />
             {error ? <Text className="mt-2 text-sm text-destructive">{error}</Text> : null}
           </ScrollView>

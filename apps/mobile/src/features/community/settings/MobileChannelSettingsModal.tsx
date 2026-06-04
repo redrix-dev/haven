@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +14,7 @@ import {
 import type { Channel, ChannelPermissionState } from "@shared/lib/backend/types";
 import { useHavenCore } from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 
 type MobileChannelSettingsModalProps = {
   visible: boolean;
@@ -33,6 +35,8 @@ export function MobileChannelSettingsModal({
 }: MobileChannelSettingsModalProps) {
   const core = useHavenCore();
   const admin = core.admin;
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const channelPermissions = admin.useChannelPermissionsState();
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
@@ -112,7 +116,7 @@ export function MobileChannelSettingsModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onDismiss}>
       <View className="flex-1 bg-card pt-14">
-        <View className="flex-row items-center justify-between border-b border-border px-4 pb-3">
+        <View className="flex-row items-center justify-between border-b border-border-panel px-4 pb-3">
           <Text className="text-lg font-semibold text-foreground">#{channel.name}</Text>
           <Pressable onPress={onDismiss} hitSlop={12}>
             <Text className="text-lg text-muted-foreground">Done</Text>
@@ -121,8 +125,7 @@ export function MobileChannelSettingsModal({
 
         {channelPermissions.channelPermissionsLoading ? (
           <View className="flex-1 items-center justify-center">
-            {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
-            <ActivityIndicator color="#e6edf7" />
+            <ActivityIndicator color={foregroundColor} />
           </View>
         ) : (
           <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled">
@@ -131,7 +134,7 @@ export function MobileChannelSettingsModal({
               value={name}
               onChangeText={setName}
               editable={canManageChannelStructure}
-              className="mb-4 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+              className="mb-4 rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
             />
             <Text className="mb-1 text-xs uppercase text-muted-foreground">Topic</Text>
             <TextInput
@@ -139,7 +142,7 @@ export function MobileChannelSettingsModal({
               onChangeText={setTopic}
               multiline
               editable={canManageChannelStructure}
-              className="mb-6 min-h-18 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+              className="mb-6 min-h-18 rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
             />
             {canManageChannelStructure ? (
               <Pressable
@@ -158,7 +161,7 @@ export function MobileChannelSettingsModal({
                   Tap View / Send to cycle default → allow → deny. Matches desktop channel permission columns.
                 </Text>
                 {roleRows.map((row) => (
-                  <View key={row.roleId} className="mb-4 rounded-xl border border-border bg-surface-panel p-3">
+                  <View key={row.roleId} className="mb-4 rounded-xl border border-border-panel bg-surface-panel p-3">
                     <View className="mb-2 flex-row items-center gap-2">
                       <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
                       <Text className="font-medium text-foreground">{row.name}</Text>

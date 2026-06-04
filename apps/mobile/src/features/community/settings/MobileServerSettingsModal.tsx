@@ -1,4 +1,5 @@
 import { ThemedIonicons } from "@/theme-rn";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,6 +20,7 @@ import type { ServerRoleItem, ServerSettingsUpdate } from "@shared/lib/backend/t
 import { useHavenCore } from "@shared/core";
 import { getPlatformInviteBaseUrl } from "@shared/platform/urls";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 
 type MobileServerSnapshots = {
   settings: ServerSettingsUpdate | null;
@@ -60,6 +62,16 @@ export function MobileServerSettingsModal({
 }: MobileServerSettingsModalProps) {
   const core = useHavenCore();
   const admin = core.admin;
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const switchColors = useMemo(
+    () => ({
+      false: resolveColorProp(themeTokens, "border-panel") ?? "#3d4f6a",
+      true: resolveColorProp(themeTokens, "primary") ?? "#4f8df5",
+      thumb: foregroundColor,
+    }),
+    [foregroundColor, themeTokens],
+  );
   const serverPanel = admin.useServerPanelState();
   const [tab, setTab] = useState<TabKey>("general");
 
@@ -184,7 +196,7 @@ export function MobileServerSettingsModal({
         <Pressable
           onLongPress={drag}
           disabled={!canManageRoles}
-          className={`mb-2 flex-row items-center justify-between rounded-xl border border-border bg-surface-panel px-3 py-3 ${
+          className={`mb-2 flex-row items-center justify-between rounded-xl border border-border-panel bg-surface-panel px-3 py-3 ${
             isActive ? "opacity-90" : ""
           }`}
         >
@@ -212,7 +224,7 @@ export function MobileServerSettingsModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onDismiss}>
       <View className="flex-1 bg-card pt-14">
-        <View className="flex-row items-center justify-between border-b border-border px-4 pb-3">
+        <View className="flex-row items-center justify-between border-b border-border-panel px-4 pb-3">
           <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
             {communityName}
           </Text>
@@ -224,7 +236,7 @@ export function MobileServerSettingsModal({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          className="max-h-12 border-b border-border py-2"
+          className="max-h-12 border-b border-border-panel py-2"
           contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
         >
           {tabs.map((t) => (
@@ -242,8 +254,7 @@ export function MobileServerSettingsModal({
 
         {loading ? (
           <View className="flex-1 items-center justify-center py-12">
-            {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
-            <ActivityIndicator color="#e6edf7" />
+            <ActivityIndicator color={foregroundColor} />
           </View>
         ) : tab === "roles" && canManageRoles ? (
           <View className="flex-1 px-4 pt-4">
@@ -270,7 +281,7 @@ export function MobileServerSettingsModal({
                 {systemRoles.map((r) => (
                   <View
                     key={r.id}
-                    className="mb-2 flex-row items-center gap-2 rounded-xl border border-border bg-surface-embedded px-3 py-3"
+                    className="mb-2 flex-row items-center gap-2 rounded-xl border border-border-panel bg-surface-embedded px-3 py-3"
                   >
                     <View className="h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
                     <Text className="flex-1 text-foreground">{r.name}</Text>
@@ -301,7 +312,7 @@ export function MobileServerSettingsModal({
                   value={draftName}
                   onChangeText={setDraftName}
                   editable={canManageServer}
-                  className="rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+                  className="rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
                 />
                 <Text className="text-xs uppercase text-muted-foreground">Description</Text>
                 <TextInput
@@ -309,7 +320,7 @@ export function MobileServerSettingsModal({
                   onChangeText={setDraftDesc}
                   multiline
                   editable={canManageServer}
-                  className="min-h-22 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+                  className="min-h-22 rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
                 />
                 <View className="flex-row items-center justify-between">
                   <Text className="text-foreground">Allow public invites</Text>
@@ -317,6 +328,8 @@ export function MobileServerSettingsModal({
                     value={draftPublicInvites}
                     onValueChange={setDraftPublicInvites}
                     disabled={!canManageServer}
+                    trackColor={{ false: switchColors.false, true: switchColors.true }}
+                    thumbColor={switchColors.thumb}
                   />
                 </View>
                 <View className="flex-row items-center justify-between">
@@ -325,6 +338,8 @@ export function MobileServerSettingsModal({
                     value={draftReportReason}
                     onValueChange={setDraftReportReason}
                     disabled={!canManageServer}
+                    trackColor={{ false: switchColors.false, true: switchColors.true }}
+                    thumbColor={switchColors.thumb}
                   />
                 </View>
                 {canManageServer ? (
@@ -348,7 +363,7 @@ export function MobileServerSettingsModal({
                   visibility.
                 </Text>
                 {(snapshots?.members ?? []).map((m) => (
-                  <View key={m.memberId} className="mb-2 rounded-xl border border-border bg-surface-panel px-3 py-3">
+                  <View key={m.memberId} className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3">
                     <Text className="font-medium text-foreground">{m.displayName}</Text>
                     <Text className="text-xs text-muted-foreground">
                       {m.isOwner ? "Owner · " : ""}
@@ -439,7 +454,7 @@ function MobileInvitesSection({
         <Text className="text-center font-semibold text-primary-foreground">{creating ? "Creating…" : "Create invite (24h)"}</Text>
       </Pressable>
       {invites.map((inv) => (
-        <View key={inv.id} className="mb-2 flex-row items-center justify-between rounded-xl border border-border px-3 py-2">
+        <View key={inv.id} className="mb-2 flex-row items-center justify-between rounded-xl border border-border-panel px-3 py-2">
           <Text className="font-mono text-xs text-foreground">{inv.code}</Text>
           <Pressable onPress={() => void onRevoke(inv.id)}>
             <Text className="text-sm text-destructive">Revoke</Text>
@@ -463,7 +478,7 @@ function MobileBansSection({
     <View className="pb-24">
       {loadError ? <Text className="mb-2 text-sm text-destructive">{loadError}</Text> : null}
       {bans.map((b) => (
-        <View key={b.id} className="mb-2 rounded-xl border border-border bg-surface-panel px-3 py-3">
+        <View key={b.id} className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3">
           <Text className="font-medium text-foreground">{b.username ?? b.bannedUserId}</Text>
           <Text className="text-xs text-muted-foreground">{b.reason}</Text>
           <Pressable className="mt-2 self-start" onPress={() => onUnban(b.bannedUserId)}>

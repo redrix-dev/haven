@@ -29,3 +29,4 @@ supabase/tests/sql/15_bans_list_profiles.sql
 supabase/tests/sql/16_profile_card_visibility.sql
 supabase/tests/sql/17_profile_flair.sql
 supabase/tests/sql/18_community_flair_grant_rules.sql
+supabase/tests/sql/19_onboarding_campaigns.sql

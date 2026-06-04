@@ -1,4 +1,5 @@
 import { ThemedIonicons } from "@/theme-rn";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,6 +25,7 @@ import { useHavenCore } from "@shared/core";
 import { useAuthStore } from "@shared/stores/authStore";
 import { getPlatformInviteBaseUrl } from "@shared/platform/urls";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 
 type TabKey = "general" | "roles" | "members" | "invites" | "bans";
 
@@ -36,6 +38,16 @@ type Props = {
 export function CommunitySettingsSection({ serverId, communityName, perms }: Props) {
   const core = useHavenCore();
   const admin = core.admin;
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const switchColors = useMemo(
+    () => ({
+      false: resolveColorProp(themeTokens, "border-panel") ?? "#3d4f6a",
+      true: resolveColorProp(themeTokens, "primary") ?? "#4f8df5",
+      thumb: foregroundColor,
+    }),
+    [foregroundColor, themeTokens],
+  );
   const serverPanel = admin.useServerPanelState();
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
@@ -171,7 +183,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
         <Pressable
           onLongPress={drag}
           disabled={!canManageRoles}
-          className={`mb-2 flex-row items-center justify-between rounded-xl border border-border bg-surface-panel px-3 py-3 ${
+          className={`mb-2 flex-row items-center justify-between rounded-xl border border-border-panel bg-surface-panel px-3 py-3 ${
             isActive ? "opacity-90" : ""
           }`}
         >
@@ -200,7 +212,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="max-h-10 border-b border-border pb-2"
+        className="max-h-10 border-b border-border-panel pb-2"
         contentContainerStyle={{ gap: 8 }}
       >
         {tabs.map((t) => (
@@ -220,8 +232,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
 
       {loading ? (
         <View className="flex-1 items-center justify-center py-8">
-          {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
-          <ActivityIndicator color="#e6edf7" />
+          <ActivityIndicator color={foregroundColor} />
         </View>
       ) : tab === "roles" && canManageRoles ? (
         <View className="flex-1 pt-4">
@@ -252,7 +263,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
               {systemRoles.map((r) => (
                 <View
                   key={r.id}
-                  className="mb-2 flex-row items-center gap-2 rounded-xl border border-border bg-surface-embedded px-3 py-3"
+                  className="mb-2 flex-row items-center gap-2 rounded-xl border border-border-panel bg-surface-embedded px-3 py-3"
                 >
                   <View className="h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
                   <Text className="flex-1 text-foreground">{r.name}</Text>
@@ -289,7 +300,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                 value={draftName}
                 onChangeText={setDraftName}
                 editable={canManageServer}
-                className="rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+                className="rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
               />
               <Text className="text-xs uppercase text-muted-foreground">Description</Text>
               <TextInput
@@ -297,7 +308,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                 onChangeText={setDraftDesc}
                 multiline
                 editable={canManageServer}
-                className="min-h-22 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+                className="min-h-22 rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
               />
               <View className="flex-row items-center justify-between">
                 <Text className="text-foreground">Allow public invites</Text>
@@ -305,6 +316,8 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                   value={draftPublicInvites}
                   onValueChange={setDraftPublicInvites}
                   disabled={!canManageServer}
+                  trackColor={{ false: switchColors.false, true: switchColors.true }}
+                  thumbColor={switchColors.thumb}
                 />
               </View>
               <View className="flex-row items-center justify-between">
@@ -313,6 +326,8 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                   value={draftReportReason}
                   onValueChange={setDraftReportReason}
                   disabled={!canManageServer}
+                  trackColor={{ false: switchColors.false, true: switchColors.true }}
+                  thumbColor={switchColors.thumb}
                 />
               </View>
               {canManageServer ? (
@@ -335,7 +350,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
               {snapshots.members.map((m) => (
                 <View
                   key={m.memberId}
-                  className="mb-2 rounded-xl border border-border bg-surface-panel px-3 py-3"
+                  className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3"
                 >
                   <Text className="font-medium text-foreground">{m.displayName}</Text>
                   <Text className="text-xs text-muted-foreground">
@@ -424,7 +439,7 @@ function InvitesTab({
       {invites.map((inv) => (
         <View
           key={inv.id}
-          className="mb-2 flex-row items-center justify-between rounded-xl border border-border px-3 py-2"
+          className="mb-2 flex-row items-center justify-between rounded-xl border border-border-panel px-3 py-2"
         >
           <Text className="font-mono text-xs text-foreground">{inv.code}</Text>
           <Pressable onPress={() => void onRevoke(inv.id)}>
@@ -454,7 +469,7 @@ function BansTab({
       {bans.map((b) => (
         <View
           key={b.id}
-          className="mb-2 rounded-xl border border-border bg-surface-panel px-3 py-3"
+          className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3"
         >
           <Text className="font-medium text-foreground">{b.username ?? b.bannedUserId}</Text>
           <Text className="text-xs text-muted-foreground">{b.reason}</Text>

@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { ThemedIonicons } from "@/theme-rn";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import type { NotificationItem } from "@shared/lib/backend/types";
 import {
   getNotificationSummary,
@@ -24,6 +25,7 @@ import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfi
 import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
 import { useHavenCore } from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 
 function formatShortTime(iso: string): string {
   const d = new Date(iso);
@@ -46,6 +48,8 @@ export function NotificationInboxList({
   onNavigate,
 }: NotificationInboxListProps) {
   const core = useHavenCore();
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const notificationItems = core.notifications.useNotifications();
   const items = useMemo(
     () => filterNotificationsForInbox(notificationItems),
@@ -109,7 +113,7 @@ export function NotificationInboxList({
           {unread ? (
             <Pressable
               accessibilityRole="button"
-              className="w-24 items-center justify-center bg-accent-slider"
+              className="w-24 items-center justify-center bg-primary"
               onPress={() => markRead(notification.recipientId)}
             >
               <Text className="text-center text-sm font-semibold text-primary-foreground">Read</Text>
@@ -147,7 +151,7 @@ export function NotificationInboxList({
 
       return (
         <Swipeable renderRightActions={() => renderRightActions(item)} overshootRight={false}>
-          <View className="border-b border-border bg-card py-3">
+          <View className="border-b border-border-panel bg-card py-3">
             <Pressable
               onPress={() => toggleExpanded(item.recipientId)}
               className="active:bg-surface-hover"
@@ -191,7 +195,7 @@ export function NotificationInboxList({
             {expanded ? (
               <Pressable
                 accessibilityRole="button"
-                className="mt-3 self-start rounded-lg bg-accent-slider px-3 py-2 active:opacity-90"
+                className="mt-3 self-start rounded-lg bg-primary px-3 py-2 active:bg-primary-hover"
                 onPress={() => onNavigate(item)}
               >
                 <Text className="text-sm font-semibold text-primary-foreground">Navigate</Text>
@@ -207,8 +211,7 @@ export function NotificationInboxList({
   if (loading && items.length === 0) {
     return (
       <View className="items-center py-12">
-        {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
-        <ActivityIndicator color="#e6edf7" />
+        <ActivityIndicator color={foregroundColor} />
         <Text className="mt-3 text-sm text-muted-foreground">Loading notifications…</Text>
       </View>
     );
@@ -220,8 +223,11 @@ export function NotificationInboxList({
       keyExtractor={(n) => n.recipientId}
       renderItem={renderItem}
       refreshControl={
-        // uniwind-theme-allow mobile-theme/no-raw-color-prop - RefreshControl tintColor requires raw color; resolves to --foreground
-        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor="#e6edf7" />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void refresh()}
+          tintColor={foregroundColor}
+        />
       }
       ListHeaderComponent={
         visibleError ? (

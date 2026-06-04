@@ -14,6 +14,7 @@ import { SocialNexus } from "@shared/nexus/social/SocialNexus";
 import { PermissionsNexus } from "@shared/nexus/permissions/PermissionsNexus";
 import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
 import { FeatureFlagNexus } from "@shared/nexus/feature-flags/FeatureFlagNexus";
+import { OnboardingNexus } from "@shared/nexus/onboarding/OnboardingNexus";
 import {
   VoiceNexus,
   type VoiceRealtimeChannel,
@@ -24,6 +25,8 @@ import { getCommunityDataBackend } from "@shared/lib/backend";
 import type {
   BanEligibleServer,
   DirectMessage,
+  OnboardingClientContext,
+  OnboardingCompletionResult,
   ProfileVisibility,
   UserFlairBadge,
   UserFlairGrant,
@@ -166,6 +169,7 @@ export class HavenCore {
   readonly permissions: PermissionsNexus;
   readonly profiles: ProfileNexus;
   readonly featureFlags: FeatureFlagNexus;
+  readonly onboarding: OnboardingNexus;
   readonly voice: VoiceNexus;
 
   readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
@@ -194,6 +198,10 @@ export class HavenCore {
     this.permissions = new PermissionsNexus(options.persistence);
     this.profiles = new ProfileNexus(options.persistence, this.backends.controlPlane);
     this.featureFlags = new FeatureFlagNexus(
+      options.persistence,
+      this.backends.controlPlane,
+    );
+    this.onboarding = new OnboardingNexus(
       options.persistence,
       this.backends.controlPlane,
     );
@@ -455,6 +463,7 @@ export class HavenCore {
     this.permissions.clear();
     this.profiles.clear();
     this.featureFlags.reset();
+    this.onboarding.reset();
     this.voice.clear();
     this.viewerMessagePolicyStore.setState(
       createDefaultViewerMessagePolicyState(),
@@ -792,6 +801,33 @@ export class HavenCore {
       communityName: result.communityName,
       joined: result.joined,
     };
+  }
+
+  async completeOnboardingCampaign(
+    campaignKey: string,
+    context: OnboardingClientContext,
+  ): Promise<OnboardingCompletionResult> {
+    const result = await this.onboarding.complete(campaignKey, context);
+    const userId = this.sessionUserId;
+
+    if (userId) {
+      await this.communities.load(userId);
+      await this.profiles.ensureViewerProfile(userId).catch((error) => {
+        console.warn("[HavenCore] onboarding viewer profile refresh failed", error);
+      });
+      await this.profiles.loadMyUserFlairs(userId).catch((error) => {
+        console.warn("[HavenCore] onboarding flair refresh failed", error);
+      });
+    }
+
+    if (result.communityId) {
+      this.communities.setActiveId(result.communityId);
+      await this.ensureCommunityPermissions(result.communityId).catch((error) => {
+        console.warn("[HavenCore] onboarding permissions refresh failed", error);
+      });
+    }
+
+    return result;
   }
 
   /**

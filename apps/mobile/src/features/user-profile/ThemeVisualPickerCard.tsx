@@ -124,7 +124,7 @@ export function ThemeVisualPickerCard({ userId, username, avatarUrl }: ThemeVisu
   );
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card">
+    <View className="overflow-hidden rounded-2xl border border-border-panel bg-card">
       <Pressable
         onPress={() => setIsOpen((prev) => !prev)}
         accessibilityRole="button"

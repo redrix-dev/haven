@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Switch, Text, View } from "react-native";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import type {
   NotificationPreferences,
   NotificationPreferenceUpdate,
 } from "@shared/lib/backend/types";
 import { useHavenCore } from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 
 function buildUpdateFromPreferences(
   prefs: NotificationPreferences,
@@ -29,16 +31,18 @@ function ToggleRow({
   description,
   value,
   disabled,
+  switchColors,
   onValueChange,
 }: {
   label: string;
   description?: string;
   value: boolean;
   disabled?: boolean;
+  switchColors: { false: string; true: string; thumb: string };
   onValueChange: (next: boolean) => void;
 }) {
   return (
-    <View className="flex-row items-center justify-between gap-3 border-b border-border py-3">
+    <View className="flex-row items-center justify-between gap-3 border-b border-border-panel py-3">
       <View className="max-w-[72%] shrink">
         <Text className="text-base text-foreground">{label}</Text>
         {description ? (
@@ -49,10 +53,8 @@ function ToggleRow({
         disabled={disabled}
         value={value}
         onValueChange={onValueChange}
-        // uniwind-theme-allow mobile-theme/no-raw-color-prop - Switch trackColor requires raw values; false=border-panel, true=primary
-        trackColor={{ false: "#3d4f6a", true: "#4f8df5" }}
-        // uniwind-theme-allow mobile-theme/no-raw-color-prop - Switch thumbColor requires raw value; resolves to --foreground
-        thumbColor="#e6edf7"
+        trackColor={{ false: switchColors.false, true: switchColors.true }}
+        thumbColor={switchColors.thumb}
       />
     </View>
   );
@@ -61,6 +63,16 @@ function ToggleRow({
 export function NotificationPreferencesPanel() {
   const core = useHavenCore();
   const inbox = core.notifications;
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const switchColors = useMemo(
+    () => ({
+      false: resolveColorProp(themeTokens, "border-panel") ?? "#3d4f6a",
+      true: resolveColorProp(themeTokens, "primary") ?? "#4f8df5",
+      thumb: foregroundColor,
+    }),
+    [foregroundColor, themeTokens],
+  );
 
   const preferences = inbox.usePreferences();
   const loading = inbox.usePreferencesLoading();
@@ -141,8 +153,7 @@ export function NotificationPreferencesPanel() {
   if (loading && !preferences) {
     return (
       <View className="items-center py-10">
-        {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
-        <ActivityIndicator color="#e6edf7" />
+        <ActivityIndicator color={foregroundColor} />
         <Text className="mt-3 text-sm text-muted-foreground">Loading preferences…</Text>
       </View>
     );
@@ -166,13 +177,14 @@ export function NotificationPreferencesPanel() {
           <Text className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {group.title}
           </Text>
-          <View className="rounded-xl border border-border bg-surface-panel px-3">
+          <View className="rounded-xl border border-border-panel bg-surface-panel px-3">
             {group.rows.map((row) => (
               <ToggleRow
                 key={row.key}
                 label={row.label}
                 value={row.value}
                 disabled={saving}
+                switchColors={switchColors}
                 onValueChange={(next) => {
                   void onSave(buildUpdateFromPreferences(preferences, { [row.key]: next }));
                 }}

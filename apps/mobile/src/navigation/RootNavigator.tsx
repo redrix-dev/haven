@@ -14,9 +14,18 @@ import { useEffect, useRef, useState } from "react";
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { consumeAuthConfirmUrl } from "@/auth/mobileAuthService";
 import { MainNavigator } from "@/navigation/MainNavigator";
+import { MobileOnboardingGate } from "@/navigation/MobileOnboardingGate";
 import { NAV_THEME } from "@/lib/theme";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+function AuthenticatedMain() {
+  return (
+    <MobileOnboardingGate>
+      <MainNavigator />
+    </MobileOnboardingGate>
+  );
+}
 
 export function RootNavigator() {
   const session = useAuthSession();
@@ -112,7 +121,7 @@ export function RootNavigator() {
                 <>
                   <Stack.Screen
                     name="Main"
-                    component={MainNavigator}
+                    component={AuthenticatedMain}
                     options={{ keyboardHandlingEnabled: false }}
                   />
                 </>

@@ -116,6 +116,42 @@ export type MessageBundle = {
 export type FeatureFlagKey = string;
 export type FeatureFlagsSnapshot = Record<FeatureFlagKey, boolean>;
 
+export type OnboardingPlatformScope = 'all' | 'ios' | 'android';
+
+export type OnboardingDistributionScope =
+  | 'all'
+  | 'development'
+  | 'preview'
+  | 'testflight'
+  | 'production';
+
+export type OnboardingClientContext = {
+  platform: string;
+  distribution: string;
+  appVersion: string | null;
+};
+
+export type OnboardingCampaign = {
+  key: string;
+  featureFlagKey: string;
+  title: string;
+  description: string | null;
+  required: boolean;
+  targetCommunityId: string | null;
+  targetFlairKey: string | null;
+  platformScope: OnboardingPlatformScope;
+  distributionScope: OnboardingDistributionScope;
+  sortOrder: number;
+};
+
+export type OnboardingCompletionResult = {
+  campaignKey: string;
+  status: 'completed' | 'skipped';
+  communityId: string | null;
+  communityName: string | null;
+  joined: boolean;
+};
+
 export type ServerSummary = {
   id: string;
   name: string;

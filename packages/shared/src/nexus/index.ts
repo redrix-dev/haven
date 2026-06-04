@@ -19,3 +19,5 @@ export { NotificationNexus } from "./notifications/NotificationNexus";
 export type { NotificationNexusState } from "./notifications/NotificationNexus";
 export { FeatureFlagNexus } from "./feature-flags/FeatureFlagNexus";
 export type { FeatureFlagNexusState } from "./feature-flags/FeatureFlagNexus";
+export { OnboardingNexus } from "./onboarding/OnboardingNexus";
+export type { OnboardingNexusState } from "./onboarding/OnboardingNexus";

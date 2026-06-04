@@ -7,6 +7,10 @@ import type {
   BanEligibleServer,
   FeatureFlagsSnapshot,
   LiveProfileIdentity,
+  OnboardingCampaign,
+  OnboardingCompletionResult,
+  OnboardingDistributionScope,
+  OnboardingPlatformScope,
   ProfileVisibility,
   RedeemedInvite,
   ServerInvite,
@@ -67,6 +71,27 @@ type FeatureFlagRow = {
   enabled: boolean;
 };
 
+type OnboardingCampaignRow = {
+  campaign_key: string;
+  feature_flag_key: string;
+  title: string;
+  description: string | null;
+  required: boolean;
+  target_community_id: string | null;
+  target_flair_key: string | null;
+  platform_scope: string;
+  distribution_scope: string;
+  sort_order: number;
+};
+
+type OnboardingCompletionRow = {
+  campaign_key: string;
+  status: string;
+  community_id: string | null;
+  community_name: string | null;
+  joined: boolean | null;
+};
+
 type ProfileIdentityRow = {
   user_id: string;
   username: string;
@@ -120,6 +145,59 @@ const normalizeProfileVisibility = (value: unknown): ProfileVisibility =>
   PROFILE_VISIBILITIES.includes(value as ProfileVisibility)
     ? (value as ProfileVisibility)
     : 'private';
+
+const ONBOARDING_PLATFORM_SCOPES: readonly OnboardingPlatformScope[] = [
+  'all',
+  'ios',
+  'android',
+];
+
+const ONBOARDING_DISTRIBUTION_SCOPES: readonly OnboardingDistributionScope[] = [
+  'all',
+  'development',
+  'preview',
+  'testflight',
+  'production',
+];
+
+const normalizeOnboardingPlatformScope = (
+  value: unknown,
+): OnboardingPlatformScope =>
+  ONBOARDING_PLATFORM_SCOPES.includes(value as OnboardingPlatformScope)
+    ? (value as OnboardingPlatformScope)
+    : 'all';
+
+const normalizeOnboardingDistributionScope = (
+  value: unknown,
+): OnboardingDistributionScope =>
+  ONBOARDING_DISTRIBUTION_SCOPES.includes(value as OnboardingDistributionScope)
+    ? (value as OnboardingDistributionScope)
+    : 'all';
+
+const mapOnboardingCampaign = (
+  row: OnboardingCampaignRow,
+): OnboardingCampaign => ({
+  key: row.campaign_key,
+  featureFlagKey: row.feature_flag_key,
+  title: row.title,
+  description: row.description ?? null,
+  required: Boolean(row.required),
+  targetCommunityId: row.target_community_id ?? null,
+  targetFlairKey: row.target_flair_key ?? null,
+  platformScope: normalizeOnboardingPlatformScope(row.platform_scope),
+  distributionScope: normalizeOnboardingDistributionScope(row.distribution_scope),
+  sortOrder: row.sort_order,
+});
+
+const mapOnboardingCompletionResult = (
+  row: OnboardingCompletionRow,
+): OnboardingCompletionResult => ({
+  campaignKey: row.campaign_key,
+  status: row.status === 'skipped' ? 'skipped' : 'completed',
+  communityId: row.community_id ?? null,
+  communityName: row.community_name ?? null,
+  joined: Boolean(row.joined),
+});
 
 export const mapLiveProfileIdentity = (row: ProfileIdentityRow): LiveProfileIdentity => ({
   userId: row.user_id,
@@ -281,6 +359,37 @@ export function createControlPlaneBackend(client: HavenSupabaseClient): ControlP
       snapshot[row.flag_key] = Boolean(row.enabled);
     }
     return snapshot;
+  },
+
+  async listMyOnboardingCampaigns(context) {
+    const { data, error } = await client.rpc('list_my_onboarding_campaigns' as never, {
+      p_platform: context.platform,
+      p_distribution: context.distribution,
+      p_app_version: context.appVersion,
+    } as never);
+    if (error) throw error;
+
+    return ((data ?? []) as OnboardingCampaignRow[]).map(mapOnboardingCampaign);
+  },
+
+  async completeOnboardingCampaign(campaignKey, context) {
+    const { data, error } = await client.rpc('complete_onboarding_campaign' as never, {
+      p_campaign_key: campaignKey,
+      p_platform: context.platform,
+      p_distribution: context.distribution,
+      p_app_version: context.appVersion,
+    } as never);
+    if (error) throw error;
+
+    const row = Array.isArray(data)
+      ? ((data[0] ?? null) as OnboardingCompletionRow | null)
+      : ((data ?? null) as OnboardingCompletionRow | null);
+
+    if (!row?.campaign_key) {
+      throw new Error('Onboarding completion returned no campaign.');
+    }
+
+    return mapOnboardingCompletionResult(row);
   },
 
   async uploadAvatar(file, options) {

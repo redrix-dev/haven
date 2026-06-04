@@ -40,6 +40,8 @@ import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useHavenCore } from "@shared/core";
 import { useAuthStore } from "@shared/stores/authStore";
+import { resolveColorProp } from "@shared/themes";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
 
@@ -61,6 +63,15 @@ function formatDmTime(iso: string): string {
 
 export function DirectMessagesContainer() {
   const composerColors = useChatComposerColors();
+  const themeTokens = useMobileThemeTokens();
+  const switchColors = useMemo(
+    () => ({
+      false: resolveColorProp(themeTokens, "border-panel") ?? "#3d4f6a",
+      true: resolveColorProp(themeTokens, "primary") ?? "#4f8df5",
+      thumb: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+    }),
+    [themeTokens],
+  );
   const { width: windowWidth } = useWindowDimensions();
   const core = useHavenCore();
   const dm = core.directMessages;
@@ -259,7 +270,7 @@ export function DirectMessagesContainer() {
       return (
         <Pressable
           onPress={() => void openDirectMessageConversation(item.conversationId)}
-          className="flex-row items-center gap-3 border-b border-border py-3 active:bg-surface-hover"
+          className="flex-row items-center gap-3 border-b border-border-panel py-3 active:bg-surface-hover"
         >
           <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
             <Text className="text-lg font-semibold text-foreground">
@@ -459,8 +470,7 @@ export function DirectMessagesContainer() {
           <Text className="mb-2 text-sm text-destructive">{dmConversationsError}</Text>
         ) : null}
         {dmConversationsLoading && dmConversations.length === 0 ? (
-          // uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground
-          <ActivityIndicator color="#e6edf7" />
+          <ActivityIndicator color={composerColors.spinner} />
         ) : (
           <FlatList
             data={dmConversations}
@@ -510,8 +520,8 @@ export function DirectMessagesContainer() {
               onValueChange={(v) => {
                 void toggleSelectedDmConversationMuted(v);
               }}
-              // uniwind-theme-allow mobile-theme/no-raw-color-prop - Switch trackColor requires raw values; false=border-panel, true=primary
-              trackColor={{ false: "#3d4f6a", true: "#4f8df5" }}
+              trackColor={{ false: switchColors.false, true: switchColors.true }}
+              thumbColor={switchColors.thumb}
             />
           </View>
         ) : (

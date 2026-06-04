@@ -1,4 +1,5 @@
 import { ThemedIonicons } from "@/theme-rn";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,6 +13,7 @@ import {
 import type { Channel, ChannelPermissionState, ServerPermissions } from "@shared/lib/backend/types";
 import { useHavenCore } from "@shared/core";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 
 type Props = {
   serverId: string;
@@ -83,6 +85,8 @@ function ChannelDetail({
 }) {
   const core = useHavenCore();
   const admin = core.admin;
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const channelPermissions = admin.useChannelPermissionsState();
   const [name, setName] = useState(channel.name);
   const [topic, setTopic] = useState(channel.topic ?? "");
@@ -171,8 +175,7 @@ function ChannelDetail({
 
       {channelPermissions.channelPermissionsLoading ? (
         <View className="flex-1 items-center justify-center">
-          {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color value; resolves to --foreground */}
-          <ActivityIndicator color="#e6edf7" />
+          <ActivityIndicator color={foregroundColor} />
         </View>
       ) : (
         <ScrollView
@@ -186,7 +189,7 @@ function ChannelDetail({
             value={name}
             onChangeText={setName}
             editable={canManageChannelStructure}
-            className="mb-4 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+            className="mb-4 rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
           />
           <Text className="mb-1 text-xs uppercase text-muted-foreground">Topic</Text>
           <TextInput
@@ -194,7 +197,7 @@ function ChannelDetail({
             onChangeText={setTopic}
             multiline
             editable={canManageChannelStructure}
-            className="mb-6 min-h-16 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+            className="mb-6 min-h-16 rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
           />
           {canManageChannelStructure ? (
             <Pressable
@@ -217,7 +220,7 @@ function ChannelDetail({
               {roleRows.map((row) => (
                 <View
                   key={row.roleId}
-                  className="mb-4 rounded-xl border border-border bg-surface-panel p-3"
+                  className="mb-4 rounded-xl border border-border-panel bg-surface-panel p-3"
                 >
                   <View className="mb-2 flex-row items-center gap-2">
                     <View

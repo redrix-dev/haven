@@ -9,6 +9,8 @@ import { useHavenCore } from "@shared/core";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import type { DirectMessageConversationSummary, FriendSummary } from "@shared/lib/backend/types";
+import { resolveColorProp } from "@shared/themes";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { MobileModmailPanel } from "@/features/moderation/MobileModmailPanel";
 
 type DrawerMode = "conversations" | "modmail";
@@ -28,6 +30,8 @@ export function DmInboxDrawer({
   onStartDirectMessage,
 }: DmInboxDrawerProps) {
   const insets = useSafeAreaInsets();
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const core = useHavenCore();
   const dm = core.directMessages;
   const social = core.social;
@@ -324,8 +328,7 @@ export function DmInboxDrawer({
           ) : null}
           {socialLoading && friends.length === 0 ? (
             <View className="flex-1 items-center justify-center">
-              {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
-              <ActivityIndicator color="#e6edf7" />
+              <ActivityIndicator color={foregroundColor} />
             </View>
           ) : (
             <FlatList
@@ -349,8 +352,7 @@ export function DmInboxDrawer({
           ) : null}
           {isLoading && conversations.length === 0 ? (
             <View className="flex-1 items-center justify-center">
-              {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
-              <ActivityIndicator color="#e6edf7" />
+              <ActivityIndicator color={foregroundColor} />
             </View>
           ) : (
             <FlatList

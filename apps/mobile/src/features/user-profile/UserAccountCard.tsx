@@ -1,5 +1,7 @@
 // apps/mobile/src/features/user-profile/UserAccountCard.tsx
 import { ThemedIonicons } from "@/theme-rn";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
+import { resolveColorProp } from "@shared/themes";
 import { Image, Pressable, Text, TextInput, View } from "react-native";
 
 type UserAccountCardProps = {
@@ -31,6 +33,9 @@ export default function UserAccountCard({
   onPressAvatar,
   onPressSave,
 }: UserAccountCardProps) {
+  const themeTokens = useMobileThemeTokens();
+  const placeholderColor =
+    resolveColorProp(themeTokens, "muted-foreground") ?? "#8b9cbb";
   const trimmedDisplayUsername = displayUsername.trim();
   const trimmedInputUsername = inputUsername.trim();
   const isChanged = trimmedInputUsername !== trimmedDisplayUsername;
@@ -40,7 +45,7 @@ export default function UserAccountCard({
   const subtitle = email ?? "No email";
 
   return (
-    <View className="rounded-2xl bg-[#1C1C1E] px-4 py-3 gap-3">
+    <View className="rounded-2xl bg-surface-panel px-4 py-3 gap-3">
       {/* Top row */}
       <View className="flex-row items-center gap-3">
         <Pressable
@@ -53,12 +58,12 @@ export default function UserAccountCard({
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} className="h-15 w-15 rounded-full" />
           ) : (
-            <View className="h-15 w-15 rounded-full bg-[#2C2C2E] items-center justify-center">
+            <View className="h-15 w-15 rounded-full bg-surface-embedded items-center justify-center">
               <Text className="text-foreground text-[22px] font-semibold">{avatarInitial}</Text>
             </View>
           )}
 
-          <View className="absolute -bottom-0.5 -right-0.5 h-5.5 w-5.5 rounded-full bg-[#0A84FF] border-2 border-[#1C1C1E] items-center justify-center">
+          <View className="absolute -bottom-0.5 -right-0.5 h-5.5 w-5.5 rounded-full bg-primary border-2 border-surface-panel items-center justify-center">
             <ThemedIonicons name="camera" size={12} colorClassName="accent-primary-foreground" />
           </View>
         </Pressable>
@@ -81,7 +86,7 @@ export default function UserAccountCard({
               />
             </Pressable>
           </View>
-          <Text numberOfLines={1} className="mt-0.5 text-[#8E8E93] text-[13px]">
+          <Text numberOfLines={1} className="mt-0.5 text-muted-foreground text-[13px]">
             {subtitle}
           </Text>
         </View>
@@ -89,7 +94,7 @@ export default function UserAccountCard({
 
       {isEditingName ? (
         <View className="gap-1.5">
-          <Text className="text-[#8E8E93] text-xs font-semibold">Username</Text>
+          <Text className="text-muted-foreground text-xs font-semibold">Username</Text>
           <TextInput
             value={inputUsername}
             onChangeText={onChangeUsername}
@@ -97,12 +102,11 @@ export default function UserAccountCard({
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="Username"
-            // uniwind-theme-allow mobile-theme/no-raw-color-prop - iOS muted placeholder; no semantic token for iOS system gray
-            placeholderTextColor="#8E8E93"
+            placeholderTextColor={placeholderColor}
             editable={!isSaving}
-            className="rounded-xl border border-[#3A3A3C] bg-[#2C2C2E] px-3 py-2.5 text-foreground text-base"
+            className="rounded-xl border border-border-control bg-surface-embedded px-3 py-2.5 text-foreground text-base"
           />
-          <Text className="text-right text-[#8E8E93] text-[11px]">
+          <Text className="text-right text-muted-foreground text-[11px]">
             {inputUsername.length}/{usernameMaxLength}
           </Text>
         </View>
@@ -115,7 +119,7 @@ export default function UserAccountCard({
           accessibilityRole="button"
           accessibilityLabel="Save account settings"
           className={`rounded-xl py-2.5 items-center justify-center ${
-            canSave ? "bg-[#0A84FF]" : "bg-[#3A3A3C] opacity-70"
+            canSave ? "bg-primary active:bg-primary-hover" : "bg-surface-embedded opacity-70"
           }`}
         >
           <Text className="text-foreground text-[15px] font-semibold">

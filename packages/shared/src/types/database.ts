@@ -1739,6 +1739,88 @@ export type Database = {
           },
         ]
       }
+      onboarding_campaigns: {
+        Row: {
+          created_at: string
+          description: string | null
+          distribution_scope: string
+          ends_at: string | null
+          feature_flag_key: string
+          is_active: boolean
+          key: string
+          max_app_version: string | null
+          min_app_version: string | null
+          platform_scope: string
+          required: boolean
+          sort_order: number
+          starts_at: string | null
+          target_community_id: string | null
+          target_flair_key: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          distribution_scope?: string
+          ends_at?: string | null
+          feature_flag_key: string
+          is_active?: boolean
+          key: string
+          max_app_version?: string | null
+          min_app_version?: string | null
+          platform_scope?: string
+          required?: boolean
+          sort_order?: number
+          starts_at?: string | null
+          target_community_id?: string | null
+          target_flair_key?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          distribution_scope?: string
+          ends_at?: string | null
+          feature_flag_key?: string
+          is_active?: boolean
+          key?: string
+          max_app_version?: string | null
+          min_app_version?: string | null
+          platform_scope?: string
+          required?: boolean
+          sort_order?: number
+          starts_at?: string | null
+          target_community_id?: string | null
+          target_flair_key?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_campaigns_feature_flag_key_fkey"
+            columns: ["feature_flag_key"]
+            isOneToOne: false
+            referencedRelation: "feature_flags_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "onboarding_campaigns_target_community_id_fkey"
+            columns: ["target_community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_campaigns_target_flair_key_fkey"
+            columns: ["target_flair_key"]
+            isOneToOne: false
+            referencedRelation: "flairs"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           active_user_flair_id: string | null
@@ -2015,6 +2097,61 @@ export type Database = {
           },
         ]
       }
+      user_onboarding_campaigns: {
+        Row: {
+          campaign_key: string
+          completed_at: string | null
+          created_at: string
+          joined_community_id: string | null
+          skipped_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_key: string
+          completed_at?: string | null
+          created_at?: string
+          joined_community_id?: string | null
+          skipped_at?: string | null
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_key?: string
+          completed_at?: string | null
+          created_at?: string
+          joined_community_id?: string | null
+          skipped_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_onboarding_campaigns_campaign_key_fkey"
+            columns: ["campaign_key"]
+            isOneToOne: false
+            referencedRelation: "onboarding_campaigns"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "user_onboarding_campaigns_joined_community_id_fkey"
+            columns: ["joined_community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_onboarding_campaigns_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_flairs: {
         Row: {
           created_at: string
@@ -2194,6 +2331,21 @@ export type Database = {
           p_retry_delay_seconds?: number
         }
         Returns: undefined
+      }
+      complete_onboarding_campaign: {
+        Args: {
+          p_app_version?: string | null
+          p_campaign_key: string
+          p_distribution?: string
+          p_platform?: string
+        }
+        Returns: {
+          campaign_key: string
+          community_id: string | null
+          community_name: string | null
+          joined: boolean
+          status: string
+        }[]
       }
       configure_haven_background_cron_jobs: { Args: never; Returns: undefined }
       create_community: {
@@ -2409,6 +2561,25 @@ export type Database = {
         Returns: {
           community_id: string
           community_name: string
+        }[]
+      }
+      list_my_onboarding_campaigns: {
+        Args: {
+          p_app_version?: string | null
+          p_distribution?: string
+          p_platform?: string
+        }
+        Returns: {
+          campaign_key: string
+          description: string | null
+          distribution_scope: string
+          feature_flag_key: string
+          platform_scope: string
+          required: boolean
+          sort_order: number
+          target_community_id: string | null
+          target_flair_key: string | null
+          title: string
         }[]
       }
       list_community_bans: {

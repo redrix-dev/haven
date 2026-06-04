@@ -1,6 +1,9 @@
 import type {
   BanEligibleServer,
   FeatureFlagsSnapshot,
+  OnboardingCampaign,
+  OnboardingClientContext,
+  OnboardingCompletionResult,
   ProfileVisibility,
   RedeemedInvite,
   ServerInvite,
@@ -32,6 +35,13 @@ export interface ControlPlaneBackend {
   listMyUserFlairs(): Promise<UserFlairGrant[]>;
   setActiveUserFlair(userFlairId: string | null): Promise<void>;
   listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
+  listMyOnboardingCampaigns(
+    context: OnboardingClientContext,
+  ): Promise<OnboardingCampaign[]>;
+  completeOnboardingCampaign(
+    campaignKey: string,
+    context: OnboardingClientContext,
+  ): Promise<OnboardingCompletionResult>;
   /** Pass `ArrayBuffer` on React Native; `Blob`/`File` on web (see Supabase RN upload guidance). */
   uploadAvatar(
     file: Blob | ArrayBuffer,

@@ -7,7 +7,9 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import type { MessageReportKind, MessageReportTarget } from "@shared/lib/backend/types";
+import { resolveColorProp } from "@shared/themes";
 
 type CommunityReportMessageModalProps = {
   visible: boolean;
@@ -37,6 +39,9 @@ export function CommunityReportMessageModal({
   communityName,
   onSubmit,
 }: CommunityReportMessageModalProps) {
+  const themeTokens = useMobileThemeTokens();
+  const placeholderColor =
+    resolveColorProp(themeTokens, "muted-foreground") ?? "#8b9cbb";
   const [target, setTarget] = useState<MessageReportTarget>("server_admins");
   const [kind, setKind] = useState<MessageReportKind>("content_abuse");
   const [comment, setComment] = useState("");
@@ -71,7 +76,7 @@ export function CommunityReportMessageModal({
       {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal scrim overlay, invariant across themes */}
       <Pressable className="flex-1 justify-center bg-black/60 px-4" onPress={onDismiss}>
         <Pressable
-          className="max-h-[88%] rounded-2xl bg-card border border-border p-4"
+          className="max-h-[88%] rounded-2xl bg-card border border-border-panel p-4"
           onPress={(e) => e.stopPropagation()}
         >
           <Text className="text-lg font-semibold text-foreground">Report message</Text>
@@ -88,7 +93,7 @@ export function CommunityReportMessageModal({
               <Pressable
                 key={opt.value}
                 className={`mb-2 rounded-xl border px-3 py-3 ${
-                  target === opt.value ? "border-primary bg-surface-panel" : "border-border"
+                  target === opt.value ? "border-primary bg-surface-panel" : "border-border-control"
                 }`}
                 onPress={() => setTarget(opt.value)}
               >
@@ -103,7 +108,7 @@ export function CommunityReportMessageModal({
               <Pressable
                 key={opt.value}
                 className={`mb-2 rounded-xl border px-3 py-3 ${
-                  kind === opt.value ? "border-primary bg-surface-panel" : "border-border"
+                  kind === opt.value ? "border-primary bg-surface-panel" : "border-border-control"
                 }`}
                 onPress={() => setKind(opt.value)}
               >
@@ -118,11 +123,10 @@ export function CommunityReportMessageModal({
               value={comment}
               onChangeText={setComment}
               placeholder="Add context for moderators"
-              // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
-              placeholderTextColor="#8e8e93"
+              placeholderTextColor={placeholderColor}
               multiline
               maxLength={1000}
-              className="min-h-22 rounded-xl border border-border bg-surface-panel px-3 py-2 text-sm text-foreground"
+              className="min-h-22 rounded-xl border border-border-control bg-surface-panel px-3 py-2 text-sm text-foreground"
             />
             {error ? <Text className="mt-2 text-sm text-destructive">{error}</Text> : null}
           </ScrollView>
