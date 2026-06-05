@@ -63,8 +63,23 @@ select test_support.assert_eq_int(
       and schemaname = 'public'
       and tablename = 'profile_identities'
   ),
+  0,
+  'profile_identities should be folded out of the realtime publication'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from pg_trigger t
+    join pg_class c on c.oid = t.tgrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'profile_identities'
+      and t.tgname = 'trg_notify_profile_identity_change'
+      and not t.tgisinternal
+  ),
   1,
-  'profile_identities should be included in the realtime publication'
+  'profile_identities should broadcast changes through private_user realtime'
 );
 
 select test_support.assert_eq_int(

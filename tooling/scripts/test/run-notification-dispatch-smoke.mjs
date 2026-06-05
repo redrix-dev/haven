@@ -22,20 +22,20 @@ const DEFAULTS = {
 function printHelp() {
   console.log(`Usage: node tooling/scripts/test/run-notification-dispatch-smoke.mjs [options]
 
-Local backend smoke runner for the notification/web-push pipeline.
+Local backend smoke runner for the notification/Expo push pipeline.
 
 What it does:
   1. (Optional) resets local Supabase + boots test users + fixture SQL
   2. signs in fixture users (member_a, member_b, platform_staff_active)
-  3. ensures a web push subscription exists for member_a (dummy endpoint)
+  3. ensures an Expo push subscription exists for member_a (dummy token)
   4. enables friend-request push prefs for member_a
   5. sends a friend request from member_b -> member_a
-  6. inspects notification event/recipient + queued web push jobs
-  7. optionally invokes web-push-worker (shadow/manual) and prints traces
+  6. inspects notification event/recipient + queued Expo push jobs
+  7. optionally invokes expo-push-worker (shadow/manual) and prints traces
 
 Options:
   --prepare              Reset local DB and load fixtures before running (deterministic)
-  --skip-worker          Do not invoke web-push-worker (queue/trace setup only)
+  --skip-worker          Do not invoke expo-push-worker (queue/trace setup only)
   --strict-worker        Fail if worker invoke is unavailable/fails
   --worker-mode=<mode>   Worker mode: shadow | manual (default: shadow)
   --max-jobs=<n>         Max jobs for worker invoke (default: 15)
@@ -240,29 +240,15 @@ async function ensureRecipientNotificationPrefs(memberClient, summary) {
   summary.actions.push('ensured member_a friend-request push preference is enabled');
 }
 
-function makeDummyBase64Url(length) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  let out = '';
-  for (let i = 0; i < length; i += 1) {
-    out += alphabet[(i * 17 + 13) % alphabet.length];
-  }
-  return out;
-}
-
 async function ensureRecipientSubscription(memberClient, memberId, summary) {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const endpoint = `https://push.example.test/local-smoke/${memberId}/${suffix}`;
+  const expoPushToken = `ExponentPushToken[local-smoke-${memberId}-${suffix}]`;
   const installationId = `local-smoke-${memberId}`;
 
-  const data = await rpc(memberClient, 'upsert_my_web_push_subscription', {
-    p_endpoint: endpoint,
+  const data = await rpc(memberClient, 'upsert_my_expo_push_subscription', {
+    p_expo_push_token: expoPushToken,
+    p_platform: process.platform === 'darwin' ? 'ios' : 'unknown',
     p_installation_id: installationId,
-    p_p256dh_key: makeDummyBase64Url(87),
-    p_auth_key: makeDummyBase64Url(24),
-    p_expiration_time: null,
-    p_user_agent: 'local-smoke-runner/1.0',
-    p_client_platform: process.platform,
-    p_app_display_mode: 'browser',
     p_metadata: {
       source: 'notification-smoke-script',
       installationId,
@@ -271,11 +257,11 @@ async function ensureRecipientSubscription(memberClient, memberId, summary) {
 
   const row = Array.isArray(data) ? data[0] : data;
   summary.subscription = {
-    endpoint: row?.endpoint ?? endpoint,
+    expoPushToken: row?.expo_push_token ?? expoPushToken,
     installationId: row?.installation_id ?? installationId,
     id: row?.id ?? null,
   };
-  summary.actions.push('upserted dummy web push subscription for member_a');
+  summary.actions.push('upserted dummy Expo push subscription for member_a');
 }
 
 async function clearPendingFriendRequestBetween(memberBClient, memberAId, summary) {
@@ -341,7 +327,7 @@ async function loadNotificationAndJobs(adminClient, requestId, recipientUserId) 
   }
 
   const jobsQuery = await adminClient
-    .from('web_push_notification_jobs')
+    .from('expo_push_notification_jobs')
     .select(
       'id, status, attempts, notification_event_id, notification_recipient_id, provider_status_code, last_error, created_at, updated_at'
     )
@@ -430,7 +416,7 @@ function buildBackendTraceParitySummary(traces) {
   }
 
   for (const trace of traces) {
-    if (trace?.transport !== 'web_push') continue;
+    if (trace?.transport !== 'expo_push') continue;
     const details = asRecord(trace.details);
     const rawWakeSource = getRecordString(details, 'wakeSource') ?? getRecordString(details, 'wake_source') ?? 'unknown';
     const wakeSource = rawWakeSource.toLowerCase();
@@ -568,7 +554,7 @@ function buildQueueHealthAlerts(diagnostics) {
 
 async function tryInvokeWorker(memberClient, mode, maxJobs, summary) {
   try {
-    const { data, error } = await memberClient.functions.invoke('web-push-worker', {
+    const { data, error } = await memberClient.functions.invoke('expo-push-worker', {
       body: { mode, maxJobs },
     });
     if (error) {
@@ -773,7 +759,7 @@ async function main() {
     summary.notification = await loadNotificationAndJobs(adminClient, requestId, fixtures.member_a.id);
 
     if (!summary.notification.jobs.length) {
-      summary.failures.push('Expected at least one web_push_notification_jobs row, but found none.');
+      summary.failures.push('Expected at least one expo_push_notification_jobs row, but found none.');
     }
 
     if (options.invokeWorker) {
@@ -781,7 +767,7 @@ async function main() {
       if (!summary.workerInvoke.ok) {
         const msg =
           summary.workerInvoke.error ??
-          'web-push-worker invoke failed (unknown error). Start `supabase functions serve web-push-worker --no-verify-jwt` for local shadow/manual runs.';
+          'expo-push-worker invoke failed (unknown error). Start `supabase functions serve expo-push-worker --no-verify-jwt` for local shadow/manual runs.';
         if (options.strictWorker) {
           summary.failures.push(msg);
         } else {

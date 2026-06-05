@@ -3,6 +3,12 @@ begin;
 select test_support.note('suite 17: profile flair grants and profile-card visibility');
 select test_support.cleanup_fixture_domain_state();
 
+create temp table if not exists flair_test_ids (
+  key text primary key,
+  id uuid not null
+) on commit drop;
+grant all on flair_test_ids to public;
+
 set local role postgres;
 
 insert into public.flairs (
@@ -66,6 +72,16 @@ select test_support.assert_not_null(
   'platform staff should be able to grant active flair'
 );
 
+insert into flair_test_ids (key, id)
+select 'member_b_alpha_grant', uf.id
+from public.user_flairs uf
+join public.flairs f on f.id = uf.flair_id
+where uf.user_id = test_support.fixture_user_id('member_b')
+  and f.key = 'alpha_2026'
+  and uf.revoked_at is null
+limit 1
+on conflict (key) do update set id = excluded.id;
+
 reset role;
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_b'));
@@ -128,14 +144,7 @@ select test_support.assert_eq_text(
 select test_support.expect_exception(
   format(
     'select public.set_active_user_flair(%L::uuid)',
-    (
-      select uf.id
-      from public.user_flairs uf
-      join public.flairs f on f.id = uf.flair_id
-      where uf.user_id = test_support.fixture_user_id('member_b')
-        and f.key = 'alpha_2026'
-      limit 1
-    )
+    (select id from flair_test_ids where key = 'member_b_alpha_grant')
   ),
   'Cannot activate unavailable flair grant'
 );
