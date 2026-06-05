@@ -3,7 +3,7 @@ import type { useChatComposerChrome } from "@/components/chat/useChatComposerChr
 
 export type ChatSurfaceChrome = Pick<
   ReturnType<typeof useChatComposerChrome>,
-  "composerChromeAnimatedStyle"
+  "composerBackdropAnimatedStyle" | "composerChromeAnimatedStyle"
 >;
 
 const ChatSurfaceContext = createContext<ChatSurfaceChrome | null>(null);

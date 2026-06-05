@@ -23,9 +23,12 @@ import type {
 } from "@shared/lib/backend/types";
 import { useHavenCore } from "@shared/core";
 import { useAuthStore } from "@shared/stores/authStore";
-import { getPlatformInviteBaseUrl } from "@shared/platform/urls";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
+import {
+  buildCommunityInviteUrl,
+  shareCommunityInvite,
+} from "@/features/invites/shareCommunityInvite";
 
 type TabKey = "general" | "roles" | "members" | "invites" | "bans";
 
@@ -410,13 +413,12 @@ function InvitesTab({
   onRevoke: (id: string) => Promise<void>;
 }) {
   const [creating, setCreating] = useState(false);
-  const baseUrl = useMemo(() => getPlatformInviteBaseUrl(), []);
 
   const handleCreate = async () => {
     setCreating(true);
     try {
       const inv = (await onCreateInvite({ maxUses: null, expiresInHours: 24 })) as { code: string };
-      Alert.alert("Invite created", `${baseUrl}${inv.code}`, [{ text: "OK" }]);
+      await shareCommunityInvite(inv.code);
     } catch (e) {
       Alert.alert("Error", getErrorMessage(e, "Could not create invite."));
     } finally {
@@ -441,10 +443,20 @@ function InvitesTab({
           key={inv.id}
           className="mb-2 flex-row items-center justify-between rounded-xl border border-border-panel px-3 py-2"
         >
-          <Text className="font-mono text-xs text-foreground">{inv.code}</Text>
-          <Pressable onPress={() => void onRevoke(inv.id)}>
-            <Text className="text-sm text-destructive">Revoke</Text>
-          </Pressable>
+          <View className="min-w-0 flex-1 pr-3">
+            <Text className="font-mono text-xs text-foreground">{inv.code}</Text>
+            <Text className="mt-1 text-[11px] text-muted-foreground" numberOfLines={1}>
+              {buildCommunityInviteUrl(inv.code)}
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-3">
+            <Pressable onPress={() => void shareCommunityInvite(inv.code)}>
+              <Text className="text-sm text-primary">Share</Text>
+            </Pressable>
+            <Pressable onPress={() => void onRevoke(inv.id)}>
+              <Text className="text-sm text-destructive">Revoke</Text>
+            </Pressable>
+          </View>
         </View>
       ))}
     </View>

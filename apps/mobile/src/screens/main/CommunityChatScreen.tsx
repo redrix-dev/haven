@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Platform, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, Platform, Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
 import { type EnrichedMarkdownTextInputInstance } from "react-native-enriched-markdown";
@@ -30,6 +30,11 @@ import {
   type ChatListItem,
   type ChatMessage,
 } from "@/features/community/CommunityMessageBubble";
+import {
+  MessageActionsSheet,
+  type MessageActionTarget,
+} from "@/features/community/MessageActionsSheet";
+import { CommunityReportMessageModal } from "@/features/community/CommunityReportMessageModal";
 import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
 import { CommunityPhaseGate } from "@/features/community/CommunityPhaseGate";
 import {
@@ -40,11 +45,13 @@ import { useDataCacheComponentProbe } from "@shared/debug";
 
 type CommunityChatScreenProps = {
   serverId: string;
+  drawerGestureNonce?: number;
   onOpenProfileCard?: (target: UserProfileModalTarget) => void;
 };
 
 export function CommunityChatScreen({
   serverId,
+  drawerGestureNonce = 0,
   onOpenProfileCard,
 }: CommunityChatScreenProps) {
   const composerColors = useChatComposerColors();
@@ -207,6 +214,12 @@ export function CommunityChatScreen({
   });
   const liveProfiles = core.profiles.useProfilesRecord();
 
+  useEffect(() => {
+    if (drawerGestureNonce <= 0) return;
+    composerInputRef.current?.blur();
+    Keyboard.dismiss();
+  }, [drawerGestureNonce]);
+
   const community = useMemo(
     () =>
       communityId ? (servers.find((s) => s.id === communityId) ?? null) : null,
@@ -238,6 +251,10 @@ export function CommunityChatScreen({
   const [pendingReplyToMessageId, setPendingReplyToMessageId] = useState<
     string | null
   >(null);
+  const [messageActionsTarget, setMessageActionsTarget] =
+    useState<MessageActionTarget | null>(null);
+  const [reportMessageTarget, setReportMessageTarget] =
+    useState<MessageActionTarget | null>(null);
 
   const pendingReplyTargetLabel = useMemo(
     () =>
@@ -332,39 +349,55 @@ export function CommunityChatScreen({
     sendMessage,
   ]);
 
-  const renderChatItem = useCallback(({ item }: { item: ChatListItem }) => {
-    if (item.kind === "divider") {
-      return <MessageDateDivider label={item.label} />;
-    }
+  const renderChatItem = useCallback(
+    ({ item }: { item: ChatListItem }) => {
+      if (item.kind === "divider") {
+        return <MessageDateDivider label={item.label} />;
+      }
 
-    const canOpenAuthorProfile =
-      Boolean(item.message.authorUserId) &&
-      item.message.authorName !== "Banned User" &&
-      item.message.authorName !== "Unknown User";
+      const canOpenAuthorProfile =
+        Boolean(item.message.authorUserId) &&
+        item.message.authorName !== "Banned User" &&
+        item.message.authorName !== "Unknown User";
 
-    return (
-      <CommunityMessageBubble
-        {...item.message}
-        attachments={item.message.attachments ?? []}
-        isCondensed={item.isCondensed}
-        onPress={() => composerInputRef.current?.blur()}
-        onPressAuthor={
-          canOpenAuthorProfile && item.message.authorUserId
-            ? () => {
-                composerInputRef.current?.blur();
-                onOpenProfileCard?.({
-                  userId: item.message.authorUserId!,
-                  username: item.message.authorName ?? "User",
-                  avatarUrl: item.message.authorAvatarUrl ?? null,
-                  sourceCommunityId: communityId,
-                  sourceCommunityName: community?.name ?? null,
-                });
-              }
-            : undefined
-        }
-      />
-    );
-  }, [onOpenProfileCard]);
+      return (
+        <CommunityMessageBubble
+          {...item.message}
+          attachments={item.message.attachments ?? []}
+          isCondensed={item.isCondensed}
+          onPress={() => composerInputRef.current?.blur()}
+          onLongPress={() => {
+            composerInputRef.current?.blur();
+            setMessageActionsTarget({
+              messageId: item.message.id,
+              authorUserId: item.message.authorUserId ?? null,
+              authorName: item.message.authorName ?? "User",
+            });
+          }}
+          onPressAuthor={
+            canOpenAuthorProfile && item.message.authorUserId
+              ? () => {
+                  composerInputRef.current?.blur();
+                  onOpenProfileCard?.({
+                    userId: item.message.authorUserId!,
+                    username: item.message.authorName ?? "User",
+                    avatarUrl: item.message.authorAvatarUrl ?? null,
+                    sourceCommunityId: communityId,
+                    sourceCommunityName: community?.name ?? null,
+                  });
+                }
+              : undefined
+          }
+        />
+      );
+    },
+    [community?.name, communityId, onOpenProfileCard],
+  );
+
+  const canReportMessageTarget = Boolean(
+    messageActionsTarget?.authorUserId &&
+      messageActionsTarget.authorUserId !== currentUserId,
+  );
 
   const phase: "loading" | "ready" | "missing" | "error" =
     serversStatus === "loading" && servers.length === 0
@@ -471,6 +504,39 @@ export function CommunityChatScreen({
           }
         />
       </Animated.View>
+      <MessageActionsSheet
+        visible={messageActionsTarget !== null}
+        onClose={() => setMessageActionsTarget(null)}
+        target={messageActionsTarget}
+        communityName={community?.name ?? "Community"}
+        canReport={canReportMessageTarget}
+        canKick={false}
+        canBan={false}
+        onReply={() => {
+          if (messageActionsTarget) setPendingReplyToMessageId(messageActionsTarget.messageId);
+        }}
+        onReport={() => {
+          if (messageActionsTarget && canReportMessageTarget) {
+            setReportMessageTarget(messageActionsTarget);
+          }
+        }}
+        onKick={() => {}}
+        onBan={() => {}}
+      />
+      <CommunityReportMessageModal
+        visible={reportMessageTarget !== null}
+        onDismiss={() => setReportMessageTarget(null)}
+        communityName={community?.name ?? "Community"}
+        onSubmit={async (input) => {
+          if (!activeChannelId || !currentUserId || !reportMessageTarget) return;
+          await messageNexus.report({
+            channelId: activeChannelId,
+            messageId: reportMessageTarget.messageId,
+            reporterUserId: currentUserId,
+            ...input,
+          });
+        }}
+      />
     </View>
   );
 }

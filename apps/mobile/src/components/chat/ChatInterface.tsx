@@ -104,7 +104,12 @@ export function ChatInterface<T>({
   );
 
   return (
-    <ChatSurfaceProvider value={{ composerChromeAnimatedStyle: chrome.composerChromeAnimatedStyle }}>
+    <ChatSurfaceProvider
+      value={{
+        composerBackdropAnimatedStyle: chrome.composerBackdropAnimatedStyle,
+        composerChromeAnimatedStyle: chrome.composerChromeAnimatedStyle,
+      }}
+    >
       <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
         <KeyboardGestureArea
           interpolator="ios"

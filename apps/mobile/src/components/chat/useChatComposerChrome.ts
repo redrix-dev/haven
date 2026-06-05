@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import {
+  COMPOSER_BACKDROP_IMMERSIVE_OPACITY,
+  COMPOSER_BACKDROP_REST_OPACITY,
   COMPOSER_CHROME_IMMERSIVE_MS,
   COMPOSER_CHROME_IMMERSIVE_OPACITY,
   COMPOSER_CHROME_REST_MS,
@@ -10,6 +12,7 @@ import {
 
 export function useChatComposerChrome() {
   const composerChromeOpacity = useSharedValue(COMPOSER_CHROME_REST_OPACITY);
+  const composerBackdropOpacity = useSharedValue(COMPOSER_BACKDROP_REST_OPACITY);
   const listDragRef = useRef(false);
   const listMomentumRef = useRef(false);
   const composerSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -26,7 +29,10 @@ export function useChatComposerChrome() {
     composerChromeOpacity.value = withTiming(COMPOSER_CHROME_IMMERSIVE_OPACITY, {
       duration: COMPOSER_CHROME_IMMERSIVE_MS,
     });
-  }, [clearComposerSettleTimer, composerChromeOpacity]);
+    composerBackdropOpacity.value = withTiming(COMPOSER_BACKDROP_IMMERSIVE_OPACITY, {
+      duration: COMPOSER_CHROME_IMMERSIVE_MS,
+    });
+  }, [clearComposerSettleTimer, composerBackdropOpacity, composerChromeOpacity]);
 
   const scheduleComposerChromeRest = useCallback(() => {
     clearComposerSettleTimer();
@@ -36,14 +42,21 @@ export function useChatComposerChrome() {
         composerChromeOpacity.value = withTiming(COMPOSER_CHROME_REST_OPACITY, {
           duration: COMPOSER_CHROME_REST_MS,
         });
+        composerBackdropOpacity.value = withTiming(COMPOSER_BACKDROP_REST_OPACITY, {
+          duration: COMPOSER_CHROME_REST_MS,
+        });
       }
     }, COMPOSER_CHROME_SETTLE_MS);
-  }, [clearComposerSettleTimer, composerChromeOpacity]);
+  }, [clearComposerSettleTimer, composerBackdropOpacity, composerChromeOpacity]);
 
   useEffect(() => () => clearComposerSettleTimer(), [clearComposerSettleTimer]);
 
   const composerChromeAnimatedStyle = useAnimatedStyle(() => ({
     opacity: composerChromeOpacity.value,
+  }));
+
+  const composerBackdropAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: composerBackdropOpacity.value,
   }));
 
   const listScrollHandlers = {
@@ -65,5 +78,5 @@ export function useChatComposerChrome() {
     },
   } as const;
 
-  return { composerChromeAnimatedStyle, listScrollHandlers };
+  return { composerBackdropAnimatedStyle, composerChromeAnimatedStyle, listScrollHandlers };
 }

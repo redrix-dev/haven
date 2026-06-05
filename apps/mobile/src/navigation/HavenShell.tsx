@@ -31,6 +31,7 @@ type HavenShellProps = {
    */
   hasContent: boolean;
   openDrawerOnMount?: boolean;
+  onDrawerGestureStart?: () => void;
   onDrawerStateChange?: (open: boolean) => void;
 };
 
@@ -43,6 +44,7 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
       topBar,
       hasContent,
       openDrawerOnMount = false,
+      onDrawerGestureStart,
       onDrawerStateChange,
     },
     ref,
@@ -50,6 +52,10 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
     const [drawerOpen, setDrawerOpen] = useState(openDrawerOnMount);
     const drawerOffset = useSharedValue(openDrawerOnMount ? 0 : -DRAWER_SURFACE_WIDTH);
     const dragStartOffset = useSharedValue(0);
+    const dismissKeyboard = useCallback(() => {
+      Keyboard.dismiss();
+      onDrawerGestureStart?.();
+    }, [onDrawerGestureStart]);
 
     const setDrawerOpenAnimated = useCallback(
       (open: boolean) => {
@@ -89,6 +95,7 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
       .activeOffsetX([-18, 18])
       .failOffsetY([-12, 12])
       .onStart(() => {
+        runOnJS(dismissKeyboard)();
         dragStartOffset.value = drawerOffset.value;
       })
       .onUpdate((event) => {
@@ -107,6 +114,7 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
       .activeOffsetX([-8, 8])
       .failOffsetY([-12, 12])
       .onStart(() => {
+        runOnJS(dismissKeyboard)();
         dragStartOffset.value = drawerOffset.value;
       })
       .onUpdate((event) => {
@@ -126,6 +134,7 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
       .activeOffsetX([-18, 18])
       .failOffsetY([-12, 12])
       .onStart(() => {
+        runOnJS(dismissKeyboard)();
         dragStartOffset.value = drawerOffset.value;
       })
       .onUpdate((event) => {

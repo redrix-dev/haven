@@ -16,6 +16,7 @@ import { consumeAuthConfirmUrl } from "@/auth/mobileAuthService";
 import { MainNavigator } from "@/navigation/MainNavigator";
 import { MobileOnboardingGate } from "@/navigation/MobileOnboardingGate";
 import { NAV_THEME } from "@/lib/theme";
+import { savePendingInviteFromUrl } from "@/features/invites/mobilePendingInvite";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -45,6 +46,10 @@ export function RootNavigator() {
         if (result.didProcess) {
           processedAuthConfirmUrlsRef.current.add(candidateUrl);
           setPasswordRecoveryRequired(result.requiresPasswordRecovery);
+          return;
+        }
+        if (savePendingInviteFromUrl(candidateUrl)) {
+          processedAuthConfirmUrlsRef.current.add(candidateUrl);
         }
       } catch (error) {
         console.error("Failed to process mobile auth confirmation URL.", error);
@@ -68,6 +73,10 @@ export function RootNavigator() {
         if (result.didProcess) {
           processedAuthConfirmUrlsRef.current.add(initialUrl);
           setPasswordRecoveryRequired(result.requiresPasswordRecovery);
+          return;
+        }
+        if (savePendingInviteFromUrl(initialUrl)) {
+          processedAuthConfirmUrlsRef.current.add(initialUrl);
         }
       } catch (error) {
         console.error("Failed to process initial mobile auth URL.", error);

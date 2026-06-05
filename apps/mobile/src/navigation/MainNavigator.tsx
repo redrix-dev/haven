@@ -42,9 +42,10 @@ import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { resolveColorProp } from "@shared/themes";
 import { countFilteredUnreadInInbox } from "@shared/features/notifications/inboxNotificationFilter";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { VoiceJoinPromptSheet } from "@/features/voice/VoiceJoinPromptSheet";
-import { VoiceReturnPill } from "@/features/voice/VoiceReturnPill";
 import { VoiceSessionSheet } from "@/features/voice/VoiceSessionSheet";
+import { VoiceFloatingController } from "@/features/voice/VoiceFloatingController";
 import {
   loadSkipVoiceSwitchPrompt,
   saveSkipVoiceSwitchPrompt,
@@ -57,6 +58,11 @@ import { NotificationsScreen } from "@/screens/main/NotificationsScreen";
 import { ProfileScreen } from "@/screens/main/ProfileScreen";
 import { SettingsScreen } from "@/screens/main/SettingsScreen";
 import { FriendsScreen } from "@/screens/main/FriendsScreen";
+import {
+  clearPendingInvite,
+  readPendingInvite,
+  subscribePendingInvite,
+} from "@/features/invites/mobilePendingInvite";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -566,6 +572,40 @@ function MainNavigationShell({ userId }: { userId: string }) {
     [navigation],
   );
 
+  const pendingInviteDrainingRef = useRef(false);
+  const [pendingInviteSignal, setPendingInviteSignal] = useState(0);
+  useEffect(
+    () => subscribePendingInvite(() => setPendingInviteSignal((value) => value + 1)),
+    [],
+  );
+
+  useEffect(() => {
+    if (pendingInviteDrainingRef.current) return;
+    const pendingInvite = readPendingInvite();
+    if (!pendingInvite) return;
+    pendingInviteDrainingRef.current = true;
+    void core
+      .joinCommunityByInvite(pendingInvite.code)
+      .then((result) => {
+        clearPendingInvite();
+        setWorkspaceMode("community");
+        navigation.navigate("Main", {
+          screen: "Community",
+          params: { serverId: result.communityId, openDrawer: false },
+        });
+      })
+      .catch((error) => {
+        clearPendingInvite();
+        Alert.alert(
+          "Invite could not be joined",
+          getErrorMessage(error, "Open the invite again or ask for a new link."),
+        );
+      })
+      .finally(() => {
+        pendingInviteDrainingRef.current = false;
+      });
+  }, [core, navigation, pendingInviteSignal, setWorkspaceMode]);
+
   useEffect(() => {
     useMobilePushNavigationStore.getState().setHandlers({
       openDm: (conversationId) => {
@@ -680,12 +720,13 @@ function MainNavigationShell({ userId }: { userId: string }) {
             options={{ animation: "slide_from_right", gestureEnabled: true }}
           />
         </Stack.Navigator>
-        {!voiceSheetOpen ? (
-          <VoiceReturnPill
-            state={voiceController.state}
-            onPress={openVoiceSheet}
-          />
-        ) : null}
+        <VoiceFloatingController
+          visible={!voiceSheetOpen}
+          state={enrichedVoiceControllerState}
+          actions={voiceController.actions}
+          onLeave={handleLeaveVoiceSession}
+          onOpenFullSheet={openVoiceSheet}
+        />
       </View>
 
       <UserProfileModal

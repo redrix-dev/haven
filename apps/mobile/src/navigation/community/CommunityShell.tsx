@@ -96,6 +96,11 @@ export function CommunityShell({
 
   // Track drawer state locally — used by the DM back handler and the debug probe.
   const [drawerOpen, setDrawerOpen] = useState(openDrawerOnEnter || !serverId);
+  const [drawerGestureNonce, setDrawerGestureNonce] = useState(0);
+
+  const handleDrawerGestureStart = useCallback(() => {
+    setDrawerGestureNonce((value) => value + 1);
+  }, []);
 
   const handleDrawerStateChange = useCallback((open: boolean) => {
     setDrawerOpen(open);
@@ -311,6 +316,7 @@ export function CommunityShell({
         ref={shellRef}
         hasContent={mode === "dm" ? true : Boolean(serverId)}
         openDrawerOnMount={openDrawerOnEnter || !serverId}
+        onDrawerGestureStart={handleDrawerGestureStart}
         onDrawerStateChange={handleDrawerStateChange}
         rail={
           <CommunityRail
@@ -368,6 +374,7 @@ export function CommunityShell({
           ) : serverId ? (
             <CommunityChatScreen
               serverId={serverId}
+              drawerGestureNonce={drawerGestureNonce}
               onOpenProfileCard={onOpenProfileCard}
             />
           ) : (

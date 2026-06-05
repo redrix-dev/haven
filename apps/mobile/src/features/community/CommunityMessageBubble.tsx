@@ -13,6 +13,7 @@ import type { MessageAttachment, MessageLinkPreview } from "@shared/lib/backend/
 import { getFallbackEmbedUrl } from "@shared/features/messaging/utils/embedUtils";
 import { createChatMarkdownStyle } from "@/components/chat/chatTypography";
 import { useCommunityMessageColors } from "@/theme-rn";
+import { MessageImageAttachment } from "@/features/media/MessageImageAttachment";
 import { CommunityAttachmentVideo } from "./CommunityAttachmentVideo";
 
 // ─── Layout constants ────────────────────────────────────────────────────────
@@ -210,11 +211,21 @@ export function CommunityMessageBubble({
           }
           if (attachment.mediaKind === "image") {
             return (
-              <Image
+              <MessageImageAttachment
                 key={attachment.id}
-                source={{ uri: attachment.signedUrl }}
-                style={styles.attachmentImage}
-                resizeMode="cover"
+                image={{
+                  id: attachment.id,
+                  signedUrl: attachment.signedUrl,
+                  originalFilename: attachment.originalFilename,
+                }}
+                images={(attachments ?? [])
+                  .filter((item) => item.mediaKind === "image" && item.signedUrl)
+                  .map((item) => ({
+                    id: item.id,
+                    signedUrl: item.signedUrl!,
+                    originalFilename: item.originalFilename,
+                  }))}
+                thumbnailStyle={styles.attachmentImage}
               />
             );
           }

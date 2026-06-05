@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Keyboard,
   Linking,
   Platform,
@@ -36,6 +35,7 @@ import { useHavenCore } from "@shared/core";
 import { useAuthStore } from "@shared/stores/authStore";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
+import { MessageImageAttachment } from "@/features/media/MessageImageAttachment";
 
 function formatDmTime(iso: string): string {
   const d = new Date(iso);
@@ -333,17 +333,27 @@ export function DmChatSurface() {
               }
               if (attachment.mediaKind === "image") {
                 return (
-                  <Image
+                  <MessageImageAttachment
                     key={attachment.id}
-                    source={{ uri: attachment.signedUrl }}
-                    style={{
+                    image={{
+                      id: attachment.id,
+                      signedUrl: attachment.signedUrl,
+                      originalFilename: attachment.originalFilename,
+                    }}
+                    images={(item.attachments ?? [])
+                      .filter((candidate) => candidate.mediaKind === "image" && candidate.signedUrl)
+                      .map((candidate) => ({
+                        id: candidate.id,
+                        signedUrl: candidate.signedUrl!,
+                        originalFilename: candidate.originalFilename,
+                      }))}
+                    thumbnailStyle={{
                       width: "100%",
                       height: 220,
                       borderRadius: 12,
                       marginTop: 8,
                       backgroundColor: "rgba(0,0,0,0.22)",
                     }}
-                    resizeMode="contain"
                   />
                 );
               }

@@ -1,0 +1,458 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+} from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  cancelAnimation,
+  FadeIn,
+  FadeOut,
+  runOnJS,
+  SlideInDown,
+  SlideOutDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withClamp,
+  withDecay,
+  withSpring,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
+import type {
+  MobileVoiceControllerActions,
+  MobileVoiceControllerState,
+} from "@/features/voice/useMobileLiveKitVoiceSession";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
+import { resolveColorProp } from "@shared/themes";
+
+const BUBBLE_SIZE = 60;
+const EDGE_MARGIN = 12;
+const CONTROL_SIZE = 48;
+const CONTROL_GAP = 8;
+const CONTROL_CLUSTER_GAP = 10;
+const THROW_PROJECTION_S = 0.14;
+const VERTICAL_VELOCITY_WEIGHT = 0.35;
+const CORNER_THROW_STRENGTH = 580;
+const CONTROL_COUNT = 4;
+
+const DRAG_SPRING = {
+  stiffness: 368,
+  damping: 18,
+  mass: 1,
+  overshootClamping: false,
+} as const;
+
+const THROW_SETTLE_SPRING = {
+  stiffness: 52,
+  damping: 20,
+  mass: 1.15,
+  overshootClamping: false,
+} as const;
+
+type VoiceFloatingControllerProps = {
+  visible: boolean;
+  state: MobileVoiceControllerState;
+  actions: MobileVoiceControllerActions;
+  onLeave: () => void;
+  onOpenFullSheet: () => void;
+};
+
+type RestPosition = { x: number; y: number };
+type ControlPlacement = {
+  above: boolean;
+  nearRightEdge: boolean;
+  left: number;
+  top: number;
+};
+
+type QuickControlProps = {
+  label: string;
+  icon: ThemedIoniconsProps["name"];
+  active?: boolean;
+  destructive?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+};
+
+function clamp(value: number, min: number, max: number): number {
+  "worklet";
+  return Math.min(max, Math.max(min, value));
+}
+
+function chooseCornerTarget(
+  x: number,
+  y: number,
+  vx: number,
+  vy: number,
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+): RestPosition {
+  "worklet";
+  if (Math.abs(vx) >= Math.abs(vy)) {
+    return { x: vx >= 0 ? maxX : minX, y: clamp(y + vy * THROW_PROJECTION_S, minY, maxY) };
+  }
+  return { x: clamp(x + vx * THROW_PROJECTION_S, minX, maxX), y: vy >= 0 ? maxY : minY };
+}
+
+function QuickControl({
+  label,
+  icon,
+  active = false,
+  destructive = false,
+  disabled = false,
+  onPress,
+}: QuickControlProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={disabled}
+      onPress={onPress}
+      className={[
+        "h-12 w-12 items-center justify-center rounded-2xl border active:opacity-85",
+        destructive
+          ? "border-destructive bg-destructive"
+          : active
+            ? "border-primary bg-primary"
+            : "border-border-panel bg-surface-modal",
+        disabled ? "opacity-50" : "",
+      ].join(" ")}
+    >
+      <ThemedIonicons
+        name={icon}
+        size={22}
+        colorClassName={destructive || active ? "accent-primary-foreground" : "accent-foreground"}
+      />
+    </Pressable>
+  );
+}
+
+export function VoiceFloatingController({
+  visible,
+  state,
+  actions,
+  onLeave,
+  onOpenFullSheet,
+}: VoiceFloatingControllerProps) {
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const themeTokens = useMobileThemeTokens();
+  const spinnerColor = resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff";
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [restPosition, setRestPosition] = useState<RestPosition | null>(null);
+
+  const layoutW = useSharedValue(width);
+  const layoutH = useSharedValue(height);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const panStartX = useSharedValue(0);
+  const panStartY = useSharedValue(0);
+  const restX = useSharedValue(0);
+  const restY = useSharedValue(0);
+  const initializedRef = useRef(false);
+
+  const active = visible && state.activeChannel && (state.joined || state.joining);
+  const participantCount = state.participants.length + (state.joined ? 1 : 0);
+
+  const closeControls = useCallback(() => {
+    setControlsOpen(false);
+  }, []);
+
+  const toggleControls = useCallback(() => {
+    setControlsOpen((open) => !open);
+  }, []);
+
+  const commitRestPosition = useCallback((x: number, y: number) => {
+    setRestPosition({ x, y });
+  }, []);
+
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const nextWidth = event.nativeEvent.layout.width;
+      const nextHeight = event.nativeEvent.layout.height;
+      layoutW.value = nextWidth;
+      layoutH.value = nextHeight;
+      if (initializedRef.current || nextWidth <= 0 || nextHeight <= 0) return;
+
+      initializedRef.current = true;
+      const minX = insets.left + EDGE_MARGIN;
+      const maxX = nextWidth - insets.right - BUBBLE_SIZE - EDGE_MARGIN;
+      const minY = insets.top + EDGE_MARGIN;
+      const maxY = nextHeight - insets.bottom - BUBBLE_SIZE - EDGE_MARGIN;
+      const initialX = maxX;
+      const initialY = clamp(nextHeight * 0.62, minY, maxY);
+
+      translateX.value = initialX;
+      translateY.value = initialY;
+      restX.value = initialX;
+      restY.value = initialY;
+      setRestPosition({ x: initialX, y: initialY });
+    },
+    [
+      insets.bottom,
+      insets.left,
+      insets.right,
+      insets.top,
+      layoutH,
+      layoutW,
+      restX,
+      restY,
+      translateX,
+      translateY,
+    ],
+  );
+
+  useEffect(() => {
+    if (active) return;
+    setControlsOpen(false);
+  }, [active]);
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(Boolean(active))
+        .onStart(() => {
+          runOnJS(closeControls)();
+          panStartX.value = translateX.value;
+          panStartY.value = translateY.value;
+        })
+        .onUpdate((event) => {
+          const minX = insets.left + EDGE_MARGIN;
+          const maxX = layoutW.value - insets.right - BUBBLE_SIZE - EDGE_MARGIN;
+          const minY = insets.top + EDGE_MARGIN;
+          const maxY = layoutH.value - insets.bottom - BUBBLE_SIZE - EDGE_MARGIN;
+          const nextX = clamp(panStartX.value + event.translationX, minX, maxX);
+          const nextY = clamp(panStartY.value + event.translationY, minY, maxY);
+
+          translateX.value = withClamp(
+            { min: minX, max: maxX },
+            withSpring(nextX, DRAG_SPRING),
+          );
+          translateY.value = withClamp(
+            { min: minY, max: maxY },
+            withSpring(nextY, DRAG_SPRING),
+          );
+        })
+        .onEnd((event) => {
+          const minX = insets.left + EDGE_MARGIN;
+          const maxX = layoutW.value - insets.right - BUBBLE_SIZE - EDGE_MARGIN;
+          const minY = insets.top + EDGE_MARGIN;
+          const maxY = layoutH.value - insets.bottom - BUBBLE_SIZE - EDGE_MARGIN;
+          const x = clamp(panStartX.value + event.translationX, minX, maxX);
+          const y = clamp(panStartY.value + event.translationY, minY, maxY);
+          const vx = event.velocityX;
+          const vy = event.velocityY;
+          const strength = Math.hypot(vx, vy * VERTICAL_VELOCITY_WEIGHT);
+
+          cancelAnimation(translateX);
+          cancelAnimation(translateY);
+          translateX.value = x;
+          translateY.value = y;
+
+          if (strength >= CORNER_THROW_STRENGTH) {
+            const target = chooseCornerTarget(x, y, vx, vy, minX, maxX, minY, maxY);
+            translateX.value = withClamp(
+              { min: minX, max: maxX },
+              withSpring(target.x, { ...THROW_SETTLE_SPRING, velocity: vx }, (finished) => {
+                "worklet";
+                if (finished) {
+                  restX.value = target.x;
+                  restY.value = target.y;
+                  runOnJS(commitRestPosition)(target.x, target.y);
+                }
+              }),
+            );
+            translateY.value = withClamp(
+              { min: minY, max: maxY },
+              withSpring(target.y, { ...THROW_SETTLE_SPRING, velocity: vy }),
+            );
+            return;
+          }
+
+          translateX.value = withDecay(
+            { velocity: vx, deceleration: 0.992, clamp: [minX, maxX] },
+            (finished) => {
+              "worklet";
+              if (finished) {
+                restX.value = translateX.value;
+                runOnJS(commitRestPosition)(translateX.value, translateY.value);
+              }
+            },
+          );
+          translateY.value = withDecay(
+            { velocity: vy, deceleration: 0.992, clamp: [minY, maxY] },
+            (finished) => {
+              "worklet";
+              if (finished) {
+                restY.value = translateY.value;
+              }
+            },
+          );
+        }),
+    [
+      active,
+      closeControls,
+      commitRestPosition,
+      insets.bottom,
+      insets.left,
+      insets.right,
+      insets.top,
+      layoutH,
+      layoutW,
+      panStartX,
+      panStartY,
+      restX,
+      restY,
+      translateX,
+      translateY,
+    ],
+  );
+
+  const tapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .enabled(Boolean(active))
+        .onEnd(() => {
+          runOnJS(toggleControls)();
+        }),
+    [active, toggleControls],
+  );
+
+  const gesture = useMemo(() => Gesture.Race(panGesture, tapGesture), [panGesture, tapGesture]);
+
+  const bubbleStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }, { translateY: translateY.value }],
+  }));
+
+  const controlPlacement = useMemo<ControlPlacement | null>(() => {
+    if (!restPosition) return null;
+    const clusterWidth = CONTROL_COUNT * CONTROL_SIZE + (CONTROL_COUNT - 1) * CONTROL_GAP;
+    const desiredLeft = restPosition.x + BUBBLE_SIZE / 2 - clusterWidth / 2;
+    const left = clamp(desiredLeft, insets.left + EDGE_MARGIN, width - insets.right - EDGE_MARGIN - clusterWidth);
+    const spaceAbove = restPosition.y - insets.top;
+    const spaceBelow = height - insets.bottom - (restPosition.y + BUBBLE_SIZE);
+    const above = spaceBelow < CONTROL_SIZE + CONTROL_CLUSTER_GAP && spaceAbove > spaceBelow;
+    const top = above
+      ? restPosition.y - CONTROL_CLUSTER_GAP - CONTROL_SIZE
+      : restPosition.y + BUBBLE_SIZE + CONTROL_CLUSTER_GAP;
+    return {
+      above,
+      nearRightEdge: restPosition.x + BUBBLE_SIZE / 2 > width / 2,
+      left,
+      top: clamp(top, insets.top + EDGE_MARGIN, height - insets.bottom - EDGE_MARGIN - CONTROL_SIZE),
+    };
+  }, [height, insets.bottom, insets.left, insets.right, insets.top, restPosition, width]);
+
+  if (!active) return null;
+
+  const bubbleIcon: ThemedIoniconsProps["name"] = state.joining
+    ? "radio-outline"
+    : state.isDeafened
+      ? "volume-mute-outline"
+      : state.isMuted
+        ? "mic-off-outline"
+        : "volume-high-outline";
+
+  const controls = [
+    <QuickControl
+      key="mute"
+      label={state.isMuted ? "Unmute" : "Mute"}
+      icon={state.isMuted ? "mic-off-outline" : "mic-outline"}
+      active={state.isMuted}
+      disabled={state.joining}
+      onPress={actions.toggleMute}
+    />,
+    <QuickControl
+      key="deafen"
+      label={state.isDeafened ? "Undeafen" : "Deafen"}
+      icon={state.isDeafened ? "volume-mute-outline" : "volume-high-outline"}
+      active={state.isDeafened}
+      disabled={state.joining}
+      onPress={actions.toggleDeafen}
+    />,
+    <QuickControl
+      key="leave"
+      label="Leave voice"
+      icon="call-outline"
+      destructive
+      onPress={() => {
+        setControlsOpen(false);
+        onLeave();
+      }}
+    />,
+    <QuickControl
+      key="open"
+      label="Open voice panel"
+      icon={controlPlacement?.nearRightEdge ? "chevron-back" : "chevron-forward"}
+      onPress={() => {
+        setControlsOpen(false);
+        onOpenFullSheet();
+      }}
+    />,
+  ];
+
+  const orderedControls = controlPlacement?.nearRightEdge
+    ? [controls[3], controls[0], controls[1], controls[2]]
+    : controls;
+
+  return (
+    <View
+      pointerEvents="box-none"
+      className="absolute inset-0"
+      onLayout={handleLayout}
+    >
+      {controlsOpen && controlPlacement ? (
+        <Animated.View
+          pointerEvents="box-none"
+          className="absolute"
+          entering={
+            controlPlacement.above
+              ? FadeIn.duration(140).springify().damping(18)
+              : SlideInDown.duration(160).springify().damping(18)
+          }
+          exiting={
+            controlPlacement.above
+              ? FadeOut.duration(110)
+              : SlideOutDown.duration(130)
+          }
+          style={{ left: controlPlacement.left, top: controlPlacement.top }}
+        >
+          <View className="flex-row gap-2 rounded-3xl border border-border-panel bg-surface-modal/95 p-1.5 shadow-lg">
+            {orderedControls}
+          </View>
+        </Animated.View>
+      ) : null}
+
+      <GestureDetector gesture={gesture}>
+        <Animated.View
+          pointerEvents="auto"
+          entering={FadeIn.duration(180).springify().damping(16)}
+          exiting={FadeOut.duration(140)}
+          style={[{ position: "absolute", height: BUBBLE_SIZE, width: BUBBLE_SIZE }, bubbleStyle]}
+        >
+          <View className="h-full w-full items-center justify-center rounded-full border border-border-panel bg-primary shadow-lg">
+            {state.joining ? (
+              <ActivityIndicator color={spinnerColor} size="small" />
+            ) : (
+              <ThemedIonicons name={bubbleIcon} size={26} colorClassName="accent-primary-foreground" />
+            )}
+            {participantCount > 0 ? (
+              <View className="absolute -right-1 -top-1 min-w-6 rounded-full border border-border-panel bg-surface-modal px-1.5 py-0.5">
+                <Text className="text-center text-[11px] font-bold text-foreground">
+                  {participantCount > 99 ? "99+" : participantCount}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+}

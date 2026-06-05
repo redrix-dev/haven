@@ -39,7 +39,7 @@ export function ChatComposer({
   strips,
   sendAccessibilityLabel = "Send message",
 }: ChatComposerProps) {
-  const { composerChromeAnimatedStyle } = useChatSurfaceChrome();
+  const { composerBackdropAnimatedStyle, composerChromeAnimatedStyle } = useChatSurfaceChrome();
 
   return (
     <>
@@ -60,8 +60,22 @@ export function ChatComposer({
             accessibilityLabel="Add media"
             disabled={isSending || isPickingMedia}
             onPress={onPickMedia}
-            className="h-8.5 w-8.5 items-center justify-center rounded-full bg-foreground/10 disabled:opacity-50"
+            className="relative h-8.5 w-8.5 items-center justify-center overflow-hidden rounded-full bg-foreground/10 disabled:opacity-50"
           >
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                {
+                  position: "absolute",
+                  bottom: 3,
+                  left: 3,
+                  right: 3,
+                  top: 3,
+                },
+                composerBackdropAnimatedStyle,
+              ]}
+              className="rounded-full bg-background"
+            />
             <ThemedIonicons name="add" size={20} colorClassName="accent-primary-foreground" />
           </Pressable>
         </Animated.View>
@@ -69,7 +83,21 @@ export function ChatComposer({
         <Animated.View
           style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
         >
-          <View className="flex-1 flex-row items-center rounded-[18px] border border-foreground/10 bg-foreground/8 pr-1">
+          <View className="relative flex-1 flex-row items-center overflow-hidden rounded-[18px] border border-foreground/10 bg-foreground/8 pr-1">
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                {
+                  position: "absolute",
+                  bottom: 2,
+                  left: 2,
+                  right: 2,
+                  top: 2,
+                },
+                composerBackdropAnimatedStyle,
+              ]}
+              className="rounded-[16px] bg-background"
+            />
             <EnrichedMarkdownTextInput
               ref={inputRef}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any

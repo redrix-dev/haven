@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Keyboard,
   Linking,
   Platform,
@@ -44,6 +43,7 @@ import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
+import { MessageImageAttachment } from "@/features/media/MessageImageAttachment";
 
 type RefreshDmConversationsOptions = { suppressLoadingState?: boolean };
 
@@ -366,11 +366,21 @@ export function DirectMessagesContainer() {
               }
               if (attachment.mediaKind === "image") {
                 return (
-                  <Image
+                  <MessageImageAttachment
                     key={attachment.id}
-                    source={{ uri: attachment.signedUrl }}
-                    style={styles.dmAttachmentImage}
-                    resizeMode="contain"
+                    image={{
+                      id: attachment.id,
+                      signedUrl: attachment.signedUrl,
+                      originalFilename: attachment.originalFilename,
+                    }}
+                    images={(item.attachments ?? [])
+                      .filter((candidate) => candidate.mediaKind === "image" && candidate.signedUrl)
+                      .map((candidate) => ({
+                        id: candidate.id,
+                        signedUrl: candidate.signedUrl!,
+                        originalFilename: candidate.originalFilename,
+                      }))}
+                    thumbnailStyle={styles.dmAttachmentImage}
                   />
                 );
               }
