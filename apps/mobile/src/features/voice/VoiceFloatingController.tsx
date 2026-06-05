@@ -13,13 +13,12 @@ import Animated, {
   FadeIn,
   FadeOut,
   runOnJS,
-  SlideInDown,
-  SlideOutDown,
   useAnimatedStyle,
   useSharedValue,
   withClamp,
   withDecay,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
@@ -146,6 +145,7 @@ export function VoiceFloatingController({
   const themeTokens = useMobileThemeTokens();
   const spinnerColor = resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff";
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [controlsMounted, setControlsMounted] = useState(false);
   const [restPosition, setRestPosition] = useState<RestPosition | null>(null);
 
   const layoutW = useSharedValue(width);
@@ -156,6 +156,7 @@ export function VoiceFloatingController({
   const panStartY = useSharedValue(0);
   const restX = useSharedValue(0);
   const restY = useSharedValue(0);
+  const controlsProgress = useSharedValue(0);
   const initializedRef = useRef(false);
 
   const active = visible && state.activeChannel && (state.joined || state.joining);
@@ -350,6 +351,47 @@ export function VoiceFloatingController({
     };
   }, [height, insets.bottom, insets.left, insets.right, insets.top, restPosition, width]);
 
+  useEffect(() => {
+    if (controlsOpen && controlPlacement) {
+      setControlsMounted(true);
+      controlsProgress.value = withTiming(1, { duration: 150 });
+      return;
+    }
+
+    controlsProgress.value = withTiming(0, { duration: 120 }, (finished) => {
+      "worklet";
+      if (finished) {
+        runOnJS(setControlsMounted)(false);
+      }
+    });
+  }, [controlPlacement, controlsOpen, controlsProgress]);
+
+  const controlAnchor = useMemo(() => {
+    if (!controlPlacement || !restPosition) return { x: 0, y: 0 };
+    return {
+      x: restPosition.x + BUBBLE_SIZE / 2 - controlPlacement.left,
+      y: restPosition.y + BUBBLE_SIZE / 2 - controlPlacement.top,
+    };
+  }, [controlPlacement, restPosition]);
+
+  const controlsRevealStyle = useAnimatedStyle(
+    () => {
+      const progress = controlsProgress.value;
+      const scale = 0.92 + progress * 0.08;
+      return {
+        opacity: progress,
+        transform: [
+          { translateX: controlAnchor.x },
+          { translateY: controlAnchor.y },
+          { scale },
+          { translateX: -controlAnchor.x },
+          { translateY: -controlAnchor.y },
+        ],
+      };
+    },
+    [controlAnchor.x, controlAnchor.y],
+  );
+
   if (!active) return null;
 
   const bubbleIcon: ThemedIoniconsProps["name"] = state.joining
@@ -408,21 +450,11 @@ export function VoiceFloatingController({
       className="absolute inset-0"
       onLayout={handleLayout}
     >
-      {controlsOpen && controlPlacement ? (
+      {controlsMounted && controlPlacement ? (
         <Animated.View
-          pointerEvents="box-none"
+          pointerEvents={controlsOpen ? "box-none" : "none"}
           className="absolute"
-          entering={
-            controlPlacement.above
-              ? FadeIn.duration(140).springify().damping(18)
-              : SlideInDown.duration(160).springify().damping(18)
-          }
-          exiting={
-            controlPlacement.above
-              ? FadeOut.duration(110)
-              : SlideOutDown.duration(130)
-          }
-          style={{ left: controlPlacement.left, top: controlPlacement.top }}
+          style={[{ left: controlPlacement.left, top: controlPlacement.top }, controlsRevealStyle]}
         >
           <View className="flex-row gap-2 rounded-3xl border border-border-panel bg-surface-modal/95 p-1.5 shadow-lg">
             {orderedControls}
@@ -433,8 +465,8 @@ export function VoiceFloatingController({
       <GestureDetector gesture={gesture}>
         <Animated.View
           pointerEvents="auto"
-          entering={FadeIn.duration(180).springify().damping(16)}
-          exiting={FadeOut.duration(140)}
+          entering={FadeIn.duration(160)}
+          exiting={FadeOut.duration(120)}
           style={[{ position: "absolute", height: BUBBLE_SIZE, width: BUBBLE_SIZE }, bubbleStyle]}
         >
           <View className="h-full w-full items-center justify-center rounded-full border border-border-panel bg-primary shadow-lg">

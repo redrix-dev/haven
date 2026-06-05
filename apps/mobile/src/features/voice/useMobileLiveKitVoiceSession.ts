@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
+import * as Haptics from "expo-haptics";
 import { AndroidAudioTypePresets, AudioSession } from "@livekit/react-native";
 import {
   ConnectionState,
@@ -80,6 +81,16 @@ const VOICE_ACTIVITY_GATE_RELEASE_MS = 220;
 const INPUT_LEVEL_INTERVAL_MS = 80;
 const VOICE_CONTROL_CHANNEL_FAILURE_MESSAGE =
   "We're having trouble connecting you to voice services. Please try again, and contact support if this keeps happening.";
+
+function playVoiceControlFeedback(enabled: boolean): void {
+  void Haptics.impactAsync(
+    enabled
+      ? Haptics.ImpactFeedbackStyle.Medium
+      : Haptics.ImpactFeedbackStyle.Light,
+  ).catch(() => {
+    // Haptics are best-effort and may be unavailable on some devices/settings.
+  });
+}
 
 type VoiceJoinTimer = {
   mark: (label: string, details?: Record<string, unknown>) => void;
@@ -549,11 +560,13 @@ export function useMobileLiveKitVoiceSession({
   const toggleMute = useCallback(() => {
     const next = !core.voice.getSnapshot().isMuted;
     core.voice.setIsMuted(next);
+    playVoiceControlFeedback(next);
   }, [core.voice]);
 
   const toggleDeafen = useCallback(() => {
     const next = !core.voice.getSnapshot().isDeafened;
     core.voice.setIsDeafened(next);
+    playVoiceControlFeedback(next);
   }, [core.voice]);
 
   const updateVoiceSettingsPatch = useCallback(
