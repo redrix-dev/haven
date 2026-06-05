@@ -14,6 +14,7 @@ export type CommunityMediaUploadPayload = {
   body: ArrayBuffer;
   contentType: string;
   fileName: string;
+  localUri: string;
 };
 
 function base64ToUint8Array(b64: string): Uint8Array {
@@ -81,7 +82,7 @@ export async function loadPickedCommunityMediaForUpload(
     throwTooLarge();
   }
   if (buffer.byteLength > 0) {
-    return { body: buffer, contentType: resolvedContentType, fileName };
+    return { body: buffer, contentType: resolvedContentType, fileName, localUri: asset.uri };
   }
 
   const legacyB64 = await LegacyFs.readAsStringAsync(asset.uri, {
@@ -98,5 +99,6 @@ export async function loadPickedCommunityMediaForUpload(
     body: uint8ArrayToArrayBuffer(bytes),
     contentType: resolvedContentType,
     fileName,
+    localUri: asset.uri,
   };
 }

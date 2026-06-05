@@ -122,6 +122,7 @@ export function DmChatSurface() {
         imageContentType?: string;
         imageFilename?: string;
         imageExpiresInHours?: number;
+        optimisticAttachmentUri?: string | null;
       },
     ) => {
       let activeConversationId = selectedDmConversationId;
@@ -165,6 +166,7 @@ export function DmChatSurface() {
                 expiresInHours: options.imageExpiresInHours,
               }
             : undefined,
+        optimisticAttachmentUri: options?.optimisticAttachmentUri ?? null,
       });
     },
     [dm, dmComposeDraftPeer, selectedDmConversationId],
@@ -236,6 +238,7 @@ export function DmChatSurface() {
               imageArrayBuffer: media.body,
               imageContentType: media.contentType,
               imageFilename: media.fileName,
+              optimisticAttachmentUri: media.localUri,
             }
           : {}),
       });

@@ -53,6 +53,7 @@ type SendDirectMessageOptions = {
   imageContentType?: string;
   imageFilename?: string;
   imageExpiresInHours?: number;
+  optimisticAttachmentUri?: string | null;
 };
 
 function formatDmTime(iso: string): string {
@@ -187,6 +188,7 @@ export function DirectMessagesContainer() {
                   expiresInHours: options.imageExpiresInHours,
                 }
               : undefined,
+          optimisticAttachmentUri: options?.optimisticAttachmentUri ?? null,
         });
       } catch (error) {
         const message = getErrorMessage(error, "Failed to send direct message.");
@@ -460,6 +462,7 @@ export function DirectMessagesContainer() {
               imageArrayBuffer: media.body,
               imageContentType: media.contentType,
               imageFilename: media.fileName,
+              optimisticAttachmentUri: media.localUri,
             }
           : {}),
       });

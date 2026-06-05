@@ -414,7 +414,7 @@ export class DirectMessageNexus extends Nexus<
     conversationId: string,
     content: string,
     options?: Parameters<DirectMessageBackend['sendMessage']>[0]['imageUpload'] extends infer T
-      ? { imageUpload?: T; metadata?: Record<string, unknown> }
+      ? { imageUpload?: T; metadata?: Record<string, unknown>; optimisticAttachmentUri?: string | null }
       : never,
   ): Promise<DirectMessage> {
     if (!this.backend) {
@@ -426,14 +426,24 @@ export class DirectMessageNexus extends Nexus<
       metadata: options?.metadata,
       imageUpload: options?.imageUpload,
     })
-    this.upsertMessage(sent)
-    if (!this.applyLatestMessageToConversation(sent, { unreadCount: 0 })) {
+    const displayMessage =
+      options?.optimisticAttachmentUri && sent.attachments.length > 0
+        ? {
+            ...sent,
+            attachments: sent.attachments.map((attachment) => ({
+              ...attachment,
+              signedUrl: attachment.signedUrl ?? options.optimisticAttachmentUri ?? null,
+            })),
+          }
+        : sent
+    this.upsertMessage(displayMessage)
+    if (!this.applyLatestMessageToConversation(displayMessage, { unreadCount: 0 })) {
       void this.refreshConversationsAfterMessageMiss(
         'sendMessage',
-        sent.conversationId,
+        displayMessage.conversationId,
       )
     }
-    return sent
+    return displayMessage
   }
 
   async markRead(conversationId: string): Promise<boolean> {

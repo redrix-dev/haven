@@ -174,6 +174,7 @@ export function CommunityChatScreen({
         mediaArrayBuffer?: ArrayBuffer;
         mediaContentType?: string;
         mediaFilename?: string;
+        optimisticMediaUri?: string | null;
       },
     ) => {
       if (content === "#RainbowRoad") {
@@ -186,6 +187,7 @@ export function CommunityChatScreen({
         mediaArrayBuffer: options?.mediaArrayBuffer,
         mediaContentType: options?.mediaContentType,
         mediaFilename: options?.mediaFilename,
+        optimisticMediaUri: options?.optimisticMediaUri ?? null,
         senderUserId: currentUserId,
       });
     },
@@ -329,6 +331,7 @@ export function CommunityChatScreen({
               mediaArrayBuffer: media.body,
               mediaContentType: media.contentType,
               mediaFilename: media.fileName,
+              optimisticMediaUri: media.localUri,
             }
           : {}),
       });

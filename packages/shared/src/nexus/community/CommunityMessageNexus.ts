@@ -13,6 +13,7 @@ import {
 } from '@shared/nexus/community/projectVisibleChannelMessages'
 import type { CommunityDataBackend } from '@shared/lib/backend/communityDataBackend.interface'
 import type { MessageBundle, MessageReportKind, MessageReportTarget } from '@shared/lib/backend/types'
+import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from '@shared/lib/backend/mediaAttachmentUtils'
 import type { StoreApi, UseBoundStore } from 'zustand'
 
 const MESSAGE_PAGE_SIZE = 50
@@ -34,6 +35,7 @@ export type SendCommunityMessageMediaOptions = {
   mediaContentType?: string
   mediaFilename?: string
   mediaExpiresInHours?: number
+  optimisticMediaUri?: string | null
   senderUserId?: string | null
 }
 
@@ -326,7 +328,8 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
           : undefined),
     })
 
-    const { id } = await this.send(channelId, content, {
+    const messageContent = content.trim().length > 0 ? content : MEDIA_ONLY_CONTENT_PLACEHOLDER
+    const { id } = await this.send(channelId, messageContent, {
       replyToMessageId: options?.replyToMessageId ?? null,
       senderUserId: options?.senderUserId ?? null,
     })
@@ -342,6 +345,24 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
         mediaKind: upload.mediaKind,
         filename: inferredMediaFilename,
         expiresAt: upload.expiresAt,
+      })
+      this.updateMessage(id, {
+        attachment: {
+          id: `optimistic:${id}`,
+          messageId: id,
+          communityId: this.communityId,
+          channelId,
+          ownerUserId: options?.senderUserId ?? '',
+          bucketName: 'message-media',
+          objectPath: upload.objectPath,
+          originalFilename: inferredMediaFilename,
+          mimeType: upload.mimeType,
+          mediaKind: upload.mediaKind,
+          sizeBytes: upload.sizeBytes,
+          createdAt: new Date().toISOString(),
+          expiresAt: upload.expiresAt,
+          signedUrl: options?.optimisticMediaUri ?? null,
+        },
       })
     } catch (error) {
       // Remove the optimistic local insert since the message will be deleted

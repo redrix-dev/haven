@@ -18,7 +18,7 @@ import {
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 export type MessageImageAttachmentItem = {
@@ -87,6 +87,7 @@ function ImageGalleryModal({
   onClose: () => void;
 }) {
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [saving, setSaving] = useState(false);
   const listRef = useRef<FlatList<MessageImageAttachmentItem> | null>(null);
@@ -149,7 +150,12 @@ function ImageGalleryModal({
   return (
     <Modal visible={visible} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={styles.viewer}>
-        <View style={styles.viewerHeader}>
+        <View
+          style={[
+            styles.viewerHeader,
+            { paddingTop: Math.max(insets.top, 12) },
+          ]}
+        >
           <Text style={styles.viewerCounter}>
             {galleryImages.length > 1 ? `${activeIndex + 1} / ${galleryImages.length}` : ""}
           </Text>
@@ -168,7 +174,12 @@ function ImageGalleryModal({
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={handleMomentumEnd}
           renderItem={({ item }) => (
-            <View style={{ width, height: Math.max(320, height - 180) }}>
+            <View
+              style={{
+                width,
+                height: Math.max(320, height - 180 - insets.top - insets.bottom),
+              }}
+            >
               <Image source={{ uri: item.signedUrl }} style={styles.viewerImage} resizeMode="contain" />
             </View>
           )}
@@ -178,7 +189,12 @@ function ImageGalleryModal({
             });
           }}
         />
-        <View style={styles.viewerActions}>
+        <View
+          style={[
+            styles.viewerActions,
+            { paddingBottom: Math.max(insets.bottom, 18) },
+          ]}
+        >
           <Pressable
             accessibilityRole="button"
             disabled={saving}
