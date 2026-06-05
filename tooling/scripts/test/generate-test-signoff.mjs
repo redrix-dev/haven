@@ -48,6 +48,7 @@ const commandSets = {
 const usage = `Usage: node tooling/scripts/test/generate-test-signoff.mjs [options]
 
 Creates a release/candidate signoff artifact with explicit signatures and command results.
+Also writes a public-safe markdown copy under the run folder's public/ directory.
 
 Required:
   --release-label <label>     e.g. v1.4.0-rc1 or staging-2026-02-26
@@ -341,7 +342,78 @@ function buildMarkdownSignoff(data) {
   lines.push('');
   lines.push(`- JSON summary: \`${data.artifacts.json}\``);
   lines.push(`- Markdown summary: \`${data.artifacts.markdown}\``);
+  if (data.artifacts.publicMarkdown) {
+    lines.push(`- Public markdown summary: \`${data.artifacts.publicMarkdown}\``);
+  }
   lines.push(`- Raw step logs: \`${data.artifacts.logsDir}\``);
+  lines.push('');
+
+  return `${lines.join('\n')}\n`;
+}
+
+function firstLine(value) {
+  if (!value) return 'unknown';
+  return String(value).split(/\r?\n/)[0]?.trim() || 'unknown';
+}
+
+function buildPublicMarkdownSignoff(data) {
+  const lines = [];
+  lines.push(`# Test Signoff (${data.status})`);
+  lines.push('');
+  lines.push('## Release Metadata');
+  lines.push('');
+  lines.push(`- Release label: \`${data.release.label}\``);
+  lines.push(`- Environment: \`${data.environment}\``);
+  if (data.release.candidateCommit) {
+    lines.push(`- Candidate commit: \`${data.release.candidateCommit}\``);
+  } else {
+    lines.push(`- Commit: \`${data.git.commit || 'unknown'}\``);
+  }
+  lines.push(`- Mode: \`${data.mode}\``);
+  lines.push(`- Started: ${data.startedAt}`);
+  lines.push(`- Finished: ${data.endedAt}`);
+  lines.push(`- Duration: ${formatDuration(data.durationMs)}`);
+  lines.push(`- Summary: ${data.summary.passed} passed / ${data.summary.failed} failed`);
+  lines.push('');
+
+  lines.push('## Tooling Snapshot');
+  lines.push('');
+  lines.push(`- Node: \`${firstLine(data.system.node)}\``);
+  lines.push(`- npm: \`${firstLine(data.system.npm)}\``);
+  lines.push(`- Supabase CLI: \`${firstLine(data.system.supabase)}\``);
+  lines.push(`- psql: \`${firstLine(data.system.psql)}\``);
+  lines.push('');
+
+  lines.push('## Command Results');
+  lines.push('');
+  lines.push('| Step | Result | Duration | Command |');
+  lines.push('|---|---|---:|---|');
+  for (const result of data.results) {
+    const outcome = result.ok ? 'PASS' : `FAIL (${result.status})`;
+    lines.push(
+      `| ${result.label} | ${outcome} | ${formatDuration(result.durationMs)} | \`${result.command}\` |`
+    );
+  }
+  lines.push('');
+
+  lines.push('## Signature');
+  lines.push('');
+  lines.push(`- Test Author: ${data.signatures.testAuthor}`);
+  lines.push(`- Run By: ${data.signatures.runBy}`);
+  lines.push(`- Run Timestamp: ${data.endedAt}`);
+  lines.push(`- Run ID: \`${data.runId}\``);
+  lines.push('');
+
+  if (data.notes) {
+    lines.push('## Notes / Known Issues');
+    lines.push('');
+    lines.push(data.notes);
+    lines.push('');
+  }
+
+  lines.push('## Public Artifact Note');
+  lines.push('');
+  lines.push('This public signoff intentionally omits raw command logs and local artifact paths.');
   lines.push('');
 
   return `${lines.join('\n')}\n`;
@@ -476,19 +548,26 @@ async function main() {
       logsDir: path.relative(repoRoot, runDir).replace(/\\/g, '/'),
       json: null,
       markdown: null,
+      publicMarkdown: null,
     },
   };
 
+  const publicDir = path.join(runDir, 'public');
   const jsonPath = path.join(runDir, 'signoff.local.json');
   const mdPath = path.join(runDir, 'signoff.local.md');
+  const publicMdPath = path.join(publicDir, 'signoff.local.md');
+  ensureDir(publicDir);
   jsonSummary.artifacts.json = path.relative(repoRoot, jsonPath).replace(/\\/g, '/');
   jsonSummary.artifacts.markdown = path.relative(repoRoot, mdPath).replace(/\\/g, '/');
+  jsonSummary.artifacts.publicMarkdown = path.relative(repoRoot, publicMdPath).replace(/\\/g, '/');
 
   fs.writeFileSync(jsonPath, `${JSON.stringify(jsonSummary, null, 2)}\n`, 'utf8');
   fs.writeFileSync(mdPath, buildMarkdownSignoff(jsonSummary), 'utf8');
+  fs.writeFileSync(publicMdPath, buildPublicMarkdownSignoff(jsonSummary), 'utf8');
 
   console.log(`[test-signoff] JSON summary: ${jsonSummary.artifacts.json}`);
   console.log(`[test-signoff] Markdown summary: ${jsonSummary.artifacts.markdown}`);
+  console.log(`[test-signoff] Public markdown summary: ${jsonSummary.artifacts.publicMarkdown}`);
   console.log(`[test-signoff] Raw logs dir: ${jsonSummary.artifacts.logsDir}`);
 
   if (args.json) {
@@ -504,4 +583,3 @@ main().catch((error) => {
   console.error(`[test-signoff] ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 });
-
