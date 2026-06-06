@@ -34,6 +34,7 @@
     "test:signoff": "node tooling/scripts/test/generate-test-signoff.mjs",
     "test:signoff:release": "node tooling/scripts/test/generate-test-signoff.mjs --mode release",
     "test:report": "node tooling/scripts/test/generate-test-report.mjs",
+    "checkin": "node tooling/scripts/checkin.mjs",
     "typecheck": "tsc --noEmit --project tsconfig.web.json && tsc --noEmit --project tsconfig.node.json",
     "test:all": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run test:unit && npm run test:db && npm run test:backend",
     "test:ci": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run mobile:typecheck && npm run test:unit && npm run test:db && npm run test:backend",
