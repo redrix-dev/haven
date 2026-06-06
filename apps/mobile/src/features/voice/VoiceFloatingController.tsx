@@ -10,8 +10,10 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
+  Extrapolation,
   FadeIn,
   FadeOut,
+  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -19,6 +21,7 @@ import Animated, {
   withDecay,
   withSpring,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
@@ -59,6 +62,21 @@ type VoiceFloatingControllerProps = {
   actions: MobileVoiceControllerActions;
   onLeave: () => void;
   onOpenFullSheet: () => void;
+  /**
+   * Shared 0→1 transition progress (0 = bubble, 1 = panel). When provided, the
+   * bubble stays mounted while the panel is open and fades/scales toward the
+   * panel in lockstep with {@link VoiceMorphShell}, instead of unmounting.
+   */
+  morphProgress?: SharedValue<number>;
+  /** Reports the bubble's on-screen center so the panel can morph from it. */
+  onRestPositionCommit?: (center: { x: number; y: number }) => void;
+  /**
+   * Whether the bubble is allowed to be visible/interactive. The bubble is the
+   * panel's minimized form, so a fresh join keeps it suppressed (`false`) and
+   * opens straight into the panel; it's armed once the panel is first minimized.
+   * Defaults to `true` for callers that don't manage the morph lifecycle.
+   */
+  armed?: boolean;
 };
 
 type RestPosition = { x: number; y: number };
@@ -139,6 +157,9 @@ export function VoiceFloatingController({
   actions,
   onLeave,
   onOpenFullSheet,
+  morphProgress,
+  onRestPositionCommit,
+  armed = true,
 }: VoiceFloatingControllerProps) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -159,7 +180,15 @@ export function VoiceFloatingController({
   const controlsProgress = useSharedValue(0);
   const initializedRef = useRef(false);
 
-  const active = visible && state.activeChannel && (state.joined || state.joining);
+  const sessionActive = Boolean(
+    state.activeChannel && (state.joined || state.joining),
+  );
+  // With a morph progress the bubble stays mounted while the panel is open so it
+  // can animate out; otherwise it unmounts the moment the sheet opens.
+  const active = morphProgress ? sessionActive : visible && sessionActive;
+  // Dragging / tapping the bubble is only allowed when it's the visible surface
+  // (sheet closed) and the bubble has been revealed (armed).
+  const interactive = active && visible && armed;
   const participantCount = state.participants.length + (state.joined ? 1 : 0);
 
   const closeControls = useCallback(() => {
@@ -170,9 +199,13 @@ export function VoiceFloatingController({
     setControlsOpen((open) => !open);
   }, []);
 
-  const commitRestPosition = useCallback((x: number, y: number) => {
-    setRestPosition({ x, y });
-  }, []);
+  const commitRestPosition = useCallback(
+    (x: number, y: number) => {
+      setRestPosition({ x, y });
+      onRestPositionCommit?.({ x: x + BUBBLE_SIZE / 2, y: y + BUBBLE_SIZE / 2 });
+    },
+    [onRestPositionCommit],
+  );
 
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -195,6 +228,10 @@ export function VoiceFloatingController({
       restX.value = initialX;
       restY.value = initialY;
       setRestPosition({ x: initialX, y: initialY });
+      onRestPositionCommit?.({
+        x: initialX + BUBBLE_SIZE / 2,
+        y: initialY + BUBBLE_SIZE / 2,
+      });
     },
     [
       insets.bottom,
@@ -203,6 +240,7 @@ export function VoiceFloatingController({
       insets.top,
       layoutH,
       layoutW,
+      onRestPositionCommit,
       restX,
       restY,
       translateX,
@@ -211,14 +249,14 @@ export function VoiceFloatingController({
   );
 
   useEffect(() => {
-    if (active) return;
+    if (interactive) return;
     setControlsOpen(false);
-  }, [active]);
+  }, [interactive]);
 
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(Boolean(active))
+        .enabled(interactive)
         .onStart(() => {
           runOnJS(closeControls)();
           panStartX.value = translateX.value;
@@ -293,12 +331,16 @@ export function VoiceFloatingController({
               "worklet";
               if (finished) {
                 restY.value = translateY.value;
+                // Re-commit with the final position: the vertical decay can
+                // outlast the horizontal one, so the X callback may have
+                // recorded a still-moving Y.
+                runOnJS(commitRestPosition)(translateX.value, translateY.value);
               }
             },
           );
         }),
     [
-      active,
+      interactive,
       closeControls,
       commitRestPosition,
       insets.bottom,
@@ -319,18 +361,43 @@ export function VoiceFloatingController({
   const tapGesture = useMemo(
     () =>
       Gesture.Tap()
-        .enabled(Boolean(active))
+        .enabled(interactive)
         .onEnd(() => {
+          // Stop any in-flight settle and pin restPosition to where the bubble
+          // actually is, so the controls anchor here instead of the pre-fling
+          // spot and then snapping over once the decay finally commits.
+          cancelAnimation(translateX);
+          cancelAnimation(translateY);
+          restX.value = translateX.value;
+          restY.value = translateY.value;
+          runOnJS(commitRestPosition)(translateX.value, translateY.value);
           runOnJS(toggleControls)();
         }),
-    [active, toggleControls],
+    [commitRestPosition, interactive, restX, restY, toggleControls, translateX, translateY],
   );
 
   const gesture = useMemo(() => Gesture.Race(panGesture, tapGesture), [panGesture, tapGesture]);
 
-  const bubbleStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }, { translateY: translateY.value }],
-  }));
+  const bubbleStyle = useAnimatedStyle(() => {
+    const p = morphProgress ? morphProgress.value : 0;
+    const baseX = translateX.value;
+    const baseY = translateY.value;
+    // As the panel opens, glide the bubble toward the panel's rest center while
+    // it shrinks and fades — so it reads as turning into the panel.
+    const targetX = layoutW.value / 2 - BUBBLE_SIZE / 2;
+    const targetY = layoutH.value * 0.54 - BUBBLE_SIZE / 2;
+    // Until the bubble is armed (panel first minimized) it stays fully hidden so
+    // a fresh join opens straight into the panel with no bubble flash.
+    const armedFactor = armed ? 1 : 0;
+    return {
+      opacity: interpolate(p, [0, 0.6], [1, 0], Extrapolation.CLAMP) * armedFactor,
+      transform: [
+        { translateX: baseX + (targetX - baseX) * p },
+        { translateY: baseY + (targetY - baseY) * p },
+        { scale: interpolate(p, [0, 1], [1, 0.4]) },
+      ],
+    };
+  }, [armed, morphProgress]);
 
   const controlPlacement = useMemo<ControlPlacement | null>(() => {
     if (!restPosition) return null;
@@ -464,9 +531,9 @@ export function VoiceFloatingController({
 
       <GestureDetector gesture={gesture}>
         <Animated.View
-          pointerEvents="auto"
-          entering={FadeIn.duration(160)}
-          exiting={FadeOut.duration(120)}
+          pointerEvents={interactive ? "auto" : "none"}
+          entering={armed ? FadeIn.duration(160) : undefined}
+          exiting={armed ? FadeOut.duration(120) : undefined}
           style={[{ position: "absolute", height: BUBBLE_SIZE, width: BUBBLE_SIZE }, bubbleStyle]}
         >
           <View className="h-full w-full items-center justify-center rounded-full border border-border-panel bg-primary shadow-lg">

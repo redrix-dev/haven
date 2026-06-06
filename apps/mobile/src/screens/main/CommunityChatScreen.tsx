@@ -66,6 +66,7 @@ export function CommunityChatScreen({
   const navigationChannelId = core.channels.useActiveChannelId();
   const messageNexus = core.messages.for(communityId ?? "__none__");
   const currentUserId = user?.id ?? null;
+  const currentUserPlatformStaff = core.profiles.usePlatformStaff(currentUserId);
   const nexusCommunities = core.communities.useCommunities();
   const serversLoading = core.communities.useIsLoading();
   const serversError = core.communities.useLoadError();
@@ -189,9 +190,16 @@ export function CommunityChatScreen({
         mediaFilename: options?.mediaFilename,
         optimisticMediaUri: options?.optimisticMediaUri ?? null,
         senderUserId: currentUserId,
+        senderIsPlatformStaff: currentUserPlatformStaff?.isActive === true,
       });
     },
-    [activeChannelId, currentUserId, messageNexus, setRainbowMode],
+    [
+      activeChannelId,
+      currentUserId,
+      currentUserPlatformStaff?.isActive,
+      messageNexus,
+      setRainbowMode,
+    ],
   );
 
   const visibleMessages = messageNexus.useVisibleChannel(

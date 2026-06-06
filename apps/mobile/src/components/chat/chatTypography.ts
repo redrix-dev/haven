@@ -14,13 +14,13 @@ export const CHAT_MARKDOWN_TYPOGRAPHY = {
 } as const;
 
 export const CHAT_COMPOSER_INPUT_STYLE = {
-  minHeight: 44,
-  maxHeight: 168,
-  paddingHorizontal: 14,
-  paddingTop: 10,
-  paddingBottom: 10,
-  fontSize: 16,
-  lineHeight: 22,
+  minHeight: 48,
+  maxHeight: 184,
+  paddingHorizontal: 16,
+  paddingTop: 12,
+  paddingBottom: 12,
+  fontSize: 17,
+  lineHeight: 24,
   backgroundColor: "transparent",
 } as const;
 

@@ -3,6 +3,7 @@ import type { NavigationProp } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSharedValue, withTiming } from "react-native-reanimated";
 import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
 import { CommunityEntry } from "@/navigation/community/CommunityEntry";
 import { CommunityShell } from "@/navigation/community/CommunityShell";
@@ -295,6 +296,18 @@ function MainNavigationShell({ userId }: { userId: string }) {
     setVoiceControlActions,
   } = voice.actions;
   const [voiceSheetOpen, setVoiceSheetOpen] = useState(false);
+  // Single 0→1 progress shared by the floating bubble and the session panel so
+  // they morph as one coordinated motion (0 = bubble, 1 = panel) anchored at the
+  // bubble's on-screen position.
+  const voiceMorph = useSharedValue(0);
+  const [voiceBubbleAnchor, setVoiceBubbleAnchor] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  // The floating bubble is the panel's *minimized* form, so it stays suppressed
+  // on a fresh join (which opens straight into the panel) and is only revealed
+  // once the user first minimizes. Resets when the session ends.
+  const [voiceBubbleArmed, setVoiceBubbleArmed] = useState(false);
   const [interruptionNoticeVisible, setInterruptionNoticeVisible] =
     useState(false);
   const [skipVoiceSwitchPrompt, setSkipVoiceSwitchPrompt] = useState(false);
@@ -316,6 +329,20 @@ function MainNavigationShell({ userId }: { userId: string }) {
     setSkipVoiceSwitchPrompt(skip);
     void saveSkipVoiceSwitchPrompt(skip);
   }, []);
+
+  // Drive the morph in lockstep with the sheet toggle.
+  useEffect(() => {
+    voiceMorph.value = withTiming(voiceSheetOpen ? 1 : 0, {
+      duration: voiceSheetOpen ? 300 : 260,
+    });
+  }, [voiceMorph, voiceSheetOpen]);
+
+  const handleVoiceBubbleAnchor = useCallback(
+    (center: { x: number; y: number }) => {
+      setVoiceBubbleAnchor(center);
+    },
+    [],
+  );
 
   const openVoiceSheet = useCallback(() => {
     if (voiceSheetOpenTimeoutRef.current) {
@@ -341,10 +368,19 @@ function MainNavigationShell({ userId }: { userId: string }) {
     voiceSheetOpenTimeoutRef.current = null;
   }, []);
 
-  const closeVoiceSheet = useCallback(() => {
+  // Close the panel without revealing the bubble — used for teardown (leave /
+  // kick / error) so the session exits cleanly instead of flashing the bubble.
+  const dismissVoiceSheet = useCallback(() => {
     clearPendingVoiceSheetOpen();
     setVoiceSheetOpen(false);
   }, [clearPendingVoiceSheetOpen]);
+
+  const closeVoiceSheet = useCallback(() => {
+    // User-initiated minimize: reveal the bubble; from now on the panel morphs
+    // to/from it.
+    setVoiceBubbleArmed(true);
+    dismissVoiceSheet();
+  }, [dismissVoiceSheet]);
 
   useEffect(() => {
     return () => {
@@ -374,7 +410,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
 
   const handleVoiceSessionError = useCallback(
     (message: string) => {
-      closeVoiceSheet();
+      dismissVoiceSheet();
       Alert.alert("Voice connection failed", message);
       void disconnectVoiceSession({ triggerPaneLeave: false }).catch(
         (error: unknown) => {
@@ -382,11 +418,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
         },
       );
     },
-    [closeVoiceSheet, disconnectVoiceSession],
+    [dismissVoiceSheet, disconnectVoiceSession],
   );
 
   const handleVoiceKick = useCallback(() => {
-    closeVoiceSheet();
+    dismissVoiceSheet();
     void forceDisconnectVoice("kicked")
       .then(() => {
         Alert.alert(
@@ -397,7 +433,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
       .catch((error: unknown) => {
         console.warn("[voice] Failed to disconnect after kick.", error);
       });
-  }, [closeVoiceSheet, forceDisconnectVoice]);
+  }, [dismissVoiceSheet, forceDisconnectVoice]);
 
   const handleVoiceInterrupted = useCallback(() => {
     setInterruptionNoticeVisible(true);
@@ -418,8 +454,18 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const { joinVoiceChannel, leaveVoiceChannel, toggleMute, toggleDeafen } =
     voiceController.actions;
 
+  // Re-arm (suppress) the bubble whenever a voice session ends so the next join
+  // opens straight into the panel again.
+  const voiceSessionActive =
+    voiceController.state.joined || voiceController.state.joining;
+  useEffect(() => {
+    if (!voiceSessionActive) setVoiceBubbleArmed(false);
+  }, [voiceSessionActive]);
+
   const handleLeaveVoiceSession = useCallback(() => {
-    closeVoiceSheet();
+    // Leaving dismisses the panel without arming the bubble, so teardown is a
+    // clean exit rather than a flash of the bubble appearing then disappearing.
+    dismissVoiceSheet();
     void (async () => {
       try {
         await leaveVoiceChannel();
@@ -432,7 +478,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
         console.warn("[voice] Failed to clear voice session state.", error);
       }
     })();
-  }, [closeVoiceSheet, disconnectVoiceSession, leaveVoiceChannel]);
+  }, [dismissVoiceSheet, disconnectVoiceSession, leaveVoiceChannel]);
 
   useEffect(() => {
     if (!activeVoiceControllerChannelKey) {
@@ -726,6 +772,9 @@ function MainNavigationShell({ userId }: { userId: string }) {
           actions={voiceController.actions}
           onLeave={handleLeaveVoiceSession}
           onOpenFullSheet={openVoiceSheet}
+          morphProgress={voiceMorph}
+          onRestPositionCommit={handleVoiceBubbleAnchor}
+          armed={voiceBubbleArmed}
         />
       </View>
 
@@ -756,6 +805,10 @@ function MainNavigationShell({ userId }: { userId: string }) {
         actions={voiceController.actions}
         onLeave={handleLeaveVoiceSession}
         onDismiss={closeVoiceSheet}
+        morphProgress={voiceMorph}
+        // First open (pre-minimize) rises from bottom-center; once the bubble is
+        // revealed, subsequent opens morph from its on-screen position.
+        morphAnchor={voiceBubbleArmed ? voiceBubbleAnchor : null}
       />
       <HavenListSheet
         visible={interruptionNoticeVisible}

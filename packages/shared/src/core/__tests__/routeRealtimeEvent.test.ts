@@ -15,7 +15,7 @@ type FakeCore = Pick<
   HavenCore,
   'communities' | 'channels' | 'messages' | 'profiles' | 'routeEvent'
 > & {
-  backends: { communityData: Pick<HavenBackends['communityData'], 'listChannelMessages'> };
+  backends: { communityData: Pick<HavenBackends['communityData'], 'getChannelMessage'> };
   onRoleChange: HavenCore['onRoleChange'];
   onNotificationEvent: HavenCore['onNotificationEvent'];
   onDmConversationEvent: HavenCore['onDmConversationEvent'];
@@ -24,7 +24,7 @@ type FakeCore = Pick<
 };
 
 const buildFakeCore = (
-  listChannelMessages: HavenBackends['communityData']['listChannelMessages'],
+  getChannelMessage: HavenBackends['communityData']['getChannelMessage'],
 ): FakeCore => {
   const persistence = createMemoryPersistence();
   const communities = new CommunityNexus(persistence, {} as never);
@@ -58,7 +58,7 @@ const buildFakeCore = (
         messageNexuses.clear();
       },
     } as unknown as HavenCore['messages'],
-    backends: { communityData: { listChannelMessages } },
+    backends: { communityData: { getChannelMessage } },
     routeEvent: (evt) => routeRealtimeEvent(core as unknown as HavenCore, evt),
     onRoleChange: vi.fn(),
     onNotificationEvent: vi.fn(),
@@ -94,11 +94,8 @@ const completeBundle = (overrides: Partial<MessageBundle>): MessageBundle =>
 describe('routeRealtimeEvent', () => {
   it('MESSAGE_INSERT inserts partial then hydrates from backend', async () => {
     const full = completeBundle({ id: 'msg-new', content: 'full body' });
-    const listChannelMessages = vi.fn().mockResolvedValue({
-      messages: [full],
-      hasMore: false,
-    });
-    const core = buildFakeCore(listChannelMessages);
+    const getChannelMessage = vi.fn().mockResolvedValue(full);
+    const core = buildFakeCore(getChannelMessage);
 
     routeRealtimeEvent(core as unknown as HavenCore, {
       type: 'MESSAGE_INSERT',
@@ -116,8 +113,71 @@ describe('routeRealtimeEvent', () => {
     expect(nexus.getSnapshot('msg-new')?.content).toBe('partial');
 
     await vi.waitFor(() => {
-      expect(listChannelMessages).toHaveBeenCalled();
+      expect(getChannelMessage).toHaveBeenCalledWith({
+        communityId: 'srv-1',
+        channelId: 'ch-1',
+        messageId: 'msg-new',
+      });
       expect(nexus.getSnapshot('msg-new')?.content).toBe('full body');
+    });
+  });
+
+  it('MESSAGE_INSERT hydrates stale optimistic staff state from the exact backend row', async () => {
+    const full = completeBundle({
+      id: 'msg-staff',
+      content: 'staff body',
+      isPlatformStaff: true,
+      displayName: 'Cody',
+    });
+    const getChannelMessage = vi.fn().mockResolvedValue(full);
+    const core = buildFakeCore(getChannelMessage);
+    const nexus = core.messages.for('srv-1');
+    nexus.insertMessage(
+      completeBundle({
+        id: 'msg-staff',
+        content: 'optimistic',
+        displayName: '…',
+        isPlatformStaff: false,
+      }),
+    );
+
+    routeRealtimeEvent(core as unknown as HavenCore, {
+      type: 'MESSAGE_INSERT',
+      payload: {
+        community_id: 'srv-1',
+        channel_id: 'ch-1',
+        message_id: 'msg-staff',
+        author_user_id: 'user-1',
+        content: 'optimistic',
+        created_at: full.createdAt,
+      },
+    });
+
+    await vi.waitFor(() => {
+      const snapshot = nexus.getSnapshot('msg-staff');
+      expect(snapshot?.content).toBe('staff body');
+      expect(snapshot?.displayName).toBe('Cody');
+      expect(snapshot?.isPlatformStaff).toBe(true);
+    });
+  });
+
+  it('MESSAGE_UPDATE upserts backend rows that are not already cached', async () => {
+    const full = completeBundle({ id: 'msg-update', content: 'edited body' });
+    const getChannelMessage = vi.fn().mockResolvedValue(full);
+    const core = buildFakeCore(getChannelMessage);
+    const nexus = core.messages.for('srv-1');
+
+    routeRealtimeEvent(core as unknown as HavenCore, {
+      type: 'MESSAGE_UPDATE',
+      payload: {
+        community_id: 'srv-1',
+        channel_id: 'ch-1',
+        message_id: 'msg-update',
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(nexus.getSnapshot('msg-update')?.content).toBe('edited body');
     });
   });
 

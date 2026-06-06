@@ -39,12 +39,6 @@ const normalizeCreatedAt = (value: unknown): string | null => {
   return new Date(ms).toISOString();
 };
 
-const createdAtBeforeCursor = (value: unknown): string | undefined => {
-  const normalized = normalizeCreatedAt(value);
-  if (!normalized) return undefined;
-  return new Date(Date.parse(normalized) + 1).toISOString();
-};
-
 export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
   switch (evt.type) {
     case "MESSAGE_INSERT": {
@@ -96,19 +90,15 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
 
       nexus.insertMessage(partial);
 
-      const beforeCreatedAt = createdAtBeforeCursor(createdAt);
-
       void core.backends.communityData
-        .listChannelMessages({
+        .getChannelMessage({
           communityId,
           channelId,
-          limit: 1,
-          ...(beforeCreatedAt ? { beforeCreatedAt } : {}),
+          messageId,
         })
-        .then((result) => {
-          const message = result.messages.find((m) => m.id === messageId);
+        .then((message) => {
           if (!message) return;
-          nexus.updateMessage(messageId, message);
+          nexus.upsertMessage(message);
         })
         .catch((err) => {
           console.warn("[routeRealtimeEvent] MESSAGE_INSERT fetch failed", err);
@@ -120,7 +110,6 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       const communityId = evt.payload.community_id;
       const channelId = evt.payload.channel_id;
       const messageId = evt.payload.message_id;
-      const createdAt = evt.payload.created_at;
       if (
         typeof communityId !== "string" ||
         typeof channelId !== "string" ||
@@ -129,19 +118,16 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
         return;
 
       const nexus = core.messages.for(communityId);
-      const beforeCreatedAt = createdAtBeforeCursor(createdAt);
 
       void core.backends.communityData
-        .listChannelMessages({
+        .getChannelMessage({
           communityId,
           channelId,
-          limit: 1,
-          ...(beforeCreatedAt ? { beforeCreatedAt } : {}),
+          messageId,
         })
-        .then((result) => {
-          const message = result.messages.find((m) => m.id === messageId);
+        .then((message) => {
           if (!message) return;
-          nexus.updateMessage(messageId, message);
+          nexus.upsertMessage(message);
         })
         .catch((err) => {
           console.warn("[routeRealtimeEvent] MESSAGE_UPDATE fetch failed", err);

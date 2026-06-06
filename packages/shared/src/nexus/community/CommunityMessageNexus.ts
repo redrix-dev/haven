@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
-import { Nexus, type NexusState } from '../Nexus'
+import { Nexus, type NexusEntry, type NexusState } from '../Nexus'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
 import type { ViewerMessagePolicyStore } from '@shared/core/viewerMessagePolicy'
 import {
@@ -18,6 +18,24 @@ import type { StoreApi, UseBoundStore } from 'zustand'
 
 const MESSAGE_PAGE_SIZE = 50
 const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000
+/**
+ * Per-channel cap on how many trailing (newest) messages we persist to MMKV.
+ * Cold start rehydrates this tail so a visited channel renders instantly while
+ * `ensureInitialLoaded` refreshes in the background.
+ */
+const PERSIST_MESSAGE_CAP = MESSAGE_PAGE_SIZE
+
+type PersistedMessageState = {
+  byChannel: Record<string, string[]>
+  cursors: Record<string, string | null>
+  hasMore: Record<string, boolean>
+  initialLoadComplete: Record<string, boolean>
+}
+
+type PersistedMessageSnapshot = {
+  entities: Record<string, NexusEntry<MessageBundle>>
+  channelState: PersistedMessageState
+}
 
 type CommunityMessageState = {
   byChannel: Record<string, string[]>
@@ -37,6 +55,7 @@ export type SendCommunityMessageMediaOptions = {
   mediaExpiresInHours?: number
   optimisticMediaUri?: string | null
   senderUserId?: string | null
+  senderIsPlatformStaff?: boolean
 }
 
 export type ChannelMeta = {
@@ -51,7 +70,39 @@ const coerceMediaExpiresInHours = (
   value: number | undefined,
 ): 1 | 24 | 168 | 720 => {
   if (value === 1 || value === 24 || value === 168 || value === 720) return value
-  return 24
+  // Default to the longest supported lifetime so media doesn't silently vanish
+  // from channels. Callers can still opt into a shorter, ephemeral expiry.
+  return 720
+}
+
+/**
+ * Signed media URLs expire ~1h after they're minted, so persisting them would
+ * rehydrate dead links on a later cold start. Null them out before persisting;
+ * the background refresh re-signs them (and the UI shows an "unavailable"
+ * placeholder rather than a broken image in the meantime).
+ */
+const stripEphemeralMediaUrls = (bundle: MessageBundle): MessageBundle => {
+  if (!bundle.attachment && !bundle.linkPreview?.snapshot?.thumbnail) {
+    return bundle
+  }
+  return {
+    ...bundle,
+    attachment: bundle.attachment
+      ? { ...bundle.attachment, signedUrl: null }
+      : null,
+    linkPreview: bundle.linkPreview?.snapshot?.thumbnail
+      ? {
+          ...bundle.linkPreview,
+          snapshot: {
+            ...bundle.linkPreview.snapshot,
+            thumbnail: {
+              ...bundle.linkPreview.snapshot.thumbnail,
+              signedUrl: null,
+            },
+          },
+        }
+      : bundle.linkPreview,
+  }
 }
 
 export const messagesEqual = (a: MessageBundle[], b: MessageBundle[]): boolean => {
@@ -237,7 +288,11 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
   async send(
     channelId: string,
     content: string,
-    options?: { replyToMessageId?: string | null; senderUserId?: string | null },
+    options?: {
+      replyToMessageId?: string | null
+      senderUserId?: string | null
+      senderIsPlatformStaff?: boolean
+    },
   ): Promise<{ id: string }> {
     if (!this.communityData) {
       throw new Error('CommunityMessageNexus.send called before backend attached.')
@@ -265,7 +320,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
       editedAt: null,
       deletedAt: null,
       isHidden: false,
-      isPlatformStaff: false,
+      isPlatformStaff: options?.senderIsPlatformStaff === true,
       reactions: [],
       attachment: null,
       linkPreview: null,
@@ -295,6 +350,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
       await this.send(channelId, content, {
         replyToMessageId: options?.replyToMessageId ?? null,
         senderUserId: options?.senderUserId ?? null,
+        senderIsPlatformStaff: options?.senderIsPlatformStaff === true,
       })
       return
     }
@@ -332,6 +388,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     const { id } = await this.send(channelId, messageContent, {
       replyToMessageId: options?.replyToMessageId ?? null,
       senderUserId: options?.senderUserId ?? null,
+      senderIsPlatformStaff: options?.senderIsPlatformStaff === true,
     })
 
     try {
@@ -568,6 +625,22 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     this.notifyRevision()
   }
 
+  upsertMessage(message: MessageBundle): void {
+    this.store.setState((state) => ({
+      entities: {
+        ...state.entities,
+        [message.id]: {
+          data: this.transform(message),
+          partial: false,
+          cachedAt: Date.now(),
+        },
+      },
+    }))
+    this.insertIntoChannel(message)
+    this.persist()
+    this.notifyRevision()
+  }
+
   insertMessages(
     messages: MessageBundle[],
     channelId: string,
@@ -576,12 +649,17 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     this.store.setState((state) => {
       const next = { ...state.entities }
       for (const message of messages) {
-        if (!next[message.id] || next[message.id].partial) {
-          next[message.id] = {
-            data: this.transform(message),
-            partial: false,
-            cachedAt: Date.now(),
-          }
+        // Overwrite with the freshly fetched server bundle even when the message
+        // is already cached: a page fetch is authoritative, so this re-signs
+        // attachment/preview URLs (which expire ~1h after they were minted),
+        // drops attachments whose media has expired, and pulls in edits /
+        // reactions missed while offline. Without this, rehydrated or
+        // previously-loaded messages keep stale signed URLs and render as blank
+        // media.
+        next[message.id] = {
+          data: this.transform(message),
+          partial: false,
+          cachedAt: Date.now(),
         }
       }
       return { entities: next }
@@ -732,6 +810,17 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     return ids[ids.length - 1] ?? null
   }
 
+  /** Unique, non-null author user ids currently loaded for a channel. */
+  getChannelAuthorIds(channelId: string): string[] {
+    const ids = this.channelState.byChannel[channelId] ?? []
+    const authors = new Set<string>()
+    for (const id of ids) {
+      const author = this.getSnapshot(id)?.authorUserId
+      if (author) authors.add(author)
+    }
+    return Array.from(authors)
+  }
+
   clear(): void {
     this.channelState = {
       byChannel: {},
@@ -750,6 +839,99 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     this.channelMessageSnapshots.clear()
     this.channelMetaSnapshots.clear()
     super.clear()
+  }
+
+  /**
+   * Persist a capped, per-channel tail of messages plus the channel index so a
+   * cold start can render cached content before the network refresh lands.
+   * Mirrors {@link ChannelNexus.persist}: entities (non-partial) + index maps.
+   */
+  override persist(): void {
+    try {
+      const state = this.store.getState()
+      const byChannel: Record<string, string[]> = {}
+      const cursors: Record<string, string | null> = {}
+      const hasMore: Record<string, boolean> = {}
+      const initialLoadComplete: Record<string, boolean> = {}
+      const entities: Record<string, NexusEntry<MessageBundle>> = {}
+
+      for (const [channelId, ids] of Object.entries(this.channelState.byChannel)) {
+        if (!ids.length) continue
+        // byChannel is ascending (oldest -> newest); keep the newest tail.
+        const tail = ids.length > PERSIST_MESSAGE_CAP ? ids.slice(-PERSIST_MESSAGE_CAP) : ids
+        const keptIds = tail.filter((id) => {
+          const entry = state.entities[id]
+          return entry != null && !entry.partial
+        })
+        if (!keptIds.length) continue
+
+        for (const id of keptIds) {
+          const entry = state.entities[id]
+          entities[id] = { ...entry, data: stripEphemeralMediaUrls(entry.data) }
+        }
+        byChannel[channelId] = keptIds
+
+        // If we dropped older messages, force hasMore so scroll-up can refetch.
+        const droppedOlder = keptIds.length < ids.length
+        hasMore[channelId] = droppedOlder
+          ? true
+          : (this.channelState.hasMore[channelId] ?? false)
+
+        const oldest = state.entities[keptIds[0]]?.data
+        cursors[channelId] = oldest ? `${oldest.createdAt}|${oldest.id}` : null
+        initialLoadComplete[channelId] =
+          this.channelState.initialLoadComplete[channelId] ?? false
+      }
+
+      const snapshot: PersistedMessageSnapshot = {
+        entities,
+        channelState: { byChannel, cursors, hasMore, initialLoadComplete },
+      }
+      this.persistence.set(this.storageKey, JSON.stringify(snapshot))
+    } catch (error) {
+      console.warn('[CommunityMessageNexus] Failed to persist', error)
+    }
+  }
+
+  override rehydrate(): void {
+    try {
+      const raw = this.persistence.getString(this.storageKey)
+      if (!raw) return
+
+      const parsed = JSON.parse(raw) as
+        | PersistedMessageSnapshot
+        | Record<string, NexusEntry<MessageBundle>>
+
+      // New format: { entities, channelState }. Legacy format: bare entity map.
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        'channelState' in parsed &&
+        'entities' in parsed
+      ) {
+        const snapshot = parsed as PersistedMessageSnapshot
+        this.store.setState({ entities: snapshot.entities ?? {}, revision: 0 })
+        this.channelState = {
+          byChannel: snapshot.channelState?.byChannel ?? {},
+          cursors: snapshot.channelState?.cursors ?? {},
+          hasMore: snapshot.channelState?.hasMore ?? {},
+          initialLoadComplete: snapshot.channelState?.initialLoadComplete ?? {},
+          loadingInitial: {},
+          loadingOlder: {},
+          // Intentionally left empty so ensureInitialLoaded() treats the
+          // rehydrated tail as stale and refreshes in the background.
+          lastInitialLoadedAt: {},
+        }
+      } else {
+        this.store.setState({
+          entities: parsed as Record<string, NexusEntry<MessageBundle>>,
+          revision: 0,
+        })
+      }
+    } catch (error) {
+      console.warn('[CommunityMessageNexus] Failed to rehydrate', error)
+      this.persistence.remove(this.storageKey)
+    }
   }
 
   private setLoadingInitial(channelId: string, loading: boolean): void {

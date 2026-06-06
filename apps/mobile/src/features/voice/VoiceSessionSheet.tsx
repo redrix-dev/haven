@@ -7,9 +7,11 @@ import {
   View,
   type DimensionValue,
 } from "react-native";
+import type { SharedValue } from "react-native-reanimated";
 import type { VoiceSettings } from "@shared/types/settings";
 import type { VoiceParticipant } from "@shared/features/voice/types";
 import { HavenModalShell } from "@/components/HavenModalShell";
+import { VoiceMorphShell } from "@/features/voice/VoiceMorphShell";
 import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
 import type {
   MobileVoiceControllerActions,
@@ -29,6 +31,15 @@ type VoiceSessionSheetProps = {
   actions: MobileVoiceControllerActions;
   onLeave: () => void;
   onDismiss: () => void;
+  /**
+   * When provided, the panel renders as a spatial morph that grows from /
+   * collapses toward the floating bubble using this shared progress value and
+   * anchor, instead of the default slide-up sheet. Both this panel and the
+   * bubble read the same progress so the transition is a single coordinated
+   * motion.
+   */
+  morphProgress?: SharedValue<number>;
+  morphAnchor?: { x: number; y: number } | null;
 };
 
 type ParticipantTileProps = {
@@ -185,6 +196,8 @@ export function VoiceSessionSheet({
   actions,
   onLeave,
   onDismiss,
+  morphProgress,
+  morphAnchor,
 }: VoiceSessionSheetProps) {
   const channelName = state.activeChannel?.channelName ?? "Voice";
   const currentUserParticipant: VoiceParticipant = {
@@ -200,14 +213,8 @@ export function VoiceSessionSheet({
   const levelPercent = `${Math.round(state.localInputLevel * 100)}%`;
   const levelWidth = levelPercent as DimensionValue;
 
-  return (
-    <HavenModalShell
-      visible={visible}
-      onDismiss={onDismiss}
-      title="Voice"
-      cardClassName="h-[92%]"
-    >
-      <ScrollView
+  const body = (
+    <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 8 }}
         showsVerticalScrollIndicator={false}
@@ -398,6 +405,31 @@ export function VoiceSessionSheet({
           ) : null}
         </View>
       </ScrollView>
+  );
+
+  if (morphProgress) {
+    return (
+      <VoiceMorphShell
+        visible={visible}
+        progress={morphProgress}
+        anchor={morphAnchor ?? null}
+        title="Voice"
+        cardClassName="h-[92%]"
+        onDismiss={onDismiss}
+      >
+        {body}
+      </VoiceMorphShell>
+    );
+  }
+
+  return (
+    <HavenModalShell
+      visible={visible}
+      onDismiss={onDismiss}
+      title="Voice"
+      cardClassName="h-[92%]"
+    >
+      {body}
     </HavenModalShell>
   );
 }

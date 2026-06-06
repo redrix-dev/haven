@@ -860,6 +860,71 @@ const mapMessageLinkPreviewRowsWithSignedUrls = async (
   });
 };
 
+const mapChannelMessageRpcRowsToBundles = async (
+  rows: Record<string, unknown>[],
+  fallbackChannelId: string,
+): Promise<MessageBundle[]> => {
+  const attachmentRows: MessageAttachmentRow[] = [];
+  const previewRows: MessageLinkPreviewRow[] = [];
+
+  for (const row of rows) {
+    const att = parseMessageAttachmentRowFromRpcJson(row.attachment);
+    if (att) attachmentRows.push(att);
+    const prev = parseMessageLinkPreviewRowFromRpcJson(row.link_preview);
+    if (prev) previewRows.push(prev);
+  }
+
+  const signedAttachments = await mapMessageAttachmentRowsWithSignedUrls(attachmentRows);
+  const signedPreviews = await mapMessageLinkPreviewRowsWithSignedUrls(previewRows);
+  const attByMessageId = new Map(signedAttachments.map((a) => [a.messageId, a]));
+  const previewByMessageId = new Map(signedPreviews.map((p) => [p.messageId, p]));
+
+  return rows.map((row) => {
+    const id = asOptionalString(row.id);
+    if (!id) {
+      throw new Error('channel message RPC returned a row without id');
+    }
+
+    return {
+      id,
+      channelId: asOptionalString(row.channel_id) ?? fallbackChannelId,
+      authorUserId:
+        row.author_user_id === null || row.author_user_id === undefined
+          ? null
+          : String(row.author_user_id),
+      displayName: typeof row.display_name === 'string' ? row.display_name : '',
+      avatarSnapshotUrl:
+        row.avatar_snapshot_url === null || row.avatar_snapshot_url === undefined
+          ? null
+          : asOptionalString(row.avatar_snapshot_url),
+      content: typeof row.content === 'string' ? row.content : '',
+      metadata: normalizeMessageMetadata(row.metadata),
+      replyToMessageId:
+        row.reply_to_message_id === null || row.reply_to_message_id === undefined
+          ? null
+          : String(row.reply_to_message_id),
+      createdAt: typeof row.created_at === 'string' ? row.created_at : '',
+      editedAt:
+        row.edited_at === null || row.edited_at === undefined
+          ? null
+          : typeof row.edited_at === 'string'
+            ? row.edited_at
+            : null,
+      deletedAt:
+        row.deleted_at === null || row.deleted_at === undefined
+          ? null
+          : typeof row.deleted_at === 'string'
+            ? row.deleted_at
+            : null,
+      isHidden: Boolean(row.is_hidden),
+      isPlatformStaff: row.is_platform_staff === true,
+      reactions: normalizeReactionsFromRpc(row.reactions),
+      attachment: attByMessageId.get(id) ?? null,
+      linkPreview: previewByMessageId.get(id) ?? null,
+    };
+  });
+};
+
 export const centralCommunityDataBackend: CommunityDataBackend = {
   async getMyPermissions(communityId) {
     const allFalse: ServerPermissions & { isElevated: boolean } = {
@@ -1364,70 +1429,59 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
 
     const rows = (data ?? []) as Record<string, unknown>[];
-    const attachmentRows: MessageAttachmentRow[] = [];
-    const previewRows: MessageLinkPreviewRow[] = [];
-
-    for (const row of rows) {
-      const att = parseMessageAttachmentRowFromRpcJson(row.attachment);
-      if (att) attachmentRows.push(att);
-      const prev = parseMessageLinkPreviewRowFromRpcJson(row.link_preview);
-      if (prev) previewRows.push(prev);
-    }
-
-    const signedAttachments = await mapMessageAttachmentRowsWithSignedUrls(attachmentRows);
-    const signedPreviews = await mapMessageLinkPreviewRowsWithSignedUrls(previewRows);
-    const attByMessageId = new Map(signedAttachments.map((a) => [a.messageId, a]));
-    const previewByMessageId = new Map(signedPreviews.map((p) => [p.messageId, p]));
-
-    const messages: MessageBundle[] = rows.map((row) => {
-      const id = asOptionalString(row.id);
-      if (!id) {
-        throw new Error('list_channel_messages returned a row without id');
-      }
-
-      return {
-        id,
-        channelId: input.channelId,
-        authorUserId:
-          row.author_user_id === null || row.author_user_id === undefined
-            ? null
-            : String(row.author_user_id),
-        displayName: typeof row.display_name === 'string' ? row.display_name : '',
-        avatarSnapshotUrl:
-          row.avatar_snapshot_url === null || row.avatar_snapshot_url === undefined
-            ? null
-            : asOptionalString(row.avatar_snapshot_url),
-        content: typeof row.content === 'string' ? row.content : '',
-        metadata: normalizeMessageMetadata(row.metadata),
-        replyToMessageId:
-          row.reply_to_message_id === null || row.reply_to_message_id === undefined
-            ? null
-            : String(row.reply_to_message_id),
-        createdAt: typeof row.created_at === 'string' ? row.created_at : '',
-        editedAt:
-          row.edited_at === null || row.edited_at === undefined
-            ? null
-            : typeof row.edited_at === 'string'
-              ? row.edited_at
-              : null,
-        deletedAt:
-          row.deleted_at === null || row.deleted_at === undefined
-            ? null
-            : typeof row.deleted_at === 'string'
-              ? row.deleted_at
-              : null,
-        isHidden: Boolean(row.is_hidden),
-        isPlatformStaff: row.is_platform_staff === true,
-        reactions: normalizeReactionsFromRpc(row.reactions),
-        attachment: attByMessageId.get(id) ?? null,
-        linkPreview: previewByMessageId.get(id) ?? null,
-      };
-    });
+    const messages = await mapChannelMessageRpcRowsToBundles(rows, input.channelId);
 
     return {
       messages,
       hasMore: rows.length === (input.limit ?? 50),
     };
+  },
+
+  async getChannelMessage(input) {
+    const { communityId, channelId, messageId } = input;
+    const { data, error } = await havenCommunitySb().rpc('get_channel_message' as never, {
+      p_community_id: communityId,
+      p_channel_id: channelId,
+      p_message_id: messageId,
+    } as never);
+    if (error) throw error;
+
+    const rows = (data ?? []) as Record<string, unknown>[];
+    const messages = await mapChannelMessageRpcRowsToBundles(rows, channelId);
+    return messages[0] ?? null;
+  },
+
+  async fetchMessageAuthorProfiles(input) {
+    const { communityId, authorUserIds } = input;
+    const uniqueIds = Array.from(
+      new Set(authorUserIds.filter((id) => typeof id === 'string' && id.length > 0)),
+    );
+    if (uniqueIds.length === 0) return [];
+
+    const { data, error } = await havenCommunitySb().rpc(
+      'get_message_author_profiles' as never,
+      {
+        p_author_user_ids: uniqueIds,
+        p_community_id: communityId,
+      } as never,
+    );
+    if (error) throw error;
+
+    const rows = (data ?? []) as Record<string, unknown>[];
+    return rows.flatMap((row) => {
+      const userId = asOptionalString(row.id);
+      const username = asOptionalString(row.username);
+      if (!userId || !username) return [];
+      return [
+        {
+          userId,
+          username,
+          avatarUrl: asOptionalString(row.avatar_url) ?? null,
+          updatedAt:
+            asOptionalString(row.updated_at) ?? new Date(0).toISOString(),
+        },
+      ];
+    });
   },
 
   async listMessageReactions(communityId, channelId) {

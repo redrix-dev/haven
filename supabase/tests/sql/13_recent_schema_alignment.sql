@@ -220,6 +220,47 @@ select test_support.assert_eq_text(
   'profile identity trigger should sync avatar updates'
 );
 
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.profile_identities
+    where user_id = test_support.fixture_user_id('non_member')
+  ),
+  1,
+  'authenticated users should be able to read any platform identity'
+);
+
+select test_support.assert_eq_text(
+  (
+    select username
+    from public.get_message_author_profiles(
+      array[test_support.fixture_user_id('non_member')]::uuid[],
+      test_support.fixture_community_id()
+    )
+    limit 1
+  ),
+  test_support.fixture_username('non_member'),
+  'message author profile lookup should return live platform identity for requested users'
+);
+
+reset role;
+set local role anon;
+select test_support.clear_jwt_claims();
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.profile_identities
+    where user_id = test_support.fixture_user_id('member_a')
+  ),
+  0,
+  'anon users should not be able to read platform identities'
+);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
 select test_support.expect_exception(
   format(
     $sql$

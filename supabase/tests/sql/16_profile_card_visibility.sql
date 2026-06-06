@@ -56,6 +56,35 @@ select test_support.assert_eq_text(
 
 reset role;
 set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('non_member'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.get_profile_card(test_support.fixture_user_id('member_b'))
+  ),
+  1,
+  'authenticated users should be able to open the profile card identity shell without a relationship'
+);
+
+select test_support.assert_false(
+  (
+    select can_view_details
+    from public.get_profile_card(test_support.fixture_user_id('member_b'))
+  ),
+  'unrelated users should not see private profile details'
+);
+
+select test_support.assert_not_null(
+  (
+    select username
+    from public.get_profile_card(test_support.fixture_user_id('member_b'))
+  ),
+  'profile card shell should still include platform username'
+);
+
+reset role;
+set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_b'));
 
 select test_support.assert_true(

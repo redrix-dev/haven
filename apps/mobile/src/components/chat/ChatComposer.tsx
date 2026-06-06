@@ -60,7 +60,7 @@ export function ChatComposer({
             accessibilityLabel="Add media"
             disabled={isSending || isPickingMedia}
             onPress={onPickMedia}
-            className="relative h-8.5 w-8.5 items-center justify-center overflow-hidden rounded-full bg-foreground/10 disabled:opacity-50"
+            className="relative h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-foreground/10 disabled:opacity-50"
           >
             <Animated.View
               pointerEvents="none"
@@ -76,14 +76,14 @@ export function ChatComposer({
               ]}
               className="rounded-full bg-background"
             />
-            <ThemedIonicons name="add" size={20} colorClassName="accent-primary-foreground" />
+            <ThemedIonicons name="add" size={22} colorClassName="accent-primary-foreground" />
           </Pressable>
         </Animated.View>
 
         <Animated.View
           style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
         >
-          <View className="relative flex-1 flex-row items-center overflow-hidden rounded-[18px] border border-foreground/10 bg-foreground/8 pr-1">
+          <View className="relative flex-1 flex-row items-center overflow-hidden rounded-[20px] border border-foreground/10 bg-foreground/8 pr-1">
             <Animated.View
               pointerEvents="none"
               style={[
@@ -96,7 +96,7 @@ export function ChatComposer({
                 },
                 composerBackdropAnimatedStyle,
               ]}
-              className="rounded-[16px] bg-background"
+              className="rounded-[18px] bg-background"
             />
             <EnrichedMarkdownTextInput
               ref={inputRef}
@@ -132,9 +132,9 @@ export function ChatComposer({
                 opacity: canSend ? (isSending ? 0.55 : 1) : 0,
                 pointerEvents: canSend ? "auto" : "none",
               }}
-              className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary"
+              className="h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary"
             >
-              <ThemedIonicons name="arrow-up" size={18} colorClassName="accent-primary-foreground" />
+              <ThemedIonicons name="arrow-up" size={20} colorClassName="accent-primary-foreground" />
             </Pressable>
           </View>
         </Animated.View>

@@ -2477,11 +2477,37 @@ export type Database = {
           username: string
         }[]
       }
+      get_channel_message: {
+        Args: {
+          p_channel_id: string
+          p_community_id: string
+          p_message_id: string
+        }
+        Returns: {
+          attachment: Json | null
+          author_user_id: string | null
+          avatar_snapshot_url: string | null
+          channel_id: string
+          content: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string
+          edited_at: string | null
+          id: string
+          is_hidden: boolean
+          is_platform_staff: boolean
+          link_preview: Json | null
+          metadata: Json
+          reactions: Json | null
+          reply_to_message_id: string | null
+        }[]
+      }
       get_message_author_profiles: {
         Args: { p_author_user_ids: string[]; p_community_id: string }
         Returns: {
           avatar_url: string | null
           id: string
+          updated_at: string
           username: string
         }[]
       }

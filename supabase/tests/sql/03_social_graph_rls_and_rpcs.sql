@@ -80,6 +80,16 @@ reset role;
 set local role authenticated;
 select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
 
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.profile_identities
+    where user_id = test_support.fixture_user_id('non_member')
+  ),
+  1,
+  'authenticated users should be able to read platform identity before any relationship exists'
+);
+
 select public.send_friend_request(test_support.fixture_username('non_member'));
 
 select test_support.assert_eq_int(
@@ -148,6 +158,29 @@ select test_support.assert_eq_int(
   ),
   1,
   'blockers should retain access to blocked users in the live profile identity lane'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.search_users_for_friend_add(test_support.fixture_username('non_member'))
+  ),
+  0,
+  'friend-add search should still suppress blocked users'
+);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('non_member'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.profile_identities
+    where user_id = test_support.fixture_user_id('member_a')
+  ),
+  1,
+  'blocked users should still be able to read blocker platform identity'
 );
 
 reset role;
@@ -345,4 +378,3 @@ select test_support.assert_eq_int(
 );
 
 rollback;
-

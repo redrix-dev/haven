@@ -125,6 +125,9 @@ class MessageNexusRegistry {
         this.viewerMessagePolicyStore,
       );
       if (this.backends) nexus.setCommunityData(this.backends.communityData);
+      // Restore any persisted message tail so a cold start can render cached
+      // content before the network refresh lands (mirrors ChannelNexus).
+      nexus.rehydrate();
       this.byCommunity.set(communityId, nexus);
     }
     return nexus;
@@ -561,6 +564,35 @@ export class HavenCore {
     }
 
     await messageNexus.ensureInitialLoaded(channelId);
+    // Prime live author identities so snapshot avatars render current and
+    // self-heal. Fire-and-forget: never blocks message rendering.
+    void this.primeMessageAuthorProfiles(communityId, channelId);
+  }
+
+  /**
+   * Batch-fetch current identities for a channel's message authors that we
+   * haven't cached yet and feed them into ProfileNexus. The render path already
+   * prefers a live profile over the message's avatar snapshot, so this makes
+   * blank/stale avatars resolve without a restart.
+   */
+  private async primeMessageAuthorProfiles(
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    try {
+      const messageNexus = this.messages.for(communityId);
+      const authorIds = messageNexus
+        .getChannelAuthorIds(channelId)
+        .filter((id) => this.profiles.getProfile(id) === undefined);
+      if (authorIds.length === 0) return;
+
+      const profiles = await getCommunityDataBackend(
+        communityId,
+      ).fetchMessageAuthorProfiles({ communityId, authorUserIds: authorIds });
+      this.profiles.upsertProfiles(profiles);
+    } catch (error) {
+      console.warn("[HavenCore] primeMessageAuthorProfiles failed", error);
+    }
   }
 
   private async runWarmTask(

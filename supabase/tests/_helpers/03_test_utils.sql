@@ -112,9 +112,11 @@ begin
 
   delete from public.web_push_subscriptions wps
   where wps.user_id in (select user_id from test_support.fixture_user_ids());
+
+  delete from public.expo_push_subscriptions eps
+  where eps.user_id in (select user_id from test_support.fixture_user_ids());
 end;
 $$;
 
 grant usage on schema test_support to public;
 grant execute on all functions in schema test_support to public;
-

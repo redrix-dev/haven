@@ -12,6 +12,7 @@ import type {
   CommunityBanItem,
   CommunityMemberListItem,
   KickCommunityMemberResult,
+  LiveProfileIdentity,
   MessageAttachment,
   MessageBundle,
   MessageLinkPreview,
@@ -122,6 +123,21 @@ export interface CommunityDataBackend {
     beforeCreatedAt?: string | null;
     beforeMessageId?: string | null;
   }): Promise<{ messages: MessageBundle[]; hasMore: boolean }>;
+  getChannelMessage(input: {
+    communityId: string;
+    channelId: string;
+    messageId: string;
+  }): Promise<MessageBundle | null>;
+  /**
+   * Batch-fetch the *live* identity (current username + avatar) for a set of
+   * message authors. Community messages only carry an avatar snapshot taken at
+   * send time, so this lets the client prime ProfileNexus and render current
+   * avatars that self-heal when an author changes their profile.
+   */
+  fetchMessageAuthorProfiles(input: {
+    communityId: string;
+    authorUserIds: string[];
+  }): Promise<LiveProfileIdentity[]>;
   listMessageReactions(communityId: string, channelId: string): Promise<MessageReaction[]>;
   toggleMessageReaction(input: {
     communityId: string;

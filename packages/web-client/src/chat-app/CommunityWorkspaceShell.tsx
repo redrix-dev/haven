@@ -134,9 +134,18 @@ export function CommunityWorkspaceShell({
         mediaContentType: options?.mediaContentType,
         mediaFilename: options?.mediaFilename,
         mediaExpiresInHours: options?.mediaExpiresInHours,
+        senderUserId: user.id,
+        senderIsPlatformStaff: app.isPlatformStaff,
       });
     },
-    [activeTextChannelId, currentServerId, messageNexus, setRainbowMode, user.id],
+    [
+      activeTextChannelId,
+      app.isPlatformStaff,
+      currentServerId,
+      messageNexus,
+      setRainbowMode,
+      user.id,
+    ],
   );
 
   const toggleMessageReaction = useCallback(
