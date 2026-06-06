@@ -18,6 +18,7 @@ import DraggableFlatList, {
 import type {
   CommunityBanItem,
   ServerInvite,
+  ServerMemberRoleItem,
   ServerPermissions,
   ServerRoleItem,
 } from "@shared/lib/backend/types";
@@ -29,8 +30,19 @@ import {
   buildCommunityInviteUrl,
   shareCommunityInvite,
 } from "@/features/invites/shareCommunityInvite";
+import { RoleEditorPanel } from "./RoleEditorPanel";
 
 type TabKey = "general" | "roles" | "members" | "invites" | "bans";
+
+// Default color for a newly-created role (a data value, not a theme style).
+const DEFAULT_ROLE_COLOR = "#99aab5";
+
+// The "Owner" role is cosmetic — real ownership is the community_members.is_owner
+// flag, which bypasses permission checks entirely. Hide it from role management so
+// it can't be edited, deleted, or assigned (matches desktop ChannelSettingsModal,
+// which filters the same role by name).
+const isOwnerRole = (role: ServerRoleItem) =>
+  role.name.trim().toLowerCase() === "owner";
 
 type Props = {
   serverId: string;
@@ -62,6 +74,13 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
   const [draftReportReason, setDraftReportReason] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [customRolesOrder, setCustomRolesOrder] = useState<ServerRoleItem[]>([]);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [pendingRoleIds, setPendingRoleIds] = useState<string[]>([]);
+  const [savingRoles, setSavingRoles] = useState(false);
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const [creatingRole, setCreatingRole] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [creatingSaving, setCreatingSaving] = useState(false);
 
   const {
     canManageServer,
@@ -84,8 +103,14 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
       members: serverPanel.serverMembers,
       invites: serverPanel.serverInvites,
       bans: serverPanel.communityBans,
+      permissionCatalog: serverPanel.serverPermissionCatalog,
     }),
     [serverPanel],
+  );
+
+  const isCurrentUserOwner = useMemo(
+    () => snapshots.members.some((m) => m.userId === currentUserId && m.isOwner),
+    [snapshots.members, currentUserId],
   );
 
   const loadErrors = useMemo(
@@ -137,7 +162,10 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
   }, [snapshots.roles]);
 
   const systemRoles = useMemo(
-    () => snapshots.roles.filter((r) => r.isSystem).sort((a, b) => b.position - a.position),
+    () =>
+      snapshots.roles
+        .filter((r) => r.isSystem && !isOwnerRole(r))
+        .sort((a, b) => b.position - a.position),
     [snapshots.roles],
   );
 
@@ -184,6 +212,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
     ({ item, drag, isActive }: RenderItemParams<ServerRoleItem>) => (
       <ScaleDecorator>
         <Pressable
+          onPress={() => setSelectedRoleId(item.id)}
           onLongPress={drag}
           disabled={!canManageRoles}
           className={`mb-2 flex-row items-center justify-between rounded-xl border border-border-panel bg-surface-panel px-3 py-3 ${
@@ -194,11 +223,87 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
             <View className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
             <Text className="text-base text-foreground">{item.name}</Text>
           </View>
-          <ThemedIonicons name="reorder-three" size={22} colorClassName="accent-muted-foreground" />
+          <View className="flex-row items-center gap-2">
+            <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
+            <ThemedIonicons name="reorder-three" size={22} colorClassName="accent-muted-foreground" />
+          </View>
         </Pressable>
       </ScaleDecorator>
     ),
     [canManageRoles],
+  );
+
+  const rolesForAssignment = useMemo(
+    () =>
+      snapshots.roles
+        .filter((r) => !isOwnerRole(r))
+        .sort((a, b) => b.position - a.position),
+    [snapshots.roles],
+  );
+
+  const selectedRole = useMemo(
+    () => snapshots.roles.find((r) => r.id === selectedRoleId) ?? null,
+    [snapshots.roles, selectedRoleId],
+  );
+
+  const mutedColor = resolveColorProp(themeTokens, "muted-foreground") ?? "#9aa0a6";
+
+  const handleCreateRole = useCallback(async () => {
+    const trimmed = newRoleName.trim();
+    if (!trimmed) return;
+    setCreatingSaving(true);
+    try {
+      const maxPosition = snapshots.roles.reduce(
+        (max, r) => Math.max(max, r.position),
+        -1,
+      );
+      await admin.createServerRole({
+        name: trimmed,
+        color: DEFAULT_ROLE_COLOR,
+        position: maxPosition + 1,
+      });
+      setNewRoleName("");
+      setCreatingRole(false);
+    } catch (e) {
+      Alert.alert("Create failed", getErrorMessage(e, "Could not create role."));
+    } finally {
+      setCreatingSaving(false);
+    }
+  }, [admin, newRoleName, snapshots.roles]);
+
+  const openMemberEditor = useCallback((member: ServerMemberRoleItem) => {
+    setEditingMemberId(member.memberId);
+    setPendingRoleIds(member.roleIds);
+  }, []);
+
+  const closeMemberEditor = useCallback(() => {
+    setEditingMemberId(null);
+    setPendingRoleIds([]);
+  }, []);
+
+  const togglePendingRole = useCallback((roleId: string) => {
+    setPendingRoleIds((prev) =>
+      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId],
+    );
+  }, []);
+
+  const handleSaveMemberRoles = useCallback(
+    async (memberId: string) => {
+      if (!canManageRoles) return;
+      setSavingRoles(true);
+      try {
+        // saveServerMemberRoles fully reconciles the member's roles, so
+        // pendingRoleIds (seeded from member.roleIds) must carry the complete
+        // desired set — locked system/default roles included.
+        await admin.saveServerMemberRoles(memberId, pendingRoleIds);
+        closeMemberEditor();
+      } catch (e) {
+        Alert.alert("Save failed", getErrorMessage(e, "Could not update member roles."));
+      } finally {
+        setSavingRoles(false);
+      }
+    },
+    [admin, canManageRoles, pendingRoleIds, closeMemberEditor],
   );
 
   const tabs: { key: TabKey; label: string }[] = [
@@ -238,55 +343,122 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
           <ActivityIndicator color={foregroundColor} />
         </View>
       ) : tab === "roles" && canManageRoles ? (
-        <View className="flex-1 pt-4">
-          <View className="mb-3 flex-row items-start gap-2">
-            <Pressable
-              onPress={() =>
-                Alert.alert(
-                  "Role hierarchy",
-                  "Higher roles override lower ones. Long-press and drag custom roles to reorder. System roles stay fixed.",
-                )
-              }
-              hitSlop={8}
-            >
-              <ThemedIonicons name="information-circle-outline" size={20} colorClassName="accent-muted-foreground" />
-            </Pressable>
-            <Text className="flex-1 text-sm text-muted-foreground">
-              Long-press to reorder. System roles are fixed.
-            </Text>
-          </View>
-          {loadErrors.roles ? (
-            <Text className="mb-2 text-sm text-destructive">{loadErrors.roles}</Text>
-          ) : null}
-          {systemRoles.length > 0 ? (
-            <View className="mb-3">
-              <Text className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-                System roles
-              </Text>
-              {systemRoles.map((r) => (
-                <View
-                  key={r.id}
-                  className="mb-2 flex-row items-center gap-2 rounded-xl border border-border-panel bg-surface-embedded px-3 py-3"
-                >
-                  <View className="h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
-                  <Text className="flex-1 text-foreground">{r.name}</Text>
-                  <ThemedIonicons name="lock-closed" size={16} colorClassName="accent-muted-foreground" />
-                </View>
-              ))}
-            </View>
-          ) : null}
-          <Text className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-            Custom roles
-          </Text>
-          <DraggableFlatList
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: 32 }}
-            data={customRolesOrder}
-            keyExtractor={(item) => item.id}
-            onDragEnd={onDragEnd}
-            renderItem={renderRoleRow}
+        selectedRole ? (
+          <RoleEditorPanel
+            key={selectedRole.id}
+            role={selectedRole}
+            permissionCatalog={snapshots.permissionCatalog}
+            canManageRoles={canManageRoles}
+            isCurrentUserOwner={isCurrentUserOwner}
+            onBack={() => setSelectedRoleId(null)}
+            onSaveDetails={({ name, color }) =>
+              admin.updateServerRole({
+                roleId: selectedRole.id,
+                name,
+                color,
+                position: selectedRole.position,
+              })
+            }
+            onSavePermissions={(keys) =>
+              admin.saveServerRolePermissions(selectedRole.id, keys)
+            }
+            onDelete={() => admin.deleteServerRole(selectedRole.id)}
           />
-        </View>
+        ) : (
+          <View className="flex-1 pt-4">
+            <View className="mb-3 flex-row items-start gap-2">
+              <Pressable
+                onPress={() =>
+                  Alert.alert(
+                    "Role hierarchy",
+                    "Higher roles override lower ones. Tap a role to edit its permissions. Long-press and drag custom roles to reorder. System roles stay fixed.",
+                  )
+                }
+                hitSlop={8}
+              >
+                <ThemedIonicons name="information-circle-outline" size={20} colorClassName="accent-muted-foreground" />
+              </Pressable>
+              <Text className="flex-1 text-sm text-muted-foreground">
+                Tap a role to edit it. Long-press to reorder.
+              </Text>
+            </View>
+
+            {creatingRole ? (
+              <View className="mb-3 gap-2">
+                <TextInput
+                  value={newRoleName}
+                  onChangeText={setNewRoleName}
+                  placeholder="Role name"
+                  placeholderTextColor={mutedColor}
+                  autoFocus
+                  className="rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
+                />
+                <View className="flex-row gap-2">
+                  <Pressable
+                    onPress={() => void handleCreateRole()}
+                    disabled={creatingSaving || !newRoleName.trim()}
+                    className="flex-1 rounded-xl bg-primary py-3"
+                  >
+                    <Text className="text-center font-semibold text-primary-foreground">
+                      {creatingSaving ? "Creating…" : "Create"}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setCreatingRole(false);
+                      setNewRoleName("");
+                    }}
+                    disabled={creatingSaving}
+                    className="rounded-xl border border-border-panel px-4 py-3"
+                  >
+                    <Text className="text-foreground">Cancel</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => setCreatingRole(true)}
+                className="mb-3 flex-row items-center justify-center gap-1 rounded-xl border border-border-panel py-3"
+              >
+                <ThemedIonicons name="add" size={18} colorClassName="accent-muted-foreground" />
+                <Text className="text-foreground">Add role</Text>
+              </Pressable>
+            )}
+
+            {loadErrors.roles ? (
+              <Text className="mb-2 text-sm text-destructive">{loadErrors.roles}</Text>
+            ) : null}
+            {systemRoles.length > 0 ? (
+              <View className="mb-3">
+                <Text className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                  System roles
+                </Text>
+                {systemRoles.map((r) => (
+                  <Pressable
+                    key={r.id}
+                    onPress={() => setSelectedRoleId(r.id)}
+                    className="mb-2 flex-row items-center gap-2 rounded-xl border border-border-panel bg-surface-embedded px-3 py-3"
+                  >
+                    <View className="h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
+                    <Text className="flex-1 text-foreground">{r.name}</Text>
+                    <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <Text className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+              Custom roles
+            </Text>
+            <DraggableFlatList
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 32 }}
+              data={customRolesOrder}
+              keyExtractor={(item) => item.id}
+              onDragEnd={onDragEnd}
+              renderItem={renderRoleRow}
+            />
+          </View>
+        )
       ) : (
         <ScrollView
           className="flex-1 pt-4"
@@ -348,20 +520,93 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
           ) : tab === "members" && canManageMembers ? (
             <View className="pb-24">
               <Text className="mb-3 text-sm text-muted-foreground">
-                Role assignment is best handled on desktop; this list is for visibility.
+                {canManageRoles
+                  ? "Tap a member to manage their roles."
+                  : "Manage Roles is required to change role assignments."}
               </Text>
-              {snapshots.members.map((m) => (
-                <View
-                  key={m.memberId}
-                  className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3"
-                >
-                  <Text className="font-medium text-foreground">{m.displayName}</Text>
-                  <Text className="text-xs text-muted-foreground">
-                    {m.isOwner ? "Owner · " : ""}
-                    {m.roleIds.length} role{m.roleIds.length === 1 ? "" : "s"}
-                  </Text>
-                </View>
-              ))}
+              {loadErrors.roles ? (
+                <Text className="mb-2 text-sm text-destructive">{loadErrors.roles}</Text>
+              ) : null}
+              {snapshots.members.map((m) => {
+                const isEditing = editingMemberId === m.memberId;
+                const canEdit = canManageRoles && !m.isOwner;
+                return (
+                  <View
+                    key={m.memberId}
+                    className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3"
+                  >
+                    <Pressable
+                      onPress={() => {
+                        if (!canEdit) return;
+                        if (isEditing) closeMemberEditor();
+                        else openMemberEditor(m);
+                      }}
+                      disabled={!canEdit}
+                      className="flex-row items-center justify-between"
+                    >
+                      <View className="flex-1">
+                        <Text className="font-medium text-foreground">{m.displayName}</Text>
+                        <Text className="text-xs text-muted-foreground">
+                          {m.isOwner ? "Owner · " : ""}
+                          {m.roleIds.length} role{m.roleIds.length === 1 ? "" : "s"}
+                        </Text>
+                      </View>
+                      {canEdit ? (
+                        <ThemedIonicons
+                          name={isEditing ? "chevron-up" : "chevron-down"}
+                          size={18}
+                          colorClassName="accent-muted-foreground"
+                        />
+                      ) : null}
+                    </Pressable>
+
+                    {isEditing ? (
+                      <View className="mt-3 border-t border-border-panel pt-3">
+                        {rolesForAssignment.map((role) => {
+                          const locked =
+                            role.isDefault || (role.isSystem && !isCurrentUserOwner);
+                          const checked = pendingRoleIds.includes(role.id) || role.isDefault;
+                          return (
+                            <View
+                              key={role.id}
+                              className="flex-row items-center justify-between py-2"
+                            >
+                              <View className="flex-1 flex-row items-center gap-2">
+                                <View
+                                  className="h-3 w-3 rounded-full"
+                                  style={{ backgroundColor: role.color }}
+                                />
+                                <Text className="flex-1 text-foreground">{role.name}</Text>
+                                {locked ? (
+                                  <Text className="text-xs text-muted-foreground">
+                                    {role.isDefault ? "Default" : "System"}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <Switch
+                                value={checked}
+                                onValueChange={() => togglePendingRole(role.id)}
+                                disabled={locked || savingRoles}
+                                trackColor={{ false: switchColors.false, true: switchColors.true }}
+                                thumbColor={switchColors.thumb}
+                              />
+                            </View>
+                          );
+                        })}
+                        <Pressable
+                          onPress={() => void handleSaveMemberRoles(m.memberId)}
+                          disabled={savingRoles}
+                          className="mt-2 rounded-xl bg-primary py-3"
+                        >
+                          <Text className="text-center font-semibold text-primary-foreground">
+                            {savingRoles ? "Saving…" : "Save roles"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
           ) : tab === "invites" && canManageInvites ? (
             <InvitesTab
