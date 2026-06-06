@@ -75,10 +75,17 @@ describe.sequential('DirectMessageBackend (contract)', () => {
     await signInAsTestUser('member_b');
     const messages = await getDirectMessageBackend().listMessages({ conversationId, limit: 20 });
     expect(messages.some((message) => message.messageId === sent.messageId)).toBe(true);
+    expect(messages[0]?.messageId).toBe(sentImage.messageId);
     const listedImage = messages.find((message) => message.messageId === sentImage.messageId);
     expect(listedImage?.attachments).toHaveLength(1);
     expect(listedImage?.attachments[0]?.mimeType).toBe('image/png');
     expect(listedImage?.attachments[0]?.signedUrl).toBeTruthy();
+    const fetchedImage = await getDirectMessageBackend().getMessage({
+      conversationId,
+      messageId: sentImage.messageId,
+    });
+    expect(fetchedImage?.messageId).toBe(sentImage.messageId);
+    expect(fetchedImage?.attachments).toHaveLength(1);
 
     const conversations = await getDirectMessageBackend().listConversations();
     const listedConversation = conversations.find(
@@ -118,4 +125,3 @@ describe.sequential('DirectMessageBackend (contract)', () => {
     ).rejects.toThrow(/access/i);
   });
 });
-

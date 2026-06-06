@@ -60,7 +60,7 @@ Business logic, types, and hooks live in `packages/shared` and are platform-agno
 | UI | Tailwind CSS + shadcn/ui (desktop/web), UniWind + Gluestack UI (iOS) |
 | Backend | Supabase (Auth, Postgres, Realtime, Edge Functions) |
 | OTA Updates (iOS) | Custom Expo Updates-compatible pipeline via Supabase Edge Function |
-| Voice | WebRTC + Xirsys TURN relay |
+| Voice | LiveKit Cloud + WebRTC |
 | State | Zustand with precise per-selector isolation |
 | Monorepo | `packages/shared` across all platforms |
 
@@ -86,8 +86,8 @@ The iOS OTA pipeline is a custom implementation of the Expo Updates protocol. A 
 ## Verifying the security model
 
 1. Client auth and data access — `packages/shared/src/lib/supabase.ts`
-2. RLS policies and schema — `services/supabase/migrations/`
-3. Voice secret handling — `services/supabase/functions/voice-ice/index.ts`
+2. RLS policies and schema — `supabase/migrations/`
+3. Voice secret handling — `supabase/functions/voice-token/index.ts`
 
 Run the app against your own Supabase project and inspect network calls in devtools. Nothing load-bearing is hidden.
 

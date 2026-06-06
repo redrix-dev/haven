@@ -2,11 +2,11 @@ const path = require("path");
 
 const notificationAudioDir = path.resolve(
   __dirname,
-  "packages/shared/src/assets/audio/notifications",
+  "packages/web-client/src/assets/audio/notifications",
 );
 const voiceAudioDir = path.resolve(
   __dirname,
-  "packages/shared/src/assets/audio/voice",
+  "packages/web-client/src/assets/audio/voice",
 );
 
 function createWebpackRules(tsconfigFile) {
@@ -67,6 +67,16 @@ function createWebpackRules(tsconfigFile) {
       exclude: [notificationAudioDir, voiceAudioDir],
       generator: {
         filename: "assets/audio/[name][ext]",
+      },
+    },
+
+    // Image assets
+    {
+      test: /\.(png|jpg|jpeg|gif|webp|ico|svg)$/i,
+      exclude: /node_modules/,
+      type: 'asset/resource',
+      generator: {
+        filename: 'assets/images/[name][contenthash:8][ext]',
       },
     },
 

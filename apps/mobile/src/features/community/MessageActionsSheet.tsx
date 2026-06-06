@@ -37,6 +37,7 @@ export function MessageActionsSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal sheet scrim overlay, invariant across themes */}
       <Pressable className="flex-1 justify-end bg-black/55" onPress={onClose}>
         <Pressable
           className="rounded-t-2xl border-t border-border-panel bg-surface-modal px-4 pb-8 pt-3"
@@ -86,7 +87,7 @@ export function MessageActionsSheet({
                 onClose();
               }}
             >
-              <Text className="text-center text-base font-medium text-red-400">Ban user</Text>
+              <Text className="text-center text-base font-medium text-destructive">Ban user</Text>
             </Pressable>
           ) : null}
           <Pressable className="mt-1 rounded-xl py-3 active:opacity-90" onPress={onClose}>

@@ -4,9 +4,9 @@ import {
   Pressable,
   TextInput,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getErrorMessage } from "@shared/platform/lib/errors";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -89,7 +89,7 @@ export function PasswordRecoveryScreen() {
   if (flow === "setNewPassword") {
     return (
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior="padding"
         className="flex-1 bg-background"
       >
         <ScrollView
@@ -167,7 +167,7 @@ export function PasswordRecoveryScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior="padding"
       className="flex-1 bg-background"
     >
       <ScrollView

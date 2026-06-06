@@ -9,7 +9,7 @@ const repoRoot = path.resolve(__dirname, '..', '..', '..');
 
 const appAssetsJsonPath = path.resolve(
   repoRoot,
-  'packages/shared/src/config/appAssets.json'
+  'packages/web-client/src/config/appAssets.json'
 );
 const appAssets = JSON.parse(await fs.readFile(appAssetsJsonPath, 'utf8'));
 

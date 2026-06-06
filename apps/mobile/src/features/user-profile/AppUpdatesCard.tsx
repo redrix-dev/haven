@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import { useCallback, useMemo, useState } from "react";
@@ -46,9 +46,9 @@ type InfoRowProps = {
 function InfoRow({ label, value, mono = false }: InfoRowProps) {
   return (
     <View className="flex-row items-start gap-3">
-      <Text className="w-24 text-[#8E8E93] text-[12px] font-semibold">{label}</Text>
+      <Text className="w-24 text-muted-foreground text-[12px] font-semibold">{label}</Text>
       <Text
-        className={`flex-1 text-white text-[13px] ${mono ? "font-mono" : ""}`}
+        className={`flex-1 text-foreground text-[13px] ${mono ? "font-mono" : ""}`}
         selectable={mono}
       >
         {value}
@@ -240,10 +240,10 @@ export default function AppUpdatesCard() {
   const primaryActionDisabled = isChecking || isDownloading || isManuallyChecking;
 
   return (
-    <View className="rounded-2xl bg-[#1C1C1E] px-4 py-3 gap-3">
+    <View className="rounded-2xl bg-surface-panel px-4 py-3 gap-3">
       <View className="flex-row items-center gap-2">
-        <Ionicons name="cloud-download-outline" size={18} color="#8E8E93" />
-        <Text className="text-white text-[16px] font-semibold">App Updates</Text>
+        <ThemedIonicons name="cloud-download-outline" size={18} colorClassName="accent-muted-foreground" />
+        <Text className="text-foreground text-[16px] font-semibold">App Updates</Text>
       </View>
 
       <View className="gap-2.5">
@@ -287,8 +287,8 @@ export default function AppUpdatesCard() {
         ) : null}
       </View>
 
-      <View className="rounded-xl bg-[#2C2C2E] px-3 py-2.5">
-        <Text className="text-[#C7C7CC] text-[12px] leading-5">{statusLabel}</Text>
+      <View className="rounded-xl bg-surface-embedded px-3 py-2.5">
+        <Text className="text-muted-foreground text-[12px] leading-5">{statusLabel}</Text>
       </View>
 
       <Pressable
@@ -297,10 +297,10 @@ export default function AppUpdatesCard() {
         accessibilityRole="button"
         accessibilityLabel={primaryActionLabel}
         className={`rounded-xl py-2.5 items-center justify-center ${
-          primaryActionDisabled ? "bg-[#3A3A3C] opacity-70" : "bg-[#0A84FF]"
+          primaryActionDisabled ? "bg-surface-embedded opacity-70" : "bg-primary active:bg-primary-hover"
         }`}
       >
-        <Text className="text-white text-[15px] font-semibold">{primaryActionLabel}</Text>
+        <Text className="text-foreground text-[15px] font-semibold">{primaryActionLabel}</Text>
       </Pressable>
     </View>
   );

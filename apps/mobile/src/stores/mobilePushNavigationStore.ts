@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ParsedExpoPushPayload } from "@shared/features/mobile/push/parseExpoPushNotificationData";
+import type { ParsedExpoPushPayload } from "@/features/notifications/utils/parseExpoPushNotificationData";
 
 export type MobileFriendsOpenInput = {
   tab: "requests" | "friends";

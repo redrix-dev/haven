@@ -96,6 +96,7 @@ export type MessageLinkPreview = {
 /** Row shape from `list_channel_messages` after mapping DB snake_case → camelCase. */
 export type MessageBundle = {
   id: string;
+  channelId: string;
   authorUserId: string | null;
   displayName: string;
   avatarSnapshotUrl: string | null;
@@ -115,6 +116,42 @@ export type MessageBundle = {
 export type FeatureFlagKey = string;
 export type FeatureFlagsSnapshot = Record<FeatureFlagKey, boolean>;
 
+export type OnboardingPlatformScope = 'all' | 'ios' | 'android';
+
+export type OnboardingDistributionScope =
+  | 'all'
+  | 'development'
+  | 'preview'
+  | 'testflight'
+  | 'production';
+
+export type OnboardingClientContext = {
+  platform: string;
+  distribution: string;
+  appVersion: string | null;
+};
+
+export type OnboardingCampaign = {
+  key: string;
+  featureFlagKey: string;
+  title: string;
+  description: string | null;
+  required: boolean;
+  targetCommunityId: string | null;
+  targetFlairKey: string | null;
+  platformScope: OnboardingPlatformScope;
+  distributionScope: OnboardingDistributionScope;
+  sortOrder: number;
+};
+
+export type OnboardingCompletionResult = {
+  campaignKey: string;
+  status: 'completed' | 'skipped';
+  communityId: string | null;
+  communityName: string | null;
+  joined: boolean;
+};
+
 export type ServerSummary = {
   id: string;
   name: string;
@@ -133,6 +170,44 @@ export type LiveProfileIdentity = {
   username: string;
   avatarUrl: string | null;
   updatedAt: string;
+};
+
+export type ProfileVisibility = 'public' | 'friends_only' | 'private';
+
+export type UserFlairBadge = {
+  userFlairId: string;
+  flairId: string;
+  key: string;
+  label: string;
+  description: string | null;
+  colorToken: string;
+  backgroundToken: string;
+  iconKey: string | null;
+};
+
+export type UserFlairGrant = UserFlairBadge & {
+  scope: 'platform' | 'community';
+  communityId: string | null;
+  grantSource: string;
+  sourceCommunityId: string | null;
+  grantedAt: string;
+  expiresAt: string | null;
+  isAvailable: boolean;
+  isSelected: boolean;
+};
+
+export type ProfileDetails = {
+  bio: string | null;
+  activeFlair: UserFlairBadge | null;
+};
+
+export type UserProfileCard = {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  profileVisibility: ProfileVisibility;
+  canViewDetails: boolean;
+  details: ProfileDetails | null;
 };
 
 export type ServerPermissions = {
@@ -705,6 +780,8 @@ export type ServerReportDetail = ServerReportSummary & {
   internalNotes: SupportReportInternalNote[];
   targetUserId: string | null;
   targetDisplayName: string | null;
+  /** Written by haven staff when they act on the linked haven_staff row. Propagated via DB trigger. */
+  platformAction: Record<string, unknown> | null;
 };
 
 export type ReportStatusUpdatedBroadcastPayload = {

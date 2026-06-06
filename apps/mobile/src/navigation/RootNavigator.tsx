@@ -4,8 +4,6 @@ import { ActivityIndicator, View } from "react-native";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { useMobileExpoPushRegistration } from "@/hooks/useMobileExpoPushRegistration";
 import { useMobileVoipFoundation } from "@/hooks/useMobileVoipFoundation";
-import { useServersRealtimeBootstrap } from "@/hooks/useServersRealtimeBootstrap";
-import { HomeScreen } from "@/screens/main/HomeScreen";
 import type { RootStackParamList } from "./types";
 import { PasswordRecoveryGateProvider } from "./PasswordRecoveryGateContext";
 import { MobileLogin } from "@/screens/entry/MobileLogin";
@@ -15,42 +13,18 @@ import * as Linking from "expo-linking";
 import { useEffect, useRef, useState } from "react";
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { consumeAuthConfirmUrl } from "@/auth/mobileAuthService";
-import { CommunityScreen } from "@/screens/main/CommunityScreen";
-import { createHavenTabNavigator } from "@/navigation/HavenTabNavigator";
-import { MobileNotificationsProvider } from "@/contexts/MobileNotificationsContext";
-import { MobileSocialWorkspaceProvider } from "@/contexts/MobileSocialWorkspaceContext";
-import { MobileDirectMessagesProvider } from "@/contexts/MobileDirectMessagesContext";
-import { useMobileCommunityPermissionsHydration } from "@/hooks/useMobileCommunityPermissionsHydration";
-import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
+import { MainNavigator } from "@/navigation/MainNavigator";
+import { MobileOnboardingGate } from "@/navigation/MobileOnboardingGate";
+import { NAV_THEME } from "@/lib/theme";
+import { savePendingInviteFromUrl } from "@/features/invites/mobilePendingInvite";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createHavenTabNavigator();
 
-function MainTabs() {
-  const session = useAuthSession();
-  const userId = session?.user?.id;
-  useMobileCommunityPermissionsHydration(userId);
-  useHydrateMobileThemeFromProfile(userId);
-
-  if (!userId) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface-app">
-        <ActivityIndicator color="#e6edf7" size="large" />
-      </View>
-    );
-  }
-
+function AuthenticatedMain() {
   return (
-    <MobileNotificationsProvider userId={userId}>
-      <MobileSocialWorkspaceProvider userId={userId}>
-        <MobileDirectMessagesProvider userId={userId}>
-          <Tab.Navigator screenOptions={{ detachInactiveScreens: false }}>
-            <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Community" component={CommunityScreen} />
-          </Tab.Navigator>
-        </MobileDirectMessagesProvider>
-      </MobileSocialWorkspaceProvider>
-    </MobileNotificationsProvider>
+    <MobileOnboardingGate>
+      <MainNavigator />
+    </MobileOnboardingGate>
   );
 }
 
@@ -58,7 +32,6 @@ export function RootNavigator() {
   const session = useAuthSession();
   useMobileExpoPushRegistration(session);
   useMobileVoipFoundation(session);
-  useServersRealtimeBootstrap(session);
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
     useState(false);
   const url = Linking.useURL();
@@ -73,6 +46,10 @@ export function RootNavigator() {
         if (result.didProcess) {
           processedAuthConfirmUrlsRef.current.add(candidateUrl);
           setPasswordRecoveryRequired(result.requiresPasswordRecovery);
+          return;
+        }
+        if (savePendingInviteFromUrl(candidateUrl)) {
+          processedAuthConfirmUrlsRef.current.add(candidateUrl);
         }
       } catch (error) {
         console.error("Failed to process mobile auth confirmation URL.", error);
@@ -96,6 +73,10 @@ export function RootNavigator() {
         if (result.didProcess) {
           processedAuthConfirmUrlsRef.current.add(initialUrl);
           setPasswordRecoveryRequired(result.requiresPasswordRecovery);
+          return;
+        }
+        if (savePendingInviteFromUrl(initialUrl)) {
+          processedAuthConfirmUrlsRef.current.add(initialUrl);
         }
       } catch (error) {
         console.error("Failed to process initial mobile auth URL.", error);
@@ -123,6 +104,7 @@ export function RootNavigator() {
   if (session === undefined) {
     return (
       <View className="flex-1 items-center justify-center bg-surface-app">
+        {/* uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground */}
         <ActivityIndicator color="#e6edf7" size="large" />
       </View>
     );
@@ -132,7 +114,7 @@ export function RootNavigator() {
     <PasswordRecoveryGateProvider
       clearPasswordRecoveryGate={() => setPasswordRecoveryRequired(false)}
     >
-      <NavigationContainer>
+      <NavigationContainer theme={NAV_THEME.dark}>
         <Stack.Navigator
           screenOptions={{ headerShown: false, animation: "fade" }}
         >
@@ -148,7 +130,7 @@ export function RootNavigator() {
                 <>
                   <Stack.Screen
                     name="Main"
-                    component={MainTabs}
+                    component={AuthenticatedMain}
                     options={{ keyboardHandlingEnabled: false }}
                   />
                 </>

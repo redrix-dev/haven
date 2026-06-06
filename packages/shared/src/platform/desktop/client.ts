@@ -2,7 +2,7 @@ import type {
   NotificationAudioSettings,
   VoiceSettings,
   AppSettings,
-} from '@shared/app/types/settings';
+} from '@shared/types/settings';
 import type { UpdaterStatus, SaveFileFromUrlResult, VoicePopoutControlAction, VoicePopoutState, DesktopAPI } from '@shared/platform/desktop/types';
 
 const DESKTOP_BRIDGE_UNAVAILABLE_ERROR = 'Desktop bridge unavailable.';
@@ -43,6 +43,9 @@ export const desktopClient = {
   },
   async checkForUpdates(): Promise<UpdaterStatus> {
     return getDesktopApi().checkForUpdates();
+  },
+  async installUpdate(): Promise<void> {
+    return getDesktopApi().installUpdate();
   },
   async saveFileFromUrl(input: {
     url: string;

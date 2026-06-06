@@ -1,5 +1,5 @@
 import React from 'react';
-import { getAppHost } from '@shared/platform/appHost';
+import { getAppHost } from '@shared/infrastructure/platform/appHost';
 
 const STORAGE_KEY = 'haven:voice:member-volumes:v1';
 const DEFAULT_MEMBER_VOLUME = 100;

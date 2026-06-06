@@ -19,6 +19,10 @@ export interface DirectMessageBackend {
     beforeCreatedAt?: string | null;
     beforeMessageId?: string | null;
   }): Promise<DirectMessage[]>;
+  getMessage(input: {
+    conversationId: string;
+    messageId: string;
+  }): Promise<DirectMessage | null>;
   sendMessage(input: {
     conversationId: string;
     content: string;
@@ -166,6 +170,19 @@ export function createDirectMessageBackend(
       );
       if (error) throw error;
       return await mapMessages((data ?? []) as DirectMessageRow[]);
+    },
+
+    async getMessage(input) {
+      const { data, error } = await client.rpc(
+        "get_dm_message" as never,
+        {
+          p_conversation_id: input.conversationId,
+          p_message_id: input.messageId,
+        } as never,
+      );
+      if (error) throw error;
+      const [message] = await mapMessages((data ?? []) as DirectMessageRow[]);
+      return message ?? null;
     },
 
     async sendMessage(input) {

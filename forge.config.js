@@ -68,6 +68,16 @@ module.exports = {
       name: "@electron-forge/plugin-webpack",
       config: {
         mainConfig: "./webpack.main.config.js",
+        // Fix HMR WebSocket URL: webpack-dev-server listens on 0.0.0.0 but the
+        // HMR client must connect to localhost, otherwise it tries
+        // ws://0.0.0.0:3000 which is (a) unroutable and (b) blocked by CSP.
+        devServer: {
+          client: {
+            webSocketURL: {
+              hostname: 'localhost',
+            },
+          },
+        },
         renderer: {
           config: "./webpack.renderer.config.js",
           entryPoints: [

@@ -1,4 +1,3 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import type { Database } from '@shared/types/database';
 import type { MessageObjectStore } from "./messageObjectStore";
@@ -25,10 +24,7 @@ import type {
   MessageAttachment,
   MessageLinkPreview,
   MessageReaction,
-  ReportStatusUpdatedBroadcastPayload,
   ChannelAccessRevokedResult,
-  MemberBannedBroadcastPayload,
-  MemberChannelAccessRevokedBroadcastPayload,
   ServerMemberRoleItem,
   ServerPermissions,
   ServerRoleItem,
@@ -64,12 +60,6 @@ type CommunityMemberWithProfile = Pick<
     | Pick<Database['public']['Tables']['profiles']['Row'], 'username' | 'avatar_url'>
     | Array<Pick<Database['public']['Tables']['profiles']['Row'], 'username' | 'avatar_url'>>
     | null;
-};
-
-const getRealtimeRowChannelId = (value: unknown): string | null => {
-  if (!value || typeof value !== 'object') return null;
-  const maybeChannelId = (value as { channel_id?: unknown }).channel_id;
-  return typeof maybeChannelId === 'string' ? maybeChannelId : null;
 };
 
 let havenCommunityClient: HavenSupabaseClient | null = null;
@@ -233,44 +223,6 @@ type ReportProfileRow = Pick<
   'id' | 'username' | 'avatar_url'
 >;
 
-/** Multiple `useCommunityWorkspace` mounts (e.g. stack keeps host + thread) each subscribe; Supabase reuses topic names, so each subscription uses a unique suffix (see `subscribeToChannels`). */
-const activeCommunityRealtimeChannelsByCommunityId = new Map<string, Set<RealtimeChannel>>();
-
-const addActiveCommunityRealtimeChannel = (
-  communityId: string,
-  channel: RealtimeChannel,
-) => {
-  let set = activeCommunityRealtimeChannelsByCommunityId.get(communityId);
-  if (!set) {
-    set = new Set();
-    activeCommunityRealtimeChannelsByCommunityId.set(communityId, set);
-  }
-  set.add(channel);
-};
-
-const removeActiveCommunityRealtimeChannel = (
-  communityId: string,
-  channel: RealtimeChannel,
-) => {
-  const set = activeCommunityRealtimeChannelsByCommunityId.get(communityId);
-  if (!set) return;
-  set.delete(channel);
-  if (set.size === 0) {
-    activeCommunityRealtimeChannelsByCommunityId.delete(communityId);
-  }
-};
-
-const getAnyActiveCommunityRealtimeChannel = (
-  communityId: string,
-): RealtimeChannel | null => {
-  const set = activeCommunityRealtimeChannelsByCommunityId.get(communityId);
-  if (!set) return null;
-  for (const ch of set) {
-    return ch;
-  }
-  return null;
-};
-
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
@@ -279,15 +231,6 @@ const asOptionalString = (value: unknown): string | null =>
 
 const asOptionalNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
-
-const isSupportReportStatus = (
-  value: unknown
-): value is ReportStatusUpdatedBroadcastPayload['status'] =>
-  value === 'pending' ||
-  value === 'under_review' ||
-  value === 'resolved' ||
-  value === 'dismissed' ||
-  value === 'escalated';
 
 const normalizeLinkPreviewSnapshot = (value: unknown): LinkPreviewSnapshot | null => {
   const obj = asObjectRecord(value);
@@ -917,6 +860,71 @@ const mapMessageLinkPreviewRowsWithSignedUrls = async (
   });
 };
 
+const mapChannelMessageRpcRowsToBundles = async (
+  rows: Record<string, unknown>[],
+  fallbackChannelId: string,
+): Promise<MessageBundle[]> => {
+  const attachmentRows: MessageAttachmentRow[] = [];
+  const previewRows: MessageLinkPreviewRow[] = [];
+
+  for (const row of rows) {
+    const att = parseMessageAttachmentRowFromRpcJson(row.attachment);
+    if (att) attachmentRows.push(att);
+    const prev = parseMessageLinkPreviewRowFromRpcJson(row.link_preview);
+    if (prev) previewRows.push(prev);
+  }
+
+  const signedAttachments = await mapMessageAttachmentRowsWithSignedUrls(attachmentRows);
+  const signedPreviews = await mapMessageLinkPreviewRowsWithSignedUrls(previewRows);
+  const attByMessageId = new Map(signedAttachments.map((a) => [a.messageId, a]));
+  const previewByMessageId = new Map(signedPreviews.map((p) => [p.messageId, p]));
+
+  return rows.map((row) => {
+    const id = asOptionalString(row.id);
+    if (!id) {
+      throw new Error('channel message RPC returned a row without id');
+    }
+
+    return {
+      id,
+      channelId: asOptionalString(row.channel_id) ?? fallbackChannelId,
+      authorUserId:
+        row.author_user_id === null || row.author_user_id === undefined
+          ? null
+          : String(row.author_user_id),
+      displayName: typeof row.display_name === 'string' ? row.display_name : '',
+      avatarSnapshotUrl:
+        row.avatar_snapshot_url === null || row.avatar_snapshot_url === undefined
+          ? null
+          : asOptionalString(row.avatar_snapshot_url),
+      content: typeof row.content === 'string' ? row.content : '',
+      metadata: normalizeMessageMetadata(row.metadata),
+      replyToMessageId:
+        row.reply_to_message_id === null || row.reply_to_message_id === undefined
+          ? null
+          : String(row.reply_to_message_id),
+      createdAt: typeof row.created_at === 'string' ? row.created_at : '',
+      editedAt:
+        row.edited_at === null || row.edited_at === undefined
+          ? null
+          : typeof row.edited_at === 'string'
+            ? row.edited_at
+            : null,
+      deletedAt:
+        row.deleted_at === null || row.deleted_at === undefined
+          ? null
+          : typeof row.deleted_at === 'string'
+            ? row.deleted_at
+            : null,
+      isHidden: Boolean(row.is_hidden),
+      isPlatformStaff: row.is_platform_staff === true,
+      reactions: normalizeReactionsFromRpc(row.reactions),
+      attachment: attByMessageId.get(id) ?? null,
+      linkPreview: previewByMessageId.get(id) ?? null,
+    };
+  });
+};
+
 export const centralCommunityDataBackend: CommunityDataBackend = {
   async getMyPermissions(communityId) {
     const allFalse: ServerPermissions & { isElevated: boolean } = {
@@ -1022,6 +1030,40 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const { error } = await havenCommunitySb().from('support_reports').insert({
       id: reportId,
       community_id: communityId,
+      destination: 'haven_staff',
+      reporter_user_id: reporterUserId,
+      title: reportTitle,
+      notes: reportNotes,
+      snapshot,
+      include_last_n_messages: null,
+    });
+    if (error) throw error;
+  },
+
+  async reportPlatformUserProfile({ targetUserId, reporterUserId, reason }) {
+    const normalizedReason = reason.trim();
+    if (!normalizedReason) {
+      throw new Error('Report reason is required.');
+    }
+
+    let snapshot: SupportReportProfileSnapshot | null = null;
+    try {
+      snapshot = await fetchSupportReportProfileSnapshot(targetUserId);
+    } catch (snapshotError) {
+      console.warn('Failed to capture support report profile snapshot:', snapshotError);
+    }
+
+    const reportId = createPortableUuid();
+    const reportTitle = 'User Report: Profile';
+    const reportNotes = JSON.stringify({
+      type: 'user_report',
+      targetUserId,
+      reason: normalizedReason,
+    });
+
+    const { error } = await havenCommunitySb().from('support_reports').insert({
+      id: reportId,
+      community_id: null,
       destination: 'haven_staff',
       reporter_user_id: reporterUserId,
       title: reportTitle,
@@ -1301,102 +1343,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
-  subscribeToChannels(communityId, onChange, options) {
-    const topicSuffix = createPortableUuid();
-    const channel = havenCommunitySb().channel(`channels:${communityId}:${topicSuffix}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'channels',
-          filter: `community_id=eq.${communityId}`,
-        },
-        onChange
-      )
-      .on('broadcast', { event: 'member_banned' }, ({ payload }) => {
-        const payloadRecord = asObjectRecord(payload);
-        const bannedUserId =
-          payloadRecord && typeof payloadRecord.bannedUserId === 'string'
-            ? payloadRecord.bannedUserId
-            : null;
-        const payloadCommunityId =
-          payloadRecord && typeof payloadRecord.communityId === 'string'
-            ? payloadRecord.communityId
-            : null;
-        if (!bannedUserId || payloadCommunityId !== communityId) return;
-        options?.onMemberBanned?.({
-          bannedUserId,
-          communityId: payloadCommunityId,
-        });
-      })
-      .on('broadcast', { event: 'member_channel_access_revoked' }, ({ payload }) => {
-        const payloadRecord = asObjectRecord(payload);
-        const revokedUserId =
-          payloadRecord && typeof payloadRecord.revokedUserId === 'string'
-            ? payloadRecord.revokedUserId
-            : null;
-        const channelId =
-          payloadRecord && typeof payloadRecord.channelId === 'string'
-            ? payloadRecord.channelId
-            : null;
-        const payloadCommunityId =
-          payloadRecord && typeof payloadRecord.communityId === 'string'
-            ? payloadRecord.communityId
-            : null;
-        if (!revokedUserId || !channelId || payloadCommunityId !== communityId) return;
-        options?.onMemberChannelAccessRevoked?.({
-          revokedUserId,
-          channelId,
-          communityId: payloadCommunityId,
-        });
-      })
-      .on('broadcast', { event: 'report_status_updated' }, ({ payload }) => {
-        const payloadRecord = asObjectRecord(payload);
-        const reportId =
-          payloadRecord && typeof payloadRecord.reportId === 'string'
-            ? payloadRecord.reportId
-            : null;
-        const status = payloadRecord?.status;
-        const updatedBy =
-          payloadRecord && typeof payloadRecord.updatedBy === 'string'
-            ? payloadRecord.updatedBy
-            : null;
-        const payloadCommunityId =
-          payloadRecord && typeof payloadRecord.communityId === 'string'
-            ? payloadRecord.communityId
-            : null;
-        if (
-          !reportId ||
-          !updatedBy ||
-          payloadCommunityId !== communityId ||
-          !isSupportReportStatus(status)
-        ) {
-          return;
-        }
-        options?.onReportStatusUpdated?.({
-          reportId,
-          status,
-          communityId: payloadCommunityId,
-          updatedBy,
-        });
-      });
-
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        addActiveCommunityRealtimeChannel(communityId, channel);
-      }
-    });
-
-    const originalUnsubscribe = channel.unsubscribe.bind(channel);
-    channel.unsubscribe = async (...args) => {
-      removeActiveCommunityRealtimeChannel(communityId, channel);
-      return originalUnsubscribe(...args);
-    };
-
-    return channel;
-  },
-
   async fetchMyMemberRoleAssignmentForRealtime(communityId, userId) {
     const { data: memberRow, error: memberErr } = await havenCommunitySb()
       .from('community_members')
@@ -1420,76 +1366,42 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return { memberId: memberRow.id, roleIds };
   },
 
-  async broadcastMemberBanned({ communityId, bannedUserId }) {
-    const broadcastChannel = getAnyActiveCommunityRealtimeChannel(communityId);
-    if (!broadcastChannel) {
-      console.warn(
-        `Skipping member_banned broadcast for ${communityId}: no active channels subscription.`
-      );
-      return;
-    }
-
-    const sendStatus = await broadcastChannel.send({
-      type: 'broadcast',
-      event: 'member_banned',
-      payload: {
-        bannedUserId,
-        communityId,
-      } satisfies MemberBannedBroadcastPayload,
-    });
-
-    if (sendStatus !== 'ok') {
-      throw new Error('Failed to broadcast member ban.');
-    }
+  async broadcastMemberBanned(_input) {
+    // Ban RPC emits member_banned on the banned user's private_user channel.
   },
 
-  async broadcastMemberChannelAccessRevoked({ communityId, channelId, revokedUserId }) {
-    const broadcastChannel = getAnyActiveCommunityRealtimeChannel(communityId);
-    if (!broadcastChannel) {
-      console.warn(
-        `Skipping member_channel_access_revoked broadcast for ${communityId}: no active channels subscription.`
-      );
-      return;
-    }
-
-    const sendStatus = await broadcastChannel.send({
-      type: 'broadcast',
-      event: 'member_channel_access_revoked',
-      payload: {
-        revokedUserId,
-        channelId,
-        communityId,
-      } satisfies MemberChannelAccessRevokedBroadcastPayload,
-    });
-
-    if (sendStatus !== 'ok') {
-      throw new Error('Failed to broadcast channel access revocation.');
-    }
+  async broadcastMemberChannelAccessRevoked({
+    communityId,
+    channelId,
+    revokedUserId,
+  }) {
+    const { error } = await havenCommunitySb().rpc(
+      'broadcast_member_channel_access_revoked' as never,
+      {
+        p_community_id: communityId,
+        p_channel_id: channelId,
+        p_revoked_user_id: revokedUserId,
+      } as never,
+    );
+    if (error) throw error;
   },
 
-  async broadcastReportStatusUpdated({ reportId, status, communityId, updatedBy }) {
-    const broadcastChannel = getAnyActiveCommunityRealtimeChannel(communityId);
-    if (!broadcastChannel) {
-      console.warn(
-        `Skipping report_status_updated broadcast for ${communityId}: no active channels subscription.`
-      );
-      return;
-    }
-
-    const sendStatus = await broadcastChannel.send({
-      type: 'broadcast',
-      event: 'report_status_updated',
-      payload: {
-        reportId,
-        status,
-        communityId,
-        updatedBy,
-      } satisfies ReportStatusUpdatedBroadcastPayload,
-    });
-
-    if (sendStatus !== 'ok') {
-      throw new Error('Failed to broadcast report status update.');
-    }
+  async broadcastReportStatusUpdated({
+    reportId,
+    status,
+    communityId,
+    updatedBy,
+  }) {
+    const { error } = await havenCommunitySb().rpc(
+      'broadcast_report_status_updated' as never,
+      {
+        p_community_id: communityId,
+        p_report_id: reportId,
+        p_status: status,
+        p_updated_by: updatedBy,
+      } as never,
+    );
+    if (error) throw error;
   },
 
   async listMessages(communityId, channelId) {
@@ -1517,64 +1429,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
 
     const rows = (data ?? []) as Record<string, unknown>[];
-    const attachmentRows: MessageAttachmentRow[] = [];
-    const previewRows: MessageLinkPreviewRow[] = [];
-
-    for (const row of rows) {
-      const att = parseMessageAttachmentRowFromRpcJson(row.attachment);
-      if (att) attachmentRows.push(att);
-      const prev = parseMessageLinkPreviewRowFromRpcJson(row.link_preview);
-      if (prev) previewRows.push(prev);
-    }
-
-    const signedAttachments = await mapMessageAttachmentRowsWithSignedUrls(attachmentRows);
-    const signedPreviews = await mapMessageLinkPreviewRowsWithSignedUrls(previewRows);
-    const attByMessageId = new Map(signedAttachments.map((a) => [a.messageId, a]));
-    const previewByMessageId = new Map(signedPreviews.map((p) => [p.messageId, p]));
-
-    const messages: MessageBundle[] = rows.map((row) => {
-      const id = asOptionalString(row.id);
-      if (!id) {
-        throw new Error('list_channel_messages returned a row without id');
-      }
-
-      return {
-        id,
-        authorUserId:
-          row.author_user_id === null || row.author_user_id === undefined
-            ? null
-            : String(row.author_user_id),
-        displayName: typeof row.display_name === 'string' ? row.display_name : '',
-        avatarSnapshotUrl:
-          row.avatar_snapshot_url === null || row.avatar_snapshot_url === undefined
-            ? null
-            : asOptionalString(row.avatar_snapshot_url),
-        content: typeof row.content === 'string' ? row.content : '',
-        metadata: normalizeMessageMetadata(row.metadata),
-        replyToMessageId:
-          row.reply_to_message_id === null || row.reply_to_message_id === undefined
-            ? null
-            : String(row.reply_to_message_id),
-        createdAt: typeof row.created_at === 'string' ? row.created_at : '',
-        editedAt:
-          row.edited_at === null || row.edited_at === undefined
-            ? null
-            : typeof row.edited_at === 'string'
-              ? row.edited_at
-              : null,
-        deletedAt:
-          row.deleted_at === null || row.deleted_at === undefined
-            ? null
-            : typeof row.deleted_at === 'string'
-              ? row.deleted_at
-              : null,
-        isHidden: Boolean(row.is_hidden),
-        isPlatformStaff: row.is_platform_staff === true,
-        reactions: normalizeReactionsFromRpc(row.reactions),
-        attachment: attByMessageId.get(id) ?? null,
-        linkPreview: previewByMessageId.get(id) ?? null,
-      };
-    });
+    const messages = await mapChannelMessageRpcRowsToBundles(rows, input.channelId);
 
     return {
       messages,
@@ -1582,45 +1437,51 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     };
   },
 
-  subscribeToMessages(channelId, onChange) {
-    return havenCommunitySb().channel(`messages:${channelId}`)
-      .on(
-        'postgres_changes',
+  async getChannelMessage(input) {
+    const { communityId, channelId, messageId } = input;
+    const { data, error } = await havenCommunitySb().rpc('get_channel_message' as never, {
+      p_community_id: communityId,
+      p_channel_id: channelId,
+      p_message_id: messageId,
+    } as never);
+    if (error) throw error;
+
+    const rows = (data ?? []) as Record<string, unknown>[];
+    const messages = await mapChannelMessageRpcRowsToBundles(rows, channelId);
+    return messages[0] ?? null;
+  },
+
+  async fetchMessageAuthorProfiles(input) {
+    const { communityId, authorUserIds } = input;
+    const uniqueIds = Array.from(
+      new Set(authorUserIds.filter((id) => typeof id === 'string' && id.length > 0)),
+    );
+    if (uniqueIds.length === 0) return [];
+
+    const { data, error } = await havenCommunitySb().rpc(
+      'get_message_author_profiles' as never,
+      {
+        p_author_user_ids: uniqueIds,
+        p_community_id: communityId,
+      } as never,
+    );
+    if (error) throw error;
+
+    const rows = (data ?? []) as Record<string, unknown>[];
+    return rows.flatMap((row) => {
+      const userId = asOptionalString(row.id);
+      const username = asOptionalString(row.username);
+      if (!userId || !username) return [];
+      return [
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `channel_id=eq.${channelId}`,
+          userId,
+          username,
+          avatarUrl: asOptionalString(row.avatar_url) ?? null,
+          updatedAt:
+            asOptionalString(row.updated_at) ?? new Date(0).toISOString(),
         },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'messages',
-        },
-        (payload) => {
-          // DELETE payloads can omit non-primary-key fields unless replica identity is FULL.
-          // Fall back to firing on every delete so UI never lags stale rows.
-          const deletedChannelId = getRealtimeRowChannelId(payload.old);
-          if (!deletedChannelId || deletedChannelId === channelId) {
-            onChange(payload);
-          }
-        }
-      )
-      .subscribe();
+      ];
+    });
   },
 
   async listMessageReactions(communityId, channelId) {
@@ -1633,45 +1494,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
 
     return mapMessageReactionRows((data ?? []) as MessageReactionRow[]);
-  },
-
-  subscribeToMessageReactions(channelId, onChange) {
-    return havenCommunitySb().channel(`message_reactions:${channelId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'message_reactions',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'message_reactions',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'message_reactions',
-        },
-        (payload) => {
-          const deletedChannelId = getRealtimeRowChannelId(payload.old);
-          if (!deletedChannelId || deletedChannelId === channelId) {
-            onChange(payload);
-          }
-        }
-      )
-      .subscribe();
   },
 
   async toggleMessageReaction({ communityId, channelId, messageId, emoji }) {
@@ -1749,45 +1571,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return await mapMessageAttachmentRowsWithSignedUrls((data ?? []) as MessageAttachmentRow[]);
   },
 
-  subscribeToMessageAttachments(channelId, onChange) {
-    return havenCommunitySb().channel(`message_attachments:${channelId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'message_attachments',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'message_attachments',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'message_attachments',
-        },
-        (payload) => {
-          const deletedChannelId = getRealtimeRowChannelId(payload.old);
-          if (!deletedChannelId || deletedChannelId === channelId) {
-            onChange(payload);
-          }
-        }
-      )
-      .subscribe();
-  },
-
   async cleanupExpiredMessageAttachments(limit = 100) {
     const boundedLimit = Number.isFinite(limit)
       ? Math.min(Math.max(Math.floor(limit), 1), 500)
@@ -1813,52 +1596,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
 
     return await mapMessageLinkPreviewRowsWithSignedUrls((data ?? []) as MessageLinkPreviewRow[]);
-  },
-
-  subscribeToMessageLinkPreviews(channelId, onChange) {
-    return havenCommunitySb().channel(`message_link_previews:${channelId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'message_link_previews',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        (payload) => onChange(payload)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'message_link_previews',
-        },
-        (payload) => {
-          const updatedChannelId =
-            getRealtimeRowChannelId(payload.new) ?? getRealtimeRowChannelId(payload.old);
-          // UPDATE payloads may omit unchanged columns (including channel_id), so fall back to
-          // refreshing conservatively when we cannot determine the row's channel.
-          if (!updatedChannelId || updatedChannelId === channelId) {
-            onChange(payload);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'message_link_previews',
-        },
-        (payload) => {
-          const deletedChannelId = getRealtimeRowChannelId(payload.old);
-          if (!deletedChannelId || deletedChannelId === channelId) {
-            onChange(payload);
-          }
-        }
-      )
-      .subscribe();
   },
 
   async requestChannelLinkPreviewBackfill({ communityId, channelId, messageIds }) {
@@ -2705,6 +2442,56 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       console.warn('Failed to capture support report message snapshot:', snapshotError);
     }
 
+    if (target === 'both') {
+      // Fan-out: insert server_admins row first, then haven_staff row with source_report_id link.
+      // 'both' is never stored — each side gets an independent row.
+      const serverAdminsId = createPortableUuid();
+      const havenStaffId = createPortableUuid();
+
+      const { error: saError } = await havenCommunitySb().from('support_reports').insert({
+        id: serverAdminsId,
+        community_id: communityId,
+        destination: 'server_admins',
+        reporter_user_id: reporterUserId,
+        title: reportTitle,
+        notes: reportNotes,
+        snapshot,
+        include_last_n_messages: null,
+      });
+      if (saError) throw saError;
+
+      const { error: hsError } = await havenCommunitySb().from('support_reports').insert({
+        id: havenStaffId,
+        community_id: communityId,
+        destination: 'haven_staff',
+        reporter_user_id: reporterUserId,
+        title: reportTitle,
+        notes: reportNotes,
+        snapshot,
+        include_last_n_messages: null,
+        source_report_id: serverAdminsId,
+      });
+      if (hsError) throw hsError;
+
+      // Link both rows to the same channel and message for context
+      for (const reportId of [serverAdminsId, havenStaffId]) {
+        const { error: channelLinkError } = await havenCommunitySb().from('support_report_channels').insert({
+          report_id: reportId,
+          community_id: communityId,
+          channel_id: channelId,
+        });
+        if (channelLinkError) throw channelLinkError;
+
+        const { error: messageLinkError } = await havenCommunitySb().from('support_report_messages').insert({
+          report_id: reportId,
+          message_id: messageId,
+        });
+        if (messageLinkError) throw messageLinkError;
+      }
+      return;
+    }
+
+    // Single destination: server_admins or haven_staff
     const reportId = createPortableUuid();
 
     const { error: reportError } = await havenCommunitySb().from('support_reports')

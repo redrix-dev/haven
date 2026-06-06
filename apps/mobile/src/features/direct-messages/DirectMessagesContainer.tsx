@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Keyboard,
   Linking,
   Platform,
@@ -14,19 +13,19 @@ import {
   useWindowDimensions,
   View,
   type ListRenderItem,
-  type ScrollViewProps,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import {
   EnrichedMarkdownText,
-  EnrichedMarkdownTextInput,
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { KeyboardStickyView } from "react-native-keyboard-controller";
-import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
-import { ChatScrollView } from "@/features/community/ChatScrollView";
+import { ThemedIonicons } from "@/theme-rn";
+import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatInterface } from "@/components/chat/ChatInterface";
+import { ChatMediaAttachmentStrip } from "@/components/chat/ChatMediaAttachmentStrip";
+import { createChatMarkdownStyle } from "@/components/chat/chatTypography";
+import { useChatComposerColors } from "@/components/chat/useChatComposerColors";
+import { toInvertedChatOrder } from "@/components/chat/toInvertedChatOrder";
 import { useDmBubbleShellStore } from "@/features/direct-messages/stores/dmBubbleShellStore";
 import {
   loadPickedCommunityMediaForUpload,
@@ -36,23 +35,26 @@ import type {
   DirectMessage,
   DirectMessageConversationSummary,
 } from "@shared/lib/backend/types";
-import { getErrorMessage } from "@platform/lib/errors";
-import { resolveColorProp } from "@shared/themes";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
+import { useHavenCore } from "@shared/core";
 import { useAuthStore } from "@shared/stores/authStore";
-import { useLiveProfilesStore } from "@shared/stores/liveProfilesStore";
-import { useMobileDirectMessages } from "@/contexts/MobileDirectMessagesContext";
+import { resolveColorProp } from "@shared/themes";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
-import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
+import { MessageImageAttachment } from "@/features/media/MessageImageAttachment";
 
-const MARGIN = 8;
-const COMPOSER_CHROME_IMMERSIVE_OPACITY = 0.38;
-const COMPOSER_CHROME_REST_OPACITY = 1;
-const COMPOSER_CHROME_IMMERSIVE_MS = 140;
-const COMPOSER_CHROME_REST_MS = 280;
-const COMPOSER_CHROME_SETTLE_MS = 200;
-const COMPOSER_SELECTION = "rgba(63, 121, 216, 0.4)";
+type RefreshDmConversationsOptions = { suppressLoadingState?: boolean };
+
+type SendDirectMessageOptions = {
+  imageBody?: Blob;
+  imageArrayBuffer?: ArrayBuffer;
+  imageContentType?: string;
+  imageFilename?: string;
+  imageExpiresInHours?: number;
+  optimisticAttachmentUri?: string | null;
+};
 
 function formatDmTime(iso: string): string {
   const d = new Date(iso);
@@ -61,69 +63,159 @@ function formatDmTime(iso: string): string {
 }
 
 export function DirectMessagesContainer() {
+  const composerColors = useChatComposerColors();
   const themeTokens = useMobileThemeTokens();
-  const {
-    ICON_MUTED,
-    ICON_ON_PRIMARY,
-    COMPOSER_PLACEHOLDER,
-    COMPOSER_CURSOR,
-    COMPOSER_LINK,
-    COMPOSER_SPOILER_FG,
-    COMPOSER_TEXT,
-  } = useMemo(
+  const switchColors = useMemo(
     () => ({
-      ICON_MUTED: resolveColorProp(themeTokens, "text-dim") ?? "#8b9cbb",
-      ICON_ON_PRIMARY: resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff",
-      COMPOSER_PLACEHOLDER: resolveColorProp(themeTokens, "text-dim") ?? "#8e8e93",
-      COMPOSER_CURSOR: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
-      COMPOSER_LINK: resolveColorProp(themeTokens, "primary") ?? "#3F79D8",
-      COMPOSER_SPOILER_FG: resolveColorProp(themeTokens, "text-muted") ?? "#a9b8cf",
-      COMPOSER_TEXT: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
+      false: resolveColorProp(themeTokens, "border-panel") ?? "#3d4f6a",
+      true: resolveColorProp(themeTokens, "primary") ?? "#4f8df5",
+      thumb: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
     }),
     [themeTokens],
   );
-
   const { width: windowWidth } = useWindowDimensions();
-  const liveProfiles = useLiveProfilesStore((s) => s.profiles);
+  const core = useHavenCore();
+  const dm = core.directMessages;
+  const liveProfiles = core.profiles.useProfilesRecord();
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
+  const dmConversations = dm.useConversations();
+  const dmConversationsLoading = dm.useIsLoadingConversations();
+  const selectedDmConversationId = dm.useActiveConversationId();
+  const dmComposeDraftPeer = dm.useComposeDraftPeer();
+  const dmMessages = dm.useMessages(selectedDmConversationId ?? "");
+  const dmMessagesLoading = dm.useIsLoadingMessages(selectedDmConversationId ?? "");
   const [draft, setDraft] = useState("");
   const [isPickingDmMedia, setIsPickingDmMedia] = useState(false);
   const [isSendingDm, setIsSendingDm] = useState(false);
   const [pendingDmMedia, setPendingDmMedia] = useState<CommunityMediaUploadPayload | null>(null);
-  const { bottom } = useSafeAreaInsets();
-  const composerHeight = useSharedValue(0);
-  const adjustedBlankSpace = useDerivedValue(() => composerHeight.value - bottom);
-  const composerChromeOpacity = useSharedValue(COMPOSER_CHROME_REST_OPACITY);
-  const listDragRef = useRef(false);
-  const listMomentumRef = useRef(false);
-  const composerSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
   const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(null);
   const [dmMessageActionsTarget, setDmMessageActionsTarget] = useState<DirectMessage | null>(null);
+  const [dmConversationsRefreshing, setDmConversationsRefreshing] = useState(false);
+  const [dmConversationsError, setDmConversationsError] = useState<string | null>(null);
+  const [dmMessagesError, setDmMessagesError] = useState<string | null>(null);
 
-  const {
-    state: {
-      dmConversations,
-      dmConversationsLoading,
-      dmConversationsRefreshing,
-      dmConversationsError,
-      selectedDmConversationId,
-      dmComposeDraftPeer,
-      dmMessages,
-      dmMessagesLoading,
-      dmMessagesError,
+  const selectedDmConversation = useMemo(
+    () =>
+      selectedDmConversationId
+        ? (dmConversations.find((c) => c.conversationId === selectedDmConversationId) ??
+          null)
+        : null,
+    [dmConversations, selectedDmConversationId],
+  );
+
+  const refreshDmConversations = useCallback(
+    async (options?: RefreshDmConversationsOptions) => {
+      if (options?.suppressLoadingState) setDmConversationsRefreshing(true);
+      setDmConversationsError(null);
+      try {
+        await dm.loadConversations();
+      } catch (error) {
+        setDmConversationsError(getErrorMessage(error, "Failed to load direct messages."));
+      } finally {
+        setDmConversationsRefreshing(false);
+      }
     },
-    derived: { selectedDmConversation },
-    actions: {
-      openDirectMessageConversation,
-      clearSelectedDmConversation,
-      clearDirectMessageDraft,
-      sendDirectMessage,
-      refreshDmConversations,
-      toggleSelectedDmConversationMuted,
-      reportDirectMessage,
+    [dm],
+  );
+
+  const openDirectMessageConversation = useCallback(
+    async (conversationId: string) => {
+      if (!conversationId) throw new Error("DM conversation id is required.");
+      setDmMessagesError(null);
+      try {
+        await dm.openConversation(conversationId, { markRead: true });
+      } catch (error) {
+        const message = getErrorMessage(error, "Failed to load direct messages.");
+        setDmMessagesError(message);
+        throw new Error(message);
+      }
     },
-  } = useMobileDirectMessages();
+    [dm],
+  );
+
+  const clearSelectedDmConversation = useCallback(() => {
+    dm.clearFocusedConversation();
+    setDmMessagesError(null);
+  }, [dm]);
+
+  const clearDirectMessageDraft = useCallback(() => {
+    dm.setComposeDraftPeer(null);
+    setDmMessagesError(null);
+  }, [dm]);
+
+  const sendDirectMessage = useCallback(
+    async (content: string, options?: SendDirectMessageOptions) => {
+      let activeConversationId = selectedDmConversationId;
+      const draftPeer = dmComposeDraftPeer;
+      if (!activeConversationId && draftPeer) {
+        activeConversationId = await dm.getOrCreateDirectConversation(draftPeer.userId);
+        dm.setComposeDraftPeer(null);
+        dm.setActiveConversationId(activeConversationId);
+        await refreshDmConversations({ suppressLoadingState: true });
+      }
+      if (!activeConversationId) throw new Error("No direct message conversation selected.");
+
+      setDmMessagesError(null);
+      try {
+        const hasBlob = options?.imageBody != null;
+        const hasBuffer = options?.imageArrayBuffer != null;
+        if (hasBlob && hasBuffer) {
+          throw new Error("Cannot send both imageBody and imageArrayBuffer.");
+        }
+        if (hasBuffer && !options.imageContentType?.trim()) {
+          throw new Error("imageContentType is required when sending imageArrayBuffer.");
+        }
+        const inferredFilename =
+          options?.imageFilename ??
+          (options?.imageBody && "name" in options.imageBody
+            ? String(options.imageBody.name)
+            : undefined) ??
+          `upload-${Date.now()}`;
+
+        await dm.sendMessage(activeConversationId, content, {
+          imageUpload: hasBuffer
+            ? {
+                body: options.imageArrayBuffer as ArrayBuffer,
+                filename: inferredFilename,
+                expiresInHours: options.imageExpiresInHours,
+                contentType: options.imageContentType?.trim(),
+              }
+            : hasBlob
+              ? {
+                  body: options.imageBody as Blob,
+                  filename: inferredFilename,
+                  expiresInHours: options.imageExpiresInHours,
+                }
+              : undefined,
+          optimisticAttachmentUri: options?.optimisticAttachmentUri ?? null,
+        });
+      } catch (error) {
+        const message = getErrorMessage(error, "Failed to send direct message.");
+        setDmMessagesError(message);
+        throw new Error(message);
+      }
+    },
+    [dm, dmComposeDraftPeer, refreshDmConversations, selectedDmConversationId],
+  );
+
+  const toggleSelectedDmConversationMuted = useCallback(
+    async (nextMuted: boolean) => {
+      if (!selectedDmConversationId) {
+        throw new Error("No direct message conversation selected.");
+      }
+      await dm.setMuted(selectedDmConversationId, nextMuted);
+      await refreshDmConversations({ suppressLoadingState: true });
+    },
+    [dm, refreshDmConversations, selectedDmConversationId],
+  );
+
+  const reportDirectMessage = useCallback(
+    async (input: Parameters<typeof dm.reportMessage>[0]) => {
+      await dm.reportMessage(input);
+    },
+    [dm],
+  );
 
   const dmComposeDraftPeerRef = useRef(dmComposeDraftPeer);
   dmComposeDraftPeerRef.current = dmComposeDraftPeer;
@@ -136,44 +228,32 @@ export function DirectMessagesContainer() {
     });
   }, [clearDirectMessageDraft]);
 
-  const clearComposerSettleTimer = useCallback(() => {
-    if (composerSettleTimerRef.current != null) {
-      clearTimeout(composerSettleTimerRef.current);
-      composerSettleTimerRef.current = null;
-    }
-  }, []);
+  useEffect(() => {
+    if (!selectedDmConversationId) return;
+    void core
+      .prepareDirectMessageConversation(selectedDmConversationId, { markRead: false })
+      .catch((error) => {
+        console.error("Failed to load selected DM conversation:", error);
+        setDmMessagesError(getErrorMessage(error, "Failed to load direct messages."));
+      });
+  }, [core, selectedDmConversationId]);
 
-  const goComposerChromeImmersive = useCallback(() => {
-    clearComposerSettleTimer();
-    composerChromeOpacity.value = withTiming(COMPOSER_CHROME_IMMERSIVE_OPACITY, {
-      duration: COMPOSER_CHROME_IMMERSIVE_MS,
-    });
-  }, [clearComposerSettleTimer]);
-
-  const scheduleComposerChromeRest = useCallback(() => {
-    clearComposerSettleTimer();
-    composerSettleTimerRef.current = setTimeout(() => {
-      composerSettleTimerRef.current = null;
-      if (!listDragRef.current && !listMomentumRef.current) {
-        composerChromeOpacity.value = withTiming(COMPOSER_CHROME_REST_OPACITY, {
-          duration: COMPOSER_CHROME_REST_MS,
-        });
-      }
-    }, COMPOSER_CHROME_SETTLE_MS);
-  }, [clearComposerSettleTimer]);
-
-  useEffect(() => () => clearComposerSettleTimer(), [clearComposerSettleTimer]);
-
-  const composerChromeAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: composerChromeOpacity.value,
-  }));
+  useEffect(() => {
+    if (!selectedDmConversationId) return;
+    const stillExists = dmConversations.some(
+      (conversation) => conversation.conversationId === selectedDmConversationId,
+    );
+    if (!stillExists) dm.setActiveConversationId(null);
+  }, [dm, dmConversations, selectedDmConversationId]);
 
   const dismissDmComposerKeyboard = useCallback(() => {
     composerInputRef.current?.blur();
     Keyboard.dismiss();
   }, []);
 
-  const orderedDmMessages = useMemo(() => [...dmMessages].reverse(), [dmMessages]);
+  // toInvertedChatOrder reverses ascending nexus order to descending for
+  // ChatInterface's inverted FlatList (newest at data[0] = visual bottom).
+  const orderedDmMessages = useMemo(() => toInvertedChatOrder(dmMessages), [dmMessages]);
 
   const otherLabel = useCallback(
     (c: DirectMessageConversationSummary) => {
@@ -192,7 +272,7 @@ export function DirectMessagesContainer() {
       return (
         <Pressable
           onPress={() => void openDirectMessageConversation(item.conversationId)}
-          className="flex-row items-center gap-3 border-b border-border py-3 active:bg-surface-hover"
+          className="flex-row items-center gap-3 border-b border-border-panel py-3 active:bg-surface-hover"
         >
           <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
             <Text className="text-lg font-semibold text-foreground">
@@ -201,17 +281,17 @@ export function DirectMessagesContainer() {
           </View>
           <View className="min-w-0 flex-1">
             <Text
-              className={`text-base ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-              numberOfLines={1}
+              className={`text-base leading-6 ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+              numberOfLines={2}
             >
               {title}
             </Text>
-            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+            <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={2}>
               {item.lastMessagePreview ?? "No messages yet"}
             </Text>
           </View>
           {unread ? (
-            <View className="min-w-[22px] rounded-full bg-primary px-2 py-0.5">
+            <View className="min-w-5.5 rounded-full bg-primary px-2 py-0.5">
               <Text className="text-center text-xs font-bold text-primary-foreground">{item.unreadCount}</Text>
             </View>
           ) : null}
@@ -219,17 +299,6 @@ export function DirectMessagesContainer() {
       );
     },
     [liveProfiles, openDirectMessageConversation, otherLabel],
-  );
-
-  const renderScrollComponent = useCallback(
-    (props: ScrollViewProps) => (
-      <ChatScrollView
-        {...props}
-        blankSpace={adjustedBlankSpace}
-        keyboardLiftBehavior="whenAtEnd"
-      />
-    ),
-    [adjustedBlankSpace],
   );
 
   const renderMessage: ListRenderItem<DirectMessage> = useCallback(
@@ -246,6 +315,12 @@ export function DirectMessagesContainer() {
       const blockSurfaceColor = isSelf ? "rgba(12, 20, 34, 0.35)" : "#1a2235";
       const blockquoteBorderColor = isSelf ? "rgba(255,255,255,0.65)" : "#3F79D8";
       const linkColor = isSelf ? "#ffffff" : "#3F79D8";
+      const markdownStyle = createChatMarkdownStyle({
+        textColor,
+        codeBackgroundColor: blockSurfaceColor,
+        blockquoteBorderColor,
+        linkColor,
+      });
       return (
         <Pressable
           onPress={dismissDmComposerKeyboard}
@@ -269,40 +344,15 @@ export function DirectMessagesContainer() {
               flavor="github"
               md4cFlags={{ underline: true }}
               markdownStyle={{
-                paragraph: { color: textColor, fontSize: 14, lineHeight: 20 },
-                h1: { fontSize: 22, fontWeight: "700", color: textColor, marginTop: 4, marginBottom: 4, lineHeight: 28 },
-                h2: { fontSize: 18, fontWeight: "700", color: textColor, marginTop: 4, marginBottom: 4, lineHeight: 24 },
-                h3: { fontSize: 16, fontWeight: "600", color: textColor, marginTop: 4, marginBottom: 2, lineHeight: 22 },
-                strong: { color: textColor },
-                em: { color: textColor },
+                ...markdownStyle,
                 code: {
+                  ...markdownStyle.code,
                   fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-                  fontSize: 13,
-                  backgroundColor: blockSurfaceColor,
-                  color: textColor,
-                  borderColor: blockSurfaceColor,
                 },
                 codeBlock: {
+                  ...markdownStyle.codeBlock,
                   fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-                  fontSize: 13,
-                  backgroundColor: blockSurfaceColor,
-                  color: textColor,
-                  padding: 10,
-                  borderRadius: 6,
-                  marginTop: 4,
-                  marginBottom: 4,
                 },
-                blockquote: {
-                  backgroundColor: blockSurfaceColor,
-                  borderColor: blockquoteBorderColor,
-                  borderWidth: 3,
-                  gapWidth: 10,
-                  marginTop: 2,
-                  marginBottom: 2,
-                },
-                strikethrough: { color: textColor },
-                list: { marginTop: 2, marginBottom: 2 },
-                link: { color: linkColor, underline: true },
               }}
               onLinkPress={({ url }) => {
                 void Linking.openURL(url);
@@ -318,18 +368,28 @@ export function DirectMessagesContainer() {
               }
               if (attachment.mediaKind === "image") {
                 return (
-                  <Image
+                  <MessageImageAttachment
                     key={attachment.id}
-                    source={{ uri: attachment.signedUrl }}
-                    style={styles.dmAttachmentImage}
-                    resizeMode="contain"
+                    image={{
+                      id: attachment.id,
+                      signedUrl: attachment.signedUrl,
+                      originalFilename: attachment.originalFilename,
+                    }}
+                    images={(item.attachments ?? [])
+                      .filter((candidate) => candidate.mediaKind === "image" && candidate.signedUrl)
+                      .map((candidate) => ({
+                        id: candidate.id,
+                        signedUrl: candidate.signedUrl!,
+                        originalFilename: candidate.originalFilename,
+                      }))}
+                    thumbnailStyle={styles.dmAttachmentImage}
                   />
                 );
               }
               return null;
             })}
             <Text
-              className="mt-1 text-[10px]"
+              className="mt-1 text-xs leading-4"
               style={{ color: mutedTextColor }}
             >
               {formatDmTime(item.createdAt)}
@@ -402,6 +462,7 @@ export function DirectMessagesContainer() {
               imageArrayBuffer: media.body,
               imageContentType: media.contentType,
               imageFilename: media.fileName,
+              optimisticAttachmentUri: media.localUri,
             }
           : {}),
       });
@@ -419,10 +480,10 @@ export function DirectMessagesContainer() {
     return (
       <View className="min-h-0 flex-1">
         {dmConversationsError ? (
-          <Text className="mb-2 text-sm text-red-400">{dmConversationsError}</Text>
+          <Text className="mb-2 text-sm text-destructive">{dmConversationsError}</Text>
         ) : null}
         {dmConversationsLoading && dmConversations.length === 0 ? (
-          <ActivityIndicator color="#e6edf7" />
+          <ActivityIndicator color={composerColors.spinner} />
         ) : (
           <FlatList
             data={dmConversations}
@@ -450,11 +511,7 @@ export function DirectMessagesContainer() {
   const canSendDmMessage = draft.trim().length > 0 || pendingDmMedia != null;
 
   return (
-    <SafeAreaView
-      edges={["bottom"]}
-      className="min-h-0 flex-1 bg-card"
-      style={{ flex: 1, minHeight: 0 }}
-    >
+    <View className="min-h-0 flex-1 bg-card" style={{ flex: 1, minHeight: 0 }}>
       <View className="mb-2 flex-row items-center justify-between gap-2">
         <Pressable
           accessibilityRole="button"
@@ -462,10 +519,10 @@ export function DirectMessagesContainer() {
           onPress={() => clearSelectedDmConversation()}
           className="flex-row items-center gap-1 active:opacity-80"
         >
-          <Ionicons name="chevron-back" size={24} color="#e6edf7" />
+          <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
           <Text className="text-sm text-foreground">Inbox</Text>
         </Pressable>
-        <Text className="max-w-[50%] flex-1 text-center text-base font-semibold text-foreground" numberOfLines={1}>
+        <Text className="max-w-[50%] flex-1 text-center text-base font-semibold leading-6 text-foreground" numberOfLines={2}>
           {threadTitle}
         </Text>
         {selectedDmConversation ? (
@@ -476,7 +533,8 @@ export function DirectMessagesContainer() {
               onValueChange={(v) => {
                 void toggleSelectedDmConversationMuted(v);
               }}
-              trackColor={{ false: "#3d4f6a", true: "#4f8df5" }}
+              trackColor={{ false: switchColors.false, true: switchColors.true }}
+              thumbColor={switchColors.thumb}
             />
           </View>
         ) : (
@@ -485,149 +543,59 @@ export function DirectMessagesContainer() {
       </View>
 
       {dmMessagesError ? (
-        <Text className="mb-2 text-sm text-red-400">{dmMessagesError}</Text>
+        <Text className="mb-2 text-sm text-destructive">{dmMessagesError}</Text>
       ) : null}
 
-      {dmMessagesLoading && dmMessages.length === 0 && !dmComposeDraftPeer ? (
-        <ActivityIndicator color="#e6edf7" />
-      ) : (
-        <FlatList
-          className="flex-1"
-          data={orderedDmMessages}
-          keyExtractor={(m) => m.messageId}
-          renderItem={renderMessage}
-          inverted
-          keyboardShouldPersistTaps="handled"
-          scrollEventThrottle={16}
-          onScrollBeginDrag={() => {
-            listDragRef.current = true;
-            goComposerChromeImmersive();
-          }}
-          onScrollEndDrag={() => {
-            listDragRef.current = false;
-            scheduleComposerChromeRest();
-          }}
-          onMomentumScrollBegin={() => {
-            listMomentumRef.current = true;
-            goComposerChromeImmersive();
-          }}
-          onMomentumScrollEnd={() => {
-            listMomentumRef.current = false;
-            scheduleComposerChromeRest();
-          }}
-          renderScrollComponent={renderScrollComponent}
-          contentContainerStyle={{ paddingTop: 32 }}
-          ListEmptyComponent={
-            <Pressable
-              onPress={dismissDmComposerKeyboard}
-              className="min-h-[320px] flex-1 items-center justify-center px-4 pt-8"
-            >
-              {dmComposeDraftPeer ? (
-                <Text className="text-center text-muted-foreground text-[13px] leading-5">
-                  This is the beginning of your direct messages with {dmComposeDraftPeer.displayName}. Cheers to new
-                  friendships!
-                </Text>
-              ) : (
-                <Text className="text-muted-foreground text-[13px]">No messages yet.</Text>
-              )}
-            </Pressable>
-          }
-        />
-      )}
-
-      <KeyboardStickyView
-        offset={{ opened: bottom - MARGIN }}
-        onLayout={(e) => {
-          composerHeight.value = e.nativeEvent.layout.height;
-        }}
-        style={{
-          position: "absolute",
-          width: "100%",
-          bottom: bottom - MARGIN,
-        }}
-      >
-        <View collapsable={Platform.OS === "android" ? false : undefined}>
-          {pendingDmMedia ? (
-            <View className="flex-row items-center gap-2 border-t border-white/8 bg-surface-modal/90 px-3 py-2">
-              <Ionicons name="attach" size={16} color={ICON_MUTED} />
-              <Text className="min-w-0 flex-1 text-xs text-foreground/90" numberOfLines={1}>
-                {pendingDmMedia.fileName}
-              </Text>
-              <Pressable
-                hitSlop={8}
-                disabled={isSendingDm}
-                onPress={() => setPendingDmMedia(null)}
-                className="shrink-0"
-              >
-                <Text className="text-xs font-semibold text-primary">Remove</Text>
-              </Pressable>
+      <ChatInterface
+        keyboardScrollProps={{ keyboardLiftBehavior: "whenAtEnd" }}
+        composerCollapsable={Platform.OS === "android" ? false : undefined}
+        listPlaceholder={
+          dmMessagesLoading && dmMessages.length === 0 && !dmComposeDraftPeer ? (
+            <View className="flex-1 items-center justify-center">
+              <ActivityIndicator color={composerColors.spinner} />
             </View>
-          ) : null}
-
-          <View className="flex-row items-end bg-transparent px-3 pt-2.5 pb-3 gap-2">
-            <Animated.View style={composerChromeAnimatedStyle}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Add media"
-                disabled={isSendingDm || isPickingDmMedia}
-                onPress={() => void handlePickDmMedia()}
-                className="w-[34px] h-[34px] rounded-full bg-white/10 items-center justify-center mb-0.5 disabled:opacity-50"
-              >
-                <Ionicons name="add" size={20} color={ICON_ON_PRIMARY} />
-              </Pressable>
-            </Animated.View>
-
-            <Animated.View
-              style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
-            >
-              <View className="flex-1 flex-row items-center rounded-[18px] border border-white/10 bg-white/8 pr-1">
-                <EnrichedMarkdownTextInput
-                  ref={composerInputRef}
-                  multiline
-                  editable={!isSendingDm}
-                  scrollEnabled
-                  defaultValue=""
-                  onChangeMarkdown={setDraft}
-                  placeholder="Type a message..."
-                  placeholderTextColor={COMPOSER_PLACEHOLDER}
-                  cursorColor={COMPOSER_CURSOR}
-                  selectionColor={COMPOSER_SELECTION}
-                  markdownStyle={{
-                    strong: { color: COMPOSER_TEXT },
-                    em: { color: COMPOSER_TEXT },
-                    link: { color: COMPOSER_LINK, underline: true },
-                    spoiler: { color: COMPOSER_SPOILER_FG, backgroundColor: "rgba(0,0,0,0.2)" },
-                  }}
-                  style={{
-                    flex: 1,
-                    minHeight: 36,
-                    maxHeight: 120,
-                    color: COMPOSER_TEXT,
-                    paddingHorizontal: 14,
-                    paddingTop: 8,
-                    paddingBottom: 8,
-                    fontSize: 16,
-                    backgroundColor: "transparent",
-                  }}
+          ) : undefined
+        }
+        data={orderedDmMessages}
+        keyExtractor={(m) => m.messageId}
+        renderItem={renderMessage}
+        ListEmptyComponent={
+          <Pressable
+            onPress={dismissDmComposerKeyboard}
+            className="min-h-[320px] flex-1 items-center justify-center px-4 pt-8"
+          >
+            {dmComposeDraftPeer ? (
+              <Text className="text-center text-[13px] leading-5 text-muted-foreground">
+                This is the beginning of your direct messages with {dmComposeDraftPeer.displayName}. Cheers to new
+                friendships!
+              </Text>
+            ) : (
+              <Text className="text-[13px] text-muted-foreground">No messages yet.</Text>
+            )}
+          </Pressable>
+        }
+        composer={
+          <ChatComposer
+            inputRef={composerInputRef}
+            colors={composerColors}
+            isSending={isSendingDm}
+            isPickingMedia={isPickingDmMedia}
+            canSend={canSendDmMessage}
+            onChangeMarkdown={setDraft}
+            onSend={() => void handleSend()}
+            onPickMedia={() => void handlePickDmMedia()}
+            strips={
+              pendingDmMedia ? (
+                <ChatMediaAttachmentStrip
+                  fileName={pendingDmMedia.fileName}
+                  disabled={isSendingDm}
+                  onRemove={() => setPendingDmMedia(null)}
                 />
-                <Pressable
-                  onPress={() => void handleSend()}
-                  disabled={isSendingDm || !canSendDmMessage}
-                  style={{
-                    opacity: canSendDmMessage ? (isSendingDm ? 0.55 : 1) : 0,
-                    pointerEvents: canSendDmMessage ? "auto" : "none",
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Send message"
-                  className="w-7 h-7 shrink-0 rounded-full bg-primary items-center justify-center"
-                >
-                  <Ionicons name="arrow-up" size={18} color={ICON_ON_PRIMARY} />
-                </Pressable>
-              </View>
-            </Animated.View>
-          </View>
-        </View>
-      </KeyboardStickyView>
+              ) : undefined
+            }
+          />
+        }
+      />
 
       <DmMessageActionsSheet
         visible={dmMessageActionsTarget !== null}
@@ -653,13 +621,14 @@ export function DirectMessagesContainer() {
           });
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   attachmentUnavailable: {
     marginTop: 8,
+    // uniwind-theme-allow mobile-theme/no-raw-style-color - muted text color for unavailable attachment label
     color: "#9ba9bf",
     fontSize: 12,
   },
@@ -668,6 +637,7 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 12,
     marginTop: 8,
+    // uniwind-theme-allow mobile-theme/no-raw-style-color - image loading placeholder; semi-transparent black is intentional
     backgroundColor: "rgba(0,0,0,0.22)",
   },
 });

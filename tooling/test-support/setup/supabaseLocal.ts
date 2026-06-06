@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { execFileSync } from 'node:child_process';
 import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
-import { initializeHavenDataFromClient } from '@shared/lib/bootstrap/initializeHavenDataFromClient';
+import { createHavenCore, createMemoryPersistence } from '@shared/core';
 import type { Database } from '@shared/types/database';
 import { loadBootstrappedTestUsers, type TestUserKey } from '../fixtures/users';
 
@@ -36,9 +36,13 @@ export const supabase = createHavenSupabaseClient(localSupabaseEnv.url, localSup
   },
 });
 
-initializeHavenDataFromClient(supabase, {
-  supabaseUrl: localSupabaseEnv.url,
-  supabaseAnonKey: localSupabaseEnv.anonKey,
+createHavenCore({
+  client: supabase,
+  publicConfig: {
+    supabaseUrl: localSupabaseEnv.url,
+    supabaseAnonKey: localSupabaseEnv.anonKey,
+  },
+  persistence: createMemoryPersistence(),
 });
 
 export async function signInAsTestUser(userKey: TestUserKey) {

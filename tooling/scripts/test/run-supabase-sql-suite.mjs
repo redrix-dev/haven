@@ -8,7 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
 
 function readRunOrder() {
-  const runOrderPath = path.join(repoRoot, 'services/supabase/tests/run_order.txt');
+  const runOrderPath = path.join(repoRoot, 'supabase/tests/run_order.txt');
   const lines = readFileSync(runOrderPath, 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -19,9 +19,9 @@ function readRunOrder() {
 function pickFiles(allFiles, { fixturesOnly, skipFixtures }) {
   return allFiles.filter((filePath) => {
     const normalized = filePath.replace(/\\/g, '/');
-    const isHelper = normalized.includes('/services/supabase/tests/_helpers/');
-    const isFixture = normalized.includes('/services/supabase/tests/fixtures/');
-    const isSqlSuite = normalized.includes('/services/supabase/tests/sql/');
+    const isHelper = normalized.includes('/supabase/tests/_helpers/');
+    const isFixture = normalized.includes('/supabase/tests/fixtures/');
+    const isSqlSuite = normalized.includes('/supabase/tests/sql/');
     if (fixturesOnly) return isHelper || isFixture;
     if (skipFixtures) return isHelper || isSqlSuite;
     return isHelper || isFixture || isSqlSuite;
@@ -40,7 +40,7 @@ function main() {
   const files = pickFiles(allFiles, { fixturesOnly, skipFixtures });
 
   if (files.length === 0) {
-    throw new Error('No SQL suite files selected. Check services/supabase/tests/run_order.txt.');
+    throw new Error('No SQL suite files selected. Check supabase/tests/run_order.txt.');
   }
 
   for (const filePath of files) {

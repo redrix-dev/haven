@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PendingUiConfirmation } from "@shared/app/types/types";
+import type { PendingUiConfirmation } from "@shared/types/types";
 
 export type RenameServerDraft = {
   serverId: string;
@@ -20,6 +20,8 @@ export type CreateGroupDraft = {
   channelId: string | null;
 };
 
+export type WorkspaceMode = "community" | "dm";
+
 const createDefaultUiState = () => ({
   showServerSettingsModal: false,
   showChannelSettingsModal: false,
@@ -36,6 +38,12 @@ const createDefaultUiState = () => ({
   renameGroupDraft: null as RenameGroupDraft | null,
   createGroupDraft: null as CreateGroupDraft | null,
   pendingUiConfirmation: null as PendingUiConfirmation | null,
+  workspaceMode: "community" as WorkspaceMode,
+  showHiddenMessages: false,
+  friendsPanelOpen: false,
+  friendsPanelRequestedTab: null as import("@shared/types/types").FriendsPanelTab | null,
+  friendsPanelHighlightedRequestId: null as string | null,
+  notificationsPanelOpen: false,
 });
 
 export type UiStoreState = ReturnType<typeof createDefaultUiState> & {
@@ -54,6 +62,14 @@ export type UiStoreState = ReturnType<typeof createDefaultUiState> & {
   setRenameGroupDraft: (draft: RenameGroupDraft | null) => void;
   setCreateGroupDraft: (draft: CreateGroupDraft | null) => void;
   setPendingUiConfirmation: (value: PendingUiConfirmation | null) => void;
+  setWorkspaceMode: (mode: WorkspaceMode) => void;
+  setShowHiddenMessages: (show: boolean) => void;
+  setFriendsPanelOpen: (open: boolean) => void;
+  setFriendsPanelRequestedTab: (
+    tab: import("@shared/types/types").FriendsPanelTab | null,
+  ) => void;
+  setFriendsPanelHighlightedRequestId: (id: string | null) => void;
+  setNotificationsPanelOpen: (open: boolean) => void;
   reset: () => void;
 };
 
@@ -82,5 +98,14 @@ export const useUiStore = create<UiStoreState>()((set) => ({
   setCreateGroupDraft: (createGroupDraft) => set({ createGroupDraft }),
   setPendingUiConfirmation: (pendingUiConfirmation) =>
     set({ pendingUiConfirmation }),
+  setWorkspaceMode: (workspaceMode) => set({ workspaceMode }),
+  setShowHiddenMessages: (showHiddenMessages) => set({ showHiddenMessages }),
+  setFriendsPanelOpen: (friendsPanelOpen) => set({ friendsPanelOpen }),
+  setFriendsPanelRequestedTab: (friendsPanelRequestedTab) =>
+    set({ friendsPanelRequestedTab }),
+  setFriendsPanelHighlightedRequestId: (friendsPanelHighlightedRequestId) =>
+    set({ friendsPanelHighlightedRequestId }),
+  setNotificationsPanelOpen: (notificationsPanelOpen) =>
+    set({ notificationsPanelOpen }),
   reset: () => set(createDefaultUiState()),
 }));

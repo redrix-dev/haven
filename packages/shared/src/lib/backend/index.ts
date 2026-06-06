@@ -1,4 +1,4 @@
-import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
+import { requireHavenCore } from "@shared/core/havenCoreRef";
 import type { CommunityDataBackend } from './communityDataBackend.interface';
 import type { ControlPlaneBackend } from './controlPlaneBackend';
 import type { DirectMessageBackend } from './directMessageBackend';
@@ -29,58 +29,23 @@ const backendMode = parseBackendMode(resolveBackendModeFromEnv());
 
 export const getBackendMode = (): BackendMode => backendMode;
 
-export const getControlPlaneBackend = (): ControlPlaneBackend => {
-  switch (backendMode) {
-    case 'central_supabase':
-    default:
-      return requireHavenDataRuntime().controlPlane;
-  }
-};
+export const getControlPlaneBackend = (): ControlPlaneBackend =>
+  requireHavenCore().backends.controlPlane;
 
-export const getCommunityDataBackend = (_communityId: string): CommunityDataBackend => {
-  switch (backendMode) {
-    case 'central_supabase':
-    default:
-      return requireHavenDataRuntime().communityData;
-  }
-};
+export const getCommunityDataBackend = (_communityId: string): CommunityDataBackend =>
+  requireHavenCore().backends.communityData;
 
-export const getNotificationBackend = (): NotificationBackend => {
-  switch (backendMode) {
-    case 'central_supabase':
-    default:
-      return requireHavenDataRuntime().notifications;
-  }
-};
+export const getNotificationBackend = (): NotificationBackend =>
+  requireHavenCore().backends.notifications;
 
-export const getSocialBackend = (): SocialBackend => {
-  switch (backendMode) {
-    case 'central_supabase':
-    default:
-      return requireHavenDataRuntime().social;
-  }
-};
+export const getSocialBackend = (): SocialBackend =>
+  requireHavenCore().backends.social;
 
-export const getDirectMessageBackend = (): DirectMessageBackend => {
-  switch (backendMode) {
-    case 'central_supabase':
-    default:
-      return requireHavenDataRuntime().directMessages;
-  }
-};
+export const getDirectMessageBackend = (): DirectMessageBackend =>
+  requireHavenCore().backends.directMessages;
 
-export const getModerationBackend = (): ModerationBackend => {
-  switch (backendMode) {
-    case 'central_supabase':
-    default:
-      return requireHavenDataRuntime().moderation;
-  }
-};
+export const getModerationBackend = (): ModerationBackend =>
+  requireHavenCore().backends.moderation;
 
-export const getServerModmailBackend = (): ServerModmailBackend => {
-  switch (backendMode) {
-    case 'central_supabase':
-    default:
-      return requireHavenDataRuntime().serverModmail;
-  }
-};
+export const getServerModmailBackend = (): ServerModmailBackend =>
+  requireHavenCore().backends.serverModmail;

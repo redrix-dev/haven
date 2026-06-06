@@ -5,7 +5,7 @@ import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import type { Session } from "@supabase/supabase-js";
-import { getMobileSupabase } from "@/supabase/getMobileSupabase";
+import { useHavenCore } from "@shared/core";
 
 const INSTALLATION_ID_KEY = "haven:mobilePushInstallationId";
 const LAST_EXPO_TOKEN_KEY = "haven:lastExpoPushToken";
@@ -20,9 +20,10 @@ async function getOrCreateInstallationId(): Promise<string> {
 
 /**
  * Registers the device Expo push token with Supabase after sign-in and removes it on sign-out.
- * Notification tap routing lives in `useMobilePushNotificationRouting` (handlers from tab shell).
+ * Notification tap routing lives in `useMobilePushNotificationRouting` (handlers from main shell).
  */
 export function useMobileExpoPushRegistration(session: Session | null | undefined): void {
+  const core = useHavenCore();
   const registeringRef = useRef(false);
 
   useEffect(() => {
@@ -33,10 +34,7 @@ export function useMobileExpoPushRegistration(session: Session | null | undefine
       const stored = await AsyncStorage.getItem(LAST_EXPO_TOKEN_KEY);
       if (!stored?.trim() || cancelled) return;
       try {
-        const supabase = getMobileSupabase();
-        await supabase.rpc("delete_my_expo_push_subscription" as never, {
-          p_expo_push_token: stored.trim(),
-        } as never);
+        await core.notifications.deleteExpoPushSubscription(stored.trim());
       } catch (error) {
         console.warn("[mobile push] Failed to delete expo push token on sign-out.", error);
       }
@@ -46,7 +44,7 @@ export function useMobileExpoPushRegistration(session: Session | null | undefine
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [core.notifications, session]);
 
   useEffect(() => {
     if (!session?.user?.id) return undefined;
@@ -100,18 +98,12 @@ export function useMobileExpoPushRegistration(session: Session | null | undefine
         const platform =
           Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "unknown";
 
-        const supabase = getMobileSupabase();
-        const { error } = await supabase.rpc("upsert_my_expo_push_subscription" as never, {
-          p_expo_push_token: expoPushToken,
-          p_platform: platform,
-          p_installation_id: installationId,
-          p_metadata: { source: "haven-mobile" },
-        } as never);
-
-        if (error) {
-          console.warn("[mobile push] upsert_my_expo_push_subscription failed:", error.message);
-          return;
-        }
+        await core.notifications.upsertExpoPushSubscription({
+          expoPushToken,
+          platform,
+          installationId,
+          metadata: { source: "haven-mobile" },
+        });
 
         await AsyncStorage.setItem(LAST_EXPO_TOKEN_KEY, expoPushToken);
       } catch (error) {
@@ -126,5 +118,5 @@ export function useMobileExpoPushRegistration(session: Session | null | undefine
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [core.notifications, session?.user?.id]);
 }

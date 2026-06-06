@@ -29,8 +29,7 @@ import type {
 import { ThemedIonicons } from "@/theme-rn";
 import { useFloatingDmPlaceholderChannels } from "@/theme-rn/useFloatingDmPlaceholderChannels";
 import { useDmBubbleSheetChrome } from "@/theme-rn/useDmBubbleSheetChrome";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useServersStore } from "@shared/stores/serversStore";
+import { useHavenCore } from "@shared/core";
 
 export type {
   FloatingDmBubbleIconName,
@@ -84,8 +83,8 @@ const MORPH_MS = 220;
 // ---------------------------------------------------------------------------
 // Public props (package-ready). Parent can pass real channels + handlers later;
 // UX lab uses PLACEHOLDER_CHANNELS when `channels` is omitted.
-// Inferred from: HavenTabNavigator DM shell (visible, onDismiss, title, body) +
-// MobileDirectMessagesProvider / useDirectMessages shape (conversations, selection).
+// Inferred from: MainNavigationShell DM sheet (visible, onDismiss, title, body)
+// plus DirectMessageNexus state (conversations, selection).
 // ---------------------------------------------------------------------------
 
 function resolveChannels(
@@ -135,14 +134,18 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
 
   const themedDefaults = useFloatingDmPlaceholderChannels();
   const sheetChrome = useDmBubbleSheetChrome();
-  const servers = useServersStore((s) => s.servers);
-  const permissionsByServerId = usePermissionsStore((s) => s.permissionsByServerId);
+  const core = useHavenCore();
+  const communities = core.communities.useCommunities();
+  const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
   const modmailManagedCommunityIds = useMemo(
     () =>
-      servers
-        .filter((s) => permissionsByServerId[s.id]?.canManageReports)
-        .map((s) => s.id),
-    [servers, permissionsByServerId],
+      communities
+        .filter(
+          (community) =>
+            permissionsByCommunityId[community.id]?.canManageReports,
+        )
+        .map((community) => community.id),
+    [communities, permissionsByCommunityId],
   );
 
   const channels = useMemo(
@@ -819,6 +822,7 @@ const styles = StyleSheet.create({
     height: BUBBLE_SIZE,
     borderRadius: BUBBLE_SIZE / 2,
     overflow: "hidden",
+    // uniwind-theme-allow mobile-theme/no-raw-style-color - bubble drop shadow; invariant black across all themes
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

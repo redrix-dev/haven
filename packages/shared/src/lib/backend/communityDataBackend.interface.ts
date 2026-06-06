@@ -1,4 +1,3 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Database } from '@shared/types/database';
 import type {
   BanCommunityMemberResult,
@@ -13,6 +12,7 @@ import type {
   CommunityBanItem,
   CommunityMemberListItem,
   KickCommunityMemberResult,
+  LiveProfileIdentity,
   MessageAttachment,
   MessageBundle,
   MessageLinkPreview,
@@ -51,6 +51,11 @@ export interface CommunityDataBackend {
     reporterUserId: string;
     reason: string;
   }): Promise<void>;
+  reportPlatformUserProfile(input: {
+    targetUserId: string;
+    reporterUserId: string;
+    reason: string;
+  }): Promise<void>;
   listCommunityBans(communityId: string): Promise<CommunityBanItem[]>;
   banCommunityMember(input: {
     communityId: string;
@@ -68,17 +73,6 @@ export interface CommunityDataBackend {
   }): Promise<void>;
   listBanEligibleServersForUser(targetUserId: string): Promise<BanEligibleServer[]>;
   listChannels(communityId: string): Promise<Channel[]>;
-  subscribeToChannels(
-    communityId: string,
-    onChange: () => void,
-    options?: {
-      onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
-      onMemberChannelAccessRevoked?: (
-        payload: MemberChannelAccessRevokedBroadcastPayload
-      ) => void;
-      onReportStatusUpdated?: (payload: ReportStatusUpdatedBroadcastPayload) => void;
-    }
-  ): RealtimeChannel;
   /** Resolves the signed-in user's `community_members` row id and assigned `role_id`s in this community. */
   fetchMyMemberRoleAssignmentForRealtime(
     communityId: string,
@@ -129,9 +123,22 @@ export interface CommunityDataBackend {
     beforeCreatedAt?: string | null;
     beforeMessageId?: string | null;
   }): Promise<{ messages: MessageBundle[]; hasMore: boolean }>;
-  subscribeToMessages(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
+  getChannelMessage(input: {
+    communityId: string;
+    channelId: string;
+    messageId: string;
+  }): Promise<MessageBundle | null>;
+  /**
+   * Batch-fetch the *live* identity (current username + avatar) for a set of
+   * message authors. Community messages only carry an avatar snapshot taken at
+   * send time, so this lets the client prime ProfileNexus and render current
+   * avatars that self-heal when an author changes their profile.
+   */
+  fetchMessageAuthorProfiles(input: {
+    communityId: string;
+    authorUserIds: string[];
+  }): Promise<LiveProfileIdentity[]>;
   listMessageReactions(communityId: string, channelId: string): Promise<MessageReaction[]>;
-  subscribeToMessageReactions(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   toggleMessageReaction(input: {
     communityId: string;
     channelId: string;
@@ -139,10 +146,8 @@ export interface CommunityDataBackend {
     emoji: string;
   }): Promise<void>;
   listMessageAttachments(communityId: string, channelId: string): Promise<MessageAttachment[]>;
-  subscribeToMessageAttachments(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   cleanupExpiredMessageAttachments(limit?: number): Promise<number>;
   listMessageLinkPreviews(communityId: string, channelId: string): Promise<MessageLinkPreview[]>;
-  subscribeToMessageLinkPreviews(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
   requestChannelLinkPreviewBackfill(input: {
     communityId: string;
     channelId: string;

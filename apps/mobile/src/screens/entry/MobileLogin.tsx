@@ -3,7 +3,8 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getErrorMessage } from "@shared/platform/lib/errors";
 import { useState } from "react";
-import { View, Text, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, TextInput, ScrollView } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signInWithPassword } from "@/auth/mobileAuthService";
 
@@ -28,8 +29,16 @@ export function MobileLogin() {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1 bg-background">
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom, flexGrow: 1,  justifyContent: 'center' }}>
+    <KeyboardAvoidingView behavior="padding" className="flex-1 bg-background">
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          flexGrow: 1,
+          justifyContent: "center",
+        }}
+      >
         <View className="w-full max-w-sm self-center bg-card rounded-3xl p-6">
           <Text className="mb-8 text-center text-2xl font-semibold text-foreground">
             Haven
@@ -41,6 +50,7 @@ export function MobileLogin() {
             autoCorrect={false}
             keyboardType="email-address"
             placeholder="you@example.com"
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
             placeholderTextColor="#a9b8cf"
             value={email}
             onChangeText={setEmail}
@@ -50,6 +60,7 @@ export function MobileLogin() {
             className="mb-6 rounded-xl border border-border bg-card px-4 py-3 text-foreground"
             secureTextEntry
             placeholder="••••••••"
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
             placeholderTextColor="#a9b8cf"
             value={password}
             onChangeText={setPassword}

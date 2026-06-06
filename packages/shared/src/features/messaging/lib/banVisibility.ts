@@ -234,7 +234,12 @@ export const filterHiddenMessageContent = (
     return bundle;
   }
 
-  const visibleMessages = bundle.messages.filter((message) => !message.is_hidden);
+  const visibleMessages = bundle.messages.filter(
+    (message) =>
+      !message.is_hidden &&
+      !message.platform_quarantined_at &&
+      !message.platform_expunged_at,
+  );
   const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
 
   return {

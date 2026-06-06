@@ -1,0 +1,189 @@
+import { create, useStore, type StoreApi, type UseBoundStore } from "zustand";
+import { useStoreWithEqualityFn } from "zustand/traditional";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+
+export type NexusEntry<T> = {
+  data: T;
+  partial: boolean;
+  cachedAt: number;
+};
+
+export type NexusState<T> = {
+  entities: Record<string, NexusEntry<T>>;
+  revision: number;
+};
+
+/**
+ * Abstract entity cache used by every domain Nexus.
+ *
+ * Responsibilities:
+ *   - entity map (Zustand store)
+ *   - getOrCreate / getOrPartial / update / delete
+ *   - persist/rehydrate via injected NexusPersistence
+ *   - stable selectors for React
+ *
+ * Subclasses provide transform(raw) and may extend the store shape.
+ * Storage is platform-agnostic; hosts inject the adapter at HavenCore creation.
+ */
+export abstract class Nexus<T, R = unknown> {
+  private entityType: string;
+  private instanceId: string;
+  protected persistence: NexusPersistence;
+  private _store: UseBoundStore<StoreApi<NexusState<T>>> | null = null;
+
+  constructor(
+    entityType: string,
+    instanceId: string,
+    persistence: NexusPersistence,
+  ) {
+    this.entityType = entityType;
+    this.instanceId = instanceId;
+    this.persistence = persistence;
+  }
+
+  protected get store(): UseBoundStore<StoreApi<NexusState<T>>> {
+    if (!this._store) {
+      this._store = create<NexusState<T>>(() => ({
+        entities: {},
+        revision: 0,
+      }));
+    }
+    return this._store;
+  }
+
+  protected get storageKey(): string {
+    return `haven:nexus:${this.entityType}:${this.instanceId}`;
+  }
+
+  protected abstract transform(raw: R): T;
+
+  protected notifyRevision(): void {
+    this.store.setState((state) => ({
+      ...state,
+      revision: state.revision + 1,
+    }));
+  }
+
+  getOrCreate(id: string, raw: R, _isNew = false): T {
+    const existing = this.store.getState().entities[id];
+    if (existing && !existing.partial) return existing.data;
+
+    const data = this.transform(raw);
+
+    this.store.setState((state) => ({
+      entities: {
+        ...state.entities,
+        [id]: { data, partial: false, cachedAt: Date.now() },
+      },
+    }));
+
+    return data;
+  }
+
+  getOrPartial(id: string, stub: Partial<T>): T | undefined {
+    const existing = this.store.getState().entities[id];
+    if (existing) return existing.data;
+
+    this.store.setState((state) => ({
+      entities: {
+        ...state.entities,
+        [id]: { data: stub as T, partial: true, cachedAt: Date.now() },
+      },
+    }));
+
+    return stub as T;
+  }
+
+  update(id: string, changes: Partial<T>): void {
+    const existing = this.store.getState().entities[id];
+    if (!existing) return;
+
+    this.store.setState((state) => ({
+      entities: {
+        ...state.entities,
+        [id]: {
+          ...existing,
+          data: { ...existing.data, ...changes },
+          cachedAt: Date.now(),
+        },
+      },
+    }));
+  }
+
+  delete(id: string): void {
+    this.store.setState((state) => {
+      const { [id]: _, ...rest } = state.entities;
+      return { entities: rest };
+    });
+  }
+
+  has(id: string): boolean {
+    return id in this.store.getState().entities;
+  }
+
+  isPartial(id: string): boolean {
+    return this.store.getState().entities[id]?.partial ?? false;
+  }
+
+  getSnapshot(id: string): T | undefined {
+    return this.store.getState().entities[id]?.data;
+  }
+
+  use<S>(
+    selector: (state: NexusState<T>) => S,
+    equalityFn?: (a: S, b: S) => boolean,
+  ): S {
+    return useStoreWithEqualityFn(
+      this.store,
+      selector,
+      equalityFn ?? Object.is,
+    );
+  }
+
+  useAll(): T[] {
+    return useStore(this.store, (state) =>
+      Object.values(state.entities)
+        .filter((entry) => !entry.partial)
+        .map((entry) => entry.data),
+    );
+  }
+
+  useOne(id: string): T | undefined {
+    return useStore(this.store, (state) => state.entities[id]?.data);
+  }
+
+  persist(): void {
+    try {
+      const state = this.store.getState();
+      const persistable = Object.fromEntries(
+        Object.entries(state.entities).filter(([_, entry]) => !entry.partial),
+      );
+      this.persistence.set(this.storageKey, JSON.stringify(persistable));
+    } catch (e) {
+      console.warn(`[Nexus] Failed to persist ${this.storageKey}`, e);
+    }
+  }
+
+  rehydrate(): void {
+    try {
+      const raw = this.persistence.getString(this.storageKey);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Record<string, NexusEntry<T>>;
+      this.store.setState({ entities: parsed, revision: 0 });
+    } catch (e) {
+      console.warn(`[Nexus] Failed to rehydrate ${this.storageKey}`, e);
+      this.persistence.remove(this.storageKey);
+    }
+  }
+
+  evict(id: string): void {
+    this.delete(id);
+    this.persist();
+  }
+
+  clear(): void {
+    this.store.setState({ entities: {}, revision: 0 });
+    this.persistence.remove(this.storageKey);
+  }
+}

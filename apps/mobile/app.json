@@ -20,6 +20,20 @@
       "expo-font",
       "expo-sharing",
       "expo-dev-client",
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "android": {
+            "audioType": "communication",
+            "enableScreenShareService": false
+          },
+          "ios": {
+            "enableMultitaskingCameraAccess": false
+          }
+        }
+      ],
+      "@config-plugins/react-native-webrtc",
+      "./plugins/withAndroidVoiceForegroundService",
       "expo-notifications",
       [
         "expo-camera",
@@ -76,6 +90,8 @@
         "READ_MEDIA_AUDIO",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_MICROPHONE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "POST_NOTIFICATIONS",
         "VIBRATE",
         "USE_BIOMETRIC"
       ]

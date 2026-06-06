@@ -1,10 +1,16 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import type {
   BanEligibleServer,
   FeatureFlagsSnapshot,
+  OnboardingCampaign,
+  OnboardingClientContext,
+  OnboardingCompletionResult,
+  ProfileVisibility,
   RedeemedInvite,
   ServerInvite,
   ServerSummary,
+  UserFlairBadge,
+  UserFlairGrant,
+  UserProfileCard,
 } from './types';
 
 export type PlatformStaffInfo = {
@@ -17,13 +23,25 @@ export type UserProfileInfo = {
   avatarUrl: string | null;
   /** Normalized theme id (see `getTheme`). */
   theme: string;
+  profileVisibility: ProfileVisibility;
+  profileBio: string | null;
+  activeFlair: UserFlairBadge | null;
 };
 
 export interface ControlPlaneBackend {
   fetchUserProfile(userId: string): Promise<UserProfileInfo | null>;
+  fetchProfileCard(userId: string): Promise<UserProfileCard | null>;
   fetchPlatformStaff(userId: string): Promise<PlatformStaffInfo | null>;
-  subscribeToProfileIdentities(onChange: (payload?: unknown) => void): RealtimeChannel;
+  listMyUserFlairs(): Promise<UserFlairGrant[]>;
+  setActiveUserFlair(userFlairId: string | null): Promise<void>;
   listMyFeatureFlags(): Promise<FeatureFlagsSnapshot>;
+  listMyOnboardingCampaigns(
+    context: OnboardingClientContext,
+  ): Promise<OnboardingCampaign[]>;
+  completeOnboardingCampaign(
+    campaignKey: string,
+    context: OnboardingClientContext,
+  ): Promise<OnboardingCompletionResult>;
   /** Pass `ArrayBuffer` on React Native; `Blob`/`File` on web (see Supabase RN upload guidance). */
   uploadAvatar(
     file: Blob | ArrayBuffer,
@@ -39,15 +57,13 @@ export interface ControlPlaneBackend {
     avatarContentType?: string;
     /** When set, updates `profiles.theme` (normalized via `getTheme`). */
     theme?: string;
+    profileVisibility?: ProfileVisibility;
+    profileBio?: string | null;
   }): Promise<UserProfileInfo>;
   listUserCommunities(userId: string): Promise<ServerSummary[]>;
   renameCommunity(input: { communityId: string; name: string }): Promise<void>;
   deleteCommunity(communityId: string): Promise<void>;
   leaveCommunity(communityId: string): Promise<void>;
-  subscribeToUserCommunities(
-    userId: string,
-    onChange: () => void,
-  ): RealtimeChannel;
   createCommunity(name: string): Promise<{ id: string }>;
   createCommunityInvite(input: {
     communityId: string;

@@ -1,8 +1,19 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from "react-native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import type { MessageAttachment, MessageLinkPreview } from "@shared/lib/backend/types";
-import { getFallbackEmbedUrl } from "@shared/features/messaging/components/message-list/messageListContentUtils";
+import { getFallbackEmbedUrl } from "@shared/features/messaging/utils/embedUtils";
+import { createChatMarkdownStyle } from "@/components/chat/chatTypography";
+import { useCommunityMessageColors } from "@/theme-rn";
+import { MessageImageAttachment } from "@/features/media/MessageImageAttachment";
 import { CommunityAttachmentVideo } from "./CommunityAttachmentVideo";
 
 // ─── Layout constants ────────────────────────────────────────────────────────
@@ -65,6 +76,7 @@ export function formatTime(timestamp: string): string {
 type CommunityMessageBubbleProps = ChatMessage & {
   isCondensed?: boolean;
   onPress?: () => void;
+  onPressAuthor?: () => void;
   onLongPress?: () => void;
 };
 
@@ -80,15 +92,27 @@ export function CommunityMessageBubble({
   attachments,
   isCondensed,
   onPress,
+  onPressAuthor,
   onLongPress,
   linkPreview,
 }: CommunityMessageBubbleProps) {
+  const c = useCommunityMessageColors();
+  const markdownStyle = createChatMarkdownStyle({
+    textColor: c.text,
+    codeBackgroundColor: c.codeBg,
+    blockquoteBorderColor: c.blockquoteAccent,
+    linkColor: c.link,
+  });
   const embedUrl = linkPreview ? getFallbackEmbedUrl(linkPreview) : null;
   const sourceUrl = linkPreview?.sourceUrl ?? linkPreview?.snapshot?.sourceUrl ?? "";
   const title = linkPreview?.snapshot?.title ?? sourceUrl;
   const siteName = linkPreview?.snapshot?.siteName ?? "Link preview";
   const thumbnailUrl = linkPreview?.snapshot?.thumbnail?.signedUrl ?? null;
   const showHeader = !isCondensed;
+  const handleAuthorPress = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    onPressAuthor?.();
+  };
 
   return (
     <Pressable
@@ -100,7 +124,15 @@ export function CommunityMessageBubble({
       onLongPress={onLongPress}
     >
       {showHeader ? (
-        <View style={styles.avatarShell}>
+        <Pressable
+          style={[styles.avatarShell, { backgroundColor: c.avatarBg }]}
+          onPress={onPressAuthor ? handleAuthorPress : undefined}
+          disabled={!onPressAuthor}
+          accessibilityRole={onPressAuthor ? "button" : undefined}
+          accessibilityLabel={
+            onPressAuthor ? `Open ${authorName ?? "user"} profile` : undefined
+          }
+        >
           {authorAvatarUrl ? (
             <Image
               source={{ uri: authorAvatarUrl }}
@@ -110,10 +142,10 @@ export function CommunityMessageBubble({
             />
           ) : (
             <View style={styles.avatarFallback}>
-              <Text style={styles.avatarFallbackText}>{authorInitial ?? "U"}</Text>
+              <Text style={[styles.avatarFallbackText, { color: c.avatarFallbackText }]}>{authorInitial ?? "U"}</Text>
             </View>
           )}
-        </View>
+        </Pressable>
       ) : (
         <View style={styles.compactSpacer} />
       )}
@@ -122,21 +154,31 @@ export function CommunityMessageBubble({
         {showHeader ? (
           <View style={styles.metaRow}>
             <View style={styles.metaNameRow}>
-              <Text style={styles.authorName} numberOfLines={1}>
-                {authorName ?? "Unknown User"}
-              </Text>
+              <Pressable
+                style={styles.authorNameButton}
+                onPress={onPressAuthor ? handleAuthorPress : undefined}
+                disabled={!onPressAuthor}
+                accessibilityRole={onPressAuthor ? "button" : undefined}
+                accessibilityLabel={
+                  onPressAuthor ? `Open ${authorName ?? "user"} profile` : undefined
+                }
+              >
+                <Text style={[styles.authorName, { color: c.authorName }]} numberOfLines={1}>
+                  {authorName ?? "Unknown User"}
+                </Text>
+              </Pressable>
               {isAuthorStaff ? (
-                <View style={styles.staffBadge}>
-                  <Text style={styles.staffBadgeText}>Staff</Text>
+                <View style={[styles.staffBadge, { backgroundColor: c.staffBadgeBg }]}>
+                  <Text style={[styles.staffBadgeText, { color: c.staffBadgeText }]}>Staff</Text>
                 </View>
               ) : null}
             </View>
-            <Text style={styles.timestamp}>{timestampLabel ?? ""}</Text>
+            <Text style={[styles.timestamp, { color: c.timestamp }]}>{timestampLabel ?? ""}</Text>
           </View>
         ) : null}
 
         {replyTargetLabel ? (
-          <Text style={styles.replyLabel}>Replying to {replyTargetLabel}</Text>
+          <Text style={[styles.replyLabel, { color: c.replyLabel }]}>Replying to {replyTargetLabel}</Text>
         ) : null}
 
         <EnrichedMarkdownText
@@ -144,40 +186,15 @@ export function CommunityMessageBubble({
           flavor="github"
           md4cFlags={{ underline: true }}
           markdownStyle={{
-            paragraph: { color: "#e6edf7", fontSize: 14, lineHeight: 20 },
-            h1: { fontSize: 22, fontWeight: "700", color: "#e6edf7", marginTop: 4, marginBottom: 4, lineHeight: 28 },
-            h2: { fontSize: 18, fontWeight: "700", color: "#e6edf7", marginTop: 4, marginBottom: 4, lineHeight: 24 },
-            h3: { fontSize: 16, fontWeight: "600", color: "#e6edf7", marginTop: 4, marginBottom: 2, lineHeight: 22 },
-            strong: { color: "#e6edf7" },
-            em: { color: "#e6edf7" },
+            ...markdownStyle,
             code: {
+              ...markdownStyle.code,
               fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-              fontSize: 13,
-              backgroundColor: "#1a2235",
-              color: "#e6edf7",
-              borderColor: "#1a2235",
             },
             codeBlock: {
+              ...markdownStyle.codeBlock,
               fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-              fontSize: 13,
-              backgroundColor: "#1a2235",
-              color: "#e6edf7",
-              padding: 10,
-              borderRadius: 6,
-              marginTop: 4,
-              marginBottom: 4,
             },
-            blockquote: {
-              backgroundColor: "#1a2235",
-              borderColor: "#3F79D8",
-              borderWidth: 3,
-              gapWidth: 10,
-              marginTop: 2,
-              marginBottom: 2,
-            },
-            strikethrough: { color: "#e6edf7" },
-            list: { marginTop: 2, marginBottom: 2 },
-            link: { color: "#3F79D8", underline: true },
           }}
           onLinkPress={({ url }) => {
             void Linking.openURL(url);
@@ -187,18 +204,28 @@ export function CommunityMessageBubble({
         {attachments?.map((attachment) => {
           if (!attachment.signedUrl) {
             return (
-              <Text key={attachment.id} style={styles.attachmentUnavailable}>
+              <Text key={attachment.id} style={[styles.attachmentUnavailable, { color: c.attachmentMuted }]}>
                 Attachment unavailable.
               </Text>
             );
           }
           if (attachment.mediaKind === "image") {
             return (
-              <Image
+              <MessageImageAttachment
                 key={attachment.id}
-                source={{ uri: attachment.signedUrl }}
-                style={styles.attachmentImage}
-                resizeMode="cover"
+                image={{
+                  id: attachment.id,
+                  signedUrl: attachment.signedUrl,
+                  originalFilename: attachment.originalFilename,
+                }}
+                images={(attachments ?? [])
+                  .filter((item) => item.mediaKind === "image" && item.signedUrl)
+                  .map((item) => ({
+                    id: item.id,
+                    signedUrl: item.signedUrl!,
+                    originalFilename: item.originalFilename,
+                  }))}
+                thumbnailStyle={styles.attachmentImage}
               />
             );
           }
@@ -217,9 +244,9 @@ export function CommunityMessageBubble({
               onPress={() => {
                 if (attachment.signedUrl) void Linking.openURL(attachment.signedUrl);
               }}
-              style={styles.attachmentFileRow}
+              style={[styles.attachmentFileRow, { backgroundColor: c.attachmentFileBg }]}
             >
-              <Text style={styles.attachmentFileLabel}>
+              <Text style={[styles.attachmentFileLabel, { color: c.attachmentFileLabel }]}>
                 {attachment.originalFilename ?? "Open attachment"}
               </Text>
             </Pressable>
@@ -232,10 +259,10 @@ export function CommunityMessageBubble({
             onPress={() => {
               if (sourceUrl) void Linking.openURL(sourceUrl);
             }}
-            style={styles.linkPreviewCard}
+            style={[styles.linkPreviewCard, { borderColor: c.linkPreviewBorder, backgroundColor: c.linkPreviewBg }]}
           >
-            <Text style={styles.linkPreviewSite}>{siteName}</Text>
-            <Text style={styles.linkPreviewTitle}>{title}</Text>
+            <Text style={[styles.linkPreviewSite, { color: c.linkPreviewSite }]}>{siteName}</Text>
+            <Text style={[styles.linkPreviewTitle, { color: c.linkPreviewTitle }]}>{title}</Text>
             {thumbnailUrl ? (
               <Image
                 source={{ uri: thumbnailUrl }}
@@ -244,7 +271,7 @@ export function CommunityMessageBubble({
               />
             ) : null}
             {embedUrl ? (
-              <Text style={styles.linkPreviewHint}>Video preview available — tap to open.</Text>
+              <Text style={[styles.linkPreviewHint, { color: c.linkPreviewHint }]}>Video preview available — tap to open.</Text>
             ) : null}
           </Pressable>
         ) : null}
@@ -256,10 +283,11 @@ export function CommunityMessageBubble({
 // ─── Date divider ─────────────────────────────────────────────────────────────
 
 export function MessageDateDivider({ label }: { label: string }) {
+  const c = useCommunityMessageColors();
   return (
     <View accessibilityRole="none" style={styles.dateDivider}>
-      <View style={styles.dateDividerLine} />
-      <Text style={styles.dateDividerText}>{label}</Text>
+      <View style={[styles.dateDividerLine, { borderTopColor: c.dateDividerLine }]} />
+      <Text style={[styles.dateDividerText, { backgroundColor: c.dateDividerBg, color: c.text }]}>{label}</Text>
     </View>
   );
 }
@@ -289,7 +317,6 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     overflow: "hidden",
     borderRadius: 999,
-    backgroundColor: "#111827",
   },
   avatarImage: {
     width: "100%",
@@ -301,7 +328,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarFallbackText: {
-    color: "#E5E7EB",
     fontSize: 11,
     fontWeight: "600",
   },
@@ -331,19 +357,19 @@ const styles = StyleSheet.create({
   },
   authorName: {
     flexShrink: 1,
-    color: "#F2F3F5",
     fontSize: 16,
     fontWeight: "500",
   },
+  authorNameButton: {
+    flexShrink: 1,
+  },
   staffBadge: {
     borderRadius: 4,
-    backgroundColor: "rgba(69, 121, 205, 0.18)",
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   staffBadgeText: {
-    color: "#3f79d8",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "600",
     letterSpacing: 0.5,
     textTransform: "uppercase",
@@ -351,13 +377,11 @@ const styles = StyleSheet.create({
   timestamp: {
     flexShrink: 0,
     marginLeft: 4,
-    color: "#A5A9B0",
     fontSize: 12,
     fontWeight: "500",
   },
   replyLabel: {
     marginBottom: 2,
-    color: "#9ba9bf",
     fontSize: 12,
   },
   dateDivider: {
@@ -375,18 +399,14 @@ const styles = StyleSheet.create({
     top: 12,
     bottom: undefined,
     borderTopWidth: 1,
-    borderTopColor: "rgba(176, 184, 199, 0.44)",
   },
   dateDividerText: {
     paddingHorizontal: 10,
-    backgroundColor: "#0F1728",
-    color: "#e6edf7",
     fontSize: 12,
     fontWeight: "600",
   },
   attachmentUnavailable: {
     marginTop: 8,
-    color: "#9ba9bf",
     fontSize: 12,
   },
   attachmentImage: {
@@ -404,12 +424,10 @@ const styles = StyleSheet.create({
   attachmentFileRow: {
     marginTop: 8,
     borderRadius: 10,
-    backgroundColor: "#1a2235",
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   attachmentFileLabel: {
-    color: "#3F79D8",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -417,19 +435,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#2b3648",
-    backgroundColor: "#22355D",
     padding: 12,
   },
   linkPreviewSite: {
     fontSize: 12,
-    color: "#9ba9bf",
   },
   linkPreviewTitle: {
     marginTop: 4,
     fontSize: 14,
     fontWeight: "600",
-    color: "#e6edf7",
   },
   linkPreviewImage: {
     width: "100%",
@@ -440,6 +454,5 @@ const styles = StyleSheet.create({
   linkPreviewHint: {
     marginTop: 8,
     fontSize: 12,
-    color: "#3E78D5",
   },
 });

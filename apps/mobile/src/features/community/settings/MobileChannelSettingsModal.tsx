@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import {
   ActivityIndicator,
   Alert,
@@ -10,16 +11,16 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { getCommunityDataBackend } from "@shared/lib/backend";
 import type { Channel, ChannelPermissionState } from "@shared/lib/backend/types";
-import { getErrorMessage } from "@platform/lib/errors";
+import { useHavenCore } from "@shared/core";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 
 type MobileChannelSettingsModalProps = {
   visible: boolean;
   onDismiss: () => void;
   communityId: string | null;
   channel: Channel | null;
-  currentUserId: string | null;
   canManageChannelStructure: boolean;
   canManageChannelPermissions: boolean;
 };
@@ -29,11 +30,14 @@ export function MobileChannelSettingsModal({
   onDismiss,
   communityId,
   channel,
-  currentUserId,
   canManageChannelStructure,
   canManageChannelPermissions,
 }: MobileChannelSettingsModalProps) {
-  const [loading, setLoading] = useState(false);
+  const core = useHavenCore();
+  const admin = core.admin;
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const channelPermissions = admin.useChannelPermissionsState();
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
   const [roleRows, setRoleRows] = useState<
@@ -48,48 +52,40 @@ export function MobileChannelSettingsModal({
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (!communityId || !channel?.id || !currentUserId) return;
-    setLoading(true);
+    if (!communityId || !channel?.id) return;
     try {
-      const backend = getCommunityDataBackend(communityId);
-      const snap = await backend.fetchChannelPermissions({
-        communityId,
-        channelId: channel.id,
-        userId: currentUserId,
-      });
       setName(channel.name);
       setTopic(channel.topic ?? "");
-      setRoleRows(
-        snap.rolePermissions.map((r) => ({
-          roleId: r.roleId,
-          name: r.name,
-          color: r.color,
-          canView: r.canView,
-          canSend: r.canSend,
-        })),
-      );
+      await admin.loadChannelPermissions(channel.id, communityId);
     } catch (e) {
       Alert.alert("Error", getErrorMessage(e, "Failed to load channel settings."));
-    } finally {
-      setLoading(false);
     }
-  }, [channel, communityId, currentUserId]);
+  }, [admin, channel, communityId]);
 
   useEffect(() => {
     if (visible && channel) void load();
   }, [visible, channel, load]);
 
+  useEffect(() => {
+    setRoleRows(
+      channelPermissions.channelRolePermissions.map((r) => ({
+        roleId: r.roleId,
+        name: r.name,
+        color: r.color,
+        canView: r.canView,
+        canSend: r.canSend,
+      })),
+    );
+  }, [channelPermissions.channelRolePermissions]);
+
   const saveGeneral = async () => {
     if (!communityId || !channel) return;
     setSaving(true);
     try {
-      const backend = getCommunityDataBackend(communityId);
-      await backend.updateChannel({
-        communityId,
-        channelId: channel.id,
+      await admin.saveChannelSettings({
         name: name.trim(),
         topic: topic.trim() || null,
-      });
+      }, communityId, channel.id);
       Alert.alert("Saved", "Channel updated.");
       onDismiss();
     } catch (e) {
@@ -102,13 +98,7 @@ export function MobileChannelSettingsModal({
   const saveRoleRow = async (roleId: string, next: ChannelPermissionState) => {
     if (!communityId || !channel) return;
     try {
-      const backend = getCommunityDataBackend(communityId);
-      await backend.saveRoleChannelPermissions({
-        communityId,
-        channelId: channel.id,
-        roleId,
-        permissions: next,
-      });
+      await admin.saveRoleChannelPermissions(roleId, next, communityId, channel.id);
       await load();
     } catch (e) {
       Alert.alert("Error", getErrorMessage(e, "Could not update permissions."));
@@ -126,16 +116,16 @@ export function MobileChannelSettingsModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onDismiss}>
       <View className="flex-1 bg-card pt-14">
-        <View className="flex-row items-center justify-between border-b border-border px-4 pb-3">
+        <View className="flex-row items-center justify-between border-b border-border-panel px-4 pb-3">
           <Text className="text-lg font-semibold text-foreground">#{channel.name}</Text>
           <Pressable onPress={onDismiss} hitSlop={12}>
             <Text className="text-lg text-muted-foreground">Done</Text>
           </Pressable>
         </View>
 
-        {loading ? (
+        {channelPermissions.channelPermissionsLoading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator color="#e6edf7" />
+            <ActivityIndicator color={foregroundColor} />
           </View>
         ) : (
           <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled">
@@ -144,7 +134,7 @@ export function MobileChannelSettingsModal({
               value={name}
               onChangeText={setName}
               editable={canManageChannelStructure}
-              className="mb-4 rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+              className="mb-4 rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
             />
             <Text className="mb-1 text-xs uppercase text-muted-foreground">Topic</Text>
             <TextInput
@@ -152,7 +142,7 @@ export function MobileChannelSettingsModal({
               onChangeText={setTopic}
               multiline
               editable={canManageChannelStructure}
-              className="mb-6 min-h-[72px] rounded-xl border border-border bg-surface-panel px-3 py-3 text-foreground"
+              className="mb-6 min-h-18 rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
             />
             {canManageChannelStructure ? (
               <Pressable
@@ -160,7 +150,7 @@ export function MobileChannelSettingsModal({
                 disabled={saving}
                 className="mb-8 rounded-xl bg-primary py-3"
               >
-                <Text className="text-center font-semibold text-white">{saving ? "Saving…" : "Save"}</Text>
+                <Text className="text-center font-semibold text-primary-foreground">{saving ? "Saving…" : "Save"}</Text>
               </Pressable>
             ) : null}
 
@@ -171,7 +161,7 @@ export function MobileChannelSettingsModal({
                   Tap View / Send to cycle default → allow → deny. Matches desktop channel permission columns.
                 </Text>
                 {roleRows.map((row) => (
-                  <View key={row.roleId} className="mb-4 rounded-xl border border-border bg-surface-panel p-3">
+                  <View key={row.roleId} className="mb-4 rounded-xl border border-border-panel bg-surface-panel p-3">
                     <View className="mb-2 flex-row items-center gap-2">
                       <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
                       <Text className="font-medium text-foreground">{row.name}</Text>
@@ -191,7 +181,7 @@ export function MobileChannelSettingsModal({
                           });
                         }}
                       >
-                        <Text className="text-[10px] uppercase text-muted-foreground">View</Text>
+                        <Text className="text-xs uppercase text-muted-foreground">View</Text>
                         <Text className="text-sm text-foreground">
                           {row.canView === null ? "Default" : row.canView ? "Allow" : "Deny"}
                         </Text>
@@ -210,7 +200,7 @@ export function MobileChannelSettingsModal({
                           });
                         }}
                       >
-                        <Text className="text-[10px] uppercase text-muted-foreground">Send</Text>
+                        <Text className="text-xs uppercase text-muted-foreground">Send</Text>
                         <Text className="text-sm text-foreground">
                           {row.canSend === null ? "Default" : row.canSend ? "Allow" : "Deny"}
                         </Text>

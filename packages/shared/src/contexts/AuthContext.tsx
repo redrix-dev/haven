@@ -6,16 +6,14 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { requireHavenDataRuntime } from "@shared/runtime/havenRuntimeRegistry";
-import { getControlPlaneBackend } from "@shared/lib/backend";
-import { hydrateCommunityPermissions } from "@shared/features/community/communityPermissionsHydration";
-import { usePermissionsStore } from "@shared/stores/permissionsStore";
-import { useNotificationsStore } from "@shared/stores/notificationsStore";
-import { useDmStore } from "@shared/stores/dmStore";
-import { useSocialStore } from "@shared/stores/socialStore";
+import { requireHavenCore } from "@shared/core";
+import { bootLogger } from "@shared/debug/bootLogger";
 
-const havenAuthClient = () => requireHavenDataRuntime().client;
-import { getAppHost } from "@shared/platform/appHost";
+// Bounded bootstrap exception: auth may touch the raw Supabase client to
+// establish, recover, refresh, and end a session. Domain reads/writes belong in
+// HavenCore/Nexus after the session exists.
+const havenAuthClient = () => requireHavenCore().backends.client;
+import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
 import {
@@ -76,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
     useState(false);
   const processedAuthConfirmUrlsRef = useRef<Set<string>>(new Set());
-  const privateUserChannelUnsubscribeRef = useRef<(() => void) | null>(null);
+  const activeSessionUserIdRef = useRef<string | null>(null);
 
   const consumeAuthConfirmUrl = useCallback(
     async (url: string): Promise<boolean> => {
@@ -141,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
 
     const initializeAuth = async () => {
+      bootLogger.mark("auth-check-start");
       useAuthStore.getState().setIsLoading(true);
       try {
         const {
@@ -157,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         setStatus(session?.user ? "authenticated" : "unauthenticated");
         setError(null);
+        bootLogger.mark("auth-check-complete", { authenticated: Boolean(session?.user) });
       } catch (err: unknown) {
         if (!isMounted) return;
         const { setSession, setUser, setIsLoading } = useAuthStore.getState();
@@ -165,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         setStatus("error");
         setError(getErrorMessage(err, "Failed to initialize authentication."));
+        bootLogger.mark("auth-check-error");
       }
     };
 
@@ -196,71 +197,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPasswordRecoveryRequired(false);
       }
 
+      // Auth's only handoff into the domain runtime is bootstrap/clear. Keep
+      // domain loading, realtime routing, and Nexus coordination inside Core.
+      const core = requireHavenCore();
+
       if (event === "SIGNED_OUT") {
-        privateUserChannelUnsubscribeRef.current?.();
-        privateUserChannelUnsubscribeRef.current = null;
+        activeSessionUserIdRef.current = null;
+        void core.clearSession();
       } else if (
         event === "SIGNED_IN" ||
         event === "TOKEN_REFRESHED" ||
         event === "INITIAL_SESSION"
       ) {
-        privateUserChannelUnsubscribeRef.current?.();
-        privateUserChannelUnsubscribeRef.current = null;
-        const userId = session?.user?.id;
-        if (userId) {
-          privateUserChannelUnsubscribeRef.current =
-            getControlPlaneBackend().subscribeToPrivateUserChannel(
-              userId,
-              (evt) => {
-                if (evt.type === "ROLE_CHANGE") {
-                  const communityId = evt.payload.community_id;
-                  if (
-                    typeof communityId !== "string" ||
-                    communityId.trim().length === 0
-                  ) {
-                    return;
-                  }
-                  usePermissionsStore
-                    .getState()
-                    .invalidateElevatedForServer(communityId);
-                  void hydrateCommunityPermissions(communityId);
-                  return;
-                }
-                if (evt.type === "NOTIFICATION") {
-                  useNotificationsStore.getState().triggerInboxRefresh();
-                  return;
-                }
-                if (evt.type === "DM_CONVERSATION") {
-                  useDmStore.getState().triggerConversationsRefresh();
-                  return;
-                }
-                if (evt.type === "DM_MESSAGE") {
-                  const conversationId = evt.payload.conversation_id;
-                  if (typeof conversationId === "string") {
-                    useDmStore.getState().triggerMessageRefresh(conversationId);
-                  }
-                  useDmStore.getState().triggerConversationsRefresh();
-                  return;
-                }
-                if (evt.type === "SOCIAL_CHANGE") {
-                  useSocialStore.getState().triggerSocialRefresh(evt.payload);
-                  return;
-                }
-                console.log(
-                  "[private_user_channel]",
-                  evt.type,
-                  evt.payload,
-                );
-              },
-            );
+        const userId = session?.user?.id ?? null;
+        if (!userId) {
+          activeSessionUserIdRef.current = null;
+          return;
         }
+        if (activeSessionUserIdRef.current === userId) return;
+        activeSessionUserIdRef.current = userId;
+        bootLogger.mark("session-bootstrap-start");
+        void core.bootstrapSession(userId).catch((err) => {
+          console.warn("[AuthContext] bootstrapSession failed", err);
+        });
       }
     });
 
     return () => {
       isMounted = false;
-      privateUserChannelUnsubscribeRef.current?.();
-      privateUserChannelUnsubscribeRef.current = null;
       subscription.unsubscribe();
     };
   }, []);

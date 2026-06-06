@@ -1,6 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
-import { parseExpoPushNotificationData } from "@shared/features/mobile/push/parseExpoPushNotificationData";
+import { parseExpoPushNotificationData } from "@/features/notifications/utils/parseExpoPushNotificationData";
 import { useMobilePushNavigationStore, dispatchParsedPayload } from "@/stores/mobilePushNavigationStore";
 
 function notificationDedupeKey(
@@ -21,7 +21,7 @@ function routeNotificationResponse(response: Notifications.NotificationResponse)
   const { handlers, setPendingParsedPayload } = useMobilePushNavigationStore.getState();
   if (!handlers) {
     // Handlers aren't registered yet (e.g. cold-start race). Store the payload so
-    // it's dispatched as soon as setHandlers is called in HavenTabNavigator.
+    // it's dispatched as soon as setHandlers is called in MainNavigationShell.
     setPendingParsedPayload(parsed);
     return;
   }

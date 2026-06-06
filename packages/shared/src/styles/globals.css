@@ -418,16 +418,28 @@
   .drag-region { -webkit-app-region: drag; }
   .no-drag { -webkit-app-region: no-drag; }
 
+  /* Height chain for the non-desktop (browser) case so h-full works
+     without needing h-screen / h-dvh on every inner leaf. */
+  #haven-web-root {
+    height: 100%;
+  }
+
   .desktop-app-shell {
-    height: 100vh;
-    padding-top: 32px;
+    height: 100dvh;
+    padding-top: 32px;       /* clears the fixed 32 px title bar */
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     background: var(--surface-0);
   }
 
-  .desktop-app-shell > *:last-child {
-    height: calc(100vh - 32px) !important;
+  /* The direct content child fills the remaining height after the title-bar
+     padding — use min-h-0 to prevent flex overflow blowout. */
+  .desktop-app-shell-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .scrollbar-inset { scrollbar-gutter: stable; }

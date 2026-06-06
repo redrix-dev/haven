@@ -126,15 +126,6 @@ supabase/functions/.env.*
 supabase/functions/**/.env
 supabase/functions/**/.env.*
 supabase/tests/.generated/
-services/supabase/.temp/
-services/supabase/.branches/
-services/supabase/.env
-services/supabase/.env.*
-services/supabase/functions/.env
-services/supabase/functions/.env.*
-services/supabase/functions/**/.env
-services/supabase/functions/**/.env.*
-services/supabase/tests/.generated/
 
 # Local packaging artifacts
 dist/
@@ -148,6 +139,7 @@ release/
 apps/mobile/.expo/
 apps/mobile/.tmp-expo-export/
 apps/mobile/ios/
+apps/mobile/android/
 
 # OTA export output (tooling/scripts/mobile/deploy-ota.sh)
 .ota-export/
@@ -167,3 +159,4 @@ test-reports/
 .claude/
 Haven-Obsidian-Vault/
 .cursor/
+.stfolder/

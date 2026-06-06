@@ -1,5 +1,5 @@
 import React from 'react';
-import { applyShellThemeTokens } from '@shared/app/shellThemeRegistry';
+import { applyShellThemeTokens } from '@web-client/shellThemeRegistry';
 import { readSessionStoredThemeId, writeSessionStoredThemeId } from '@shared/themes/sessionThemeStorage';
 import { builtinThemes, getTheme } from '@shared/themes/registry';
 import { notifyElectronDevThemeChanged } from './themeDemoEvents';

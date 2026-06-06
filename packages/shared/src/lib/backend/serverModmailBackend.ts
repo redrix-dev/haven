@@ -27,6 +27,7 @@ type SupportReportRow = Pick<
   | 'updated_at'
   | 'reporter_user_id'
   | 'include_last_n_messages'
+  | 'platform_action'
 > & {
   reporter:
     | Pick<Database['public']['Tables']['profiles']['Row'], 'username' | 'avatar_url'>
@@ -62,13 +63,14 @@ type RoleNameRow = Pick<Database['public']['Tables']['roles']['Row'], 'id' | 'na
 
 type MemberRoleRow = Pick<Database['public']['Tables']['member_roles']['Row'], 'role_id'>;
 
-const SERVER_VISIBLE_DESTINATIONS: SupportReportDestination[] = ['server_admins', 'both'];
+const SERVER_VISIBLE_DESTINATIONS: SupportReportDestination[] = ['server_admins'];
 const VALID_REPORT_STATUSES: SupportReportStatus[] = [
   'pending',
   'under_review',
   'resolved',
   'dismissed',
   'escalated',
+  'resolved_by_platform',
 ];
 
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
@@ -179,6 +181,9 @@ const mapSupportReportRowToSummary = (row: SupportReportRow): ServerReportSummar
   const community = takeFirst(row.community);
   const notes = parseJsonRecord(row.notes);
   const snapshot = parseSupportReportSnapshot(row.snapshot);
+  if (!row.community_id) {
+    throw new Error('Server report is missing a community id.');
+  }
 
   return {
     reportId: row.id,
@@ -260,7 +265,7 @@ const fetchSupportReportRow = async (sb: HavenSupabaseClient, reportId: string) 
   const { data, error } = await sb
     .from('support_reports')
     .select(
-      'id, community_id, destination, status, title, notes, snapshot, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
+      'id, community_id, destination, status, title, notes, snapshot, platform_action, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
     )
     .eq('id', reportId)
     .in('destination', SERVER_VISIBLE_DESTINATIONS)
@@ -289,7 +294,7 @@ export function createServerModmailBackend(
     const { data, error } = await client
       .from('support_reports')
       .select(
-        'id, community_id, destination, status, title, notes, snapshot, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
+        'id, community_id, destination, status, title, notes, snapshot, platform_action, created_at, updated_at, reporter_user_id, include_last_n_messages, reporter:profiles!support_reports_reporter_user_id_fkey(username, avatar_url), community:communities!support_reports_community_id_fkey(name)'
       )
       .in('community_id', uniqueCommunityIds)
       .in('destination', SERVER_VISIBLE_DESTINATIONS)
@@ -367,6 +372,7 @@ export function createServerModmailBackend(
       internalNotes: parseInternalNotes(notes),
       targetUserId: getTargetUserId(summary.reportType, notes, summary.snapshot),
       targetDisplayName: getTargetDisplayName(summary.reportType, notes, summary.snapshot),
+      platformAction: asObjectRecord(reportRow.platform_action),
     };
   },
 
@@ -385,6 +391,9 @@ export function createServerModmailBackend(
     const reportRow = await fetchSupportReportRow(client, reportId);
     if (!reportRow) {
       throw new Error('Report not found.');
+    }
+    if (!reportRow.community_id) {
+      throw new Error('Platform-only reports do not have a community status broadcast.');
     }
 
     const { error: updateError } = await client
@@ -467,6 +476,9 @@ export function createServerModmailBackend(
     if (!reportRow) {
       throw new Error('Report not found.');
     }
+    if (!reportRow.community_id) {
+      throw new Error('Platform-only reports cannot be escalated through server modmail.');
+    }
     if (reportRow.destination !== 'server_admins') {
       throw new Error('Only server-staff-only reports can be shared with Haven staff.');
     }
@@ -493,7 +505,8 @@ export function createServerModmailBackend(
     if (messageLinksError) throw messageLinksError;
     if (originalReporterError) throw originalReporterError;
 
-    const escalationContext = await loadEscalationContext(client, reportRow.community_id, user.id);
+    const communityId = reportRow.community_id;
+    const escalationContext = await loadEscalationContext(client, communityId, user.id);
     const escalatedAt = new Date().toISOString();
     const escalatedReportId = createPortableUuid();
 
@@ -512,7 +525,7 @@ export function createServerModmailBackend(
 
     const { error: insertError } = await client.from('support_reports').insert({
       id: escalatedReportId,
-      community_id: reportRow.community_id,
+      community_id: communityId,
       destination: 'haven_staff',
       status: 'pending',
       title: reportRow.title,
@@ -526,7 +539,7 @@ export function createServerModmailBackend(
     const nextChannelLinks = ((originalChannelLinks ?? []) as Array<{ channel_id: string }>).map(
       (row) => ({
         report_id: escalatedReportId,
-        community_id: reportRow.community_id,
+        community_id: communityId,
         channel_id: row.channel_id,
       })
     );
@@ -557,4 +570,3 @@ export function createServerModmailBackend(
 
   return modmail;
 }
-

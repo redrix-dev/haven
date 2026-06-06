@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RUNTIME_AUDIO_URLS } from "@platform/assets/runtimeAudio";
-import type { NotificationAudioSettings } from "@shared/app/types/settings";
+import type { NotificationAudioSettings } from "@shared/types/settings";
 
 const baseAudioSettings: NotificationAudioSettings = {
   masterSoundEnabled: true,

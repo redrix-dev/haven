@@ -19,9 +19,10 @@ export function DmMessageActionsSheet({
 }: DmMessageActionsSheetProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal sheet scrim overlay, invariant across themes */}
       <Pressable className="flex-1 justify-end bg-black/55" onPress={onClose}>
         <Pressable
-          className="rounded-t-2xl border-t border-border bg-surface-modal px-4 pb-8 pt-3"
+          className="rounded-t-2xl border-t border-border-panel bg-surface-modal px-4 pb-8 pt-3"
           onPress={(e) => e.stopPropagation()}
         >
           {peerLabel ? (

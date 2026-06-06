@@ -1,4 +1,4 @@
-import type { VoiceSettings } from '@shared/app/types/settings';
+import type { VoiceSettings } from '@shared/types/settings';
 
 export type VoiceControllerChannel = {
   communityId: string;

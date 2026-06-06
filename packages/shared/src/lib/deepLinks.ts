@@ -1,7 +1,7 @@
 import { 
     asRecord,
     getRecordString } from '@platform/lib/records';
-import { getAppHost } from '@shared/platform/appHost';
+import { getAppHost } from '@shared/infrastructure/platform/appHost';
 
 
 
