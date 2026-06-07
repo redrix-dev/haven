@@ -59,7 +59,7 @@ to any architecture. Hack freely — crappy auth, minimal UI, direct backend cal
 | # | Probe | What it proves | Result | Notes |
 |---|---|---|---|---|
 | 1 | **Injection** | Shell can inject *real* capabilities into Solid (beyond `ping`) | — | |
-| 2 | **`@shared` from Solid** | Solid can drive the framework-agnostic shared logic (stores/nexus), incl. a strategy for the ~7 React-bound files — *the load-bearing assumption of the whole migration* | — | |
+| 2 | **`@shared` from Solid** | Solid can drive the framework-agnostic shared logic (stores/nexus), incl. a strategy for the ~7 React-bound files — *the load-bearing assumption of the whole migration* | ✅ | Solid reactively drives the **real** `authStore` via a `subscribe → signal` wrapper (`fromStore`) — `isLoading`/`user` confirmed reactive in-browser. **Finding:** store uses `zustand` `create` (React-bound, pulls React); migrate shared stores to `zustand/vanilla createStore` for a React-free layer. |
 | 3 | **Supabase in WKWebView** | Hacked login, session persistence, and **Realtime websockets** alive in the native webview (not Chromium) | ✅* | `signInWithPassword` ✅ + `functions.invoke("voice-token")` ✅ in WKWebView (via the voice run). *Supabase **Realtime channels** not yet directly exercised — but auth + functions + LiveKit `wss://` all work, so transport viability is strongly indicated. |
 | 4 | **Essential Solid libs** | Kobalte (dialog/menu), a virtualized list (chat), markdown, and the editor core render + function | — | |
 | 5 | **OS bridge** | One real Tauri command beyond `ping` round-trips (secure storage / notification / fs) | 🔄 | Native mic permission (Info.plist + audio-input entitlement) ✅ + `ping` invoke ✅ (spike). A richer native command (fs / notification / secure-storage) still to test. |
@@ -103,6 +103,27 @@ before it, because planning a build that might be DOA is wasted effort.
 - **CONDITIONAL** — viable, but with named blockers to resolve before committing.
 
 **Exit criteria (gate):** a recorded decision — GO / NO-GO / CONDITIONAL.
+
+#### 🟢 Verdict (recorded 2026-06-07): **GO**
+Both killswitches cleared:
+- **Voice (Probe 6)** — two-way audio cross-device through WKWebView (mic → `voice-token`
+  → LiveKit WebRTC → publish/subscribe). The single most likely ❌ in the whole bet; passed.
+- **`@shared` from Solid (Probe 2)** — Solid reactively drives the real `authStore` via a
+  `subscribe → signal` wrapper.
+
+Incidental: Supabase auth + `functions.invoke` in the webview (Probe 3) ✅; native mic
+permission (Probe 5) ✅.
+
+Non-gating follow-ups carried into the foundation phase (low-risk, not blockers):
+- **Probe 1** — a non-trivial *injected* OS capability (spike proved the `ping` mechanism;
+  a real fs/secure-storage injection still TBD; overlaps Probe 5).
+- **Probe 4** — validate the Solid lib set (Kobalte / virtua / markdown / editor) per-component.
+- **Architecture note** — migrate `@shared` stores from `zustand` `create` (React-bound) to
+  `zustand/vanilla createStore` for a genuinely React-free shared layer.
+- **Voice real-build note** — echo-cancellation tuning (the feedback was two co-located
+  devices, not a defect).
+
+→ Re-enter the roadmap loop to plan the real build (Phases 2–4). **Then nuke the dirty build.**
 
 ---
 
