@@ -76,6 +76,9 @@ This is where Step 3b actually lives. **Two patterns**, which changes the strate
 
 **Service-Nexus** — standalone classes, each with its **own** `zustand create` + React hooks
 (don't extend the base). *Each needs its own conversion — this is the per-file grind.*
+**Rename convention (decided):** these get `<Domain>Nexus` → `<Domain>ControllerNexus` during the
+lift (e.g. `ProfileControllerNexus`). The entity-cache classes above keep the bare `…Nexus` name.
+Future: extract a base `ControllerNexus.ts` once the shape is apparent (earmarked, not now).
 | File | Lines | | File | Lines |
 |---|---:|---|---|---:|
 | `CommunityAdminNexus` | 1133 | | `CommunityModerationNexus` | 266 |
