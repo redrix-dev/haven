@@ -17,7 +17,8 @@ import {
 import { useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { signUpWithPassword } from "@/auth/mobileAuthService";
+import { resendConfirmation, signUpWithPassword } from "@/auth/mobileAuthService";
+import { BuildStamp } from "@/components/BuildStamp";
 import type { RootStackParamList } from "@/navigation/types";
 
 const PLACEHOLDER_MUTED = "#a9b8cf";
@@ -36,6 +37,22 @@ export function SignUpScreen() {
   const [username, setUsername] = useState("");
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendNote, setResendNote] = useState("");
+
+  const onResend = async () => {
+    setResending(true);
+    setResendNote("");
+    try {
+      const { error } = await resendConfirmation(email);
+      if (error) throw error;
+      setResendNote("Sent. Check your inbox again.");
+    } catch (err) {
+      setResendNote(getErrorMessage(err));
+    } finally {
+      setResending(false);
+    }
+  };
 
   const onSubmit = async () => {
     setError("");
@@ -99,6 +116,21 @@ export function SignUpScreen() {
                   Back to login
                 </Text>
               </Pressable>
+              <Pressable
+                className="mt-3"
+                disabled={resending}
+                onPress={() => void onResend()}
+                hitSlop={8}
+              >
+                <Text className="text-center text-sm text-primary">
+                  {resending ? "Resending…" : "Didn't get it? Resend email"}
+                </Text>
+              </Pressable>
+              {resendNote ? (
+                <Text className="mt-2 text-center text-xs text-muted-foreground">
+                  {resendNote}
+                </Text>
+              ) : null}
             </>
           ) : (
             <>
@@ -222,6 +254,9 @@ export function SignUpScreen() {
               </View>
             </>
           )}
+        </View>
+        <View className="mt-6 self-center">
+          <BuildStamp />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

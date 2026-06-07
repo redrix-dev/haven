@@ -74,6 +74,23 @@ export const signUpWithPassword = async (input: {
   return { error };
 };
 
+export const resendConfirmation = async (email: string): Promise<MobileAuthResult> => {
+  const trimmed = email.trim();
+  if (!trimmed) {
+    return { error: new Error("Enter your email address.") };
+  }
+  // Passes emailRedirectTo so the resent link is the haven:// deep link (unlike a
+  // Supabase dashboard resend, which falls back to the Site URL / web client).
+  const { error } = await getMobileSupabase().auth.resend({
+    type: "signup",
+    email: trimmed,
+    options: {
+      emailRedirectTo: getPlatformAuthConfirmRedirectUrl(),
+    },
+  });
+  return { error };
+};
+
 export const requestPasswordReset = async (email: string): Promise<MobileAuthResult> => {
   const trimmed = email.trim();
   if (!trimmed) {

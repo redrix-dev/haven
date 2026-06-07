@@ -7,6 +7,7 @@ import { View, Text, Pressable, TextInput, ScrollView } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signInWithPassword } from "@/auth/mobileAuthService";
+import { BuildStamp } from "@/components/BuildStamp";
 
 export function MobileLogin() {
   const insets = useSafeAreaInsets();
@@ -89,6 +90,9 @@ export function MobileLogin() {
           >
             <Text className="text-center text-sm text-muted-foreground">Don't have an account? Sign up</Text>
           </Pressable>
+        </View>
+        <View className="mt-6 self-center">
+          <BuildStamp />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
