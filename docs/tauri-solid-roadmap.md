@@ -132,9 +132,25 @@ Planning began post-GO. (Phases 3–4 — parity build, cutover/release — stay
 foundation shape is set; still no planning past the next unvalidated step.)
 
 ### Step 3 — Shared-core hardening
-**Status:** in progress (audit underway).
+**Status:** 3a done · **3b plan finalized & approved (2026-06-07)** · execution pending.
 **Guardrail:** *comb everything, ration the rewriting.* The audit catches all cruft; only the
 required decoupling + cheap/safe cleanups happen here. Big rewrites get their own gated steps.
+
+**Finalized decisions (Phase 2 approved):**
+- **Depth:** **full extraction + migrate live call sites now** → shared core ends *zero-React*. Highest
+  churn, run as a **disciplined per-domain CI-gated loop** (pilot-first, not big-bang).
+- **Adapter topology (outside `shared`):** two new framework-binding packages —
+  `packages/react-bindings` (React hooks → web-client + RN) and `packages/solid-bindings`
+  (Solid subscribe→signal, getter ids → solid-client now + future solid-web). Core stays pure; the Solid
+  build never imports react-bindings (that's the zero-React proof). *Rationale:* **both desktop *and* web
+  are Solid-bound long-term** — Solid is the lasting target, RN the lasting React consumer, React-DOM
+  `web-client` transitional.
+- **Pilots:** `PermissionsControllerNexus` → `ProfileControllerNexus` → **extract base `ControllerNexus.ts`
+  from observed repetition** → roll the remaining 6 service classes.
+- **Per-domain loop:** vanilla store → relocate hooks to react-bindings → add solid-bindings → rename
+  `…Nexus`→`…ControllerNexus` + composition wiring → migrate call sites → `test:ci` + `mobile:typecheck` green.
+- **Branch:** `feat/shared-core-hardening` off `staging`. **Exit:** CI green + Solid smoke (via solid-bindings)
+  + Electron/web build. Full detail in the approved plan.
 
 - **3a · Audit & triage** — the fine-tooth comb, recorded in
   [`shared-core-audit.md`](./shared-core-audit.md). Each item → react-free? · decouple? ·
