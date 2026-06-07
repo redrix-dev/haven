@@ -47,8 +47,70 @@ all deferrable to its own gated step.
 
 ---
 
-## Still to comb (next audit passes)
-- `stores/` — `authStore` / `uiStore` / `userStatusStore` (zustand `create` → 🔧 vanilla + adapters)
-- `nexus/` — base `Nexus` (🔧 React-bound) + ~5 subclasses; dead `use*` methods
-- The ~7 React-bound files (`useHavenCore`, `useVoice`, `AuthContext`, …) → 🔧 Solid/React bindings
-- `platform/` vs `infrastructure/platform/` duplication (identical `urls.ts`) → 🧩 dedup
+## `stores/` — 🔧 trivial decouple
+3 stores via zustand `create` (React-bound); convert to `zustand/vanilla createStore` +
+per-platform adapters. Tiny surface.
+
+| File | Lines | Disposition |
+|---|---:|---|
+| `uiStore.ts` | 111 | 🔧 → vanilla + adapter |
+| `authStore.ts` | 20 | 🔧 → vanilla + adapter (already probed with the Solid `fromStore` bridge) |
+| `userStatusStore.ts` | 18 | 🔧 → vanilla + adapter |
+| `index.ts` | 8 | ✅ barrel |
+
+## `nexus/` — 🔧 the bulk of the decoupling (~7.7k lines, 13 React-coupled classes)
+This is where Step 3b actually lives. **Two patterns**, which changes the strategy:
+
+**Entity-Nexus** — extend the base `Nexus<T,R>`. *Fixing the base fixes all 5 at once.*
+| File | Lines | | File | Lines |
+|---|---:|---|---|---:|
+| `CommunityMessageNexus` | 1009 | | `Community` | 384 |
+| `DirectMessageNexus` | 1016 | | `Notification` | 442 |
+| `ChannelNexus` | 716 | | | |
+
+**Service-Nexus** — standalone classes, each with its **own** `zustand create` + React hooks
+(don't extend the base). *Each needs its own conversion — this is the per-file grind.*
+| File | Lines | | File | Lines |
+|---|---:|---|---|---:|
+| `CommunityAdminNexus` | 1133 | | `CommunityModerationNexus` | 266 |
+| `VoiceNexus` | 716 | | `PermissionsNexus` | 263 |
+| `ProfileNexus` | 630 | | `OnboardingNexus` | 233 |
+| `SocialNexus` | 377 | | `FeatureFlagNexus` | 151 |
+
+Plus: `Nexus.ts` base (189, 🔧 the keystone), `index.ts` (23, ✅), `projectVisibleChannelMessages.ts`
+(121, ✅ React-free).
+
+**Strategy:** fix the base → 5 entity-Nexus inherit it; then convert the 8 service-Nexus
+**class-by-class** (mechanical, repeatable — *not* big-bang). Many are also large → 🧩 decompose
+candidates, but **decomposition is 3d, deferred — do not split while decoupling (3b).**
+
+## Binding layer (hooks/context) — 🔧 needs Solid equivalents
+| File | Lines | Disposition |
+|---|---:|---|
+| `contexts/AuthContext.tsx` | 462 | 🔧 substantial — React Context provider; Solid provider + logic extract |
+| `features/voice/hooks/useVoice.ts` | 385 | 🔧 substantial — voice orchestration hook; Solid rewrite |
+| `features/voice/hooks/useVoiceMemberVolumes.ts` | 161 | 🔧 hook → Solid rewrite |
+| `core/useHavenCore.ts` | 25 | 🔧 trivial — `useSyncExternalStore` → Solid `from()` (the canonical binding) |
+| `debug/useDataCacheComponentProbe.ts` | 31 | 🔧 trivial — debug hook; rewrite or drop |
+
+## `platform/` vs `infrastructure/platform/` — 🧩 dedup (one wrinkle)
+| File | State | Disposition |
+|---|---|---|
+| `urls.ts` | **identical** in both | 🧩 delete one + repoint imports (cheap → 3c) |
+| `appHost.ts` | **differs** between the two | ⚠️ reconcile — *not* a pure dup (which is canonical? mobile imports `@shared/platform/…`, others `@shared/infrastructure/platform/…`) |
+| `deepLinks.ts`, `webRouter.ts` | only in `infrastructure/` | ✅ no dup |
+| `desktop/` `ipc/` `lib/` subdirs | likely also duplicated | check during execution |
+
+---
+
+## Decoupling surface — final tally (what 3b must actually touch)
+- **`nexus/`** — the bulk: base + **8 service classes** (the grind) + 5 entity classes (inherit the base fix). ~7.7k lines.
+- **binding layer** — 5 files (`AuthContext` + `useVoice` substantial; the other 3 small).
+- **`stores/`** — 3 tiny stores.
+- **`lib/backend/`** — **nothing** (already React-free ✅).
+- **`platform/`** — dedup is 🧩 hygiene, not decoupling.
+
+**Takeaway:** decoupling is concentrated in **nexus + the binding hooks**. The base-Nexus fix is
+high-leverage (clears 5 subclasses); the 8 standalone service-Nexus classes are the real volume.
+Backend and most utils are already free. Sizeable nexus files are *also* 3d decompose candidates —
+kept strictly separate from the 3b decoupling pass.

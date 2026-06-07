@@ -139,9 +139,13 @@ required decoupling + cheap/safe cleanups happen here. Big rewrites get their ow
 - **3a · Audit & triage** — the fine-tooth comb, recorded in
   [`shared-core-audit.md`](./shared-core-audit.md). Each item → react-free? · decouple? ·
   decompose-later? · fine.
-  - ✅ `lib/backend/` combed — **entirely React-free** (16 files / ~7k lines; 0 React, 0 zustand).
-    Nothing to decouple; decomposition deferred (`communityDataBackend.ts` @ 2525 lines the headline).
-  - ⬜ remaining passes: `stores/`, `nexus/`, the ~7 React-bound files, `platform/` dedup.
+  - ✅ `lib/backend/` — **entirely React-free** (16 files / ~7k lines; 0 React, 0 zustand). Nothing to
+    decouple; decomposition deferred (`communityDataBackend.ts` @ 2525 the headline).
+  - ✅ `stores/` · `nexus/` · binding hooks/context · `platform/` dedup — combed. **Decoupling is
+    concentrated in `nexus/`** (~7.7k lines, 13 React-coupled classes; base-fix clears 5 entity
+    subclasses, 8 standalone service-Nexus are the grind) + 5 binding files (`AuthContext`, `useVoice`
+    the big two) + 3 tiny stores. See [`shared-core-audit.md`](./shared-core-audit.md).
+  - **3a essentially complete** — the shared-core decoupling surface is now fully mapped.
 - **3b · React-free decoupling (required)** — stores + Nexus → `zustand/vanilla` + React/Solid
   adapters; extract the React-bound files. Exit: shared imports **zero React**; RN + a Solid
   smoke both consume it.
