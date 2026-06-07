@@ -11,8 +11,15 @@
     "allowSyntheticDefaultImports": true,
     "types": ["vite/client"],
     "paths": {
-      "@solid-client/*": ["../../packages/solid-client/src/*"]
+      "@solid-client/*": ["../../packages/solid-client/src/*"],
+      "@solid-bindings": ["../../packages/solid-bindings/src"],
+      "@solid-bindings/*": ["../../packages/solid-bindings/src/*"]
     }
   },
-  "include": ["src", "../../packages/solid-client/src", "vite.config.ts"]
+  "include": [
+    "src",
+    "../../packages/solid-client/src",
+    "../../packages/solid-bindings/src",
+    "vite.config.ts"
+  ]
 }

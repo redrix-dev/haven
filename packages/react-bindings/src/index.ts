@@ -1,0 +1,1 @@
+export { useStoreSelector } from "./useStoreSelector";
