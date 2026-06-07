@@ -58,6 +58,12 @@ per-platform adapters. Tiny surface.
 | `userStatusStore.ts` | 18 | 🔧 → vanilla + adapter |
 | `index.ts` | 8 | ✅ barrel |
 
+### Other zustand users (caught in the final sweep)
+| File | Lines | Disposition |
+|---|---:|---|
+| `core/viewerMessagePolicy.ts` | 83 | 🔧 standalone zustand `create` store → vanilla + adapter (small) |
+| `debug/instrumentZustandStore.ts` | 65 | ✅ type-only `StoreApi` — already vanilla-compatible; works (better) post-migration |
+
 ## `nexus/` — 🔧 the bulk of the decoupling (~7.7k lines, 13 React-coupled classes)
 This is where Step 3b actually lives. **Two patterns**, which changes the strategy:
 
@@ -106,7 +112,7 @@ candidates, but **decomposition is 3d, deferred — do not split while decouplin
 ## Decoupling surface — final tally (what 3b must actually touch)
 - **`nexus/`** — the bulk: base + **8 service classes** (the grind) + 5 entity classes (inherit the base fix). ~7.7k lines.
 - **binding layer** — 5 files (`AuthContext` + `useVoice` substantial; the other 3 small).
-- **`stores/`** — 3 tiny stores.
+- **`stores/`** — 3 tiny stores + `core/viewerMessagePolicy.ts` (1 small policy store).
 - **`lib/backend/`** — **nothing** (already React-free ✅).
 - **`platform/`** — dedup is 🧩 hygiene, not decoupling.
 
