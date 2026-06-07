@@ -127,11 +127,32 @@ Non-gating follow-ups carried into the foundation phase (low-risk, not blockers)
 
 ---
 
-## Phases 2–4 — intentionally unplanned
-Left `TBD` **on purpose.** No point planning the parity build, cutover, or release
-until Gate 1 says the stack isn't DOA — planning past an unvalidated gate is the exact
-wasted-effort trap this roadmap exists to avoid. We re-enter the
-propose → discuss → record loop **after Step 2 returns GO.**
+## Phase 2 — Foundation: shared-core hardening
+Planning began post-GO. (Phases 3–4 — parity build, cutover/release — stay `TBD` until the
+foundation shape is set; still no planning past the next unvalidated step.)
+
+### Step 3 — Shared-core hardening
+**Status:** in progress (audit underway).
+**Guardrail:** *comb everything, ration the rewriting.* The audit catches all cruft; only the
+required decoupling + cheap/safe cleanups happen here. Big rewrites get their own gated steps.
+
+- **3a · Audit & triage** — the fine-tooth comb, recorded in
+  [`shared-core-audit.md`](./shared-core-audit.md). Each item → react-free? · decouple? ·
+  decompose-later? · fine.
+  - ✅ `lib/backend/` combed — **entirely React-free** (16 files / ~7k lines; 0 React, 0 zustand).
+    Nothing to decouple; decomposition deferred (`communityDataBackend.ts` @ 2525 lines the headline).
+  - ⬜ remaining passes: `stores/`, `nexus/`, the ~7 React-bound files, `platform/` dedup.
+- **3b · React-free decoupling (required)** — stores + Nexus → `zustand/vanilla` + React/Solid
+  adapters; extract the React-bound files. Exit: shared imports **zero React**; RN + a Solid
+  smoke both consume it.
+- **3c · Cheap inline cleanups** — dedup `platform/` vs `infrastructure/platform/` (identical
+  `urls.ts`) and other safe wins surfaced by 3a.
+- **3d · Deferred, scoped separately** — the decomposition backlog (headed by the
+  `communityDataBackend` split) → own gated steps, **not** folded into 3b.
+
+**Exit criteria (Step 3):** (i) audit complete + triaged; (ii) shared core React-free with
+adapters, RN unbroken + a Solid smoke; (iii) cheap cleanups done; (iv) big rewrites logged as
+scoped follow-ups (not executed here).
 
 ---
 
