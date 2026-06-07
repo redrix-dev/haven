@@ -158,16 +158,18 @@ required decoupling + cheap/safe cleanups happen here. Big rewrites get their ow
   - ✅ `lib/backend/` — **entirely React-free** (16 files / ~7k lines; 0 React, 0 zustand). Nothing to
     decouple; decomposition deferred (`communityDataBackend.ts` @ 2525 the headline).
   - ✅ `stores/` · `nexus/` · binding hooks/context · `platform/` dedup — combed. **Decoupling is
-    concentrated in `nexus/`** (~7.7k lines, 13 React-coupled classes; base-fix clears 5 entity
-    subclasses, 8 standalone service-Nexus are the grind) + 5 binding files (`AuthContext`, `useVoice`
-    the big two) + 3 tiny stores. See [`shared-core-audit.md`](./shared-core-audit.md).
+    concentrated in `nexus/`** (~7.7k lines, 13 React-coupled classes) + 5 binding files (`AuthContext`,
+    `useVoice` the big two) + 3 tiny stores. ⚠️ **3b.2 discovery:** the entity family is NOT a free
+    "base-fix clears 5" — the base `use<S>` is used by `CommunityMessageNexus`, and 4 subclasses override
+    `store` + use bespoke hooks → it's a **per-class loop too**. See [`shared-core-audit.md`](./shared-core-audit.md).
   - **3a essentially complete** — the shared-core decoupling surface is now fully mapped.
 - **3b · React-free decoupling (required)** — `create` → `zustand/vanilla createStore` + per-platform
   adapters (React for RN/Electron; Solid `subscribe→signal`, getter-based ids). Exit: shared imports
   **zero React**; RN + a Solid smoke both consume it. **Two families, two treatments:**
   - **Entity-cache Nexus** (base `Nexus` + 5 subclasses: Channel / CommunityMessage / Community / DM /
-    Notification) — fix the **base** (`create`→`createStore`, drop dead `use*`, add adapters); the 5
-    inherit it. **Stays named `…Nexus`** — keep the entity-cache pattern pure.
+    Notification) — **per-class loop** (not a single base swap; see 3b.2 discovery): base→vanilla + drop
+    dead `useAll`/`useOne`, then each subclass's `store` override + bespoke hooks relocate to bindings +
+    call sites migrate, CI-gated. **Stays named `…Nexus`** — keep the entity-cache pattern pure.
   - **Service/feature classes** (the 8 standalone) — convert **in place** to vanilla + adapter **and
     rename `<Domain>Nexus` → `<Domain>ControllerNexus`** (e.g. `ProfileControllerNexus`,
     `VoiceControllerNexus`). **Naming convention:** `Nexus` = entity cache · `ControllerNexus` =

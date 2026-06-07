@@ -67,12 +67,26 @@ per-platform adapters. Tiny surface.
 ## `nexus/` — 🔧 the bulk of the decoupling (~7.7k lines, 13 React-coupled classes)
 This is where Step 3b actually lives. **Two patterns**, which changes the strategy:
 
-**Entity-Nexus** — extend the base `Nexus<T,R>`. *Fixing the base fixes all 5 at once.*
+**Entity-Nexus** — extend the base `Nexus<T,R>`.
 | File | Lines | | File | Lines |
 |---|---:|---|---|---:|
 | `CommunityMessageNexus` | 1009 | | `Community` | 384 |
 | `DirectMessageNexus` | 1016 | | `Notification` | 442 |
 | `ChannelNexus` | 716 | | | |
+
+> **⚠️ 3b.2 discovery (CI-gated revert) — "fix base → 5 inherit" was WRONG.** Converting the base
+> to vanilla in isolation does **not** typecheck; the entity family is more coupled (and inconsistent)
+> than the grep implied:
+> - **`use<S>` on the base is NOT dead** — `CommunityMessageNexus` calls `this.use()` ×5. (Only
+>   `useAll`/`useOne` are dead — my earlier grep filtered out `Nexus.ts` files and hid this.)
+> - **4 of 5 override `get store()`** with their own (extended) store shape (`UseBoundStore`) +
+>   call `useStore(this.store, …)` for bespoke hooks: Channel (3), Community (5), DirectMessage (3),
+>   Notification (5). Making the base `store` public/vanilla collides with their `protected` overrides
+>   and their callable hook-store usage.
+>
+> **Revised approach:** treat the entity family like the service classes — a **per-class loop** (base +
+> one subclass at a time, relocate its store override + bespoke hooks → react/solid-bindings + migrate
+> call sites), each CI-gated. There is **no free "base fix clears 5."** Effort ≈ the service-Nexus grind.
 
 **Service-Nexus** — standalone classes, each with its **own** `zustand create` + React hooks
 (don't extend the base). *Each needs its own conversion — this is the per-file grind.*
