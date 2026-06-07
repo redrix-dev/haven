@@ -132,3 +132,47 @@ Left `TBD` **on purpose.** No point planning the parity build, cutover, or relea
 until Gate 1 says the stack isn't DOA — planning past an unvalidated gate is the exact
 wasted-effort trap this roadmap exists to avoid. We re-enter the
 propose → discuss → record loop **after Step 2 returns GO.**
+
+---
+
+## Keep-in-mind / architecture notes (foundation inputs)
+Captured from probe findings + a `Nexus` review. Shape Phase 2; not yet sequenced.
+
+### Governing principle: framework-agnostic core + thin per-platform adapters
+The shared layer serves **three** consumers — React Native (mobile), React (Electron/web
+today), and Solid (Tauri). So reactivity must **not** live in the shared core:
+- **Core** = `zustand/vanilla` (`createStore`) — CRUD, persist, transform, `subscribe`.
+  Pure, no React import.
+- **Adapters** (thin, per-platform): React adapter (`useStore` hooks) for RN/Electron;
+  Solid adapter (`subscribe → signal`) for Tauri.
+
+Applies to **both** the plain stores (`authStore`, …) and the `Nexus` entity layer.
+
+### `Nexus<T,R>` — verified state (not hearsay)
+- `packages/shared/src/nexus/Nexus.ts` is **React-bound**: imports `create`/`useStore`/
+  `UseBoundStore` from `zustand`; `_store` is a `UseBoundStore`.
+- The reactive methods `use<S>` / `useAll` / `useOne` (~lines 132–153) **appear to be dead
+  code — zero call sites found** across shared/web-client/mobile/electron. Vestigial, not a
+  load-bearing API.
+- **~5** domain subclasses extend it (DirectMessage, CommunityMessage, Community, Channel,
+  Notification). They rely on the **CRUD / persist / transform** layer — fully cross-platform,
+  unaffected by the change.
+
+### The refactor (smaller/safer than it first looks)
+1. Swap the base `_store`: `create` (zustand) → `createStore` (`zustand/vanilla`). Removes
+   React from the shared Nexus layer.
+2. Drop the three unused `use*` reactive methods (dead code) — or relocate to a React adapter
+   if/when a platform actually needs reactive Nexus subscription.
+3. Add per-platform reactive adapters **only as needed** — currently nothing consumes the
+   reactive trio, so it's greenfield (no call-site migration).
+4. The ~5 subclasses + CRUD/persist/transform stay intact.
+
+### Solid-ism to design around
+Solid tracks reactivity at access time, so a Solid adapter (`createNexusOne(nexus, id)`) must
+take **`id` as a getter `() => string`**, not a plain string, so it re-subscribes when the id
+changes. Same for any adapter taking reactive args.
+
+### Caveat
+The base swap is small *because* the reactive methods are unused. The real per-platform
+reactive work surfaces whenever a platform first needs to reactively consume a Nexus — design
+the adapter signatures (getter-based) before that point.
