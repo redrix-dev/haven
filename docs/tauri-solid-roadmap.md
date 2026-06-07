@@ -78,6 +78,17 @@ recommendation on (a) the Tauri shell and (b) the Solid UI**.
 **Exit criteria (gate):** all 6 probes answered (✅/⚠️/❌ with notes). Feeds Step 2.
 Once findings are captured → **nuke the dirty build.**
 
+**Execution order (refined):** **hardline the calls** — no `@shared` reactivity in the
+voice track (that stays a separate probe), for diagnostic purity. Voice is a dependency
+chain; run cheapest-gate-first:
+1. WKWebView `getUserMedia({audio})` + native mic config (Info.plist usage string +
+   audio-input entitlement). ← **gate**; if the webview can't capture mic, voice is dead.
+2. Authed Supabase client → `voice-token` invoke (`{ communityId, channelId }`) for a real room.
+3. `livekit-client` connect → publish mic → subscribe audio → join the same channel from desktop.
+
+Probe 2 (`@shared` from Solid) is an independent track. Real community/channel ids + a
+test account are hardcoded in the junk build for the cross-device test.
+
 ### Step 2 — Assemble findings & viability verdict (Gate 1)
 **Status:** planned
 
