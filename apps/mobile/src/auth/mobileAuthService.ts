@@ -74,6 +74,33 @@ export const signUpWithPassword = async (input: {
   return { error };
 };
 
+/** True when a sign-in failed specifically because the email isn't confirmed yet. */
+export const isEmailNotConfirmedError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code.toLowerCase() : "";
+  const message =
+    typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+  return code === "email_not_confirmed" || message.includes("not confirmed");
+};
+
+export const resendConfirmation = async (email: string): Promise<MobileAuthResult> => {
+  const trimmed = email.trim();
+  if (!trimmed) {
+    return { error: new Error("Enter your email address.") };
+  }
+  // Passes emailRedirectTo so the resent link is the haven:// deep link (unlike a
+  // Supabase dashboard resend, which falls back to the Site URL / web client).
+  const { error } = await getMobileSupabase().auth.resend({
+    type: "signup",
+    email: trimmed,
+    options: {
+      emailRedirectTo: getPlatformAuthConfirmRedirectUrl(),
+    },
+  });
+  return { error };
+};
+
 export const requestPasswordReset = async (email: string): Promise<MobileAuthResult> => {
   const trimmed = email.trim();
   if (!trimmed) {

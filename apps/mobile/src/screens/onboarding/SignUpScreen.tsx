@@ -18,6 +18,8 @@ import { useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { signUpWithPassword } from "@/auth/mobileAuthService";
+import { BuildStamp } from "@/components/BuildStamp";
+import { useResendConfirmation } from "@/hooks/useResendConfirmation";
 import type { RootStackParamList } from "@/navigation/types";
 
 const PLACEHOLDER_MUTED = "#a9b8cf";
@@ -36,6 +38,12 @@ export function SignUpScreen() {
   const [username, setUsername] = useState("");
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const {
+    resend,
+    resending,
+    note: resendNote,
+    cooldown: resendCooldown,
+  } = useResendConfirmation();
 
   const onSubmit = async () => {
     setError("");
@@ -99,6 +107,25 @@ export function SignUpScreen() {
                   Back to login
                 </Text>
               </Pressable>
+              <Pressable
+                className="mt-3"
+                disabled={resending || resendCooldown > 0}
+                onPress={() => void resend(email)}
+                hitSlop={8}
+              >
+                <Text className="text-center text-sm text-primary">
+                  {resending
+                    ? "Resending…"
+                    : resendCooldown > 0
+                      ? `Resend available in ${resendCooldown}s`
+                      : "Didn't get it? Resend email"}
+                </Text>
+              </Pressable>
+              {resendNote ? (
+                <Text className="mt-2 text-center text-xs text-muted-foreground">
+                  {resendNote}
+                </Text>
+              ) : null}
             </>
           ) : (
             <>
@@ -222,6 +249,9 @@ export function SignUpScreen() {
               </View>
             </>
           )}
+        </View>
+        <View className="mt-6 self-center">
+          <BuildStamp />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
