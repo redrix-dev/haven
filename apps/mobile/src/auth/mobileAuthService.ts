@@ -74,6 +74,16 @@ export const signUpWithPassword = async (input: {
   return { error };
 };
 
+/** True when a sign-in failed specifically because the email isn't confirmed yet. */
+export const isEmailNotConfirmedError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code.toLowerCase() : "";
+  const message =
+    typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+  return code === "email_not_confirmed" || message.includes("not confirmed");
+};
+
 export const resendConfirmation = async (email: string): Promise<MobileAuthResult> => {
   const trimmed = email.trim();
   if (!trimmed) {

@@ -17,8 +17,9 @@ import {
 import { useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { resendConfirmation, signUpWithPassword } from "@/auth/mobileAuthService";
+import { signUpWithPassword } from "@/auth/mobileAuthService";
 import { BuildStamp } from "@/components/BuildStamp";
+import { useResendConfirmation } from "@/hooks/useResendConfirmation";
 import type { RootStackParamList } from "@/navigation/types";
 
 const PLACEHOLDER_MUTED = "#a9b8cf";
@@ -37,22 +38,12 @@ export function SignUpScreen() {
   const [username, setUsername] = useState("");
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [resendNote, setResendNote] = useState("");
-
-  const onResend = async () => {
-    setResending(true);
-    setResendNote("");
-    try {
-      const { error } = await resendConfirmation(email);
-      if (error) throw error;
-      setResendNote("Sent. Check your inbox again.");
-    } catch (err) {
-      setResendNote(getErrorMessage(err));
-    } finally {
-      setResending(false);
-    }
-  };
+  const {
+    resend,
+    resending,
+    note: resendNote,
+    cooldown: resendCooldown,
+  } = useResendConfirmation();
 
   const onSubmit = async () => {
     setError("");
@@ -118,12 +109,16 @@ export function SignUpScreen() {
               </Pressable>
               <Pressable
                 className="mt-3"
-                disabled={resending}
-                onPress={() => void onResend()}
+                disabled={resending || resendCooldown > 0}
+                onPress={() => void resend(email)}
                 hitSlop={8}
               >
                 <Text className="text-center text-sm text-primary">
-                  {resending ? "Resending…" : "Didn't get it? Resend email"}
+                  {resending
+                    ? "Resending…"
+                    : resendCooldown > 0
+                      ? `Resend available in ${resendCooldown}s`
+                      : "Didn't get it? Resend email"}
                 </Text>
               </Pressable>
               {resendNote ? (

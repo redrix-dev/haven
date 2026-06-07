@@ -6,8 +6,9 @@ import { useState } from "react";
 import { View, Text, Pressable, TextInput, ScrollView } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { signInWithPassword } from "@/auth/mobileAuthService";
+import { isEmailNotConfirmedError, signInWithPassword } from "@/auth/mobileAuthService";
 import { BuildStamp } from "@/components/BuildStamp";
+import { useResendConfirmation } from "@/hooks/useResendConfirmation";
 
 export function MobileLogin() {
   const insets = useSafeAreaInsets();
@@ -15,6 +16,13 @@ export function MobileLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const {
+    resend,
+    resending,
+    note: resendNote,
+    cooldown: resendCooldown,
+  } = useResendConfirmation();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const onSubmit = async () => {
     setError("");
@@ -22,8 +30,10 @@ export function MobileLogin() {
     try {
       const { error } = await signInWithPassword(email, password);
       if (error) throw error;
+      setNeedsConfirmation(false);
     } catch (error) {
       setError(getErrorMessage(error));
+      setNeedsConfirmation(isEmailNotConfirmedError(error));
     } finally {
       setLoading(false);
     }
@@ -68,6 +78,28 @@ export function MobileLogin() {
           />
           {error ? (
             <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
+          ) : null}
+          {needsConfirmation ? (
+            <View className="mb-4">
+              <Pressable
+                disabled={resending || resendCooldown > 0}
+                onPress={() => void resend(email)}
+                hitSlop={8}
+              >
+                <Text className="text-center text-sm text-primary">
+                  {resending
+                    ? "Resending…"
+                    : resendCooldown > 0
+                      ? `Resend available in ${resendCooldown}s`
+                      : "Resend confirmation email"}
+                </Text>
+              </Pressable>
+              {resendNote ? (
+                <Text className="mt-2 text-center text-xs text-muted-foreground">
+                  {resendNote}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
           <Pressable
             className={`rounded-xl bg-primary py-4 ${loading ? "opacity-60" : ""}`}
