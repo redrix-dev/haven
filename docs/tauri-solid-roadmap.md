@@ -132,9 +132,25 @@ Planning began post-GO. (Phases 3–4 — parity build, cutover/release — stay
 foundation shape is set; still no planning past the next unvalidated step.)
 
 ### Step 3 — Shared-core hardening
-**Status:** in progress (audit underway).
+**Status:** 3a done · **3b plan finalized & approved (2026-06-07)** · execution pending.
 **Guardrail:** *comb everything, ration the rewriting.* The audit catches all cruft; only the
 required decoupling + cheap/safe cleanups happen here. Big rewrites get their own gated steps.
+
+**Finalized decisions (Phase 2 approved):**
+- **Depth:** **full extraction + migrate live call sites now** → shared core ends *zero-React*. Highest
+  churn, run as a **disciplined per-domain CI-gated loop** (pilot-first, not big-bang).
+- **Adapter topology (outside `shared`):** two new framework-binding packages —
+  `packages/react-bindings` (React hooks → web-client + RN) and `packages/solid-bindings`
+  (Solid subscribe→signal, getter ids → solid-client now + future solid-web). Core stays pure; the Solid
+  build never imports react-bindings (that's the zero-React proof). *Rationale:* **both desktop *and* web
+  are Solid-bound long-term** — Solid is the lasting target, RN the lasting React consumer, React-DOM
+  `web-client` transitional.
+- **Pilots:** `PermissionsControllerNexus` → `ProfileControllerNexus` → **extract base `ControllerNexus.ts`
+  from observed repetition** → roll the remaining 6 service classes.
+- **Per-domain loop:** vanilla store → relocate hooks to react-bindings → add solid-bindings → rename
+  `…Nexus`→`…ControllerNexus` + composition wiring → migrate call sites → `test:ci` + `mobile:typecheck` green.
+- **Branch:** `feat/shared-core-hardening` off `staging`. **Exit:** CI green + Solid smoke (via solid-bindings)
+  + Electron/web build. Full detail in the approved plan.
 
 - **3a · Audit & triage** — the fine-tooth comb, recorded in
   [`shared-core-audit.md`](./shared-core-audit.md). Each item → react-free? · decouple? ·
@@ -146,9 +162,20 @@ required decoupling + cheap/safe cleanups happen here. Big rewrites get their ow
     subclasses, 8 standalone service-Nexus are the grind) + 5 binding files (`AuthContext`, `useVoice`
     the big two) + 3 tiny stores. See [`shared-core-audit.md`](./shared-core-audit.md).
   - **3a essentially complete** — the shared-core decoupling surface is now fully mapped.
-- **3b · React-free decoupling (required)** — stores + Nexus → `zustand/vanilla` + React/Solid
-  adapters; extract the React-bound files. Exit: shared imports **zero React**; RN + a Solid
-  smoke both consume it.
+- **3b · React-free decoupling (required)** — `create` → `zustand/vanilla createStore` + per-platform
+  adapters (React for RN/Electron; Solid `subscribe→signal`, getter-based ids). Exit: shared imports
+  **zero React**; RN + a Solid smoke both consume it. **Two families, two treatments:**
+  - **Entity-cache Nexus** (base `Nexus` + 5 subclasses: Channel / CommunityMessage / Community / DM /
+    Notification) — fix the **base** (`create`→`createStore`, drop dead `use*`, add adapters); the 5
+    inherit it. **Stays named `…Nexus`** — keep the entity-cache pattern pure.
+  - **Service/feature classes** (the 8 standalone) — convert **in place** to vanilla + adapter **and
+    rename `<Domain>Nexus` → `<Domain>ControllerNexus`** (e.g. `ProfileControllerNexus`,
+    `VoiceControllerNexus`). **Naming convention:** `Nexus` = entity cache · `ControllerNexus` =
+    feature-state controller — same family, honest contract. **The rename is in scope for the lift**
+    (ripples to `useHavenCore` wiring + call sites — planned, not incidental).
+  - **stores/** (4 tiny + `core/viewerMessagePolicy`) → vanilla + adapter.
+  - **binding hooks/context** (`AuthContext`, `useVoice`, `useHavenCore`, …) → Solid/React bindings.
+  - **Approach:** convert 2–3 ControllerNexus first, watch what repeats, *then* extract — don't impose a base.
 - **3c · Cheap inline cleanups** — dedup `platform/` vs `infrastructure/platform/` (identical
   `urls.ts`) and other safe wins surfaced by 3a.
 - **3d · Deferred, scoped separately** — the decomposition backlog (headed by the
@@ -157,6 +184,15 @@ required decoupling + cheap/safe cleanups happen here. Big rewrites get their ow
 **Exit criteria (Step 3):** (i) audit complete + triaged; (ii) shared core React-free with
 adapters, RN unbroken + a Solid smoke; (iii) cheap cleanups done; (iv) big rewrites logged as
 scoped follow-ups (not executed here).
+
+### 📌 Earmarks (future — NOT in 3b scope)
+Captured so they don't get lost, deliberately *not* pulled into the current lift:
+- **Base `ControllerNexus.ts`** — once the shape is apparent across the 8 renamed controllers, extract a
+  thin shared base (vanilla store + `revision` + reset/hydrate + adapter wiring) to solidify it.
+  **Extract from observed repetition only** — do not design/impose it up front (that's how the original
+  "Nexus name, no contract" drift happened).
+- **Decomposition backlog** (3d) — `communityDataBackend.ts` (2525) split + the other large files; pure
+  hygiene, own gated steps.
 
 ---
 
