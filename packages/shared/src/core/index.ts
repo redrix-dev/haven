@@ -64,8 +64,48 @@ export {
 } from "./communityAccessHandlers";
 export {
   createDefaultViewerMessagePolicyState,
-  createViewerMessagePolicyStore,
+  viewerCommunityPolicyEqual,
+  viewerPolicyHiddenAuthorIdsEqual,
   type ViewerMessagePolicyState,
   type ViewerMessagePolicyStore,
 } from "./viewerMessagePolicy";
+export type {
+  CommunityMessageCacheInstance,
+  CommunityMessageRegistry,
+  CreateCommunityMessageRegistry,
+} from "./cache/communityMessageCachePort";
+export type {
+  AuthStorePort,
+  AuthStoreState,
+  UiStorePort,
+  UiStoreState,
+  UserStatusStorePort,
+  UserStatusStoreState,
+  UserStatus,
+  WorkspaceMode,
+} from "./sessionStorePorts";
+export {
+  registerSessionStores,
+  resetSessionStores,
+  requireAuthStore,
+  requireUiStore,
+  requireUserStatusStore,
+} from "./sessionStoreRegistry";
+export type {
+  PlatformNexusBundle,
+  PlatformNexusContext,
+  CreatePlatformNexusBundle,
+  VoiceRealtimeChannel,
+  VoiceRealtimeTransport,
+} from "./cache/platformNexusPorts";
+export type {
+  CommunityNexusPort,
+  ChannelNexusPort,
+  DirectMessageNexusPort,
+  NotificationNexusPort,
+  CreateCommunityNexus,
+  CreateChannelNexus,
+  CreateDirectMessageNexus,
+  CreateNotificationNexus,
+} from "./cache/entityNexusPorts";
 export { useHavenCore, useBootstrapPhase } from "./useHavenCore";

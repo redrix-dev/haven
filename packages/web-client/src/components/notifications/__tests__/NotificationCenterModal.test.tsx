@@ -10,8 +10,8 @@ import {
   resetHavenCore,
 } from "@shared/core";
 import type { HavenCore } from "@shared/core/HavenCore";
-import { NotificationNexus } from "@shared/nexus/notifications/NotificationNexus";
-import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
+import { NotificationNexus } from "@mobile-data/notifications/NotificationNexus";
+import { ProfileNexus } from "@mobile-data/profile/ProfileNexus";
 import type {
   NotificationItem,
 } from "@shared/lib/backend/types";

@@ -9,7 +9,7 @@ import {
   syncNotificationSounds,
   useHavenCore,
 } from "@shared/core";
-import { useNotificationCounts, useNotifications } from "@react-bindings";
+import { useNotificationCounts, useNotifications } from "@mobile-data/hooks";
 import { getErrorMessage } from "@platform/lib/errors";
 
 export function NotificationModalsHost() {

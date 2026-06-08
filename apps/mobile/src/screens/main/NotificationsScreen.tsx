@@ -4,7 +4,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
 import NotificationsContainer from "@/features/notifications/NotificationsContainer";
 import type { NotificationsFriendsPanelOpenInput } from "@/features/notifications/NotificationsContainer";

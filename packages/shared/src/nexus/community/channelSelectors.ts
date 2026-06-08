@@ -1,12 +1,12 @@
 import type { ChannelGroupState } from '@shared/lib/backend/types'
-import type { ChannelNexusState, HavenChannel } from './ChannelNexus'
+import type { ChannelNexusState, HavenChannel } from './channelTypes'
 
 /**
  * Pure, framework-agnostic projections + equality fns for the channel store.
  *
  * These are the single source of truth for "which slice of channel state, and
  * how to compare it" — domain knowledge that is meaningful regardless of who is
- * observing. The React (`@react-bindings`) and Solid (`@solid-bindings`)
+ * observing. The React (`@mobile-data/hooks`) and Solid (`@solid-bindings`)
  * adapters both consume these, so there is exactly one projection per concept.
  *
  * Memoization strategy (useMemo vs createMemo) belongs to the adapters; these

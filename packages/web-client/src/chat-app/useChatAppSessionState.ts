@@ -21,7 +21,7 @@ import {
   useCommunitiesLoadError,
   useCommunitiesLoading,
   useNotifications,
-} from "@react-bindings";
+} from "@mobile-data/hooks";
 import { getPlatformInviteBaseUrl } from "@platform/urls";
 import {
   ENABLE_CHANNEL_RELOAD_DIAGNOSTICS,
@@ -33,8 +33,8 @@ import { getErrorMessage } from "@platform/lib/errors";
 import { useDesktopSettings } from "@web-client/hooks/useDesktopSettings";
 import { useDeepLinks } from "@web-client/hooks/useDeepLinks";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";
-import { useUserStatusStore } from "@shared/stores/userStatusStore";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUserStatusStore } from "@mobile-data/session/userStatusStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import { getNotificationPayloadString } from "@shared/infrastructure/utils/appUtils";
 import { getTheme } from "@shared/themes/registry";
 import { useChatAppAccessAndBroadcastOrchestration } from "@web-client/chat-app/controllers/useChatAppAccessAndBroadcastOrchestration";

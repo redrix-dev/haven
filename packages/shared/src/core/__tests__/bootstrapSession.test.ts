@@ -4,9 +4,9 @@ import {
   resetHavenCore,
   syncFocusFromRoute,
 } from '@shared/core';
-import { CommunityNexus } from '@shared/nexus/community/CommunityNexus';
-import { ChannelNexus } from '@shared/nexus/community/ChannelNexus';
-import { CommunityMessageNexus } from '@shared/nexus/community/CommunityMessageNexus';
+import { CommunityNexus } from '@mobile-data/communities/CommunityNexus';
+import { ChannelNexus } from '@mobile-data/channels/ChannelNexus';
+import { CommunityMessageCache as CommunityMessageNexus } from '@mobile-data/messages/CommunityMessageCache';
 import { HavenCore } from '@shared/core/HavenCore';
 import type { ServerSummary } from '@shared/lib/backend/types';
 

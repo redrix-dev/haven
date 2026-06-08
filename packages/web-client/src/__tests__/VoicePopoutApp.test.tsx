@@ -62,7 +62,7 @@ import {
   resetHavenCore,
 } from '@shared/core';
 import type { HavenCore } from '@shared/core/HavenCore';
-import { VoiceNexus } from '@shared/nexus/voice/VoiceNexus';
+import { VoiceNexus } from '@mobile-data/voice/VoiceNexus';
 
 function registerTestHavenCore() {
   const persistence = createMemoryPersistence();

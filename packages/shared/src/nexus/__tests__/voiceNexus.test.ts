@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryPersistence, createViewerMessagePolicyStore } from "@shared/core";
+import { createMemoryPersistence } from "@shared/core";
+import { createTestViewerMessagePolicyStore } from "@test-support/createTestViewerMessagePolicyStore";
 import {
   VoiceNexus,
   type VoiceRealtimeChannel,
   type VoiceRealtimeTransport,
-} from "@shared/nexus/voice/VoiceNexus";
+} from "@mobile-data/voice/VoiceNexus";
 import type { VoicePresenceStateRow } from "@shared/types/types";
 
 class FakeVoiceRealtimeChannel implements VoiceRealtimeChannel {
@@ -115,7 +116,7 @@ const buildNexus = () => {
     })),
   };
   const realtime = new FakeVoiceRealtimeTransport();
-  const policy = createViewerMessagePolicyStore();
+  const policy = createTestViewerMessagePolicyStore();
   const nexus = new VoiceNexus(
     createMemoryPersistence(),
     policy,
@@ -269,7 +270,7 @@ describe("VoiceNexus", () => {
         serverUrl: "wss://voice.example.test",
       })),
     };
-    const policy = createViewerMessagePolicyStore();
+    const policy = createTestViewerMessagePolicyStore();
     const channels: DeferredVoiceRealtimeChannel[] = [];
     const removed: DeferredVoiceRealtimeChannel[] = [];
     const realtime: VoiceRealtimeTransport = {

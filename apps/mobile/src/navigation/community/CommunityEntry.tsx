@@ -13,8 +13,8 @@ import {
   useCommunitiesLoadError,
   useCommunitiesLoading,
   useOrderedCommunities,
-} from "@react-bindings";
-import { useAuthStore } from "@shared/stores/authStore";
+} from "@mobile-data/hooks";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { getLastCommunitySurface } from "@/storage/communitySurfacePrefs";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { resolveColorProp } from "@shared/themes";

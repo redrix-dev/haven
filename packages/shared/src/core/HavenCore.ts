@@ -1,26 +1,11 @@
 import type { HavenSupabaseClient } from "@shared/infrastructure/client/createHavenSupabaseClient";
-import {
-  CommunityNexus,
-} from "@shared/nexus/community/CommunityNexus";
-import {
-  ChannelNexus,
-} from "@shared/nexus/community/ChannelNexus";
-import { CommunityAdminNexus } from "@shared/nexus/community/CommunityAdminNexus";
-import { CommunityModerationNexus } from "@shared/nexus/community/CommunityModerationNexus";
-import { CommunityMessageNexus } from "@shared/nexus/community/CommunityMessageNexus";
-import { DirectMessageNexus } from "@shared/nexus/direct-messages/DirectMessageNexus";
-import { NotificationNexus } from "@shared/nexus/notifications/NotificationNexus";
-import { SocialNexus } from "@shared/nexus/social/SocialNexus";
-import { PermissionsNexus } from "@shared/nexus/permissions/PermissionsNexus";
-import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
-import { FeatureFlagNexus } from "@shared/nexus/feature-flags/FeatureFlagNexus";
-import { OnboardingNexus } from "@shared/nexus/onboarding/OnboardingNexus";
-import {
-  VoiceNexus,
-  type VoiceRealtimeChannel,
-  type VoiceRealtimeTransport,
-} from "@shared/nexus/voice/VoiceNexus";
-import { useUiStore } from "@shared/stores/uiStore";
+import type {
+  CreatePlatformNexusBundle,
+  PlatformNexusBundle,
+  VoiceRealtimeChannel,
+  VoiceRealtimeTransport,
+} from "@shared/core/cache/platformNexusPorts";
+import type { AuthStorePort, UiStorePort, UserStatusStorePort } from "./sessionStorePorts";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import type {
   BanEligibleServer,
@@ -40,13 +25,26 @@ import {
 } from "./communityChannelUtils";
 import type { NexusPersistence } from "./persistence/NexusPersistence";
 import { routeRealtimeEvent, type RealtimeEvent } from "./routeRealtimeEvent";
-import { bootLogger } from "@shared/debug/bootLogger";
+import type { CommunityMessageRegistry } from "./cache/communityMessageCachePort";
+import type { CreateCommunityMessageRegistry } from "./cache/communityMessageCachePort";
+import type {
+  ChannelNexusPort,
+  CommunityNexusPort,
+  CreateChannelNexus,
+  CreateCommunityNexus,
+  CreateDirectMessageNexus,
+  CreateNotificationNexus,
+  DirectMessageNexusPort,
+  NotificationNexusPort,
+} from "./cache/entityNexusPorts";
 import {
   createDefaultViewerMessagePolicyState,
-  createViewerMessagePolicyStore,
+  type ViewerMessagePolicyStore,
+} from "./viewerMessagePolicy";
+import { bootLogger } from "@shared/debug/bootLogger";
+import {
   viewerCommunityPolicyEqual,
   viewerPolicyHiddenAuthorIdsEqual,
-  type ViewerMessagePolicyStore,
 } from "./viewerMessagePolicy";
 
 const normalizeRealtimeIso = (value: unknown): string | null => {
@@ -94,63 +92,24 @@ export type HavenCoreOptions = {
   client: HavenSupabaseClient;
   publicConfig: HavenSupabasePublicConfig;
   persistence: NexusPersistence;
+  authStore: AuthStorePort;
+  uiStore: UiStorePort;
+  userStatusStore: UserStatusStorePort;
+  viewerMessagePolicyStore: ViewerMessagePolicyStore;
+  createMessageRegistry: CreateCommunityMessageRegistry;
+  createCommunityNexus: CreateCommunityNexus;
+  createChannelNexus: CreateChannelNexus;
+  createDirectMessageNexus: CreateDirectMessageNexus;
+  createNotificationNexus: CreateNotificationNexus;
+  createPlatformNexusBundle: CreatePlatformNexusBundle;
 };
 
-/**
- * Per-community message nexus registry. Lazy-created on first access and
- * owned by HavenCore so persistence is consistent and cleanup is centralized.
- */
-class MessageNexusRegistry {
-  private byCommunity = new Map<string, CommunityMessageNexus>();
-  private backends: HavenBackends | null = null;
-
-  constructor(
-    private readonly persistence: NexusPersistence,
-    private readonly viewerMessagePolicyStore: ViewerMessagePolicyStore,
-  ) {}
-
-  setBackends(backends: HavenBackends): void {
-    this.backends = backends;
-    for (const nexus of this.byCommunity.values()) {
-      nexus.setCommunityData(backends.communityData);
-    }
-  }
-
-  for(communityId: string): CommunityMessageNexus {
-    let nexus = this.byCommunity.get(communityId);
-    if (!nexus) {
-      nexus = new CommunityMessageNexus(
-        communityId,
-        this.persistence,
-        this.viewerMessagePolicyStore,
-      );
-      if (this.backends) nexus.setCommunityData(this.backends.communityData);
-      // Restore any persisted message tail so a cold start can render cached
-      // content before the network refresh lands (mirrors ChannelNexus).
-      nexus.rehydrate();
-      this.byCommunity.set(communityId, nexus);
-    }
-    return nexus;
-  }
-
-  has(communityId: string): boolean {
-    return this.byCommunity.has(communityId);
-  }
-
-  clearCommunity(communityId: string): void {
-    const nexus = this.byCommunity.get(communityId);
-    if (nexus) {
-      nexus.clear();
-      this.byCommunity.delete(communityId);
-    }
-  }
-
-  clearAll(): void {
-    for (const [communityId] of this.byCommunity) {
-      this.clearCommunity(communityId);
-    }
-  }
-}
+export type {
+  PlatformNexusBundle,
+  CreatePlatformNexusBundle,
+  VoiceRealtimeChannel,
+  VoiceRealtimeTransport,
+} from "@shared/core/cache/platformNexusPorts";
 
 /**
  * The single session-scoped composition root.
@@ -161,21 +120,24 @@ class MessageNexusRegistry {
 export class HavenCore {
   readonly backends: HavenBackends;
   readonly persistence: NexusPersistence;
-  readonly communities: CommunityNexus;
-  readonly channels: ChannelNexus;
-  readonly admin: CommunityAdminNexus;
-  readonly moderation: CommunityModerationNexus;
-  readonly messages: MessageNexusRegistry;
-  readonly directMessages: DirectMessageNexus;
-  readonly notifications: NotificationNexus;
-  readonly social: SocialNexus;
-  readonly permissions: PermissionsNexus;
-  readonly profiles: ProfileNexus;
-  readonly featureFlags: FeatureFlagNexus;
-  readonly onboarding: OnboardingNexus;
-  readonly voice: VoiceNexus;
+  readonly communities: CommunityNexusPort;
+  readonly channels: ChannelNexusPort;
+  readonly admin: PlatformNexusBundle["admin"];
+  readonly moderation: PlatformNexusBundle["moderation"];
+  readonly messages: CommunityMessageRegistry;
+  readonly directMessages: DirectMessageNexusPort;
+  readonly notifications: NotificationNexusPort;
+  readonly social: PlatformNexusBundle["social"];
+  readonly permissions: PlatformNexusBundle["permissions"];
+  readonly profiles: PlatformNexusBundle["profiles"];
+  readonly featureFlags: PlatformNexusBundle["featureFlags"];
+  readonly onboarding: PlatformNexusBundle["onboarding"];
+  readonly voice: PlatformNexusBundle["voice"];
 
   readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
+  readonly authStore: AuthStorePort;
+  readonly uiStore: UiStorePort;
+  readonly userStatusStore: UserStatusStorePort;
 
   private readonly phase = new BootstrapPhase();
   private realtimeUnsubscribe: (() => void) | null = null;
@@ -185,29 +147,32 @@ export class HavenCore {
   constructor(options: HavenCoreOptions) {
     this.persistence = options.persistence;
     this.backends = createHavenBackends(options.client, options.publicConfig);
-    this.viewerMessagePolicyStore = createViewerMessagePolicyStore();
+    this.authStore = options.authStore;
+    this.uiStore = options.uiStore;
+    this.userStatusStore = options.userStatusStore;
+    this.viewerMessagePolicyStore = options.viewerMessagePolicyStore;
 
-    this.communities = new CommunityNexus(options.persistence, this.backends.controlPlane);
-    this.channels = new ChannelNexus(options.persistence, this.backends.communityData);
-    this.admin = new CommunityAdminNexus(options.persistence, this.backends.controlPlane);
-    this.moderation = new CommunityModerationNexus(options.persistence, this.backends.serverModmail);
-    this.messages = new MessageNexusRegistry(
+    this.communities = options.createCommunityNexus(
+      options.persistence,
+      this.backends.controlPlane,
+    );
+    this.channels = options.createChannelNexus(
+      options.persistence,
+      this.backends.communityData,
+    );
+    this.messages = options.createMessageRegistry(
       options.persistence,
       this.viewerMessagePolicyStore,
     );
-    this.directMessages = new DirectMessageNexus(options.persistence, this.backends.directMessages);
-    this.notifications = new NotificationNexus(options.persistence, this.backends.notifications);
-    this.social = new SocialNexus(options.persistence, this.backends.social);
-    this.permissions = new PermissionsNexus(options.persistence);
-    this.profiles = new ProfileNexus(options.persistence, this.backends.controlPlane);
-    this.featureFlags = new FeatureFlagNexus(
+    this.directMessages = options.createDirectMessageNexus(
       options.persistence,
-      this.backends.controlPlane,
+      this.backends.directMessages,
     );
-    this.onboarding = new OnboardingNexus(
+    this.notifications = options.createNotificationNexus(
       options.persistence,
-      this.backends.controlPlane,
+      this.backends.notifications,
     );
+
     const voiceRealtime: VoiceRealtimeTransport = {
       channel: (topic, options) =>
         this.backends.client.channel(
@@ -219,12 +184,21 @@ export class HavenCore {
       getChannels: () =>
         this.backends.client.getChannels() as unknown as VoiceRealtimeChannel[],
     };
-    this.voice = new VoiceNexus(
-      options.persistence,
-      this.viewerMessagePolicyStore,
-      this.backends.voiceToken,
+
+    const platformNexuses = options.createPlatformNexusBundle({
+      persistence: options.persistence,
+      backends: this.backends,
+      viewerMessagePolicyStore: this.viewerMessagePolicyStore,
       voiceRealtime,
-    );
+    });
+    this.admin = platformNexuses.admin;
+    this.moderation = platformNexuses.moderation;
+    this.social = platformNexuses.social;
+    this.permissions = platformNexuses.permissions;
+    this.profiles = platformNexuses.profiles;
+    this.featureFlags = platformNexuses.featureFlags;
+    this.onboarding = platformNexuses.onboarding;
+    this.voice = platformNexuses.voice;
 
     this.messages.setBackends(this.backends);
 
@@ -241,7 +215,7 @@ export class HavenCore {
 
     // Auto-sync policy when the mod "show hidden messages" toggle changes.
     // This eliminates the need for call sites to manually invoke syncViewerMessagePolicy.
-    useUiStore.subscribe((state, prevState) => {
+    this.uiStore.subscribe((state, prevState) => {
       if (state.showHiddenMessages !== prevState.showHiddenMessages) {
         this.syncViewerMessagePolicy();
       }
@@ -337,7 +311,7 @@ export class HavenCore {
     const activeCommunityId =
       communityId ?? this.communities.getActiveId() ?? null;
     const hiddenAuthorIds = this.social.getHiddenAuthorIdsForViewer();
-    const showHiddenMessages = useUiStore.getState().showHiddenMessages;
+    const showHiddenMessages = this.uiStore.getState().showHiddenMessages;
 
     const prev = this.viewerMessagePolicyStore.getState();
     const prevCommunities = prev.communities;
@@ -471,7 +445,7 @@ export class HavenCore {
     this.viewerMessagePolicyStore.setState(
       createDefaultViewerMessagePolicyState(),
     );
-    useUiStore.getState().reset();
+    this.uiStore.getState().reset();
     this.phase.set("idle");
   }
 

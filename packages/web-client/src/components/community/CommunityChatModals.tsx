@@ -10,7 +10,7 @@ import { ChannelSettingsModal } from "@web-client/components/community/ChannelSe
 import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 import { useChatAppModalUiState } from "@web-client/chat-app/modals/chatAppModalUiState";
 import { useHavenCore, toChannel } from "@shared/core";
-import { useChannels } from "@react-bindings";
+import { useChannels } from "@mobile-data/hooks";
 import { getPlatformInviteBaseUrl } from "@platform/urls";
 
 type CommunityChatModalsProps = {

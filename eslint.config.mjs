@@ -41,7 +41,7 @@ const rendererBoundaryRestrictions = [
 const havenCoreDeprecatedImports = [
   {
     group: [
-      "@shared/stores/navigationStore",
+      "@mobile-data/session/navigationStore",
       "**/stores/navigationStore",
       "@shared/features/community/hooks/useCommunityWorkspace",
       "**/useCommunityWorkspace",

@@ -5,11 +5,11 @@ import {
   resetHavenCore,
 } from '@shared/core';
 import type { HavenCore } from '@shared/core/HavenCore';
-import { ChannelNexus } from '@shared/nexus/community/ChannelNexus';
-import { CommunityAdminNexus } from '@shared/nexus/community/CommunityAdminNexus';
-import { CommunityNexus } from '@shared/nexus/community/CommunityNexus';
+import { ChannelNexus } from '@mobile-data/channels/ChannelNexus';
+import { CommunityAdminNexus } from '@mobile-data/community/CommunityAdminNexus';
+import { CommunityNexus } from '@mobile-data/communities/CommunityNexus';
 import type { Channel, ServerRoleItem } from '@shared/lib/backend/types';
-import { useAuthStore } from '@shared/stores/authStore';
+import { useAuthStore, useUiStore } from '@mobile-data/session';
 
 const textChannel = (overrides: Partial<Channel> = {}): Channel =>
   ({
@@ -46,6 +46,8 @@ describe('CommunityAdminNexus', () => {
     registerHavenCore({
       communities,
       channels,
+      authStore: useAuthStore,
+      uiStore: useUiStore,
       permissions: {
         getPermissions: () => ({ canManageInvites: true }),
       },

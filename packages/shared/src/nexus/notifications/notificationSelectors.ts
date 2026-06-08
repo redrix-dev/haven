@@ -1,4 +1,4 @@
-import type { NotificationNexusState } from './NotificationNexus'
+import type { NotificationNexusState } from './notificationTypes'
 import type {
   NotificationCounts,
   NotificationItem,
@@ -8,7 +8,7 @@ import type {
 /**
  * Pure, framework-agnostic projections + equality fns for the notification
  * store. Single source of truth for "which slice + how to compare", consumed by
- * both `@react-bindings` and `@solid-bindings`. Memoization lives in the adapters.
+ * both `@mobile-data/hooks` and `@solid-bindings`. Memoization lives in the adapters.
  */
 
 const EMPTY_NOTIFICATIONS: NotificationItem[] = []

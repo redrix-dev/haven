@@ -6,8 +6,8 @@ import { getErrorMessage } from "@platform/lib/errors";
 import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 import { useLiveKitVoiceSession } from "@web-client/features/voice/useLiveKitVoiceSession";
 import { useHavenCore } from "@shared/core";
-import { useActiveCommunityId } from "@react-bindings";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useActiveCommunityId } from "@mobile-data/hooks";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import {
   filterBlockedUsersFromParticipantList,
   filterBlockedUsersFromParticipantRecord,

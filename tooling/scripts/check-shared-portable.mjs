@@ -2,11 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * CI guardrail: portable `packages/shared` must not reintroduce the old
- * import-time Supabase singleton or direct public Supabase env reads.
+ * CI guardrail: portable `packages/shared` must stay framework-free.
  *
- * Broader DOM/Radix eviction is tracked manually; this script enforces the
- * data-plane boundary that Metro/Vitest rely on.
+ * Enforces:
+ * - no deprecated Supabase singleton / direct env reads
+ * - no react / solid-js / react-flavored zustand anywhere in shared (except
+ *   documented host-layer exclusions still being relocated)
+ * - browser-global and web-only imports in portable logic paths
  */
 const sharedRoot = path.join("packages", "shared", "src");
 const bannedSingletonFile = path.join("packages", "shared", "src", "lib", "supabase.ts");
@@ -30,23 +32,16 @@ const portablePathExclusions = [
   /^packages\/shared\/src\/app\/hooks\/useDesktopSettings\.ts$/,
 ];
 
-/**
- * Core modules that have completed the zero-React conversion (Phase 2 shared-core
- * hardening). These must not import any UI framework or the React-flavored zustand
- * entries — reactivity lives in the binding packages. `zustand/vanilla` is allowed.
- *
- * Append each file as its per-domain loop lands so finished work can't regress.
- */
-const reactFreeCoreChecks = [
-  /^packages\/shared\/src\/nexus\/community\/ChannelNexus\.ts$/,
-  /^packages\/shared\/src\/nexus\/community\/channelSelectors\.ts$/,
-  /^packages\/shared\/src\/nexus\/community\/CommunityNexus\.ts$/,
-  /^packages\/shared\/src\/nexus\/community\/communitySelectors\.ts$/,
-  /^packages\/shared\/src\/nexus\/direct-messages\/DirectMessageNexus\.ts$/,
-  /^packages\/shared\/src\/nexus\/direct-messages\/dmSelectors\.ts$/,
-  /^packages\/shared\/src\/nexus\/notifications\/NotificationNexus\.ts$/,
-  /^packages\/shared\/src\/nexus\/notifications\/notificationSelectors\.ts$/,
+/** Host-layer files still in shared during cleave — remove as each relocates. */
+const frameworkImportExclusions = [
+  /^packages\/shared\/src\/contexts\/.+\.(?:ts|tsx)$/,
+  /^packages\/shared\/src\/features\/.+\/hooks\/.+\.(?:ts|tsx)$/,
+  /^packages\/shared\/src\/core\/useHavenCore\.ts$/,
+  /^packages\/shared\/src\/debug\/useDataCacheComponentProbe\.ts$/,
+  /^packages\/shared\/src\/nexus\/Nexus\.ts$/,
+  /^packages\/shared\/src\/nexus\/__tests__\/.+\.(?:ts|tsx)$/,
 ];
+
 const frameworkImportRe =
   /\bfrom\s+["'](?:react|react-dom|solid-js|zustand|zustand\/traditional|zustand\/react)["']/;
 
@@ -80,15 +75,15 @@ for (const file of walk(sharedRoot)) {
   const shouldCheckPortablePath = portablePathChecks.some((pattern) =>
     pattern.test(rel),
   ) && !portablePathExclusions.some((pattern) => pattern.test(rel));
-  const shouldCheckReactFree = reactFreeCoreChecks.some((pattern) =>
+  const shouldCheckFrameworkImports = !frameworkImportExclusions.some((pattern) =>
     pattern.test(rel),
   );
   const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((rawLine, i) => {
     const line = stripComments(rawLine);
-    if (shouldCheckReactFree && frameworkImportRe.test(line)) {
+    if (shouldCheckFrameworkImports && frameworkImportRe.test(line)) {
       violations.push(
-        `${rel}:${i + 1}: framework import in zero-React core module (reactivity belongs in @react-bindings/@solid-bindings; use zustand/vanilla)`,
+        `${rel}:${i + 1}: framework import in packages/shared (reactivity belongs in platform data layers; use zustand/vanilla in shared only if unavoidable)`,
       );
     }
     if (importSupabaseRe.test(line)) {

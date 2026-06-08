@@ -13,9 +13,9 @@ import {
   useActiveCommunityId,
   useChannels,
   useChannelsLoading,
-} from "@react-bindings";
-import { useUiStore } from "@shared/stores/uiStore";
-import { useUserStatusStore } from "@shared/stores/userStatusStore";
+} from "@mobile-data/hooks";
+import { useUiStore } from "@mobile-data/session/uiStore";
+import { useUserStatusStore } from "@mobile-data/session/userStatusStore";
 import type { MessageReportKind, MessageReportTarget } from "@shared/lib/backend/types";
 
 type CommunityWorkspaceShellProps = {

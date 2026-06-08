@@ -5,6 +5,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import { createHavenCore, createMemoryPersistence } from '@shared/core';
+import { createReactHavenCoreOptions } from '@mobile-data/createReactHavenCore';
 import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppRoot } from '@web-client/AppRoot';
@@ -34,11 +35,13 @@ const havenWebClient = createHavenSupabaseClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 bootLogger.mark('supabase-client-created');
-createHavenCore({
-  client: havenWebClient,
-  publicConfig: { supabaseUrl, supabaseAnonKey },
-  persistence: createMemoryPersistence(),
-});
+createHavenCore(
+  createReactHavenCoreOptions({
+    client: havenWebClient,
+    publicConfig: { supabaseUrl, supabaseAnonKey },
+    persistence: createMemoryPersistence(),
+  }),
+);
 bootLogger.mark('core-created');
 
 document.documentElement.classList.add('haven-web-shell');

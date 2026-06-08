@@ -12,14 +12,14 @@ import {
   ChatAppSessionProvider,
   useChatAppSession,
 } from "@web-client/chat-app/ChatAppSession";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import { useHavenCore, toServerSummaries } from "@shared/core";
 import {
   useActiveCommunityId,
   useDmConversations,
   useNotificationCounts,
   useOrderedCommunities,
-} from "@react-bindings";
+} from "@mobile-data/hooks";
 
 function ChatAppInner() {
   const app = useChatAppSession();

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import { ChannelNexus } from '@shared/nexus/community/ChannelNexus';
-import { CommunityNexus } from '@shared/nexus/community/CommunityNexus';
+import { ChannelNexus } from '@mobile-data/channels/ChannelNexus';
+import { CommunityNexus } from '@mobile-data/communities/CommunityNexus';
 import type {
   Channel,
   ChannelGroupState,

@@ -1,5 +1,5 @@
 import { dataCacheDebug, instrumentZustandStore } from "@shared/debug";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 
 let bootstrapped = false;
 

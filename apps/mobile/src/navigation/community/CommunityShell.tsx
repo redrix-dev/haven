@@ -12,7 +12,7 @@ import {
   useChannels,
   useCommunitiesLoading,
   useOrderedCommunities,
-} from "@react-bindings";
+} from "@mobile-data/hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackHandler, View } from "react-native";
 import { CommunityChatScreen } from "@/screens/main/CommunityChatScreen";
@@ -24,10 +24,10 @@ import { useDataCacheComponentProbe } from "@shared/debug";
 import { CommunityRail } from "./CommunityRail";
 import { CommunityActionSheets } from "./CommunityActionSheets";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
 import { HavenShell, type HavenShellHandle } from "@/navigation/HavenShell";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import { DmInboxDrawer } from "@/features/direct-messages/DmInboxDrawer";
 import { DmChatSurface } from "@/features/direct-messages/DmChatSurface";
 import { DmTopBar } from "@/features/direct-messages/DmTopBar";

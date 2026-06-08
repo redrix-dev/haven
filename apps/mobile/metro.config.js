@@ -9,22 +9,14 @@ const monorepoRoot = path.resolve(projectRoot, "../..");
 const mobileNodeModules = path.resolve(projectRoot, "node_modules");
 const sharedPackageRoot = path.resolve(monorepoRoot, "packages/shared");
 const webClientPackageRoot = path.resolve(monorepoRoot, "packages/web-client");
-const reactBindingsPackageRoot = path.resolve(
-  monorepoRoot,
-  "packages/react-bindings",
-);
 const sharedSrcRoot = path.join(sharedPackageRoot, "src");
 const webClientAppUiRoot = path.join(webClientPackageRoot, "src", "app-ui");
-const reactBindingsSrcRoot = path.join(reactBindingsPackageRoot, "src");
 const mobileSrcRoot = path.join(projectRoot, "src");
+const mobileDataRoot = path.join(mobileSrcRoot, "data");
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [
-  sharedPackageRoot,
-  webClientPackageRoot,
-  reactBindingsPackageRoot,
-];
+config.watchFolders = [sharedPackageRoot, webClientPackageRoot];
 config.resolver.nodeModulesPaths = [
   mobileNodeModules,
   path.resolve(monorepoRoot, "node_modules"),
@@ -69,14 +61,14 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
   }
 
-  if (moduleName === "@react-bindings" || moduleName.startsWith("@react-bindings/")) {
+  if (moduleName === "@mobile-data" || moduleName.startsWith("@mobile-data/")) {
     const sub =
-      moduleName === "@react-bindings"
+      moduleName === "@mobile-data"
         ? ""
-        : moduleName.slice("@react-bindings/".length);
+        : moduleName.slice("@mobile-data/".length);
     const absolutePath = sub
-      ? path.join(reactBindingsSrcRoot, sub)
-      : reactBindingsSrcRoot;
+      ? path.join(mobileDataRoot, sub)
+      : mobileDataRoot;
     return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
   }
 

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { execFileSync } from 'node:child_process';
 import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import { createHavenCore, createMemoryPersistence } from '@shared/core';
+import { createReactHavenCoreOptions } from '@mobile-data/createReactHavenCore';
 import type { Database } from '@shared/types/database';
 import { loadBootstrappedTestUsers, type TestUserKey } from '../fixtures/users';
 
@@ -36,14 +37,16 @@ export const supabase = createHavenSupabaseClient(localSupabaseEnv.url, localSup
   },
 });
 
-createHavenCore({
-  client: supabase,
-  publicConfig: {
-    supabaseUrl: localSupabaseEnv.url,
-    supabaseAnonKey: localSupabaseEnv.anonKey,
-  },
-  persistence: createMemoryPersistence(),
-});
+createHavenCore(
+  createReactHavenCoreOptions({
+    client: supabase,
+    publicConfig: {
+      supabaseUrl: localSupabaseEnv.url,
+      supabaseAnonKey: localSupabaseEnv.anonKey,
+    },
+    persistence: createMemoryPersistence(),
+  }),
+);
 
 export async function signInAsTestUser(userKey: TestUserKey) {
   const users = loadBootstrappedTestUsers();

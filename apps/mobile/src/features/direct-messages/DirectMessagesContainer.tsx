@@ -45,8 +45,8 @@ import {
   useDmConversationsLoading,
   useDmMessages,
   useDmMessagesLoading,
-} from "@react-bindings";
-import { useAuthStore } from "@shared/stores/authStore";
+} from "@mobile-data/hooks";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";

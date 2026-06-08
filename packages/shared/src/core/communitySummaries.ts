@@ -1,4 +1,4 @@
-import type { Community } from "@shared/nexus/community/CommunityNexus";
+import type { Community } from "@shared/nexus/community/communityTypes";
 import type { ServerSummary } from "@shared/lib/backend/types";
 
 export const toServerSummary = (community: Community): ServerSummary => ({

@@ -1,0 +1,1 @@
+export { VoiceSolidCache } from "./voiceSolidCache";

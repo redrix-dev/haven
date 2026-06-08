@@ -12,8 +12,8 @@
     "types": ["vite/client"],
     "paths": {
       "@solid-client/*": ["../../packages/solid-client/src/*"],
-      "@solid-bindings": ["../../packages/solid-bindings/src"],
-      "@solid-bindings/*": ["../../packages/solid-bindings/src/*"],
+      "@mobile-data": ["../../apps/mobile/src/data"],
+      "@mobile-data/*": ["../../apps/mobile/src/data/*"],
       "@shared": ["../../packages/shared/src"],
       "@shared/*": ["../../packages/shared/src/*"]
     }
@@ -21,7 +21,6 @@
   "include": [
     "src",
     "../../packages/solid-client/src",
-    "../../packages/solid-bindings/src",
     "vite.config.ts"
   ]
 }

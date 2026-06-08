@@ -10,7 +10,7 @@ import {
   useCommunities,
   useDmConversations,
   useDmConversationsLoading,
-} from "@react-bindings";
+} from "@mobile-data/hooks";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import type { DirectMessageConversationSummary, FriendSummary } from "@shared/lib/backend/types";

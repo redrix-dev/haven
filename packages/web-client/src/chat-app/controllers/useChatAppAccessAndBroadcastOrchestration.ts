@@ -9,7 +9,7 @@ import type {
   ServerSummary,
 } from "@shared/lib/backend/types";
 import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 
 type VoiceChannelLike = { id: string; community_id: string } | null;
 

@@ -1,8 +1,15 @@
 # Shared-core audit (Step 3a — the fine-tooth comb)
 
-Living inventory of `packages/shared/src` feeding **Step 3 — Shared-core hardening** of the
-[Tauri/Solid roadmap](./tauri-solid-roadmap.md). Goal: know exactly what's framework-coupled
-(must decouple for Tauri/Solid), what's structurally crufty (hygiene, defer), and what's fine.
+> **⚠️ PARTIALLY SUPERSEDED by THE CLEAVE (2026-06-08).** Read
+> [`solid-migration-handoff.md`](./solid-migration-handoff.md) §0 first. This file is still useful
+> as the **catalog of what's in `packages/shared` today** — but its disposition framing ("decouple
+> for Tauri/Solid" = make it framework-neutral + add adapters) is the *old* approach. Re-read each
+> entry through the handoff's §0.4 test instead: **is it logic (→ stays in pure `shared`) or a cache
+> (→ moves to a per-platform data layer)?** "🔧 decouple" entries are mostly *caches* that should
+> **leave** `shared` for a platform, not become framework-neutral in place.
+
+Living inventory of `packages/shared/src`. Goal: know exactly what's framework-coupled,
+what's structurally crufty (hygiene, defer), and what's fine.
 
 **Disposition legend**
 - ✅ **fine as-is** — leave it

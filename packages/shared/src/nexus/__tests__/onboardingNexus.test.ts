@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import { OnboardingNexus } from '@shared/nexus/onboarding/OnboardingNexus';
+import { OnboardingNexus } from '@mobile-data/onboarding/OnboardingNexus';
 import type { OnboardingClientContext } from '@shared/lib/backend/types';
 
 const context: OnboardingClientContext = {

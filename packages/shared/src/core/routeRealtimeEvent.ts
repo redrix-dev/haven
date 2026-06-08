@@ -1,4 +1,5 @@
 import type { HavenCore } from "./HavenCore";
+import { buildPartialMessageFromRealtimePayload } from "@shared/features/messaging/logic/realtimePartialMessage";
 import { mapLiveProfileIdentity } from "@shared/lib/backend/controlPlaneBackend";
 import type { MessageBundle, ReportStatusUpdatedBroadcastPayload } from "@shared/lib/backend/types";
 import {
@@ -30,22 +31,12 @@ export type RealtimeMessageSyncEvent = {
   message?: MessageBundle;
 };
 
-const normalizeCreatedAt = (value: unknown): string | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const ms = Date.parse(trimmed);
-  if (!Number.isFinite(ms)) return null;
-  return new Date(ms).toISOString();
-};
-
 export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
   switch (evt.type) {
     case "MESSAGE_INSERT": {
       const communityId = evt.payload.community_id;
       const channelId = evt.payload.channel_id;
       const messageId = evt.payload.message_id;
-      const createdAt = evt.payload.created_at;
       if (
         typeof communityId !== "string" ||
         typeof channelId !== "string" ||
@@ -55,38 +46,11 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
 
       const nexus = core.messages.for(communityId);
 
-      const partial: MessageBundle = {
-        id: messageId,
+      const partial = buildPartialMessageFromRealtimePayload({
+        messageId,
         channelId,
-        authorUserId:
-          typeof evt.payload.author_user_id === "string"
-            ? evt.payload.author_user_id
-            : null,
-        content:
-          typeof evt.payload.content === "string" ? evt.payload.content : "",
-        metadata:
-          typeof evt.payload.metadata === "object" && evt.payload.metadata !== null
-            ? (evt.payload.metadata as Record<string, unknown>)
-            : {},
-        createdAt: normalizeCreatedAt(createdAt) ?? new Date().toISOString(),
-        editedAt: null,
-        deletedAt:
-          typeof evt.payload.deleted_at === "string" &&
-          evt.payload.deleted_at.trim()
-            ? evt.payload.deleted_at
-            : null,
-        isHidden:
-          typeof evt.payload.is_hidden === "boolean"
-            ? evt.payload.is_hidden
-            : false,
-        displayName: "…",
-        avatarSnapshotUrl: null,
-        isPlatformStaff: false,
-        replyToMessageId: null,
-        reactions: [],
-        attachment: null,
-        linkPreview: null,
-      } as MessageBundle;
+        payload: evt.payload,
+      });
 
       nexus.insertMessage(partial);
 

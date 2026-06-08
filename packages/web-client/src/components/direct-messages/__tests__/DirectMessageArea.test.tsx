@@ -16,7 +16,7 @@ import {
   resetHavenCore,
 } from "@shared/core";
 import type { HavenCore } from "@shared/core/HavenCore";
-import { ProfileNexus } from "@shared/nexus/profile/ProfileNexus";
+import { ProfileNexus } from "@mobile-data/profile/ProfileNexus";
 import type {
   DirectMessage,
   DirectMessageConversationSummary,

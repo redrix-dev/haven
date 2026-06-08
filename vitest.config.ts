@@ -20,6 +20,7 @@ const conditionalReporters = markdownOutputFile
 
 export default defineConfig({
   resolve: {
+    dedupe: ["react", "react-dom"],
     // Array form so we can match `solid-js` exactly (regex) without also
     // catching `solid-js/store` etc. Order matters: most-specific first.
     alias: [
@@ -35,8 +36,14 @@ export default defineConfig({
       { find: '@electron', replacement: path.resolve(__dirname, 'apps/electron/src') },
       { find: '@web', replacement: path.resolve(__dirname, 'apps/web/src') },
       { find: '@web-client', replacement: path.resolve(__dirname, 'packages/web-client/src') },
-      { find: '@react-bindings', replacement: path.resolve(__dirname, 'packages/react-bindings/src') },
-      { find: '@solid-bindings', replacement: path.resolve(__dirname, 'packages/solid-bindings/src') },
+      { find: '@mobile-data', replacement: path.resolve(__dirname, 'apps/mobile/src/data') },
+      { find: /^@mobile-data\/(.*)/, replacement: path.resolve(__dirname, 'apps/mobile/src/data/$1') },
+      { find: 'react', replacement: path.resolve(__dirname, 'node_modules/react') },
+      { find: 'react-dom', replacement: path.resolve(__dirname, 'node_modules/react-dom') },
+      { find: 'zustand/traditional', replacement: path.resolve(__dirname, 'node_modules/zustand/traditional') },
+      { find: 'zustand', replacement: path.resolve(__dirname, 'node_modules/zustand') },
+      { find: 'use-sync-external-store/shim/with-selector', replacement: path.resolve(__dirname, 'node_modules/use-sync-external-store/shim/with-selector') },
+      { find: '@solid-client', replacement: path.resolve(__dirname, 'packages/solid-client/src') },
       { find: '@shared/app/ui', replacement: path.resolve(__dirname, 'packages/web-client/src/app-ui') },
       { find: '@shared', replacement: path.resolve(__dirname, 'packages/shared/src') },
       { find: '@client', replacement: path.resolve(__dirname, 'packages/shared/src/client') },

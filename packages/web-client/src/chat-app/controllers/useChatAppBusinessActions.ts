@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { getErrorMessage } from "@platform/lib/errors";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { requireHavenCore } from "@shared/core";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import type {
   BanEligibleServer,
   MessageAttachment,

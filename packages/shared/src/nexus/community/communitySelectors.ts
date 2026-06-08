@@ -1,9 +1,9 @@
-import type { Community, CommunityNexusState } from './CommunityNexus'
+import type { Community, CommunityNexusState } from './communityTypes'
 
 /**
  * Pure, framework-agnostic projections + equality fns for the community store.
  * Single source of truth for "which slice + how to compare", consumed by both
- * `@react-bindings` and `@solid-bindings`. Memoization lives in the adapters.
+ * `@mobile-data/hooks` and `@solid-bindings`. Memoization lives in the adapters.
  *
  * `applyCommunityDisplayOrder` (the display-order projection used by
  * `useOrderedCommunities`) deliberately stays in `@shared/core/communityDisplayOrder`

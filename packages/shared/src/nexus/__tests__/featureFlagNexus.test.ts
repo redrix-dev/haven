@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import { FeatureFlagNexus } from '@shared/nexus/feature-flags/FeatureFlagNexus';
+import { FeatureFlagNexus } from '@mobile-data/feature-flags/FeatureFlagNexus';
 
 describe('FeatureFlagNexus', () => {
   it('loads feature flags and exposes flag checks', async () => {

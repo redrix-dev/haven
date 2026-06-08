@@ -5,7 +5,7 @@ import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHavenCore } from "@shared/core";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
 import { ThemeVisualPickerCard } from "@/features/user-profile/ThemeVisualPickerCard";

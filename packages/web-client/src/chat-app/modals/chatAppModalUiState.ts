@@ -1,7 +1,7 @@
 import React from "react";
 import { useHavenCore } from "@shared/core";
-import { useActiveChannelId, useActiveCommunityId } from "@react-bindings";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useActiveChannelId, useActiveCommunityId } from "@mobile-data/hooks";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import { getPendingUiConfirmationCopy } from "@web-client/ui-confirmations";
 
 export function useChatAppModalUiState() {

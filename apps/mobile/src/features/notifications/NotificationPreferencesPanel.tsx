@@ -10,7 +10,7 @@ import {
   useNotificationPreferences,
   useNotificationPreferencesLoading,
   useNotificationPreferencesSaving,
-} from "@react-bindings";
+} from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 

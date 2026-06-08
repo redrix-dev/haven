@@ -4,7 +4,7 @@ import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { requireHavenCore } from "@shared/core";
 import type { Channel } from "@shared/lib/backend/types";
 import type { ServerSummary } from "@shared/lib/backend/types";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 
 type ChannelGroupStateGroups = ReadonlyArray<{ id: string; name: string }>;
 

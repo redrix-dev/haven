@@ -1,5 +1,4 @@
-import { create } from "zustand";
-import type { StoreApi, UseBoundStore } from "zustand";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 
 /** v1: block visibility only. v2 expands via community-keyed buckets. */
 export type ViewerMessagePolicyState = {
@@ -17,10 +16,6 @@ export type ViewerMessagePolicyState = {
   >;
 };
 
-export type ViewerMessagePolicyStore = UseBoundStore<
-  StoreApi<ViewerMessagePolicyState>
->;
-
 const EMPTY_HIDDEN = new Set<string>() as ReadonlySet<string>;
 
 export const createDefaultViewerMessagePolicyState =
@@ -30,11 +25,14 @@ export const createDefaultViewerMessagePolicyState =
     communities: {},
   });
 
-export function createViewerMessagePolicyStore(): ViewerMessagePolicyStore {
-  return create<ViewerMessagePolicyState>()(() =>
-    createDefaultViewerMessagePolicyState(),
-  );
-}
+/** Reactive store handle — implementation lives in platform data layers. */
+export type ViewerMessagePolicyStore = ReadableStore<ViewerMessagePolicyState> & {
+  setState: (
+    partial:
+      | Partial<ViewerMessagePolicyState>
+      | ((state: ViewerMessagePolicyState) => Partial<ViewerMessagePolicyState>),
+  ) => void;
+};
 
 const hiddenAuthorIdsEqual = (
   a: ReadonlySet<string>,

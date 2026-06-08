@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import { ProfileNexus } from '@shared/nexus/profile/ProfileNexus';
+import { ProfileNexus } from '@mobile-data/profile/ProfileNexus';
 
 describe('ProfileNexus', () => {
   it('loads the viewer profile and mirrors it into live profile identity state', async () => {

@@ -30,7 +30,7 @@ import { ThemedIonicons } from "@/theme-rn";
 import { useFloatingDmPlaceholderChannels } from "@/theme-rn/useFloatingDmPlaceholderChannels";
 import { useDmBubbleSheetChrome } from "@/theme-rn/useDmBubbleSheetChrome";
 import { useHavenCore } from "@shared/core";
-import { useCommunities } from "@react-bindings";
+import { useCommunities } from "@mobile-data/hooks";
 
 export type {
   FloatingDmBubbleIconName,

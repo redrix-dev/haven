@@ -33,7 +33,7 @@ import {
   DropdownMenuRadioItem,
 } from "@shared/app/ui/dropdown-menu";
 import { useHavenCore } from "@shared/core";
-import { useActiveChannelId } from "@react-bindings";
+import { useActiveChannelId } from "@mobile-data/hooks";
 const SIDEBAR_BASE_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 640;
 const SIDEBAR_WIDTH_STORAGE_KEY = "haven:sidebar-width";

@@ -38,8 +38,8 @@ import {
   useDmConversations,
   useDmMessages,
   useDmMessagesLoading,
-} from "@react-bindings";
-import { useAuthStore } from "@shared/stores/authStore";
+} from "@mobile-data/hooks";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
 import { MessageImageAttachment } from "@/features/media/MessageImageAttachment";

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import { SocialNexus } from '@shared/nexus/social/SocialNexus';
+import { SocialNexus } from '@mobile-data/social/SocialNexus';
 import { DEFAULT_SOCIAL_COUNTS } from '@shared/infrastructure/constants';
 
 const makeBackend = (overrides: Record<string, unknown> = {}) =>

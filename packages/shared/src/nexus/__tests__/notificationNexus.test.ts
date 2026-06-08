@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import { NotificationNexus } from '@shared/nexus/notifications/NotificationNexus';
+import { NotificationNexus } from '@mobile-data/notifications/NotificationNexus';
 import type { NotificationItem } from '@shared/lib/backend/types';
 
 const item = (overrides: Partial<NotificationItem> = {}): NotificationItem =>

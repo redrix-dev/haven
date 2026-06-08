@@ -31,13 +31,13 @@ import {
   useDmConversations,
   useNotifications,
   useOrderedCommunities,
-} from "@react-bindings";
+} from "@mobile-data/hooks";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
 import UserProfileModal, {
   type UserProfileModalTarget,
 } from "@/features/user-profile/UserProfileModal";
-import { useUiStore } from "@shared/stores/uiStore";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
 import type { NotificationAudioSettings } from "@shared/types/settings";
 import { useVoice } from "@shared/features/voice/hooks/useVoice";

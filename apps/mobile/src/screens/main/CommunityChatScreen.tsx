@@ -3,8 +3,8 @@ import { ActivityIndicator, Alert, Keyboard, Platform, Text, View } from "react-
 import Animated, { FadeIn } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
 import { type EnrichedMarkdownTextInputInstance } from "react-native-enriched-markdown";
-import { useAuthStore } from "@shared/stores/authStore";
-import { useUserStatusStore } from "@shared/stores/userStatusStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
+import { useUserStatusStore } from "@mobile-data/session/userStatusStore";
 import {
   deriveCommunitiesLoadStatus,
   toChannel,
@@ -19,7 +19,7 @@ import {
   useCommunities,
   useCommunitiesLoadError,
   useCommunitiesLoading,
-} from "@react-bindings";
+} from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   buildChatListItemsFromChatMessages,
@@ -51,6 +51,7 @@ import {
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
 import { useDataCacheComponentProbe } from "@shared/debug";
+import type { CommunityMessageCache } from "@mobile-data/messages/CommunityMessageCache";
 
 type CommunityChatScreenProps = {
   serverId: string;
@@ -73,7 +74,9 @@ export function CommunityChatScreen({
   const user = useAuthStore((state) => state.user);
   const communityId = useActiveCommunityId(core.communities) ?? serverId;
   const navigationChannelId = useActiveChannelId(core.channels);
-  const messageNexus = core.messages.for(communityId ?? "__none__");
+  const messageNexus = core.messages.for(
+    communityId ?? "__none__",
+  ) as CommunityMessageCache;
   const currentUserId = user?.id ?? null;
   const currentUserPlatformStaff = core.profiles.usePlatformStaff(currentUserId);
   const nexusCommunities = useCommunities(core.communities);

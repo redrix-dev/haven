@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import { CommunityMessageNexus } from '@shared/nexus/community/CommunityMessageNexus';
+import { CommunityMessageCache as CommunityMessageNexus } from '@mobile-data/messages/CommunityMessageCache';
 import type { MessageBundle } from '@shared/lib/backend/types';
 
 const bundle = (overrides: Partial<MessageBundle>): MessageBundle =>

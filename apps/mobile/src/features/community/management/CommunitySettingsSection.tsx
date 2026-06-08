@@ -23,7 +23,7 @@ import type {
   ServerRoleItem,
 } from "@shared/lib/backend/types";
 import { useHavenCore } from "@shared/core";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 import {

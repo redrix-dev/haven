@@ -1,6 +1,6 @@
 import React from "react";
 import { useHavenCore } from "@shared/core";
-import { useNotifications, useNotificationsLoading } from "@react-bindings";
+import { useNotifications, useNotificationsLoading } from "@mobile-data/hooks";
 import {
   Avatar,
   AvatarFallback,

@@ -13,7 +13,7 @@ import {
   useActiveDmConversationId,
   useDmConversations,
   useDmConversationsLoading,
-} from "@react-bindings";
+} from "@mobile-data/hooks";
 import { DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT } from "@shared/lib/backend/directMessageUtils";
 import {
   resolveLiveAvatarUrl,

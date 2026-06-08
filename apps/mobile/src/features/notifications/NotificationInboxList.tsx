@@ -24,7 +24,7 @@ import {
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
 import { useHavenCore } from "@shared/core";
-import { useNotifications, useNotificationsLoading } from "@react-bindings";
+import { useNotifications, useNotificationsLoading } from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 

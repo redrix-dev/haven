@@ -1,23 +1,37 @@
 export { Nexus } from "./Nexus";
 export type { NexusEntry, NexusState } from "./Nexus";
-export { CommunityMessageNexus } from "./community/CommunityMessageNexus";
-export type { ChannelMeta } from "./community/CommunityMessageNexus";
-export { CommunityNexus } from "./community/CommunityNexus";
-export type { Community } from "./community/CommunityNexus";
-export { ChannelNexus } from "./community/ChannelNexus";
-export type { HavenChannel } from "./community/ChannelNexus";
-export { CommunityAdminNexus } from "./community/CommunityAdminNexus";
+export type { ChannelMeta } from "@shared/features/messaging/logic/types";
+export type { Community, CommunityNexusState } from "./community/communityTypes";
+export type { HavenChannel, ChannelNexusState } from "./community/channelTypes";
 export type {
+  DmComposeDraftPeer,
+  DirectMessageNexusState,
+} from "./direct-messages/dmTypes";
+export type { NotificationNexusState } from "./notifications/notificationTypes";
+
+export type { FeatureFlagNexus, FeatureFlagNexusState } from "@mobile-data/feature-flags";
+export type { OnboardingNexus, OnboardingNexusState } from "@mobile-data/onboarding";
+export type { PermissionsNexus, PermissionsNexusState } from "@mobile-data/permissions";
+export type { ProfileNexus, ProfileNexusState, ViewerProfileUpdateInput } from "@mobile-data/profile";
+export type { SocialNexus, SocialNexusState } from "@mobile-data/social";
+export type {
+  CommunityAdminNexus,
   CommunityAdminNexusState,
   CommunityAdminMembersModalState,
   CommunityAdminServerPanelState,
   CommunityAdminChannelPermissionsState,
-} from "./community/CommunityAdminNexus";
-export { DirectMessageNexus } from "./direct-messages/DirectMessageNexus";
-export type { DirectMessageNexusState } from "./direct-messages/DirectMessageNexus";
-export { NotificationNexus } from "./notifications/NotificationNexus";
-export type { NotificationNexusState } from "./notifications/NotificationNexus";
-export { FeatureFlagNexus } from "./feature-flags/FeatureFlagNexus";
-export type { FeatureFlagNexusState } from "./feature-flags/FeatureFlagNexus";
-export { OnboardingNexus } from "./onboarding/OnboardingNexus";
-export type { OnboardingNexusState } from "./onboarding/OnboardingNexus";
+  CommunityModerationNexus,
+} from "@mobile-data/community";
+export type {
+  VoiceNexus,
+  VoiceNexusState,
+  VoiceConnectionPhase,
+  VoiceRealtimeChannel,
+  VoiceRealtimeTransport,
+} from "@mobile-data/voice";
+export type {
+  CommunityNexus,
+} from "@mobile-data/communities";
+export type { ChannelNexus } from "@mobile-data/channels";
+export type { DirectMessageNexus } from "@mobile-data/direct-messages";
+export type { NotificationNexus } from "@mobile-data/notifications";

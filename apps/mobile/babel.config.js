@@ -18,10 +18,7 @@ module.exports = function (api) {
               "../../packages/web-client/src/app-ui",
             ),
             "@shared": path.resolve(__dirname, "../../packages/shared/src"),
-            "@react-bindings": path.resolve(
-              __dirname,
-              "../../packages/react-bindings/src",
-            ),
+            "@mobile-data": path.resolve(__dirname, "./src/data"),
             "@platform": path.resolve(
               __dirname,
               "../../packages/shared/src/platform",

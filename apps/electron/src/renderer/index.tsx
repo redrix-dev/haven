@@ -5,6 +5,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
 import { createHavenCore, createMemoryPersistence } from '@shared/core';
+import { createReactHavenCoreOptions } from '@mobile-data/createReactHavenCore';
 import { TooltipProvider } from '@shared/app/ui/tooltip';
 import { Toaster as SonnerToaster } from 'sonner';
 import { registerElectronAppHost } from './registerElectronAppHost';
@@ -36,11 +37,13 @@ const havenElectronClient = createHavenSupabaseClient(supabaseUrl, supabaseAnonK
     detectSessionInUrl: false,
   },
 });
-createHavenCore({
-  client: havenElectronClient,
-  publicConfig: { supabaseUrl, supabaseAnonKey },
-  persistence: createMemoryPersistence(),
-});
+createHavenCore(
+  createReactHavenCoreOptions({
+    client: havenElectronClient,
+    publicConfig: { supabaseUrl, supabaseAnonKey },
+    persistence: createMemoryPersistence(),
+  }),
+);
 bootLogger.mark('core-created');
 
 bootLogger.mark('react-render-start');

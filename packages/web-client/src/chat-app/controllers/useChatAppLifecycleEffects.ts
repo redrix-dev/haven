@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { installPromptTrap } from "@shared/infrastructure/contextMenu/debugTrace";
 import { requireHavenCore } from "@shared/core";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 
 type UseChatAppLifecycleEffectsInput = {
   user: unknown | null;

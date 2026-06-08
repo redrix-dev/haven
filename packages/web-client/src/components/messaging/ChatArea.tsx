@@ -6,7 +6,7 @@ import { Button } from "@shared/app/ui/button";
 import { Switch } from "@shared/app/ui/switch";
 import { Headphones } from "lucide-react";
 import { useHavenCore } from "@shared/core";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import type {
   BanEligibleServer,
   MessageAttachment,

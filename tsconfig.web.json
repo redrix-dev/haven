@@ -11,7 +11,7 @@
     "apps/web/src/**/*",
     "apps/electron/src/renderer/**/*",
     "packages/web-client/src/**/*",
-    "packages/react-bindings/src/**/*",
+    "apps/mobile/src/data/**/*",
     "packages/shared/src/**/*",
     "tooling/test-support/setup/jsdom.ts"
   ],

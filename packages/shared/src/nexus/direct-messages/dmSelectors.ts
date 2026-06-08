@@ -1,4 +1,4 @@
-import type { DirectMessageNexusState } from './DirectMessageNexus'
+import type { DirectMessageNexusState } from './dmTypes'
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
@@ -7,7 +7,7 @@ import type {
 /**
  * Pure, framework-agnostic projections + equality fns for the DM store.
  * Single source of truth for "which slice + how to compare", consumed by both
- * `@react-bindings` and `@solid-bindings`. Memoization lives in the adapters.
+ * `@mobile-data/hooks` and `@solid-bindings`. Memoization lives in the adapters.
  */
 
 const EMPTY_CONVERSATIONS: DirectMessageConversationSummary[] = []

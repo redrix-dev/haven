@@ -127,74 +127,80 @@ Non-gating follow-ups carried into the foundation phase (low-risk, not blockers)
 
 ---
 
-## Phase 2 — Foundation: shared-core hardening
-Planning began post-GO. (Phases 3–4 — parity build, cutover/release — stay `TBD` until the
-foundation shape is set; still no planning past the next unvalidated step.)
+## Phase 2 — THE CLEAVE (split shared logic from per-platform caches)
 
-### Step 3 — Shared-core hardening
-**Status:** 3a done · **3b plan finalized & approved (2026-06-07)** · execution pending.
-**Guardrail:** *comb everything, ration the rewriting.* The audit catches all cruft; only the
-required decoupling + cheap/safe cleanups happen here. Big rewrites get their own gated steps.
+> **Canonical detail lives in [`solid-migration-handoff.md`](./solid-migration-handoff.md)
+> — read its §0 ruleset first.** This section is the phase + decision record.
 
-**Finalized decisions (Phase 2 approved):**
-- **Depth:** **full extraction + migrate live call sites now** → shared core ends *zero-React*. Highest
-  churn, run as a **disciplined per-domain CI-gated loop** (pilot-first, not big-bang).
-- **Adapter topology (outside `shared`):** two new framework-binding packages —
-  `packages/react-bindings` (React hooks → web-client + RN) and `packages/solid-bindings`
-  (Solid subscribe→signal, getter ids → solid-client now + future solid-web). Core stays pure; the Solid
-  build never imports react-bindings (that's the zero-React proof). *Rationale:* **both desktop *and* web
-  are Solid-bound long-term** — Solid is the lasting target, RN the lasting React consumer, React-DOM
-  `web-client` transitional.
-- **Pilots:** `PermissionsControllerNexus` → `ProfileControllerNexus` → **extract base `ControllerNexus.ts`
-  from observed repetition** → roll the remaining 6 service classes.
-- **Per-domain loop:** vanilla store → relocate hooks to react-bindings → add solid-bindings → rename
-  `…Nexus`→`…ControllerNexus` + composition wiring → migrate call sites → `test:ci` + `mobile:typecheck` green.
-- **Branch:** `feat/shared-core-hardening` off `staging`. **Exit:** CI green + Solid smoke (via solid-bindings)
-  + Electron/web build. Full detail in the approved plan.
+**Status:** direction set (2026-06-08). Supersedes the prior "shared-core hardening / Approach C"
+plan (preserved below under *Superseded*). Execution = the per-domain cleave loop (handoff §4).
 
-- **3a · Audit & triage** — the fine-tooth comb, recorded in
-  [`shared-core-audit.md`](./shared-core-audit.md). Each item → react-free? · decouple? ·
-  decompose-later? · fine.
-  - ✅ `lib/backend/` — **entirely React-free** (16 files / ~7k lines; 0 React, 0 zustand). Nothing to
-    decouple; decomposition deferred (`communityDataBackend.ts` @ 2525 the headline).
-  - ✅ `stores/` · `nexus/` · binding hooks/context · `platform/` dedup — combed. **Decoupling is
-    concentrated in `nexus/`** (~7.7k lines, 13 React-coupled classes) + 5 binding files (`AuthContext`,
-    `useVoice` the big two) + 3 tiny stores. ⚠️ **3b.2 discovery:** the entity family is NOT a free
-    "base-fix clears 5" — the base `use<S>` is used by `CommunityMessageNexus`, and 4 subclasses override
-    `store` + use bespoke hooks → it's a **per-class loop too**. See [`shared-core-audit.md`](./shared-core-audit.md).
-  - **3a essentially complete** — the shared-core decoupling surface is now fully mapped.
-- **3b · React-free decoupling (required)** — `create` → `zustand/vanilla createStore` + per-platform
-  adapters (React for RN/Electron; Solid `subscribe→signal`, getter-based ids). Exit: shared imports
-  **zero React**; RN + a Solid smoke both consume it. **Two families, two treatments:**
-  - **Entity-cache Nexus** (base `Nexus` + 5 subclasses: Channel / CommunityMessage / Community / DM /
-    Notification) — **per-class loop** (not a single base swap; see 3b.2 discovery): base→vanilla + drop
-    dead `useAll`/`useOne`, then each subclass's `store` override + bespoke hooks relocate to bindings +
-    call sites migrate, CI-gated. **Stays named `…Nexus`** — keep the entity-cache pattern pure.
-  - **Service/feature classes** (the 8 standalone) — convert **in place** to vanilla + adapter **and
-    rename `<Domain>Nexus` → `<Domain>ControllerNexus`** (e.g. `ProfileControllerNexus`,
-    `VoiceControllerNexus`). **Naming convention:** `Nexus` = entity cache · `ControllerNexus` =
-    feature-state controller — same family, honest contract. **The rename is in scope for the lift**
-    (ripples to `useHavenCore` wiring + call sites — planned, not incidental).
-  - **stores/** (4 tiny + `core/viewerMessagePolicy`) → vanilla + adapter.
-  - **binding hooks/context** (`AuthContext`, `useVoice`, `useHavenCore`, …) → Solid/React bindings.
-  - **Approach:** convert 2–3 ControllerNexus first, watch what repeats, *then* extract — don't impose a base.
-- **3c · Cheap inline cleanups** — dedup `platform/` vs `infrastructure/platform/` (identical
-  `urls.ts`) and other safe wins surfaced by 3a.
-- **3d · Deferred, scoped separately** — the decomposition backlog (headed by the
-  `communityDataBackend` split) → own gated steps, **not** folded into 3b.
+**The decision, in one line:** stop trying to share a *reactive cache* across React and Solid.
+Split the data layer into **three layers** — pure shared logic; a per-platform cache (mobile
+React / desktop+web Solid); per-platform UI — and never share the cache.
 
-**Exit criteria (Step 3):** (i) audit complete + triaged; (ii) shared core React-free with
-adapters, RN unbroken + a Solid smoke; (iii) cheap cleanups done; (iv) big rewrites logged as
-scoped follow-ups (not executed here).
+**Why we changed course (the realization):**
+- The Nexus pattern was lifted from the stoat/Revolt SDK, which runs it on **Solid's**
+  fine-grained reactivity. That's *why* the original has no snapshot caches / `revision`
+  counters / selector factories.
+- Haven ran the same pattern on **zustand** (coarse, manual reactivity) and **shared the
+  reactive cache across platforms** → all that machinery had to be hand-built, and the
+  shared reactive core grew illegible. The complexity is *substrate scar tissue*, not the
+  pattern's fault.
+- The rebuild targets **Solid** — the substrate the pattern was born for. So: share the
+  *logic* (pure functions, identical everywhere), let each platform own its *cache* in its
+  native idiom. Mobile keeps React's surgical re-renders untouched (precision lives in how the
+  screen reads, not in the shared machinery); desktop/web get a clean Solid-native cache.
 
-### 📌 Earmarks (future — NOT in 3b scope)
-Captured so they don't get lost, deliberately *not* pulled into the current lift:
-- **Base `ControllerNexus.ts`** — once the shape is apparent across the 8 renamed controllers, extract a
-  thin shared base (vanilla store + `revision` + reset/hydrate + adapter wiring) to solidify it.
-  **Extract from observed repetition only** — do not design/impose it up front (that's how the original
-  "Nexus name, no contract" drift happened).
-- **Decomposition backlog** (3d) — `communityDataBackend.ts` (2525) split + the other large files; pure
-  hygiene, own gated steps.
+**Shape of the cleave (handoff §3):**
+```
+packages/shared   = PURE logic + types + backend.  zero framework, zero reactivity.
+apps/mobile/data  = React cache (today's Nexus, relocated + thinned), calls shared logic.
+<solid>/data      = Solid-native cache, built fresh, calls shared logic.
+```
+
+**Per-domain loop (handoff §4, CI-gated):** inventory (logic vs cache) → extract/confirm shared
+pure logic → point mobile's cache at it + relocate it out of `shared` → build the Solid-native
+cache → gate (mobile green · `check:shared-portable` · `typecheck:solid`) → next domain.
+
+**Disposition of the Approach-C work (handoff §5):** the **pure projections** extracted
+(`channelSelectors`/`communitySelectors`/`dmSelectors`/`notificationSelectors`, plus
+`projectVisibleChannelMessages`/`routeRealtimeEvent`/`viewerMessagePolicy`) are **Layer-1 keepers**.
+The vanilla-zustand nexuses become **mobile's** cache (relocate). `react-bindings` =
+mobile's React read layer. `solid-bindings` = **retired** (Solid owns its cache natively).
+`CommunityMessageNexus` is **not** to be ported into bindings. The guard + `mobile:bundle` +
+`typecheck:solid` gates are kept.
+
+**Exit (Phase 2 / The Cleave):** `packages/shared` provably pure (`check:shared-portable` over all
+of it) · no reactive store shared across frameworks · mobile green throughout · a Solid-native cache
+exists for each domain and `typecheck:solid` is green · the retired adapter/reactive-core packages deleted.
+
+**Out of scope (next phase, NOT now):** building screens/features/the Solid app UI. See handoff §7.
+
+---
+
+<details>
+<summary><strong>SUPERSEDED — Approach C: framework-agnostic shared reactive core (kept for history)</strong></summary>
+
+> This was the plan executed in the first 5 commits on `feat/shared-core-hardening`
+> (binding packages + Channel/Community/DM/Notification conversions). It tried to make **one
+> reactive cache framework-neutral and shared** via `react-bindings` + `solid-bindings`. That
+> sharing of the *cache* (not the logic) is exactly what The Cleave undoes. Its pure-logic
+> extraction survives (§5 of the handoff); its dual-binding/shared-store half is retired.
+
+- **Depth:** full extraction → shared core *zero-React*, per-domain CI-gated loop.
+- **Adapter topology:** `packages/react-bindings` (React) + `packages/solid-bindings` (Solid) over a
+  shared `zustand/vanilla` core; "the Solid build never imports react-bindings" as the zero-React proof.
+- **Per-domain loop:** vanilla store → relocate hooks to react-bindings → add solid-bindings → migrate
+  call sites → `test:ci` + `mobile:typecheck` green.
+- **3a audit** (kept as the catalog of what's in `shared`): `lib/backend/` entirely React-free;
+  decoupling concentrated in `nexus/`. **3b.2 discovery:** entity family is a per-class loop (base
+  `use<S>` used by `CommunityMessageNexus`; 4 subclasses override `store`).
+- **Service-class rename** `…Nexus` → `…ControllerNexus`, base `ControllerNexus.ts` extracted from
+  repetition — *not pursued*; folded into the cleave's reasoning instead.
+- **3c cleanups / 3d decomposition** (`communityDataBackend.ts` @ 2525 split) — still valid hygiene,
+  still their own gated steps, now framed as work on the *pure shared logic* layer.
+</details>
 
 ---
 
@@ -202,9 +208,14 @@ Captured so they don't get lost, deliberately *not* pulled into the current lift
 
 **Status: DECIDED (end state) · NOT YET SCHEDULED · interim guardrail in place.**
 
-> **The binding packages (`@react-bindings`, `@solid-bindings`) and `@shared` MUST eventually become
-> real workspace packages (`package.json` + `name` + `exports`). The current path-alias approach is a
-> deliberate INTERIM, not the destination.**
+> **Reframed for The Cleave:** the package that matters now is **`packages/shared` (the pure logic
+> layer)** — it must resolve cleanly from *both* mobile and the Solid world. `solid-bindings` is being
+> retired; `react-bindings` becomes mobile-local. So read "the binding packages and `@shared`" below as
+> primarily **`@shared`**: the pure shared layer that both platforms' caches import.
+
+> **`@shared` (and any lasting shared package) MUST eventually become a real workspace package
+> (`package.json` + `name` + `exports`). The current path-alias approach is a deliberate INTERIM,
+> not the destination.**
 
 **Why this is the end state (the alias's truthful cost):**
 - No enforced public surface — anything can deep-import internals; no `exports` map.

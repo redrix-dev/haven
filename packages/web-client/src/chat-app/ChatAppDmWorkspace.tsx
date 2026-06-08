@@ -12,8 +12,8 @@ import {
   useDmConversationsLoading,
   useDmMessages,
   useDmMessagesLoading,
-} from "@react-bindings";
-import { useUiStore } from "@shared/stores/uiStore";
+} from "@mobile-data/hooks";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import type { DirectMessageReportKind } from "@shared/lib/backend/types";
 
 type ChatAppDmWorkspaceProps = {

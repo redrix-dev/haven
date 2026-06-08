@@ -4,7 +4,7 @@ import { requireHavenCore } from "@shared/core";
 import { dataCacheDebug } from "@shared/debug";
 import { getMobileSupabase } from "../supabase/getMobileSupabase";
 import { clearAllChannelScrollExits } from "../storage/communityTimelinePrefs";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
 
 /**

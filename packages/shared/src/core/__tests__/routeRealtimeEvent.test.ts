@@ -4,10 +4,10 @@ import {
   routeRealtimeEvent,
   type HavenBackends,
 } from '@shared/core';
-import { ChannelNexus } from '@shared/nexus/community/ChannelNexus';
-import { CommunityNexus } from '@shared/nexus/community/CommunityNexus';
-import { CommunityMessageNexus } from '@shared/nexus/community/CommunityMessageNexus';
-import { ProfileNexus } from '@shared/nexus/profile/ProfileNexus';
+import { ChannelNexus } from '@mobile-data/channels/ChannelNexus';
+import { CommunityNexus } from '@mobile-data/communities/CommunityNexus';
+import { CommunityMessageCache as CommunityMessageNexus } from '@mobile-data/messages/CommunityMessageCache';
+import { ProfileNexus } from '@mobile-data/profile/ProfileNexus';
 import type { HavenCore } from '@shared/core/HavenCore';
 import type { MessageBundle } from '@shared/lib/backend/types';
 

@@ -10,7 +10,7 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { createHavenCore } from "@shared/core"
+import { createReactHavenCore } from "@/data/createReactHavenCore";
 import { createMmkvPersistence } from "@/lib/createMmkvPersistence"
 import { registerMobileAppHost } from "@/lib/registerMobileAppHost";
 import {
@@ -33,7 +33,7 @@ bootstrapDataCacheDebug();
 const mobileClient = getMobileSupabase();
 bootLogger.mark("supabase-client-created");
 const mobileConfig = resolveMobileSupabaseConfig();
-createHavenCore({
+createReactHavenCore({
   client: mobileClient,
   publicConfig: {
     supabaseUrl: mobileConfig.supabaseUrl,

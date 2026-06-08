@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useHavenCore } from "@shared/core";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { ThemedIonicons } from "@/theme-rn";

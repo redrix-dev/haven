@@ -5,14 +5,12 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useSyncExternalStore,
 } from "react";
 import { requireHavenCore } from "@shared/core";
+import { requireAuthStore } from "@shared/core/sessionStoreRegistry";
+import type { AuthStoreState } from "@shared/core/sessionStorePorts";
 import { bootLogger } from "@shared/debug/bootLogger";
-
-// Bounded bootstrap exception: auth may touch the raw Supabase client to
-// establish, recover, refresh, and end a session. Domain reads/writes belong in
-// HavenCore/Nexus after the session exists.
-const havenAuthClient = () => requireHavenCore().backends.client;
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
 import { getErrorMessage } from "@platform/lib/errors";
@@ -23,7 +21,6 @@ import {
   SUPPORTED_EMAIL_OTP_TYPES,
   validateLegalAcceptance,
 } from "@shared/features/auth/domain";
-import { useAuthStore } from "@shared/stores/authStore";
 import type {
   AuthError,
   EmailOtpType,
@@ -31,6 +28,22 @@ import type {
   User,
   Session,
 } from "@supabase/supabase-js";
+
+// Bounded bootstrap exception: auth may touch the raw Supabase client to
+// establish, recover, refresh, and end a session. Domain reads/writes belong in
+// HavenCore/Nexus after the session exists.
+const havenAuthClient = () => requireHavenCore().backends.client;
+
+const authStore = () => requireAuthStore();
+
+function useAuthStoreSelector<T>(selector: (state: AuthStoreState) => T): T {
+  const store = requireAuthStore();
+  return useSyncExternalStore(
+    store.subscribe,
+    () => selector(store.getState()),
+    () => selector(store.getState()),
+  );
+}
 
 type AuthStatus =
   | "initializing"
@@ -140,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       bootLogger.mark("auth-check-start");
-      useAuthStore.getState().setIsLoading(true);
+      authStore().getState().setIsLoading(true);
       try {
         const {
           data: { session },
@@ -150,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error;
         if (!isMounted) return;
 
-        const { setSession, setUser, setIsLoading } = useAuthStore.getState();
+        const { setSession, setUser, setIsLoading } = authStore().getState();
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
@@ -159,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bootLogger.mark("auth-check-complete", { authenticated: Boolean(session?.user) });
       } catch (err: unknown) {
         if (!isMounted) return;
-        const { setSession, setUser, setIsLoading } = useAuthStore.getState();
+        const { setSession, setUser, setIsLoading } = authStore().getState();
         setSession(null);
         setUser(null);
         setIsLoading(false);
@@ -177,13 +190,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = havenAuthClient().auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
       const nextUser = session?.user ?? null;
-      const currentUserId = useAuthStore.getState().user?.id ?? null;
+      const currentUserId = authStore().getState().user?.id ?? null;
       const shouldSkipUserUpdate =
         event === "TOKEN_REFRESHED" ||
         (event === "SIGNED_IN" &&
           nextUser?.id != null &&
           nextUser.id === currentUserId);
-      const { setSession, setUser, setIsLoading } = useAuthStore.getState();
+      const { setSession, setUser, setIsLoading } = authStore().getState();
       setSession(session);
       if (!shouldSkipUserUpdate) {
         setUser(nextUser);
@@ -381,7 +394,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("Failed to sign out after account deletion:", signOutError);
     }
 
-    const { setSession, setUser, setIsLoading } = useAuthStore.getState();
+    const { setSession, setUser, setIsLoading } = authStore().getState();
     setSession(null);
     setUser(null);
     setIsLoading(false);
@@ -411,9 +424,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth(): UseAuthResult {
   const context = useContext(AuthContext);
-  const user = useAuthStore((state) => state.user);
-  const session = useAuthStore((state) => state.session);
-  const loading = useAuthStore((state) => state.isLoading);
+  const user = useAuthStoreSelector((state) => state.user);
+  const session = useAuthStoreSelector((state) => state.session);
+  const loading = useAuthStoreSelector((state) => state.isLoading);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import { DirectMessageNexus } from '@shared/nexus/direct-messages/DirectMessageNexus';
+import { DirectMessageNexus } from '@mobile-data/direct-messages/DirectMessageNexus';
 import { conversationsEqual } from '@shared/nexus/direct-messages/dmSelectors';
 import type {
   DirectMessage,
