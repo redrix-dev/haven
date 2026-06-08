@@ -1,6 +1,6 @@
-import { create } from 'zustand'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { createStore, type StoreApi } from 'zustand/vanilla'
 import { Nexus, type NexusEntry, type NexusState } from '../Nexus'
+import type { ReadableStore } from '../storeTypes'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
 import type { NotificationBackend } from '@shared/lib/backend/notificationBackend'
 import type {
@@ -11,12 +11,10 @@ import type {
   NotificationPreferenceUpdate,
   NotificationPreferences,
 } from '@shared/lib/backend/types'
-import type { StoreApi, UseBoundStore } from 'zustand'
 
 const STORAGE_KEY = 'haven:nexus:notifications:global'
 const PAGE_SIZE = 50
 
-const EMPTY_NOTIFICATIONS: NotificationItem[] = []
 const DEFAULT_COUNTS: NotificationCounts = { unseenCount: 0, unreadCount: 0 }
 
 export type NotificationNexusState = NexusState<NotificationItem> & {
@@ -31,58 +29,23 @@ export type NotificationNexusState = NexusState<NotificationItem> & {
   preferencesLastLoadedAt: number
 }
 
-const selectCounts = (state: NotificationNexusState) => state.counts
-const selectIsLoading = (state: NotificationNexusState) => state.isLoading
-const selectPreferences = (state: NotificationNexusState) => state.preferences
-const selectPreferencesLoading = (state: NotificationNexusState) =>
-  state.preferencesLoading
-const selectPreferencesSaving = (state: NotificationNexusState) =>
-  state.preferencesSaving
-
-const notificationsEqual = (
-  a: NotificationItem[],
-  b: NotificationItem[],
-): boolean => {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) {
-    if (a[i].recipientId !== b[i].recipientId) return false
-  }
-  return true
-}
-
 export class NotificationNexus extends Nexus<NotificationItem, NotificationItem> {
-  private _notificationStore:
-    | UseBoundStore<StoreApi<NotificationNexusState>>
-    | null = null
+  private _notificationStore: StoreApi<NotificationNexusState> | null = null
 
   private readonly backend: NotificationBackend
   private listInflight: Promise<void> | null = null
   private preferencesInflight: Promise<NotificationPreferences> | null = null
-  private notificationsSnapshot: NotificationItem[] = EMPTY_NOTIFICATIONS
-
-  private readonly notificationsSelector = (
-    state: NotificationNexusState,
-  ): NotificationItem[] => {
-    void state.revision
-    if (state.recipientOrder.length === 0) return EMPTY_NOTIFICATIONS
-    const next = state.recipientOrder
-      .map((id) => state.entities[id]?.data)
-      .filter((item): item is NotificationItem => item !== undefined)
-    if (notificationsEqual(this.notificationsSnapshot, next)) {
-      return this.notificationsSnapshot
-    }
-    this.notificationsSnapshot = next
-    return next
-  }
 
   constructor(persistence: NexusPersistence, backend: NotificationBackend) {
     super('notifications', 'global', persistence)
     this.backend = backend
   }
 
-  /** Test-only access to the underlying store. */
-  getReactiveStore(): UseBoundStore<StoreApi<NotificationNexusState>> {
+  /**
+   * Read-only store handle for the binding packages — `getState`/`subscribe`
+   * only. Also used by tests for state assertions.
+   */
+  get reactiveStore(): ReadableStore<NotificationNexusState> {
     return this.store
   }
 
@@ -90,11 +53,9 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     return raw
   }
 
-  protected override get store(): UseBoundStore<
-    StoreApi<NotificationNexusState>
-  > {
+  protected override get store(): StoreApi<NotificationNexusState> {
     if (!this._notificationStore) {
-      this._notificationStore = create<NotificationNexusState>(() => ({
+      this._notificationStore = createStore<NotificationNexusState>(() => ({
         entities: {},
         recipientOrder: [],
         counts: DEFAULT_COUNTS,
@@ -356,34 +317,6 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     }))
   }
 
-  useNotifications(): NotificationItem[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      this.notificationsSelector,
-      notificationsEqual,
-    )
-  }
-
-  useCounts(): NotificationCounts {
-    return useStoreWithEqualityFn(this.store, selectCounts)
-  }
-
-  useIsLoading(): boolean {
-    return useStoreWithEqualityFn(this.store, selectIsLoading)
-  }
-
-  usePreferences(): NotificationPreferences | null {
-    return useStoreWithEqualityFn(this.store, selectPreferences)
-  }
-
-  usePreferencesLoading(): boolean {
-    return useStoreWithEqualityFn(this.store, selectPreferencesLoading)
-  }
-
-  usePreferencesSaving(): boolean {
-    return useStoreWithEqualityFn(this.store, selectPreferencesSaving)
-  }
-
   override persist(): void {
     try {
       const state = this.store.getState()
@@ -436,7 +369,6 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       preferencesLastLoadedAt: 0,
       revision: 0,
     })
-    this.notificationsSnapshot = EMPTY_NOTIFICATIONS
     this.persistence.remove(STORAGE_KEY)
   }
 }

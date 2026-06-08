@@ -29,6 +29,7 @@ import {
   useActiveCommunityId,
   useChannels,
   useDmConversations,
+  useNotifications,
   useOrderedCommunities,
 } from "@react-bindings";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
@@ -177,7 +178,7 @@ function MobileNotificationSoundSync({
   audioSettings: NotificationAudioSettings;
 }) {
   const core = useHavenCore();
-  const notificationItems = core.notifications.useNotifications();
+  const notificationItems = useNotifications(core.notifications);
   const soundSyncRef = useRef(createNotificationSoundSyncState());
   const audioRef = useRef(audioSettings);
 
@@ -213,7 +214,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const dm = core.directMessages;
   const authUser = useAuthStore((s) => s.user);
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
-  const notificationItems = core.notifications.useNotifications();
+  const notificationItems = useNotifications(core.notifications);
   const dmConversations = useDmConversations(dm);
   const socialCounts = core.social.useCounts();
   const currentServerId = useActiveCommunityId(core.communities);

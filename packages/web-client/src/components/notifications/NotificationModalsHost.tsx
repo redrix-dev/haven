@@ -9,14 +9,15 @@ import {
   syncNotificationSounds,
   useHavenCore,
 } from "@shared/core";
+import { useNotificationCounts, useNotifications } from "@react-bindings";
 import { getErrorMessage } from "@platform/lib/errors";
 
 export function NotificationModalsHost() {
   const app = useChatAppSession();
   const core = useHavenCore();
   const inbox = core.notifications;
-  const notificationCounts = inbox.useCounts();
-  const notificationItems = inbox.useNotifications();
+  const notificationCounts = useNotificationCounts(inbox);
+  const notificationItems = useNotifications(inbox);
   const { notificationsPanelOpen, setNotificationsPanelOpen } =
     useChatAppModalUiState();
 

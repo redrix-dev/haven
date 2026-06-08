@@ -6,6 +6,11 @@ import type {
   NotificationPreferenceUpdate,
 } from "@shared/lib/backend/types";
 import { useHavenCore } from "@shared/core";
+import {
+  useNotificationPreferences,
+  useNotificationPreferencesLoading,
+  useNotificationPreferencesSaving,
+} from "@react-bindings";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 
@@ -74,9 +79,9 @@ export function NotificationPreferencesPanel() {
     [foregroundColor, themeTokens],
   );
 
-  const preferences = inbox.usePreferences();
-  const loading = inbox.usePreferencesLoading();
-  const saving = inbox.usePreferencesSaving();
+  const preferences = useNotificationPreferences(inbox);
+  const loading = useNotificationPreferencesLoading(inbox);
+  const saving = useNotificationPreferencesSaving(inbox);
 
   const [error, setError] = useState<string | null>(null);
 

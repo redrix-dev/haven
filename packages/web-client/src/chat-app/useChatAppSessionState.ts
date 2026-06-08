@@ -20,6 +20,7 @@ import {
   useCommunities,
   useCommunitiesLoadError,
   useCommunitiesLoading,
+  useNotifications,
 } from "@react-bindings";
 import { getPlatformInviteBaseUrl } from "@platform/urls";
 import {
@@ -639,7 +640,7 @@ export function useChatAppSessionState() {
 
   const notificationSoundSyncRef = useRef(createNotificationSoundSyncState());
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
-  const notificationItems = core.notifications.useNotifications();
+  const notificationItems = useNotifications(core.notifications);
 
   const refreshNotificationInbox = useCallback(async () => {
     if (!user?.id) return;

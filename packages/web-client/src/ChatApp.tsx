@@ -17,6 +17,7 @@ import { useHavenCore, toServerSummaries } from "@shared/core";
 import {
   useActiveCommunityId,
   useDmConversations,
+  useNotificationCounts,
   useOrderedCommunities,
 } from "@react-bindings";
 
@@ -25,7 +26,7 @@ function ChatAppInner() {
   const voice = useChatAppVoiceIntegration();
   const core = useHavenCore();
   const dmConversations = useDmConversations(core.directMessages);
-  const notificationCounts = core.notifications.useCounts();
+  const notificationCounts = useNotificationCounts(core.notifications);
   const totalDmUnreadCount = React.useMemo(
     () =>
       dmConversations.reduce(

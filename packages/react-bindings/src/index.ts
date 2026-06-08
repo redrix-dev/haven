@@ -20,3 +20,11 @@ export {
   useDmMessages,
   useDmMessagesLoading,
 } from "./directMessages";
+export {
+  useNotificationCounts,
+  useNotificationPreferences,
+  useNotificationPreferencesLoading,
+  useNotificationPreferencesSaving,
+  useNotifications,
+  useNotificationsLoading,
+} from "./notifications";

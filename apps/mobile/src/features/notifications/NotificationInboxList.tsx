@@ -24,6 +24,7 @@ import {
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
 import { useHavenCore } from "@shared/core";
+import { useNotifications, useNotificationsLoading } from "@react-bindings";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 
@@ -50,13 +51,13 @@ export function NotificationInboxList({
   const core = useHavenCore();
   const themeTokens = useMobileThemeTokens();
   const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
-  const notificationItems = core.notifications.useNotifications();
+  const notificationItems = useNotifications(core.notifications);
   const items = useMemo(
     () => filterNotificationsForInbox(notificationItems),
     [notificationItems],
   );
   const liveProfiles = core.profiles.useProfilesRecord();
-  const loading = core.notifications.useIsLoading();
+  const loading = useNotificationsLoading(core.notifications);
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());

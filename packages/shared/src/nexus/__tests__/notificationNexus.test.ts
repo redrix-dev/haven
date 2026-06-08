@@ -29,7 +29,7 @@ describe('NotificationNexus', () => {
     await nexus.loadInbox();
 
     expect(nexus.getSnapshot('r1')).toBeDefined();
-    expect(nexus.getReactiveStore().getState().counts.unseenCount).toBe(1);
+    expect(nexus.reactiveStore.getState().counts.unseenCount).toBe(1);
   });
 
   it('dedupes concurrent inbox loads', async () => {

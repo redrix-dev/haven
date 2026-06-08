@@ -44,6 +44,8 @@ const reactFreeCoreChecks = [
   /^packages\/shared\/src\/nexus\/community\/communitySelectors\.ts$/,
   /^packages\/shared\/src\/nexus\/direct-messages\/DirectMessageNexus\.ts$/,
   /^packages\/shared\/src\/nexus\/direct-messages\/dmSelectors\.ts$/,
+  /^packages\/shared\/src\/nexus\/notifications\/NotificationNexus\.ts$/,
+  /^packages\/shared\/src\/nexus\/notifications\/notificationSelectors\.ts$/,
 ];
 const frameworkImportRe =
   /\bfrom\s+["'](?:react|react-dom|solid-js|zustand|zustand\/traditional|zustand\/react)["']/;
