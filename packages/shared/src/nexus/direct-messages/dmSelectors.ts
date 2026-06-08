@@ -7,7 +7,7 @@ import type {
 /**
  * Pure, framework-agnostic projections + equality fns for the DM store.
  * Single source of truth for "which slice + how to compare", consumed by both
- * `@mobile-data/hooks` and `@solid-bindings`. Memoization lives in the adapters.
+ * `@mobile-data/hooks` and `@solid-client/data` accessors. Memoization lives in the adapters.
  */
 
 const EMPTY_CONVERSATIONS: DirectMessageConversationSummary[] = []

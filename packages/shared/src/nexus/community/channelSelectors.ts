@@ -6,7 +6,7 @@ import type { ChannelNexusState, HavenChannel } from './channelTypes'
  *
  * These are the single source of truth for "which slice of channel state, and
  * how to compare it" — domain knowledge that is meaningful regardless of who is
- * observing. The React (`@mobile-data/hooks`) and Solid (`@solid-bindings`)
+ * observing. The React (`@mobile-data/hooks`) and Solid (`@solid-client/data`)
  * adapters both consume these, so there is exactly one projection per concept.
  *
  * Memoization strategy (useMemo vs createMemo) belongs to the adapters; these

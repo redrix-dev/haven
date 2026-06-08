@@ -8,6 +8,16 @@
 > (→ moves to a per-platform data layer)?** "🔧 decouple" entries are mostly *caches* that should
 > **leave** `shared` for a platform, not become framework-neutral in place.
 
+## Post-cleave snapshot (2026-06-08)
+
+| Area | Status |
+|------|--------|
+| `stores/` | **Deleted** — session stores in `apps/mobile/src/data/session/` + Solid stubs |
+| `nexus/*` reactive classes | **Relocated** to `apps/mobile/src/data/` |
+| `nexus/{feature-flags,onboarding,permissions,profile,social,voice}/` | **Removed** — empty placeholders, never populated post-cleave |
+| Shared retains | Types, selectors, `Nexus.ts` base (transitional), cache **port interfaces** |
+| `@shared/nexus` barrel | Shared types + ports only; concrete classes → `@mobile-data/*` |
+
 Living inventory of `packages/shared/src`. Goal: know exactly what's framework-coupled,
 what's structurally crufty (hygiene, defer), and what's fine.
 
@@ -54,16 +64,10 @@ all deferrable to its own gated step.
 
 ---
 
-## `stores/` — 🔧 trivial decouple
-3 stores via zustand `create` (React-bound); convert to `zustand/vanilla createStore` +
-per-platform adapters. Tiny surface.
+## `stores/` — ✅ deleted (cleave complete)
 
-| File | Lines | Disposition |
-|---|---:|---|
-| `uiStore.ts` | 111 | 🔧 → vanilla + adapter |
-| `authStore.ts` | 20 | 🔧 → vanilla + adapter (already probed with the Solid `fromStore` bridge) |
-| `userStatusStore.ts` | 18 | 🔧 → vanilla + adapter |
-| `index.ts` | 8 | ✅ barrel |
+Relocated to `apps/mobile/src/data/session/` (React) and `packages/solid-client/src/data/session/`
+(Solid stubs). The `packages/shared/src/stores/` directory has been removed.
 
 ### Other zustand users (caught in the final sweep)
 | File | Lines | Disposition |

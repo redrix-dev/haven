@@ -127,7 +127,7 @@ Non-gating follow-ups carried into the foundation phase (low-risk, not blockers)
 
 ---
 
-## Phase 2 — THE CLEAVE (split shared logic from per-platform caches)
+## Phase 2 — THE CLEAVE ✅ (split shared logic from per-platform caches)
 
 > **Canonical detail lives in [`solid-migration-handoff.md`](./solid-migration-handoff.md)
 > — read its §0 ruleset first.** This section is the phase + decision record.
@@ -171,9 +171,10 @@ mobile's React read layer. `solid-bindings` = **retired** (Solid owns its cache 
 `CommunityMessageNexus` is **not** to be ported into bindings. The guard + `mobile:bundle` +
 `typecheck:solid` gates are kept.
 
-**Exit (Phase 2 / The Cleave):** `packages/shared` provably pure (`check:shared-portable` over all
-of it) · no reactive store shared across frameworks · mobile green throughout · a Solid-native cache
-exists for each domain and `typecheck:solid` is green · the retired adapter/reactive-core packages deleted.
+**Exit (Phase 2 / The Cleave):** ✅ met on `feat/shared-core-hardening` — `packages/shared`
+provably pure (`check:shared-portable` over all of it) · no reactive store shared across
+frameworks · mobile green throughout · Solid-native cache scaffolding per domain · retired
+adapter packages deleted · `@shared/nexus` barrel decoupled from `@mobile-data`.
 
 **Out of scope (next phase, NOT now):** building screens/features/the Solid app UI. See handoff §7.
 

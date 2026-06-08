@@ -101,30 +101,33 @@ smarts and let each platform keep its own dumb memory.*
 ## §2 — Where we are now (honest current state)
 
 **Branch:** `feat/shared-core-hardening` (off `staging`). **The cleave is complete**
-for the messages domain and session/bindings cleanup (Phases 5–6). `packages/shared`
-is now a pure logic layer for messaging; reactive caches live per-platform.
+(all domains + session/bindings + cache port decoupling). `packages/shared` is a pure
+logic + port layer; reactive caches live per-platform.
 
 **Current architecture:**
-- **Shared (pure):** messaging logic (`features/messaging/logic/`), selectors,
-  `routeRealtimeEvent`, cache port interfaces, backend clients, types.
-  `check:shared-portable` enforces zero framework imports across all of
-  `packages/shared/src/**` (with narrow exclusions for host-layer files still
-  being relocated: `contexts/`, voice hooks, `Nexus.ts` base class).
+- **Shared (pure):** domain logic (`features/*/logic/`), selectors, `routeRealtimeEvent`,
+  cache port interfaces (`entityNexusPorts`, `platformNexusPorts`, `communityMessageCachePort`),
+  backend clients, entity/admin/voice state types. `@shared/nexus` barrel exports shared
+  types and ports only — no `@mobile-data` imports.
 - **Mobile (React):** full data layer under `apps/mobile/src/data/` — message
   cache, entity nexuses, session stores (`authStore`, `uiStore`,
   `userStatusStore`), React read hooks (`@mobile-data/hooks`). Wired via
-  `createReactHavenCore`.
+  `createReactHavenCore`. Concrete nexus classes import from `@mobile-data/*`.
 - **Solid (Tauri):** native caches under `packages/solid-client/src/data/`
   including message cache and session store stubs. No zustand adapter.
-- **Retired:** `packages/react-bindings`, `packages/solid-bindings`, and
-  `packages/shared/src/stores/`. The dual-binding / shared-reactive-store
-  approach (Approach C) is fully superseded.
+- **Retired:** `packages/react-bindings`, `packages/solid-bindings`,
+  `packages/shared/src/stores/`, and empty post-cleave placeholder dirs under
+  `packages/shared/src/nexus/{feature-flags,onboarding,permissions,profile,social,voice}`.
+  The dual-binding / shared-reactive-store approach (Approach C) is fully superseded.
 
 **What remains transitional (not blocking gates):**
 - `packages/shared/src/nexus/Nexus.ts` — base entity cache class still imported
   by mobile nexuses; scheduled for mobile relocation.
 - `packages/shared/src/contexts/AuthContext.tsx` and voice hooks — React host
   layer still in shared; relocate in a later phase.
+- `packages/shared/src/nexus/__tests__/*` — integration tests still construct
+  mobile nexuses via `@mobile-data` (acceptable; keeps `@mobile-data` in
+  `tsconfig.node.json` for shared test runs only).
 - React desktop (`web-client`/electron/web) imports mobile's data layer via
   `@mobile-data` as scaffolding until Solid replaces it.
 
@@ -280,12 +283,17 @@ green on a cleaved `packages/shared`.
 
 ## §8 — Next concrete step
 
-Produce the **messages inventory**: take the real message files
-(`CommunityMessageNexus.ts`, `projectVisibleChannelMessages.ts`, `viewerMessagePolicy.ts`,
-`routeRealtimeEvent.ts`, the backend message calls) and sort every function against §0.4 into
-**Layer-1 (shared logic — and where it lives now)** vs **the small per-platform cache shell**.
-That inventory is the map for cleaving messages, and the template for every other domain.
-It is *analysis*, not code — safe to produce without touching the live app.
+**Cleave exit criteria met** (see §6 gates). The data/cache phase is done.
+
+**Next phase (app build — handoff §7):**
+1. Flesh out Solid-native cache I/O in `packages/solid-client/src/data/` (stubs → real backends).
+2. Wire `createSolidHavenCore` (or equivalent) and start Tauri/Solid UI on the cleaved structure.
+3. Relocate remaining React host layer from shared (`AuthContext`, voice hooks, `Nexus.ts` base).
+
+**Optional cleanup (non-blocking):** move shared nexus integration tests to `apps/mobile` or
+`tooling/test-support` so `packages/shared` has zero `@mobile-data` imports even in tests.
+
+Reference inventory (complete): **`docs/messages-cleave-inventory.md`** — template used for all domains.
 
 ## Reference docs (read in this order)
 - **This file** — the ruleset + current/target state + the cleave plan.

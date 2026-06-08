@@ -104,7 +104,8 @@ End state: shared defines `buildPartialMessageFromRealtimePayload()`; cache port
 
 **Precision contract:** `useVisibleChannel` must keep same equality fns and projection behavior. Screen API unchanged.
 
-**Transitional web-client:** `CommunityWorkspaceShell.tsx`, `ChatArea.tsx` — same nexus API; alias to mobile data during cleave.
+**Transitional web-client:** `CommunityWorkspaceShell.tsx`, `ChatArea.tsx` — same HavenCore port
+API; wired via `@mobile-data` until Solid desktop replaces React web/electron scaffolding.
 
 ---
 
