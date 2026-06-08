@@ -106,6 +106,7 @@ const havenCoreConsumerBoundaryIgnores = [
   "**/__tests__/**",
   "**/*.test.{ts,tsx,js,jsx}",
   "apps/mobile/src/auth/mobileAuthService.ts",
+  "apps/mobile/src/data/**",
   "apps/mobile/src/lib/createMmkvPersistence.ts",
   "apps/mobile/src/lib/react-native-mmkv.d.ts",
   "apps/mobile/src/supabase/**",

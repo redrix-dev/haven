@@ -69,7 +69,7 @@ describe("NotificationCenterModal", () => {
     registerHavenCore({
       notifications: notificationNexus,
       profiles: profileNexus,
-    } as HavenCore);
+    } as unknown as HavenCore);
     profileNexus.clear();
   });
 

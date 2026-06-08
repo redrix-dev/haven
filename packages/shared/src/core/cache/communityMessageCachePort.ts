@@ -4,12 +4,13 @@ import type {
   MessageReportKind,
   MessageReportTarget,
 } from "@shared/lib/backend/types";
-import type { SendCommunityMessageMediaOptions } from "@shared/features/messaging/logic/types";
+import type { SendCommunityMessageMediaOptions, ChannelMeta } from "@shared/features/messaging/logic/types";
 
 /** Sync mutation surface used by routeRealtimeEvent and HavenCore orchestration. */
 export interface CommunityMessageCacheInstance {
   setCommunityData(communityData: CommunityDataBackend): void;
   isCommunityDataAttached(): boolean;
+  getSnapshot(messageId: string): MessageBundle | undefined;
   insertMessage(message: MessageBundle): void;
   upsertMessage(message: MessageBundle): void;
   removeMessage(messageId: string, channelId: string): void;
@@ -54,6 +55,13 @@ export interface CommunityMessageCacheInstance {
   }): Promise<void>;
   getLastMessageId(channelId: string): string | null;
   getChannelAuthorIds(channelId: string): string[];
+  /** React-platform read surface (mobile + transitional web-client). */
+  useChannel(channelId: string): MessageBundle[];
+  useVisibleChannel(channelId: string): MessageBundle[];
+  useChannelMeta(channelId: string): ChannelMeta;
+  useIsLoadingInitial(channelId: string): boolean;
+  useIsLoadingOlder(channelId: string): boolean;
+  useHasInitialLoadCompleted(channelId: string): boolean;
   clear(): void;
   rehydrate(): void;
 }

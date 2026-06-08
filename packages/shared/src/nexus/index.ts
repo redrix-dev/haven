@@ -12,23 +12,26 @@ export type { NotificationNexusState } from "./notifications/notificationTypes";
 export type { FeatureFlagNexus, FeatureFlagNexusState } from "@mobile-data/feature-flags";
 export type { OnboardingNexus, OnboardingNexusState } from "@mobile-data/onboarding";
 export type { PermissionsNexus, PermissionsNexusState } from "@mobile-data/permissions";
-export type { ProfileNexus, ProfileNexusState, ViewerProfileUpdateInput } from "@mobile-data/profile";
+export type { ProfileNexus, ProfileNexusState } from "@mobile-data/profile";
+export type { ViewerProfileUpdateInput } from "@shared/core/cache/platformNexusPorts";
 export type { SocialNexus, SocialNexusState } from "@mobile-data/social";
 export type {
   CommunityAdminNexus,
-  CommunityAdminNexusState,
-  CommunityAdminMembersModalState,
-  CommunityAdminServerPanelState,
-  CommunityAdminChannelPermissionsState,
   CommunityModerationNexus,
 } from "@mobile-data/community";
 export type {
+  CommunityAdminChannelPermissionsState,
+  CommunityAdminMembersModalState,
+  CommunityAdminNexusState,
+  CommunityAdminServerPanelState,
+} from "@shared/nexus/community/communityAdminTypes";
+export type {
   VoiceNexus,
-  VoiceNexusState,
   VoiceConnectionPhase,
   VoiceRealtimeChannel,
   VoiceRealtimeTransport,
 } from "@mobile-data/voice";
+export type { VoiceNexusState } from "@shared/features/voice/voiceNexusTypes";
 export type {
   CommunityNexus,
 } from "@mobile-data/communities";

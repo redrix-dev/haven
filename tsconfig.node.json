@@ -3,11 +3,13 @@
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2020"],
+    "lib": ["ES2020", "DOM"],
     "paths": {
       "@electron/*": ["./apps/electron/src/*"],
       "@web/*": ["./apps/web/src/*"],
       "@web-client/*": ["./packages/web-client/src/*"],
+      "@mobile-data": ["./apps/mobile/src/data"],
+      "@mobile-data/*": ["./apps/mobile/src/data/*"],
       "@shared/app/ui/*": ["./packages/web-client/src/app-ui/*"],
       "@shared/*": ["./packages/shared/src/*"],
       "@client/app/*": ["./packages/shared/src/app/*"],
@@ -23,6 +25,7 @@
     "apps/electron/src/main/**/*",
     "apps/electron/src/preload/**/*",
     "tooling/**/*",
+    "apps/mobile/src/data/**/*",
     "packages/shared/src/platform/ipc/**/*",
     "packages/shared/src/lib/backend/__tests__/**/*"
   ],

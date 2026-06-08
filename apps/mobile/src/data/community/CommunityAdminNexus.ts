@@ -19,51 +19,21 @@ import type {
   ServerRoleItem,
   ServerSettingsUpdate,
 } from '@shared/lib/backend/types'
+import type {
+  CommunityAdminChannelPermissionsState,
+  CommunityAdminMembersModalState,
+  CommunityAdminNexusState,
+  CommunityAdminServerPanelState,
+} from '@shared/nexus/community/communityAdminTypes'
 import { getErrorMessage } from '@platform/lib/errors'
 import type { StoreApi, UseBoundStore } from 'zustand'
 
-export type CommunityAdminMembersModalState = {
-  showMembersModal: boolean
-  membersModalCommunityId: string | null
-  membersModalServerName: string
-  membersModalMembers: CommunityMemberListItem[]
-  membersModalLoading: boolean
-  membersModalError: string | null
-  membersModalCanCreateReports: boolean
-  membersModalCanManageMembers: boolean
-  membersModalCanManageBans: boolean
-}
-
-export type CommunityAdminServerPanelState = {
-  communityBans: CommunityBanItem[]
-  communityBansLoading: boolean
-  communityBansError: string | null
-  serverInvites: ServerInvite[]
-  serverInvitesLoading: boolean
-  serverInvitesError: string | null
-  serverRoles: ServerRoleItem[]
-  serverMembers: ServerMemberRoleItem[]
-  serverPermissionCatalog: PermissionCatalogItem[]
-  serverRoleManagementLoading: boolean
-  serverRoleManagementError: string | null
-  serverSettingsInitialValues: ServerSettingsUpdate | null
-  serverSettingsLoading: boolean
-  serverSettingsLoadError: string | null
-}
-
-export type CommunityAdminChannelPermissionsState = {
-  channelRolePermissions: ChannelRolePermissionItem[]
-  channelMemberPermissions: ChannelMemberPermissionItem[]
-  channelPermissionMemberOptions: ChannelMemberOption[]
-  channelPermissionsLoading: boolean
-  channelPermissionsLoadError: string | null
-}
-
-export type CommunityAdminNexusState = CommunityAdminMembersModalState &
-  CommunityAdminServerPanelState &
-  CommunityAdminChannelPermissionsState & {
-    revision: number
-  }
+export type {
+  CommunityAdminChannelPermissionsState,
+  CommunityAdminMembersModalState,
+  CommunityAdminNexusState,
+  CommunityAdminServerPanelState,
+} from '@shared/nexus/community/communityAdminTypes'
 
 const createInitialState = (): CommunityAdminNexusState => ({
   showMembersModal: false,

@@ -125,7 +125,7 @@ export class CommunityMessageCache implements CommunityMessageCacheInstance {
     return raw;
   }
 
-  private getSnapshot(id: string): MessageBundle | undefined {
+  getSnapshot(id: string): MessageBundle | undefined {
     return this.store.getState().entities[id]?.data;
   }
 

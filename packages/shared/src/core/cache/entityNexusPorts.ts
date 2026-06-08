@@ -71,6 +71,29 @@ export interface ChannelNexusPort {
   getLastChannelId(communityId: string): string | null;
   getChannelsSnapshot(communityId: string): HavenChannel[];
   getDefaultChannelId(communityId: string): string | null;
+  createChannelGroup(
+    communityId: string,
+    name: string,
+    createdByUserId: string,
+    channelIdToAssign?: string | null,
+  ): Promise<void>;
+  renameChannelGroup(
+    communityId: string,
+    groupId: string,
+    name: string,
+  ): Promise<void>;
+  deleteChannelGroup(communityId: string, groupId: string): Promise<void>;
+  assignChannelToGroup(
+    communityId: string,
+    channelId: string,
+    groupId: string,
+  ): Promise<void>;
+  removeChannelFromGroup(communityId: string, channelId: string): Promise<void>;
+  setChannelGroupCollapsed(
+    communityId: string,
+    groupId: string,
+    isCollapsed: boolean,
+  ): Promise<void>;
   rehydrate(): void;
   clear(): void;
 }
@@ -141,6 +164,7 @@ export interface NotificationNexusPort {
   markSeen(recipientIds: string[]): Promise<void>;
   markAllSeen(): Promise<void>;
   dismiss(recipientIds: string[]): Promise<void>;
+  dismissAll(): Promise<void>;
   setPreferences(preferences: NotificationPreferences | null): void;
   savePreferences(updates: NotificationPreferenceUpdate): Promise<NotificationPreferences>;
   upsertExpoPushSubscription(

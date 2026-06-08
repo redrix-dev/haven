@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
-import type { ViewerMessagePolicyStore } from "../session/viewerMessagePolicyStore";
+import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
 import type { VoiceChannelReference, VoiceSidebarParticipant } from "@shared/types/types";
 import type {
   VoiceTokenBackend,
@@ -19,6 +19,10 @@ import type {
   VoiceRealtimeChannel,
   VoiceRealtimeTransport,
 } from "@shared/features/voice/types";
+import type {
+  VoiceNexusState,
+  VoiceSessionSnapshot,
+} from "@shared/features/voice/voiceNexusTypes";
 import type { StoreApi, UseBoundStore } from "zustand";
 
 export type {
@@ -26,28 +30,7 @@ export type {
   VoiceRealtimeChannel,
   VoiceRealtimeTransport,
 } from "@shared/features/voice/types";
-
-type VoiceSessionSnapshot = {
-  joined: boolean;
-  isMuted: boolean;
-  isDeafened: boolean;
-};
-
-export type VoiceNexusState = {
-  phase: VoiceConnectionPhase;
-  activeChannel: VoiceChannelReference | null;
-  pendingChannel: VoiceChannelReference | null;
-  error: string | null;
-  joined: boolean;
-  isMuted: boolean;
-  isDeafened: boolean;
-  currentChannelId: string | null;
-  participants: VoiceSidebarParticipant[];
-  participantsByChannelId: Record<string, VoiceSidebarParticipant[]>;
-  voiceConnected: boolean;
-  sessionState: VoiceSessionSnapshot | null;
-  revision: number;
-};
+export type { VoiceNexusState, VoiceSessionSnapshot } from "@shared/features/voice/voiceNexusTypes";
 
 type ConnectKickChannelInput = {
   communityId: string;

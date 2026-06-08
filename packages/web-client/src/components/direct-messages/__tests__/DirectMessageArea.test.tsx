@@ -68,7 +68,7 @@ describe("DirectMessageArea", () => {
   beforeEach(() => {
     resetHavenCore();
     profileNexus = new ProfileNexus(createMemoryPersistence());
-    registerHavenCore({ profiles: profileNexus } as HavenCore);
+    registerHavenCore({ profiles: profileNexus } as unknown as HavenCore);
     profileNexus.clear();
   });
 

@@ -1,7 +1,15 @@
 import type { HavenSupabaseClient } from "@shared/infrastructure/client/createHavenSupabaseClient";
 import type {
+  CommunityAdminNexusPort,
+  CommunityModerationNexusPort,
   CreatePlatformNexusBundle,
+  FeatureFlagNexusPort,
+  OnboardingNexusPort,
+  PermissionsNexusPort,
   PlatformNexusBundle,
+  ProfileNexusPort,
+  SocialNexusPort,
+  VoiceNexusPort,
   VoiceRealtimeChannel,
   VoiceRealtimeTransport,
 } from "@shared/core/cache/platformNexusPorts";
@@ -122,17 +130,17 @@ export class HavenCore {
   readonly persistence: NexusPersistence;
   readonly communities: CommunityNexusPort;
   readonly channels: ChannelNexusPort;
-  readonly admin: PlatformNexusBundle["admin"];
-  readonly moderation: PlatformNexusBundle["moderation"];
+  readonly admin: CommunityAdminNexusPort;
+  readonly moderation: CommunityModerationNexusPort;
   readonly messages: CommunityMessageRegistry;
   readonly directMessages: DirectMessageNexusPort;
   readonly notifications: NotificationNexusPort;
-  readonly social: PlatformNexusBundle["social"];
-  readonly permissions: PlatformNexusBundle["permissions"];
-  readonly profiles: PlatformNexusBundle["profiles"];
-  readonly featureFlags: PlatformNexusBundle["featureFlags"];
-  readonly onboarding: PlatformNexusBundle["onboarding"];
-  readonly voice: PlatformNexusBundle["voice"];
+  readonly social: SocialNexusPort;
+  readonly permissions: PermissionsNexusPort;
+  readonly profiles: ProfileNexusPort;
+  readonly featureFlags: FeatureFlagNexusPort;
+  readonly onboarding: OnboardingNexusPort;
+  readonly voice: VoiceNexusPort;
 
   readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
   readonly authStore: AuthStorePort;
@@ -205,7 +213,7 @@ export class HavenCore {
     this.social.setPolicySyncCallback(() => {
       this.syncViewerMessagePolicy();
     });
-    this.permissions.setPolicySyncCallback((communityId) => {
+    this.permissions.setPolicySyncCallback((communityId: string) => {
       this.syncViewerMessagePolicy(communityId);
     });
 
@@ -818,10 +826,10 @@ export class HavenCore {
 
     if (userId) {
       await this.communities.load(userId);
-      await this.profiles.ensureViewerProfile(userId).catch((error) => {
+      await this.profiles.ensureViewerProfile(userId).catch((error: unknown) => {
         console.warn("[HavenCore] onboarding viewer profile refresh failed", error);
       });
-      await this.profiles.loadMyUserFlairs(userId).catch((error) => {
+      await this.profiles.loadMyUserFlairs(userId).catch((error: unknown) => {
         console.warn("[HavenCore] onboarding flair refresh failed", error);
       });
     }

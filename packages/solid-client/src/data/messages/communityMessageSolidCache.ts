@@ -61,6 +61,36 @@ export class CommunityMessageSolidCache implements CommunityMessageCacheInstance
     return this.communityData !== null;
   }
 
+  getSnapshot(messageId: string): MessageBundle | undefined {
+    return this.state.entities[messageId]?.data;
+  }
+
+  useChannel(_channelId: string): MessageBundle[] {
+    throw new Error("CommunityMessageSolidCache.useChannel is React-only");
+  }
+
+  useVisibleChannel(_channelId: string): MessageBundle[] {
+    throw new Error("CommunityMessageSolidCache.useVisibleChannel is React-only");
+  }
+
+  useChannelMeta(_channelId: string): ChannelMeta {
+    throw new Error("CommunityMessageSolidCache.useChannelMeta is React-only");
+  }
+
+  useIsLoadingInitial(_channelId: string): boolean {
+    throw new Error("CommunityMessageSolidCache.useIsLoadingInitial is React-only");
+  }
+
+  useIsLoadingOlder(_channelId: string): boolean {
+    throw new Error("CommunityMessageSolidCache.useIsLoadingOlder is React-only");
+  }
+
+  useHasInitialLoadCompleted(_channelId: string): boolean {
+    throw new Error(
+      "CommunityMessageSolidCache.useHasInitialLoadCompleted is React-only",
+    );
+  }
+
   async ensureInitialLoaded(
     channelId: string,
     options?: { freshnessMs?: number },
