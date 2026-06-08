@@ -24,6 +24,7 @@ import {
   toServerSummaries,
   useHavenCore,
 } from "@shared/core";
+import { useActiveChannelId, useChannels } from "@react-bindings";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
 import UserProfileModal, {
   type UserProfileModalTarget,
@@ -210,8 +211,9 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const dmConversations = dm.useConversations();
   const socialCounts = core.social.useCounts();
   const currentServerId = core.communities.useActiveId();
-  const currentChannelId = core.channels.useActiveChannelId();
-  const activeCommunityChannels = core.channels.useChannels(
+  const currentChannelId = useActiveChannelId(core.channels);
+  const activeCommunityChannels = useChannels(
+    core.channels,
     currentServerId ?? "__none__",
   );
   const channels = useMemo(

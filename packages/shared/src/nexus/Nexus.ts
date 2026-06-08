@@ -41,7 +41,7 @@ export abstract class Nexus<T, R = unknown> {
     this.persistence = persistence;
   }
 
-  protected get store(): UseBoundStore<StoreApi<NexusState<T>>> {
+  protected get store(): StoreApi<NexusState<T>> {
     if (!this._store) {
       this._store = create<NexusState<T>>(() => ({
         entities: {},

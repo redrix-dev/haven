@@ -1,6 +1,6 @@
-import { create } from 'zustand'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { createStore, type StoreApi } from 'zustand/vanilla'
 import { Nexus, type NexusEntry, type NexusState } from '../Nexus'
+import type { ReadableStore } from '../storeTypes'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
 import type { CommunityDataBackend } from '@shared/lib/backend/communityDataBackend.interface'
 import type {
@@ -9,7 +9,6 @@ import type {
   ChannelGroupState,
   ChannelKind,
 } from '@shared/lib/backend/types'
-import type { StoreApi, UseBoundStore } from 'zustand'
 
 export type HavenChannel = {
   id: string
@@ -34,57 +33,8 @@ export type ChannelNexusState = NexusState<HavenChannel> & {
 const STORAGE_KEY = 'haven:nexus:channels:global'
 const EMPTY_CHANNELS: HavenChannel[] = []
 
-const selectActiveChannelId = (state: ChannelNexusState) => state.activeChannelId
-
-export const channelsEqual = (a: HavenChannel[], b: HavenChannel[]): boolean => {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) {
-    if (
-      a[i].id !== b[i].id ||
-      a[i].name !== b[i].name ||
-      a[i].position !== b[i].position
-    ) {
-      return false
-    }
-  }
-  return true
-}
-
-export const groupStateEqual = (
-  a: ChannelGroupState,
-  b: ChannelGroupState,
-): boolean =>
-  a.groups.length === b.groups.length &&
-  a.ungroupedChannelIds.length === b.ungroupedChannelIds.length &&
-  a.collapsedGroupIds.length === b.collapsedGroupIds.length
-
 export class ChannelNexus extends Nexus<HavenChannel, Channel> {
-  private _channelStore: UseBoundStore<StoreApi<ChannelNexusState>> | null =
-    null
-
-  private channelSelectors = new Map<
-    string,
-    (state: ChannelNexusState) => HavenChannel | undefined
-  >()
-
-  private channelsSelectors = new Map<
-    string,
-    (state: ChannelNexusState) => HavenChannel[]
-  >()
-
-  private groupsSelectors = new Map<
-    string,
-    (state: ChannelNexusState) => ChannelGroupState
-  >()
-
-  private loadingSelectors = new Map<
-    string,
-    (state: ChannelNexusState) => boolean
-  >()
-
-  private channelsSnapshots = new Map<string, HavenChannel[]>()
-  private groupStateSnapshots = new Map<string, ChannelGroupState>()
+  private _channelStore: StoreApi<ChannelNexusState> | null = null
 
   private readonly communityData: CommunityDataBackend
   private inflight = new Map<string, Promise<void>>()
@@ -190,9 +140,13 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
     }
   }
 
-  protected override get store(): UseBoundStore<StoreApi<ChannelNexusState>> {
+  /**
+   * Full vanilla store — `protected` so only the class (and Nexus base) can
+   * mutate via `setState`. External readers go through `reactiveStore`.
+   */
+  protected override get store(): StoreApi<ChannelNexusState> {
     if (!this._channelStore) {
-      this._channelStore = create<ChannelNexusState>(() => ({
+      this._channelStore = createStore<ChannelNexusState>(() => ({
         entities: {},
         byCommunity: {},
         groups: {},
@@ -208,78 +162,14 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
     return this._channelStore
   }
 
-  private getChannelSelector(
-    id: string,
-  ): (state: ChannelNexusState) => HavenChannel | undefined {
-    if (!this.channelSelectors.has(id)) {
-      this.channelSelectors.set(id, (state) => state.entities[id]?.data)
-    }
-    return this.channelSelectors.get(id)!
-  }
-
-  private getChannelsSelector(
-    communityId: string,
-  ): (state: ChannelNexusState) => HavenChannel[] {
-    if (!this.channelsSelectors.has(communityId)) {
-      this.channelsSelectors.set(communityId, (state) => {
-        void state.revision
-        const ids = state.byCommunity[communityId]
-        if (!ids?.length) return EMPTY_CHANNELS
-
-        const channels: HavenChannel[] = []
-        for (const id of ids) {
-          const entry = state.entities[id]
-          if (entry && !entry.partial) {
-            channels.push(entry.data)
-          }
-        }
-
-        const cached = this.channelsSnapshots.get(communityId)
-        if (cached && channelsEqual(cached, channels)) {
-          return cached
-        }
-
-        this.channelsSnapshots.set(communityId, channels)
-        return channels
-      })
-    }
-    return this.channelsSelectors.get(communityId)!
-  }
-
-  private getGroupsSelector(
-    communityId: string,
-  ): (state: ChannelNexusState) => ChannelGroupState {
-    if (!this.groupsSelectors.has(communityId)) {
-      this.groupsSelectors.set(communityId, (state) => {
-        void state.revision
-        const next: ChannelGroupState = {
-          groups: state.groups[communityId] ?? [],
-          ungroupedChannelIds: state.ungrouped[communityId] ?? [],
-          collapsedGroupIds: state.collapsed[communityId] ?? [],
-        }
-
-        const cached = this.groupStateSnapshots.get(communityId)
-        if (cached && groupStateEqual(cached, next)) {
-          return cached
-        }
-
-        this.groupStateSnapshots.set(communityId, next)
-        return next
-      })
-    }
-    return this.groupsSelectors.get(communityId)!
-  }
-
-  private getLoadingSelector(
-    communityId: string,
-  ): (state: ChannelNexusState) => boolean {
-    if (!this.loadingSelectors.has(communityId)) {
-      this.loadingSelectors.set(
-        communityId,
-        (state) => state.loadingByCommunity[communityId] ?? false,
-      )
-    }
-    return this.loadingSelectors.get(communityId)!
+  /**
+   * Read-only store handle for the binding packages (`@react-bindings`,
+   * `@solid-bindings`). Exposes `getState`/`subscribe` only — not `setState` —
+   * so reactivity bindings can observe channel state without bypassing the
+   * class's action methods, persistence, or revision bookkeeping.
+   */
+  get reactiveStore(): ReadableStore<ChannelNexusState> {
+    return this.store
   }
 
   setChannels(
@@ -493,7 +383,6 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
       },
       revision: state.revision + 1,
     }))
-    this.groupStateSnapshots.delete(communityId)
     this.persist()
   }
 
@@ -676,41 +565,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
       lastChannelByCommunity: {},
       revision: 0,
     })
-    this.channelSelectors.clear()
-    this.channelsSelectors.clear()
-    this.groupsSelectors.clear()
-    this.loadingSelectors.clear()
-    this.channelsSnapshots.clear()
-    this.groupStateSnapshots.clear()
     this.persistence.remove(STORAGE_KEY)
-  }
-
-  useChannels(communityId: string): HavenChannel[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      this.getChannelsSelector(communityId),
-      channelsEqual,
-    )
-  }
-
-  useChannel(id: string): HavenChannel | undefined {
-    return useStoreWithEqualityFn(this.store, this.getChannelSelector(id))
-  }
-
-  useChannelGroups(communityId: string): ChannelGroupState {
-    return useStoreWithEqualityFn(
-      this.store,
-      this.getGroupsSelector(communityId),
-      groupStateEqual,
-    )
-  }
-
-  useActiveChannelId(): string | null {
-    return useStoreWithEqualityFn(this.store, selectActiveChannelId)
-  }
-
-  useIsLoading(communityId: string): boolean {
-    return useStoreWithEqualityFn(this.store, this.getLoadingSelector(communityId))
   }
 }
 

@@ -9,13 +9,22 @@ const monorepoRoot = path.resolve(projectRoot, "../..");
 const mobileNodeModules = path.resolve(projectRoot, "node_modules");
 const sharedPackageRoot = path.resolve(monorepoRoot, "packages/shared");
 const webClientPackageRoot = path.resolve(monorepoRoot, "packages/web-client");
+const reactBindingsPackageRoot = path.resolve(
+  monorepoRoot,
+  "packages/react-bindings",
+);
 const sharedSrcRoot = path.join(sharedPackageRoot, "src");
 const webClientAppUiRoot = path.join(webClientPackageRoot, "src", "app-ui");
+const reactBindingsSrcRoot = path.join(reactBindingsPackageRoot, "src");
 const mobileSrcRoot = path.join(projectRoot, "src");
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [sharedPackageRoot, webClientPackageRoot];
+config.watchFolders = [
+  sharedPackageRoot,
+  webClientPackageRoot,
+  reactBindingsPackageRoot,
+];
 config.resolver.nodeModulesPaths = [
   mobileNodeModules,
   path.resolve(monorepoRoot, "node_modules"),
@@ -57,6 +66,17 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
       sharedSrcRoot,
       moduleName.slice("@shared/".length),
     );
+    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
+  }
+
+  if (moduleName === "@react-bindings" || moduleName.startsWith("@react-bindings/")) {
+    const sub =
+      moduleName === "@react-bindings"
+        ? ""
+        : moduleName.slice("@react-bindings/".length);
+    const absolutePath = sub
+      ? path.join(reactBindingsSrcRoot, sub)
+      : reactBindingsSrcRoot;
     return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
   }
 

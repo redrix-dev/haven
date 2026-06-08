@@ -36,8 +36,9 @@
     "test:report": "node tooling/scripts/test/generate-test-report.mjs",
     "checkin": "node tooling/scripts/checkin.mjs",
     "typecheck": "tsc --noEmit --project tsconfig.web.json && tsc --noEmit --project tsconfig.node.json",
+    "typecheck:solid": "tsc --noEmit --project apps/tauri/tsconfig.json",
     "test:all": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run test:unit && npm run test:db && npm run test:backend",
-    "test:ci": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run mobile:typecheck && npm run test:unit && npm run test:db && npm run test:backend",
+    "test:ci": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run mobile:typecheck && npm run typecheck:solid && npm run test:unit && npm run test:db && npm run test:backend",
     "ci:verify": "npm run test:ci",
     "dev:web": "npm run assets:generate && vite",
     "build:web": "npm run assets:generate && vite build",
@@ -77,6 +78,7 @@
     "mobile:eas:credentials": "node tooling/scripts/mobile/run-in-mobile.mjs npm run eas:credentials",
     "mobile:ota:deploy": "bash tooling/scripts/mobile/deploy-ota.sh",
     "mobile:typecheck": "node tooling/scripts/mobile/run-in-mobile.mjs npm run typecheck",
+    "mobile:bundle": "node tooling/scripts/mobile/run-in-mobile.mjs npm run bundle:check",
     "mobile:release:check": "npm run check:themes && npm run check:chat-surface && npm run check:mobile-uniwind && npm run check:mobile-typography && npm run mobile:preflight && npm run mobile:typecheck",
     "setup:mobile": "node tooling/scripts/mobile/run-in-mobile.mjs npm ci",
     "reset:mobile": "node tooling/scripts/mobile/reset.mjs"

@@ -8,6 +8,11 @@ import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 import { useChatAppVoiceIntegration } from "@web-client/chat-app/useChatAppVoiceIntegration";
 import { getErrorMessage } from "@platform/lib/errors";
 import { useHavenCore, toChannel } from "@shared/core";
+import {
+  useActiveChannelId,
+  useChannels,
+  useChannelsLoading,
+} from "@react-bindings";
 import { useUiStore } from "@shared/stores/uiStore";
 import { useUserStatusStore } from "@shared/stores/userStatusStore";
 import type { MessageReportKind, MessageReportTarget } from "@shared/lib/backend/types";
@@ -25,9 +30,12 @@ export function CommunityWorkspaceShell({
   const core = useHavenCore();
   const admin = core.admin;
   const currentServerId = core.communities.useActiveId();
-  const currentChannelId = core.channels.useActiveChannelId();
-  const havenChannels = core.channels.useChannels(currentServerId ?? "__none__");
-  const channelsLoading = core.channels.useIsLoading(currentServerId ?? "__none__");
+  const currentChannelId = useActiveChannelId(core.channels);
+  const havenChannels = useChannels(core.channels, currentServerId ?? "__none__");
+  const channelsLoading = useChannelsLoading(
+    core.channels,
+    currentServerId ?? "__none__",
+  );
   const channels = useMemo(
     () => havenChannels.map(toChannel),
     [havenChannels],

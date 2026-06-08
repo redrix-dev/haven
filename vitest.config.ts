@@ -20,17 +20,33 @@ const conditionalReporters = markdownOutputFile
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@electron': path.resolve(__dirname, 'apps/electron/src'),
-      '@web': path.resolve(__dirname, 'apps/web/src'),
-      '@web-client': path.resolve(__dirname, 'packages/web-client/src'),
-      '@shared/app/ui': path.resolve(__dirname, 'packages/web-client/src/app-ui'),
-      '@shared': path.resolve(__dirname, 'packages/shared/src'),
-      '@client': path.resolve(__dirname, 'packages/shared/src/client'),
-      '@platform/assets/runtimeAudio': path.resolve(__dirname, 'packages/web-client/src/infrastructure/platform/assets/runtimeAudio'),
-      '@platform': path.resolve(__dirname, 'packages/shared/src/platform'),
-      '@test-support': path.resolve(__dirname, 'tooling/test-support'),
-    },
+    // Array form so we can match `solid-js` exactly (regex) without also
+    // catching `solid-js/store` etc. Order matters: most-specific first.
+    alias: [
+      // Vitest runs in a node env, where solid-js's `node` export condition
+      // resolves to the non-reactive SSR build (dist/server.js). Force the
+      // reactive development build so `@solid-bindings` signals/memos actually
+      // update under test. Scoped to the bare specifier — React tests never
+      // import solid-js, so this has zero blast radius on the rest of the suite.
+      {
+        find: /^solid-js$/,
+        replacement: path.resolve(__dirname, 'node_modules/solid-js/dist/dev.js'),
+      },
+      { find: '@electron', replacement: path.resolve(__dirname, 'apps/electron/src') },
+      { find: '@web', replacement: path.resolve(__dirname, 'apps/web/src') },
+      { find: '@web-client', replacement: path.resolve(__dirname, 'packages/web-client/src') },
+      { find: '@react-bindings', replacement: path.resolve(__dirname, 'packages/react-bindings/src') },
+      { find: '@solid-bindings', replacement: path.resolve(__dirname, 'packages/solid-bindings/src') },
+      { find: '@shared/app/ui', replacement: path.resolve(__dirname, 'packages/web-client/src/app-ui') },
+      { find: '@shared', replacement: path.resolve(__dirname, 'packages/shared/src') },
+      { find: '@client', replacement: path.resolve(__dirname, 'packages/shared/src/client') },
+      {
+        find: '@platform/assets/runtimeAudio',
+        replacement: path.resolve(__dirname, 'packages/web-client/src/infrastructure/platform/assets/runtimeAudio'),
+      },
+      { find: '@platform', replacement: path.resolve(__dirname, 'packages/shared/src/platform') },
+      { find: '@test-support', replacement: path.resolve(__dirname, 'tooling/test-support') },
+    ],
   },
   test: {
     globals: true,

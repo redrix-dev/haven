@@ -11,6 +11,11 @@ import {
   toServerSummaries,
   useHavenCore,
 } from "@shared/core";
+import {
+  useActiveChannelId,
+  useChannels,
+  useChannelsLoading,
+} from "@react-bindings";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   buildChatListItemsFromChatMessages,
@@ -63,7 +68,7 @@ export function CommunityChatScreen({
   const { setRainbowMode } = useUserStatusStore();
   const user = useAuthStore((state) => state.user);
   const communityId = core.communities.useActiveId() ?? serverId;
-  const navigationChannelId = core.channels.useActiveChannelId();
+  const navigationChannelId = useActiveChannelId(core.channels);
   const messageNexus = core.messages.for(communityId ?? "__none__");
   const currentUserId = user?.id ?? null;
   const currentUserPlatformStaff = core.profiles.usePlatformStaff(currentUserId);
@@ -84,8 +89,11 @@ export function CommunityChatScreen({
     if (!currentUserId) return;
     await core.refreshCommunities(currentUserId);
   }, [core, currentUserId]);
-  const havenChannels = core.channels.useChannels(communityId ?? serverId);
-  const channelsLoading = core.channels.useIsLoading(communityId ?? serverId);
+  const havenChannels = useChannels(core.channels, communityId ?? serverId);
+  const channelsLoading = useChannelsLoading(
+    core.channels,
+    communityId ?? serverId,
+  );
   const channels = useMemo(() => havenChannels.map(toChannel), [havenChannels]);
   const currentChannel = useMemo(
     () =>

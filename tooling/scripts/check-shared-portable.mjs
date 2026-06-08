@@ -30,6 +30,20 @@ const portablePathExclusions = [
   /^packages\/shared\/src\/app\/hooks\/useDesktopSettings\.ts$/,
 ];
 
+/**
+ * Core modules that have completed the zero-React conversion (Phase 2 shared-core
+ * hardening). These must not import any UI framework or the React-flavored zustand
+ * entries — reactivity lives in the binding packages. `zustand/vanilla` is allowed.
+ *
+ * Append each file as its per-domain loop lands so finished work can't regress.
+ */
+const reactFreeCoreChecks = [
+  /^packages\/shared\/src\/nexus\/community\/ChannelNexus\.ts$/,
+  /^packages\/shared\/src\/nexus\/community\/channelSelectors\.ts$/,
+];
+const frameworkImportRe =
+  /\bfrom\s+["'](?:react|react-dom|solid-js|zustand|zustand\/traditional|zustand\/react)["']/;
+
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -60,9 +74,17 @@ for (const file of walk(sharedRoot)) {
   const shouldCheckPortablePath = portablePathChecks.some((pattern) =>
     pattern.test(rel),
   ) && !portablePathExclusions.some((pattern) => pattern.test(rel));
+  const shouldCheckReactFree = reactFreeCoreChecks.some((pattern) =>
+    pattern.test(rel),
+  );
   const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((rawLine, i) => {
     const line = stripComments(rawLine);
+    if (shouldCheckReactFree && frameworkImportRe.test(line)) {
+      violations.push(
+        `${rel}:${i + 1}: framework import in zero-React core module (reactivity belongs in @react-bindings/@solid-bindings; use zustand/vanilla)`,
+      );
+    }
     if (importSupabaseRe.test(line)) {
       violations.push(`${rel}:${i + 1}: import of deprecated @shared/lib/supabase`);
     }

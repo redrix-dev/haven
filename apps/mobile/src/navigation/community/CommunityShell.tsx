@@ -7,6 +7,7 @@ import {
   toServerSummaries,
   useHavenCore,
 } from "@shared/core";
+import { useActiveChannelId, useChannels } from "@react-bindings";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackHandler, View } from "react-native";
 import { CommunityChatScreen } from "@/screens/main/CommunityChatScreen";
@@ -146,8 +147,8 @@ export function CommunityShell({
     () => toServerSummaries(nexusCommunities),
     [nexusCommunities],
   );
-  const currentChannelId = core.channels.useActiveChannelId();
-  const havenChannels = core.channels.useChannels(serverId ?? "__empty__");
+  const currentChannelId = useActiveChannelId(core.channels);
+  const havenChannels = useChannels(core.channels, serverId ?? "__empty__");
   const channels = useMemo(() => havenChannels.map(toChannel), [havenChannels]);
 
   useEffect(() => {

@@ -198,6 +198,64 @@ Captured so they don't get lost, deliberately *not* pulled into the current lift
 
 ---
 
+## 🚨 STANDING DECISION — Monorepo package resolution: alias → workspace packages
+
+**Status: DECIDED (end state) · NOT YET SCHEDULED · interim guardrail in place.**
+
+> **The binding packages (`@react-bindings`, `@solid-bindings`) and `@shared` MUST eventually become
+> real workspace packages (`package.json` + `name` + `exports`). The current path-alias approach is a
+> deliberate INTERIM, not the destination.**
+
+**Why this is the end state (the alias's truthful cost):**
+- No enforced public surface — anything can deep-import internals; no `exports` map.
+- No real dependency graph — alias "folders" can't declare their own deps; they inherit the app's.
+- Unbounded, hand-maintained resolution machinery duplicated across **every toolchain**: tsconfig `paths`
+  + babel `module-resolver` + Metro `resolveRequest` + Vite + Vitest. Cost scales with
+  (packages × toolchains) and is paid continuously and silently. Each is a drift footgun (a change that
+  updates 2 of N configs passes typecheck and only fails at app boot / bundle).
+- Opts out of ecosystem tooling (turbo/nx graphs, `npm ls`, audits, per-package caching).
+
+**Honest cost of the migration (why it's a milestone, not a drive-by):**
+- Metro + symlinked workspaces is *the* historically painful part — it's literally why this repo
+  hand-rolled `resolveRequest`. SDK 55 Metro handles symlinks far better, but hoisting / duplicate-React
+  hazards still need care.
+- Build-vs-source decision: ship TS source via `exports` (every tool must transpile it) **or** add a
+  per-package build step.
+- `@shared` has many consumers → converting it touches every app's resolution at once (high blast radius).
+
+**Sequencing rules (do NOT violate):**
+1. **Do not half-migrate.** Converting only the binding packages while `@shared` stays aliased = two
+   resolution mechanisms = worse than either pure state. **Convert the binding packages AND `@shared`
+   together**, as one dedicated "monorepo resolution" milestone.
+2. **Trigger:** schedule the milestone when `@shared`-as-a-real-package is on the near roadmap.
+3. **Prerequisite/safety net:** the headless **`mobile:bundle`** gate (`expo export`, added with the
+   ChannelNexus loop) is what makes this conversion *safe to attempt* — it fails on any broken Metro/Babel
+   resolution in CI without a simulator. Land/keep that gate green before attempting the conversion.
+
+**Interim that IS sanctioned until then:** a single alias **manifest** (one source of truth consumed by
+babel + metro) + a `check:aliases` guard that fails CI on tsconfig drift. This is acceptable **only** as
+the bridge to the milestone above — it is explicitly throwaway and gets deleted by the conversion. Do not
+let the interim ossify into "the way we do it."
+
+> **🔍 Finding (ChannelNexus loop, recorded 2026-06-08): mobile alias resolution is driven by `tsconfig`
+> paths, not babel/metro.** Empirically (via the `mobile:bundle` self-test): breaking the `@react-bindings`
+> alias in **both** `babel.config.js` (module-resolver) **and** `metro.config.js` (`resolveRequest`) still
+> bundled successfully — only when the **`tsconfig.json` `paths`** entry was *also* removed did
+> `expo export` fail. Expo Metro (SDK 49+) honors `compilerOptions.paths` natively. **Implication:** the
+> babel + metro alias entries for the binding packages are **redundant belt-and-suspenders** (kept only to
+> match the existing `@shared`/`@platform` convention). The cleaner interim may be to **rely on `tsconfig`
+> paths as the single mobile resolver and delete the babel/metro alias copies** — fewer layers to drift,
+> and directionally toward toolchain-native resolution (the workspace end-state). Open question to settle
+> with the milestone: tsconfig-paths-only vs. manifest-synced-belt-and-suspenders. (Verify tsconfig-paths
+> covers Jest + any babel transform edge cases before deleting layers.)
+>
+> **Corollary — what `mobile:bundle` does and doesn't gate:** it's a valid headless CI smoke (exits **1**
+> on a *total* resolution failure: missing module, broken import, transform error, or an alias broken in
+> **all** layers). Because the resolvers are redundant, it does **NOT** catch single-layer alias *drift* —
+> that still needs the explicit `check:aliases` guard (or layer reduction above).
+
+---
+
 ## Keep-in-mind / architecture notes (foundation inputs)
 Captured from probe findings + a `Nexus` review. Shape Phase 2; not yet sequenced.
 

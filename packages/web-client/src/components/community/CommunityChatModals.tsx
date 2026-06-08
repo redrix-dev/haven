@@ -10,6 +10,7 @@ import { ChannelSettingsModal } from "@web-client/components/community/ChannelSe
 import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 import { useChatAppModalUiState } from "@web-client/chat-app/modals/chatAppModalUiState";
 import { useHavenCore, toChannel } from "@shared/core";
+import { useChannels } from "@react-bindings";
 import { getPlatformInviteBaseUrl } from "@platform/urls";
 
 type CommunityChatModalsProps = {
@@ -53,7 +54,7 @@ export function CommunityChatModals({ user }: CommunityChatModalsProps) {
     canOpenChannelSettings,
   } = ui;
 
-  const havenChannels = core.channels.useChannels(currentServerId ?? "__none__");
+  const havenChannels = useChannels(core.channels, currentServerId ?? "__none__");
   const channels = useMemo(
     () => havenChannels.map(toChannel),
     [havenChannels],

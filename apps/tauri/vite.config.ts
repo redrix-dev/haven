@@ -12,6 +12,7 @@ export default defineConfig({
     alias: {
       "@solid-client": path.resolve(__dirname, "../../packages/solid-client/src"),
       "@solid-bindings": path.resolve(__dirname, "../../packages/solid-bindings/src"),
+      "@shared": path.resolve(__dirname, "../../packages/shared/src"),
     },
   },
   build: {

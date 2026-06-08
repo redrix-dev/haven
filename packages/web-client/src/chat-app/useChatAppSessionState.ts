@@ -11,6 +11,12 @@ import {
   resetNotificationSoundSyncState,
   syncNotificationSounds,
 } from "@shared/core";
+import {
+  useActiveChannelId,
+  useChannelGroups,
+  useChannels,
+  useChannelsLoading,
+} from "@react-bindings";
 import { getPlatformInviteBaseUrl } from "@platform/urls";
 import {
   ENABLE_CHANNEL_RELOAD_DIAGNOSTICS,
@@ -169,7 +175,7 @@ export function useChatAppSessionState() {
 
   // ── Community workspace (nexus-backed) ─────────────────────────────────────
   const currentServerId = core.communities.useActiveId();
-  const currentChannelId = core.channels.useActiveChannelId();
+  const currentChannelId = useActiveChannelId(core.channels);
   const setCurrentServerId = useCallback(
     (id: string | null) => {
       core.communities.setActiveId(id);
@@ -190,8 +196,11 @@ export function useChatAppSessionState() {
     [core],
   );
 
-  const havenChannels = core.channels.useChannels(currentServerId ?? "__none__");
-  const channelsLoading = core.channels.useIsLoading(currentServerId ?? "__none__");
+  const havenChannels = useChannels(core.channels, currentServerId ?? "__none__");
+  const channelsLoading = useChannelsLoading(
+    core.channels,
+    currentServerId ?? "__none__",
+  );
   const channels = useMemo(
     () => havenChannels.map(toChannel),
     [havenChannels],
@@ -428,7 +437,7 @@ export function useChatAppSessionState() {
   ]);
 
   // ── Channel groups ────────────────────────────────────────────────────────
-  const channelGroupState = core.channels.useChannelGroups(currentServerId ?? "");
+  const channelGroupState = useChannelGroups(core.channels, currentServerId ?? "");
   const sidebarChannelGroups = useMemo(
     () =>
       channelGroupState.groups.map((group) => ({

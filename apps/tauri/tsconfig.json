@@ -13,7 +13,9 @@
     "paths": {
       "@solid-client/*": ["../../packages/solid-client/src/*"],
       "@solid-bindings": ["../../packages/solid-bindings/src"],
-      "@solid-bindings/*": ["../../packages/solid-bindings/src/*"]
+      "@solid-bindings/*": ["../../packages/solid-bindings/src/*"],
+      "@shared": ["../../packages/shared/src"],
+      "@shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": [

@@ -14,7 +14,7 @@ import {
 import type { CommunityDataBackend } from '@shared/lib/backend/communityDataBackend.interface'
 import type { MessageBundle, MessageReportKind, MessageReportTarget } from '@shared/lib/backend/types'
 import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from '@shared/lib/backend/mediaAttachmentUtils'
-import type { StoreApi, UseBoundStore } from 'zustand'
+import type { StoreApi } from 'zustand'
 
 const MESSAGE_PAGE_SIZE = 50
 const MESSAGE_RELOAD_FRESHNESS_WINDOW_MS = 10_000
@@ -504,7 +504,7 @@ export class CommunityMessageNexus extends Nexus<MessageBundle, MessageBundle> {
     }
   }
 
-  getReactiveStore(): UseBoundStore<StoreApi<NexusState<MessageBundle>>> {
+  getReactiveStore(): StoreApi<NexusState<MessageBundle>> {
     return this.store
   }
 

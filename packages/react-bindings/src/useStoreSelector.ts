@@ -1,5 +1,5 @@
 import { useStoreWithEqualityFn } from "zustand/traditional";
-import type { StoreApi } from "zustand/vanilla";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 
 /**
  * Generic React adapter over a framework-agnostic vanilla zustand store.
@@ -14,7 +14,7 @@ import type { StoreApi } from "zustand/vanilla";
  * behave identically.
  */
 export function useStoreSelector<S, T>(
-  store: StoreApi<S>,
+  store: ReadableStore<S>,
   selector: (state: S) => T,
   equalityFn: (a: T, b: T) => boolean = Object.is,
 ): T {

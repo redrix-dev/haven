@@ -1,5 +1,5 @@
 import { createMemo, createSignal, onCleanup, type Accessor } from "solid-js";
-import type { StoreApi } from "zustand/vanilla";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 
 /**
  * Generic Solid adapter over a framework-agnostic vanilla zustand store.
@@ -8,7 +8,7 @@ import type { StoreApi } from "zustand/vanilla";
  * subscribe → signal. Per-domain Solid accessors (`createProfile`, …) compose it.
  * Consumed by solid-client (tauri) now, and future solid-web.
  */
-export function fromStore<S>(store: StoreApi<S>): Accessor<S> {
+export function fromStore<S>(store: ReadableStore<S>): Accessor<S> {
   const [state, setState] = createSignal<S>(store.getState());
   const unsubscribe = store.subscribe((next) => setState(() => next));
   onCleanup(unsubscribe);
@@ -23,7 +23,7 @@ export function fromStore<S>(store: StoreApi<S>): Accessor<S> {
  *   createStoreSelector(store, (s) => s.profiles[id()])  // re-runs when id() changes
  */
 export function createStoreSelector<S, T>(
-  store: StoreApi<S>,
+  store: ReadableStore<S>,
   selector: (state: S) => T,
   equals?: (a: T, b: T) => boolean,
 ): Accessor<T> {
