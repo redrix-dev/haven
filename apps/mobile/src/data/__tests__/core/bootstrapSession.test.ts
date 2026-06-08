@@ -1,17 +1,19 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   createMemoryPersistence,
+} from '@shared/core';
+import {
   resetHavenCore,
   syncFocusFromRoute,
-} from '@shared/core';
+} from '@mobile-data';
 import { CommunityNexus } from '@mobile-data/communities/CommunityNexus';
 import { ChannelNexus } from '@mobile-data/channels/ChannelNexus';
 import { CommunityMessageCache as CommunityMessageNexus } from '@mobile-data/messages/CommunityMessageCache';
-import { HavenCore } from '@shared/core/HavenCore';
+import { HavenReactCore } from '@mobile-data/core/HavenReactCore';
 import type { ServerSummary } from '@shared/lib/backend/types';
 
 /**
- * Bootstrap tests exercise HavenCore.bootstrapSession at the integration level
+ * Bootstrap tests exercise HavenReactCore.bootstrapSession at the integration level
  * without depending on a real Supabase client. We instantiate the nexuses
  * directly and stub the two surfaces bootstrap touches: control-plane.listUserCommunities
  * and control-plane.subscribeToPrivateUserChannel.
@@ -25,7 +27,7 @@ const makeFakeCore = (input: {
     userId: string,
     listener: Listener,
   ) => () => void;
-}): HavenCore => {
+}): HavenReactCore => {
   const persistence = createMemoryPersistence();
   const communities = new CommunityNexus(persistence, {} as never);
   const channels = new ChannelNexus(persistence, {} as never);
@@ -40,7 +42,7 @@ const makeFakeCore = (input: {
     },
   };
 
-  const core: HavenCore = {
+  const core: HavenReactCore = {
     persistence,
     communities,
     channels,
@@ -62,7 +64,7 @@ const makeFakeCore = (input: {
         for (const n of messageNexuses.values()) n.clear();
         messageNexuses.clear();
       },
-    } as unknown as HavenCore['messages'],
+    } as unknown as HavenReactCore['messages'],
     backends: {
       controlPlane: {
         listUserCommunities: input.listUserCommunities,
@@ -70,7 +72,7 @@ const makeFakeCore = (input: {
           input.subscribeToPrivateUserChannel ?? (() => () => {}),
       },
       communityData: { listChannelMessages: vi.fn() },
-    } as unknown as HavenCore['backends'],
+    } as unknown as HavenReactCore['backends'],
     getBootstrapPhase: () => phase.snapshot as never,
     subscribeBootstrapPhase: ((l: unknown) => {
       const lf = l as (snapshot: { phase: string; error: string | null }) => void;
@@ -87,10 +89,10 @@ const makeFakeCore = (input: {
     bootstrapSession: vi.fn(async () => {}),
     clearSession: vi.fn(async () => {}),
     prepareTextChannelMessages: vi.fn(async () => {}),
-  } as unknown as HavenCore;
+  } as unknown as HavenReactCore;
 
   // Provide a real bootstrapSession that drives the same phases as production.
-  (core as { bootstrapSession: HavenCore['bootstrapSession'] }).bootstrapSession =
+  (core as { bootstrapSession: HavenReactCore['bootstrapSession'] }).bootstrapSession =
     async (userId: string) => {
       phase.set('rehydrating');
       communities.rehydrate();
@@ -277,9 +279,9 @@ describe('prepareCommunityEntry', () => {
       channels,
       ensureCommunityPermissions,
       prepareTextChannelMessages,
-    } as unknown as HavenCore;
+    } as unknown as HavenReactCore;
 
-    const result = await HavenCore.prototype.prepareCommunityEntry.call(
+    const result = await HavenReactCore.prototype.prepareCommunityEntry.call(
       core,
       's1',
       { lastVisitedChannelId: 'c2' },
@@ -294,8 +296,8 @@ describe('prepareCommunityEntry', () => {
 });
 
 describe('warmup orchestration', () => {
-  const createWarmCore = (): HavenCore =>
-    Object.create(HavenCore.prototype) as HavenCore;
+  const createWarmCore = (): HavenReactCore =>
+    Object.create(HavenReactCore.prototype) as HavenReactCore;
 
   it('warms session surfaces and isolates individual failures', async () => {
     const core = createWarmCore();
@@ -349,7 +351,7 @@ describe('warmup orchestration', () => {
     });
     expect(ensureMessagesLoaded).not.toHaveBeenCalledWith('dm2', expect.anything());
     expect(warn).toHaveBeenCalledWith(
-      '[HavenCore warmup] viewer profile failed',
+      '[HavenReactCore warmup] viewer profile failed',
       expect.any(Error),
     );
 
@@ -472,9 +474,9 @@ describe('deleteCommunityMessageForModeration', () => {
       backends: {
         communityData: { deleteMessage },
       },
-    } as unknown as HavenCore;
+    } as unknown as HavenReactCore;
 
-    await HavenCore.prototype.deleteCommunityMessageForModeration.call(core, {
+    await HavenReactCore.prototype.deleteCommunityMessageForModeration.call(core, {
       communityId: 's1',
       messageId: 'm1',
     });

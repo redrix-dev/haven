@@ -29,8 +29,11 @@ import type {
 import { ThemedIonicons } from "@/theme-rn";
 import { useFloatingDmPlaceholderChannels } from "@/theme-rn/useFloatingDmPlaceholderChannels";
 import { useDmBubbleSheetChrome } from "@/theme-rn/useDmBubbleSheetChrome";
-import { useHavenCore } from "@shared/core";
-import { useCommunities } from "@mobile-data/hooks";
+import { useHavenCore } from "@mobile-data";
+import {
+  useCommunities,
+  usePermissionsByCommunityId,
+} from "@mobile-data/hooks";
 
 export type {
   FloatingDmBubbleIconName,
@@ -137,7 +140,7 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
   const sheetChrome = useDmBubbleSheetChrome();
   const core = useHavenCore();
   const communities = useCommunities(core.communities);
-  const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
+  const permissionsByCommunityId = usePermissionsByCommunityId(core.permissions);
   const modmailManagedCommunityIds = useMemo(
     () =>
       communities

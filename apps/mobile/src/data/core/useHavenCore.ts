@@ -1,20 +1,17 @@
 import { useSyncExternalStore } from "react";
 import { requireHavenCore } from "./havenCoreRegistry";
-import type { HavenCore } from "./HavenCore";
+import type { HavenReactCore } from "./HavenReactCore";
 import type { BootstrapPhaseSnapshot } from "./bootstrapPhase";
 
 /**
- * Access the active HavenCore from inside React.
- * The instance reference is stable for the lifetime of a session, so this
- * returns the same value every render without subscribing to anything.
+ * Access the active HavenReactCore from inside React.
+ * The instance reference is stable for the lifetime of a session.
  */
-export function useHavenCore(): HavenCore {
+export function useHavenCore(): HavenReactCore {
   return requireHavenCore();
 }
 
-/**
- * Subscribe to bootstrap phase changes (splash/loading UI).
- */
+/** Subscribe to bootstrap phase changes (splash/loading UI). */
 export function useBootstrapPhase(): BootstrapPhaseSnapshot {
   const core = useHavenCore();
   return useSyncExternalStore(

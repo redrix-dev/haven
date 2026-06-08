@@ -31,13 +31,14 @@ import {
 import type { DirectMessage, DirectMessageConversationSummary } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
 import {
   useActiveDmConversationId,
   useDmComposeDraftPeer,
   useDmConversations,
   useDmMessages,
   useDmMessagesLoading,
+  useProfilesRecord,
 } from "@mobile-data/hooks";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
@@ -55,7 +56,7 @@ export function DmChatSurface() {
   const { width: windowWidth } = useWindowDimensions();
   const core = useHavenCore();
   const dm = core.directMessages;
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const liveProfiles = useProfilesRecord(core.profiles);
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
 
   const selectedDmConversationId = useActiveDmConversationId(dm);

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type {
   ControlPlaneBackend,
@@ -47,6 +47,11 @@ export type ViewerProfileUpdateInput = {
 
 export class ProfileNexus {
   private readonly store: UseBoundStore<StoreApi<ProfileNexusState>>;
+
+  get reactiveStore(): ReadableStore<ProfileNexusState> {
+    return this.store;
+  }
+
   private readonly controlPlane: ControlPlaneBackend | null;
   private viewerProfileInflight = new Map<string, Promise<UserProfileInfo | null>>();
   private profileCardInflight = new Map<string, Promise<UserProfileCard | null>>();
@@ -459,12 +464,6 @@ export class ProfileNexus {
     });
   }
 
-  useProfile(userId: string | null | undefined): LiveProfileIdentity | undefined {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? state.profiles[userId] : undefined,
-    );
-  }
-
   getProfile(userId: string): LiveProfileIdentity | undefined {
     return this.store.getState().profiles[userId];
   }
@@ -499,105 +498,6 @@ export class ProfileNexus {
 
   getPlatformStaffError(userId: string): string | null {
     return this.store.getState().platformStaffErrors[userId] ?? null;
-  }
-
-  useProfilesRecord(): Record<string, LiveProfileIdentity> {
-    return useStoreWithEqualityFn(this.store, (state) => {
-      void state.revision;
-      return state.profiles;
-    });
-  }
-
-  useProfiles(userIds: readonly string[]): Record<string, LiveProfileIdentity> {
-    return useStoreWithEqualityFn(this.store, (state) => {
-      void state.revision;
-      const result: Record<string, LiveProfileIdentity> = {};
-      for (const userId of userIds) {
-        const profile = state.profiles[userId];
-        if (profile) result[userId] = profile;
-      }
-      return result;
-    });
-  }
-
-  useViewerProfile(userId: string | null | undefined): UserProfileInfo | null {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? (state.viewerProfiles[userId] ?? null) : null,
-    );
-  }
-
-  useViewerProfileLoaded(userId: string | null | undefined): boolean {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId
-        ? Object.prototype.hasOwnProperty.call(state.viewerProfiles, userId)
-        : false,
-    );
-  }
-
-  useViewerProfileLoading(userId: string | null | undefined): boolean {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? Boolean(state.viewerProfileLoading[userId]) : false,
-    );
-  }
-
-  useViewerProfileError(userId: string | null | undefined): string | null {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? (state.viewerProfileErrors[userId] ?? null) : null,
-    );
-  }
-
-  useProfileCard(userId: string | null | undefined): UserProfileCard | null {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? (state.profileCards[userId] ?? null) : null,
-    );
-  }
-
-  useProfileCardLoading(userId: string | null | undefined): boolean {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? Boolean(state.profileCardLoading[userId]) : false,
-    );
-  }
-
-  useProfileCardError(userId: string | null | undefined): string | null {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? (state.profileCardErrors[userId] ?? null) : null,
-    );
-  }
-
-  useUserFlairGrants(userId: string | null | undefined): UserFlairGrant[] {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? (state.userFlairGrants[userId] ?? []) : [],
-    );
-  }
-
-  useUserFlairGrantLoading(userId: string | null | undefined): boolean {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? Boolean(state.userFlairGrantLoading[userId]) : false,
-    );
-  }
-
-  useUserFlairGrantError(userId: string | null | undefined): string | null {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? (state.userFlairGrantErrors[userId] ?? null) : null,
-    );
-  }
-
-  usePlatformStaff(userId: string | null | undefined): PlatformStaffInfo | null {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? (state.platformStaff[userId] ?? null) : null,
-    );
-  }
-
-  usePlatformStaffLoading(userId: string | null | undefined): boolean {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? Boolean(state.platformStaffLoading[userId]) : false,
-    );
-  }
-
-  usePlatformStaffError(userId: string | null | undefined): string | null {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      userId ? (state.platformStaffErrors[userId] ?? null) : null,
-    );
   }
 
   rehydrate(): void {}

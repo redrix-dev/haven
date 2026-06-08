@@ -1,5 +1,9 @@
 import React from "react";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useVoiceParticipantsByChannel,
+  useVoiceSession,
+} from "@mobile-data/hooks";
 import type { Channel } from "@shared/lib/backend/types";
 import type {
   VoiceChannelReference,
@@ -55,8 +59,8 @@ export function useVoice({
   channels,
 }: UseVoiceInput) {
   const core = useHavenCore();
-  const voiceSession = core.voice.useSession();
-  const voicePresenceByChannelId = core.voice.useParticipantsByChannel();
+  const voiceSession = useVoiceSession(core.voice);
+  const voicePresenceByChannelId = useVoiceParticipantsByChannel(core.voice);
   const activeVoiceChannel = voiceSession.activeChannel;
   const activeVoiceChannelId = activeVoiceChannel?.id ?? null;
   const [voicePanelOpen, setVoicePanelOpen] = React.useState(false);

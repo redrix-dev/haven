@@ -32,6 +32,9 @@
       ],
       "@platform/*": [
         "../../packages/shared/src/platform/*"
+      ],
+      "@test-support/*": [
+        "../../tooling/test-support/*"
       ]
     }
   },

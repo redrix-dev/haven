@@ -8,15 +8,21 @@
 > (→ moves to a per-platform data layer)?** "🔧 decouple" entries are mostly *caches* that should
 > **leave** `shared` for a platform, not become framework-neutral in place.
 
-## Post-cleave snapshot (2026-06-08)
+## Post-cleave snapshot (2026-06-08, true cleave)
 
 | Area | Status |
 |------|--------|
-| `stores/` | **Deleted** — session stores in `apps/mobile/src/data/session/` + Solid stubs |
+| `stores/` | **Deleted** — session stores in `apps/mobile/src/data/session/` |
 | `nexus/*` reactive classes | **Relocated** to `apps/mobile/src/data/` |
-| `nexus/{feature-flags,onboarding,permissions,profile,social,voice}/` | **Removed** — empty placeholders, never populated post-cleave |
-| Shared retains | Types, selectors, `Nexus.ts` base (transitional), cache **port interfaces** |
-| `@shared/nexus` barrel | Shared types + ports only; concrete classes → `@mobile-data/*` |
+| `nexus/Nexus.ts` base | **Relocated** to `apps/mobile/src/data/Nexus.ts` |
+| `HavenCore` orchestration | **Relocated + renamed** → `apps/mobile/src/data/core/HavenReactCore.ts` |
+| Cache injection ports | **Deleted** — mobile constructs caches directly |
+| React host layer | **Relocated** — `AuthContext`, voice hooks, `useDataCacheComponentProbe` → mobile |
+| Platform read hooks | **Standalone** — `apps/mobile/src/data/hooks/*` (no `use*` on cache classes) |
+| Shared retains | Pure logic, types, selectors, `routeRealtimeEvent`, backend clients, port **types** only |
+| `@shared/nexus` barrel | Entity/admin/voice **types** only — no ports, no classes |
+| Integration tests | **Relocated** to `apps/mobile/src/data/__tests__/` |
+| Web/Electron | **Broken (accepted)** — rebuild when Solid joins |
 
 Living inventory of `packages/shared/src`. Goal: know exactly what's framework-coupled,
 what's structurally crufty (hygiene, defer), and what's fine.
@@ -69,63 +75,52 @@ all deferrable to its own gated step.
 Relocated to `apps/mobile/src/data/session/` (React) and `packages/solid-client/src/data/session/`
 (Solid stubs). The `packages/shared/src/stores/` directory has been removed.
 
-### Other zustand users (caught in the final sweep)
-| File | Lines | Disposition |
-|---|---:|---|
-| `core/viewerMessagePolicy.ts` | 83 | 🔧 standalone zustand `create` store → vanilla + adapter (small) |
-| `debug/instrumentZustandStore.ts` | 65 | ✅ type-only `StoreApi` — already vanilla-compatible; works (better) post-migration |
+### Other zustand in shared (post-cleave)
+| File | Disposition |
+|---|---|
+| `core/viewerMessagePolicy.ts` | ✅ **fine** — vanilla `createStore` policy state; consumed by mobile cache via port type |
+| `debug/instrumentZustandStore.ts` | ✅ type-only `StoreApi` — vanilla-compatible |
 
-## `nexus/` — 🔧 the bulk of the decoupling (~7.7k lines, 13 React-coupled classes)
-This is where Step 3b actually lives. **Two patterns**, which changes the strategy:
+## `core/` — ✅ orchestration relocated; shared retains pure surface
 
-**Entity-Nexus** — extend the base `Nexus<T,R>`.
-| File | Lines | | File | Lines |
-|---|---:|---|---|---:|
-| `CommunityMessageNexus` | 1009 | | `Community` | 384 |
-| `DirectMessageNexus` | 1016 | | `Notification` | 442 |
-| `ChannelNexus` | 716 | | | |
+| Was in shared | Now |
+|---|---|
+| `HavenCore.ts` | `apps/mobile/src/data/core/HavenReactCore.ts` |
+| `useHavenCore`, registries, bootstrap, focus/sync, commands | `apps/mobile/src/data/core/` |
+| Cache injection ports | **Deleted** |
+| `routeRealtimeEvent.ts` | **Kept** — operates on `RealtimeMutationTarget` interface |
+| `realtimeMutationTarget.ts` | **New** — minimal mutation interface for shared routing |
+| `sessionBackendRegistry.ts` | **New** — imperative backend accessors without HavenCore import |
+| `communityChannelUtils`, `viewerMessagePolicy`, `backends`, … | **Kept** — pure logic |
 
-> **⚠️ 3b.2 discovery (CI-gated revert) — "fix base → 5 inherit" was WRONG.** Converting the base
-> to vanilla in isolation does **not** typecheck; the entity family is more coupled (and inconsistent)
-> than the grep implied:
-> - **`use<S>` on the base is NOT dead** — `CommunityMessageNexus` calls `this.use()` ×5. (Only
->   `useAll`/`useOne` are dead — my earlier grep filtered out `Nexus.ts` files and hid this.)
-> - **4 of 5 override `get store()`** with their own (extended) store shape (`UseBoundStore`) +
->   call `useStore(this.store, …)` for bespoke hooks: Channel (3), Community (5), DirectMessage (3),
->   Notification (5). Making the base `store` public/vanilla collides with their `protected` overrides
->   and their callable hook-store usage.
->
-> **Revised approach:** treat the entity family like the service classes — a **per-class loop** (base +
-> one subclass at a time, relocate its store override + bespoke hooks → react/solid-bindings + migrate
-> call sites), each CI-gated. There is **no free "base fix clears 5."** Effort ≈ the service-Nexus grind.
+## `nexus/` — ✅ relocated to mobile (cleave complete)
 
-**Service-Nexus** — standalone classes, each with its **own** `zustand create` + React hooks
-(don't extend the base). *Each needs its own conversion — this is the per-file grind.*
-**Rename convention (decided):** these get `<Domain>Nexus` → `<Domain>ControllerNexus` during the
-lift (e.g. `ProfileControllerNexus`). The entity-cache classes above keep the bare `…Nexus` name.
-Future: extract a base `ControllerNexus.ts` once the shape is apparent (earmarked, not now).
-| File | Lines | | File | Lines |
-|---|---:|---|---|---:|
-| `CommunityAdminNexus` | 1133 | | `CommunityModerationNexus` | 266 |
-| `VoiceNexus` | 716 | | `PermissionsNexus` | 263 |
-| `ProfileNexus` | 630 | | `OnboardingNexus` | 233 |
-| `SocialNexus` | 377 | | `FeatureFlagNexus` | 151 |
+All reactive nexus classes now live under `apps/mobile/src/data/`. `packages/shared/src/nexus/`
+exports **types only** (entity/admin/voice state shapes, selectors live in subpaths).
 
-Plus: `Nexus.ts` base (189, 🔧 the keystone), `index.ts` (23, ✅), `projectVisibleChannelMessages.ts`
-(121, ✅ React-free).
+| Was in shared | Now |
+|---|---|
+| `Nexus.ts` base | `apps/mobile/src/data/Nexus.ts` |
+| Entity nexuses (Community, Channel, DM, Notification) | `apps/mobile/src/data/{communities,channels,direct-messages,notifications}/` |
+| Service nexuses (Admin, Moderation, Social, …) | `apps/mobile/src/data/{community,social,profile,...}/` |
+| `CommunityMessageNexus` | `apps/mobile/src/data/messages/CommunityMessageCache.ts` |
+| Integration tests | `apps/mobile/src/data/__tests__/nexus/` |
 
-**Strategy:** fix the base → 5 entity-Nexus inherit it; then convert the 8 service-Nexus
-**class-by-class** (mechanical, repeatable — *not* big-bang). Many are also large → 🧩 decompose
-candidates, but **decomposition is 3d, deferred — do not split while decoupling (3b).**
+**Read pattern:** UI imports `@mobile-data/hooks` (e.g. `useFriends(core.social)`), not
+`core.social.useFriends()`. Cache classes expose `reactiveStore` + imperative/sync methods only.
 
-## Binding layer (hooks/context) — 🔧 needs Solid equivalents
-| File | Lines | Disposition |
-|---|---:|---|
-| `contexts/AuthContext.tsx` | 462 | 🔧 substantial — React Context provider; Solid provider + logic extract |
-| `features/voice/hooks/useVoice.ts` | 385 | 🔧 substantial — voice orchestration hook; Solid rewrite |
-| `features/voice/hooks/useVoiceMemberVolumes.ts` | 161 | 🔧 hook → Solid rewrite |
-| `core/useHavenCore.ts` | 25 | 🔧 trivial — `useSyncExternalStore` → Solid `from()` (the canonical binding) |
-| `debug/useDataCacheComponentProbe.ts` | 31 | 🔧 trivial — debug hook; rewrite or drop |
+**Still in shared under `nexus/`:** pure selectors (`*Selectors.ts`), `projectVisibleChannelMessages.ts`,
+type barrels (`communityTypes.ts`, `channelTypes.ts`, …).
+
+## Binding layer (hooks/context) — ✅ relocated to mobile
+
+| File | Disposition |
+|---|---|
+| `contexts/AuthContext.tsx` | ✅ moved → `apps/mobile/src/contexts/` |
+| `features/voice/hooks/useVoice.ts` | ✅ moved → `apps/mobile/src/features/voice/hooks/` |
+| `features/voice/hooks/useVoiceMemberVolumes.ts` | ✅ moved → mobile |
+| `core/useHavenCore.ts` | ✅ moved → `apps/mobile/src/data/core/` |
+| `debug/useDataCacheComponentProbe.ts` | ✅ moved → `apps/mobile/src/debug/` |
 
 ## `platform/` vs `infrastructure/platform/` — 🧩 dedup (one wrinkle)
 | File | State | Disposition |
@@ -137,14 +132,14 @@ candidates, but **decomposition is 3d, deferred — do not split while decouplin
 
 ---
 
-## Decoupling surface — final tally (what 3b must actually touch)
-- **`nexus/`** — the bulk: base + **8 service classes** (the grind) + 5 entity classes (inherit the base fix). ~7.7k lines.
-- **binding layer** — 5 files (`AuthContext` + `useVoice` substantial; the other 3 small).
-- **`stores/`** — 3 tiny stores + `core/viewerMessagePolicy.ts` (1 small policy store).
-- **`lib/backend/`** — **nothing** (already React-free ✅).
-- **`platform/`** — dedup is 🧩 hygiene, not decoupling.
+## Decoupling surface — final tally (post true cleave)
 
-**Takeaway:** decoupling is concentrated in **nexus + the binding hooks**. The base-Nexus fix is
-high-leverage (clears 5 subclasses); the 8 standalone service-Nexus classes are the real volume.
-Backend and most utils are already free. Sizeable nexus files are *also* 3d decompose candidates —
-kept strictly separate from the 3b decoupling pass.
+- **`nexus/` reactive classes** — ✅ all relocated to `apps/mobile/src/data/`
+- **binding layer** — ✅ relocated to mobile (`AuthContext`, voice hooks, `useHavenCore`, debug probe)
+- **`stores/`** — ✅ deleted from shared; mobile session stores in `apps/mobile/src/data/session/`
+- **`core/` orchestration** — ✅ relocated to mobile as `HavenReactCore` + `core/*`
+- **`lib/backend/`** — ✅ React-free; `sessionBackendRegistry` replaces `requireHavenCore()` coupling
+- **`platform/`** — 🧩 dedup hygiene only (unchanged)
+
+**Takeaway:** `packages/shared` is now logic + types + backend clients. All reactive/cache
+machinery lives in mobile (React) or Solid stubs. Gate: `npm run test:cleave`.

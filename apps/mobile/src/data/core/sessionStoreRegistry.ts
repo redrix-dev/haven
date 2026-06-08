@@ -2,7 +2,7 @@ import type {
   AuthStorePort,
   UiStorePort,
   UserStatusStorePort,
-} from "./sessionStorePorts";
+} from "@shared/core/sessionStorePorts";
 
 let authStore: AuthStorePort | null = null;
 let uiStore: UiStorePort | null = null;

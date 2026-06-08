@@ -5,7 +5,7 @@ import type {
   NotificationPreferences,
   NotificationPreferenceUpdate,
 } from "@shared/lib/backend/types";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
 import {
   useNotificationPreferences,
   useNotificationPreferencesLoading,

@@ -1,4 +1,4 @@
-import type { NotificationNexusPort } from "@shared/core/cache/entityNexusPorts";
+import type { NotificationNexus } from "../notifications/NotificationNexus";
 import type {
   NotificationCounts,
   NotificationItem,
@@ -15,7 +15,7 @@ import {
 } from "@shared/nexus/notifications/notificationSelectors";
 import { useStoreSelector } from "./useStoreSelector";
 
-export function useNotifications(nexus: NotificationNexusPort): NotificationItem[] {
+export function useNotifications(nexus: NotificationNexus): NotificationItem[] {
   return useStoreSelector(
     nexus.reactiveStore,
     projectNotifications,
@@ -24,29 +24,29 @@ export function useNotifications(nexus: NotificationNexusPort): NotificationItem
 }
 
 export function useNotificationCounts(
-  nexus: NotificationNexusPort,
+  nexus: NotificationNexus,
 ): NotificationCounts {
   return useStoreSelector(nexus.reactiveStore, selectCounts);
 }
 
-export function useNotificationsLoading(nexus: NotificationNexusPort): boolean {
+export function useNotificationsLoading(nexus: NotificationNexus): boolean {
   return useStoreSelector(nexus.reactiveStore, selectIsLoading);
 }
 
 export function useNotificationPreferences(
-  nexus: NotificationNexusPort,
+  nexus: NotificationNexus,
 ): NotificationPreferences | null {
   return useStoreSelector(nexus.reactiveStore, selectPreferences);
 }
 
 export function useNotificationPreferencesLoading(
-  nexus: NotificationNexusPort,
+  nexus: NotificationNexus,
 ): boolean {
   return useStoreSelector(nexus.reactiveStore, selectPreferencesLoading);
 }
 
 export function useNotificationPreferencesSaving(
-  nexus: NotificationNexusPort,
+  nexus: NotificationNexus,
 ): boolean {
   return useStoreSelector(nexus.reactiveStore, selectPreferencesSaving);
 }

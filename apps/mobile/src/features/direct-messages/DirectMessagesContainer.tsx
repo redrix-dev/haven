@@ -37,7 +37,7 @@ import type {
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
 import {
   useActiveDmConversationId,
   useDmComposeDraftPeer,
@@ -45,6 +45,7 @@ import {
   useDmConversationsLoading,
   useDmMessages,
   useDmMessagesLoading,
+  useProfilesRecord,
 } from "@mobile-data/hooks";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import { resolveColorProp } from "@shared/themes";
@@ -84,7 +85,7 @@ export function DirectMessagesContainer() {
   const { width: windowWidth } = useWindowDimensions();
   const core = useHavenCore();
   const dm = core.directMessages;
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const liveProfiles = useProfilesRecord(core.profiles);
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
   const dmConversations = useDmConversations(dm);
   const dmConversationsLoading = useDmConversationsLoading(dm);

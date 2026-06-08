@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { dataCacheDebug } from "./dataCacheDebug";
+import { dataCacheDebug } from "@shared/debug/dataCacheDebug";
 
 /**
  * Logs a component's derived data snapshot on mount and whenever `values` change.

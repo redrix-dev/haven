@@ -9,8 +9,8 @@ import {
   deriveCommunitiesLoadStatus,
   toChannel,
   toServerSummaries,
-  useHavenCore,
 } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
 import {
   useActiveChannelId,
   useActiveCommunityId,
@@ -19,6 +19,12 @@ import {
   useCommunities,
   useCommunitiesLoadError,
   useCommunitiesLoading,
+  useChannelMeta,
+  useHasInitialLoadCompleted,
+  useIsLoadingOlder,
+  usePlatformStaff,
+  useProfilesRecord,
+  useVisibleChannel,
 } from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
@@ -50,7 +56,7 @@ import {
   loadPickedCommunityMediaForUpload,
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
-import { useDataCacheComponentProbe } from "@shared/debug";
+import { useDataCacheComponentProbe } from "@/debug/useDataCacheComponentProbe";
 import type { CommunityMessageCache } from "@mobile-data/messages/CommunityMessageCache";
 
 type CommunityChatScreenProps = {
@@ -78,7 +84,10 @@ export function CommunityChatScreen({
     communityId ?? "__none__",
   ) as CommunityMessageCache;
   const currentUserId = user?.id ?? null;
-  const currentUserPlatformStaff = core.profiles.usePlatformStaff(currentUserId);
+  const currentUserPlatformStaff = usePlatformStaff(
+    core.profiles,
+    currentUserId,
+  );
   const nexusCommunities = useCommunities(core.communities);
   const serversLoading = useCommunitiesLoading(core.communities);
   const serversError = useCommunitiesLoadError(core.communities);
@@ -162,14 +171,17 @@ export function CommunityChatScreen({
     void core.prepareTextChannelMessages(communityId, activeChannelIdForLoad);
   }, [core, communityId, activeChannelIdForLoad]);
 
-  const channelMeta = messageNexus.useChannelMeta(
+  const channelMeta = useChannelMeta(
+    messageNexus,
     activeChannelId ?? "__none__",
   );
   const hasOlderMessages = channelMeta.hasMore;
-  const isLoadingOlderMessages = messageNexus.useIsLoadingOlder(
+  const isLoadingOlderMessages = useIsLoadingOlder(
+    messageNexus,
     activeChannelId ?? "__none__",
   );
-  const hasCompletedInitialLoad = messageNexus.useHasInitialLoadCompleted(
+  const hasCompletedInitialLoad = useHasInitialLoadCompleted(
+    messageNexus,
     activeChannelId ?? "__none__",
   );
 
@@ -217,7 +229,8 @@ export function CommunityChatScreen({
     ],
   );
 
-  const visibleMessages = messageNexus.useVisibleChannel(
+  const visibleMessages = useVisibleChannel(
+    messageNexus,
     activeChannelId ?? "__none__",
   );
 
@@ -237,7 +250,7 @@ export function CommunityChatScreen({
     channelsLoading,
     communityIdMatchesRoute: communityId === serverId,
   });
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const liveProfiles = useProfilesRecord(core.profiles);
 
   useEffect(() => {
     if (drawerGestureNonce <= 0) return;

@@ -9,7 +9,14 @@ import {
   Text,
   View,
 } from "react-native";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useDetail,
+  useIsLoadingDetail,
+  useIsLoadingReports,
+  useReports,
+  useSelectedReportId,
+} from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 type MobileModmailPanelProps = {
@@ -19,11 +26,11 @@ type MobileModmailPanelProps = {
 
 export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelProps) {
   const core = useHavenCore();
-  const reports = core.moderation.useReports();
-  const detail = core.moderation.useDetail();
-  const selectedReportId = core.moderation.useSelectedReportId();
-  const loading = core.moderation.useIsLoadingReports();
-  const loadingDetail = core.moderation.useIsLoadingDetail();
+  const reports = useReports(core.moderation);
+  const detail = useDetail(core.moderation);
+  const selectedReportId = useSelectedReportId(core.moderation);
+  const loading = useIsLoadingReports(core.moderation);
+  const loadingDetail = useIsLoadingDetail(core.moderation);
 
   useEffect(() => {
     if (managedCommunityIds.length === 0) return;

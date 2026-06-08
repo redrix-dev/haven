@@ -13,6 +13,7 @@ import type {
 } from "@/navigation/types";
 import { NAV_THEME } from "@/lib/theme";
 import { setMobileNavigationDelegate } from "@/lib/registerMobileAppHost";
+import { toChannel, toServerSummaries } from "@shared/core";
 import {
   bootstrapNotificationSoundSync,
   createNotificationSoundSyncState,
@@ -20,17 +21,18 @@ import {
   resetNotificationSoundSyncState,
   syncFocusFromRoute,
   syncNotificationSounds,
-  toChannel,
-  toServerSummaries,
   useHavenCore,
-} from "@shared/core";
+} from "@mobile-data";
 import {
   useActiveChannelId,
   useActiveCommunityId,
   useChannels,
+  useCounts,
   useDmConversations,
   useNotifications,
   useOrderedCommunities,
+  useProfilesRecord,
+  useViewerProfile,
 } from "@mobile-data/hooks";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
 import UserProfileModal, {
@@ -40,7 +42,7 @@ import { useUiStore } from "@mobile-data/session/uiStore";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
 import type { NotificationAudioSettings } from "@shared/types/settings";
-import { useVoice } from "@shared/features/voice/hooks/useVoice";
+import { useVoice } from "@/features/voice/hooks/useVoice";
 import {
   type LiveProfilesRecord,
   resolveLiveAvatarUrl,
@@ -216,7 +218,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
   const notificationItems = useNotifications(core.notifications);
   const dmConversations = useDmConversations(dm);
-  const socialCounts = core.social.useCounts();
+  const socialCounts = useCounts(core.social);
   const currentServerId = useActiveCommunityId(core.communities);
   const currentChannelId = useActiveChannelId(core.channels);
   const activeCommunityChannels = useChannels(
@@ -233,8 +235,8 @@ function MainNavigationShell({ userId }: { userId: string }) {
     },
     [core],
   );
-  const viewerProfile = core.profiles.useViewerProfile(userId);
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const viewerProfile = useViewerProfile(core.profiles, userId);
+  const liveProfiles = useProfilesRecord(core.profiles);
   const orderedCommunities = useOrderedCommunities(core.communities);
   const servers = useMemo(
     () => toServerSummaries(orderedCommunities),

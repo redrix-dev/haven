@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend.interface";
 import type {
@@ -7,7 +7,6 @@ import type {
   OnboardingClientContext,
   OnboardingCompletionResult,
 } from "@shared/lib/backend/types";
-import { campaignsEqual } from "@shared/features/onboarding/logic/equality";
 import type { StoreApi, UseBoundStore } from "zustand";
 
 export type OnboardingNexusState = {
@@ -22,6 +21,11 @@ export type OnboardingNexusState = {
 
 export class OnboardingNexus {
   private readonly store: UseBoundStore<StoreApi<OnboardingNexusState>>;
+
+  get reactiveStore(): ReadableStore<OnboardingNexusState> {
+    return this.store;
+  }
+
   private readonly controlPlane: Pick<
     ControlPlaneBackend,
     "listMyOnboardingCampaigns" | "completeOnboardingCampaign"
@@ -167,40 +171,4 @@ export class OnboardingNexus {
     return this.store.getState().completionError;
   }
 
-  useCampaigns(): OnboardingCampaign[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => {
-        void state.revision;
-        return state.campaigns;
-      },
-      campaignsEqual,
-    );
-  }
-
-  useLoaded(): boolean {
-    return useStoreWithEqualityFn(this.store, (state) => state.loaded);
-  }
-
-  useLoading(): boolean {
-    return useStoreWithEqualityFn(this.store, (state) => state.loading);
-  }
-
-  useError(): string | null {
-    return useStoreWithEqualityFn(this.store, (state) => state.error);
-  }
-
-  useCompletingCampaignKey(): string | null {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.completingCampaignKey,
-    );
-  }
-
-  useCompletionError(): string | null {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.completionError,
-    );
-  }
 }

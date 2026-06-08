@@ -1,31 +1,31 @@
-# Messages domain cleave inventory (Phase 0)
+# Messages domain cleave inventory
 
-> Analysis artifact for [The Cleave](solid-migration-handoff.md) §8. Sorted against §0.4:
+> Analysis artifact for [The Cleave](solid-migration-handoff.md) §4. Sorted against §0.4:
 > *"Is this logic, or is this a cache?"*
 
-**Status:** complete (Phases 5–6 landed). Checklist below reflects cleave-complete state.
+**Status:** complete (true cleave on `feat/shared-core-hardening`). Checklist reflects final state.
 
 ---
 
-## Surface area
+## Surface area (post-relocation)
 
 | File | LOC | Layer | Disposition |
 |------|-----|-------|-------------|
-| `packages/shared/src/nexus/community/CommunityMessageNexus.ts` | 1009 | Mixed | **CACHE** → `apps/mobile/src/data/messages/`; extract logic first |
+| `apps/mobile/src/data/messages/CommunityMessageCache.ts` | ~1000 | Cache | **DONE** — mobile React cache |
 | `packages/shared/src/nexus/community/projectVisibleChannelMessages.ts` | 121 | Logic | **KEEP** in shared |
-| `packages/shared/src/core/viewerMessagePolicy.ts` | 83 | Mixed | Types + equality → **KEEP**; zustand factory → **CACHE** → mobile |
-| `packages/shared/src/core/routeRealtimeEvent.ts` (MESSAGE_*) | ~110 | Mixed | Partial-row shaping → **KEEP**; nexus calls → cache port |
-| `packages/shared/src/core/HavenCore.ts` `MessageNexusRegistry` | ~50 | Cache | **CACHE** → mobile data layer |
+| `packages/shared/src/core/viewerMessagePolicy.ts` | 83 | Mixed | Types + equality → **KEEP**; store factory → mobile |
+| `packages/shared/src/core/routeRealtimeEvent.ts` (MESSAGE_*) | ~110 | Mixed | Partial-row shaping → **KEEP**; cache via `RealtimeMutationTarget` |
+| `apps/mobile/src/data/messages/registry.ts` | ~50 | Cache | **DONE** — `MessageNexusRegistry` on `HavenReactCore` |
 | `packages/shared/src/lib/backend/communityDataBackend.ts` (message RPCs) | ~400 | Logic/I/O | **KEEP** |
 | `packages/shared/src/lib/backend/messageObjectStore.ts` | 125 | Logic/I/O | **KEEP** |
-| `packages/shared/src/features/messaging/lib/banVisibility.ts` | 257 | Logic | **KEEP** (consolidate with projection during extract) |
-| `packages/shared/src/features/messaging/lib/mergeMessageBundle.ts` | 97 | Logic | **KEEP** (wire into page merge or delete if unused) |
-| `packages/shared/src/core/prefetchCommunityChannelMessages.ts` | 21 | Orchestration | **KEEP** (calls cache port) |
-| `packages/shared/src/core/syncFocusFromRoute.ts` | 85 | Orchestration | **KEEP** |
+| `packages/shared/src/features/messaging/lib/banVisibility.ts` | 257 | Logic | **KEEP** |
+| `packages/shared/src/features/messaging/lib/mergeMessageBundle.ts` | 97 | Logic | **KEEP** |
+| `apps/mobile/src/data/core/prefetchCommunityChannelMessages.ts` | 21 | Orchestration | **DONE** — mobile |
+| `apps/mobile/src/data/core/syncFocusFromRoute.ts` | 85 | Orchestration | **DONE** — mobile |
 
 ---
 
-## `CommunityMessageNexus.ts` — symbol inventory
+## `CommunityMessageCache.ts` — symbol inventory (was `CommunityMessageNexus.ts`)
 
 ### Layer 1 — extract to shared (pure)
 
@@ -50,11 +50,11 @@
 
 | Symbol | Lines | Notes |
 |--------|-------|-------|
-| `CommunityMessageNexus` class + private Maps | 120–161 | Relocate to mobile; Solid built fresh |
+| `CommunityMessageCache` class + private Maps | 120–161 | Mobile cache; Solid built fresh |
 | `loadInitial` / `loadOlder` / send/edit/delete/react/report | 192–498 | Shell: calls shared logic + backend, writes store |
 | Selector factories + snapshot Maps | 523–576 | **Delete** after unified store (channelState wart fix) |
 | `insertMessage` / `upsertMessage` / `insertMessages` / mutations | 621–740 | Cache writes |
-| `useChannel` / `useVisibleChannel` / loading hooks | 744–806 | React read layer (mobile) |
+| `useChannel` / `useVisibleChannel` / loading hooks | 744–806 | **Removed from class** — standalone hooks in `@mobile-data/hooks/messages` |
 | `persist` / `rehydrate` | 849–935 | Platform persistence inject |
 | `getLastMessageId` / `getChannelAuthorIds` | 808–822 | Sync cache reads |
 | `clear` / inflight dedupe maps | 824–842, 160–161 | Lifecycle |
@@ -102,10 +102,11 @@ End state: shared defines `buildPartialMessageFromRealtimePayload()`; cache port
 | `apps/mobile/src/navigation/MainNavigator.tsx` | `syncFocusFromRoute` → `prepareTextChannelMessages` |
 | `apps/mobile/src/features/notifications/NotificationsContainer.tsx` | `syncFocusFromRoute` on deep-link |
 
-**Precision contract:** `useVisibleChannel` must keep same equality fns and projection behavior. Screen API unchanged.
+**Precision contract:** `useVisibleChannel` (from `@mobile-data/hooks/messages`) must keep same
+equality fns and projection behavior. Screen API unchanged.
 
-**Transitional web-client:** `CommunityWorkspaceShell.tsx`, `ChatArea.tsx` — same HavenCore port
-API; wired via `@mobile-data` until Solid desktop replaces React web/electron scaffolding.
+**Web/electron:** React desktop scaffolding is **broken / quarantined** until rebuilt on Solid.
+Do not maintain transitional `@mobile-data` wiring for web-client.
 
 ---
 
@@ -113,22 +114,22 @@ API; wired via `@mobile-data` until Solid desktop replaces React web/electron sc
 
 | File | Action |
 |------|--------|
-| `nexus/__tests__/messageNexusLoad.test.ts` | Split: logic → shared unit tests; cache → mobile |
-| `core/__tests__/routeRealtimeEvent.test.ts` | Keep in shared; mock cache port |
-| `features/messaging/lib/__tests__/banVisibility.test.ts` | KEEP |
-| `features/messaging/lib/__tests__/mergeMessageBundle.test.ts` | KEEP |
+| `apps/mobile/src/data/__tests__/nexus/messageNexusLoad.test.ts` | **DONE** — mobile cache integration |
+| `apps/mobile/src/data/__tests__/core/routeRealtimeEvent.test.ts` | **DONE** — shared routing + mobile mock target |
+| `packages/shared/src/features/messaging/lib/__tests__/banVisibility.test.ts` | KEEP — shared pure logic |
+| `packages/shared/src/features/messaging/lib/__tests__/mergeMessageBundle.test.ts` | KEEP — shared pure logic |
 
 ---
 
 ## Cleave checklist (Phase 2 sign-off)
 
-- [x] Pure logic extracted to `packages/shared/src/features/messaging/logic/`
-- [x] Mobile cache in `apps/mobile/src/data/messages/` with unified store (wart gone)
-- [x] Solid cache in `packages/solid-client/src/data/messages/`
-- [x] `viewerMessagePolicyStore` factory relocated to mobile
-- [x] `MessageNexusRegistry` relocated to mobile
-- [x] Shared cache port interface; `routeRealtimeEvent` uses port
-- [x] No `CommunityMessageNexus` import from `packages/shared`
-- [x] Session stores (`authStore`, `uiStore`, `userStatusStore`) relocated to mobile; Solid stubs in `solid-client`
-- [x] `packages/react-bindings` and `packages/solid-bindings` deleted; hooks live under `@mobile-data`
-- [x] Gates green: `mobile:typecheck`, `mobile:bundle`, `test:unit`, `typecheck:solid`
+- [x] Pure logic in `packages/shared/src/features/messaging/` (and related core helpers)
+- [x] Mobile cache in `apps/mobile/src/data/messages/` (`CommunityMessageCache.ts`)
+- [x] Solid stub in `packages/solid-client/src/data/messages/`
+- [x] `viewerMessagePolicyStore` factory in mobile session layer
+- [x] `MessageNexusRegistry` on `HavenReactCore`
+- [x] `routeRealtimeEvent` uses `RealtimeMutationTarget` (no HavenCore import)
+- [x] No reactive message cache in `packages/shared`
+- [x] Session stores relocated to mobile; Solid stubs in `solid-client`
+- [x] `packages/react-bindings` and `packages/solid-bindings` deleted; hooks under `@mobile-data/hooks`
+- [x] Gates green: `npm run test:cleave` (lint · check:shared-portable · mobile:typecheck · mobile:bundle · test:unit)

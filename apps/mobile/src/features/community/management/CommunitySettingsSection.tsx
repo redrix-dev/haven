@@ -22,7 +22,8 @@ import type {
   ServerPermissions,
   ServerRoleItem,
 } from "@shared/lib/backend/types";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import { useServerPanelState } from "@mobile-data/hooks";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
@@ -63,7 +64,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
     }),
     [foregroundColor, themeTokens],
   );
-  const serverPanel = admin.useServerPanelState();
+  const serverPanel = useServerPanelState(admin);
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
 

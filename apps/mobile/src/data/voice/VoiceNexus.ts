@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
 import type { VoiceChannelReference, VoiceSidebarParticipant } from "@shared/types/types";
@@ -74,20 +74,13 @@ const defaultState = (): Omit<VoiceNexusState, "revision"> => ({
   sessionState: null,
 });
 
-const hiddenAuthorIdsEqual = (
-  left: ReadonlySet<string>,
-  right: ReadonlySet<string>,
-): boolean => {
-  if (left === right) return true;
-  if (left.size !== right.size) return false;
-  for (const id of left) {
-    if (!right.has(id)) return false;
-  }
-  return true;
-};
-
 export class VoiceNexus {
   private readonly store: UseBoundStore<StoreApi<VoiceNexusState>>;
+
+  get reactiveStore(): ReadableStore<VoiceNexusState> {
+    return this.store;
+  }
+
   private readonly viewerPolicyStore: ViewerMessagePolicyStore;
   private readonly tokenBackend: VoiceTokenBackend | null;
   private readonly realtime: VoiceRealtimeTransport | null;
@@ -505,34 +498,6 @@ export class VoiceNexus {
         void this.realtime?.removeChannel(subscriptionChannel);
       }
     };
-  }
-
-  useSession(): VoiceNexusState {
-    return useStoreWithEqualityFn(this.store, (state) => {
-      void state.revision;
-      return state;
-    });
-  }
-
-  useParticipantsByChannel(): Record<string, VoiceSidebarParticipant[]> {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.participantsByChannelId,
-      voiceParticipantRecordsEqual,
-    );
-  }
-
-  useVisibleParticipants(channelId: string): VoiceSidebarParticipant[] {
-    const participants = useStoreWithEqualityFn(this.store, (state) =>
-      this.getParticipantsForChannel(state, channelId),
-    );
-    const hiddenAuthorIds = useStoreWithEqualityFn(
-      this.viewerPolicyStore,
-      (s) => s.hiddenAuthorIds,
-      hiddenAuthorIdsEqual,
-    );
-
-    return this.filterVisibleParticipants(participants, hiddenAuthorIds);
   }
 
   getSnapshot(): VoiceNexusState {

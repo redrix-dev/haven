@@ -5,7 +5,7 @@ import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import type { Session } from "@supabase/supabase-js";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
 
 const INSTALLATION_ID_KEY = "haven:mobilePushInstallationId";
 const LAST_EXPO_TOKEN_KEY = "haven:lastExpoPushToken";

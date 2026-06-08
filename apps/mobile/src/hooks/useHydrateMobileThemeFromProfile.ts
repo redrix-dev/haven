@@ -1,12 +1,13 @@
 import { useEffect } from "react";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import { useViewerProfile } from "@mobile-data/hooks";
 import { getTheme } from "@shared/themes/registry";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
 
 /** Loads `profiles.theme` into the mobile theme store when `userId` is present. */
 export function useHydrateMobileThemeFromProfile(userId: string | null | undefined) {
   const core = useHavenCore();
-  const viewerProfile = core.profiles.useViewerProfile(userId);
+  const viewerProfile = useViewerProfile(core.profiles, userId);
 
   useEffect(() => {
     if (!userId) return;

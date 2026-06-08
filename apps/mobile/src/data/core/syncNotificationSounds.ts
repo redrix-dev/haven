@@ -1,4 +1,4 @@
-import type { HavenCore } from "./HavenCore";
+import type { HavenReactCore } from "./HavenReactCore";
 import { playNotificationSound } from "@shared/features/notifications/utils/sound";
 import { recordLocalNotificationDeliveryTrace } from "@shared/features/notifications/utils/devTrace";
 import type { NotificationAudioSettings } from "@shared/types/settings";
@@ -16,7 +16,7 @@ export function createNotificationSoundSyncState(): NotificationSoundSyncState {
 }
 
 export async function bootstrapNotificationSoundSync(
-  core: HavenCore,
+  core: HavenReactCore,
   state: NotificationSoundSyncState,
 ): Promise<void> {
   try {
@@ -32,7 +32,7 @@ export async function bootstrapNotificationSoundSync(
 }
 
 export async function syncNotificationSounds(
-  core: HavenCore,
+  core: HavenReactCore,
   audioSettings: NotificationAudioSettings,
   state: NotificationSoundSyncState,
 ): Promise<void> {

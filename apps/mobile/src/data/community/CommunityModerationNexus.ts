@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type { StoreApi, UseBoundStore } from "zustand";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ServerModmailBackend } from "@shared/lib/backend/serverModmailBackend";
@@ -9,8 +9,6 @@ import type {
   ServerReportSummary,
   SupportReportStatus,
 } from "@shared/lib/backend/types";
-import { reportsEqual } from "@shared/features/moderation/logic/equality";
-
 type CommunityModerationNexusState = {
   reports: ServerReportSummary[];
   selectedReportId: string | null;
@@ -39,9 +37,12 @@ const EMPTY_REPORTS: ServerReportSummary[] = [];
 export class CommunityModerationNexus {
   private readonly backend: ServerModmailBackend;
   private loadInflight: Promise<void> | null = null;
-  private reportsSnapshot: ServerReportSummary[] = EMPTY_REPORTS;
 
   private readonly store: UseBoundStore<StoreApi<CommunityModerationNexusState>>;
+
+  get reactiveStore(): ReadableStore<CommunityModerationNexusState> {
+    return this.store;
+  }
 
   constructor(_persistence: NexusPersistence, backend: ServerModmailBackend) {
     void _persistence;
@@ -69,7 +70,6 @@ export class CommunityModerationNexus {
     const uniqueIds = Array.from(new Set(communityIds.filter(Boolean)));
     if (uniqueIds.length === 0) {
       this.store.setState({ reports: EMPTY_REPORTS, loadedCommunityIds: [] });
-      this.reportsSnapshot = EMPTY_REPORTS;
       return;
     }
 
@@ -199,48 +199,6 @@ export class CommunityModerationNexus {
     this.bumpRevision();
   }
 
-  // ─── React hooks ──────────────────────────────────────────────────────────────
-
-  useReports(serverFilter?: string, statusFilter?: SupportReportStatus | "all"): ServerReportSummary[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => {
-        void state.revision;
-        let filtered = state.reports;
-        if (serverFilter && serverFilter !== "all") {
-          filtered = filtered.filter((r) => r.communityId === serverFilter);
-        }
-        if (statusFilter && statusFilter !== "all") {
-          filtered = filtered.filter((r) => r.status === statusFilter);
-        }
-        if (reportsEqual(this.reportsSnapshot, filtered)) {
-          return this.reportsSnapshot;
-        }
-        this.reportsSnapshot = filtered;
-        return filtered;
-      },
-      reportsEqual,
-    );
-  }
-
-  useSelectedReportId(): string | null {
-    return useStoreWithEqualityFn(this.store, (s) => s.selectedReportId);
-  }
-
-  useDetail(): ServerReportDetail | null {
-    return useStoreWithEqualityFn(this.store, (s) => s.detail);
-  }
-
-  useIsLoadingReports(): boolean {
-    return useStoreWithEqualityFn(this.store, (s) => s.isLoadingReports);
-  }
-
-  useIsLoadingDetail(): boolean {
-    return useStoreWithEqualityFn(this.store, (s) => s.isLoadingDetail);
-  }
-
-  // ─── Lifecycle ────────────────────────────────────────────────────────────────
-
   rehydrate(): void {}
 
   clear(): void {
@@ -253,6 +211,5 @@ export class CommunityModerationNexus {
       loadedCommunityIds: [],
       revision: 0,
     });
-    this.reportsSnapshot = EMPTY_REPORTS;
   }
 }

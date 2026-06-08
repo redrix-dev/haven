@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { requireHavenCore } from "@shared/core";
+import { requireHavenCore } from "@mobile-data";
 import { dataCacheDebug } from "@shared/debug";
 import { getMobileSupabase } from "../supabase/getMobileSupabase";
 import { clearAllChannelScrollExits } from "../storage/communityTimelinePrefs";

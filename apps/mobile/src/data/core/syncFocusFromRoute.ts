@@ -1,8 +1,8 @@
-import type { HavenCore } from "./HavenCore";
+import type { HavenReactCore } from "./HavenReactCore";
 import {
   getCachedChannelsForServer,
   resolvePreferredChannelIdForServer,
-} from "./communityChannelUtils";
+} from "@shared/core/communityChannelUtils";
 
 export type FocusFromRouteInput = {
   communityId: string | null;
@@ -14,16 +14,9 @@ export type ApplyCommunityFocusOptions = {
   previousChannelId?: string | null;
 };
 
-/**
- * Apply the router's current screen context onto the nexus focus.
- * Called by mobile `CommunityShell` on screen focus and by web shell on URL change.
- *
- * If channelId is omitted, the nexus picks the last visited channel for the
- * community (persisted via ChannelNexus.lastChannelByCommunity) and falls back
- * to the first text channel.
- */
+/** Apply the router's current screen context onto the nexus focus. */
 export function syncFocusFromRoute(
-  core: HavenCore,
+  core: HavenReactCore,
   input: FocusFromRouteInput,
 ): void {
   const { communityId, channelId } = input;
@@ -56,24 +49,23 @@ export function syncFocusFromRoute(
   void core.prepareTextChannelMessages(communityId, resolvedChannelId);
 }
 
-/**
- * Sync community + channel focus from route context, resolving a preferred
- * channel when the caller has a loaded channel list.
- */
 export function applyCommunityFocus(
-  core: HavenCore,
+  core: HavenReactCore,
   serverId: string,
   options?: ApplyCommunityFocusOptions,
 ): string | null {
-  const cached = getCachedChannelsForServer(core, serverId);
+  const cached = getCachedChannelsForServer(
+    core.channels.getChannelsSnapshot(serverId),
+  );
   const channelList = cached ?? [];
   const channelId =
     channelList.length > 0
-      ? resolvePreferredChannelIdForServer(core, serverId, channelList, {
+      ? resolvePreferredChannelIdForServer(channelList, {
           lastVisitedChannelId: options?.lastVisitedChannelId,
           previousChannelId:
-            options?.previousChannelId ??
-            core.channels.getActiveChannelId(),
+            options?.previousChannelId ?? core.channels.getActiveChannelId(),
+          lastChannelId: core.channels.getLastChannelId(serverId),
+          defaultChannelId: core.channels.getDefaultChannelId(serverId),
         })
       : (options?.lastVisitedChannelId ?? null);
 

@@ -3,7 +3,8 @@ import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import { useProfilesRecord, useViewerProfile } from "@mobile-data/hooks";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
@@ -29,8 +30,8 @@ export function ProfileScreen({ navigation }: Props) {
     void core.profiles.ensureViewerProfile(userId).catch(() => {});
   }, [core.profiles, userId]);
 
-  const viewerProfile = core.profiles.useViewerProfile(userId);
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const viewerProfile = useViewerProfile(core.profiles, userId);
+  const liveProfiles = useProfilesRecord(core.profiles);
 
   const identity = useMemo(() => {
     const email = user?.email ?? null;

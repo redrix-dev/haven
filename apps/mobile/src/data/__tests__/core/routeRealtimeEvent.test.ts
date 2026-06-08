@@ -8,19 +8,26 @@ import { ChannelNexus } from '@mobile-data/channels/ChannelNexus';
 import { CommunityNexus } from '@mobile-data/communities/CommunityNexus';
 import { CommunityMessageCache as CommunityMessageNexus } from '@mobile-data/messages/CommunityMessageCache';
 import { ProfileNexus } from '@mobile-data/profile/ProfileNexus';
-import type { HavenCore } from '@shared/core/HavenCore';
+import type { RealtimeEvent, RealtimeMutationTarget } from '@shared/core';
 import type { MessageBundle } from '@shared/lib/backend/types';
 
-type FakeCore = Pick<
-  HavenCore,
-  'communities' | 'channels' | 'messages' | 'profiles' | 'routeEvent'
-> & {
+type FakeCore = {
+  communities: CommunityNexus;
+  channels: ChannelNexus;
+  profiles: ProfileNexus;
+  messages: {
+    for(communityId: string): CommunityMessageNexus;
+    has(communityId: string): boolean;
+    clearCommunity(communityId: string): void;
+    clearAll(): void;
+  };
   backends: { communityData: Pick<HavenBackends['communityData'], 'getChannelMessage'> };
-  onRoleChange: HavenCore['onRoleChange'];
-  onNotificationEvent: HavenCore['onNotificationEvent'];
-  onDmConversationEvent: HavenCore['onDmConversationEvent'];
-  onDmMessageEvent: HavenCore['onDmMessageEvent'];
-  onSocialChange: HavenCore['onSocialChange'];
+  routeEvent: (evt: RealtimeEvent) => void;
+  onRoleChange: ReturnType<typeof vi.fn>;
+  onNotificationEvent: ReturnType<typeof vi.fn>;
+  onDmConversationEvent: ReturnType<typeof vi.fn>;
+  onDmMessageEvent: ReturnType<typeof vi.fn>;
+  onSocialChange: ReturnType<typeof vi.fn>;
 };
 
 const buildFakeCore = (
@@ -57,9 +64,9 @@ const buildFakeCore = (
         for (const nexus of messageNexuses.values()) nexus.clear();
         messageNexuses.clear();
       },
-    } as unknown as HavenCore['messages'],
+    },
     backends: { communityData: { getChannelMessage } },
-    routeEvent: (evt) => routeRealtimeEvent(core as unknown as HavenCore, evt),
+    routeEvent: (evt) => routeRealtimeEvent(core as unknown as RealtimeMutationTarget, evt),
     onRoleChange: vi.fn(),
     onNotificationEvent: vi.fn(),
     onDmConversationEvent: vi.fn(),
@@ -97,7 +104,7 @@ describe('routeRealtimeEvent', () => {
     const getChannelMessage = vi.fn().mockResolvedValue(full);
     const core = buildFakeCore(getChannelMessage);
 
-    routeRealtimeEvent(core as unknown as HavenCore, {
+    routeRealtimeEvent(core as unknown as RealtimeMutationTarget, {
       type: 'MESSAGE_INSERT',
       payload: {
         community_id: 'srv-1',
@@ -141,7 +148,7 @@ describe('routeRealtimeEvent', () => {
       }),
     );
 
-    routeRealtimeEvent(core as unknown as HavenCore, {
+    routeRealtimeEvent(core as unknown as RealtimeMutationTarget, {
       type: 'MESSAGE_INSERT',
       payload: {
         community_id: 'srv-1',
@@ -167,7 +174,7 @@ describe('routeRealtimeEvent', () => {
     const core = buildFakeCore(getChannelMessage);
     const nexus = core.messages.for('srv-1');
 
-    routeRealtimeEvent(core as unknown as HavenCore, {
+    routeRealtimeEvent(core as unknown as RealtimeMutationTarget, {
       type: 'MESSAGE_UPDATE',
       payload: {
         community_id: 'srv-1',
@@ -186,7 +193,7 @@ describe('routeRealtimeEvent', () => {
     const nexus = core.messages.for('srv-1');
     nexus.insertMessage(completeBundle({ id: 'msg-del' }));
 
-    routeRealtimeEvent(core as unknown as HavenCore, {
+    routeRealtimeEvent(core as unknown as RealtimeMutationTarget, {
       type: 'MESSAGE_DELETE',
       payload: {
         community_id: 'srv-1',
@@ -201,7 +208,7 @@ describe('routeRealtimeEvent', () => {
   it('PROFILE_IDENTITY_CHANGE upserts and deletes profiles', () => {
     const core = buildFakeCore(vi.fn());
 
-    routeRealtimeEvent(core as unknown as HavenCore, {
+    routeRealtimeEvent(core as unknown as RealtimeMutationTarget, {
       type: 'PROFILE_IDENTITY_CHANGE',
       payload: {
         event: 'INSERT',
@@ -214,7 +221,7 @@ describe('routeRealtimeEvent', () => {
 
     expect(core.profiles.getProfile('user-2')?.username).toBe('alice');
 
-    routeRealtimeEvent(core as unknown as HavenCore, {
+    routeRealtimeEvent(core as unknown as RealtimeMutationTarget, {
       type: 'PROFILE_IDENTITY_CHANGE',
       payload: {
         event: 'DELETE',
@@ -230,7 +237,7 @@ describe('routeRealtimeEvent', () => {
     const core = buildFakeCore(vi.fn());
     core.channels.loadForCommunity = loadForCommunity;
 
-    routeRealtimeEvent(core as unknown as HavenCore, {
+    routeRealtimeEvent(core as unknown as RealtimeMutationTarget, {
       type: 'CHANNEL_GROUP_CHANGE',
       payload: { community_id: 'srv-1' },
     });

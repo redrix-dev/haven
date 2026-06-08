@@ -2,13 +2,8 @@ import { useEffect, useRef } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "@/navigation/types";
-import {
-  applyCommunityFocus,
-  resolveCommunityEntrypointTarget,
-  toServerSummaries,
-  useBootstrapPhase,
-  useHavenCore,
-} from "@shared/core";
+import { resolveCommunityEntrypointTarget, toServerSummaries } from "@shared/core";
+import { applyCommunityFocus, useBootstrapPhase, useHavenCore } from "@mobile-data";
 import {
   useCommunitiesLoadError,
   useCommunitiesLoading,

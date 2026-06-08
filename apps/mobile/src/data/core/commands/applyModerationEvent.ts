@@ -1,4 +1,4 @@
-import type { HavenCore } from "../HavenCore";
+import type { HavenReactCore } from "../HavenReactCore";
 
 export type ModerationEventInput = {
   communityId: string;
@@ -6,12 +6,9 @@ export type ModerationEventInput = {
   messageId?: string | null;
 };
 
-/**
- * Cross-nexus command for moderation actions that delete or hide messages.
- * Routed via HavenCore so feature code never directly mutates nexuses.
- */
+/** Cross-nexus command for moderation actions that delete or hide messages. */
 export function applyModerationEvent(
-  core: HavenCore,
+  core: HavenReactCore,
   input: ModerationEventInput,
 ): void {
   const { communityId, channelId, messageId } = input;

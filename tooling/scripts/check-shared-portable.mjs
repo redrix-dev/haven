@@ -6,8 +6,8 @@ import path from "node:path";
  *
  * Enforces:
  * - no deprecated Supabase singleton / direct env reads
- * - no react / solid-js / react-flavored zustand anywhere in shared (except
- *   documented host-layer exclusions still being relocated)
+ * - no react / solid-js / react-flavored zustand anywhere in shared
+ * - no hook-shaped `use*` exports under shared/core (cache ports belong in mobile)
  * - browser-global and web-only imports in portable logic paths
  */
 const sharedRoot = path.join("packages", "shared", "src");
@@ -22,9 +22,7 @@ const webOnlyImportRe =
   /\b(?:sonner|react-dom|react-markdown|@radix-ui\/|@tiptap\/|lucide-react|cmdk)\b/;
 
 const portablePathChecks = [
-  /^packages\/shared\/src\/contexts\/.+\.(?:ts|tsx)$/,
   /^packages\/shared\/src\/app\/hooks\/.+\.(?:ts|tsx)$/,
-  /^packages\/shared\/src\/features\/.+\/hooks\/.+\.(?:ts|tsx)$/,
   /^packages\/shared\/src\/lib\/deepLinks\.ts$/,
   /^packages\/shared\/src\/platform\/urls\.ts$/,
 ];
@@ -32,18 +30,11 @@ const portablePathExclusions = [
   /^packages\/shared\/src\/app\/hooks\/useDesktopSettings\.ts$/,
 ];
 
-/** Host-layer files still in shared during cleave — remove as each relocates. */
-const frameworkImportExclusions = [
-  /^packages\/shared\/src\/contexts\/.+\.(?:ts|tsx)$/,
-  /^packages\/shared\/src\/features\/.+\/hooks\/.+\.(?:ts|tsx)$/,
-  /^packages\/shared\/src\/core\/useHavenCore\.ts$/,
-  /^packages\/shared\/src\/debug\/useDataCacheComponentProbe\.ts$/,
-  /^packages\/shared\/src\/nexus\/Nexus\.ts$/,
-  /^packages\/shared\/src\/nexus\/__tests__\/.+\.(?:ts|tsx)$/,
-];
-
 const frameworkImportRe =
   /\bfrom\s+["'](?:react|react-dom|solid-js|zustand|zustand\/traditional|zustand\/react)["']/;
+
+const coreUseMemberRe =
+  /^\s*(?:export\s+)?(?:async\s+)?function\s+(use[A-Z][A-Za-z0-9]*)\s*\(/;
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -75,15 +66,20 @@ for (const file of walk(sharedRoot)) {
   const shouldCheckPortablePath = portablePathChecks.some((pattern) =>
     pattern.test(rel),
   ) && !portablePathExclusions.some((pattern) => pattern.test(rel));
-  const shouldCheckFrameworkImports = !frameworkImportExclusions.some((pattern) =>
-    pattern.test(rel),
-  );
   const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((rawLine, i) => {
     const line = stripComments(rawLine);
-    if (shouldCheckFrameworkImports && frameworkImportRe.test(line)) {
+    if (frameworkImportRe.test(line)) {
       violations.push(
-        `${rel}:${i + 1}: framework import in packages/shared (reactivity belongs in platform data layers; use zustand/vanilla in shared only if unavoidable)`,
+        `${rel}:${i + 1}: framework import in packages/shared (reactivity belongs in platform data layers)`,
+      );
+    }
+    if (
+      /^packages\/shared\/src\/core\/.+\.(?:ts|tsx)$/.test(rel) &&
+      coreUseMemberRe.test(line)
+    ) {
+      violations.push(
+        `${rel}:${i + 1}: hook-shaped use* export in packages/shared/core (move to mobile data hooks)`,
       );
     }
     if (importSupabaseRe.test(line)) {

@@ -1,4 +1,4 @@
-import { requireHavenCore } from "@shared/core/havenCoreRef";
+import { requireSessionBackends } from "./sessionBackendRegistry";
 import type { CommunityDataBackend } from './communityDataBackend.interface';
 import type { ControlPlaneBackend } from './controlPlaneBackend';
 import type { DirectMessageBackend } from './directMessageBackend';
@@ -30,22 +30,28 @@ const backendMode = parseBackendMode(resolveBackendModeFromEnv());
 export const getBackendMode = (): BackendMode => backendMode;
 
 export const getControlPlaneBackend = (): ControlPlaneBackend =>
-  requireHavenCore().backends.controlPlane;
+  requireSessionBackends().controlPlane;
 
 export const getCommunityDataBackend = (_communityId: string): CommunityDataBackend =>
-  requireHavenCore().backends.communityData;
+  requireSessionBackends().communityData;
 
 export const getNotificationBackend = (): NotificationBackend =>
-  requireHavenCore().backends.notifications;
+  requireSessionBackends().notifications;
 
 export const getSocialBackend = (): SocialBackend =>
-  requireHavenCore().backends.social;
+  requireSessionBackends().social;
 
 export const getDirectMessageBackend = (): DirectMessageBackend =>
-  requireHavenCore().backends.directMessages;
+  requireSessionBackends().directMessages;
 
 export const getModerationBackend = (): ModerationBackend =>
-  requireHavenCore().backends.moderation;
+  requireSessionBackends().moderation;
 
 export const getServerModmailBackend = (): ServerModmailBackend =>
-  requireHavenCore().backends.serverModmail;
+  requireSessionBackends().serverModmail;
+
+export {
+  registerSessionBackends,
+  resetSessionBackends,
+  requireSessionBackends,
+} from "./sessionBackendRegistry";

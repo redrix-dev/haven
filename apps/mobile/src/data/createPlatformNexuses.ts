@@ -1,8 +1,10 @@
+import type { HavenBackends } from "@shared/core/backends";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
 import type {
-  CreatePlatformNexusBundle,
-  PlatformNexusBundle,
-  PlatformNexusContext,
-} from "@shared/core/cache/platformNexusPorts";
+  VoiceRealtimeChannel,
+  VoiceRealtimeTransport,
+} from "@shared/features/voice/types";
 import type { ViewerMessagePolicyStore as ReactViewerMessagePolicyStore } from "./session/viewerMessagePolicyStore";
 import { CommunityAdminNexus } from "./community/CommunityAdminNexus";
 import { CommunityModerationNexus } from "./community/CommunityModerationNexus";
@@ -12,6 +14,24 @@ import { PermissionsNexus } from "./permissions/PermissionsNexus";
 import { ProfileNexus } from "./profile/ProfileNexus";
 import { SocialNexus } from "./social/SocialNexus";
 import { VoiceNexus } from "./voice/VoiceNexus";
+
+export type PlatformNexusContext = {
+  persistence: NexusPersistence;
+  backends: HavenBackends;
+  viewerMessagePolicyStore: ViewerMessagePolicyStore;
+  voiceRealtime: VoiceRealtimeTransport;
+};
+
+export type PlatformNexusBundle = {
+  admin: CommunityAdminNexus;
+  moderation: CommunityModerationNexus;
+  social: SocialNexus;
+  permissions: PermissionsNexus;
+  profiles: ProfileNexus;
+  featureFlags: FeatureFlagNexus;
+  onboarding: OnboardingNexus;
+  voice: VoiceNexus;
+};
 
 export function createPlatformNexusBundle(
   ctx: PlatformNexusContext,
@@ -35,5 +55,6 @@ export function createPlatformNexusBundle(
   };
 }
 
-export const createReactPlatformNexusBundle: CreatePlatformNexusBundle =
-  createPlatformNexusBundle;
+export const createReactPlatformNexusBundle = createPlatformNexusBundle;
+
+export type { VoiceRealtimeChannel, VoiceRealtimeTransport };

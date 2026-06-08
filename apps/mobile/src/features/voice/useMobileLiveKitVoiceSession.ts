@@ -9,8 +9,9 @@ import {
   Track,
   type RemoteParticipant,
 } from "livekit-client";
-import { useHavenCore } from "@shared/core";
-import { useVoiceMemberVolumes } from "@shared/features/voice/hooks/useVoiceMemberVolumes";
+import { useHavenCore } from "@mobile-data";
+import { useVoiceSession } from "@mobile-data/hooks";
+import { useVoiceMemberVolumes } from "@/features/voice/hooks/useVoiceMemberVolumes";
 import type {
   VoiceControllerChannel,
   VoiceParticipant,
@@ -185,7 +186,7 @@ export function useMobileLiveKitVoiceSession({
   livekitRoom: Room;
 } {
   const core = useHavenCore();
-  const voiceSession = core.voice.useSession();
+  const voiceSession = useVoiceSession(core.voice);
   const joined = voiceSession.joined;
   const isMuted = voiceSession.isMuted;
   const isDeafened = voiceSession.isDeafened;

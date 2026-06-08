@@ -1,12 +1,9 @@
 import { create, useStore, type StoreApi, type UseBoundStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { NexusEntry } from "@shared/core/cache/entityTypes";
 
-export type NexusEntry<T> = {
-  data: T;
-  partial: boolean;
-  cachedAt: number;
-};
+export type { NexusEntry };
 
 export type NexusState<T> = {
   entities: Record<string, NexusEntry<T>>;
@@ -14,16 +11,10 @@ export type NexusState<T> = {
 };
 
 /**
- * Abstract entity cache used by every domain Nexus.
- *
- * Responsibilities:
- *   - entity map (Zustand store)
- *   - getOrCreate / getOrPartial / update / delete
- *   - persist/rehydrate via injected NexusPersistence
- *   - stable selectors for React
+ * Abstract entity cache used by every mobile domain Nexus.
  *
  * Subclasses provide transform(raw) and may extend the store shape.
- * Storage is platform-agnostic; hosts inject the adapter at HavenCore creation.
+ * Storage is platform-agnostic; hosts inject the adapter at HavenReactCore creation.
  */
 export abstract class Nexus<T, R = unknown> {
   private entityType: string;

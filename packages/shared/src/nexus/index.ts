@@ -1,10 +1,8 @@
 /**
- * Shared nexus surface: entity state types, pure selectors (import subpaths),
- * cache port interfaces, and the entity `Nexus` base class (scheduled for mobile
- * relocation). Concrete reactive cache classes live in `@mobile-data/*`.
+ * Shared nexus surface: entity state types and pure selectors (import subpaths).
+ * Concrete reactive cache classes live in `@mobile-data/*`.
  */
-export { Nexus } from "./Nexus";
-export type { NexusEntry, NexusState } from "./Nexus";
+export type { NexusEntry, EntityMapState, NexusState } from "@shared/core/cache/entityTypes";
 export type { ReadableStore } from "./storeTypes";
 export type { ChannelMeta } from "@shared/features/messaging/logic/types";
 export type { Community, CommunityNexusState } from "./community/communityTypes";
@@ -30,27 +28,3 @@ export type {
   VoiceNexusState,
   VoiceSessionSnapshot,
 } from "@shared/features/voice/voiceNexusTypes";
-export type {
-  ChannelNexusPort,
-  CommunityNexusPort,
-  CreateChannelNexus,
-  CreateCommunityNexus,
-  CreateDirectMessageNexus,
-  CreateNotificationNexus,
-  DirectMessageNexusPort,
-  NotificationNexusPort,
-} from "@shared/core/cache/entityNexusPorts";
-export type {
-  CommunityAdminNexusPort,
-  CommunityModerationNexusPort,
-  CreatePlatformNexusBundle,
-  FeatureFlagNexusPort,
-  OnboardingNexusPort,
-  PermissionsNexusPort,
-  PlatformNexusBundle,
-  PlatformNexusContext,
-  ProfileNexusPort,
-  SocialNexusPort,
-  ViewerProfileUpdateInput,
-  VoiceNexusPort,
-} from "@shared/core/cache/platformNexusPorts";

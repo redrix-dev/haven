@@ -1,7 +1,7 @@
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react-native";
 import { ThemedIonicons } from "@/theme-rn";
 import { useCallback, useState } from "react";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { listSelectableBuiltinThemes } from "@shared/themes/selectableBuiltinThemes";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";

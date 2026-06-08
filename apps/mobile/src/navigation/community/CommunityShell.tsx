@@ -1,12 +1,11 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { Channel } from "@shared/lib/backend/types";
 import {
-  applyCommunityFocus,
   resolvePreferredChannelIdForServer,
   toChannel,
   toServerSummaries,
-  useHavenCore,
 } from "@shared/core";
+import { applyCommunityFocus, useHavenCore } from "@mobile-data";
 import {
   useActiveChannelId,
   useChannels,
@@ -20,7 +19,7 @@ import type { UserProfileModalTarget } from "@/features/user-profile/UserProfile
 import type { MainStackParamList } from "@/navigation/types";
 import { CommunityChannelDrawer } from "@/navigation/community/CommunityChannelDrawer";
 import { CommunityTopBar } from "@/navigation/community/CommunityTopBar";
-import { useDataCacheComponentProbe } from "@shared/debug";
+import { useDataCacheComponentProbe } from "@/debug/useDataCacheComponentProbe";
 import { CommunityRail } from "./CommunityRail";
 import { CommunityActionSheets } from "./CommunityActionSheets";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
@@ -173,12 +172,11 @@ export function CommunityShell({
       currentChannelId != null &&
       channels.some((channel) => channel.id === currentChannelId);
     if (valid) return;
-    const preferred = resolvePreferredChannelIdForServer(
-      core,
-      serverId,
-      channels,
-      { previousChannelId: currentChannelId },
-    );
+    const preferred = resolvePreferredChannelIdForServer(channels, {
+      previousChannelId: currentChannelId,
+      lastChannelId: core.channels.getLastChannelId(serverId),
+      defaultChannelId: core.channels.getDefaultChannelId(serverId),
+    });
     core.communities.setActiveId(serverId);
     core.channels.setActiveChannelId(preferred);
   }, [channels, core, currentChannelId, serverId]);

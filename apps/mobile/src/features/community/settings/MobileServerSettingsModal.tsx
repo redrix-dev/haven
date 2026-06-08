@@ -17,7 +17,8 @@ import DraggableFlatList, {
   type RenderItemParams,
 } from "react-native-draggable-flatlist";
 import type { ServerRoleItem, ServerSettingsUpdate } from "@shared/lib/backend/types";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import { useServerPanelState } from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 import {
@@ -75,7 +76,7 @@ export function MobileServerSettingsModal({
     }),
     [foregroundColor, themeTokens],
   );
-  const serverPanel = admin.useServerPanelState();
+  const serverPanel = useServerPanelState(admin);
   const [tab, setTab] = useState<TabKey>("general");
 
   const [draftName, setDraftName] = useState("");

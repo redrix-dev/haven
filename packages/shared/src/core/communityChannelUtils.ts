@@ -1,6 +1,5 @@
 import type { Channel } from "@shared/lib/backend/types";
 import type { HavenChannel } from "@shared/nexus/community/channelTypes";
-import type { HavenCore } from "./HavenCore";
 
 export const toChannel = (channel: HavenChannel): Channel =>
   ({
@@ -14,26 +13,26 @@ export const toChannel = (channel: HavenChannel): Channel =>
   }) as unknown as Channel;
 
 export function getCachedChannelsForServer(
-  core: HavenCore,
-  serverId: string,
+  channelsSnapshot: readonly HavenChannel[],
 ): Channel[] | null {
-  const snapshot = core.channels.getChannelsSnapshot(serverId);
-  if (snapshot.length === 0) return null;
-  return snapshot.map(toChannel);
+  if (channelsSnapshot.length === 0) return null;
+  return channelsSnapshot.map(toChannel);
 }
 
+export type ResolvePreferredChannelOptions = {
+  lastVisitedChannelId?: string | null;
+  previousChannelId?: string | null;
+  lastChannelId?: string | null;
+  defaultChannelId?: string | null;
+};
+
 export function resolvePreferredChannelIdForServer(
-  core: HavenCore,
-  serverId: string,
   channelList: Channel[],
-  options?: {
-    lastVisitedChannelId?: string | null;
-    previousChannelId?: string | null;
-  },
+  options?: ResolvePreferredChannelOptions,
 ): string | null {
   if (channelList.length === 0) return null;
 
-  const remembered = core.channels.getLastChannelId(serverId);
+  const remembered = options?.lastChannelId ?? null;
   const previousValid =
     options?.previousChannelId &&
     channelList.some((channel) => channel.id === options.previousChannelId)
@@ -54,7 +53,7 @@ export function resolvePreferredChannelIdForServer(
     }
   }
   return (
-    core.channels.getDefaultChannelId(serverId) ??
+    options?.defaultChannelId ??
     channelList[0]?.id ??
     null
   );

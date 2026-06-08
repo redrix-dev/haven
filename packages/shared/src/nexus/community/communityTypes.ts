@@ -1,4 +1,4 @@
-import type { NexusEntry, NexusState } from '../Nexus'
+import type { NexusEntry, NexusState } from '@shared/core/cache/entityTypes'
 
 export type Community = {
   id: string

@@ -7,8 +7,8 @@ import React, {
   useCallback,
   useSyncExternalStore,
 } from "react";
-import { requireHavenCore } from "@shared/core";
-import { requireAuthStore } from "@shared/core/sessionStoreRegistry";
+import { requireHavenCore } from "@mobile-data";
+import { requireAuthStore } from "@mobile-data";
 import type { AuthStoreState } from "@shared/core/sessionStorePorts";
 import { bootLogger } from "@shared/debug/bootLogger";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
@@ -22,7 +22,6 @@ import {
   validateLegalAcceptance,
 } from "@shared/features/auth/domain";
 import type {
-  AuthError,
   EmailOtpType,
   PostgrestError,
   User,
@@ -33,6 +32,11 @@ import type {
 // establish, recover, refresh, and end a session. Domain reads/writes belong in
 // HavenCore/Nexus after the session exists.
 const havenAuthClient = () => requireHavenCore().backends.client;
+
+type HavenAuthClient = ReturnType<typeof havenAuthClient>;
+type HavenAuthError = Awaited<
+  ReturnType<HavenAuthClient["auth"]["signInWithPassword"]>
+>["error"];
 
 const authStore = () => requireAuthStore();
 
@@ -60,15 +64,17 @@ interface AuthContextValue {
     password: string,
     username: string,
     acceptedLegal: boolean,
-  ) => Promise<{ error: AuthError | PostgrestError | Error | null }>;
+  ) => Promise<{ error: HavenAuthError | PostgrestError | Error | null }>;
   signIn: (
     email: string,
     password: string,
-  ) => Promise<{ error: AuthError | null }>;
-  requestPasswordReset: (email: string) => Promise<{ error: AuthError | null }>;
+  ) => Promise<{ error: HavenAuthError | null }>;
+  requestPasswordReset: (
+    email: string,
+  ) => Promise<{ error: HavenAuthError | null }>;
   completePasswordRecovery: (
     password: string,
-  ) => Promise<{ error: AuthError | null }>;
+  ) => Promise<{ error: HavenAuthError | null }>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
 }

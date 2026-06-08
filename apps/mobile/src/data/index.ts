@@ -15,6 +15,37 @@ export {
   type ReactHavenCoreOptions,
 } from "./createReactHavenCore";
 export {
+  HavenReactCore,
+  type HavenReactCoreOptions,
+  useHavenCore,
+  useBootstrapPhase,
+  requireHavenCore,
+  getHavenCore,
+  registerHavenCore,
+  resetHavenCore,
+  syncFocusFromRoute,
+  applyCommunityFocus,
+  applyAccessRevoked,
+  applyModerationEvent,
+  prefetchCommunityChannelMessages,
+  bootstrapNotificationSoundSync,
+  createNotificationSoundSyncState,
+  resetNotificationSoundSyncState,
+  syncNotificationSounds,
+  registerSessionStores,
+  resetSessionStores,
+  requireAuthStore,
+  requireUiStore,
+  requireUserStatusStore,
+} from "./core";
+export type {
+  BootstrapPhaseSnapshot,
+  FocusFromRouteInput,
+  ApplyCommunityFocusOptions,
+  PrefetchCommunityChannelMessagesInput,
+  NotificationSoundSyncState,
+} from "./core";
+export {
   createMobileViewerMessagePolicyStore,
   type ViewerMessagePolicyStore,
 } from "./session";

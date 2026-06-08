@@ -1,4 +1,4 @@
-import type { HavenCore } from "./HavenCore";
+import type { RealtimeMutationTarget } from "./realtimeMutationTarget";
 import { buildPartialMessageFromRealtimePayload } from "@shared/features/messaging/logic/realtimePartialMessage";
 import { mapLiveProfileIdentity } from "@shared/lib/backend/controlPlaneBackend";
 import type { MessageBundle, ReportStatusUpdatedBroadcastPayload } from "@shared/lib/backend/types";
@@ -31,7 +31,10 @@ export type RealtimeMessageSyncEvent = {
   message?: MessageBundle;
 };
 
-export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
+export function routeRealtimeEvent(
+  target: RealtimeMutationTarget,
+  evt: RealtimeEvent,
+): void {
   switch (evt.type) {
     case "MESSAGE_INSERT": {
       const communityId = evt.payload.community_id;
@@ -44,7 +47,7 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       )
         return;
 
-      const nexus = core.messages.for(communityId);
+      const nexus = target.messages.for(communityId);
 
       const partial = buildPartialMessageFromRealtimePayload({
         messageId,
@@ -54,7 +57,7 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
 
       nexus.insertMessage(partial);
 
-      void core.backends.communityData
+      void target.backends.communityData
         .getChannelMessage({
           communityId,
           channelId,
@@ -81,9 +84,9 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       )
         return;
 
-      const nexus = core.messages.for(communityId);
+      const nexus = target.messages.for(communityId);
 
-      void core.backends.communityData
+      void target.backends.communityData
         .getChannelMessage({
           communityId,
           channelId,
@@ -110,7 +113,7 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       )
         return;
 
-      core.messages.for(communityId).removeMessage(messageId, channelId);
+      target.messages.for(communityId).removeMessage(messageId, channelId);
       return;
     }
 
@@ -118,27 +121,27 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       const communityId = evt.payload.community_id;
       if (typeof communityId !== "string" || communityId.trim().length === 0)
         return;
-      core.onRoleChange(communityId);
+      target.onRoleChange(communityId);
       return;
     }
 
     case "NOTIFICATION": {
-      core.onNotificationEvent(evt.payload);
+      target.onNotificationEvent(evt.payload);
       return;
     }
 
     case "DM_CONVERSATION": {
-      core.onDmConversationEvent(evt.payload);
+      target.onDmConversationEvent(evt.payload);
       return;
     }
 
     case "DM_MESSAGE": {
-      core.onDmMessageEvent(evt.payload);
+      target.onDmMessageEvent(evt.payload);
       return;
     }
 
     case "SOCIAL_CHANGE": {
-      core.onSocialChange(evt.payload);
+      target.onSocialChange(evt.payload);
       return;
     }
 
@@ -154,12 +157,12 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
         typeof candidate.community_id !== "string"
       ) {
         // Fall back to a refetch when the payload doesn't carry a full row.
-        void core.channels.loadForCommunity(communityId).catch((err) => {
+        void target.channels.loadForCommunity(communityId).catch((err) => {
           console.warn("[routeRealtimeEvent] channel reload failed", err);
         });
         return;
       }
-      core.channels.upsertChannel(candidate as never);
+      target.channels.upsertChannel(candidate as never);
       return;
     }
 
@@ -167,8 +170,8 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       const communityId = evt.payload.community_id;
       const channelId = evt.payload.channel_id;
       if (typeof communityId !== "string" || typeof channelId !== "string") return;
-      core.channels.removeChannel(channelId, communityId);
-      core.messages.for(communityId).evictChannel(channelId);
+      target.channels.removeChannel(channelId, communityId);
+      target.messages.for(communityId).evictChannel(channelId);
       return;
     }
 
@@ -193,8 +196,8 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
             : null;
       if (!channelId || !communityId) return;
 
-      core.channels.removeChannel(channelId, communityId);
-      core.messages.for(communityId).evictChannel(channelId);
+      target.channels.removeChannel(channelId, communityId);
+      target.messages.for(communityId).evictChannel(channelId);
 
       if (revokedUserId) {
         notifyMemberChannelAccessRevoked({
@@ -222,13 +225,13 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       if (!communityId || !bannedUserId) return;
 
       notifyMemberBanned({ communityId, bannedUserId });
-      void core.ensureCommunityPermissions(communityId);
+      void target.ensureCommunityPermissions(communityId);
       return;
     }
 
     case "report_status_updated": {
       const reportPayload = evt.payload as ReportStatusUpdatedBroadcastPayload;
-      core.moderation.handleReportChange(reportPayload);
+      target.moderation.handleReportChange(reportPayload);
       return;
     }
 
@@ -236,7 +239,7 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       const userId =
         typeof evt.payload.user_id === "string" ? evt.payload.user_id : null;
       if (userId) {
-        core.moderation.handleUserPlatformBanned(userId);
+        target.moderation.handleUserPlatformBanned(userId);
       }
       return;
     }
@@ -245,7 +248,7 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       const communityId = evt.payload.community_id;
       if (typeof communityId !== "string" || communityId.trim().length === 0)
         return;
-      void core.channels.loadForCommunity(communityId).catch((err) => {
+      void target.channels.loadForCommunity(communityId).catch((err) => {
         console.warn("[routeRealtimeEvent] CHANNEL_GROUP_CHANGE reload failed", err);
       });
       return;
@@ -259,7 +262,7 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       if (!userId) return;
 
       if (event === "DELETE") {
-        core.profiles.removeProfile(userId);
+        target.profiles.removeProfile(userId);
         return;
       }
 
@@ -271,7 +274,7 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
           : null;
       if (!username || !updatedAt) return;
 
-      core.profiles.upsertProfile(
+      target.profiles.upsertProfile(
         mapLiveProfileIdentity({
           user_id: userId,
           username,
@@ -289,7 +292,7 @@ export function routeRealtimeEvent(core: HavenCore, evt: RealtimeEvent): void {
       const userId =
         typeof evt.payload.user_id === "string" ? evt.payload.user_id : null;
       if (!userId) return;
-      void core.communities.load(userId).catch((err) => {
+      void target.communities.load(userId).catch((err) => {
         console.warn(
           "[routeRealtimeEvent] COMMUNITY_MEMBERSHIP_CHANGE reload failed",
           err,

@@ -8,3 +8,8 @@ export type NexusEntry<T> = {
 export type EntityMapState<T> = {
   entities: Record<string, NexusEntry<T>>;
 };
+
+/** Entity map state with revision counter (used by mobile/solid cache state types). */
+export type NexusState<T> = EntityMapState<T> & {
+  revision: number;
+};

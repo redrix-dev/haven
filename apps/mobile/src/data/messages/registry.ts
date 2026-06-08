@@ -1,10 +1,9 @@
-import type { CommunityMessageRegistry } from "@shared/core/cache/communityMessageCachePort";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
 import type { HavenBackends } from "@shared/core/backends";
 import { CommunityMessageCache } from "./CommunityMessageCache";
 
-export class MessageNexusRegistry implements CommunityMessageRegistry {
+export class MessageNexusRegistry {
   private byCommunity = new Map<string, CommunityMessageCache>();
   private backends: HavenBackends | null = null;
 

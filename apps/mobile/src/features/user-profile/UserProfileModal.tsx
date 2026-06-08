@@ -9,7 +9,16 @@ import {
   Text,
   View,
 } from "react-native";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useBlockedUsers,
+  useFriendRequests,
+  useFriends,
+  useProfileCard,
+  useProfileCardError,
+  useProfileCardLoading,
+  useProfilesRecord,
+} from "@mobile-data/hooks";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import { resolveColorProp } from "@shared/themes";
@@ -50,13 +59,13 @@ export default function UserProfileModal({
   const themeTokens = useMobileThemeTokens();
   const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const viewerUserId = useAuthStore((state) => state.user?.id ?? null);
-  const liveProfiles = core.profiles.useProfilesRecord();
-  const profileCard = core.profiles.useProfileCard(target?.userId);
-  const loading = core.profiles.useProfileCardLoading(target?.userId);
-  const error = core.profiles.useProfileCardError(target?.userId);
-  const friends = core.social.useFriends();
-  const requests = core.social.useFriendRequests();
-  const blockedUsers = core.social.useBlockedUsers();
+  const liveProfiles = useProfilesRecord(core.profiles);
+  const profileCard = useProfileCard(core.profiles, target?.userId);
+  const loading = useProfileCardLoading(core.profiles, target?.userId);
+  const error = useProfileCardError(core.profiles, target?.userId);
+  const friends = useFriends(core.social);
+  const requests = useFriendRequests(core.social);
+  const blockedUsers = useBlockedUsers(core.social);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);

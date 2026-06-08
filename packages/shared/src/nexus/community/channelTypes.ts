@@ -1,5 +1,5 @@
 import type { ChannelGroup, ChannelKind } from '@shared/lib/backend/types'
-import type { NexusState } from '../Nexus'
+import type { NexusState } from '@shared/core/cache/entityTypes'
 
 export type HavenChannel = {
   id: string

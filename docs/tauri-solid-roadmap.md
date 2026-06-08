@@ -29,7 +29,14 @@ flowchart TD
 
     S2 --> G1{"Gate 1:<br/>go / no-go on<br/>Tauri &amp; Solid?"}
     G1 -->|no-go| STOP["Stop / rethink the stack"]
-    G1 -->|go| RESUME["↺ Resume roadmap loop<br/>plan the real build (Phases 2–4, TBD)"]
+    G1 -->|go| P2["Phase 2 · THE CLEAVE ✅<br/>shared pure · mobile owns HavenReactCore"]
+    P2 --> P3
+
+    subgraph P3["Phase 3 · Solid app build (next)"]
+        S3["Wire HavenSolidCore + real Solid caches"]
+        S4["Tauri/Solid UI on cleaved structure"]
+        S3 --> S4
+    end
 ```
 
 ---
@@ -118,8 +125,9 @@ Non-gating follow-ups carried into the foundation phase (low-risk, not blockers)
 - **Probe 1** — a non-trivial *injected* OS capability (spike proved the `ping` mechanism;
   a real fs/secure-storage injection still TBD; overlaps Probe 5).
 - **Probe 4** — validate the Solid lib set (Kobalte / virtua / markdown / editor) per-component.
-- **Architecture note** — migrate `@shared` stores from `zustand` `create` (React-bound) to
-  `zustand/vanilla createStore` for a genuinely React-free shared layer.
+- Architecture note — migrate `@shared` stores from `zustand` `create` (React-bound) to
+  `zustand/vanilla createStore` for a genuinely React-free shared layer. **Resolved by true
+  cleave:** session stores relocated to mobile; shared retains only vanilla policy state.
 - **Voice real-build note** — echo-cancellation tuning (the feedback was two co-located
   devices, not a defect).
 
@@ -132,8 +140,8 @@ Non-gating follow-ups carried into the foundation phase (low-risk, not blockers)
 > **Canonical detail lives in [`solid-migration-handoff.md`](./solid-migration-handoff.md)
 > — read its §0 ruleset first.** This section is the phase + decision record.
 
-**Status:** direction set (2026-06-08). Supersedes the prior "shared-core hardening / Approach C"
-plan (preserved below under *Superseded*). Execution = the per-domain cleave loop (handoff §4).
+**Status:** ✅ complete (2026-06-08 true cleave on `feat/shared-core-hardening`).
+Supersedes the prior "shared-core hardening / Approach C" plan (preserved below under *Superseded*).
 
 **The decision, in one line:** stop trying to share a *reactive cache* across React and Solid.
 Split the data layer into **three layers** — pure shared logic; a per-platform cache (mobile
@@ -159,22 +167,17 @@ apps/mobile/data  = React cache (today's Nexus, relocated + thinned), calls shar
 <solid>/data      = Solid-native cache, built fresh, calls shared logic.
 ```
 
-**Per-domain loop (handoff §4, CI-gated):** inventory (logic vs cache) → extract/confirm shared
-pure logic → point mobile's cache at it + relocate it out of `shared` → build the Solid-native
-cache → gate (mobile green · `check:shared-portable` · `typecheck:solid`) → next domain.
+**Per-domain loop (handoff §4, CI-gated):** inventory → extract shared logic → relocate mobile
+cache → build Solid stub → gate (`test:cleave`) → next domain. **All domains done for mobile.**
 
-**Disposition of the Approach-C work (handoff §5):** the **pure projections** extracted
-(`channelSelectors`/`communitySelectors`/`dmSelectors`/`notificationSelectors`, plus
-`projectVisibleChannelMessages`/`routeRealtimeEvent`/`viewerMessagePolicy`) are **Layer-1 keepers**.
-The vanilla-zustand nexuses become **mobile's** cache (relocate). `react-bindings` =
-mobile's React read layer. `solid-bindings` = **retired** (Solid owns its cache natively).
-`CommunityMessageNexus` is **not** to be ported into bindings. The guard + `mobile:bundle` +
-`typecheck:solid` gates are kept.
+**Disposition of the Approach-C work (handoff §5):** pure projections and logic functions are
+**Layer-1 keepers**. Reactive nexuses are **mobile's** cache. Adapter packages **retired**.
 
-**Exit (Phase 2 / The Cleave):** ✅ met on `feat/shared-core-hardening` — `packages/shared`
-provably pure (`check:shared-portable` over all of it) · no reactive store shared across
-frameworks · mobile green throughout · Solid-native cache scaffolding per domain · retired
-adapter packages deleted · `@shared/nexus` barrel decoupled from `@mobile-data`.
+**Exit (Phase 2 / The Cleave):** ✅ met — `packages/shared` provably pure
+(`check:shared-portable` with empty exclusions) · reactive cache + `HavenReactCore`
+owned by mobile · standalone selector-hooks · no reactive store shared across frameworks
+· mobile green (`test:cleave`) · web/electron breakage accepted · Solid app build is
+**Phase 3+** (future `HavenSolidCore`, not started).
 
 **Out of scope (next phase, NOT now):** building screens/features/the Solid app UI. See handoff §7.
 

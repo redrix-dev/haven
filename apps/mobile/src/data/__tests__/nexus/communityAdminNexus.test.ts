@@ -1,10 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { createMemoryPersistence, type HavenBackends } from '@shared/core';
 import {
-  createMemoryPersistence,
+  registerSessionBackends,
+  resetSessionBackends,
+} from '@shared/lib/backend';
+import {
   registerHavenCore,
   resetHavenCore,
-} from '@shared/core';
-import type { HavenCore } from '@shared/core/HavenCore';
+} from '@mobile-data';
+import type { HavenReactCore } from '@mobile-data/core/HavenReactCore';
 import { ChannelNexus } from '@mobile-data/channels/ChannelNexus';
 import { CommunityAdminNexus } from '@mobile-data/community/CommunityAdminNexus';
 import { CommunityNexus } from '@mobile-data/communities/CommunityNexus';
@@ -22,6 +26,14 @@ const textChannel = (overrides: Partial<Channel> = {}): Channel =>
     created_at: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }) as Channel;
+
+const registerTestCore = (
+  partial: Partial<HavenReactCore> & { backends?: Partial<HavenBackends> },
+): void => {
+  const backends = partial.backends ?? ({} as Partial<HavenBackends>);
+  registerSessionBackends({ communityData: backends.communityData } as HavenBackends);
+  registerHavenCore({ ...partial, backends } as HavenReactCore);
+};
 
 describe('CommunityAdminNexus', () => {
   let admin: CommunityAdminNexus;
@@ -43,7 +55,7 @@ describe('CommunityAdminNexus', () => {
     ]);
     communities.setActiveId('c1');
 
-    registerHavenCore({
+    registerTestCore({
       communities,
       channels,
       authStore: useAuthStore,
@@ -58,11 +70,12 @@ describe('CommunityAdminNexus', () => {
           ),
         },
       },
-    } as unknown as HavenCore);
+    } as unknown as HavenReactCore);
   });
 
   afterEach(() => {
     resetHavenCore();
+    resetSessionBackends();
     useAuthStore.getState().setUser(null);
   });
 
@@ -102,7 +115,7 @@ describe('CommunityAdminNexus', () => {
       canManageBans: false,
     }));
 
-    registerHavenCore({
+    registerTestCore({
       communities,
       channels,
       permissions: {
@@ -114,7 +127,7 @@ describe('CommunityAdminNexus', () => {
           getMyPermissions,
         },
       },
-    } as unknown as HavenCore);
+    } as unknown as HavenReactCore);
 
     await admin.openServerMembersModal('c1');
 
@@ -152,7 +165,7 @@ describe('CommunityAdminNexus', () => {
       permissionsCatalog: [],
     }));
 
-    registerHavenCore({
+    registerTestCore({
       communities,
       channels,
       permissions: {
@@ -164,7 +177,7 @@ describe('CommunityAdminNexus', () => {
           fetchServerRoleManagement,
         },
       },
-    } as unknown as HavenCore);
+    } as unknown as HavenReactCore);
 
     await admin.reorderServerRoles(
       [

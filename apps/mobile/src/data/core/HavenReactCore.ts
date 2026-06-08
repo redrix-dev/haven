@@ -1,19 +1,9 @@
 import type { HavenSupabaseClient } from "@shared/infrastructure/client/createHavenSupabaseClient";
 import type {
-  CommunityAdminNexusPort,
-  CommunityModerationNexusPort,
-  CreatePlatformNexusBundle,
-  FeatureFlagNexusPort,
-  OnboardingNexusPort,
-  PermissionsNexusPort,
-  PlatformNexusBundle,
-  ProfileNexusPort,
-  SocialNexusPort,
-  VoiceNexusPort,
   VoiceRealtimeChannel,
   VoiceRealtimeTransport,
-} from "@shared/core/cache/platformNexusPorts";
-import type { AuthStorePort, UiStorePort, UserStatusStorePort } from "./sessionStorePorts";
+} from "@shared/features/voice/types";
+import type { AuthStorePort, UiStorePort, UserStatusStorePort } from "@shared/core/sessionStorePorts";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import type {
   BanEligibleServer,
@@ -24,36 +14,58 @@ import type {
   UserFlairBadge,
   UserFlairGrant,
 } from "@shared/lib/backend/types";
-import { createHavenBackends, type HavenBackends, type HavenSupabasePublicConfig } from "./backends";
-import { notifyActiveServerAccessLost } from "./communityAccessHandlers";
+import {
+  createHavenBackends,
+  type HavenBackends,
+  type HavenSupabasePublicConfig,
+} from "@shared/core/backends";
+import { notifyActiveServerAccessLost } from "@shared/core/communityAccessHandlers";
 import { BootstrapPhase, type BootstrapPhaseSnapshot, type BootstrapPhaseListener } from "./bootstrapPhase";
 import {
   resolvePreferredChannelIdForServer,
   toChannel,
-} from "./communityChannelUtils";
-import type { NexusPersistence } from "./persistence/NexusPersistence";
-import { routeRealtimeEvent, type RealtimeEvent } from "./routeRealtimeEvent";
-import type { CommunityMessageRegistry } from "./cache/communityMessageCachePort";
-import type { CreateCommunityMessageRegistry } from "./cache/communityMessageCachePort";
-import type {
-  ChannelNexusPort,
-  CommunityNexusPort,
-  CreateChannelNexus,
-  CreateCommunityNexus,
-  CreateDirectMessageNexus,
-  CreateNotificationNexus,
-  DirectMessageNexusPort,
-  NotificationNexusPort,
-} from "./cache/entityNexusPorts";
+} from "@shared/core/communityChannelUtils";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import { routeRealtimeEvent, type RealtimeEvent } from "@shared/core/routeRealtimeEvent";
+import type { RealtimeMutationTarget } from "@shared/core/realtimeMutationTarget";
 import {
   createDefaultViewerMessagePolicyState,
   type ViewerMessagePolicyStore,
-} from "./viewerMessagePolicy";
+} from "@shared/core/viewerMessagePolicy";
 import { bootLogger } from "@shared/debug/bootLogger";
 import {
   viewerCommunityPolicyEqual,
   viewerPolicyHiddenAuthorIdsEqual,
-} from "./viewerMessagePolicy";
+} from "@shared/core/viewerMessagePolicy";
+import { createCommunityNexus } from "../communities/factory";
+import { createChannelNexus } from "../channels/factory";
+import { createDirectMessageNexus } from "../direct-messages/factory";
+import { createNotificationNexus } from "../notifications/factory";
+import { createCommunityMessageRegistry, type MessageNexusRegistry } from "../messages/registry";
+import { createPlatformNexusBundle } from "../createPlatformNexuses";
+import {
+  createMobileViewerMessagePolicyStore,
+  useAuthStore,
+  useUiStore,
+  useUserStatusStore,
+} from "../session";
+import type { CommunityNexus } from "../communities/CommunityNexus";
+import type { ChannelNexus } from "../channels/ChannelNexus";
+import type { DirectMessageNexus } from "../direct-messages/DirectMessageNexus";
+import type { NotificationNexus } from "../notifications/NotificationNexus";
+import type { CommunityAdminNexus } from "../community/CommunityAdminNexus";
+import type { CommunityModerationNexus } from "../community/CommunityModerationNexus";
+import type { SocialNexus } from "../social/SocialNexus";
+import type { PermissionsNexus } from "../permissions/PermissionsNexus";
+import type { ProfileNexus } from "../profile/ProfileNexus";
+import type { FeatureFlagNexus } from "../feature-flags/FeatureFlagNexus";
+import type { OnboardingNexus } from "../onboarding/OnboardingNexus";
+import type { VoiceNexus } from "../voice/VoiceNexus";
+import { registerSessionStores } from "./sessionStoreRegistry";
+import {
+  registerSessionBackends,
+  resetSessionBackends,
+} from "@shared/lib/backend/sessionBackendRegistry";
 
 const normalizeRealtimeIso = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
@@ -96,51 +108,39 @@ const directMessageFromRealtimePayload = (
   };
 };
 
-export type HavenCoreOptions = {
+export type HavenReactCoreOptions = {
   client: HavenSupabaseClient;
   publicConfig: HavenSupabasePublicConfig;
   persistence: NexusPersistence;
-  authStore: AuthStorePort;
-  uiStore: UiStorePort;
-  userStatusStore: UserStatusStorePort;
-  viewerMessagePolicyStore: ViewerMessagePolicyStore;
-  createMessageRegistry: CreateCommunityMessageRegistry;
-  createCommunityNexus: CreateCommunityNexus;
-  createChannelNexus: CreateChannelNexus;
-  createDirectMessageNexus: CreateDirectMessageNexus;
-  createNotificationNexus: CreateNotificationNexus;
-  createPlatformNexusBundle: CreatePlatformNexusBundle;
 };
 
 export type {
-  PlatformNexusBundle,
-  CreatePlatformNexusBundle,
   VoiceRealtimeChannel,
   VoiceRealtimeTransport,
-} from "@shared/core/cache/platformNexusPorts";
+} from "@shared/features/voice/types";
 
 /**
- * The single session-scoped composition root.
+ * React-platform session-scoped composition root (mobile + transitional web/electron).
  *
- * HavenCore assumes auth has already established a Supabase session. It owns
+ * HavenReactCore assumes auth has already established a Supabase session. It owns
  * the authenticated domain runtime, not sign-in/sign-out/recovery flows.
  */
-export class HavenCore {
+export class HavenReactCore implements RealtimeMutationTarget {
   readonly backends: HavenBackends;
   readonly persistence: NexusPersistence;
-  readonly communities: CommunityNexusPort;
-  readonly channels: ChannelNexusPort;
-  readonly admin: CommunityAdminNexusPort;
-  readonly moderation: CommunityModerationNexusPort;
-  readonly messages: CommunityMessageRegistry;
-  readonly directMessages: DirectMessageNexusPort;
-  readonly notifications: NotificationNexusPort;
-  readonly social: SocialNexusPort;
-  readonly permissions: PermissionsNexusPort;
-  readonly profiles: ProfileNexusPort;
-  readonly featureFlags: FeatureFlagNexusPort;
-  readonly onboarding: OnboardingNexusPort;
-  readonly voice: VoiceNexusPort;
+  readonly communities: CommunityNexus;
+  readonly channels: ChannelNexus;
+  readonly admin: CommunityAdminNexus;
+  readonly moderation: CommunityModerationNexus;
+  readonly messages: MessageNexusRegistry;
+  readonly directMessages: DirectMessageNexus;
+  readonly notifications: NotificationNexus;
+  readonly social: SocialNexus;
+  readonly permissions: PermissionsNexus;
+  readonly profiles: ProfileNexus;
+  readonly featureFlags: FeatureFlagNexus;
+  readonly onboarding: OnboardingNexus;
+  readonly voice: VoiceNexus;
 
   readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
   readonly authStore: AuthStorePort;
@@ -152,40 +152,47 @@ export class HavenCore {
   private sessionUserId: string | null = null;
   private lastNotifiedAccessLostCommunityId: string | null = null;
 
-  constructor(options: HavenCoreOptions) {
+  constructor(options: HavenReactCoreOptions) {
+    registerSessionStores({
+      authStore: useAuthStore,
+      uiStore: useUiStore,
+      userStatusStore: useUserStatusStore,
+    });
+
     this.persistence = options.persistence;
     this.backends = createHavenBackends(options.client, options.publicConfig);
-    this.authStore = options.authStore;
-    this.uiStore = options.uiStore;
-    this.userStatusStore = options.userStatusStore;
-    this.viewerMessagePolicyStore = options.viewerMessagePolicyStore;
+    registerSessionBackends(this.backends);
+    this.authStore = useAuthStore;
+    this.uiStore = useUiStore;
+    this.userStatusStore = useUserStatusStore;
+    this.viewerMessagePolicyStore = createMobileViewerMessagePolicyStore();
 
-    this.communities = options.createCommunityNexus(
+    this.communities = createCommunityNexus(
       options.persistence,
       this.backends.controlPlane,
     );
-    this.channels = options.createChannelNexus(
+    this.channels = createChannelNexus(
       options.persistence,
       this.backends.communityData,
     );
-    this.messages = options.createMessageRegistry(
+    this.messages = createCommunityMessageRegistry(
       options.persistence,
       this.viewerMessagePolicyStore,
     );
-    this.directMessages = options.createDirectMessageNexus(
+    this.directMessages = createDirectMessageNexus(
       options.persistence,
       this.backends.directMessages,
     );
-    this.notifications = options.createNotificationNexus(
+    this.notifications = createNotificationNexus(
       options.persistence,
       this.backends.notifications,
     );
 
     const voiceRealtime: VoiceRealtimeTransport = {
-      channel: (topic, options) =>
+      channel: (topic, channelOptions) =>
         this.backends.client.channel(
           topic,
-          options as never,
+          channelOptions as never,
         ) as unknown as VoiceRealtimeChannel,
       removeChannel: (channel) =>
         this.backends.client.removeChannel(channel as never),
@@ -193,7 +200,7 @@ export class HavenCore {
         this.backends.client.getChannels() as unknown as VoiceRealtimeChannel[],
     };
 
-    const platformNexuses = options.createPlatformNexusBundle({
+    const platformNexuses = createPlatformNexusBundle({
       persistence: options.persistence,
       backends: this.backends,
       viewerMessagePolicyStore: this.viewerMessagePolicyStore,
@@ -305,7 +312,7 @@ export class HavenCore {
       try {
         this.realtimeUnsubscribe();
       } catch (err) {
-        console.warn("[HavenCore] realtime unsubscribe failed", err);
+        console.warn("[HavenReactCore] realtime unsubscribe failed", err);
       }
       this.realtimeUnsubscribe = null;
     }
@@ -423,7 +430,7 @@ export class HavenCore {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error ?? "unknown");
-      console.error("[HavenCore] bootstrapSession failed", error);
+      console.error("[HavenReactCore] bootstrapSession failed", error);
       this.phase.set("error", message);
       throw error;
     }
@@ -454,6 +461,7 @@ export class HavenCore {
       createDefaultViewerMessagePolicyState(),
     );
     this.uiStore.getState().reset();
+    resetSessionBackends();
     this.phase.set("idle");
   }
 
@@ -476,16 +484,16 @@ export class HavenCore {
 
   onNotificationEvent(_payload: Record<string, unknown>): void {
     void this.notifications.loadInbox().catch((err) => {
-      console.warn("[HavenCore] notifications.loadInbox failed", err);
+      console.warn("[HavenReactCore] notifications.loadInbox failed", err);
     });
     void this.notifications.refreshCounts().catch((err) => {
-      console.warn("[HavenCore] notifications.refreshCounts failed", err);
+      console.warn("[HavenReactCore] notifications.refreshCounts failed", err);
     });
   }
 
   onDmConversationEvent(_payload: Record<string, unknown>): void {
     void this.directMessages.loadConversations().catch((err) => {
-      console.warn("[HavenCore] directMessages.loadConversations failed", err);
+      console.warn("[HavenReactCore] directMessages.loadConversations failed", err);
     });
   }
 
@@ -503,11 +511,11 @@ export class HavenCore {
           this.directMessages.upsertMessage(partial);
         }
         void this.directMessages.receiveMessage(conversationId, messageId).catch((err) => {
-          console.warn("[HavenCore] directMessages.receiveMessage failed", err);
+          console.warn("[HavenReactCore] directMessages.receiveMessage failed", err);
         });
       } else {
         void this.directMessages.receiveLatest(conversationId).catch((err) => {
-          console.warn("[HavenCore] directMessages.receiveLatest failed", err);
+          console.warn("[HavenReactCore] directMessages.receiveLatest failed", err);
         });
       }
     }
@@ -542,7 +550,7 @@ export class HavenCore {
       );
       this.syncViewerMessagePolicy(communityId);
     } catch (err) {
-      console.warn("[HavenCore] loadRevokedAuthorIds failed", err);
+      console.warn("[HavenReactCore] loadRevokedAuthorIds failed", err);
     }
 
     await messageNexus.ensureInitialLoaded(channelId);
@@ -573,7 +581,7 @@ export class HavenCore {
       ).fetchMessageAuthorProfiles({ communityId, authorUserIds: authorIds });
       this.profiles.upsertProfiles(profiles);
     } catch (error) {
-      console.warn("[HavenCore] primeMessageAuthorProfiles failed", error);
+      console.warn("[HavenReactCore] primeMessageAuthorProfiles failed", error);
     }
   }
 
@@ -584,7 +592,7 @@ export class HavenCore {
     try {
       await task();
     } catch (error) {
-      console.warn(`[HavenCore warmup] ${label} failed`, error);
+      console.warn(`[HavenReactCore warmup] ${label} failed`, error);
     }
   }
 
@@ -685,8 +693,10 @@ export class HavenCore {
       channelList.some((channel) => channel.id === activeChannelId);
     const channelId = activeBelongsToCommunity
       ? activeChannelId
-      : resolvePreferredChannelIdForServer(this, communityId, channelList, {
+      : resolvePreferredChannelIdForServer(channelList, {
           previousChannelId: activeChannelId,
+          lastChannelId: this.channels.getLastChannelId(communityId),
+          defaultChannelId: this.channels.getDefaultChannelId(communityId),
         });
 
     this.communities.setActiveId(communityId);
@@ -752,21 +762,18 @@ export class HavenCore {
     try {
       await this.ensureCommunityPermissions(communityId);
     } catch (error) {
-      console.warn("[HavenCore] ensureCommunityPermissions failed", error);
+      console.warn("[HavenReactCore] ensureCommunityPermissions failed", error);
     }
 
     const channelList = this.channels
       .getChannelsSnapshot(communityId)
       .map(toChannel);
-    const channelId = resolvePreferredChannelIdForServer(
-      this,
-      communityId,
-      channelList,
-      {
-        lastVisitedChannelId: options?.lastVisitedChannelId,
-        previousChannelId: this.channels.getActiveChannelId(),
-      },
-    );
+    const channelId = resolvePreferredChannelIdForServer(channelList, {
+      lastVisitedChannelId: options?.lastVisitedChannelId,
+      previousChannelId: this.channels.getActiveChannelId(),
+      lastChannelId: this.channels.getLastChannelId(communityId),
+      defaultChannelId: this.channels.getDefaultChannelId(communityId),
+    });
 
     this.communities.setActiveId(communityId);
     this.channels.setActiveChannelId(channelId);
@@ -827,17 +834,17 @@ export class HavenCore {
     if (userId) {
       await this.communities.load(userId);
       await this.profiles.ensureViewerProfile(userId).catch((error: unknown) => {
-        console.warn("[HavenCore] onboarding viewer profile refresh failed", error);
+        console.warn("[HavenReactCore] onboarding viewer profile refresh failed", error);
       });
       await this.profiles.loadMyUserFlairs(userId).catch((error: unknown) => {
-        console.warn("[HavenCore] onboarding flair refresh failed", error);
+        console.warn("[HavenReactCore] onboarding flair refresh failed", error);
       });
     }
 
     if (result.communityId) {
       this.communities.setActiveId(result.communityId);
       await this.ensureCommunityPermissions(result.communityId).catch((error) => {
-        console.warn("[HavenCore] onboarding permissions refresh failed", error);
+        console.warn("[HavenReactCore] onboarding permissions refresh failed", error);
       });
     }
 

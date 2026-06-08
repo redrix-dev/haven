@@ -12,7 +12,8 @@ import {
   View,
 } from "react-native";
 import type { Channel, ChannelPermissionState } from "@shared/lib/backend/types";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import { useChannelPermissionsState } from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 
@@ -37,7 +38,7 @@ export function MobileChannelSettingsModal({
   const admin = core.admin;
   const themeTokens = useMobileThemeTokens();
   const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
-  const channelPermissions = admin.useChannelPermissionsState();
+  const channelPermissions = useChannelPermissionsState(admin);
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
   const [roleRows, setRoleRows] = useState<

@@ -8,7 +8,7 @@ import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { getPlatformInviteInputPlaceholder } from "@shared/infrastructure/platform/urls";
 import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode";
 import { resolveColorProp } from "@shared/themes";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
 
 type CommunityActionSheetsProps = {

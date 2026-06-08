@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import type { ReadableStore } from '@shared/nexus/storeTypes'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
-import { requireHavenCore } from '@shared/core/havenCoreRef'
+import { requireHavenCore } from '@mobile-data/core/havenCoreRegistry'
 import { getCommunityDataBackend } from '@shared/lib/backend'
 import type { ControlPlaneBackend } from '@shared/lib/backend/controlPlaneBackend.interface'
 import type {
@@ -67,56 +67,6 @@ const createInitialState = (): CommunityAdminNexusState => ({
   revision: 0,
 })
 
-const selectMembersModalState = (
-  state: CommunityAdminNexusState,
-): CommunityAdminMembersModalState => ({
-  showMembersModal: state.showMembersModal,
-  membersModalCommunityId: state.membersModalCommunityId,
-  membersModalServerName: state.membersModalServerName,
-  membersModalMembers: state.membersModalMembers,
-  membersModalLoading: state.membersModalLoading,
-  membersModalError: state.membersModalError,
-  membersModalCanCreateReports: state.membersModalCanCreateReports,
-  membersModalCanManageMembers: state.membersModalCanManageMembers,
-  membersModalCanManageBans: state.membersModalCanManageBans,
-})
-
-const selectServerPanelState = (
-  state: CommunityAdminNexusState,
-): CommunityAdminServerPanelState => ({
-  communityBans: state.communityBans,
-  communityBansLoading: state.communityBansLoading,
-  communityBansError: state.communityBansError,
-  serverInvites: state.serverInvites,
-  serverInvitesLoading: state.serverInvitesLoading,
-  serverInvitesError: state.serverInvitesError,
-  serverRoles: state.serverRoles,
-  serverMembers: state.serverMembers,
-  serverPermissionCatalog: state.serverPermissionCatalog,
-  serverRoleManagementLoading: state.serverRoleManagementLoading,
-  serverRoleManagementError: state.serverRoleManagementError,
-  serverSettingsInitialValues: state.serverSettingsInitialValues,
-  serverSettingsLoading: state.serverSettingsLoading,
-  serverSettingsLoadError: state.serverSettingsLoadError,
-})
-
-const selectChannelPermissionsState = (
-  state: CommunityAdminNexusState,
-): CommunityAdminChannelPermissionsState => ({
-  channelRolePermissions: state.channelRolePermissions,
-  channelMemberPermissions: state.channelMemberPermissions,
-  channelPermissionMemberOptions: state.channelPermissionMemberOptions,
-  channelPermissionsLoading: state.channelPermissionsLoading,
-  channelPermissionsLoadError: state.channelPermissionsLoadError,
-})
-
-const selectServerAdminState = (
-  state: CommunityAdminNexusState,
-): CommunityAdminMembersModalState & CommunityAdminServerPanelState => ({
-  ...selectMembersModalState(state),
-  ...selectServerPanelState(state),
-})
-
 export class CommunityAdminNexus {
   private readonly store: UseBoundStore<StoreApi<CommunityAdminNexusState>>
   private readonly controlPlane: ControlPlaneBackend
@@ -125,6 +75,10 @@ export class CommunityAdminNexus {
     void _persistence
     this.controlPlane = controlPlane
     this.store = create<CommunityAdminNexusState>()(() => createInitialState())
+  }
+
+  get reactiveStore(): ReadableStore<CommunityAdminNexusState> {
+    return this.store
   }
 
   getReactiveStore(): UseBoundStore<StoreApi<CommunityAdminNexusState>> {
@@ -190,23 +144,6 @@ export class CommunityAdminNexus {
 
   clear(): void {
     this.store.setState(createInitialState())
-  }
-
-  useMembersModalState(): CommunityAdminMembersModalState {
-    return useStoreWithEqualityFn(this.store, selectMembersModalState)
-  }
-
-  useServerPanelState(): CommunityAdminServerPanelState {
-    return useStoreWithEqualityFn(this.store, selectServerPanelState)
-  }
-
-  useServerAdminState(): CommunityAdminMembersModalState &
-    CommunityAdminServerPanelState {
-    return useStoreWithEqualityFn(this.store, selectServerAdminState)
-  }
-
-  useChannelPermissionsState(): CommunityAdminChannelPermissionsState {
-    return useStoreWithEqualityFn(this.store, selectChannelPermissionsState)
   }
 
   resetMembersModal = (): void => {

@@ -1,5 +1,5 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
-import { Nexus, type NexusEntry } from '@shared/nexus/Nexus'
+import { Nexus, type NexusEntry } from '@mobile-data/Nexus'
 import type { ReadableStore } from '@shared/nexus/storeTypes'
 import type {
   ChannelNexusState,

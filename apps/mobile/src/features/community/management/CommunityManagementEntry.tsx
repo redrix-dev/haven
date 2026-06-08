@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Channel } from "@shared/lib/backend/types";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import { usePermissions } from "@mobile-data/hooks";
 import {
   Popover,
   PopoverClose,
@@ -19,7 +20,7 @@ type Props = {
 
 export function CommunityManagementEntry({ serverId, communityName, channels }: Props) {
   const core = useHavenCore();
-  const perms = core.permissions.usePermissions(serverId);
+  const perms = usePermissions(core.permissions, serverId);
   const [sheetTab, setSheetTab] = useState<"community" | "channels" | null>(null);
 
   const canManageAnything =

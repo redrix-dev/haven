@@ -4,7 +4,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ThemedIonicons } from "@/theme-rn";
 import type { NotificationItem } from "@shared/lib/backend/types";
-import { syncFocusFromRoute, useHavenCore } from "@shared/core";
+import { syncFocusFromRoute, useHavenCore } from "@mobile-data";
 import { useUiStore } from "@mobile-data/session/uiStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { getNotificationPayloadString } from "@shared/infrastructure/utils/appUtils";

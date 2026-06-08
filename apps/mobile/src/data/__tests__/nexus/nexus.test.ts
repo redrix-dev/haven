@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import { Nexus } from '@shared/nexus/Nexus';
+import { Nexus } from '@mobile-data/Nexus';
 
 type DemoRaw = { id: string; name: string };
 type Demo = { id: string; displayName: string };

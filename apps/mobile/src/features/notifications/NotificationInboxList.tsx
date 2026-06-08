@@ -23,8 +23,12 @@ import {
 } from "@shared/features/notifications/notificationCopy";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
-import { useHavenCore } from "@shared/core";
-import { useNotifications, useNotificationsLoading } from "@mobile-data/hooks";
+import { useHavenCore } from "@mobile-data";
+import {
+  useNotifications,
+  useNotificationsLoading,
+  useProfilesRecord,
+} from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 
@@ -56,7 +60,7 @@ export function NotificationInboxList({
     () => filterNotificationsForInbox(notificationItems),
     [notificationItems],
   );
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const liveProfiles = useProfilesRecord(core.profiles);
   const loading = useNotificationsLoading(core.notifications);
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);

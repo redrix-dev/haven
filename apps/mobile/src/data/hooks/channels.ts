@@ -1,4 +1,4 @@
-import type { ChannelNexusPort } from "@shared/core/cache/entityNexusPorts";
+import type { ChannelNexus } from "../channels/ChannelNexus";
 import type { HavenChannel } from "@shared/nexus/community/channelTypes";
 import type { ChannelGroupState } from "@shared/lib/backend/types";
 import {
@@ -12,7 +12,7 @@ import {
 import { useStoreSelector } from "./useStoreSelector";
 
 export function useChannels(
-  nexus: ChannelNexusPort,
+  nexus: ChannelNexus,
   communityId: string,
 ): HavenChannel[] {
   return useStoreSelector(
@@ -23,7 +23,7 @@ export function useChannels(
 }
 
 export function useChannelGroups(
-  nexus: ChannelNexusPort,
+  nexus: ChannelNexus,
   communityId: string,
 ): ChannelGroupState {
   return useStoreSelector(
@@ -33,12 +33,12 @@ export function useChannelGroups(
   );
 }
 
-export function useActiveChannelId(nexus: ChannelNexusPort): string | null {
+export function useActiveChannelId(nexus: ChannelNexus): string | null {
   return useStoreSelector(nexus.reactiveStore, selectActiveChannelId);
 }
 
 export function useChannelsLoading(
-  nexus: ChannelNexusPort,
+  nexus: ChannelNexus,
   communityId: string,
 ): boolean {
   return useStoreSelector(nexus.reactiveStore, (state) =>

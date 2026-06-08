@@ -1,5 +1,5 @@
 import type { DirectMessage, DirectMessageConversationSummary } from '@shared/lib/backend/types'
-import type { NexusState } from '../Nexus'
+import type { NexusState } from '@shared/core/cache/entityTypes'
 
 export type DmComposeDraftPeer = {
   userId: string

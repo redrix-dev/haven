@@ -1,4 +1,4 @@
-import type { CommunityNexusPort } from "@shared/core/cache/entityNexusPorts";
+import type { CommunityNexus } from "../communities/CommunityNexus";
 import type { Community } from "@shared/nexus/community/communityTypes";
 import { useMemo } from "react";
 import {
@@ -12,7 +12,7 @@ import {
 import { applyCommunityDisplayOrder } from "@shared/core/communityDisplayOrder";
 import { useStoreSelector } from "./useStoreSelector";
 
-export function useCommunities(nexus: CommunityNexusPort): Community[] {
+export function useCommunities(nexus: CommunityNexus): Community[] {
   return useStoreSelector(
     nexus.reactiveStore,
     projectCommunities,
@@ -20,19 +20,19 @@ export function useCommunities(nexus: CommunityNexusPort): Community[] {
   );
 }
 
-export function useActiveCommunityId(nexus: CommunityNexusPort): string | null {
+export function useActiveCommunityId(nexus: CommunityNexus): string | null {
   return useStoreSelector(nexus.reactiveStore, selectActiveId);
 }
 
-export function useCommunitiesLoading(nexus: CommunityNexusPort): boolean {
+export function useCommunitiesLoading(nexus: CommunityNexus): boolean {
   return useStoreSelector(nexus.reactiveStore, selectIsLoading);
 }
 
-export function useCommunitiesLoadError(nexus: CommunityNexusPort): string | null {
+export function useCommunitiesLoadError(nexus: CommunityNexus): string | null {
   return useStoreSelector(nexus.reactiveStore, selectLoadError);
 }
 
-export function useOrderedCommunities(nexus: CommunityNexusPort): Community[] {
+export function useOrderedCommunities(nexus: CommunityNexus): Community[] {
   const communities = useStoreSelector(
     nexus.reactiveStore,
     projectCommunities,

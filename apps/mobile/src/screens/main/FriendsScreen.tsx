@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
 import UserProfileModal from "@/features/user-profile/UserProfileModal";

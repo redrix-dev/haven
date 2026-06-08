@@ -5,11 +5,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
 import {
   useCommunities,
   useDmConversations,
   useDmConversationsLoading,
+  useFriends,
+  useIsLoading,
+  usePermissionsByCommunityId,
+  useProfilesRecord,
 } from "@mobile-data/hooks";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
@@ -40,9 +44,9 @@ export function DmInboxDrawer({
   const core = useHavenCore();
   const dm = core.directMessages;
   const social = core.social;
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const liveProfiles = useProfilesRecord(core.profiles);
   const communities = useCommunities(core.communities);
-  const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
+  const permissionsByCommunityId = usePermissionsByCommunityId(core.permissions);
 
   // ── ModMail availability ────────────────────────────────────────────────
   const modmailCommunityIds = useMemo(
@@ -76,8 +80,8 @@ export function DmInboxDrawer({
 
   // ── Conversation list data ──────────────────────────────────────────────
   const conversations = useDmConversations(dm);
-  const friends = social.useFriends();
-  const socialLoading = social.useIsLoading();
+  const friends = useFriends(social);
+  const socialLoading = useIsLoading(social);
   const isLoading = useDmConversationsLoading(dm);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);

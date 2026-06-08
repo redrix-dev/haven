@@ -3,7 +3,7 @@ import type {
   NotificationItem,
   NotificationPreferences,
 } from '@shared/lib/backend/types'
-import type { NexusState } from '../Nexus'
+import type { NexusState } from '@shared/core/cache/entityTypes'
 
 export type NotificationNexusState = NexusState<NotificationItem> & {
   recipientOrder: string[]

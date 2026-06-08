@@ -1,4 +1,4 @@
-import type { HavenCore } from "../HavenCore";
+import type { HavenReactCore } from "../HavenReactCore";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 
 export type AccessRevokedInput = {
@@ -7,14 +7,9 @@ export type AccessRevokedInput = {
   fallbackCommunityId?: string | null;
 };
 
-/**
- * Cross-nexus command for moderation/access events.
- *
- * Evicts the channel (or all of the community) from nexuses, then tells the
- * shell to navigate away via AppHost. Data on Core, movement on AppHost.
- */
+/** Cross-nexus command for moderation/access events. */
 export function applyAccessRevoked(
-  core: HavenCore,
+  core: HavenReactCore,
   input: AccessRevokedInput,
 ): void {
   const { communityId, channelId, fallbackCommunityId } = input;

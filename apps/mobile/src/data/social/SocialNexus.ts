@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { SocialBackend } from "@shared/lib/backend/socialBackend";
 import type {
@@ -10,13 +10,7 @@ import type {
   SocialCounts,
 } from "@shared/lib/backend/types";
 import { DEFAULT_SOCIAL_COUNTS } from "@shared/infrastructure/constants";
-import {
-  blockedEqual,
-  friendsEqual,
-  normalizeUserIds,
-  requestsEqual,
-  unionHiddenAuthorIds,
-} from "@shared/features/social/logic";
+import { normalizeUserIds, unionHiddenAuthorIds } from "@shared/features/social/logic";
 import type { StoreApi, UseBoundStore } from "zustand";
 
 const EMPTY_FRIENDS: FriendSummary[] = [];
@@ -42,11 +36,11 @@ export class SocialNexus {
   private loadInflight: Promise<void> | null = null;
   private blockListsInflight: Promise<void> | null = null;
 
-  private friendsSnapshot = EMPTY_FRIENDS;
-  private requestsSnapshot = EMPTY_REQUESTS;
-  private blockedSnapshot = EMPTY_BLOCKED;
-
   private readonly store: UseBoundStore<StoreApi<SocialNexusState>>;
+
+  get reactiveStore(): ReadableStore<SocialNexusState> {
+    return this.store;
+  }
 
   constructor(_persistence: NexusPersistence, backend: SocialBackend) {
     void _persistence;
@@ -248,78 +242,6 @@ export class SocialNexus {
     return this.backend.searchUsersForFriendAdd(query);
   }
 
-  useCounts(): SocialCounts {
-    return useStoreWithEqualityFn(this.store, (state) => state.counts);
-  }
-
-  useFriends(): FriendSummary[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => {
-        void state.revision;
-        if (friendsEqual(this.friendsSnapshot, state.friends)) {
-          return this.friendsSnapshot;
-        }
-        this.friendsSnapshot = state.friends;
-        return state.friends;
-      },
-      friendsEqual,
-    );
-  }
-
-  useRequests(): FriendRequestSummary[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => {
-        void state.revision;
-        if (requestsEqual(this.requestsSnapshot, state.requests)) {
-          return this.requestsSnapshot;
-        }
-        this.requestsSnapshot = state.requests;
-        return state.requests;
-      },
-      requestsEqual,
-    );
-  }
-
-  useFriendRequests(): FriendRequestSummary[] {
-    return this.useRequests();
-  }
-
-  useBlockedUsers(): BlockedUserSummary[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => {
-        void state.revision;
-        if (blockedEqual(this.blockedSnapshot, state.blockedUsers)) {
-          return this.blockedSnapshot;
-        }
-        this.blockedSnapshot = state.blockedUsers;
-        return state.blockedUsers;
-      },
-      blockedEqual,
-    );
-  }
-
-  useBlockedUserIds(): ReadonlySet<string> {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.hiddenAuthorIds,
-      (a, b) => {
-        if (a === b) return true;
-        if (a.size !== b.size) return false;
-        for (const id of a) {
-          if (!b.has(id)) return false;
-        }
-        return true;
-      },
-    );
-  }
-
-  useIsLoading(): boolean {
-    return useStoreWithEqualityFn(this.store, (state) => state.isLoading);
-  }
-
   rehydrate(): void {}
 
   clear(): void {
@@ -335,8 +257,5 @@ export class SocialNexus {
       lastLoadedAt: 0,
       revision: 0,
     });
-    this.friendsSnapshot = EMPTY_FRIENDS;
-    this.requestsSnapshot = EMPTY_REQUESTS;
-    this.blockedSnapshot = EMPTY_BLOCKED;
   }
 }

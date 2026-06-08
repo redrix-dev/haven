@@ -1,15 +1,9 @@
-import { useMemo } from "react";
 import { create } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
 import type { StoreApi } from "zustand";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
-import type { CommunityMessageCacheInstance } from "@shared/core/cache/communityMessageCachePort";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
-import {
-  viewerCommunityPolicyEqual,
-  viewerPolicyHiddenAuthorIdsEqual,
-} from "@shared/core/viewerMessagePolicy";
 import {
   MESSAGE_PAGE_SIZE,
   ascendingMessagesFromRpcPage,
@@ -28,10 +22,6 @@ import {
   type ChannelMeta,
   type SendCommunityMessageMediaOptions,
 } from "@shared/features/messaging/logic";
-import {
-  projectVisibleChannelMessages,
-  projectVisibleChannelMessagesBlockOnly,
-} from "@shared/nexus/community/projectVisibleChannelMessages";
 import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type {
   MessageBundle,
@@ -67,22 +57,34 @@ const createInitialState = (): CommunityMessageStoreState => ({
   lastInitialLoadedAt: {},
 });
 
-export class CommunityMessageCache implements CommunityMessageCacheInstance {
+export class CommunityMessageCache {
   private readonly store: StoreApi<CommunityMessageStoreState>;
   private communityData: CommunityDataBackend | null = null;
   private initialLoadInflight = new Map<string, Promise<void>>();
   private olderLoadInflight = new Map<string, Promise<void>>();
 
   constructor(
-    private readonly communityId: string,
+    private readonly _communityId: string,
     private readonly persistence: NexusPersistence,
-    private readonly viewerMessagePolicyStore: ViewerMessagePolicyStore | null = null,
+    private readonly _viewerMessagePolicyStore: ViewerMessagePolicyStore | null = null,
   ) {
     this.store = create<CommunityMessageStoreState>(() => createInitialState());
   }
 
+  get communityId(): string {
+    return this._communityId;
+  }
+
+  get viewerMessagePolicyStore(): ViewerMessagePolicyStore | null {
+    return this._viewerMessagePolicyStore;
+  }
+
+  get reactiveStore(): ReadableStore<CommunityMessageStoreState> {
+    return this.store;
+  }
+
   private get storageKey(): string {
-    return `haven:nexus:community-messages:${this.communityId}`;
+    return `haven:nexus:community-messages:${this._communityId}`;
   }
 
   getReactiveStore(): StoreApi<CommunityMessageStoreState> {
@@ -566,99 +568,6 @@ export class CommunityMessageCache implements CommunityMessageCacheInstance {
       lastInitialLoadedAt: { ...state.lastInitialLoadedAt, [channelId]: 0 },
     });
     this.persist();
-  }
-
-  useChannel(channelId: string): MessageBundle[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => {
-        const ids = state.byChannel[channelId];
-        if (!ids?.length) return EMPTY_MESSAGES;
-        const messages: MessageBundle[] = [];
-        for (const id of ids) {
-          const entry = state.entities[id];
-          if (entry && !entry.partial) messages.push(entry.data);
-        }
-        return messages;
-      },
-      messagesEqual,
-    );
-  }
-
-  useVisibleChannel(channelId: string): MessageBundle[] {
-    const raw = this.useChannel(channelId);
-    const hiddenAuthorIds = this.viewerMessagePolicyStore
-      ? useStoreWithEqualityFn(
-          this.viewerMessagePolicyStore,
-          (state) => state.hiddenAuthorIds,
-          viewerPolicyHiddenAuthorIdsEqual,
-        )
-      : null;
-    const showHiddenMessages = this.viewerMessagePolicyStore
-      ? useStoreWithEqualityFn(
-          this.viewerMessagePolicyStore,
-          (state) => state.showHiddenMessages,
-        )
-      : false;
-    const communityPolicy = this.viewerMessagePolicyStore
-      ? useStoreWithEqualityFn(
-          this.viewerMessagePolicyStore,
-          (state) => state.communities[this.communityId],
-          viewerCommunityPolicyEqual,
-        )
-      : undefined;
-
-    return useMemo(() => {
-      if (!this.viewerMessagePolicyStore) {
-        return projectVisibleChannelMessagesBlockOnly(raw, new Set<string>());
-      }
-      const policy = {
-        hiddenAuthorIds: hiddenAuthorIds ?? new Set<string>(),
-        showHiddenMessages,
-        communities: communityPolicy
-          ? { [this.communityId]: communityPolicy }
-          : {},
-      };
-      if (Object.keys(policy.communities).length === 0) {
-        return projectVisibleChannelMessagesBlockOnly(raw, policy.hiddenAuthorIds);
-      }
-      return projectVisibleChannelMessages(raw, policy, {
-        communityId: this.communityId,
-        channelId,
-      });
-    }, [raw, hiddenAuthorIds, showHiddenMessages, communityPolicy, channelId]);
-  }
-
-  useChannelMeta(channelId: string): ChannelMeta {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => ({
-        hasMore: state.hasMore[channelId] ?? false,
-        cursor: state.cursors[channelId] ?? null,
-      }),
-      channelMetaEqual,
-    );
-  }
-
-  useIsLoadingInitial(channelId: string): boolean {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.loadingInitial[channelId] ?? false,
-    );
-  }
-
-  useIsLoadingOlder(channelId: string): boolean {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.loadingOlder[channelId] ?? false,
-    );
-  }
-
-  useHasInitialLoadCompleted(channelId: string): boolean {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.initialLoadComplete[channelId] ?? false,
-    );
   }
 
   getLastMessageId(channelId: string): string | null {

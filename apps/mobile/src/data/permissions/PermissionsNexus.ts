@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type { ServerPermissions } from "@shared/lib/backend/types";
@@ -21,6 +21,11 @@ export type PermissionsNexusState = {
 
 export class PermissionsNexus {
   private readonly store: UseBoundStore<StoreApi<PermissionsNexusState>>;
+
+  get reactiveStore(): ReadableStore<PermissionsNexusState> {
+    return this.store;
+  }
+
   private inflight = new Map<string, Promise<void>>();
   private policySync: ((communityId: string) => void) | null = null;
 
@@ -207,30 +212,8 @@ export class PermissionsNexus {
     });
   }
 
-  usePermissions(communityId: string): ServerPermissions {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) =>
-        state.permissionsByCommunityId[communityId] ?? EMPTY_PERMISSIONS,
-    );
-  }
-
-  usePermissionsByCommunityId(): Record<string, ServerPermissions> {
-    return useStoreWithEqualityFn(this.store, (state) => {
-      void state.revision;
-      return state.permissionsByCommunityId;
-    });
-  }
-
   getPermissionsByCommunityId(): Record<string, ServerPermissions> {
     return this.store.getState().permissionsByCommunityId;
-  }
-
-  useIsElevated(communityId: string): boolean {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.elevatedByCommunityId[communityId] ?? false,
-    );
   }
 
   rehydrate(): void {}

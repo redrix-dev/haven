@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, Text, TextInput, View } from "react-native";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useUserFlairGrantError,
+  useUserFlairGrantLoading,
+  useUserFlairGrants,
+} from "@mobile-data/hooks";
 import type { ProfileVisibility, UserFlairGrant } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
@@ -54,9 +59,9 @@ export function ProfileDetailsSettingsCard({
   const [draftBio, setDraftBio] = useState(profileBio ?? "");
   const [saving, setSaving] = useState(false);
   const [savingFlairId, setSavingFlairId] = useState<string | null>(null);
-  const flairGrants = core.profiles.useUserFlairGrants(userId);
-  const flairLoading = core.profiles.useUserFlairGrantLoading(userId);
-  const flairError = core.profiles.useUserFlairGrantError(userId);
+  const flairGrants = useUserFlairGrants(core.profiles, userId);
+  const flairLoading = useUserFlairGrantLoading(core.profiles, userId);
+  const flairError = useUserFlairGrantError(core.profiles, userId);
 
   useEffect(() => {
     setDraftVisibility(profileVisibility);

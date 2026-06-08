@@ -19,7 +19,15 @@ import type {
   FriendSummary,
 } from "@shared/lib/backend/types";
 import { resolveLiveUsername } from "@shared/infrastructure/liveProfiles";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useBlockedUsers,
+  useCounts,
+  useFriendRequests,
+  useFriends,
+  useIsLoading,
+  useProfilesRecord,
+} from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
@@ -54,12 +62,12 @@ export function FriendsSurface({
   const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const placeholderColor =
     resolveColorProp(themeTokens, "muted-foreground") ?? "#8b9cbb";
-  const liveProfiles = core.profiles.useProfilesRecord();
-  const counts = social.useCounts();
-  const friends = social.useFriends();
-  const requests = social.useFriendRequests();
-  const blockedUsers = social.useBlockedUsers();
-  const nexusLoading = social.useIsLoading();
+  const liveProfiles = useProfilesRecord(core.profiles);
+  const counts = useCounts(social);
+  const friends = useFriends(social);
+  const requests = useFriendRequests(social);
+  const blockedUsers = useBlockedUsers(social);
+  const nexusLoading = useIsLoading(social);
   const [activeTab, setActiveTab] = useState<FriendsPanelTab>("friends");
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
