@@ -1,94 +1,92 @@
-# Nexus-Direct Refactor Working Audit
+# Mobile cache-direct refactor audit
 
-Timestamp: 2026-05-23 18:00:31 EDT
+Timestamp: 2026-05-23 (initial) · updated 2026-06-08 (post-cleave)
 
-This is a current working refactor list, not a final architecture contract. It records what is actually left before the repo fully matches the HavenCore -> Nexus -> UI Consumer shape.
+Working audit of the **mobile** HavenReactCore → Cache → UI Consumer shape. Web/electron are
+out of scope until the Solid rebuild.
 
-## Current Direction
+## Current direction
 
-The canonical application pattern is:
+The canonical **mobile** pattern:
 
-- UI components call `useHavenCore()`.
-- Domain state is read from `core.<nexus>.use...()` selectors.
-- Domain mutations call `core.<nexus>...()` or a `HavenCore` command.
-- Missing domain commands are added to Core/Nexus, not to mobile/web/electron controller hooks or provider wrappers.
+- UI calls `useHavenCore()` → `HavenReactCore`.
+- Domain state is read via **`@mobile-data/hooks`** selector-hooks
+  (`useFriends(core.social)`, `useVisibleChannel(messageCache, channelId)`, …).
+- Domain mutations call `core.<cache>...()` or a HavenReactCore command.
+- Cache classes expose `reactiveStore` + imperative methods — **no `use*` on classes**.
 
-## Current Repo Status
+## Current repo status (post-cleave)
 
-The consumer-facing cutover is mostly over the line.
+**Complete for mobile:**
 
-Clean now:
+- All reactive caches relocated to `apps/mobile/src/data/`.
+- `HavenReactCore` + registries + orchestration in `apps/mobile/src/data/core/`.
+- Standalone selector-hooks in `apps/mobile/src/data/hooks/`.
+- `AuthContext`, voice hooks, debug probe relocated to `apps/mobile/src/`.
+- Integration tests in `apps/mobile/src/data/__tests__/`.
+- `packages/shared` is pure (`check:shared-portable`, empty exclusions).
 
-- Mobile feature, screen, and navigation consumers are clean for direct backend factories, direct `@shared/nexus/*` class imports, and `core.backends` usage.
-- Web/electron feature and component consumers are clean for direct backend factories after the feature flag, profile/session, notification, DM interaction, permission hydration, voice, and moderation passes.
-- Community modmail is now the in-app moderation review surface and reads/writes through Core/Nexus.
-- DM report review UI was removed from this repo because platform DM review lives in the separate admin Next.js repo.
-- `npm run lint`, `npm run typecheck`, `npm run mobile:typecheck`, `npm run check:shared-portable`, and `npm run test:unit` pass as of the last verification run. Lint still reports three pre-existing unused-disable warnings.
+**Gates:** `npm run test:cleave` green
+(`lint` · `check:shared-portable` · `mobile:typecheck` · `mobile:bundle` · `test:unit`).
 
-## Remaining Consumer Work
+**Quarantined:** web `typecheck`, `typecheck:solid` — React desktop not maintained post-cleave.
 
-### Flatten Web Session Ergonomics
+## Remaining consumer work (mobile)
 
-`packages/web-client/src/chat-app/useChatAppSessionState.ts` is now boundary-aligned, but still functions as a large compatibility shell that passes many values/actions to older web components.
+### Shrink session contexts
 
-This is no longer a backend-boundary blocker. It is remaining readability work:
+Some mobile providers (`MobileMainSessionContext`, DM/notifications contexts) still wrap Core
+reads. Prefer landing-screen `useEffect`s + direct hook reads when editing those surfaces — same
+pattern as the web DM/notifications migration (web itself is quarantined).
 
-- Move more web components to direct `useHavenCore()` reads when editing those surfaces.
-- Keep local shell state for UI chrome, active modals, transient errors, and host lifecycle.
-- Avoid introducing new controller hooks that only repackage Nexus selectors into `state/derived/actions`.
+### Flatten admin/mobile action hooks
 
-## Host And Platform Exceptions To Keep
+`useMobileServerAdminActions` and similar thin wrappers can collapse into direct `core.admin`
+calls at call sites when touched.
 
-These are acceptable exceptions, not pattern violations:
+## Host and platform exceptions to keep
+
+Acceptable exceptions, not pattern violations:
 
 - Auth/bootstrap:
-  - `packages/shared/src/contexts/AuthContext.tsx`
+  - `apps/mobile/src/contexts/AuthContext.tsx`
   - `apps/mobile/src/auth/mobileAuthService.ts`
   - host Supabase client construction
-  - mobile Supabase bootstrap
-- Persistence construction:
+- Persistence:
   - `apps/mobile/src/lib/createMmkvPersistence.ts`
-  - `apps/mobile/src/lib/react-native-mmkv.d.ts`
-  - host-provided memory persistence for web/electron
 - Native/platform lifecycle:
-  - Expo push token acquisition and push tap listeners
-  - VoIP foundation
-  - media/file picker preparation
-  - desktop settings and Electron shell bridges
+  - Expo push, VoIP, media picker, theme hydration hooks
 - UI-only stores:
-  - `useUiStore`
-  - push navigation store
-  - chrome/bubble/sidebar stores
-- Backend contract tests and backend modules.
+  - `apps/mobile/src/data/session/uiStore.ts` (and related session stores)
+- Backend contract tests and `packages/shared/src/lib/backend/*`.
 
-## Internal Hardening Still Available
+## Internal hardening still available
 
-These are internal cleanup opportunities, not consumer blockers:
+Not consumer blockers:
 
-- `CommunityAdminNexus` still imports `getCommunityDataBackend` internally for community-scoped admin operations. It is acceptable today because it is Nexus-internal, but can be tightened by injecting the community-data backend through `HavenCore`.
-- `HavenCore.prepareTextChannelMessages` still uses `getCommunityDataBackend(...)` internally for revoked-author hydration. This can be replaced with `this.backends.communityData`.
-- Core notification sound sync uses `core.backends.notifications` internally. It can be moved behind `NotificationNexus` if we want Core helpers to avoid backend reach-through entirely.
-- `packages/shared/src/lib/backend/index.ts` still exposes legacy backend factory shims for contract tests and transitional compatibility. UI/feature consumers should not import these.
+- `CommunityAdminNexus` may still call `getCommunityDataBackend` internally — tighten via
+  constructor injection through HavenReactCore if desired.
+- `HavenReactCore.prepareTextChannelMessages` may reach backends for revoked-author hydration —
+  can move to explicit cache command.
+- `sessionBackendRegistry` in shared replaces older `requireHavenCore()` coupling for imperative
+  backend access in pure code paths.
 
-## Enforcement Snapshot
+## Enforcement snapshot
 
-`havenCoreConsumerBoundaryIgnores` should now contain only host/bootstrap or stale mobile exceptions:
+Mobile consumers (`apps/mobile/src/**/*`) should stay out of:
 
-- test files
-- deleted mobile `haven-rev2` path until removed
-- mobile auth service
-- mobile MMKV persistence files
-- mobile Supabase bootstrap
+- Direct `@shared/lib/backend/*` factory imports (except bootstrap/auth quarantine).
+- Direct cache class imports in feature UI (use Core + hooks).
+- `core.backends` from UI/feature code.
 
-No active web/electron feature or component file should be in the quarantine list.
+`havenCoreConsumerBoundaryIgnores` should list only host/bootstrap/test exceptions.
 
-## Working Cutover Test
+## Working cutover test
 
-For any migrated screen or feature, these should be true:
+For any mobile screen or feature:
 
-- The host entrypoint creates Core.
-- The screen gets domain state from `useHavenCore()`.
-- Mutations call Core/Nexus commands.
-- Platform behavior goes through `AppHost` or a lifecycle adapter.
-- Local component state is only temporary UI state.
-- No direct backend factories, Supabase clients, persistence adapters, or Nexus classes are imported by UI/feature consumers.
+- `App.tsx` (or test setup) calls `createReactHavenCore`.
+- Screen uses `useHavenCore()` + `@mobile-data/hooks`.
+- Mutations call Core/cache commands.
+- Platform behavior goes through `AppHost` or lifecycle adapter.
+- No direct backend factories, Supabase clients, persistence adapters, or cache class imports in UI.
