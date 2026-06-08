@@ -1,6 +1,6 @@
-import { create } from 'zustand'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { createStore, type StoreApi } from 'zustand/vanilla'
 import { Nexus, type NexusEntry, type NexusState } from '../Nexus'
+import type { ReadableStore } from '../storeTypes'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
 import type { DirectMessageBackend } from '@shared/lib/backend/directMessageBackend'
 import { getDirectMessagePreviewText } from '@shared/lib/backend/directMessageUtils'
@@ -9,7 +9,6 @@ import type {
   DirectMessageConversationSummary,
   DirectMessageReportKind,
 } from '@shared/lib/backend/types'
-import type { StoreApi, UseBoundStore } from 'zustand'
 
 const STORAGE_KEY = 'haven:nexus:direct-messages:global'
 const DM_PAGE_SIZE = 50
@@ -17,7 +16,6 @@ const DM_RELOAD_FRESHNESS_WINDOW_MS = 10_000
 const DM_PREVIEW_MAX_LENGTH = 180
 
 const EMPTY_CONVERSATIONS: DirectMessageConversationSummary[] = []
-const EMPTY_MESSAGES: DirectMessage[] = []
 
 const toEpochMs = (value: string | null | undefined): number => {
   if (!value) return 0
@@ -129,96 +127,26 @@ export type DirectMessageNexusState = NexusState<
   composeDraftPeer: DmComposeDraftPeer | null
 }
 
-const selectActiveConversationId = (state: DirectMessageNexusState) =>
-  state.activeConversationId
-const selectIsLoadingConversations = (state: DirectMessageNexusState) =>
-  state.isLoadingConversations
-const selectComposeDraftPeer = (state: DirectMessageNexusState) =>
-  state.composeDraftPeer
-
-export const conversationsEqual = (
-  a: DirectMessageConversationSummary[],
-  b: DirectMessageConversationSummary[],
-): boolean => {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) {
-    if (
-      a[i].conversationId !== b[i].conversationId ||
-      a[i].otherUserId !== b[i].otherUserId ||
-      a[i].otherUsername !== b[i].otherUsername ||
-      a[i].otherAvatarUrl !== b[i].otherAvatarUrl ||
-      a[i].updatedAt !== b[i].updatedAt ||
-      a[i].lastMessageAt !== b[i].lastMessageAt ||
-      a[i].lastMessageId !== b[i].lastMessageId ||
-      a[i].lastMessageAuthorUserId !== b[i].lastMessageAuthorUserId ||
-      a[i].lastMessagePreview !== b[i].lastMessagePreview ||
-      a[i].lastMessageCreatedAt !== b[i].lastMessageCreatedAt ||
-      a[i].unreadCount !== b[i].unreadCount ||
-      a[i].isMuted !== b[i].isMuted ||
-      a[i].mutedUntil !== b[i].mutedUntil
-    ) {
-      return false
-    }
-  }
-  return true
-}
-
-const directMessagesEqual = (
-  a: DirectMessage[],
-  b: DirectMessage[],
-): boolean => {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false
-  }
-  return true
-}
-
 export class DirectMessageNexus extends Nexus<
   DirectMessageConversationSummary,
   DirectMessageConversationSummary
 > {
-  private _dmStore:
-    | UseBoundStore<StoreApi<DirectMessageNexusState>>
-    | null = null
+  private _dmStore: StoreApi<DirectMessageNexusState> | null = null
 
   private readonly backend: DirectMessageBackend
   private conversationsInflight: Promise<void> | null = null
   private messagesInflight = new Map<string, Promise<void>>()
-
-  private conversationsSnapshot: DirectMessageConversationSummary[] =
-    EMPTY_CONVERSATIONS
-  private messageSnapshots = new Map<string, DirectMessage[]>()
-
-  private readonly conversationsSelector = (
-    state: DirectMessageNexusState,
-  ): DirectMessageConversationSummary[] => {
-    void state.revision
-    if (state.conversationIds.length === 0) return EMPTY_CONVERSATIONS
-    const list = state.conversationIds
-      .map((id) => state.entities[id]?.data)
-      .filter((c): c is DirectMessageConversationSummary => c !== undefined)
-    if (conversationsEqual(this.conversationsSnapshot, list)) {
-      return this.conversationsSnapshot
-    }
-    this.conversationsSnapshot = list
-    return list
-  }
-
-  private messagesSelectors = new Map<
-    string,
-    (state: DirectMessageNexusState) => DirectMessage[]
-  >()
 
   constructor(persistence: NexusPersistence, backend: DirectMessageBackend) {
     super('direct-messages', 'global', persistence)
     this.backend = backend
   }
 
-  /** Test-only access to the underlying store. Production code should use the `use*` hooks. */
-  getReactiveStore(): UseBoundStore<StoreApi<DirectMessageNexusState>> {
+  /**
+   * Read-only store handle for the binding packages — `getState`/`subscribe`
+   * only. Also used by tests for state assertions.
+   */
+  get reactiveStore(): ReadableStore<DirectMessageNexusState> {
     return this.store
   }
 
@@ -228,11 +156,9 @@ export class DirectMessageNexus extends Nexus<
     return raw
   }
 
-  protected override get store(): UseBoundStore<
-    StoreApi<DirectMessageNexusState>
-  > {
+  protected override get store(): StoreApi<DirectMessageNexusState> {
     if (!this._dmStore) {
-      this._dmStore = create<DirectMessageNexusState>(() => ({
+      this._dmStore = createStore<DirectMessageNexusState>(() => ({
         entities: {},
         conversationIds: [],
         messagesByConversation: {},
@@ -860,77 +786,6 @@ export class DirectMessageNexus extends Nexus<
       .filter((c): c is DirectMessageConversationSummary => c !== undefined)
   }
 
-  useConversations(): DirectMessageConversationSummary[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      this.conversationsSelector,
-      conversationsEqual,
-    )
-  }
-
-  useActiveConversationId(): string | null {
-    return useStoreWithEqualityFn(this.store, selectActiveConversationId)
-  }
-
-  useIsLoadingConversations(): boolean {
-    return useStoreWithEqualityFn(this.store, selectIsLoadingConversations)
-  }
-
-  useMessages(conversationId: string): DirectMessage[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      this.getMessagesSelector(conversationId),
-      directMessagesEqual,
-    )
-  }
-
-  useHasMore(conversationId: string): boolean {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.hasMoreByConversation[conversationId] ?? false,
-    )
-  }
-
-  useIsLoadingMessages(conversationId: string): boolean {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.loadingByConversation[conversationId] ?? false,
-    )
-  }
-
-  useComposeDraftPeer(): DmComposeDraftPeer | null {
-    return useStoreWithEqualityFn(this.store, selectComposeDraftPeer)
-  }
-
-  useHasMessagesLoadCompleted(conversationId: string): boolean {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => state.messagesLoadComplete[conversationId] ?? false,
-    )
-  }
-
-  private getMessagesSelector(
-    conversationId: string,
-  ): (state: DirectMessageNexusState) => DirectMessage[] {
-    if (!this.messagesSelectors.has(conversationId)) {
-      this.messagesSelectors.set(conversationId, (state) => {
-        void state.revision
-        const ids = state.messagesByConversation[conversationId] ?? []
-        if (ids.length === 0) return EMPTY_MESSAGES
-        const list: DirectMessage[] = []
-        for (const id of ids) {
-          const msg = state.messageEntities[id]
-          if (msg) list.push(msg)
-        }
-        const cached = this.messageSnapshots.get(conversationId)
-        if (cached && directMessagesEqual(cached, list)) return cached
-        this.messageSnapshots.set(conversationId, list)
-        return list
-      })
-    }
-    return this.messagesSelectors.get(conversationId)!
-  }
-
   // ---- Persistence ----
 
   override persist(): void {
@@ -985,9 +840,6 @@ export class DirectMessageNexus extends Nexus<
       composeDraftPeer: null,
       revision: 0,
     })
-    this.conversationsSnapshot = EMPTY_CONVERSATIONS
-    this.messagesSelectors.clear()
-    this.messageSnapshots.clear()
     this.persistence.remove(STORAGE_KEY)
   }
 

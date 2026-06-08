@@ -9,6 +9,11 @@ import { Button } from "@shared/app/ui/button";
 import { ScrollArea } from "@shared/app/ui/scroll-area";
 import { Skeleton } from "@shared/app/ui/skeleton";
 import { useHavenCore } from "@shared/core";
+import {
+  useActiveDmConversationId,
+  useDmConversations,
+  useDmConversationsLoading,
+} from "@react-bindings";
 import { DIRECT_MESSAGE_IMAGE_PREVIEW_TEXT } from "@shared/lib/backend/directMessageUtils";
 import {
   resolveLiveAvatarUrl,
@@ -46,9 +51,9 @@ export function DirectMessagesSidebar({
   onRefresh,
 }: DirectMessagesSidebarProps) {
   const core = useHavenCore();
-  const conversations = core.directMessages.useConversations();
-  const selectedConversationId = core.directMessages.useActiveConversationId();
-  const loading = core.directMessages.useIsLoadingConversations();
+  const conversations = useDmConversations(core.directMessages);
+  const selectedConversationId = useActiveDmConversationId(core.directMessages);
+  const loading = useDmConversationsLoading(core.directMessages);
   const liveProfiles = core.profiles.useProfilesRecord();
   const sidebarRef = React.useRef<HTMLDivElement | null>(null);
   const userTitleRef = React.useRef<HTMLParagraphElement | null>(null);

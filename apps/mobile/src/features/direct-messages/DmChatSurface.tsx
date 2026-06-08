@@ -32,6 +32,13 @@ import type { DirectMessage, DirectMessageConversationSummary } from "@shared/li
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useHavenCore } from "@shared/core";
+import {
+  useActiveDmConversationId,
+  useDmComposeDraftPeer,
+  useDmConversations,
+  useDmMessages,
+  useDmMessagesLoading,
+} from "@react-bindings";
 import { useAuthStore } from "@shared/stores/authStore";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
 import { DmReportSheet } from "@/features/direct-messages/DmReportSheet";
@@ -51,11 +58,11 @@ export function DmChatSurface() {
   const liveProfiles = core.profiles.useProfilesRecord();
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
 
-  const selectedDmConversationId = dm.useActiveConversationId();
-  const dmComposeDraftPeer = dm.useComposeDraftPeer();
-  const dmConversations = dm.useConversations();
-  const dmMessages = dm.useMessages(selectedDmConversationId ?? "");
-  const dmMessagesLoading = dm.useIsLoadingMessages(selectedDmConversationId ?? "");
+  const selectedDmConversationId = useActiveDmConversationId(dm);
+  const dmComposeDraftPeer = useDmComposeDraftPeer(dm);
+  const dmConversations = useDmConversations(dm);
+  const dmMessages = useDmMessages(dm, selectedDmConversationId ?? "");
+  const dmMessagesLoading = useDmMessagesLoading(dm, selectedDmConversationId ?? "");
 
   const [draft, setDraft] = useState("");
   const [isPickingDmMedia, setIsPickingDmMedia] = useState(false);

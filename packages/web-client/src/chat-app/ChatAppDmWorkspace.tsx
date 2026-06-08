@@ -6,6 +6,13 @@ import { DirectMessagesSidebar } from "@web-client/components/direct-messages/Di
 import { getErrorMessage } from "@platform/lib/errors";
 import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 import { useHavenCore } from "@shared/core";
+import {
+  useActiveDmConversationId,
+  useDmConversations,
+  useDmConversationsLoading,
+  useDmMessages,
+  useDmMessagesLoading,
+} from "@react-bindings";
 import { useUiStore } from "@shared/stores/uiStore";
 import type { DirectMessageReportKind } from "@shared/lib/backend/types";
 
@@ -19,13 +26,13 @@ export function ChatAppDmWorkspace({ user }: ChatAppDmWorkspaceProps) {
   const dmNexus = core.directMessages;
   const dmWorkspaceIsActive = useUiStore((state) => state.workspaceMode === "dm");
 
-  const dmConversations = dmNexus.useConversations();
-  const dmConversationsLoading = dmNexus.useIsLoadingConversations();
-  const selectedDmConversationId = dmNexus.useActiveConversationId();
+  const dmConversations = useDmConversations(dmNexus);
+  const dmConversationsLoading = useDmConversationsLoading(dmNexus);
+  const selectedDmConversationId = useActiveDmConversationId(dmNexus);
   const messageConversationKey =
     dmWorkspaceIsActive && selectedDmConversationId ? selectedDmConversationId : "";
-  const dmMessages = dmNexus.useMessages(messageConversationKey);
-  const dmMessagesLoading = dmNexus.useIsLoadingMessages(messageConversationKey);
+  const dmMessages = useDmMessages(dmNexus, messageConversationKey);
+  const dmMessagesLoading = useDmMessagesLoading(dmNexus, messageConversationKey);
 
   const [dmConversationsRefreshing, setDmConversationsRefreshing] = useState(false);
   const [dmConversationsError, setDmConversationsError] = useState<string | null>(null);

@@ -6,7 +6,11 @@ import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useHavenCore } from "@shared/core";
-import { useCommunities } from "@react-bindings";
+import {
+  useCommunities,
+  useDmConversations,
+  useDmConversationsLoading,
+} from "@react-bindings";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import type { DirectMessageConversationSummary, FriendSummary } from "@shared/lib/backend/types";
@@ -71,10 +75,10 @@ export function DmInboxDrawer({
   }));
 
   // ── Conversation list data ──────────────────────────────────────────────
-  const conversations = dm.useConversations();
+  const conversations = useDmConversations(dm);
   const friends = social.useFriends();
   const socialLoading = social.useIsLoading();
-  const isLoading = dm.useIsLoadingConversations();
+  const isLoading = useDmConversationsLoading(dm);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

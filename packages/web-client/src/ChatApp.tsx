@@ -14,13 +14,17 @@ import {
 } from "@web-client/chat-app/ChatAppSession";
 import { useUiStore } from "@shared/stores/uiStore";
 import { useHavenCore, toServerSummaries } from "@shared/core";
-import { useActiveCommunityId, useOrderedCommunities } from "@react-bindings";
+import {
+  useActiveCommunityId,
+  useDmConversations,
+  useOrderedCommunities,
+} from "@react-bindings";
 
 function ChatAppInner() {
   const app = useChatAppSession();
   const voice = useChatAppVoiceIntegration();
   const core = useHavenCore();
-  const dmConversations = core.directMessages.useConversations();
+  const dmConversations = useDmConversations(core.directMessages);
   const notificationCounts = core.notifications.useCounts();
   const totalDmUnreadCount = React.useMemo(
     () =>

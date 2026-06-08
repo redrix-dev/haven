@@ -12,3 +12,11 @@ export {
   useCommunitiesLoading,
   useOrderedCommunities,
 } from "./community";
+export {
+  useActiveDmConversationId,
+  useDmComposeDraftPeer,
+  useDmConversations,
+  useDmConversationsLoading,
+  useDmMessages,
+  useDmMessagesLoading,
+} from "./directMessages";

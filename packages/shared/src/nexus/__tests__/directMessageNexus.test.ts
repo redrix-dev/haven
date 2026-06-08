@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMemoryPersistence } from '@shared/core';
-import {
-  conversationsEqual,
-  DirectMessageNexus,
-} from '@shared/nexus/direct-messages/DirectMessageNexus';
+import { DirectMessageNexus } from '@shared/nexus/direct-messages/DirectMessageNexus';
+import { conversationsEqual } from '@shared/nexus/direct-messages/dmSelectors';
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
@@ -68,12 +66,12 @@ describe('DirectMessageNexus', () => {
 
     const promise = nexus.loadConversations({ suppressLoadingState: true });
 
-    expect(nexus.getReactiveStore().getState().isLoadingConversations).toBe(false);
+    expect(nexus.reactiveStore.getState().isLoadingConversations).toBe(false);
     resolveList([conversation()]);
     await promise;
 
     expect(nexus.getSnapshot('dm1')).toBeDefined();
-    expect(nexus.getReactiveStore().getState().isLoadingConversations).toBe(false);
+    expect(nexus.reactiveStore.getState().isLoadingConversations).toBe(false);
   });
 
   it('loadMessages reverses the response into ascending order', async () => {
@@ -85,7 +83,7 @@ describe('DirectMessageNexus', () => {
 
     await nexus.loadMessages('dm1');
 
-    const state = nexus.getReactiveStore().getState();
+    const state = nexus.reactiveStore.getState();
     expect(state.messagesByConversation['dm1']).toEqual(['m1', 'm2']);
   });
 
@@ -93,7 +91,7 @@ describe('DirectMessageNexus', () => {
     const nexus = new DirectMessageNexus(createMemoryPersistence(), {} as never);
     nexus.upsertMessage(message({ messageId: 'm10' }));
 
-    const state = nexus.getReactiveStore().getState();
+    const state = nexus.reactiveStore.getState();
     expect(state.messagesByConversation['dm1']).toEqual(['m10']);
     expect(state.messageEntities['m10']?.content).toBe('hello');
   });
@@ -105,7 +103,7 @@ describe('DirectMessageNexus', () => {
     nexus.upsertMessage(message({ messageId: 'm3', createdAt: '2026-01-01T00:00:03.000Z' }));
     nexus.upsertMessage(message({ messageId: 'm2', createdAt: '2026-01-01T00:00:02.000Z' }));
 
-    const state = nexus.getReactiveStore().getState();
+    const state = nexus.reactiveStore.getState();
     expect(state.messagesByConversation['dm1']).toEqual(['m1', 'm2', 'm3']);
   });
 
@@ -121,7 +119,7 @@ describe('DirectMessageNexus', () => {
     await nexus.receiveMessage('dm1', 'm42');
 
     expect(getMessage).toHaveBeenCalledWith({ conversationId: 'dm1', messageId: 'm42' });
-    expect(nexus.getReactiveStore().getState().messageEntities['m42']?.content).toBe('hydrated');
+    expect(nexus.reactiveStore.getState().messageEntities['m42']?.content).toBe('hydrated');
   });
 
   it('sendMessage updates the cached inbox summary without reloading conversations', async () => {
@@ -158,7 +156,7 @@ describe('DirectMessageNexus', () => {
 
     await nexus.sendMessage('dm1', 'latest body');
 
-    const state = nexus.getReactiveStore().getState();
+    const state = nexus.reactiveStore.getState();
     const updated = state.entities['dm1']?.data;
     expect(sendMessage).toHaveBeenCalledWith({
       conversationId: 'dm1',
@@ -199,7 +197,7 @@ describe('DirectMessageNexus', () => {
 
     await nexus.receiveMessage('dm1', 'm-incoming');
 
-    const updated = nexus.getReactiveStore().getState().entities['dm1']?.data;
+    const updated = nexus.reactiveStore.getState().entities['dm1']?.data;
     expect(updated?.lastMessageId).toBe('m-incoming');
     expect(updated?.lastMessagePreview).toBe('new from bob');
     expect(updated?.unreadCount).toBe(2);
@@ -225,7 +223,7 @@ describe('DirectMessageNexus', () => {
       }),
     ]);
 
-    const updated = nexus.getReactiveStore().getState().entities['dm1']?.data;
+    const updated = nexus.reactiveStore.getState().entities['dm1']?.data;
     expect(updated?.lastMessageId).toBe('m-new');
     expect(updated?.lastMessagePreview).toBe('local new');
   });

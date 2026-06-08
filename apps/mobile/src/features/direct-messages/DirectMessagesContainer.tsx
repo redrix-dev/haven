@@ -38,6 +38,14 @@ import type {
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useHavenCore } from "@shared/core";
+import {
+  useActiveDmConversationId,
+  useDmComposeDraftPeer,
+  useDmConversations,
+  useDmConversationsLoading,
+  useDmMessages,
+  useDmMessagesLoading,
+} from "@react-bindings";
 import { useAuthStore } from "@shared/stores/authStore";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
@@ -78,12 +86,12 @@ export function DirectMessagesContainer() {
   const dm = core.directMessages;
   const liveProfiles = core.profiles.useProfilesRecord();
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
-  const dmConversations = dm.useConversations();
-  const dmConversationsLoading = dm.useIsLoadingConversations();
-  const selectedDmConversationId = dm.useActiveConversationId();
-  const dmComposeDraftPeer = dm.useComposeDraftPeer();
-  const dmMessages = dm.useMessages(selectedDmConversationId ?? "");
-  const dmMessagesLoading = dm.useIsLoadingMessages(selectedDmConversationId ?? "");
+  const dmConversations = useDmConversations(dm);
+  const dmConversationsLoading = useDmConversationsLoading(dm);
+  const selectedDmConversationId = useActiveDmConversationId(dm);
+  const dmComposeDraftPeer = useDmComposeDraftPeer(dm);
+  const dmMessages = useDmMessages(dm, selectedDmConversationId ?? "");
+  const dmMessagesLoading = useDmMessagesLoading(dm, selectedDmConversationId ?? "");
   const [draft, setDraft] = useState("");
   const [isPickingDmMedia, setIsPickingDmMedia] = useState(false);
   const [isSendingDm, setIsSendingDm] = useState(false);

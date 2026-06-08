@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Image, Modal, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHavenCore } from "@shared/core";
+import { useActiveDmConversationId, useDmConversations } from "@react-bindings";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { ThemedIonicons } from "@/theme-rn";
 
@@ -19,8 +20,8 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
   const liveProfiles = core.profiles.useProfilesRecord();
   const [actionsOpen, setActionsOpen] = useState(false);
 
-  const activeConversationId = dm.useActiveConversationId();
-  const conversations = dm.useConversations();
+  const activeConversationId = useActiveDmConversationId(dm);
+  const conversations = useDmConversations(dm);
 
   const activeConversation = useMemo(
     () =>
