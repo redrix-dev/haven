@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
-import { create } from 'zustand'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { createStore, type StoreApi } from 'zustand/vanilla'
 import { Nexus, type NexusEntry, type NexusState } from '../Nexus'
+import type { ReadableStore } from '../storeTypes'
+import { projectCommunities } from './communitySelectors'
 import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
 import {
   applyCommunityDisplayOrder,
@@ -12,7 +12,6 @@ import {
 } from '@shared/core/communityDisplayOrder'
 import type { ControlPlaneBackend } from '@shared/lib/backend/controlPlaneBackend.interface'
 import type { ServerSummary } from '@shared/lib/backend/types'
-import type { StoreApi, UseBoundStore } from 'zustand'
 
 export type Community = {
   id: string
@@ -29,52 +28,9 @@ export type CommunityNexusState = NexusState<Community> & {
 }
 
 const STORAGE_KEY = 'haven:nexus:communities:global'
-const EMPTY_COMMUNITIES: Community[] = []
-
-const selectActiveId = (state: CommunityNexusState) => state.activeId
-const selectIsLoading = (state: CommunityNexusState) => state.isLoading
-const selectLoadError = (state: CommunityNexusState) => state.loadError
-const selectDisplayOrderIds = (state: CommunityNexusState) => state.displayOrderIds
-
-const selectCommunities = (state: CommunityNexusState): Community[] => {
-  if (state.orderedIds.length === 0) return EMPTY_COMMUNITIES
-
-  return state.orderedIds
-    .map((id) => state.entities[id]?.data)
-    .filter((community): community is Community => community !== undefined)
-}
-
-export const communitiesEqual = (a: Community[], b: Community[]): boolean => {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) {
-    if (a[i].id !== b[i].id || a[i].name !== b[i].name) return false
-  }
-  return true
-}
 
 export class CommunityNexus extends Nexus<Community, ServerSummary> {
-  private _communityStore: UseBoundStore<StoreApi<CommunityNexusState>> | null =
-    null
-
-  private communitySelectors = new Map<
-    string,
-    (state: CommunityNexusState) => Community | undefined
-  >()
-
-  private communitiesSnapshot: Community[] = EMPTY_COMMUNITIES
-
-  private readonly communitiesSelector = (
-    state: CommunityNexusState,
-  ): Community[] => {
-    void state.revision
-    const next = selectCommunities(state)
-    if (communitiesEqual(this.communitiesSnapshot, next)) {
-      return this.communitiesSnapshot
-    }
-    this.communitiesSnapshot = next
-    return next
-  }
+  private _communityStore: StoreApi<CommunityNexusState> | null = null
 
   private readonly controlPlane: ControlPlaneBackend
   private onListChanged: (() => void) | null = null
@@ -128,7 +84,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
   }
 
   setDisplayOrder(ids: string[], userId: string | null): void {
-    const communities = selectCommunities(this.store.getState())
+    const communities = projectCommunities(this.store.getState())
     const currentOrderedIds = applyCommunityDisplayOrder(
       communities,
       this.store.getState().displayOrderIds,
@@ -152,9 +108,9 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
     }
   }
 
-  protected override get store(): UseBoundStore<StoreApi<CommunityNexusState>> {
+  protected override get store(): StoreApi<CommunityNexusState> {
     if (!this._communityStore) {
-      this._communityStore = create<CommunityNexusState>(() => ({
+      this._communityStore = createStore<CommunityNexusState>(() => ({
         entities: {},
         orderedIds: [],
         activeId: null,
@@ -168,13 +124,12 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
     return this._communityStore
   }
 
-  private getCommunitySelector(
-    id: string,
-  ): (state: CommunityNexusState) => Community | undefined {
-    if (!this.communitySelectors.has(id)) {
-      this.communitySelectors.set(id, (state) => state.entities[id]?.data)
-    }
-    return this.communitySelectors.get(id)!
+  /**
+   * Read-only store handle for the binding packages — `getState`/`subscribe`
+   * only, no `setState`, so reactivity bindings can't bypass action methods.
+   */
+  get reactiveStore(): ReadableStore<CommunityNexusState> {
+    return this.store
   }
 
   setCommunities(communities: Community[]): void {
@@ -339,46 +294,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       displayOrderIds: null,
       revision: 0,
     })
-    this.communitiesSnapshot = EMPTY_COMMUNITIES
-    this.communitySelectors.clear()
     this.persistence.remove(STORAGE_KEY)
-  }
-
-  useCommunities(): Community[] {
-    return useStoreWithEqualityFn(
-      this.store,
-      this.communitiesSelector,
-      communitiesEqual,
-    )
-  }
-
-  useCommunity(id: string): Community | undefined {
-    return useStoreWithEqualityFn(this.store, this.getCommunitySelector(id))
-  }
-
-  useActiveId(): string | null {
-    return useStoreWithEqualityFn(this.store, selectActiveId)
-  }
-
-  useIsLoading(): boolean {
-    return useStoreWithEqualityFn(this.store, selectIsLoading)
-  }
-
-  useLoadError(): string | null {
-    return useStoreWithEqualityFn(this.store, selectLoadError)
-  }
-
-  useDisplayOrderIds(): string[] | null {
-    return useStoreWithEqualityFn(this.store, selectDisplayOrderIds)
-  }
-
-  useOrderedCommunities(): Community[] {
-    const communities = this.useCommunities()
-    const displayOrderIds = this.useDisplayOrderIds()
-    return useMemo(
-      () => applyCommunityDisplayOrder(communities, displayOrderIds),
-      [communities, displayOrderIds],
-    )
   }
 }
 

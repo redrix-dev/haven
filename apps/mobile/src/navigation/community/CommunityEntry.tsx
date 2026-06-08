@@ -9,6 +9,11 @@ import {
   useBootstrapPhase,
   useHavenCore,
 } from "@shared/core";
+import {
+  useCommunitiesLoadError,
+  useCommunitiesLoading,
+  useOrderedCommunities,
+} from "@react-bindings";
 import { useAuthStore } from "@shared/stores/authStore";
 import { getLastCommunitySurface } from "@/storage/communitySurfacePrefs";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
@@ -20,9 +25,9 @@ export function CommunityEntry({ navigation }: Props) {
   const core = useHavenCore();
   const bootstrapPhase = useBootstrapPhase();
   const userId = useAuthStore((state) => state.user?.id ?? null);
-  const communities = core.communities.useOrderedCommunities();
-  const communitiesLoading = core.communities.useIsLoading();
-  const loadError = core.communities.useLoadError();
+  const communities = useOrderedCommunities(core.communities);
+  const communitiesLoading = useCommunitiesLoading(core.communities);
+  const loadError = useCommunitiesLoadError(core.communities);
   const themeTokens = useMobileThemeTokens();
   const spinnerFg = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const routedRef = useRef(false);

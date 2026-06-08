@@ -13,9 +13,13 @@ import {
 } from "@shared/core";
 import {
   useActiveChannelId,
+  useActiveCommunityId,
   useChannelGroups,
   useChannels,
   useChannelsLoading,
+  useCommunities,
+  useCommunitiesLoadError,
+  useCommunitiesLoading,
 } from "@react-bindings";
 import { getPlatformInviteBaseUrl } from "@platform/urls";
 import {
@@ -67,13 +71,13 @@ export function useChatAppSessionState() {
   const core = useHavenCore();
 
   // ── Servers ───────────────────────────────────────────────────────────────
-  const nexusCommunities = core.communities.useCommunities();
+  const nexusCommunities = useCommunities(core.communities);
   const servers = useMemo(
     () => toServerSummaries(nexusCommunities),
     [nexusCommunities],
   );
-  const serversLoadError = core.communities.useLoadError();
-  const isServersLoading = core.communities.useIsLoading();
+  const serversLoadError = useCommunitiesLoadError(core.communities);
+  const isServersLoading = useCommunitiesLoading(core.communities);
   const serversStatus = deriveCommunitiesLoadStatus({
     hasUser: Boolean(user?.id),
     isLoading: isServersLoading,
@@ -174,7 +178,7 @@ export function useChatAppSessionState() {
   );
 
   // ── Community workspace (nexus-backed) ─────────────────────────────────────
-  const currentServerId = core.communities.useActiveId();
+  const currentServerId = useActiveCommunityId(core.communities);
   const currentChannelId = useActiveChannelId(core.channels);
   const setCurrentServerId = useCallback(
     (id: string | null) => {

@@ -28,6 +28,7 @@ import { ActionMenuContent } from "@web-client/components/menus/ActionMenuConten
 import { resolveContextMenuIntent } from "@shared/infrastructure/contextMenu";
 import { traceContextMenuEvent } from "@shared/infrastructure/contextMenu/debugTrace";
 import { useHavenCore } from "@shared/core";
+import { useActiveCommunityId } from "@react-bindings";
 import type { ServerSummary } from "@shared/lib/backend/types";
 import type { MenuActionNode } from "@shared/infrastructure/contextMenu/types";
 
@@ -89,7 +90,7 @@ export function ServerList({
   onOpenServerSettingsForServer,
   onReorder,
 }: ServerListProps) {
-  const currentServerId = useHavenCore().communities.useActiveId();
+  const currentServerId = useActiveCommunityId(useHavenCore().communities);
   const avatarInitial = userDisplayName.trim().charAt(0).toUpperCase() || "U";
 
   // Drag-to-reorder state

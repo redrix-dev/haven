@@ -30,6 +30,7 @@ import { ThemedIonicons } from "@/theme-rn";
 import { useFloatingDmPlaceholderChannels } from "@/theme-rn/useFloatingDmPlaceholderChannels";
 import { useDmBubbleSheetChrome } from "@/theme-rn/useDmBubbleSheetChrome";
 import { useHavenCore } from "@shared/core";
+import { useCommunities } from "@react-bindings";
 
 export type {
   FloatingDmBubbleIconName,
@@ -135,7 +136,7 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
   const themedDefaults = useFloatingDmPlaceholderChannels();
   const sheetChrome = useDmBubbleSheetChrome();
   const core = useHavenCore();
-  const communities = core.communities.useCommunities();
+  const communities = useCommunities(core.communities);
   const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
   const modmailManagedCommunityIds = useMemo(
     () =>

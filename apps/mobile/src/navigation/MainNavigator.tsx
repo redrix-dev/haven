@@ -24,7 +24,12 @@ import {
   toServerSummaries,
   useHavenCore,
 } from "@shared/core";
-import { useActiveChannelId, useChannels } from "@react-bindings";
+import {
+  useActiveChannelId,
+  useActiveCommunityId,
+  useChannels,
+  useOrderedCommunities,
+} from "@react-bindings";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
 import UserProfileModal, {
   type UserProfileModalTarget,
@@ -210,7 +215,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const notificationItems = core.notifications.useNotifications();
   const dmConversations = dm.useConversations();
   const socialCounts = core.social.useCounts();
-  const currentServerId = core.communities.useActiveId();
+  const currentServerId = useActiveCommunityId(core.communities);
   const currentChannelId = useActiveChannelId(core.channels);
   const activeCommunityChannels = useChannels(
     core.channels,
@@ -228,7 +233,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
   );
   const viewerProfile = core.profiles.useViewerProfile(userId);
   const liveProfiles = core.profiles.useProfilesRecord();
-  const orderedCommunities = core.communities.useOrderedCommunities();
+  const orderedCommunities = useOrderedCommunities(core.communities);
   const servers = useMemo(
     () => toServerSummaries(orderedCommunities),
     [orderedCommunities],

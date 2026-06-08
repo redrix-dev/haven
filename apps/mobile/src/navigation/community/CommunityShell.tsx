@@ -7,7 +7,12 @@ import {
   toServerSummaries,
   useHavenCore,
 } from "@shared/core";
-import { useActiveChannelId, useChannels } from "@react-bindings";
+import {
+  useActiveChannelId,
+  useChannels,
+  useCommunitiesLoading,
+  useOrderedCommunities,
+} from "@react-bindings";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackHandler, View } from "react-native";
 import { CommunityChatScreen } from "@/screens/main/CommunityChatScreen";
@@ -141,8 +146,8 @@ export function CommunityShell({
     applyCommunityFocus(core, serverId);
   }, [core, serverId]);
 
-  const nexusCommunities = core.communities.useOrderedCommunities();
-  const communitiesLoading = core.communities.useIsLoading();
+  const nexusCommunities = useOrderedCommunities(core.communities);
+  const communitiesLoading = useCommunitiesLoading(core.communities);
   const servers = useMemo(
     () => toServerSummaries(nexusCommunities),
     [nexusCommunities],

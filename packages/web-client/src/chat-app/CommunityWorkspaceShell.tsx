@@ -10,6 +10,7 @@ import { getErrorMessage } from "@platform/lib/errors";
 import { useHavenCore, toChannel } from "@shared/core";
 import {
   useActiveChannelId,
+  useActiveCommunityId,
   useChannels,
   useChannelsLoading,
 } from "@react-bindings";
@@ -29,7 +30,7 @@ export function CommunityWorkspaceShell({
   const app = useChatAppSession();
   const core = useHavenCore();
   const admin = core.admin;
-  const currentServerId = core.communities.useActiveId();
+  const currentServerId = useActiveCommunityId(core.communities);
   const currentChannelId = useActiveChannelId(core.channels);
   const havenChannels = useChannels(core.channels, currentServerId ?? "__none__");
   const channelsLoading = useChannelsLoading(

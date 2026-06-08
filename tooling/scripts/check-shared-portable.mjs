@@ -40,6 +40,8 @@ const portablePathExclusions = [
 const reactFreeCoreChecks = [
   /^packages\/shared\/src\/nexus\/community\/ChannelNexus\.ts$/,
   /^packages\/shared\/src\/nexus\/community\/channelSelectors\.ts$/,
+  /^packages\/shared\/src\/nexus\/community\/CommunityNexus\.ts$/,
+  /^packages\/shared\/src\/nexus\/community\/communitySelectors\.ts$/,
 ];
 const frameworkImportRe =
   /\bfrom\s+["'](?:react|react-dom|solid-js|zustand|zustand\/traditional|zustand\/react)["']/;

@@ -14,6 +14,7 @@ import {
 } from "@web-client/chat-app/ChatAppSession";
 import { useUiStore } from "@shared/stores/uiStore";
 import { useHavenCore, toServerSummaries } from "@shared/core";
+import { useActiveCommunityId, useOrderedCommunities } from "@react-bindings";
 
 function ChatAppInner() {
   const app = useChatAppSession();
@@ -29,7 +30,7 @@ function ChatAppInner() {
       ),
     [dmConversations],
   );
-  const currentServerId = core.communities.useActiveId();
+  const currentServerId = useActiveCommunityId(core.communities);
   const setWorkspaceMode = useUiStore((state) => state.setWorkspaceMode);
   const setCurrentServerId = useCallback(
     (id: string | null) => {
@@ -44,7 +45,7 @@ function ChatAppInner() {
     serverPermissions.canManageMembers ||
     serverPermissions.canManageBans ||
     serverPermissions.canManageInvites;
-  const orderedCommunities = core.communities.useOrderedCommunities();
+  const orderedCommunities = useOrderedCommunities(core.communities);
   const orderedServers = React.useMemo(
     () => toServerSummaries(orderedCommunities),
     [orderedCommunities],

@@ -1,12 +1,12 @@
 import React from "react";
 import { useHavenCore } from "@shared/core";
-import { useActiveChannelId } from "@react-bindings";
+import { useActiveChannelId, useActiveCommunityId } from "@react-bindings";
 import { useUiStore } from "@shared/stores/uiStore";
 import { getPendingUiConfirmationCopy } from "@web-client/ui-confirmations";
 
 export function useChatAppModalUiState() {
   const core = useHavenCore();
-  const currentServerId = core.communities.useActiveId();
+  const currentServerId = useActiveCommunityId(core.communities);
   const currentChannelId = useActiveChannelId(core.channels);
   const channelSettingsTargetId = useUiStore(
     (state) => state.channelSettingsTargetId,

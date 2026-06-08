@@ -6,6 +6,7 @@ import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useHavenCore } from "@shared/core";
+import { useCommunities } from "@react-bindings";
 import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import type { DirectMessageConversationSummary, FriendSummary } from "@shared/lib/backend/types";
@@ -36,7 +37,7 @@ export function DmInboxDrawer({
   const dm = core.directMessages;
   const social = core.social;
   const liveProfiles = core.profiles.useProfilesRecord();
-  const communities = core.communities.useCommunities();
+  const communities = useCommunities(core.communities);
   const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
 
   // ── ModMail availability ────────────────────────────────────────────────

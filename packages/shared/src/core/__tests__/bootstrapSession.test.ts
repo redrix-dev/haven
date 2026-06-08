@@ -134,7 +134,7 @@ describe('bootstrapSession', () => {
       'connecting_realtime',
       'ready',
     ]);
-    expect(core.communities.useCommunities).toBeDefined();
+    expect(core.communities.reactiveStore.getState().orderedIds).toContain('s1');
     expect(core.communities.getSnapshot('s1')?.name).toBe('Alpha');
     expect(listUserCommunities).toHaveBeenCalledWith('u1');
     unsubscribe();

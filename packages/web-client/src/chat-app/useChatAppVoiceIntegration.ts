@@ -6,6 +6,7 @@ import { getErrorMessage } from "@platform/lib/errors";
 import { useChatAppSession } from "@web-client/chat-app/ChatAppSession";
 import { useLiveKitVoiceSession } from "@web-client/features/voice/useLiveKitVoiceSession";
 import { useHavenCore } from "@shared/core";
+import { useActiveCommunityId } from "@react-bindings";
 import { useUiStore } from "@shared/stores/uiStore";
 import {
   filterBlockedUsersFromParticipantList,
@@ -18,7 +19,7 @@ export function useChatAppVoiceIntegration() {
   // VOICE_NEXUS_RESHAPE_TODO: this keeps the existing web/electron integration
   // shape while VoiceNexus absorbs the boundary work. Later, read voice state
   // directly from core.voice in consumers and keep only platform adapter logic.
-  const currentServerId = core.communities.useActiveId();
+  const currentServerId = useActiveCommunityId(core.communities);
   const currentServer = useMemo(
     () => app.servers.find((server) => server.id === currentServerId) ?? null,
     [app.servers, currentServerId],

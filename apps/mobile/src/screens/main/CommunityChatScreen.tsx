@@ -13,8 +13,12 @@ import {
 } from "@shared/core";
 import {
   useActiveChannelId,
+  useActiveCommunityId,
   useChannels,
   useChannelsLoading,
+  useCommunities,
+  useCommunitiesLoadError,
+  useCommunitiesLoading,
 } from "@react-bindings";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
@@ -67,14 +71,14 @@ export function CommunityChatScreen({
   const core = useHavenCore();
   const { setRainbowMode } = useUserStatusStore();
   const user = useAuthStore((state) => state.user);
-  const communityId = core.communities.useActiveId() ?? serverId;
+  const communityId = useActiveCommunityId(core.communities) ?? serverId;
   const navigationChannelId = useActiveChannelId(core.channels);
   const messageNexus = core.messages.for(communityId ?? "__none__");
   const currentUserId = user?.id ?? null;
   const currentUserPlatformStaff = core.profiles.usePlatformStaff(currentUserId);
-  const nexusCommunities = core.communities.useCommunities();
-  const serversLoading = core.communities.useIsLoading();
-  const serversError = core.communities.useLoadError();
+  const nexusCommunities = useCommunities(core.communities);
+  const serversLoading = useCommunitiesLoading(core.communities);
+  const serversError = useCommunitiesLoadError(core.communities);
   const servers = useMemo(
     () => toServerSummaries(nexusCommunities),
     [nexusCommunities],
