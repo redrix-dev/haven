@@ -2,6 +2,8 @@
   "files": [],
   "references": [
     { "path": "./tsconfig.web.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+    { "path": "./tsconfig.node.json" },
+    { "path": "./packages/solid-client/tsconfig.json" },
+    { "path": "./apps/tauri/tsconfig.json" },
+  ],
 }

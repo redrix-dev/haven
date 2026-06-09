@@ -9,9 +9,9 @@
     "noEmit": true,
     "types": ["vite/client", "node"],
     "paths": {
-      "@solid-client/*": ["../../packages/solid-client/src/*"],
+      "@solid-client/*": ["./src/*"],
       "@shared/*": ["../../packages/shared/src/*"],
     },
   },
-  "include": ["./src/**/*.ts", "./src/**/*.tsx", "./vite.config.ts"],
+  "include": ["./src/**/*.ts", "./src/**/*.tsx"],
 }
