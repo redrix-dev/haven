@@ -1,6 +1,6 @@
 import { Show } from "solid-js";
 import type { HavenBridge } from "./bridge";
-import { createSessionController } from "./sessionController";
+import { SessionProvider, useSession } from "./contexts/SessionProvider";
 import { DevLogin, SessionPanel } from "./components/DevLogin";
 import "./styles.css";
 
@@ -9,11 +9,19 @@ import "./styles.css";
  * with a real account, watch HavenSolidCore march through its bootstrap phases
  * and populate the caches. No real UI yet — that's Phase 3.
  *
- * The optional `bridge` is injected by the host (Tauri shell, or nothing in a
- * plain browser).
+ * `App` only plants the session boundary; `AppContent` (and everything deeper)
+ * lives inside it and reads auth via `useSession()`.
  */
 export function App(_props: { bridge?: HavenBridge }) {
-  const { session, phase, signIn, signOut } = createSessionController();
+  return (
+    <SessionProvider>
+      <AppContent />
+    </SessionProvider>
+  );
+}
+
+function AppContent() {
+  const { session, phase, signIn, signOut } = useSession();
 
   return (
     <div style={{ height: "100%", width: "100%" }}>

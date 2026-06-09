@@ -10,7 +10,7 @@ export function DevLogin(props: {
   onSubmit: (
     email: string,
     password: string,
-  ) => Promise<{ error: { message: string } | null }>;
+  ) => Promise<{ error: unknown }>;
 }) {
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
@@ -22,7 +22,11 @@ export function DevLogin(props: {
     setBusy(true);
     setError(null);
     const { error: signInError } = await props.onSubmit(email(), password());
-    if (signInError) setError(signInError.message);
+    if (signInError) {
+      setError(
+        signInError instanceof Error ? signInError.message : String(signInError),
+      );
+    }
     setBusy(false);
   };
 

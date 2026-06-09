@@ -1,21 +1,24 @@
-import { createSignal, onCleanup } from "solid-js";
+import { createSignal, onCleanup, createContext, useContext } from "solid-js";
+import { requireHavenSolidCore } from "@solid-client/core";
+import type { JSX } from "solid-js";
+import type { Accessor } from "solid-js";
 import type { Session } from "@supabase/supabase-js";
+import type { BootstrapPhaseSnapshot } from "@solid-client/core";
 import {
-  requireHavenSolidCore,
-  type BootstrapPhaseSnapshot,
-} from "@solid-client/core";
+  SolidAuthResult,
+  signInWithPassword,
+  signOutFromAuth,
+} from "@solid-client/auth/solidAuthService";
+type SessionValue = {
+  session: Accessor<Session | null | undefined>;
+  phase: Accessor<BootstrapPhaseSnapshot>;
+  signIn: (email: string, password: string) => Promise<SolidAuthResult>;
+  signOut: () => Promise<void>;
+};
 
-/**
- * Disposable dev session controller — the Solid counterpart to mobile's
- * `useAuthSession`. It does the one job auth has in this architecture: watch
- * Supabase session state and hand the user id off to the cache machine
- * (`bootstrapSession` / `clearSession`). Everything downstream (loading
- * communities, realtime, etc.) lives inside HavenSolidCore.
- *
- * Returns reactive `session` + `phase` signals plus `signIn`/`signOut` actions
- * for the throwaway login UI. Replace with a real auth layer in Phase 3.
- */
-export function createSessionController() {
+const SessionContext = createContext<SessionValue>();
+
+export function SessionProvider(props: { children: JSX.Element }) {
   const core = requireHavenSolidCore();
   const supabase = core.backends.client;
 
@@ -76,10 +79,20 @@ export function createSessionController() {
   });
   onCleanup(() => subscription.unsubscribe());
 
-  const signIn = (email: string, password: string) =>
-    supabase.auth.signInWithPassword({ email, password });
+  const signIn = signInWithPassword;
+  const signOut = signOutFromAuth;
 
-  const signOut = () => supabase.auth.signOut();
+  const value: SessionValue = { session, phase, signIn, signOut };
 
-  return { session, phase, signIn, signOut };
+  return (
+    <SessionContext.Provider value={value}>
+      {props.children}
+    </SessionContext.Provider>
+  );
+}
+
+export function useSession() {
+  const ctx = useContext(SessionContext);
+  if (!ctx) throw new Error("useSession must be used within <SessionProvider>");
+  return ctx;
 }
