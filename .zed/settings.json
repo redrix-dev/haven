@@ -1,0 +1,19 @@
+{
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/.svn",
+    "**/.hg",
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "**/node_modules",
+    "**/dist",
+    "**/out",
+    "**/.webpack",
+    "**/target",
+    "**/test-reports",
+    "**/coverage",
+    "**/local_archives",
+    "**/.expo",
+    "**/.turbo"
+  ]
+}
