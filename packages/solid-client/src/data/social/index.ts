@@ -1,1 +1,1 @@
-export { SocialSolidCache } from "./socialSolidCache";
+export { SocialSolidCache, createSocialSolidCache } from "./socialSolidCache";

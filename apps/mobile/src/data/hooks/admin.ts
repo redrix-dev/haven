@@ -1,4 +1,4 @@
-import type { CommunityAdminNexus } from "../community/CommunityAdminNexus";
+import type { CommunityAdminNexus } from "../community-management/CommunityAdminNexus";
 import type {
   CommunityAdminChannelPermissionsState,
   CommunityAdminServerPanelState,

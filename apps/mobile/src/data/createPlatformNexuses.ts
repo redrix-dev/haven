@@ -6,8 +6,8 @@ import type {
   VoiceRealtimeTransport,
 } from "@shared/features/voice/types";
 import type { ViewerMessagePolicyStore as ReactViewerMessagePolicyStore } from "./session/viewerMessagePolicyStore";
-import { CommunityAdminNexus } from "./community/CommunityAdminNexus";
-import { CommunityModerationNexus } from "./community/CommunityModerationNexus";
+import { CommunityAdminNexus } from "./community-management/CommunityAdminNexus";
+import { CommunityModerationNexus } from "./community-management/CommunityModerationNexus";
 import { FeatureFlagNexus } from "./feature-flags/FeatureFlagNexus";
 import { OnboardingNexus } from "./onboarding/OnboardingNexus";
 import { PermissionsNexus } from "./permissions/PermissionsNexus";

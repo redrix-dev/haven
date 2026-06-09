@@ -1,4 +1,4 @@
-import type { CommunityModerationNexus } from "../community/CommunityModerationNexus";
+import type { CommunityModerationNexus } from "../community-management/CommunityModerationNexus";
 import type {
   ServerReportDetail,
   ServerReportSummary,

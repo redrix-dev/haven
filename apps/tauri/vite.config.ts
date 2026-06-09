@@ -8,10 +8,13 @@ export default defineConfig({
   plugins: [solid()],
   root: __dirname,
   publicDir: false,
+  envDir: path.resolve(__dirname, "../.."),
   resolve: {
     alias: {
-      "@solid-client": path.resolve(__dirname, "../../packages/solid-client/src"),
-      "@mobile-data": path.resolve(__dirname, "../../apps/mobile/src/data"),
+      "@solid-client": path.resolve(
+        __dirname,
+        "../../packages/solid-client/src",
+      ),
       "@shared": path.resolve(__dirname, "../../packages/shared/src"),
     },
   },

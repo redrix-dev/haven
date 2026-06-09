@@ -1,17 +1,33 @@
 import { createStore } from "solid-js/store";
 import type { LiveProfileIdentity } from "@shared/lib/backend/types";
+import {
+  wireSolidReadableStore,
+  type NotifyingReadableStore,
+} from "../solidReadableStore";
 
 export type ProfileSolidState = {
   profiles: Record<string, LiveProfileIdentity>;
+  revision: number;
 };
 
-/** Solid-native profile cache stub for typecheck:solid. */
+/** Solid-native profile cache — identity map for realtime + display. */
 export class ProfileSolidCache {
-  private readonly state: ProfileSolidState;
+  readonly state: ProfileSolidState;
+  readonly reactiveStore: NotifyingReadableStore<ProfileSolidState>;
+  private readonly setState: (
+    updater: (
+      state: ProfileSolidState,
+    ) => Partial<ProfileSolidState> | ProfileSolidState,
+  ) => void;
 
   constructor() {
-    const [state] = createStore<ProfileSolidState>({ profiles: {} });
+    const [state, setState] = createStore<ProfileSolidState>({
+      profiles: {},
+      revision: 0,
+    });
     this.state = state;
+    this.setState = setState as typeof this.setState;
+    this.reactiveStore = wireSolidReadableStore(state);
   }
 
   getProfile(userId: string): LiveProfileIdentity | undefined {
@@ -19,11 +35,28 @@ export class ProfileSolidCache {
   }
 
   upsertProfile(profile: LiveProfileIdentity): void {
-    void profile;
-    throw new Error("ProfileSolidCache.upsertProfile not implemented yet");
+    this.setState((s) => ({
+      profiles: { ...s.profiles, [profile.userId]: profile },
+      revision: s.revision + 1,
+    }));
+    this.reactiveStore.notify();
+  }
+
+  removeProfile(userId: string): void {
+    if (!this.state.profiles[userId]) return;
+    this.setState((s) => {
+      const { [userId]: _, ...rest } = s.profiles;
+      return { profiles: rest, revision: s.revision + 1 };
+    });
+    this.reactiveStore.notify();
   }
 
   clear(): void {
-    void this.state;
+    this.setState(() => ({ profiles: {}, revision: 0 }));
+    this.reactiveStore.notify();
   }
+}
+
+export function createProfileSolidCache(): ProfileSolidCache {
+  return new ProfileSolidCache();
 }

@@ -1,10 +1,11 @@
 import { createStore } from "solid-js/store";
 import { wireSolidReadableStore, type NotifyingReadableStore } from "../solidReadableStore";
-import type { NexusEntry } from "@shared/nexus/Nexus";
+import type { NexusEntry } from "@shared/core/cache/entityTypes";
 import type {
   ChannelNexusState,
   HavenChannel,
 } from "@shared/nexus/community/channelTypes";
+import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type {
   Channel,
   ChannelGroupState,
@@ -41,12 +42,108 @@ export class ChannelSolidCache {
       state: ChannelNexusState,
     ) => Partial<ChannelNexusState> | ChannelNexusState,
   ) => void;
+  private readonly inflight = new Map<string, Promise<void>>();
 
-  constructor() {
+  constructor(private readonly communityData: CommunityDataBackend) {
     const [state, setState] = createStore(initialState());
     this.state = state;
     this.setState = setState as typeof this.setState;
     this.reactiveStore = wireSolidReadableStore(state);
+  }
+
+  async loadForCommunity(communityId: string): Promise<void> {
+    const existing = this.inflight.get(communityId);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      this.setIsLoading(communityId, true);
+      try {
+        const channels = await this.communityData.listChannels(communityId);
+        let groupState: ChannelGroupState;
+        try {
+          groupState = await this.communityData.listChannelGroups({
+            communityId,
+            channelIds: channels.map((channel) => channel.id),
+          });
+        } catch {
+          groupState = {
+            groups: [],
+            ungroupedChannelIds: channels.map((channel) => channel.id),
+            collapsedGroupIds: [],
+          };
+        }
+        this.setChannels(communityId, channels, groupState);
+      } finally {
+        this.setIsLoading(communityId, false);
+        this.inflight.delete(communityId);
+      }
+    })();
+
+    this.inflight.set(communityId, promise);
+    return promise;
+  }
+
+  async ensureLoaded(communityId: string): Promise<void> {
+    const ids = this.state.byCommunity[communityId] ?? [];
+    if (ids.length > 0) return;
+    await this.loadForCommunity(communityId);
+  }
+
+  upsertChannel(raw: Channel | unknown): void {
+    const channel = toHavenChannel(raw as Channel);
+    this.setState((s) => {
+      const communityIds = s.byCommunity[channel.communityId] ?? [];
+      const alreadyIndexed = communityIds.includes(channel.id);
+      return {
+        entities: {
+          ...s.entities,
+          [channel.id]: {
+            data: channel,
+            partial: false,
+            cachedAt: Date.now(),
+          },
+        },
+        byCommunity: alreadyIndexed
+          ? s.byCommunity
+          : {
+              ...s.byCommunity,
+              [channel.communityId]: [...communityIds, channel.id],
+            },
+        revision: s.revision + 1,
+      };
+    });
+    this.reactiveStore.notify();
+  }
+
+  removeChannel(id: string, communityId: string): void {
+    this.setState((s) => {
+      const { [id]: _, ...restEntities } = s.entities;
+      const nextGroups = (s.groups[communityId] ?? []).map((group) => ({
+        ...group,
+        channelIds: group.channelIds.filter((channelId) => channelId !== id),
+      }));
+      return {
+        entities: restEntities,
+        byCommunity: {
+          ...s.byCommunity,
+          [communityId]: (s.byCommunity[communityId] ?? []).filter(
+            (channelId) => channelId !== id,
+          ),
+        },
+        groups: {
+          ...s.groups,
+          [communityId]: nextGroups,
+        },
+        ungrouped: {
+          ...s.ungrouped,
+          [communityId]: (s.ungrouped[communityId] ?? []).filter(
+            (channelId) => channelId !== id,
+          ),
+        },
+        revision: s.revision + 1,
+      };
+    });
+    this.reactiveStore.notify();
   }
 
   setChannels(
@@ -76,7 +173,11 @@ export class ChannelSolidCache {
       },
       collapsed: {
         ...s.collapsed,
-        [communityId]: groupState.collapsedGroupIds,
+        [communityId]: s.collapsed[communityId] ?? groupState.collapsedGroupIds,
+      },
+      loadingByCommunity: {
+        ...s.loadingByCommunity,
+        [communityId]: false,
       },
       revision: s.revision + 1,
     }));
@@ -91,8 +192,28 @@ export class ChannelSolidCache {
     }));
     this.reactiveStore.notify();
   }
+
+  rehydrate(): void {}
+
+  clear(): void {
+    this.setState(() => initialState());
+    this.reactiveStore.notify();
+  }
+
+  private setIsLoading(communityId: string, loading: boolean): void {
+    this.setState((s) => ({
+      loadingByCommunity: {
+        ...s.loadingByCommunity,
+        [communityId]: loading,
+      },
+      revision: s.revision + 1,
+    }));
+    this.reactiveStore.notify();
+  }
 }
 
-export function createChannelSolidCache(): ChannelSolidCache {
-  return new ChannelSolidCache();
+export function createChannelSolidCache(
+  communityData: CommunityDataBackend,
+): ChannelSolidCache {
+  return new ChannelSolidCache(communityData);
 }

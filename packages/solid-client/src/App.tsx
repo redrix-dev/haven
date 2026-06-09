@@ -1,24 +1,27 @@
-import { createSignal } from "solid-js";
+import { Show } from "solid-js";
 import type { HavenBridge } from "./bridge";
-import { Sidebar } from "./components/Sidebar";
-import { ChannelView } from "./components/ChannelView";
+import { createSessionController } from "./sessionController";
+import { DevLogin, SessionPanel } from "./components/DevLogin";
 import "./styles.css";
 
-const CHANNELS = ["general", "design", "engineering", "voice-lounge"];
-
 /**
- * Placeholder Haven shell rendered with Solid. No `@shared` wiring yet — this
- * exists to evaluate Solid composition + the Tauri shell. The optional `bridge`
- * is injected by whatever host renders this (Tauri shell, or nothing in a
+ * Haven Solid shell. Currently a disposable auth + bootstrap harness: sign in
+ * with a real account, watch HavenSolidCore march through its bootstrap phases
+ * and populate the caches. No real UI yet — that's Phase 3.
+ *
+ * The optional `bridge` is injected by the host (Tauri shell, or nothing in a
  * plain browser).
  */
-export function App(props: { bridge?: HavenBridge }) {
-  const [active, setActive] = createSignal(CHANNELS[0]);
+export function App(_props: { bridge?: HavenBridge }) {
+  const { session, phase, signIn, signOut } = createSessionController();
 
   return (
-    <div class="app-shell">
-      <Sidebar channels={CHANNELS} active={active()} onSelect={setActive} />
-      <ChannelView channel={active()} bridge={props.bridge} />
+    <div style={{ height: "100%", width: "100%" }}>
+      <Show when={session()} fallback={<DevLogin onSubmit={signIn} />}>
+        {(active) => (
+          <SessionPanel session={active()} phase={phase} onSignOut={signOut} />
+        )}
+      </Show>
     </div>
   );
 }

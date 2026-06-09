@@ -10,7 +10,7 @@ import {
 } from '@mobile-data';
 import type { HavenReactCore } from '@mobile-data/core/HavenReactCore';
 import { ChannelNexus } from '@mobile-data/channels/ChannelNexus';
-import { CommunityAdminNexus } from '@mobile-data/community/CommunityAdminNexus';
+import { CommunityAdminNexus } from '@mobile-data/community-management/CommunityAdminNexus';
 import { CommunityNexus } from '@mobile-data/communities/CommunityNexus';
 import type { Channel, ServerRoleItem } from '@shared/lib/backend/types';
 import { useAuthStore, useUiStore } from '@mobile-data/session';

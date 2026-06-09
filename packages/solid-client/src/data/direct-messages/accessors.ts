@@ -10,7 +10,7 @@ import {
   projectMessages,
 } from "@shared/nexus/direct-messages/dmSelectors";
 import { createStoreSelector } from "../fromStore";
-import type { DirectMessageSolidCache } from "./dmSolidCache";
+import type { DirectMessageSolidCache } from "./directMessageSolidCache";
 
 export function createDmConversations(
   cache: DirectMessageSolidCache,

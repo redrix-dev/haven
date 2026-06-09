@@ -1,7 +1,8 @@
 import { createStore } from "solid-js/store";
 import { wireSolidReadableStore, type NotifyingReadableStore } from "../solidReadableStore";
-import type { NexusEntry } from "@shared/nexus/Nexus";
+import type { NexusEntry } from "@shared/core/cache/entityTypes";
 import type { DirectMessageNexusState } from "@shared/nexus/direct-messages/dmTypes";
+import type { DirectMessageBackend } from "@shared/lib/backend/directMessageBackend";
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
@@ -32,12 +33,67 @@ export class DirectMessageSolidCache {
       state: DirectMessageNexusState,
     ) => Partial<DirectMessageNexusState> | DirectMessageNexusState,
   ) => void;
+  private conversationsInflight: Promise<void> | null = null;
 
-  constructor() {
+  constructor(private readonly backend: DirectMessageBackend) {
     const [state, setState] = createStore(initialState());
     this.state = state;
     this.setState = setState as typeof this.setState;
     this.reactiveStore = wireSolidReadableStore(state);
+  }
+
+  async loadConversations(): Promise<void> {
+    if (this.conversationsInflight) return this.conversationsInflight;
+
+    this.conversationsInflight = (async () => {
+      this.setState((s) => ({
+        isLoadingConversations: true,
+        revision: s.revision + 1,
+      }));
+      this.reactiveStore.notify();
+      try {
+        const conversations = await this.backend.listConversations();
+        this.setConversations(conversations);
+        this.setState((s) => ({
+          conversationsLastLoadedAt: Date.now(),
+          isLoadingConversations: false,
+          revision: s.revision + 1,
+        }));
+        this.reactiveStore.notify();
+      } catch (error) {
+        this.setState((s) => ({
+          isLoadingConversations: false,
+          revision: s.revision + 1,
+        }));
+        this.reactiveStore.notify();
+        throw error;
+      }
+    })().finally(() => {
+      this.conversationsInflight = null;
+    });
+
+    return this.conversationsInflight;
+  }
+
+  async ensureConversationsLoaded(
+    options?: { freshnessMs?: number },
+  ): Promise<void> {
+    if (this.conversationsInflight) return this.conversationsInflight;
+    const freshnessMs = options?.freshnessMs ?? 60_000;
+    if (
+      this.state.conversationsLastLoadedAt > 0 &&
+      Date.now() - this.state.conversationsLastLoadedAt < freshnessMs
+    ) {
+      return;
+    }
+    await this.loadConversations();
+  }
+
+  async receiveMessage(conversationId: string, messageId: string): Promise<void> {
+    const message = await this.backend.getMessage({ conversationId, messageId });
+    if (message) {
+      this.upsertMessage(message);
+    }
   }
 
   setConversations(conversations: DirectMessageConversationSummary[]): void {
@@ -91,8 +147,17 @@ export class DirectMessageSolidCache {
     });
     this.reactiveStore.notify();
   }
+
+  rehydrate(): void {}
+
+  clear(): void {
+    this.setState(() => initialState());
+    this.reactiveStore.notify();
+  }
 }
 
-export function createDirectMessageSolidCache(): DirectMessageSolidCache {
-  return new DirectMessageSolidCache();
+export function createDirectMessageSolidCache(
+  backend: DirectMessageBackend,
+): DirectMessageSolidCache {
+  return new DirectMessageSolidCache(backend);
 }

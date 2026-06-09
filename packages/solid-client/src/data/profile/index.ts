@@ -1,1 +1,1 @@
-export { ProfileSolidCache } from "./profileSolidCache";
+export { ProfileSolidCache, createProfileSolidCache } from "./profileSolidCache";

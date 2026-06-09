@@ -1,8 +1,11 @@
 import { createStore } from "solid-js/store";
 import type { MessageBundle } from "@shared/lib/backend/types";
 import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
-import type { CommunityMessageCacheInstance } from "@shared/core/cache/communityMessageCachePort";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
+import {
+  wireSolidReadableStore,
+  type NotifyingReadableStore,
+} from "../solidReadableStore";
 import {
   MESSAGE_PAGE_SIZE,
   ascendingMessagesFromRpcPage,
@@ -38,8 +41,9 @@ const initialState = (): CommunityMessageSolidState => ({
 });
 
 /** Solid-native community message cache — calls shared pure logic, no zustand adapter. */
-export class CommunityMessageSolidCache implements CommunityMessageCacheInstance {
-  private state: CommunityMessageSolidState;
+export class CommunityMessageSolidCache {
+  readonly state: CommunityMessageSolidState;
+  readonly reactiveStore: NotifyingReadableStore<CommunityMessageSolidState>;
   private readonly setState: (
     updater: (
       state: CommunityMessageSolidState,
@@ -51,6 +55,11 @@ export class CommunityMessageSolidCache implements CommunityMessageCacheInstance
     const [state, setState] = createStore(initialState());
     this.state = state;
     this.setState = setState as typeof this.setState;
+    this.reactiveStore = wireSolidReadableStore(state);
+  }
+
+  private bump(): void {
+    this.reactiveStore.notify();
   }
 
   setCommunityData(communityData: CommunityDataBackend): void {
@@ -63,32 +72,6 @@ export class CommunityMessageSolidCache implements CommunityMessageCacheInstance
 
   getSnapshot(messageId: string): MessageBundle | undefined {
     return this.state.entities[messageId]?.data;
-  }
-
-  useChannel(_channelId: string): MessageBundle[] {
-    throw new Error("CommunityMessageSolidCache.useChannel is React-only");
-  }
-
-  useVisibleChannel(_channelId: string): MessageBundle[] {
-    throw new Error("CommunityMessageSolidCache.useVisibleChannel is React-only");
-  }
-
-  useChannelMeta(_channelId: string): ChannelMeta {
-    throw new Error("CommunityMessageSolidCache.useChannelMeta is React-only");
-  }
-
-  useIsLoadingInitial(_channelId: string): boolean {
-    throw new Error("CommunityMessageSolidCache.useIsLoadingInitial is React-only");
-  }
-
-  useIsLoadingOlder(_channelId: string): boolean {
-    throw new Error("CommunityMessageSolidCache.useIsLoadingOlder is React-only");
-  }
-
-  useHasInitialLoadCompleted(_channelId: string): boolean {
-    throw new Error(
-      "CommunityMessageSolidCache.useHasInitialLoadCompleted is React-only",
-    );
   }
 
   async ensureInitialLoaded(
@@ -129,6 +112,7 @@ export class CommunityMessageSolidCache implements CommunityMessageCacheInstance
       initialLoadComplete: { ...s.initialLoadComplete, [channelId]: true },
       lastInitialLoadedAt: { ...s.lastInitialLoadedAt, [channelId]: Date.now() },
     }));
+    this.bump();
   }
 
   async loadOlder(channelId: string): Promise<void> {
@@ -172,6 +156,7 @@ export class CommunityMessageSolidCache implements CommunityMessageCacheInstance
         ),
       },
     }));
+    this.bump();
   }
 
   upsertMessage(message: MessageBundle): void {
@@ -205,6 +190,7 @@ export class CommunityMessageSolidCache implements CommunityMessageCacheInstance
         hasMore: { ...s.hasMore, [channelId]: options.hasMore },
       };
     });
+    this.bump();
   }
 
   removeMessage(messageId: string, channelId: string): void {
@@ -221,6 +207,7 @@ export class CommunityMessageSolidCache implements CommunityMessageCacheInstance
         },
       };
     });
+    this.bump();
   }
 
   evictChannel(channelId: string): void {
@@ -236,6 +223,7 @@ export class CommunityMessageSolidCache implements CommunityMessageCacheInstance
         initialLoadComplete: { ...s.initialLoadComplete, [channelId]: false },
       };
     });
+    this.bump();
   }
 
   async send(
@@ -338,6 +326,7 @@ export class CommunityMessageSolidCache implements CommunityMessageCacheInstance
 
   clear(): void {
     this.setState(() => initialState());
+    this.bump();
   }
 
   rehydrate(): void {

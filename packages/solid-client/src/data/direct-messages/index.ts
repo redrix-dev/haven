@@ -1,5 +1,5 @@
 export {
   DirectMessageSolidCache,
   createDirectMessageSolidCache,
-} from "./dmSolidCache";
+} from "./directMessageSolidCache";
 export { createDmConversations, createDmMessages } from "./accessors";

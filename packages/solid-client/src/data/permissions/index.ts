@@ -1,1 +1,4 @@
-export { PermissionsSolidCache } from "./permissionsSolidCache";
+export {
+  PermissionsSolidCache,
+  createPermissionsSolidCache,
+} from "./permissionsSolidCache";

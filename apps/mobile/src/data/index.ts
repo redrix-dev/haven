@@ -62,7 +62,7 @@ export {
   type CommunityAdminMembersModalState,
   type CommunityAdminServerPanelState,
   type CommunityAdminChannelPermissionsState,
-} from "./community";
+} from "./community-management";
 export {
   VoiceNexus,
   type VoiceNexusState,
