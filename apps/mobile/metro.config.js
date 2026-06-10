@@ -71,15 +71,6 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
   }
 
-  if (moduleName.startsWith("@client/app/")) {
-    const absolutePath = path.join(
-      sharedSrcRoot,
-      "app",
-      moduleName.slice("@client/app/".length),
-    );
-    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
-  }
-
   if (moduleName.startsWith("@/")) {
     const absolutePath = path.join(mobileSrcRoot, moduleName.slice("@/".length));
     return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);

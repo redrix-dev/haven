@@ -96,7 +96,7 @@ const playSoundEvent = async ({
   // Structural types avoid any reference to lib.dom.d.ts names.
   type BrowserLike = {
     document?: { hasFocus: () => boolean };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     AudioContext?: new () => any;
   };
   const browser = globalThis as typeof globalThis & BrowserLike;

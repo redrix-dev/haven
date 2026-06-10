@@ -16,7 +16,7 @@ export function MobileDevToolsOverlay() {
   const showBootLog = () => {
     const report = bootLogger.getReport();
     // Print to Metro/console for full detail, show summary in Alert.
-    // eslint-disable-next-line no-console
+     
     console.log("\n" + report);
     const events = bootLogger.getEvents();
     const total = events[events.length - 1]?.elapsed ?? 0;

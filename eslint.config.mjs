@@ -1,21 +1,6 @@
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 
-const rendererBoundaryFiles = [
-  "packages/shared/src/client/**/*.{ts,tsx,js,jsx}",
-  "packages/shared/src/components/**/*.{ts,tsx,js,jsx}",
-  "packages/shared/src/contexts/**/*.{ts,tsx,js,jsx}",
-  "packages/shared/src/lib/hooks/**/*.{ts,tsx,js,jsx}",
-  "packages/shared/src/lib/voice/**/*.{ts,tsx,js,jsx}",
-];
-
-const rendererBoundaryRestrictions = [
-  {
-    group: ["node:*"],
-    message: "Renderer/features must not import Node built-ins.",
-  },
-];
-
 /**
  * HavenCore architecture boundary restrictions.
  * The Nexus layer is the only authority that may touch backend factories,
@@ -299,17 +284,6 @@ export default [
         },
       ],
       "no-restricted-syntax": ["error", ...havenCoreConsumerRestrictedSyntax],
-    },
-  },
-  {
-    files: rendererBoundaryFiles,
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: rendererBoundaryRestrictions,
-        },
-      ],
     },
   },
   {

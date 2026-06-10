@@ -24,9 +24,6 @@
       "@mobile-data/*": [
         "../../apps/mobile/src/data/*"
       ],
-      "@client/app/*": [
-        "../../packages/shared/src/app/*"
-      ],
       "@platform/*": [
         "../../packages/shared/src/platform/*"
       ],

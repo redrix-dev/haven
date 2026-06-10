@@ -48,7 +48,6 @@ export default defineConfig({
       { find: /^zustand$/, replacement: path.resolve(__dirname, 'apps/mobile/node_modules/zustand') },
       { find: '@solid-client', replacement: path.resolve(__dirname, 'packages/solid-client/src') },
       { find: '@shared', replacement: path.resolve(__dirname, 'packages/shared/src') },
-      { find: '@client', replacement: path.resolve(__dirname, 'packages/shared/src/client') },
       {
         find: '@platform/assets/runtimeAudio',
         replacement: path.resolve(__dirname, 'packages/shared/src/platform/assets/runtimeAudio'),

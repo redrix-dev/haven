@@ -18,7 +18,7 @@ function Textarea({
         props.editable === false && 'opacity-50',
         className
       )}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       {...({ placeholderClassName: cn('text-muted-foreground', placeholderClassName) } as any)}
       multiline={multiline}
       numberOfLines={numberOfLines}

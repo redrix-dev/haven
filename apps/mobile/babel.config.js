@@ -19,10 +19,6 @@ module.exports = function (api) {
               __dirname,
               "../../packages/shared/src/platform",
             ),
-            "@client/app": path.resolve(
-              __dirname,
-              "../../packages/shared/src/app",
-            ),
             "@": path.resolve(__dirname, "./src"),
           },
         },

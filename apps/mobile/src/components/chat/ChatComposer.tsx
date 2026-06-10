@@ -100,7 +100,7 @@ export function ChatComposer({
             />
             <EnrichedMarkdownTextInput
               ref={inputRef}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+               
               {...({ nativeID: CHAT_COMPOSER_NATIVE_ID } as any)}
               multiline
               editable={!isSending}
