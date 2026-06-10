@@ -1,6 +1,7 @@
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import reactHooks from "eslint-plugin-react-hooks";
+import boundaries from "eslint-plugin-boundaries";
 
 /**
  * HavenCore architecture boundary restrictions.
@@ -320,6 +321,143 @@ export default [
         },
       ],
       "no-restricted-syntax": ["error", ...havenCoreConsumerRestrictedSyntax],
+    },
+  },
+  {
+    // ── Solid client shape boundaries ──────────────────────────────────────
+    // The committed folder shape of packages/solid-client and the one-way
+    // dependency flow between its layers. Full reasoning + the shape itself:
+    // docs/architecture/SOLID_CLIENT_SHAPE.md. If a rule here blocks you, the
+    // answer is almost always "move the shared thing DOWN a layer", not "allow
+    // the import".
+    files: ["packages/solid-client/src/**/*.{ts,tsx}"],
+    plugins: { boundaries },
+    settings: {
+      "import/resolver": {
+        typescript: {
+          project: "packages/solid-client/tsconfig.json",
+        },
+      },
+      "boundaries/elements": [
+        // Order matters: first match wins, so deeper/more-specific first.
+        {
+          type: "feature",
+          pattern: "packages/solid-client/src/features/*",
+          mode: "folder",
+          capture: ["featureName"],
+        },
+        {
+          type: "routes",
+          pattern: "packages/solid-client/src/routes",
+          mode: "folder",
+        },
+        {
+          type: "ui",
+          pattern: "packages/solid-client/src/components/ui",
+          mode: "folder",
+        },
+        {
+          type: "contexts",
+          pattern: "packages/solid-client/src/contexts",
+          mode: "folder",
+        },
+        {
+          type: "auth",
+          pattern: "packages/solid-client/src/auth",
+          mode: "folder",
+        },
+        {
+          type: "core",
+          pattern: "packages/solid-client/src/core",
+          mode: "folder",
+        },
+        {
+          type: "data",
+          pattern: "packages/solid-client/src/data",
+          mode: "folder",
+        },
+        {
+          type: "app",
+          pattern: "packages/solid-client/src/*.{ts,tsx}",
+          mode: "file",
+        },
+      ],
+    },
+    rules: {
+      "boundaries/dependencies": [
+        "error",
+        {
+          // Anything not explicitly allowed is a violation.
+          default: "disallow",
+          message:
+            "${file.type} may not import this from ${dependency.type}. Dependencies flow one way (app → routes → features → data/ui/contexts/auth/core), and features are entered only through their index barrel. See docs/architecture/SOLID_CLIENT_SHAPE.md.",
+          rules: [
+            // App.tsx mounts providers + routes + chrome. It does not reach
+            // into features or data — that's how it stays small forever.
+            // (app → app covers root files importing each other, e.g. bridge.ts.)
+            {
+              from: { type: "app" },
+              allow: {
+                to: { type: ["app", "routes", "contexts", "core", "ui"] },
+              },
+            },
+            // routes/ is the registration point: maps addresses to feature
+            // views. The only layer above features — and it may only enter a
+            // feature through its index barrel (the feature's public surface).
+            {
+              from: { type: "routes" },
+              allow: { to: { type: ["contexts", "core", "ui"] } },
+            },
+            {
+              from: { type: "routes" },
+              allow: {
+                to: { type: "feature", internalPath: "index.{ts,tsx}" },
+              },
+            },
+            // Features import shared infrastructure, never each other.
+            // (Same-feature imports are internal and always fine.) If two
+            // features need the same thing, it moves down a layer.
+            {
+              from: { type: "feature" },
+              allow: {
+                to: { type: ["data", "ui", "contexts", "auth", "core"] },
+              },
+            },
+            {
+              from: { type: "contexts" },
+              allow: { to: { type: ["core", "auth", "data"] } },
+            },
+            { from: { type: "auth" }, allow: { to: { type: "core" } } },
+            { from: { type: "core" }, allow: { to: { type: "data" } } },
+            // data and ui appear in no `from` rule on purpose: they are the
+            // bottom — they import @shared and solid-js, never upward.
+          ],
+        },
+      ],
+      // Shell-agnosticism and framework purity, enforced. solid-client must
+      // run identically under Tauri and a plain browser tab.
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@tauri-apps/*"],
+              message:
+                "solid-client is shell-agnostic: it must run under Tauri AND a plain browser. Shell capabilities are injected at bootstrap (see bridge.ts / apps/tauri).",
+            },
+            {
+              group: ["react", "react-dom", "react-native", "react-*"],
+              message:
+                "solid-client is a Solid app. React belongs to mobile only.",
+            },
+            {
+              group: ["@mobile-data/*"],
+              message:
+                "Reactive caches are never shared across frameworks. Solid reads its own data layer (@solid-client/data).",
+            },
+          ],
+        },
+      ],
     },
   },
   {

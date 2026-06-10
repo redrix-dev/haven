@@ -16,6 +16,7 @@ packages/
   shared/          PURE logic, types, backend clients. Zero framework, zero
                    reactivity. Consumed by every platform.
   solid-client/    Solid UI + Solid-native caches for desktop/web (in progress).
+                   Folder shape + dependency law: architecture/SOLID_CLIENT_SHAPE.md.
 supabase/          Migrations, RLS policies, Edge Functions, SQL test suites.
 tooling/           Scripts (checks, test harness, mobile ops) + test-support.
 docs/              You are here.
@@ -84,15 +85,16 @@ exception). Coverage matrix and open holes:
 
 ## Guardrails (decisions, encoded)
 
-| Guard                                                                     | Enforces                                                                                                             | Why                                                                       |
-| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `check:shared-portable`                                                   | No react/solid/react-zustand, no browser globals in portable paths, no `use*` exports under `core/`                  | The three-layer law, mechanically                                         |
-| `check:shared-hex`                                                        | No hex color literals in shared outside `themes/`                                                                    | Colors flow through the theme system                                      |
-| `mobile:ownership`                                                        | Root must not own react/expo deps; mobile must not own solid/tauri/vite                                              | Dependency ownership mirrors the layer split                              |
-| `check:themes`                                                            | Theme bridge outputs match their source                                                                              | Mobile themes are generated from shared tokens; drift = visual divergence |
-| `check:chat-surface` / `check:mobile-uniwind` / `check:mobile-typography` | Mobile UI conventions                                                                                                | Theme/typography consistency on the live app                              |
-| eslint boundary rules                                                     | UI/features can't import backend factories, construct Supabase clients, touch persistence, or open realtime directly | The HavenCore → cache → UI consumer contract                              |
-| `mobile:bundle`                                                           | Headless Metro export resolves the whole mobile module graph                                                         | Catches broken imports/aliases in CI without a simulator                  |
+| Guard                                                                     | Enforces                                                                                                                 | Why                                                                                                         |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `check:shared-portable`                                                   | No react/solid/react-zustand, no browser globals in portable paths, no `use*` exports under `core/`                      | The three-layer law, mechanically                                                                           |
+| `check:shared-hex`                                                        | No hex color literals in shared outside `themes/`                                                                        | Colors flow through the theme system                                                                        |
+| `mobile:ownership`                                                        | Root must not own react/expo deps; mobile must not own solid/tauri/vite                                                  | Dependency ownership mirrors the layer split                                                                |
+| `check:themes`                                                            | Theme bridge outputs match their source                                                                                  | Mobile themes are generated from shared tokens; drift = visual divergence                                   |
+| `check:chat-surface` / `check:mobile-uniwind` / `check:mobile-typography` | Mobile UI conventions                                                                                                    | Theme/typography consistency on the live app                                                                |
+| eslint boundary rules                                                     | UI/features can't import backend factories, construct Supabase clients, touch persistence, or open realtime directly     | The HavenCore → cache → UI consumer contract                                                                |
+| solid-client shape boundaries (`boundaries/dependencies`)                 | One-way layer flow inside `packages/solid-client`; features isolated + barrel-only entry; no `@tauri-apps`/react imports | The committed desktop/web shape: [architecture/SOLID_CLIENT_SHAPE.md](./architecture/SOLID_CLIENT_SHAPE.md) |
+| `mobile:bundle`                                                           | Headless Metro export resolves the whole mobile module graph                                                             | Catches broken imports/aliases in CI without a simulator                                                    |
 
 ## Gates
 

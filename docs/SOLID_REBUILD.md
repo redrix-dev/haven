@@ -76,16 +76,29 @@ Order of work (each step gated by `test:cleave` + `typecheck:solid` / `build:sol
    - `styles.css` (placeholder spike CSS) stays until step 2 replaces it with theme
      utilities; a temporary `ThemeProbe` in `App.tsx` verifies both layers and gets
      deleted once confirmed.
-2. **"Dumb UI behind login" playground.** A minimal authenticated screen reached
+2. **Application shape committed + enforced — ✅ done (2026-06-10).** The folder
+   shape, dependency law, and window model for the UI build are decided and
+   documented in
+   [architecture/SOLID_CLIENT_SHAPE.md](./architecture/SOLID_CLIENT_SHAPE.md)
+   (the Electron god-renderer postmortem lives there too). Enforcement is live
+   before the first screen exists: the "Solid client shape boundaries" section of
+   `eslint.config.mjs` (`eslint-plugin-boundaries`) fails lint on cross-feature
+   imports, upward imports, non-barrel feature entry, and any
+   `@tauri-apps`/react import inside `solid-client`. `features/`, `routes/`, and
+   `components/ui/` are scaffolded with READMEs stating their contracts.
+3. **"Dumb UI behind login" playground.** A minimal authenticated screen reached
    through the real `solidAuthService` → `SessionProvider` → `bootstrapSession`
    path. Low domain complexity on purpose: it proves the theme setup renders, and
    exercises the session/accessor read path before tackling a data-heavy screen.
-3. **Real screens as vertical slices.** One screen at a time, consuming caches
-   **through accessors only**; add a domain's `accessors.ts` when its first screen
-   needs it. The community channel chat view is the meatiest slice — it exercises
-   the `messages` cache + realtime end to end; do it once the playground proves the
+   Even pre-router, the screen registers through `routes/` — `App.tsx` never
+   imports screens directly.
+4. **Real screens as vertical slices.** One screen at a time as a
+   `features/<domain>/` slice (shape doc governs), consuming caches **through
+   accessors only**; add a domain's `accessors.ts` when its first screen needs
+   it. The community channel chat view is the meatiest slice — it exercises the
+   `messages` cache + realtime end to end; do it once the playground proves the
    plumbing.
-4. **Shell capabilities.** Map the `AppHost` bridge surface
+5. **Shell capabilities.** Map the `AppHost` bridge surface
    (`packages/shared/src/infrastructure/platform/appHost.ts`) onto Tauri
    `invoke()` commands as features need them: window chrome, updater, deep links
    (`haven://`), notifications, file save.
