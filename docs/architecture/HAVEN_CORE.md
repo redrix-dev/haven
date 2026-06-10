@@ -7,9 +7,10 @@ Supabase subscriptions.
 
 > **Post-cleave (2026-06):** orchestration and all reactive caches live in
 > `apps/mobile/src/data/`. `packages/shared` is pure logic, types, and backend clients.
-> Web/electron React hosts are quarantined until rebuilt on Solid (`HavenSolidCore` — not
-> started). The patterns below describe the **mobile contract**; shared routing logic is
-> framework-free via `RealtimeMutationTarget`.
+> The legacy web/Electron React clients are **deleted**; desktop/web are being rebuilt on
+> Solid with `HavenSolidCore` mirroring this contract (see
+> [`docs/SOLID_REBUILD.md`](../SOLID_REBUILD.md)). The patterns below describe the
+> **mobile contract**; shared routing logic is framework-free via `RealtimeMutationTarget`.
 
 ## Onboarding rules
 
@@ -25,7 +26,7 @@ or evict** — not a hook fan-out that refreshes three domains after every click
 
 **Hooks observe React lifecycle.** Selector-hooks in `@mobile-data/hooks` bind React to cache
 stores. A feature hook belongs when it exposes a *small* interface tied to
-mount/focus/auth/platform (Electron settings, deep links, WebRTC). If a cache already owns the
+mount/focus/auth/platform (push registration, deep links, WebRTC). If a cache already owns the
 state and actions, migrate callers to `core.*` and delete the hook. Do not add reusable hook
 files that only aggregate selectors or re-fetch what realtime should already deliver.
 
@@ -167,7 +168,7 @@ Event types currently handled by `routeRealtimeEvent`:
 - `SOCIAL_CHANGE` — `SocialNexus.handleSocialChange` + `syncViewerMessagePolicy`
 - `member_banned` / `report_status_updated` — community access handlers (shell callbacks)
 
-See [HAVEN_CORE_REALTIME_AUDIT.md](./HAVEN_CORE_REALTIME_AUDIT.md) for coverage holes.
+See [REALTIME.md](./REALTIME.md) for the coverage matrix and open holes.
 
 ## Persistence
 
@@ -178,7 +179,7 @@ injects the adapter at `createReactHavenCore({ ..., persistence })` time.
 |------|---------|
 | Mobile (React Native) | `createMmkvPersistence()` |
 | Tests | `createMemoryPersistence()` |
-| Web / Electron (future Solid) | TBD — not wired post-cleave |
+| Desktop / web (Solid) | TBD — chosen during the Solid app build |
 
 No cache module imports `react-native-mmkv` directly.
 
@@ -205,6 +206,29 @@ Splash UI subscribes via `core.useBootstrapPhase()` (or reads `getBootstrapPhase
 8. **Load** → Cache `load*` / `ensureLoaded`; text-channel focus prep via `core.prepareTextChannelMessages`.
 9. **Hooks** → Lifecycle + platform only, or thin selector-hooks in `@mobile-data/hooks`.
 10. **Platform** → AppHost for OS + imperative shell nav; NexusPersistence for disk.
+
+## Host boundaries (platform injection)
+
+Platform injection provides **host capabilities**, never domain behavior. Three clean seams:
+`AppHost` (OS/shell), `NexusPersistence` (disk), HavenReactCore + caches (domain). The target
+is not "no injection" — it is "no domain behavior hidden inside platform bridges."
+
+1. **Host entrypoints compose the world.** Only the app entrypoint (`App.tsx`) registers the
+   platform host, creates the Supabase client, chooses persistence, and calls
+   `createReactHavenCore(...)`. Screens and feature code never do.
+2. **AppHost is OS and shell only.** Allowed: external URLs, file save, settings bridges,
+   window chrome, imperative shell navigation for push taps / deep links / access-revoked
+   redirects. Not allowed: any domain entity, backend RPC wrapper, or cache.
+3. **Auth is a bounded exception.** `AuthContext` may touch Supabase because it creates the
+   session Core depends on (Supabase → `bootstrapSession` / `clearSession`). Boundary only —
+   not a pattern for domain screens.
+4. **`core.backends` is private-in-practice.** Core internals and cache construction may use
+   backends; UI/feature code adds a Core/cache command instead.
+
+Anti-patterns: controller hooks that only bundle selector-hooks into `state/derived/actions`;
+providers that forward cache state without adding lifecycle value; platform bridges carrying
+domain data; a UI component importing a backend factory because Core is missing a command —
+add the command.
 
 ## Enforcement
 
@@ -293,13 +317,11 @@ only construction entrypoint on mobile.
 
 ## Known follow-ups
 
-- **Solid desktop:** implement `HavenSolidCore` + native Solid caches; do not revive shared reactive layer.
-- **Web/electron React:** quarantined; rebuild on Solid rather than `@mobile-data` shims.
-- Close reaction/attachment/link-preview realtime holes (see realtime audit).
-- Shrink remaining mobile session contexts toward landing `useEffect`s where practical.
+Tracked in [`docs/BACKLOG.md`](../BACKLOG.md) (mobile data layer + realtime sections).
+The Solid counterpart (`HavenSolidCore`) is the active build — [`docs/SOLID_REBUILD.md`](../SOLID_REBUILD.md).
 
 ## See also
 
-- [HavenReactCore hook audit](./HAVEN_CORE_HOOKS_AUDIT.md)
-- [Platform injection cutover](./PLATFORM_INJECTION_CUTOVER_RULESET.md)
-- [Solid migration handoff](../solid-migration-handoff.md)
+- [REALTIME.md](./REALTIME.md) — event contract + coverage matrix
+- [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) — the three-layer law this contract implements
+- Historical audits (hooks, consumer refactor, platform injection): [`docs/_archive/`](../_archive/)

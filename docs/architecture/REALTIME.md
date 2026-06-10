@@ -1,7 +1,9 @@
-# HavenReactCore — Realtime event coverage audit
+# Realtime — event contract & coverage
 
 Maintained alongside [HAVEN_CORE.md](./HAVEN_CORE.md). One sentence per row: does the private
 user channel broadcast this event, and does `routeRealtimeEvent` route it into a cache?
+The Solid core (`HavenSolidCore`) implements the same `RealtimeMutationTarget` contract
+against this same matrix.
 
 > **Post-cleave:** routing logic lives in `packages/shared/src/core/routeRealtimeEvent.ts` and
 > operates on `RealtimeMutationTarget` (implemented by `HavenReactCore` on mobile). Message

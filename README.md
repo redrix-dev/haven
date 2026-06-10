@@ -78,6 +78,8 @@ Domain state lives in framework-free stores (`zustand/vanilla`) inside `packages
 
 The iOS OTA pipeline is a custom implementation of the Expo Updates protocol. A local toolchain handles asset fingerprinting, bundle generation, and manifest construction. The manifest is served by a Supabase Edge Function and the client fetches and applies updates at launch without going through EAS. This gives full control over the update cadence and keeps update infrastructure consolidated with the rest of the backend.
 
+Full documentation — engineering principles, architecture, the active rebuild plan, and the backlog — starts at [docs/README.md](docs/README.md).
+
 ---
 
 ## Verifying the security model

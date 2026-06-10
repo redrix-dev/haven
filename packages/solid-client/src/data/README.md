@@ -1,7 +1,7 @@
 # `data/` — Solid-native cache layer
 
 This is the **per-platform cache** for the Solid (Tauri desktop + web) app. It is
-one of the three layers from the cleave (see `docs/solid-migration-handoff.md`):
+one of the three layers of the architecture (see `docs/ARCHITECTURE.md`):
 
 ```
 packages/shared (pure logic) → THIS (Solid cache) → solid-client UI
