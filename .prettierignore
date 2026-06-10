@@ -8,6 +8,9 @@ apps/mobile/.expo/
 apps/mobile/ios/
 apps/mobile/android/
 apps/tauri/src-tauri/target/
+# Tauri-generated schemas (gitignored via a nested .gitignore that Prettier
+# doesn't read; list here so format:check skips them too).
+apps/tauri/src-tauri/gen/
 
 # Lockfiles
 package-lock.json

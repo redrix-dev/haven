@@ -1,11 +1,12 @@
 import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
+import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 // Dedicated Vite config for the Tauri/Solid spike. Kept separate from the
 // React `vite.config.ts` at the repo root so the two stacks never interfere.
 export default defineConfig({
-  plugins: [solid()],
+  plugins: [solid(), tailwindcss()],
   root: __dirname,
   publicDir: false,
   envDir: path.resolve(__dirname, "../.."),

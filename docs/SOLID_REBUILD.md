@@ -55,17 +55,27 @@ theme.
 
 Order of work (each step gated by `test:cleave` + `typecheck:solid` / `build:solid`):
 
-1. **Theme + Tailwind foundation (do first — it unblocks all real UI).** The theme
-   codegen already emits everything needed: `generate-theme-bridge` writes
+1. **Theme + Tailwind foundation — ✅ done (2026-06-10).** Theme parity comes free
+   from the existing codegen: `generate-theme-bridge` writes
    `packages/shared/src/styles/globals.css` (302 tokens, Tailwind v4
-   `@import "tailwindcss"` + `@theme inline` mapping + dark variant) from the same
-   shared `themes/` source that drives mobile. The Solid app just isn't consuming
-   it. Wire it up: add Tailwind v4 to the Tauri/Solid build (the
-   `@tailwindcss/vite` plugin in `apps/tauri/vite.config.ts` is the modern path),
-   replace the placeholder `styles.css` import with the generated `globals.css`,
-   and verify utilities resolve against the theme vars. Result: **theme parity for
-   free**, maintained by the existing bridge — no new codegen target. Keep these
-   deps Solid-scoped, not at root (mirrors the react-is-mobile-owned split).
+   `@import "tailwindcss"` + `@theme inline` + dark variant) from the same shared
+   `themes/` source that drives mobile — no new codegen target. How it's wired (and
+   the gotchas worth knowing for the web shell later):
+   - Tailwind deps (`tailwindcss`, `@tailwindcss/vite`, `tw-animate-css`) live at
+     **root** — the Solid app runs on root `node_modules` (there is no
+     Solid-scoped install). No collision with mobile, which uses UniWind, not
+     `tailwindcss`.
+   - `@tailwindcss/vite` plugin added to `apps/tauri/vite.config.ts`.
+   - The app imports an **app-owned** `packages/solid-client/src/theme.css` that
+     `@import`s the generated globals.css and adds `@source` lines — **not** the
+     globals.css directly. Tailwind v4 roots its class-scan near the CSS file's
+     package (`packages/shared`) and the vite root (`apps/tauri`), so without
+     `@source` it sees zero UI source and generates **no utilities** (theme vars
+     load, but `bg-*`/`text-*` classes silently don't). Add a `@source` line if UI
+     classes ever live somewhere new.
+   - `styles.css` (placeholder spike CSS) stays until step 2 replaces it with theme
+     utilities; a temporary `ThemeProbe` in `App.tsx` verifies both layers and gets
+     deleted once confirmed.
 2. **"Dumb UI behind login" playground.** A minimal authenticated screen reached
    through the real `solidAuthService` → `SessionProvider` → `bootstrapSession`
    path. Low domain complexity on purpose: it proves the theme setup renders, and

@@ -1,0 +1,15 @@
+/*
+ * App-owned Tailwind entry for the Solid client.
+ *
+ * The theme itself (globals.css) is GENERATED and shared across apps — never edit
+ * it by hand. But Tailwind v4 roots its automatic class-scanning near that file's
+ * package (packages/shared), which misses the real UI source in this package and
+ * in apps/tauri. So the app declares its own content sources here, and imports
+ * THIS file instead of globals.css directly.
+ *
+ * Add a @source line if UI class names ever live somewhere new.
+ */
+@import "../../shared/src/styles/globals.css";
+
+@source "./";
+@source "../../../apps/tauri/src";
