@@ -8,7 +8,7 @@ import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
   type LiveProfilesRecord,
-} from "@shared/infrastructure/liveProfiles";
+} from "@shared/lib/liveProfiles";
 import {
   dayBucket,
   formatDateDividerLabel,

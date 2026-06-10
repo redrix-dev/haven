@@ -8,13 +8,6 @@ When an item ships, delete it here (the change records itself in git).
 
 ## Repo hygiene
 
-### Retire the re-export shims
-
-Several modules in `packages/shared` keep a second import path alive via one-line
-`export *` shims (marked with a `Re-export shim:` comment — grep for it). Pick the
-canonical path, codemod the handful of importers, delete the shims.
-_Trigger: any convenient moment; ~30 minutes._
-
 ### Workspace packages milestone
 
 The alias → workspace-package conversion. Decided, not scheduled — full sequencing

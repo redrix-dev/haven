@@ -4,7 +4,7 @@ import type {
   MessageLinkPreview,
   MessageReaction,
 } from "@shared/lib/backend/types";
-import { asRecord } from "@platform/lib/records";
+import { asRecord } from "@shared/infrastructure/platform/lib/records";
 
 export const BANNED_REPLY_PLACEHOLDER_CONTENT = "[content removed]";
 

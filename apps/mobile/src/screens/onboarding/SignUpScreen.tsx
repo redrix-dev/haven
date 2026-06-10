@@ -8,12 +8,12 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getErrorMessage } from "@shared/platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   HAVEN_PRIVACY_URL,
   HAVEN_TERMS_URL,
   openPlatformExternalUrl,
-} from "@shared/platform/urls";
+} from "@shared/infrastructure/platform/urls";
 import { useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";

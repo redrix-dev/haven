@@ -12,8 +12,8 @@ import { requireAuthStore } from "@mobile-data";
 import type { AuthStoreState } from "@shared/core/sessionStorePorts";
 import { bootLogger } from "@shared/debug/bootLogger";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
-import { getPlatformAuthConfirmRedirectUrl } from "@platform/urls";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getPlatformAuthConfirmRedirectUrl } from "@shared/infrastructure/platform/urls";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   buildSignUpMetadata,
   parseAuthConfirmParams,

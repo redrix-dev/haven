@@ -1,5 +1,5 @@
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
-import { getPlatformAuthConfirmRedirectUrl } from "@shared/platform/urls";
+import { getPlatformAuthConfirmRedirectUrl } from "@shared/infrastructure/platform/urls";
 import {
   buildSignUpMetadata,
   parseAuthConfirmParams,

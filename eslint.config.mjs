@@ -95,11 +95,6 @@ const havenCoreConsumerRestrictedImportPaths = [
       "UI/features must not import backend factories directly. Route reads/writes through useHavenCore()/requireHavenCore() and a domain Nexus/HavenCore command.",
   },
   {
-    name: "@shared/infrastructure/client/createHavenSupabaseClient",
-    message:
-      "Supabase client construction belongs to host bootstrap. UI/features consume the registered HavenCore instead.",
-  },
-  {
     name: "@shared/lib/createHavenSupabaseClient",
     message:
       "Supabase client construction belongs to host bootstrap. UI/features consume the registered HavenCore instead.",
@@ -226,13 +221,13 @@ export default [
           object: "window",
           property: "desktop",
           message:
-            "Use getAppHost() from @shared/platform/appHost in app code; the legacy window.desktop Electron bridge is gone.",
+            "Use getAppHost() from @shared/infrastructure/platform/appHost in app code; the legacy window.desktop Electron bridge is gone.",
         },
         {
           object: "window",
           property: "havenDesktop",
           message:
-            "Use getAppHost() from @shared/platform/appHost instead of legacy window.havenDesktop access.",
+            "Use getAppHost() from @shared/infrastructure/platform/appHost instead of legacy window.havenDesktop access.",
         },
       ],
     },
@@ -248,7 +243,7 @@ export default [
             {
               name: "@platform/desktop/client",
               message:
-                "Import getAppHost from @shared/platform/appHost instead. Each shell registers its own bridge at bootstrap.",
+                "Import getAppHost from @shared/infrastructure/platform/appHost instead. Each shell registers its own bridge at bootstrap.",
             },
           ],
           patterns: [...havenCoreNexusBoundary, ...havenCoreDeprecatedImports],
@@ -267,7 +262,7 @@ export default [
             {
               name: "@platform/desktop/client",
               message:
-                "Import getAppHost from @shared/platform/appHost instead. Each shell registers its own bridge at bootstrap.",
+                "Import getAppHost from @shared/infrastructure/platform/appHost instead. Each shell registers its own bridge at bootstrap.",
             },
             ...havenCoreConsumerRestrictedImportPaths,
           ],
@@ -295,7 +290,7 @@ export default [
         {
           name: "window",
           message:
-            "Mobile code should use platform-safe abstractions from @shared/platform/appHost.",
+            "Mobile code should use platform-safe abstractions from @shared/infrastructure/platform/appHost.",
         },
         {
           name: "document",

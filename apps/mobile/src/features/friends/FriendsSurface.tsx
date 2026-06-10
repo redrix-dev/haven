@@ -18,7 +18,7 @@ import type {
   FriendSearchResult,
   FriendSummary,
 } from "@shared/lib/backend/types";
-import { resolveLiveUsername } from "@shared/infrastructure/liveProfiles";
+import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useHavenCore } from "@mobile-data";
 import {
   useBlockedUsers,

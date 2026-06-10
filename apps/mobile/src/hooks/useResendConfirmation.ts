@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getErrorMessage } from "@shared/platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resendConfirmation } from "@/auth/mobileAuthService";
 
 const COOLDOWN_SECONDS = 120;

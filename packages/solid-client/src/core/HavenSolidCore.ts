@@ -1,4 +1,4 @@
-import type { HavenSupabaseClient } from "@shared/infrastructure/client/createHavenSupabaseClient";
+import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 import {
   createHavenBackends,
   type HavenBackends,

@@ -25,7 +25,7 @@ import type {
   CommunityAdminNexusState,
   CommunityAdminServerPanelState,
 } from "@shared/nexus/community/communityAdminTypes";
-import { getErrorMessage } from "@platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import type { StoreApi, UseBoundStore } from "zustand";
 
 export type {

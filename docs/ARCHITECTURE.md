@@ -48,8 +48,8 @@ One sentence: _we share the smarts and let each platform keep its own dumb memor
 
 ## Where things live in `packages/shared`
 
-Canonical homes (one implementation per module; anything else is a marked
-re-export shim):
+Canonical homes — one implementation per module, no duplicate trees and no
+re-export shims:
 
 | Concern                                                            | Home                                         |
 | ------------------------------------------------------------------ | -------------------------------------------- |

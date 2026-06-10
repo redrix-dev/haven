@@ -1,7 +1,7 @@
 import type { RootStackParamList } from "@/navigation/types";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getErrorMessage } from "@shared/platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { useState } from "react";
 import { View, Text, Pressable, TextInput, ScrollView } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
