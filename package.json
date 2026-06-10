@@ -58,7 +58,9 @@
     "mobile:bundle": "node tooling/scripts/mobile/run-in-mobile.mjs npm run bundle:check",
     "mobile:release:check": "npm run check:themes && npm run check:chat-surface && npm run check:mobile-uniwind && npm run check:mobile-typography && npm run mobile:preflight && npm run mobile:typecheck",
     "setup:mobile": "node tooling/scripts/mobile/run-in-mobile.mjs npm ci",
-    "reset:mobile": "node tooling/scripts/mobile/reset.mjs"
+    "reset:mobile": "node tooling/scripts/mobile/reset.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "keywords": [],
   "author": {

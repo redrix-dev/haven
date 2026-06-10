@@ -1,0 +1,26 @@
+# Dependencies & build output
+node_modules/
+dist/
+**/dist/
+out/
+.webpack/
+apps/mobile/.expo/
+apps/mobile/ios/
+apps/mobile/android/
+apps/tauri/src-tauri/target/
+
+# Lockfiles
+package-lock.json
+**/package-lock.json
+
+# Generated — owned by their generators. Prettier must NOT touch these or it
+# will fight the generator and break check:themes / supabase:types.
+apps/mobile/uniwind-types.d.ts
+apps/mobile/uniwind-themes.generated.cjs
+apps/mobile/src/lib/reusables-theme.generated.ts
+apps/mobile/global.css
+packages/shared/src/styles/globals.css
+packages/shared/src/types/database.ts
+
+# Standalone artifact
+docs/architecture/nexus-framework.html
