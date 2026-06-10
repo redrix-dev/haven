@@ -8,13 +8,14 @@ completed phases get one line and a pointer to the archive.
 
 ## Where we are
 
-| Phase                                                    | Outcome                                                                                                                            | Record                                                                        |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Spike (shell + Solid composition)                        | ✅ proven                                                                                                                          | [\_archive/tauri-solid-rebuild.md](./_archive/tauri-solid-rebuild.md)         |
-| Gate 1 — go/no-go on the stack                           | ✅ **GO** (2026-06-07). Both killswitches cleared: two-way LiveKit voice in WKWebView; Solid reactively driving real shared stores | [\_archive/tauri-solid-roadmap.md](./_archive/tauri-solid-roadmap.md)         |
-| THE CLEAVE — split shared logic from per-platform caches | ✅ complete (2026-06-08). Shared is pure; mobile owns `HavenReactCore`                                                             | [\_archive/solid-migration-handoff.md](./_archive/solid-migration-handoff.md) |
-| Legacy client removal                                    | ✅ complete (2026-06-09). Electron/React-web deleted; root deps 36→6; scripts and guards repaired                                  | git history (`rewrite/desktop-web-rebuild`)                                   |
-| **Solid app build**                                      | **← current phase**                                                                                                                | this file                                                                     |
+| Phase                                                    | Outcome                                                                                                                                                                         | Record                                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Spike (shell + Solid composition)                        | ✅ proven                                                                                                                                                                       | [\_archive/tauri-solid-rebuild.md](./_archive/tauri-solid-rebuild.md)         |
+| Gate 1 — go/no-go on the stack                           | ✅ **GO** (2026-06-07). Both killswitches cleared: two-way LiveKit voice in WKWebView; Solid reactively driving real shared stores                                              | [\_archive/tauri-solid-roadmap.md](./_archive/tauri-solid-roadmap.md)         |
+| THE CLEAVE — split shared logic from per-platform caches | ✅ complete (2026-06-08). Shared is pure; mobile owns `HavenReactCore`                                                                                                          | [\_archive/solid-migration-handoff.md](./_archive/solid-migration-handoff.md) |
+| Legacy client removal                                    | ✅ complete (2026-06-09). Electron/React-web deleted; root deps 36→6; scripts and guards repaired                                                                               | git history (`rewrite/desktop-web-rebuild`)                                   |
+| Solid data layer + `HavenSolidCore`                      | ✅ substantially built. Per-domain `*SolidCache.ts` wired to real backends; `HavenSolidCore` (385 LOC) implements `RealtimeMutationTarget`. A few caches still thin (see below) | git history (`5898820` wired real backends)                                   |
+| **Solid UI + theme foundation**                          | **← current phase**                                                                                                                                                             | this file                                                                     |
 
 **Why Solid, in one paragraph:** the Nexus cache pattern was lifted from the
 stoat/Revolt SDK, which runs it on Solid's fine-grained reactivity — that's why the
@@ -24,25 +25,59 @@ all of that machinery had to be hand-built to compensate. Moving desktop/web to
 Solid returns the pattern to the substrate it was born for; the cleave removed the
 sharing. (Full reasoning: archive, roadmap Phase 2.)
 
-## Current phase — Solid app build
+## What's actually built (audited 2026-06-10)
 
-Order of work (each step gated by `test:cleave` staying green plus
-`typecheck:solid` / `build:solid`):
+The data and core layers are **done and wired to real backends** — the earlier
+"flesh out stubs" framing of this doc was stale. Concretely:
 
-1. **Real Solid cache I/O.** Flesh out `packages/solid-client/src/data/` from stubs
-   to real backends. Per-domain folder shape is documented in
-   [`packages/solid-client/src/data/README.md`](../packages/solid-client/src/data/README.md):
-   `<domain>SolidCache.ts` + `accessors.ts` + `index.ts`. Caches call shared logic;
-   they never duplicate it.
-2. **`HavenSolidCore`** — the Solid counterpart to mobile's `HavenReactCore`:
-   session bootstrap, `routeEvent` (implements `RealtimeMutationTarget`),
-   cross-cache commands, focus. Mirror the contract in
-   [architecture/HAVEN_CORE.md](./architecture/HAVEN_CORE.md); do not revive any
-   shared reactive layer.
-3. **Tauri/Solid UI** on top — screens consume caches through accessors only.
-4. **Shell capabilities** — map the `AppHost` bridge surface
-   (`packages/shared/src/infrastructure/platform/appHost.ts`) onto Tauri `invoke()`
-   commands as features need them: window chrome, updater, deep links
+- **`HavenSolidCore`** (`core/HavenSolidCore.ts`, ~385 LOC) implements
+  `RealtimeMutationTarget`, with real `bootstrapSession` and cross-cache routing.
+  Supporting core: `bootstrapPhase`, `havenSolidRegistry`/`havenSolidRef`,
+  `SessionProvider`, `solidAuthService`. No stubs.
+- **Per-domain caches** under `data/<domain>/` following the documented
+  `*SolidCache.ts` (+ `accessors.ts` + `index.ts`) shape. Substantial and real:
+  channels, communities, direct-messages, notifications, permissions, social,
+  profile, messages. **Still thin / audit before relying:** `feature-flags`,
+  `onboarding`, `voice`, `community-management`.
+- **Accessors (the UI read layer)** exist for **channels, communities,
+  direct-messages, notifications** only. The rest are added per the
+  [`data/README.md`](../packages/solid-client/src/data/README.md) rule — _an
+  accessor is written when a screen first needs to read that domain_, so a missing
+  one is by-design, not debt.
+- **Session stores** (auth, ui, userStatus, viewerMessagePolicy) built.
+
+The frontier is everything **above** the cache: there is no real UI yet
+(`App.tsx` + `DevLogin.tsx` only), and **the theme/styling layer is unwired** —
+`solid-client/src/styles.css` is hand-written placeholder colors, not the shared
+theme.
+
+## Current phase — UI + theme foundation
+
+Order of work (each step gated by `test:cleave` + `typecheck:solid` / `build:solid`):
+
+1. **Theme + Tailwind foundation (do first — it unblocks all real UI).** The theme
+   codegen already emits everything needed: `generate-theme-bridge` writes
+   `packages/shared/src/styles/globals.css` (302 tokens, Tailwind v4
+   `@import "tailwindcss"` + `@theme inline` mapping + dark variant) from the same
+   shared `themes/` source that drives mobile. The Solid app just isn't consuming
+   it. Wire it up: add Tailwind v4 to the Tauri/Solid build (the
+   `@tailwindcss/vite` plugin in `apps/tauri/vite.config.ts` is the modern path),
+   replace the placeholder `styles.css` import with the generated `globals.css`,
+   and verify utilities resolve against the theme vars. Result: **theme parity for
+   free**, maintained by the existing bridge — no new codegen target. Keep these
+   deps Solid-scoped, not at root (mirrors the react-is-mobile-owned split).
+2. **"Dumb UI behind login" playground.** A minimal authenticated screen reached
+   through the real `solidAuthService` → `SessionProvider` → `bootstrapSession`
+   path. Low domain complexity on purpose: it proves the theme setup renders, and
+   exercises the session/accessor read path before tackling a data-heavy screen.
+3. **Real screens as vertical slices.** One screen at a time, consuming caches
+   **through accessors only**; add a domain's `accessors.ts` when its first screen
+   needs it. The community channel chat view is the meatiest slice — it exercises
+   the `messages` cache + realtime end to end; do it once the playground proves the
+   plumbing.
+4. **Shell capabilities.** Map the `AppHost` bridge surface
+   (`packages/shared/src/infrastructure/platform/appHost.ts`) onto Tauri
+   `invoke()` commands as features need them: window chrome, updater, deep links
    (`haven://`), notifications, file save.
 
 **Solid-ism to design around:** Solid tracks reactivity at access time — any
