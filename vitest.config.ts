@@ -20,36 +20,38 @@ const conditionalReporters = markdownOutputFile
 
 export default defineConfig({
   resolve: {
-    dedupe: ["react", "react-dom"],
     // Array form so we can match `solid-js` exactly (regex) without also
     // catching `solid-js/store` etc. Order matters: most-specific first.
     alias: [
       // Vitest runs in a node env, where solid-js's `node` export condition
       // resolves to the non-reactive SSR build (dist/server.js). Force the
-      // reactive development build so `@solid-bindings` signals/memos actually
-      // update under test. Scoped to the bare specifier — React tests never
-      // import solid-js, so this has zero blast radius on the rest of the suite.
+      // reactive development build so signals/memos actually update under test.
       {
         find: /^solid-js$/,
         replacement: path.resolve(__dirname, 'node_modules/solid-js/dist/dev.js'),
       },
-      { find: '@electron', replacement: path.resolve(__dirname, 'apps/electron/src') },
-      { find: '@web', replacement: path.resolve(__dirname, 'apps/web/src') },
-      { find: '@web-client', replacement: path.resolve(__dirname, 'packages/web-client/src') },
       { find: '@mobile-data', replacement: path.resolve(__dirname, 'apps/mobile/src/data') },
       { find: /^@mobile-data\/(.*)/, replacement: path.resolve(__dirname, 'apps/mobile/src/data/$1') },
-      { find: 'react', replacement: path.resolve(__dirname, 'node_modules/react') },
-      { find: 'react-dom', replacement: path.resolve(__dirname, 'node_modules/react-dom') },
-      { find: 'zustand/traditional', replacement: path.resolve(__dirname, 'node_modules/zustand/traditional') },
-      { find: 'zustand', replacement: path.resolve(__dirname, 'node_modules/zustand') },
-      { find: 'use-sync-external-store/shim/with-selector', replacement: path.resolve(__dirname, 'node_modules/use-sync-external-store/shim/with-selector') },
+      // React is mobile-owned after the cleave: the root has no react install,
+      // so mobile data tests (and zustand's react entry) resolve it from
+      // apps/mobile/node_modules. Requires `npm run setup:mobile` first.
+      { find: /^react$/, replacement: path.resolve(__dirname, 'apps/mobile/node_modules/react') },
+      { find: /^react\/(.*)/, replacement: path.resolve(__dirname, 'apps/mobile/node_modules/react/$1') },
+      {
+        find: 'use-sync-external-store/shim/with-selector',
+        replacement: path.resolve(__dirname, 'apps/mobile/node_modules/use-sync-external-store/shim/with-selector.js'),
+      },
+      // zustand's react-flavored entries must live next to a react install,
+      // so they also come from the mobile tree. `zustand/vanilla` (all that
+      // packages/shared may import) still resolves from the root install.
+      { find: 'zustand/traditional', replacement: path.resolve(__dirname, 'apps/mobile/node_modules/zustand/traditional') },
+      { find: /^zustand$/, replacement: path.resolve(__dirname, 'apps/mobile/node_modules/zustand') },
       { find: '@solid-client', replacement: path.resolve(__dirname, 'packages/solid-client/src') },
-      { find: '@shared/app/ui', replacement: path.resolve(__dirname, 'packages/web-client/src/app-ui') },
       { find: '@shared', replacement: path.resolve(__dirname, 'packages/shared/src') },
       { find: '@client', replacement: path.resolve(__dirname, 'packages/shared/src/client') },
       {
         find: '@platform/assets/runtimeAudio',
-        replacement: path.resolve(__dirname, 'packages/web-client/src/infrastructure/platform/assets/runtimeAudio'),
+        replacement: path.resolve(__dirname, 'packages/shared/src/platform/assets/runtimeAudio'),
       },
       { find: '@platform', replacement: path.resolve(__dirname, 'packages/shared/src/platform') },
       { find: '@test-support', replacement: path.resolve(__dirname, 'tooling/test-support') },
@@ -66,7 +68,7 @@ export default defineConfig({
       'packages/**/*.test.ts',
       'packages/**/*.test.tsx',
     ],
-    exclude: ['node_modules/**', '**/node_modules/**', 'out/**', '.webpack/**'],
+    exclude: ['node_modules/**', '**/node_modules/**'],
     ...(conditionalReporters ? { reporters: conditionalReporters } : {}),
   },
 });

@@ -61,7 +61,7 @@ export type BrowserRuntimeBridge = {
 /**
  * Portable device info — structurally matches the browser MediaDeviceInfo
  * interface but defined here so it's usable in non-DOM compilation contexts
- * (Electron main, backend tests) without requiring lib.dom.d.ts.
+ * (backend tests, native shells) without requiring lib.dom.d.ts.
  */
 export type AudioDeviceInfo = {
   deviceId: string;
@@ -72,8 +72,8 @@ export type AudioDeviceInfo = {
 
 /**
  * Minimal voice runtime bridge — only device enumeration remains after LiveKit
- * took over media capture, VAD, and PTT in web-client. The Electron host
- * implements these; web uses browser APIs directly.
+ * took over media capture, VAD, and PTT. A desktop shell may implement these;
+ * a browser shell uses browser APIs directly.
  */
 export type VoiceRuntimeBridge = {
   enumerateDevices: () => Promise<AudioDeviceInfo[]>;
@@ -116,8 +116,8 @@ export type AppHost = {
 /**
  * No-op fallback host used before any platform registers.
  * All capabilities return safe empty values — real implementations are
- * provided by each platform's registration call (registerWebAppHost,
- * registerElectronAppHost, registerMobileAppHost).
+ * provided by each platform shell's registration call at bootstrap
+ * (e.g. registerMobileAppHost; the Tauri shell registers its own).
  */
 const noOpHost: AppHost = {
   isDesktopApp: () => false,

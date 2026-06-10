@@ -6,11 +6,6 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"]
   },
   "include": [
-    "vite-env.d.ts",
-    "vite.config.ts",
-    "apps/web/src/**/*",
-    "apps/electron/src/renderer/**/*",
-    "packages/web-client/src/**/*",
     "apps/mobile/src/data/**/*",
     "packages/shared/src/**/*",
     "tooling/test-support/setup/jsdom.ts"
@@ -18,9 +13,6 @@
   "exclude": [
     "node_modules",
     "dist",
-    "apps/electron/src/main/**/*",
-    "apps/electron/src/preload/**/*",
-    "packages/shared/src/platform/ipc/**/*",
     "packages/shared/src/lib/backend/__tests__/**/*",
     "tooling/**/*"
   ]

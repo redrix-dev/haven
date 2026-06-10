@@ -8,15 +8,13 @@ const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, "../..");
 const mobileNodeModules = path.resolve(projectRoot, "node_modules");
 const sharedPackageRoot = path.resolve(monorepoRoot, "packages/shared");
-const webClientPackageRoot = path.resolve(monorepoRoot, "packages/web-client");
 const sharedSrcRoot = path.join(sharedPackageRoot, "src");
-const webClientAppUiRoot = path.join(webClientPackageRoot, "src", "app-ui");
 const mobileSrcRoot = path.join(projectRoot, "src");
 const mobileDataRoot = path.join(mobileSrcRoot, "data");
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [sharedPackageRoot, webClientPackageRoot];
+config.watchFolders = [sharedPackageRoot];
 config.resolver.nodeModulesPaths = [
   mobileNodeModules,
   path.resolve(monorepoRoot, "node_modules"),
@@ -44,14 +42,6 @@ const upstreamResolveRequest = finalConfig.resolver.resolveRequest;
  */
 finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
   const resolve = metroResolver.resolve;
-
-  if (moduleName.startsWith("@shared/app/ui/")) {
-    const absolutePath = path.join(
-      webClientAppUiRoot,
-      moduleName.slice("@shared/app/ui/".length),
-    );
-    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
-  }
 
   if (moduleName.startsWith("@shared/")) {
     const absolutePath = path.join(

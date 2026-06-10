@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { execFileSync } from 'node:child_process';
 import { createHavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
-import { createHavenCore, createMemoryPersistence } from '@shared/core';
+import { createMemoryPersistence } from '@shared/core';
+import { createHavenCore } from '@mobile-data/core';
 import { createReactHavenCoreOptions } from '@mobile-data/createReactHavenCore';
 import type { Database } from '@shared/types/database';
 import { loadBootstrappedTestUsers, type TestUserKey } from '../fixtures/users';

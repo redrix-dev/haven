@@ -17,10 +17,7 @@
         "apps/mobile/global.css"
       ],
       "packages/shared/src/styles/globals.css": [
-        "apps/web/src/**/*.{js,jsx,ts,tsx}",
-        "apps/electron/src/**/*.{js,jsx,ts,tsx}",
         "packages/shared/src/**/*.{js,jsx,ts,tsx}",
-        "packages/web-client/src/**/*.{js,jsx,ts,tsx}",
         "packages/shared/src/styles/globals.css"
       ]
     },

@@ -3,10 +3,9 @@ import type { PermissionCatalogItem } from "@shared/lib/backend/types";
 /**
  * Permission display metadata + grouping for the mobile role editor.
  *
- * NOTE: This mirrors the inline metadata in the desktop
- * `packages/web-client/src/components/community/ServerSettingsModal.tsx`. The two
- * should eventually consolidate into a shared module; kept mobile-local for now to
- * avoid touching the desktop/web build. Keep them in sync if permissions change.
+ * NOTE: When the Solid desktop client grows a role editor, this metadata
+ * should move into a shared module rather than being duplicated. It is the
+ * only copy today.
  */
 
 export type PermissionScope =

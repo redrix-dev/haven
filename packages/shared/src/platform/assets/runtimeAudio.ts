@@ -6,8 +6,8 @@
  * that the mobile TypeScript compiler can resolve the shared/src/…/sound.ts
  * import (which Metro replaces with sound.native.ts at bundle time).
  *
- * Shape must match the web-client version in
- * packages/web-client/src/infrastructure/platform/assets/runtimeAudio.ts.
+ * A desktop/web shell that plays these sounds should provide its own
+ * implementation with real asset URLs and the same shape.
  */
 export const RUNTIME_AUDIO_URLS = {
   notifications: { default: "" },

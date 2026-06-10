@@ -13,10 +13,6 @@ module.exports = function (api) {
           root: [path.resolve(__dirname)],
           extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
           alias: {
-            "@shared/app/ui": path.resolve(
-              __dirname,
-              "../../packages/web-client/src/app-ui",
-            ),
             "@shared": path.resolve(__dirname, "../../packages/shared/src"),
             "@mobile-data": path.resolve(__dirname, "./src/data"),
             "@platform": path.resolve(

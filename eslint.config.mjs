@@ -1,6 +1,5 @@
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
-import reactHooks from "eslint-plugin-react-hooks";
 
 const rendererBoundaryFiles = [
   "packages/shared/src/client/**/*.{ts,tsx,js,jsx}",
@@ -8,24 +7,9 @@ const rendererBoundaryFiles = [
   "packages/shared/src/contexts/**/*.{ts,tsx,js,jsx}",
   "packages/shared/src/lib/hooks/**/*.{ts,tsx,js,jsx}",
   "packages/shared/src/lib/voice/**/*.{ts,tsx,js,jsx}",
-  "apps/web/src/**/*.{ts,tsx,js,jsx}",
-  "apps/electron/src/renderer/**/*.{ts,tsx,js,jsx}",
 ];
 
 const rendererBoundaryRestrictions = [
-  {
-    group: ["@platform/ipc/*", "**/platform/ipc/*"],
-    message:
-      "Renderer/features must not import shared/ipc. Use getAppHost() from @shared/platform/appHost (registered in the Electron renderer) for desktop capabilities.",
-  },
-  {
-    group: ["@electron/main/*", "**/apps/electron/src/main/*"],
-    message: "Renderer/features must not import Electron main-process modules.",
-  },
-  {
-    group: ["electron", "electron/*"],
-    message: "Renderer/features must not import electron APIs directly.",
-  },
   {
     group: ["node:*"],
     message: "Renderer/features must not import Node built-ins.",
@@ -57,7 +41,6 @@ const havenCoreDeprecatedImports = [
       "**/useMessageNexus",
       "@shared/features/profile/hooks/useLiveProfiles",
       "**/useLiveProfiles",
-      "@web-client/hooks/useChatAppOrchestration",
       "**/useChatAppOrchestration",
     ],
     message:
@@ -91,10 +74,6 @@ const havenCoreNexusBoundary = [
     message:
       "HavenEventBus is removed. Use requireHavenCore().routeEvent for ingestion and core.messages.* for reads.",
   },
-];
-
-const havenCoreWebConsumerFiles = [
-  "packages/web-client/src/**/*.{ts,tsx,js,jsx}",
 ];
 
 /**
@@ -218,20 +197,12 @@ const havenCoreConsumerRestrictedSyntax = [
 
 const mobileBoundaryRestrictions = [
   {
-    group: ["@web/*", "**/apps/web/src/*"],
-    message: "Mobile code must not import web modules.",
-  },
-  {
-    group: ["@electron/*", "**/apps/electron/src/*"],
-    message: "Mobile code must not import Electron modules.",
-  },
-  {
     group: ["@platform/desktop/*", "**/platform/desktop/*"],
     message: "Mobile code must not import desktop platform bridges.",
   },
   {
-    group: ["electron", "electron/*"],
-    message: "Mobile code must not import Electron APIs.",
+    group: ["@solid-client/*", "solid-js", "solid-js/*"],
+    message: "Mobile code must not import Solid modules.",
   },
   {
     group: ["node:*"],
@@ -243,8 +214,6 @@ export default [
   {
     ignores: [
       "node_modules/**",
-      ".webpack/**",
-      "out/**",
       "dist/**",
       "**/dist/**",
     ],
@@ -268,7 +237,6 @@ export default [
     },
     plugins: {
       "@typescript-eslint": tsPlugin,
-      "react-hooks": reactHooks,
     },
     rules: {
       "no-restricted-properties": [
@@ -277,7 +245,7 @@ export default [
           object: "window",
           property: "desktop",
           message:
-            "Use getAppHost() from @shared/platform/appHost in app code; only packages/shared/src/platform/desktop/client.ts may read window.desktop.",
+            "Use getAppHost() from @shared/platform/appHost in app code; the legacy window.desktop Electron bridge is gone.",
         },
         {
           object: "window",
@@ -289,34 +257,9 @@ export default [
     },
   },
   {
-    files: [
-      "packages/shared/src/platform/desktop/client.ts",
-      "packages/shared/src/infrastructure/platform/desktop/client.ts",
-    ],
-    rules: {
-      "no-restricted-properties": "off",
-    },
-  },
-  {
-    files: havenCoreWebConsumerFiles,
-    ignores: havenCoreConsumerBoundaryIgnores,
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          paths: havenCoreConsumerRestrictedImportPaths,
-          patterns: havenCoreConsumerRestrictedImportPatterns,
-        },
-      ],
-      "no-restricted-syntax": ["error", ...havenCoreConsumerRestrictedSyntax],
-    },
-  },
-  {
     files: ["packages/shared/src/**/*.{ts,tsx}"],
     ignores: [
       "packages/shared/src/core/persistence/createMmkvPersistence.ts",
-      "packages/shared/src/platform/desktop/client.ts",
-      "packages/shared/src/infrastructure/platform/desktop/client.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -326,7 +269,7 @@ export default [
             {
               name: "@platform/desktop/client",
               message:
-                "Import getAppHost from @shared/platform/appHost instead. Electron registers the real bridge in apps/electron/src/renderer/registerElectronAppHost.ts.",
+                "Import getAppHost from @shared/platform/appHost instead. Each shell registers its own bridge at bootstrap.",
             },
           ],
           patterns: [...havenCoreNexusBoundary, ...havenCoreDeprecatedImports],
@@ -345,7 +288,7 @@ export default [
             {
               name: "@platform/desktop/client",
               message:
-                "Import getAppHost from @shared/platform/appHost instead. Electron registers the real bridge in apps/electron/src/renderer/registerElectronAppHost.ts.",
+                "Import getAppHost from @shared/platform/appHost instead. Each shell registers its own bridge at bootstrap.",
             },
             ...havenCoreConsumerRestrictedImportPaths,
           ],
