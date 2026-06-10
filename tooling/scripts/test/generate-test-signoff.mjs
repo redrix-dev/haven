@@ -19,7 +19,7 @@ const commandSets = {
     { id: 'unit', label: 'Unit / Component Tests', command: 'npm', args: ['run', 'test:unit'] },
     { id: 'db', label: 'DB / RLS Suite', command: 'npm', args: ['run', 'test:db'] },
     { id: 'backend', label: 'Backend Contract Tests', command: 'npm', args: ['run', 'test:backend'] },
-    { id: 'build_web', label: 'Web Build', command: 'npm', args: ['run', 'build:web'] },
+    { id: 'build_solid', label: 'Solid Build', command: 'npm', args: ['run', 'build:solid'] },
     {
       id: 'notif_smoke',
       label: 'Notification Dispatch Smoke',
@@ -31,17 +31,6 @@ const commandSets = {
     { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
     { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
     { id: 'unit', label: 'Unit / Component Tests', command: 'npm', args: ['run', 'test:unit'] },
-  ],
-  web: [
-    { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
-    { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
-    { id: 'build_web', label: 'Web Build', command: 'npm', args: ['run', 'build:web'] },
-    {
-      id: 'notif_smoke',
-      label: 'Notification Dispatch Smoke',
-      command: 'npm',
-      args: ['run', 'test:notifications:smoke', '--', '--skip-worker', '--json'],
-    },
   ],
 };
 
@@ -57,7 +46,7 @@ Required:
   --run-by <name>             person who executed the run
 
 Optional:
-  --mode <release|quick|web>   default: release
+  --mode <release|quick>       default: release
   --candidate-commit <sha>
   --notes <text>
   --json                          print summary JSON to stdout
@@ -65,7 +54,7 @@ Optional:
 
 Examples:
   npm run test:signoff -- --release-label staging-2026-02-26 --environment staging
-  npm run test:signoff -- --release-label v1.4.0-rc1 --environment staging --test-author "Test Owner" --run-by "Runner Name" --mode web --json
+  npm run test:signoff -- --release-label v1.4.0-rc1 --environment staging --test-author "Test Owner" --run-by "Runner Name" --mode quick --json
 `;
 
 function parseArgs(argv) {

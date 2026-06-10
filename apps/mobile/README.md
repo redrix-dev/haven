@@ -39,16 +39,18 @@ This project uses **development clients**, not Expo Go.
 
 ### Script naming (repo root)
 
-| Script | Also known as | What it does |
-|--------|----------------|--------------|
-| `mobile:dev:metro` | `mobile:start` | **JS only:** starts Metro + `expo start --dev-client`. Does **not** rebuild or reinstall the native app. |
-| `mobile:dev:metro:clear` | `mobile:start:clear` | Same as above, plus **`--clear`** (Metro / JS cache reset). |
-| `mobile:run:ios:simulator` | `mobile:ios` | **Native:** Xcode build + install on **iOS Simulator** (`expo run:ios`). |
-| `mobile:run:ios:device` | `mobile:ios:device` | **Native:** Xcode build + install on a **USB / paired iPhone** (`expo run:ios --device`). Use after Info.plist, entitlements, or native dep changes. |
-| `mobile:run:android` | `mobile:android` | **Native:** `expo run:android`. |
-| `mobile:native:prebuild` | `mobile:prebuild` | **Regenerates** `ios/` and `android/` from Expo config (`expo prebuild`). Does **not** install an app by itself. |
+| Script | What it does |
+|--------|--------------|
+| `mobile:dev:metro` | **JS only:** starts Metro + `expo start --dev-client`. Does **not** rebuild or reinstall the native app. |
+| `mobile:dev:metro:clear` | Same as above, plus **`--clear`** (Metro / JS cache reset). |
+| `mobile:run:ios:simulator` | **Native:** Xcode build + install on **iOS Simulator** (`expo run:ios`). |
+| `mobile:run:ios:device` | **Native:** Xcode build + install on a **USB / paired iPhone** (`expo run:ios --device`). Use after Info.plist, entitlements, or native dep changes. |
+| `mobile:run:android` | **Native:** `expo run:android`. |
+| `mobile:native:prebuild` | **Regenerates** `ios/` and `android/` from Expo config (`expo prebuild`). Does **not** install an app by itself. |
 
-EAS scripts (`mobile:eas:build:*`, etc.) are **cloud builds**; you install the IPA/APK they produce.
+Inside `apps/mobile`, the conventional Expo names (`npm start`, `npm run ios`, `npm run android`, `npm run prebuild`) map to the same commands.
+
+EAS cloud builds go through one passthrough: `npm run mobile:eas:build -- --profile <development|preview|production> [--platform ios|android]`. You install the IPA/APK it produces.
 
 ### Canonical command matrix
 

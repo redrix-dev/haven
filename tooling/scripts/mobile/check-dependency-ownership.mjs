@@ -28,15 +28,18 @@ const rootForbidden = [
   "expo-asset",
   "expo-constants",
   "expo-linking",
+  // React is mobile-owned after the cleave; the root install must stay
+  // framework-free apart from Solid.
+  "react",
+  "react-dom",
 ];
 
 const mobileForbidden = [
-  "electron",
-  "electron-forge",
-  "@electron-forge/cli",
-  "@electron-forge/plugin-webpack",
   "vite",
-  "@vitejs/plugin-react",
+  "vite-plugin-solid",
+  "solid-js",
+  "@tauri-apps/api",
+  "@tauri-apps/cli",
 ];
 
 const violations = [];

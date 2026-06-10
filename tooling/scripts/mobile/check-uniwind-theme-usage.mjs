@@ -140,9 +140,14 @@ function walk(dir, out = []) {
     const fullPath = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
+      // Tests aren't rendered UI — fixture data (e.g. role colors) is allowed
+      // to contain raw color values.
+      if (entry.name === "__tests__") continue;
       walk(fullPath, out);
       continue;
     }
+
+    if (/\.test\.(ts|tsx)$/.test(entry.name)) continue;
 
     if (/\.(ts|tsx)$/.test(entry.name) && !entry.name.endsWith(".d.ts")) {
       out.push(fullPath);
