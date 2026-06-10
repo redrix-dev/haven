@@ -15,6 +15,16 @@ import {
   projectVisibleChannelMessagesBlockOnly,
 } from "@shared/nexus/community/projectVisibleChannelMessages";
 import { useStoreSelector } from "./useStoreSelector";
+import { createMobileViewerMessagePolicyStore } from "../session/viewerMessagePolicyStore";
+
+/**
+ * Stable sentinel for caches that have no viewer-policy store. The policy hooks
+ * in useVisibleChannel must run unconditionally (rules-of-hooks), so a null
+ * store falls back to this constant empty one. Its default state ("nothing
+ * hidden") yields exactly the projection the old null-branch produced, and its
+ * identity never changes, so it never triggers a re-subscribe.
+ */
+const EMPTY_VIEWER_POLICY_STORE = createMobileViewerMessagePolicyStore();
 
 export function useChannel(
   cache: CommunityMessageCache,
@@ -32,33 +42,30 @@ export function useVisibleChannel(
   channelId: string,
 ): MessageBundle[] {
   const raw = useChannel(cache, channelId);
-  const policyStore = cache.viewerMessagePolicyStore;
   const communityId = cache.communityId;
+  // Fall back to the stable empty sentinel so the policy hooks always run in the
+  // same order, regardless of which cache instance this is (rules-of-hooks).
+  const policyStore =
+    cache.viewerMessagePolicyStore ?? EMPTY_VIEWER_POLICY_STORE;
 
-  const hiddenAuthorIds = policyStore
-    ? useStoreSelector(
-        policyStore,
-        (state) => state.hiddenAuthorIds,
-        viewerPolicyHiddenAuthorIdsEqual,
-      )
-    : null;
-  const showHiddenMessages = policyStore
-    ? useStoreSelector(policyStore, (state) => state.showHiddenMessages)
-    : false;
-  const communityPolicy = policyStore
-    ? useStoreSelector(
-        policyStore,
-        (state) => state.communities[communityId],
-        viewerCommunityPolicyEqual,
-      )
-    : undefined;
+  const hiddenAuthorIds = useStoreSelector(
+    policyStore,
+    (state) => state.hiddenAuthorIds,
+    viewerPolicyHiddenAuthorIdsEqual,
+  );
+  const showHiddenMessages = useStoreSelector(
+    policyStore,
+    (state) => state.showHiddenMessages,
+  );
+  const communityPolicy = useStoreSelector(
+    policyStore,
+    (state) => state.communities[communityId],
+    viewerCommunityPolicyEqual,
+  );
 
   return useMemo(() => {
-    if (!policyStore) {
-      return projectVisibleChannelMessagesBlockOnly(raw, new Set<string>());
-    }
     const policy = {
-      hiddenAuthorIds: hiddenAuthorIds ?? new Set<string>(),
+      hiddenAuthorIds,
       showHiddenMessages,
       communities: communityPolicy ? { [communityId]: communityPolicy } : {},
     };
@@ -79,7 +86,6 @@ export function useVisibleChannel(
     communityPolicy,
     channelId,
     communityId,
-    policyStore,
   ]);
 }
 

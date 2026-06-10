@@ -13,12 +13,16 @@ When an item ships, delete it here (the change records itself in git).
 The alias → workspace-package conversion. Decided, not scheduled — full sequencing
 rules in [SOLID_REBUILD.md](./SOLID_REBUILD.md#standing-decision--workspace-packages).
 
-### React hooks linting on mobile
+### Stale exhaustive-deps warnings (advisory)
 
-`eslint-plugin-react-hooks` was registered for months with zero rules enabled (and
-has been removed). Adding it back **with** `rules-of-hooks`/`exhaustive-deps` scoped
-to `apps/mobile` may surface real bugs — budget time for what it finds.
-_Trigger: a quiet week, or the first hooks-ordering bug on mobile._
+`react-hooks/exhaustive-deps` runs as a **warn** on `apps/mobile` (rules-of-hooks
+is enforced as error). Seven advisory warnings remain, mostly false positives on
+Reanimated `useSharedValue` handles (stable refs that intentionally stay out of
+dep arrays — `HavenModalShell`, `HavenNavbar`, `skeleton`). Two are cosmetic
+over-listing. One worth an eventual look: `DmInboxDrawer.tsx:215` reports a missing
+`liveProfiles` dep — likely an eslint transitive quirk (the callback body doesn't
+read it directly), but confirm it isn't a stale closure when next editing that file.
+_Trigger: when touching the relevant component; not blocking._
 
 ### Version semantics
 

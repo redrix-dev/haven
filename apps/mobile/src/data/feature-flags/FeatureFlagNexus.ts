@@ -1,9 +1,7 @@
 import { create } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend.interface";
 import type { FeatureFlagsSnapshot } from "@shared/lib/backend/types";
-import { flagsEqual } from "@shared/features/feature-flags/logic/equality";
 import type { StoreApi, UseBoundStore } from "zustand";
 
 export type FeatureFlagNexusState = {
@@ -108,34 +106,5 @@ export class FeatureFlagNexus {
 
   getError(): string | null {
     return this.store.getState().error;
-  }
-
-  useFlags(): FeatureFlagsSnapshot {
-    return useStoreWithEqualityFn(
-      this.store,
-      (state) => {
-        void state.revision;
-        return state.flags;
-      },
-      flagsEqual,
-    );
-  }
-
-  useLoaded(): boolean {
-    return useStoreWithEqualityFn(this.store, (state) => state.loaded);
-  }
-
-  useLoading(): boolean {
-    return useStoreWithEqualityFn(this.store, (state) => state.loading);
-  }
-
-  useError(): string | null {
-    return useStoreWithEqualityFn(this.store, (state) => state.error);
-  }
-
-  useHasFlag(flagKey: string): boolean {
-    return useStoreWithEqualityFn(this.store, (state) =>
-      Boolean(state.flags[flagKey]),
-    );
   }
 }

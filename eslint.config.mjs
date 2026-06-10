@@ -1,5 +1,6 @@
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
+import reactHooks from "eslint-plugin-react-hooks";
 
 /**
  * HavenCore architecture boundary restrictions.
@@ -319,6 +320,19 @@ export default [
         },
       ],
       "no-restricted-syntax": ["error", ...havenCoreConsumerRestrictedSyntax],
+    },
+  },
+  {
+    // React hooks correctness — scoped to mobile (the only React app).
+    // rules-of-hooks catches genuine bugs (conditional/looped/class hooks) and
+    // is clean, so it's enforced as error. exhaustive-deps is advisory (warn):
+    // it has known false positives on Reanimated shared values, which are stable
+    // refs that intentionally stay out of dependency arrays.
+    files: ["apps/mobile/**/*.{ts,tsx,js,jsx}"],
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
 ];

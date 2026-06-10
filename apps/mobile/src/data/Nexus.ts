@@ -1,5 +1,4 @@
-import { create, useStore, type StoreApi, type UseBoundStore } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
+import { create, type StoreApi, type UseBoundStore } from "zustand";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
 
@@ -118,29 +117,6 @@ export abstract class Nexus<T, R = unknown> {
 
   getSnapshot(id: string): T | undefined {
     return this.store.getState().entities[id]?.data;
-  }
-
-  use<S>(
-    selector: (state: NexusState<T>) => S,
-    equalityFn?: (a: S, b: S) => boolean,
-  ): S {
-    return useStoreWithEqualityFn(
-      this.store,
-      selector,
-      equalityFn ?? Object.is,
-    );
-  }
-
-  useAll(): T[] {
-    return useStore(this.store, (state) =>
-      Object.values(state.entities)
-        .filter((entry) => !entry.partial)
-        .map((entry) => entry.data),
-    );
-  }
-
-  useOne(id: string): T | undefined {
-    return useStore(this.store, (state) => state.entities[id]?.data);
   }
 
   persist(): void {
