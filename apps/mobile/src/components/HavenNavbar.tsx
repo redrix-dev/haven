@@ -32,7 +32,10 @@ const goCommunityEntry = (
   navigation: NativeStackNavigationProp<RootStackParamList>,
 ) =>
   navigation.dispatch(
-    CommonActions.navigate({ name: "Main", params: { screen: "CommunityEntry" } }),
+    CommonActions.navigate({
+      name: "Main",
+      params: { screen: "CommunityEntry" },
+    }),
   );
 
 function NotificationsBellButton({
@@ -69,7 +72,9 @@ function NotificationsBellButton({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
-          unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"
+          unreadCount > 0
+            ? `Notifications, ${unreadCount} unread`
+            : "Notifications"
         }
         className="h-11 w-11 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
         onPress={onPress}
@@ -124,7 +129,8 @@ export function HavenNavbar({
   onPressFriends,
 }: HavenNavbarProps) {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const iconBtn = (name: ThemedIoniconsProps["name"], onPress: () => void) => (
     <Pressable
@@ -132,7 +138,11 @@ export function HavenNavbar({
       className="h-11 w-11 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
       onPress={onPress}
     >
-      <ThemedIonicons name={name} size={22} colorClassName="accent-foreground" />
+      <ThemedIonicons
+        name={name}
+        size={22}
+        colorClassName="accent-foreground"
+      />
     </Pressable>
   );
 

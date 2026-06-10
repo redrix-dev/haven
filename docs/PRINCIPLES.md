@@ -1,19 +1,19 @@
 # Principles
 
-How Haven is built and maintained. Every rule here carries its *why* — a rule whose
+How Haven is built and maintained. Every rule here carries its _why_ — a rule whose
 why is gone is a rule up for deletion. This file changes rarely and deliberately.
 
 ---
 
 ## 1. The prime rule
 
-> **Prefer the correct *understandable* path over the correct (but I can't explain
+> **Prefer the correct _understandable_ path over the correct (but I can't explain
 > why) path. Always.**
 
 Code that works but can't be explained is a liability with a delay on it. If a
 solution can't be narrated plainly — what it does, why it's shaped this way, what
 breaks if you change it — it isn't done, even if it's green. Cleverness is welcome;
-*unexplainable* cleverness is not. When two correct approaches exist, take the one a
+_unexplainable_ cleverness is not. When two correct approaches exist, take the one a
 future maintainer (most likely: you, six months from now, tired) can read cold.
 
 Corollary: argue for "do it right" only by demonstrating genuine clarity about why
@@ -35,8 +35,8 @@ guard fails for a dumb reason, fix the guard that day or delete it.
 
 ## 3. The sorting test (logic vs. cache)
 
-For every file and function in the data layer, ask: *"Is this logic, or is this a
-cache?"*
+For every file and function in the data layer, ask: _"Is this logic, or is this a
+cache?"_
 
 - **Logic** = data in → data out. No held state, no notion of "a screen is watching."
   → lives in `packages/shared`, written once, identical on every platform.
@@ -46,7 +46,7 @@ cache?"*
 
 ## 4. Share the smarts, not the memory
 
-A reactive store is **never** shared across frameworks. Sharing the *cache* across
+A reactive store is **never** shared across frameworks. Sharing the _cache_ across
 React and Solid is the architectural mistake the 2026 rebuild exists to undo — it
 forced snapshot caches, revision counters, and selector factories that existed only
 to prop up the sharing. The thin "hold + notify" shell may be written twice;
@@ -75,14 +75,14 @@ the floor, not the ceiling.
 
 ## 8. Spikes are disposable by declaration
 
-Exploratory code is declared throwaway *before* it's written, lives on a branch that
+Exploratory code is declared throwaway _before_ it's written, lives on a branch that
 never merges, and is deleted on exit. Only the findings survive. Pre-deciding
 disposability removes the sunk-cost pressure to "save what we wrote" — the pressure
 that caused prior refactor pain.
 
 ## 9. Every phase has an exit gate
 
-Work is planned as: goal → deliverable → **exit criteria** ("how do we *know* this
+Work is planned as: goal → deliverable → **exit criteria** ("how do we _know_ this
 is done and we're allowed to move on"). The gate is the point; it's what resists
 scope drift. No gate, no phase.
 

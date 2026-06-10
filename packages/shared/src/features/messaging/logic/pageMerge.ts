@@ -9,9 +9,7 @@ export function ascendingMessagesFromRpcPage(
 }
 
 /** Build pagination cursor from the oldest message in an ascending page. */
-export function oldestMessageCursor(
-  ascending: MessageBundle[],
-): string | null {
+export function oldestMessageCursor(ascending: MessageBundle[]): string | null {
   if (ascending.length === 0) return null;
   const oldest = ascending[0];
   return `${oldest.createdAt}|${oldest.id}`;

@@ -22,7 +22,9 @@ async function getOrCreateInstallationId(): Promise<string> {
  * Registers the device Expo push token with Supabase after sign-in and removes it on sign-out.
  * Notification tap routing lives in `useMobilePushNotificationRouting` (handlers from main shell).
  */
-export function useMobileExpoPushRegistration(session: Session | null | undefined): void {
+export function useMobileExpoPushRegistration(
+  session: Session | null | undefined,
+): void {
   const core = useHavenCore();
   const registeringRef = useRef(false);
 
@@ -36,7 +38,10 @@ export function useMobileExpoPushRegistration(session: Session | null | undefine
       try {
         await core.notifications.deleteExpoPushSubscription(stored.trim());
       } catch (error) {
-        console.warn("[mobile push] Failed to delete expo push token on sign-out.", error);
+        console.warn(
+          "[mobile push] Failed to delete expo push token on sign-out.",
+          error,
+        );
       }
       await AsyncStorage.removeItem(LAST_EXPO_TOKEN_KEY);
     })();
@@ -83,20 +88,33 @@ export function useMobileExpoPushRegistration(session: Session | null | undefine
         }
 
         const projectId =
-          (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
-            ?.projectId ?? (Constants as { easConfig?: { projectId?: string } }).easConfig?.projectId;
+          (
+            Constants.expoConfig?.extra as
+              | { eas?: { projectId?: string } }
+              | undefined
+          )?.eas?.projectId ??
+          (Constants as { easConfig?: { projectId?: string } }).easConfig
+            ?.projectId;
         if (!projectId || typeof projectId !== "string") {
-          console.warn("[mobile push] Missing EAS projectId in app config; cannot obtain Expo push token.");
+          console.warn(
+            "[mobile push] Missing EAS projectId in app config; cannot obtain Expo push token.",
+          );
           return;
         }
 
-        const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
+        const tokenResult = await Notifications.getExpoPushTokenAsync({
+          projectId,
+        });
         const expoPushToken = tokenResult.data?.trim();
         if (!expoPushToken || cancelled) return;
 
         const installationId = await getOrCreateInstallationId();
         const platform =
-          Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "unknown";
+          Platform.OS === "ios"
+            ? "ios"
+            : Platform.OS === "android"
+              ? "android"
+              : "unknown";
 
         await core.notifications.upsertExpoPushSubscription({
           expoPushToken,

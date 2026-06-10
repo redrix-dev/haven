@@ -38,7 +38,9 @@ const createDefaultUiState = () => ({
   workspaceMode: "community" as WorkspaceMode,
   showHiddenMessages: false,
   friendsPanelOpen: false,
-  friendsPanelRequestedTab: null as import("@shared/types/types").FriendsPanelTab | null,
+  friendsPanelRequestedTab: null as
+    | import("@shared/types/types").FriendsPanelTab
+    | null,
   friendsPanelHighlightedRequestId: null as string | null,
   notificationsPanelOpen: false,
 });

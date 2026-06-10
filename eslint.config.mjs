@@ -197,11 +197,7 @@ const mobileBoundaryRestrictions = [
 
 export default [
   {
-    ignores: [
-      "node_modules/**",
-      "dist/**",
-      "**/dist/**",
-    ],
+    ignores: ["node_modules/**", "dist/**", "**/dist/**"],
   },
   {
     files: [
@@ -243,9 +239,7 @@ export default [
   },
   {
     files: ["packages/shared/src/**/*.{ts,tsx}"],
-    ignores: [
-      "packages/shared/src/core/persistence/createMmkvPersistence.ts",
-    ],
+    ignores: ["packages/shared/src/core/persistence/createMmkvPersistence.ts"],
     rules: {
       "no-restricted-imports": [
         "error",

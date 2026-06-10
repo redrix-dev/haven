@@ -490,7 +490,10 @@ export function useMobileLiveKitVoiceSession({
           timer.mark("presence published");
         })
         .catch((presenceError) => {
-          console.warn("[voice] Failed to publish voice presence.", presenceError);
+          console.warn(
+            "[voice] Failed to publish voice presence.",
+            presenceError,
+          );
           timer.mark("presence publish failed", {
             message: getErrorMessage(
               presenceError,

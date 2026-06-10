@@ -28,7 +28,10 @@ export function dispatchParsedPayload(
       }
       break;
     case "friend_request_received":
-      handlers.openFriends({ tab: "requests", highlightedRequestId: parsed.friendRequestId });
+      handlers.openFriends({
+        tab: "requests",
+        highlightedRequestId: parsed.friendRequestId,
+      });
       break;
     case "friend_request_accepted":
       handlers.openFriends({ tab: "friends", highlightedRequestId: null });
@@ -55,18 +58,21 @@ type MobilePushNavigationState = {
   setPendingParsedPayload: (payload: ParsedExpoPushPayload | null) => void;
 };
 
-export const useMobilePushNavigationStore = create<MobilePushNavigationState>()((set, get) => ({
-  handlers: null,
-  pendingParsedPayload: null,
-  setHandlers: (handlers) => {
-    set({ handlers });
-    if (handlers) {
-      const pending = get().pendingParsedPayload;
-      if (pending) {
-        set({ pendingParsedPayload: null });
-        dispatchParsedPayload(handlers, pending);
+export const useMobilePushNavigationStore = create<MobilePushNavigationState>()(
+  (set, get) => ({
+    handlers: null,
+    pendingParsedPayload: null,
+    setHandlers: (handlers) => {
+      set({ handlers });
+      if (handlers) {
+        const pending = get().pendingParsedPayload;
+        if (pending) {
+          set({ pendingParsedPayload: null });
+          dispatchParsedPayload(handlers, pending);
+        }
       }
-    }
-  },
-  setPendingParsedPayload: (payload) => set({ pendingParsedPayload: payload }),
-}));
+    },
+    setPendingParsedPayload: (payload) =>
+      set({ pendingParsedPayload: payload }),
+  }),
+);

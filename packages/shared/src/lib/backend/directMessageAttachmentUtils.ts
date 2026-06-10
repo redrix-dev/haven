@@ -1,6 +1,6 @@
 import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
 import { getSignedUrlMapKey } from "./mediaAttachmentUtils";
-import type { DirectMessageAttachment } from './types';
+import type { DirectMessageAttachment } from "./types";
 
 export type DirectMessageAttachmentRow = {
   id: string;
@@ -11,37 +11,43 @@ export type DirectMessageAttachmentRow = {
   object_path: string;
   original_filename: string | null;
   mime_type: string;
-  media_kind: 'image';
+  media_kind: "image";
   size_bytes: number;
   created_at: string;
   expires_at: string;
 };
 
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
 const asRequiredString = (value: unknown): string | null =>
-  typeof value === 'string' && value.trim().length > 0 ? value : null;
+  typeof value === "string" && value.trim().length > 0 ? value : null;
 
 const asOptionalString = (value: unknown): string | null =>
-  typeof value === 'string' && value.trim().length > 0 ? value : null;
+  typeof value === "string" && value.trim().length > 0 ? value : null;
 
 const asFiniteNumber = (value: unknown): number | null => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim().length > 0) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
 };
 
-const parseDirectMessageAttachmentRow = (value: unknown): DirectMessageAttachmentRow | null => {
+const parseDirectMessageAttachmentRow = (
+  value: unknown,
+): DirectMessageAttachmentRow | null => {
   const obj = asObjectRecord(value);
   if (!obj) return null;
 
   const id = asRequiredString(obj.id);
   const messageId = asRequiredString(obj.message_id ?? obj.messageId);
-  const conversationId = asRequiredString(obj.conversation_id ?? obj.conversationId);
+  const conversationId = asRequiredString(
+    obj.conversation_id ?? obj.conversationId,
+  );
   const ownerUserId = asRequiredString(obj.owner_user_id ?? obj.ownerUserId);
   const bucketName = asRequiredString(obj.bucket_name ?? obj.bucketName);
   const objectPath = asRequiredString(obj.object_path ?? obj.objectPath);
@@ -59,7 +65,7 @@ const parseDirectMessageAttachmentRow = (value: unknown): DirectMessageAttachmen
     !bucketName ||
     !objectPath ||
     !mimeType ||
-    mediaKind !== 'image' ||
+    mediaKind !== "image" ||
     sizeBytes === null ||
     !createdAt ||
     !expiresAt
@@ -74,16 +80,20 @@ const parseDirectMessageAttachmentRow = (value: unknown): DirectMessageAttachmen
     owner_user_id: ownerUserId,
     bucket_name: bucketName,
     object_path: objectPath,
-    original_filename: asOptionalString(obj.original_filename ?? obj.originalFilename),
+    original_filename: asOptionalString(
+      obj.original_filename ?? obj.originalFilename,
+    ),
     mime_type: mimeType,
-    media_kind: 'image',
+    media_kind: "image",
     size_bytes: sizeBytes,
     created_at: createdAt,
     expires_at: expiresAt,
   };
 };
 
-export const parseDirectMessageAttachmentRows = (value: unknown): DirectMessageAttachmentRow[] => {
+export const parseDirectMessageAttachmentRows = (
+  value: unknown,
+): DirectMessageAttachmentRow[] => {
   if (!Array.isArray(value)) return [];
 
   const rows: DirectMessageAttachmentRow[] = [];
@@ -102,9 +112,15 @@ export const mapDirectMessageAttachmentRowsWithSignedUrls = async (
 
   let signedUrlByBucketAndPath = new Map<string, string>();
   try {
-    signedUrlByBucketAndPath = await createSignedUrlMap(attachmentRows, 60 * 60);
+    signedUrlByBucketAndPath = await createSignedUrlMap(
+      attachmentRows,
+      60 * 60,
+    );
   } catch (signedError) {
-    console.error('Failed to create signed URLs for DM attachments:', signedError);
+    console.error(
+      "Failed to create signed URLs for DM attachments:",
+      signedError,
+    );
   }
 
   return attachmentRows.map((row) => ({
@@ -121,6 +137,8 @@ export const mapDirectMessageAttachmentRowsWithSignedUrls = async (
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     signedUrl:
-      signedUrlByBucketAndPath.get(getSignedUrlMapKey(row.bucket_name, row.object_path)) ?? null,
+      signedUrlByBucketAndPath.get(
+        getSignedUrlMapKey(row.bucket_name, row.object_path),
+      ) ?? null,
   }));
 };

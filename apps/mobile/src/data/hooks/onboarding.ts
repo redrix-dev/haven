@@ -26,7 +26,9 @@ export function useError(nexus: OnboardingNexus): string | null {
   return useStoreSelector(nexus.reactiveStore, (state) => state.error);
 }
 
-export function useCompletingCampaignKey(nexus: OnboardingNexus): string | null {
+export function useCompletingCampaignKey(
+  nexus: OnboardingNexus,
+): string | null {
   return useStoreSelector(
     nexus.reactiveStore,
     (state) => state.completingCampaignKey,

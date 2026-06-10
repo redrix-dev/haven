@@ -2,7 +2,10 @@ import { createStore } from "solid-js/store";
 import { DEFAULT_SOCIAL_COUNTS } from "@shared/infrastructure/constants";
 import type { SocialBackend } from "@shared/lib/backend/socialBackend";
 import type { SocialCounts } from "@shared/lib/backend/types";
-import { normalizeUserIds, unionHiddenAuthorIds } from "@shared/features/social/logic";
+import {
+  normalizeUserIds,
+  unionHiddenAuthorIds,
+} from "@shared/features/social/logic";
 import {
   wireSolidReadableStore,
   type NotifyingReadableStore,
@@ -59,15 +62,12 @@ export class SocialSolidCache {
     this.setState((s) => ({ isLoading: true, revision: s.revision }));
     const promise = (async () => {
       try {
-        const [
-          counts,
-          myBlockedUserIds,
-          usersBlockingMeIds,
-        ] = await Promise.all([
-          this.backend.getSocialCounts(),
-          this.backend.listMyBlocks(),
-          this.backend.listUsersBlockingMe(),
-        ]);
+        const [counts, myBlockedUserIds, usersBlockingMeIds] =
+          await Promise.all([
+            this.backend.getSocialCounts(),
+            this.backend.listMyBlocks(),
+            this.backend.listUsersBlockingMe(),
+          ]);
         this.setBlockLists({ myBlockedUserIds, usersBlockingMeIds });
         this.setState((s) => ({
           counts,
@@ -140,6 +140,8 @@ export class SocialSolidCache {
   }
 }
 
-export function createSocialSolidCache(backend: SocialBackend): SocialSolidCache {
+export function createSocialSolidCache(
+  backend: SocialBackend,
+): SocialSolidCache {
   return new SocialSolidCache(backend);
 }

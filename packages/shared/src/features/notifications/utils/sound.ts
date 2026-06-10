@@ -96,7 +96,7 @@ const playSoundEvent = async ({
   // Structural types avoid any reference to lib.dom.d.ts names.
   type BrowserLike = {
     document?: { hasFocus: () => boolean };
-     
+
     AudioContext?: new () => any;
   };
   const browser = globalThis as typeof globalThis & BrowserLike;
@@ -130,7 +130,8 @@ const playSoundEvent = async ({
   );
   if (volume === 0) return { played: false, reasonCode: "sound_pref_disabled" };
 
-  if (!browser.AudioContext) return { played: false, reasonCode: "sound_pref_disabled" };
+  if (!browser.AudioContext)
+    return { played: false, reasonCode: "sound_pref_disabled" };
 
   try {
     const audioContext = new browser.AudioContext();

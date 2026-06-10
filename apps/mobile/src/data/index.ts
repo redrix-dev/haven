@@ -49,11 +49,18 @@ export {
   createMobileViewerMessagePolicyStore,
   type ViewerMessagePolicyStore,
 } from "./session";
-export { createReactPlatformNexusBundle, createPlatformNexusBundle } from "./createPlatformNexuses";
+export {
+  createReactPlatformNexusBundle,
+  createPlatformNexusBundle,
+} from "./createPlatformNexuses";
 export { FeatureFlagNexus, type FeatureFlagNexusState } from "./feature-flags";
 export { OnboardingNexus, type OnboardingNexusState } from "./onboarding";
 export { PermissionsNexus, type PermissionsNexusState } from "./permissions";
-export { ProfileNexus, type ProfileNexusState, type ViewerProfileUpdateInput } from "./profile";
+export {
+  ProfileNexus,
+  type ProfileNexusState,
+  type ViewerProfileUpdateInput,
+} from "./profile";
 export { SocialNexus, type SocialNexusState } from "./social";
 export {
   CommunityAdminNexus,

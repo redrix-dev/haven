@@ -16,7 +16,10 @@ class FakeVoiceRealtimeChannel implements VoiceRealtimeChannel {
   }> = [];
   readonly tracked: VoicePresenceStateRow[] = [];
   untracked = false;
-  private readonly callbacks = new Map<string, (payload: { payload?: unknown }) => void>();
+  private readonly callbacks = new Map<
+    string,
+    (payload: { payload?: unknown }) => void
+  >();
   private presence: Record<string, VoicePresenceStateRow[]> = {};
 
   constructor(
@@ -179,7 +182,11 @@ describe("VoiceNexus", () => {
   it("tracks active and per-channel participants", () => {
     const { nexus } = buildNexus();
 
-    nexus.startConnect({ id: "voice-a", name: "Alpha", community_id: "server-1" });
+    nexus.startConnect({
+      id: "voice-a",
+      name: "Alpha",
+      community_id: "server-1",
+    });
     nexus.setParticipants([{ userId: "u1", displayName: "Uma" }]);
     nexus.setChannelParticipants("voice-b", [
       { userId: "u2", displayName: "Bea" },
@@ -216,7 +223,9 @@ describe("VoiceNexus", () => {
   it("fetches join credentials through the injected voice token backend", async () => {
     const { nexus, tokenBackend } = buildNexus();
 
-    await expect(nexus.fetchJoinCredentials("server-1", "voice-a")).resolves.toEqual({
+    await expect(
+      nexus.fetchJoinCredentials("server-1", "voice-a"),
+    ).resolves.toEqual({
       token: "voice-token",
       serverUrl: "wss://voice.example.test",
     });

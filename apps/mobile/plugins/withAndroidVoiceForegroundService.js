@@ -9,12 +9,18 @@ function upsertMetaData(application, name, value) {
   application["meta-data"] = (application["meta-data"] ?? []).filter(
     (item) => item?.$?.["android:name"] !== name,
   );
-  AndroidConfig.Manifest.addMetaDataItemToMainApplication(application, name, value);
+  AndroidConfig.Manifest.addMetaDataItemToMainApplication(
+    application,
+    name,
+    value,
+  );
 }
 
 function upsertService(application, name) {
   const services = application.service ?? [];
-  const existing = services.find((service) => service?.$?.["android:name"] === name);
+  const existing = services.find(
+    (service) => service?.$?.["android:name"] === name,
+  );
   const attrs = {
     "android:name": name,
     "android:exported": "false",

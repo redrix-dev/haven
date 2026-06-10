@@ -25,25 +25,25 @@ command). The private-user channel is the event bus: most events are a **targete
 or evict** — not a hook fan-out that refreshes three domains after every click.
 
 **Hooks observe React lifecycle.** Selector-hooks in `@mobile-data/hooks` bind React to cache
-stores. A feature hook belongs when it exposes a *small* interface tied to
+stores. A feature hook belongs when it exposes a _small_ interface tied to
 mount/focus/auth/platform (push registration, deep links, WebRTC). If a cache already owns the
 state and actions, migrate callers to `core.*` and delete the hook. Do not add reusable hook
 files that only aggregate selectors or re-fetch what realtime should already deliver.
 
 ## Cache registry
 
-| Cache | Imperative / sync | Selector-hooks (`@mobile-data/hooks`) |
-|-------|-------------------|-------------------------------------|
-| `core.communities` | `load()`, `setActiveId()` | `useCommunities(core.communities)`, `useActiveCommunityId`, … |
-| `core.channels` | `ensureLoaded()`, `setActiveChannelId()` | `useChannels(core.channels, id)`, `useActiveChannelId`, … |
-| `core.messages.for(id)` | `loadInitial`, `sendWithMedia`, … | `useChannel(cache, ch)`, **`useVisibleChannel(cache, ch)`** |
-| `core.directMessages` | `loadConversations()`, `loadMessages()` | `useDmConversations(core.directMessages)`, … |
-| `core.notifications` | `loadInbox()`, `markRead()` | `useNotifications(core.notifications)`, … |
-| `core.admin` | CRUD + modal state mutations | `useServerPanelState(core.admin)`, … |
-| `core.social` | `blockUser()`, `load()` | `useFriends(core.social)`, `useCounts`, … |
-| `core.permissions` | `ensureLoaded()` | `usePermissions(core.permissions, id)`, … |
-| `core.profiles` | `loadProfile()`, … | `useProfilesRecord(core.profiles)`, `useViewerProfile`, … |
-| `core.voice` | join/leave, session sync | `useVoiceSession(core.voice)`, … |
+| Cache                   | Imperative / sync                        | Selector-hooks (`@mobile-data/hooks`)                         |
+| ----------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| `core.communities`      | `load()`, `setActiveId()`                | `useCommunities(core.communities)`, `useActiveCommunityId`, … |
+| `core.channels`         | `ensureLoaded()`, `setActiveChannelId()` | `useChannels(core.channels, id)`, `useActiveChannelId`, …     |
+| `core.messages.for(id)` | `loadInitial`, `sendWithMedia`, …        | `useChannel(cache, ch)`, **`useVisibleChannel(cache, ch)`**   |
+| `core.directMessages`   | `loadConversations()`, `loadMessages()`  | `useDmConversations(core.directMessages)`, …                  |
+| `core.notifications`    | `loadInbox()`, `markRead()`              | `useNotifications(core.notifications)`, …                     |
+| `core.admin`            | CRUD + modal state mutations             | `useServerPanelState(core.admin)`, …                          |
+| `core.social`           | `blockUser()`, `load()`                  | `useFriends(core.social)`, `useCounts`, …                     |
+| `core.permissions`      | `ensureLoaded()`                         | `usePermissions(core.permissions, id)`, …                     |
+| `core.profiles`         | `loadProfile()`, …                       | `useProfilesRecord(core.profiles)`, `useViewerProfile`, …     |
+| `core.voice`            | join/leave, session sync                 | `useVoiceSession(core.voice)`, …                              |
 
 Cache classes expose `reactiveStore` + imperative methods only — **no `use*` methods on classes**.
 
@@ -71,36 +71,39 @@ Policy shape (community-keyed for mod/revoked fields):
 
 ```ts
 {
-  hiddenAuthorIds: ReadonlySet<string>
-  showHiddenMessages: boolean
-  communities: Record<communityId, {
-    suppressAuthorFilter: boolean
-    canViewBanHidden: boolean
-    revokedAuthorIdsByChannel: Record<channelId, string[]>
-  }>
+  hiddenAuthorIds: ReadonlySet<string>;
+  showHiddenMessages: boolean;
+  communities: Record<
+    communityId,
+    {
+      suppressAuthorFilter: boolean;
+      canViewBanHidden: boolean;
+      revokedAuthorIdsByChannel: Record<channelId, string[]>;
+    }
+  >;
 }
 ```
 
 ## The four layers
 
-| Layer | Owns | Must NOT |
-|-------|------|----------|
-| **Router / shell** | Screen stack, URL (web), route params (mobile), drawer/layout | Domain entity caches, fetch, realtime |
-| **Cache (Nexus)** | Entity map, indexes, `load*` / `ensureLoaded`, persist/rehydrate, domain evict, **domain focus** (`activeId`, `activeChannelId`) | Supabase subscribe, auth, screen stack, React hooks |
-| **HavenReactCore** | Session lifecycle, `routeEvent`, cross-cache orchestration (policy sync, focus load, eviction), bootstrap phases, `messages.for(id)` registry | React hooks, UI state, multi-cache refresh fan-out in feature hooks |
-| **uiStore / local UI** | Modals, panels, friends panel state, workspace layout mode | Domain entities, block lists, counts, messages |
-| **AppHost** | OS bridges + **imperative shell navigation** for external events (push tap, deep link, access revoked redirect) | Domain data, cache writes |
+| Layer                  | Owns                                                                                                                                          | Must NOT                                                            |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **Router / shell**     | Screen stack, URL (web), route params (mobile), drawer/layout                                                                                 | Domain entity caches, fetch, realtime                               |
+| **Cache (Nexus)**      | Entity map, indexes, `load*` / `ensureLoaded`, persist/rehydrate, domain evict, **domain focus** (`activeId`, `activeChannelId`)              | Supabase subscribe, auth, screen stack, React hooks                 |
+| **HavenReactCore**     | Session lifecycle, `routeEvent`, cross-cache orchestration (policy sync, focus load, eviction), bootstrap phases, `messages.for(id)` registry | React hooks, UI state, multi-cache refresh fan-out in feature hooks |
+| **uiStore / local UI** | Modals, panels, friends panel state, workspace layout mode                                                                                    | Domain entities, block lists, counts, messages                      |
+| **AppHost**            | OS bridges + **imperative shell navigation** for external events (push tap, deep link, access revoked redirect)                               | Domain data, cache writes                                           |
 
 ## Where state lives
 
-| State | Owner |
-|-------|-------|
-| `currentServerId` | `core.communities.activeId` |
-| `currentChannelId` | `core.channels.activeChannelId` |
-| Last visited channel per community | `core.channels.getLastChannelId(communityId)` (persisted on cache) |
-| Inbox panel open / friends panel tab | `uiStore` |
-| Settings target / modal target | `uiStore` |
-| `workspaceMode` (community vs DM layout) | Shell local state or `uiStore` |
+| State                                    | Owner                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| `currentServerId`                        | `core.communities.activeId`                                        |
+| `currentChannelId`                       | `core.channels.activeChannelId`                                    |
+| Last visited channel per community       | `core.channels.getLastChannelId(communityId)` (persisted on cache) |
+| Inbox panel open / friends panel tab     | `uiStore`                                                          |
+| Settings target / modal target           | `uiStore`                                                          |
+| `workspaceMode` (community vs DM layout) | Shell local state or `uiStore`                                     |
 
 Domain focus: `core.communities` / `core.channels`. Layout mode: `uiStore.workspaceMode`.
 
@@ -175,10 +178,10 @@ See [REALTIME.md](./REALTIME.md) for the coverage matrix and open holes.
 `NexusPersistence` is the platform-agnostic port every cache uses for persist/rehydrate. Mobile
 injects the adapter at `createReactHavenCore({ ..., persistence })` time.
 
-| Host | Adapter |
-|------|---------|
-| Mobile (React Native) | `createMmkvPersistence()` |
-| Tests | `createMemoryPersistence()` |
+| Host                  | Adapter                                 |
+| --------------------- | --------------------------------------- |
+| Mobile (React Native) | `createMmkvPersistence()`               |
+| Tests                 | `createMemoryPersistence()`             |
 | Desktop / web (Solid) | TBD — chosen during the Solid app build |
 
 No cache module imports `react-native-mmkv` directly.

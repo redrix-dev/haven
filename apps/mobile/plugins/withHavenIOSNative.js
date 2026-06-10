@@ -6,25 +6,25 @@
  *
  * Templates live in `plugins/haven-ios-native-templates/`; edit those files, then re-run prebuild.
  */
-const fs = require('fs');
-const path = require('path');
-const { withXcodeProject } = require('expo/config-plugins');
+const fs = require("fs");
+const path = require("path");
+const { withXcodeProject } = require("expo/config-plugins");
 const {
   getProjectName,
   getHackyProjectName,
   addBuildSourceFileToGroup,
 } = require(
-  require.resolve('@expo/config-plugins/build/ios/utils/Xcodeproj', {
+  require.resolve("@expo/config-plugins/build/ios/utils/Xcodeproj", {
     // `@expo/config-plugins` is nested under `expo` in SDK 54+; resolve from the `expo` install.
-    paths: [path.join(__dirname, '../node_modules/expo')],
+    paths: [path.join(__dirname, "../node_modules/expo")],
   }),
 );
 
-const TEMPLATE_DIR = path.join(__dirname, 'haven-ios-native-templates');
-const TEMPLATE_SWIFT = path.join(TEMPLATE_DIR, 'AppDelegate.swift');
-const TEMPLATE_BRIDGE_H = path.join(TEMPLATE_DIR, 'HavenVoipPushBridge.h');
-const TEMPLATE_BRIDGE_M = path.join(TEMPLATE_DIR, 'HavenVoipPushBridge.m');
-const TEMPLATE_BRIDGING = path.join(TEMPLATE_DIR, 'Bridging-Header.h');
+const TEMPLATE_DIR = path.join(__dirname, "haven-ios-native-templates");
+const TEMPLATE_SWIFT = path.join(TEMPLATE_DIR, "AppDelegate.swift");
+const TEMPLATE_BRIDGE_H = path.join(TEMPLATE_DIR, "HavenVoipPushBridge.h");
+const TEMPLATE_BRIDGE_M = path.join(TEMPLATE_DIR, "HavenVoipPushBridge.m");
+const TEMPLATE_BRIDGING = path.join(TEMPLATE_DIR, "Bridging-Header.h");
 
 /**
  * @param {import('@expo/config-plugins').ExpoConfig} _config
@@ -44,17 +44,28 @@ function withHavenIOSNative(config) {
 
     if (!fs.existsSync(TEMPLATE_SWIFT)) {
       throw new Error(
-        `[withHavenIOSNative] Missing template: ${TEMPLATE_SWIFT}. Reinstall or restore plugins/haven-ios-native-templates.`
+        `[withHavenIOSNative] Missing template: ${TEMPLATE_SWIFT}. Reinstall or restore plugins/haven-ios-native-templates.`,
       );
     }
 
-    fs.copyFileSync(TEMPLATE_SWIFT, path.join(appDir, 'AppDelegate.swift'));
-    fs.copyFileSync(TEMPLATE_BRIDGE_H, path.join(appDir, 'HavenVoipPushBridge.h'));
-    fs.copyFileSync(TEMPLATE_BRIDGE_M, path.join(appDir, 'HavenVoipPushBridge.m'));
+    fs.copyFileSync(TEMPLATE_SWIFT, path.join(appDir, "AppDelegate.swift"));
+    fs.copyFileSync(
+      TEMPLATE_BRIDGE_H,
+      path.join(appDir, "HavenVoipPushBridge.h"),
+    );
+    fs.copyFileSync(
+      TEMPLATE_BRIDGE_M,
+      path.join(appDir, "HavenVoipPushBridge.m"),
+    );
     const bridgingName = `${projectName}-Bridging-Header.h`;
     fs.copyFileSync(TEMPLATE_BRIDGING, path.join(appDir, bridgingName));
 
-    for (const legacy of ['main.m', 'AppDelegate.m', 'AppDelegate.mm', 'AppDelegate.h']) {
+    for (const legacy of [
+      "main.m",
+      "AppDelegate.m",
+      "AppDelegate.mm",
+      "AppDelegate.h",
+    ]) {
       const p = path.join(appDir, legacy);
       if (fs.existsSync(p)) {
         try {
@@ -66,9 +77,9 @@ function withHavenIOSNative(config) {
     }
 
     const pr = conf.modResults;
-    const relVoipM = path.join(projectName, 'HavenVoipPushBridge.m');
+    const relVoipM = path.join(projectName, "HavenVoipPushBridge.m");
 
-    if (!pr.hasFile(relVoipM) && !pr.hasFile('HavenVoipPushBridge.m')) {
+    if (!pr.hasFile(relVoipM) && !pr.hasFile("HavenVoipPushBridge.m")) {
       addBuildSourceFileToGroup({
         filepath: relVoipM,
         groupName: projectName,
@@ -78,14 +89,14 @@ function withHavenIOSNative(config) {
     }
 
     const legacyRefs = [
-      path.join(projectName, 'main.m'),
-      'main.m',
-      path.join(projectName, 'AppDelegate.mm'),
-      'AppDelegate.mm',
-      path.join(projectName, 'AppDelegate.m'),
-      'AppDelegate.m',
-      path.join(projectName, 'AppDelegate.h'),
-      'AppDelegate.h',
+      path.join(projectName, "main.m"),
+      "main.m",
+      path.join(projectName, "AppDelegate.mm"),
+      "AppDelegate.mm",
+      path.join(projectName, "AppDelegate.m"),
+      "AppDelegate.m",
+      path.join(projectName, "AppDelegate.h"),
+      "AppDelegate.h",
     ];
     for (const rel of legacyRefs) {
       try {
@@ -97,7 +108,11 @@ function withHavenIOSNative(config) {
       }
     }
 
-    setBridgingHeaderInAppTarget(pr, projectName, `${projectName}/${projectName}-Bridging-Header.h`);
+    setBridgingHeaderInAppTarget(
+      pr,
+      projectName,
+      `${projectName}/${projectName}-Bridging-Header.h`,
+    );
 
     return conf;
   });
@@ -109,24 +124,27 @@ function withHavenIOSNative(config) {
  * @param {string} bridgingRelative
  */
 function setBridgingHeaderInAppTarget(project, projectName, bridgingRelative) {
-  const re = new RegExp(projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  const re = new RegExp(
+    projectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    "i",
+  );
   const section = project.pbxXCBuildConfigurationSection();
   for (const k of Object.keys(section)) {
     const entry = section[k];
-    if (!entry || typeof entry !== 'object' || !entry.buildSettings) {
+    if (!entry || typeof entry !== "object" || !entry.buildSettings) {
       continue;
     }
     const { buildSettings } = entry;
-    const listName = (entry.name && String(entry.name)) || '';
-    if (listName.includes('Test')) {
+    const listName = (entry.name && String(entry.name)) || "";
+    if (listName.includes("Test")) {
       continue;
     }
     const info = buildSettings.INFOPLIST_FILE;
     if (!info) {
       continue;
     }
-    const istr = String(info).replace(/^"|"$/g, '');
-    if (re.test(istr) && !istr.includes('Tests')) {
+    const istr = String(info).replace(/^"|"$/g, "");
+    if (re.test(istr) && !istr.includes("Tests")) {
       const quoted = `"${bridgingRelative}"`;
       buildSettings.SWIFT_OBJC_BRIDGING_HEADER = quoted;
     }

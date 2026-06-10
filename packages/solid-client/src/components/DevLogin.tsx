@@ -7,10 +7,7 @@ import type { Session } from "@supabase/supabase-js";
  * cache machine bootstrap. Delete when the real Phase 3 auth UI lands.
  */
 export function DevLogin(props: {
-  onSubmit: (
-    email: string,
-    password: string,
-  ) => Promise<{ error: unknown }>;
+  onSubmit: (email: string, password: string) => Promise<{ error: unknown }>;
 }) {
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
@@ -24,7 +21,9 @@ export function DevLogin(props: {
     const { error: signInError } = await props.onSubmit(email(), password());
     if (signInError) {
       setError(
-        signInError instanceof Error ? signInError.message : String(signInError),
+        signInError instanceof Error
+          ? signInError.message
+          : String(signInError),
       );
     }
     setBusy(false);
@@ -91,7 +90,14 @@ export function SessionPanel(props: {
   onSignOut: () => void;
 }) {
   return (
-    <div style={{ padding: "24px", display: "flex", "flex-direction": "column", gap: "8px" }}>
+    <div
+      style={{
+        padding: "24px",
+        display: "flex",
+        "flex-direction": "column",
+        gap: "8px",
+      }}
+    >
       <div style={{ "font-weight": "700", "font-size": "16px" }}>
         Signed in as {props.session.user?.email ?? props.session.user?.id}
       </div>
@@ -99,7 +105,9 @@ export function SessionPanel(props: {
         bootstrap phase: <strong>{props.phase().phase}</strong>
       </div>
       <Show when={props.phase().error}>
-        <div style={{ color: "var(--accent)" }}>error: {props.phase().error}</div>
+        <div style={{ color: "var(--accent)" }}>
+          error: {props.phase().error}
+        </div>
       </Show>
       <div style={{ "font-size": "12px", color: "var(--text-dim)" }}>
         Inspect caches in the console via <code>__haven</code> (e.g.{" "}

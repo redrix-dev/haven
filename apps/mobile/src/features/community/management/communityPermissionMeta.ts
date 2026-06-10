@@ -60,27 +60,87 @@ const PERMISSION_SCOPE_LABELS: Record<PermissionScope, string> = {
 };
 
 const COMMUNITY_PERMISSION_METADATA: Record<string, PermissionMetadata> = {
-  view_channels: { label: "View Channels", scope: "channel_access", ownerVisible: true },
-  send_messages: { label: "Send Messages", scope: "channel_access", ownerVisible: true },
-  create_channels: { label: "Create Channels", scope: "channel_structure", ownerVisible: true },
-  manage_channels: { label: "Manage Channel Structure", scope: "channel_structure", ownerVisible: true },
-  manage_channel_permissions: { label: "Manage Channel Overwrites", scope: "channel_overwrites", ownerVisible: true },
-  manage_messages: { label: "Manage Messages", scope: "message_admin", ownerVisible: true },
-  manage_server: { label: "Manage Community", scope: "community_admin", ownerVisible: true },
-  manage_roles: { label: "Manage Roles", scope: "role_admin", ownerVisible: true },
-  manage_members: { label: "Manage Members", scope: "member_admin", ownerVisible: true },
-  manage_invites: { label: "Manage Invites", scope: "invite_admin", ownerVisible: true },
-  create_reports: { label: "Create Reports", scope: "reporting", ownerVisible: true },
-  manage_reports: { label: "Manage Reports", scope: "reporting", ownerVisible: true },
-  manage_developer_access: { label: "Manage Developer Access", scope: "developer", ownerVisible: true },
-  manage_bans: { label: "Manage Bans", scope: "moderation", ownerVisible: true },
+  view_channels: {
+    label: "View Channels",
+    scope: "channel_access",
+    ownerVisible: true,
+  },
+  send_messages: {
+    label: "Send Messages",
+    scope: "channel_access",
+    ownerVisible: true,
+  },
+  create_channels: {
+    label: "Create Channels",
+    scope: "channel_structure",
+    ownerVisible: true,
+  },
+  manage_channels: {
+    label: "Manage Channel Structure",
+    scope: "channel_structure",
+    ownerVisible: true,
+  },
+  manage_channel_permissions: {
+    label: "Manage Channel Overwrites",
+    scope: "channel_overwrites",
+    ownerVisible: true,
+  },
+  manage_messages: {
+    label: "Manage Messages",
+    scope: "message_admin",
+    ownerVisible: true,
+  },
+  manage_server: {
+    label: "Manage Community",
+    scope: "community_admin",
+    ownerVisible: true,
+  },
+  manage_roles: {
+    label: "Manage Roles",
+    scope: "role_admin",
+    ownerVisible: true,
+  },
+  manage_members: {
+    label: "Manage Members",
+    scope: "member_admin",
+    ownerVisible: true,
+  },
+  manage_invites: {
+    label: "Manage Invites",
+    scope: "invite_admin",
+    ownerVisible: true,
+  },
+  create_reports: {
+    label: "Create Reports",
+    scope: "reporting",
+    ownerVisible: true,
+  },
+  manage_reports: {
+    label: "Manage Reports",
+    scope: "reporting",
+    ownerVisible: true,
+  },
+  manage_developer_access: {
+    label: "Manage Developer Access",
+    scope: "developer",
+    ownerVisible: true,
+  },
+  manage_bans: {
+    label: "Manage Bans",
+    scope: "moderation",
+    ownerVisible: true,
+  },
   can_view_ban_hidden: {
     label: "View Hidden Messages",
     description: "Can see messages hidden by bans.",
     scope: "moderation",
     ownerVisible: true,
   },
-  refresh_link_previews: { label: "Refresh Link Previews", scope: "developer", ownerVisible: true },
+  refresh_link_previews: {
+    label: "Refresh Link Previews",
+    scope: "developer",
+    ownerVisible: true,
+  },
   ["mention_haven_" + "developers"]: {
     label: "Mention Haven Moderation Team",
     scope: "reserved",

@@ -61,4 +61,8 @@ export type {
   UserStatus,
   WorkspaceMode,
 } from "./sessionStorePorts";
-export type { NexusEntry, EntityMapState, NexusState } from "./cache/entityTypes";
+export type {
+  NexusEntry,
+  EntityMapState,
+  NexusState,
+} from "./cache/entityTypes";

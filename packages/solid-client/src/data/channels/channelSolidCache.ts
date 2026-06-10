@@ -1,15 +1,15 @@
 import { createStore } from "solid-js/store";
-import { wireSolidReadableStore, type NotifyingReadableStore } from "../solidReadableStore";
+import {
+  wireSolidReadableStore,
+  type NotifyingReadableStore,
+} from "../solidReadableStore";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
 import type {
   ChannelNexusState,
   HavenChannel,
 } from "@shared/nexus/community/channelTypes";
 import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
-import type {
-  Channel,
-  ChannelGroupState,
-} from "@shared/lib/backend/types";
+import type { Channel, ChannelGroupState } from "@shared/lib/backend/types";
 
 const initialState = (): ChannelNexusState => ({
   entities: {},

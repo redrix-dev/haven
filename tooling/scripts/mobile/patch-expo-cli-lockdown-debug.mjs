@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "../../..");
 const target = path.join(
   repoRoot,
-  "apps/mobile/node_modules/expo/node_modules/@expo/cli/build/src/run/ios/appleDevice/client/LockdowndClient.js"
+  "apps/mobile/node_modules/expo/node_modules/@expo/cli/build/src/run/ios/appleDevice/client/LockdowndClient.js",
 );
 
 const unsafe = "debug(`startSession: ${pairRecord}`);";
@@ -20,12 +20,16 @@ if (!fs.existsSync(target)) {
 
 const contents = fs.readFileSync(target, "utf8");
 if (contents.includes(safe)) {
-  console.log("[mobile:patch-expo-cli] Expo CLI lockdown debug patch already applied.");
+  console.log(
+    "[mobile:patch-expo-cli] Expo CLI lockdown debug patch already applied.",
+  );
   process.exit(0);
 }
 
 if (!contents.includes(unsafe)) {
-  console.warn("[mobile:patch-expo-cli] Expo CLI lockdown debug line not found; leaving file unchanged.");
+  console.warn(
+    "[mobile:patch-expo-cli] Expo CLI lockdown debug line not found; leaving file unchanged.",
+  );
   process.exit(0);
 }
 

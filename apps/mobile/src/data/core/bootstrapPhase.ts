@@ -38,7 +38,10 @@ export class BootstrapPhase {
 
   set(phase: BootstrapPhaseValue, error: string | null = null): void {
     const next: BootstrapPhaseSnapshot = { phase, error };
-    if (next.phase === this.snapshot.phase && next.error === this.snapshot.error) {
+    if (
+      next.phase === this.snapshot.phase &&
+      next.error === this.snapshot.error
+    ) {
       return;
     }
     this.snapshot = next;

@@ -1,4 +1,4 @@
-import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
+import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 import type {
   NotificationCounts,
   NotificationDeliveryTraceRecord,
@@ -12,7 +12,7 @@ import type {
   WebPushSubscriptionUpsertInput,
   ExpoPushSubscriptionRecord,
   ExpoPushSubscriptionUpsertInput,
-} from './types';
+} from "./types";
 
 export interface NotificationBackend {
   listNotifications(input?: {
@@ -26,10 +26,14 @@ export interface NotificationBackend {
     beforeRecipientId?: string | null;
   }): Promise<NotificationItem[]>;
   listWebPushSubscriptions(): Promise<WebPushSubscriptionRecord[]>;
-  upsertWebPushSubscription(input: WebPushSubscriptionUpsertInput): Promise<WebPushSubscriptionRecord>;
+  upsertWebPushSubscription(
+    input: WebPushSubscriptionUpsertInput,
+  ): Promise<WebPushSubscriptionRecord>;
   deleteWebPushSubscription(endpoint: string): Promise<boolean>;
   listExpoPushSubscriptions(): Promise<ExpoPushSubscriptionRecord[]>;
-  upsertExpoPushSubscription(input: ExpoPushSubscriptionUpsertInput): Promise<ExpoPushSubscriptionRecord>;
+  upsertExpoPushSubscription(
+    input: ExpoPushSubscriptionUpsertInput,
+  ): Promise<ExpoPushSubscriptionRecord>;
   deleteExpoPushSubscription(expoPushToken: string): Promise<boolean>;
   listNotificationDeliveryTraces(input?: {
     limit?: number;
@@ -38,7 +42,7 @@ export interface NotificationBackend {
   getWebPushDispatchQueueHealthDiagnostics(): Promise<WebPushDispatchQueueHealthDiagnostics | null>;
   getWebPushDispatchWakeupDiagnostics(): Promise<WebPushDispatchWakeupDiagnostics | null>;
   updateWebPushDispatchWakeupConfig(
-    input: WebPushDispatchWakeupConfigUpdate
+    input: WebPushDispatchWakeupConfigUpdate,
   ): Promise<WebPushDispatchWakeupDiagnostics>;
   getNotificationCounts(): Promise<NotificationCounts>;
   markNotificationsSeen(recipientIds: string[]): Promise<number>;
@@ -47,14 +51,16 @@ export interface NotificationBackend {
   markAllNotificationsSeen(): Promise<number>;
   dismissNotifications(recipientIds: string[]): Promise<number>;
   getNotificationPreferences(): Promise<NotificationPreferences>;
-  updateNotificationPreferences(input: NotificationPreferenceUpdate): Promise<NotificationPreferences>;
+  updateNotificationPreferences(
+    input: NotificationPreferenceUpdate,
+  ): Promise<NotificationPreferences>;
 }
 
 type NotificationListRow = {
   recipient_id: string;
   event_id: string;
-  kind: NotificationItem['kind'];
-  source_kind: NotificationItem['sourceKind'];
+  kind: NotificationItem["kind"];
+  source_kind: NotificationItem["sourceKind"];
   source_id: string;
   actor_user_id: string | null;
   actor_username: string | null;
@@ -173,7 +179,7 @@ type WebPushDispatchQueueHealthDiagnosticsRow = {
 };
 
 const asRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' && !Array.isArray(value)
+  value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 
@@ -195,7 +201,9 @@ const mapNotificationItem = (row: NotificationListRow): NotificationItem => ({
   dismissedAt: row.dismissed_at,
 });
 
-const mapNotificationPreferences = (row: NotificationPreferencesRow): NotificationPreferences => ({
+const mapNotificationPreferences = (
+  row: NotificationPreferencesRow,
+): NotificationPreferences => ({
   userId: row.user_id,
   friendRequestInAppEnabled: Boolean(row.friend_request_in_app_enabled),
   friendRequestSoundEnabled: Boolean(row.friend_request_sound_enabled),
@@ -210,7 +218,9 @@ const mapNotificationPreferences = (row: NotificationPreferencesRow): Notificati
   updatedAt: row.updated_at,
 });
 
-const mapWebPushSubscriptionRecord = (row: WebPushSubscriptionRow): WebPushSubscriptionRecord => ({
+const mapWebPushSubscriptionRecord = (
+  row: WebPushSubscriptionRow,
+): WebPushSubscriptionRecord => ({
   id: row.id,
   userId: row.user_id,
   endpoint: row.endpoint,
@@ -227,7 +237,9 @@ const mapWebPushSubscriptionRecord = (row: WebPushSubscriptionRow): WebPushSubsc
   lastSeenAt: row.last_seen_at,
 });
 
-const mapExpoPushSubscriptionRecord = (row: ExpoPushSubscriptionRow): ExpoPushSubscriptionRecord => ({
+const mapExpoPushSubscriptionRecord = (
+  row: ExpoPushSubscriptionRow,
+): ExpoPushSubscriptionRecord => ({
   id: row.id,
   userId: row.user_id,
   expoPushToken: row.expo_push_token,
@@ -240,22 +252,22 @@ const mapExpoPushSubscriptionRecord = (row: ExpoPushSubscriptionRow): ExpoPushSu
 });
 
 const mapNotificationDeliveryTraceRecord = (
-  row: NotificationDeliveryTraceRow
+  row: NotificationDeliveryTraceRow,
 ): NotificationDeliveryTraceRecord => ({
   id: row.id,
   notificationRecipientId: row.notification_recipient_id,
   notificationEventId: row.notification_event_id,
   recipientUserId: row.recipient_user_id,
-  transport: row.transport as NotificationDeliveryTraceRecord['transport'],
-  stage: row.stage as NotificationDeliveryTraceRecord['stage'],
-  decision: row.decision as NotificationDeliveryTraceRecord['decision'],
+  transport: row.transport as NotificationDeliveryTraceRecord["transport"],
+  stage: row.stage as NotificationDeliveryTraceRecord["stage"],
+  decision: row.decision as NotificationDeliveryTraceRecord["decision"],
   reasonCode: row.reason_code,
   details: asRecord(row.details),
   createdAt: row.created_at,
 });
 
 const mapWebPushDispatchWakeupDiagnostics = (
-  row: WebPushDispatchWakeupDiagnosticsRow
+  row: WebPushDispatchWakeupDiagnosticsRow,
 ): WebPushDispatchWakeupDiagnostics => ({
   enabled: Boolean(row.enabled),
   shadowMode: Boolean(row.shadow_mode),
@@ -263,7 +275,8 @@ const mapWebPushDispatchWakeupDiagnostics = (
   lastAttemptedAt: row.last_attempted_at,
   lastRequestedAt: row.last_requested_at,
   lastRequestId:
-    typeof row.last_request_id === 'number' && Number.isFinite(row.last_request_id)
+    typeof row.last_request_id === "number" &&
+    Number.isFinite(row.last_request_id)
       ? Math.trunc(row.last_request_id)
       : null,
   lastMode: row.last_mode,
@@ -290,7 +303,7 @@ const normalizeNonNegativeInt = (value: unknown): number => {
 };
 
 const mapWebPushDispatchQueueHealthDiagnostics = (
-  row: WebPushDispatchQueueHealthDiagnosticsRow
+  row: WebPushDispatchQueueHealthDiagnosticsRow,
 ): WebPushDispatchQueueHealthDiagnostics => ({
   asOf: row.as_of,
   totalPending: normalizeNonNegativeInt(row.total_pending),
@@ -302,283 +315,335 @@ const mapWebPushDispatchQueueHealthDiagnostics = (
   claimableNowCount: normalizeNonNegativeInt(row.claimable_now_count),
   pendingDueNowCount: normalizeNonNegativeInt(row.pending_due_now_count),
   retryableDueNowCount: normalizeNonNegativeInt(row.retryable_due_now_count),
-  processingLeaseExpiredCount: normalizeNonNegativeInt(row.processing_lease_expired_count),
-  oldestClaimableAgeSeconds: normalizeNullableInt(row.oldest_claimable_age_seconds),
+  processingLeaseExpiredCount: normalizeNonNegativeInt(
+    row.processing_lease_expired_count,
+  ),
+  oldestClaimableAgeSeconds: normalizeNullableInt(
+    row.oldest_claimable_age_seconds,
+  ),
   oldestPendingAgeSeconds: normalizeNullableInt(row.oldest_pending_age_seconds),
-  oldestRetryableFailedAgeSeconds: normalizeNullableInt(row.oldest_retryable_failed_age_seconds),
-  oldestProcessingAgeSeconds: normalizeNullableInt(row.oldest_processing_age_seconds),
+  oldestRetryableFailedAgeSeconds: normalizeNullableInt(
+    row.oldest_retryable_failed_age_seconds,
+  ),
+  oldestProcessingAgeSeconds: normalizeNullableInt(
+    row.oldest_processing_age_seconds,
+  ),
   oldestProcessingLeaseOverdueSeconds: normalizeNullableInt(
-    row.oldest_processing_lease_overdue_seconds
+    row.oldest_processing_lease_overdue_seconds,
   ),
   maxAttemptsActive: normalizeNullableInt(row.max_attempts_active),
   highRetryAttemptCount: normalizeNonNegativeInt(row.high_retry_attempt_count),
-  deadLetterLast60mCount: normalizeNonNegativeInt(row.dead_letter_last_60m_count),
-  retryableFailedLast10mCount: normalizeNonNegativeInt(row.retryable_failed_last_10m_count),
+  deadLetterLast60mCount: normalizeNonNegativeInt(
+    row.dead_letter_last_60m_count,
+  ),
+  retryableFailedLast10mCount: normalizeNonNegativeInt(
+    row.retryable_failed_last_10m_count,
+  ),
   doneLast10mCount: normalizeNonNegativeInt(row.done_last_10m_count),
 });
 
-export function createNotificationBackend(client: HavenSupabaseClient): NotificationBackend {
+export function createNotificationBackend(
+  client: HavenSupabaseClient,
+): NotificationBackend {
   return {
-  async listNotifications(input) {
-    const { data, error } = await client.rpc(
-      'list_my_notifications' as never,
-      {
-        p_limit: input?.limit ?? 50,
-        p_before_created_at: input?.beforeCreatedAt ?? undefined,
-        p_before_id: input?.beforeRecipientId ?? undefined,
-      } as never
-    );
-    if (error) throw error;
-    return ((data ?? []) as NotificationListRow[]).map(mapNotificationItem);
-  },
+    async listNotifications(input) {
+      const { data, error } = await client.rpc(
+        "list_my_notifications" as never,
+        {
+          p_limit: input?.limit ?? 50,
+          p_before_created_at: input?.beforeCreatedAt ?? undefined,
+          p_before_id: input?.beforeRecipientId ?? undefined,
+        } as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as NotificationListRow[]).map(mapNotificationItem);
+    },
 
-  async listSoundNotifications(input) {
-    const { data, error } = await client.rpc(
-      'list_my_sound_notifications' as never,
-      {
-        p_limit: input?.limit ?? 50,
-        p_before_created_at: input?.beforeCreatedAt ?? undefined,
-        p_before_id: input?.beforeRecipientId ?? undefined,
-      } as never
-    );
-    if (error) throw error;
-    return ((data ?? []) as NotificationListRow[]).map(mapNotificationItem);
-  },
+    async listSoundNotifications(input) {
+      const { data, error } = await client.rpc(
+        "list_my_sound_notifications" as never,
+        {
+          p_limit: input?.limit ?? 50,
+          p_before_created_at: input?.beforeCreatedAt ?? undefined,
+          p_before_id: input?.beforeRecipientId ?? undefined,
+        } as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as NotificationListRow[]).map(mapNotificationItem);
+    },
 
-  async listWebPushSubscriptions() {
-    const { data, error } = await client.rpc('list_my_web_push_subscriptions' as never);
-    if (error) throw error;
-    return ((data ?? []) as WebPushSubscriptionRow[]).map(mapWebPushSubscriptionRecord);
-  },
+    async listWebPushSubscriptions() {
+      const { data, error } = await client.rpc(
+        "list_my_web_push_subscriptions" as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as WebPushSubscriptionRow[]).map(
+        mapWebPushSubscriptionRecord,
+      );
+    },
 
-  async upsertWebPushSubscription(input) {
-    const endpoint = input.endpoint?.trim();
-    const p256dhKey = input.p256dhKey?.trim();
-    const authKey = input.authKey?.trim();
+    async upsertWebPushSubscription(input) {
+      const endpoint = input.endpoint?.trim();
+      const p256dhKey = input.p256dhKey?.trim();
+      const authKey = input.authKey?.trim();
 
-    if (!endpoint) throw new Error('Web push subscription endpoint is required.');
-    if (!p256dhKey) throw new Error('Web push subscription p256dh key is required.');
-    if (!authKey) throw new Error('Web push subscription auth key is required.');
+      if (!endpoint)
+        throw new Error("Web push subscription endpoint is required.");
+      if (!p256dhKey)
+        throw new Error("Web push subscription p256dh key is required.");
+      if (!authKey)
+        throw new Error("Web push subscription auth key is required.");
 
-    const { data, error } = await client.rpc(
-      'upsert_my_web_push_subscription' as never,
-      {
-        p_endpoint: endpoint,
-        p_installation_id: input.installationId ?? null,
-        p_p256dh_key: p256dhKey,
-        p_auth_key: authKey,
-        p_expiration_time: input.expirationTime ?? null,
-        p_user_agent: input.userAgent ?? null,
-        p_client_platform: input.clientPlatform ?? null,
-        p_app_display_mode: input.appDisplayMode ?? null,
-        p_metadata: input.metadata ?? {},
-      } as never
-    );
-    if (error) throw error;
+      const { data, error } = await client.rpc(
+        "upsert_my_web_push_subscription" as never,
+        {
+          p_endpoint: endpoint,
+          p_installation_id: input.installationId ?? null,
+          p_p256dh_key: p256dhKey,
+          p_auth_key: authKey,
+          p_expiration_time: input.expirationTime ?? null,
+          p_user_agent: input.userAgent ?? null,
+          p_client_platform: input.clientPlatform ?? null,
+          p_app_display_mode: input.appDisplayMode ?? null,
+          p_metadata: input.metadata ?? {},
+        } as never,
+      );
+      if (error) throw error;
 
-    const row = (Array.isArray(data) ? data[0] : null) as WebPushSubscriptionRow | null;
-    if (!row) {
-      throw new Error('Web push subscription upsert returned no row.');
-    }
-    return mapWebPushSubscriptionRecord(row);
-  },
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as WebPushSubscriptionRow | null;
+      if (!row) {
+        throw new Error("Web push subscription upsert returned no row.");
+      }
+      return mapWebPushSubscriptionRecord(row);
+    },
 
-  async deleteWebPushSubscription(endpoint) {
-    const normalizedEndpoint = endpoint?.trim();
-    if (!normalizedEndpoint) return false;
+    async deleteWebPushSubscription(endpoint) {
+      const normalizedEndpoint = endpoint?.trim();
+      if (!normalizedEndpoint) return false;
 
-    const { data, error } = await client.rpc(
-      'delete_my_web_push_subscription' as never,
-      {
-        p_endpoint: normalizedEndpoint,
-      } as never
-    );
-    if (error) throw error;
-    return Boolean(data);
-  },
+      const { data, error } = await client.rpc(
+        "delete_my_web_push_subscription" as never,
+        {
+          p_endpoint: normalizedEndpoint,
+        } as never,
+      );
+      if (error) throw error;
+      return Boolean(data);
+    },
 
-  async listExpoPushSubscriptions() {
-    const { data, error } = await client.rpc('list_my_expo_push_subscriptions' as never);
-    if (error) throw error;
-    return ((data ?? []) as ExpoPushSubscriptionRow[]).map(mapExpoPushSubscriptionRecord);
-  },
+    async listExpoPushSubscriptions() {
+      const { data, error } = await client.rpc(
+        "list_my_expo_push_subscriptions" as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as ExpoPushSubscriptionRow[]).map(
+        mapExpoPushSubscriptionRecord,
+      );
+    },
 
-  async upsertExpoPushSubscription(input) {
-    const token = input.expoPushToken?.trim();
-    if (!token) throw new Error('Expo push token is required.');
+    async upsertExpoPushSubscription(input) {
+      const token = input.expoPushToken?.trim();
+      if (!token) throw new Error("Expo push token is required.");
 
-    const platform = input.platform ?? 'unknown';
+      const platform = input.platform ?? "unknown";
 
-    const { data, error } = await client.rpc(
-      'upsert_my_expo_push_subscription' as never,
-      {
-        p_expo_push_token: token,
-        p_platform: platform,
-        p_installation_id: input.installationId ?? null,
-        p_metadata: input.metadata ?? {},
-      } as never
-    );
-    if (error) throw error;
+      const { data, error } = await client.rpc(
+        "upsert_my_expo_push_subscription" as never,
+        {
+          p_expo_push_token: token,
+          p_platform: platform,
+          p_installation_id: input.installationId ?? null,
+          p_metadata: input.metadata ?? {},
+        } as never,
+      );
+      if (error) throw error;
 
-    const row = (Array.isArray(data) ? data[0] : null) as ExpoPushSubscriptionRow | null;
-    if (!row) {
-      throw new Error('Expo push subscription upsert returned no row.');
-    }
-    return mapExpoPushSubscriptionRecord(row);
-  },
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as ExpoPushSubscriptionRow | null;
+      if (!row) {
+        throw new Error("Expo push subscription upsert returned no row.");
+      }
+      return mapExpoPushSubscriptionRecord(row);
+    },
 
-  async deleteExpoPushSubscription(expoPushToken) {
-    const normalized = expoPushToken?.trim();
-    if (!normalized) return false;
+    async deleteExpoPushSubscription(expoPushToken) {
+      const normalized = expoPushToken?.trim();
+      if (!normalized) return false;
 
-    const { data, error } = await client.rpc(
-      'delete_my_expo_push_subscription' as never,
-      {
-        p_expo_push_token: normalized,
-      } as never
-    );
-    if (error) throw error;
-    return Boolean(data);
-  },
+      const { data, error } = await client.rpc(
+        "delete_my_expo_push_subscription" as never,
+        {
+          p_expo_push_token: normalized,
+        } as never,
+      );
+      if (error) throw error;
+      return Boolean(data);
+    },
 
-  async listNotificationDeliveryTraces(input) {
-    const { data, error } = await client.rpc(
-      'list_my_notification_delivery_traces' as never,
-      {
-        p_limit: input?.limit ?? 50,
-        p_notification_recipient_id: input?.recipientId ?? null,
-      } as never
-    );
-    if (error) throw error;
-    return ((data ?? []) as NotificationDeliveryTraceRow[]).map(mapNotificationDeliveryTraceRecord);
-  },
+    async listNotificationDeliveryTraces(input) {
+      const { data, error } = await client.rpc(
+        "list_my_notification_delivery_traces" as never,
+        {
+          p_limit: input?.limit ?? 50,
+          p_notification_recipient_id: input?.recipientId ?? null,
+        } as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as NotificationDeliveryTraceRow[]).map(
+        mapNotificationDeliveryTraceRecord,
+      );
+    },
 
-  async getWebPushDispatchWakeupDiagnostics() {
-    const { data, error } = await client.rpc(
-      'get_web_push_dispatch_wakeup_diagnostics' as never
-    );
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : null) as WebPushDispatchWakeupDiagnosticsRow | null;
-    return row ? mapWebPushDispatchWakeupDiagnostics(row) : null;
-  },
+    async getWebPushDispatchWakeupDiagnostics() {
+      const { data, error } = await client.rpc(
+        "get_web_push_dispatch_wakeup_diagnostics" as never,
+      );
+      if (error) throw error;
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as WebPushDispatchWakeupDiagnosticsRow | null;
+      return row ? mapWebPushDispatchWakeupDiagnostics(row) : null;
+    },
 
-  async getWebPushDispatchQueueHealthDiagnostics() {
-    const { data, error } = await client.rpc(
-      'get_web_push_dispatch_queue_health_diagnostics' as never
-    );
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : null) as WebPushDispatchQueueHealthDiagnosticsRow | null;
-    return row ? mapWebPushDispatchQueueHealthDiagnostics(row) : null;
-  },
+    async getWebPushDispatchQueueHealthDiagnostics() {
+      const { data, error } = await client.rpc(
+        "get_web_push_dispatch_queue_health_diagnostics" as never,
+      );
+      if (error) throw error;
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as WebPushDispatchQueueHealthDiagnosticsRow | null;
+      return row ? mapWebPushDispatchQueueHealthDiagnostics(row) : null;
+    },
 
-  async updateWebPushDispatchWakeupConfig(input) {
-    const minIntervalSeconds =
-      typeof input.minIntervalSeconds === 'number' && Number.isFinite(input.minIntervalSeconds)
-        ? Math.trunc(input.minIntervalSeconds)
-        : null;
-    const { data, error } = await client.rpc(
-      'update_web_push_dispatch_wakeup_config' as never,
-      {
-        p_enabled: typeof input.enabled === 'boolean' ? input.enabled : null,
-        p_shadow_mode: typeof input.shadowMode === 'boolean' ? input.shadowMode : null,
-        p_min_interval_seconds: minIntervalSeconds,
-      } as never
-    );
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : null) as WebPushDispatchWakeupDiagnosticsRow | null;
-    if (!row) {
-      throw new Error('Web push dispatch wakeup config update returned no row.');
-    }
-    return mapWebPushDispatchWakeupDiagnostics(row);
-  },
+    async updateWebPushDispatchWakeupConfig(input) {
+      const minIntervalSeconds =
+        typeof input.minIntervalSeconds === "number" &&
+        Number.isFinite(input.minIntervalSeconds)
+          ? Math.trunc(input.minIntervalSeconds)
+          : null;
+      const { data, error } = await client.rpc(
+        "update_web_push_dispatch_wakeup_config" as never,
+        {
+          p_enabled: typeof input.enabled === "boolean" ? input.enabled : null,
+          p_shadow_mode:
+            typeof input.shadowMode === "boolean" ? input.shadowMode : null,
+          p_min_interval_seconds: minIntervalSeconds,
+        } as never,
+      );
+      if (error) throw error;
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as WebPushDispatchWakeupDiagnosticsRow | null;
+      if (!row) {
+        throw new Error(
+          "Web push dispatch wakeup config update returned no row.",
+        );
+      }
+      return mapWebPushDispatchWakeupDiagnostics(row);
+    },
 
-  async getNotificationCounts() {
-    const { data, error } = await client.rpc('get_my_notification_counts' as never);
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : null) as NotificationCountsRow | null;
-    return {
-      unseenCount: Number(row?.unseen_count ?? 0),
-      unreadCount: Number(row?.unread_count ?? 0),
-    };
-  },
+    async getNotificationCounts() {
+      const { data, error } = await client.rpc(
+        "get_my_notification_counts" as never,
+      );
+      if (error) throw error;
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as NotificationCountsRow | null;
+      return {
+        unseenCount: Number(row?.unseen_count ?? 0),
+        unreadCount: Number(row?.unread_count ?? 0),
+      };
+    },
 
-  async markNotificationsSeen(recipientIds) {
-    const uniqueIds = Array.from(new Set(recipientIds.filter(Boolean)));
-    if (uniqueIds.length === 0) return 0;
-    const { data, error } = await client.rpc(
-      'mark_notifications_seen' as never,
-      {
-        p_recipient_ids: uniqueIds,
-      } as never
-    );
-    if (error) throw error;
-    return typeof data === 'number' ? data : 0;
-  },
+    async markNotificationsSeen(recipientIds) {
+      const uniqueIds = Array.from(new Set(recipientIds.filter(Boolean)));
+      if (uniqueIds.length === 0) return 0;
+      const { data, error } = await client.rpc(
+        "mark_notifications_seen" as never,
+        {
+          p_recipient_ids: uniqueIds,
+        } as never,
+      );
+      if (error) throw error;
+      return typeof data === "number" ? data : 0;
+    },
 
-  async markNotificationsRead(recipientIds) {
-    const uniqueIds = Array.from(new Set(recipientIds.filter(Boolean)));
-    if (uniqueIds.length === 0) return 0;
-    const { data, error } = await client.rpc(
-      'mark_notifications_read' as never,
-      {
-        p_recipient_ids: uniqueIds,
-      } as never
-    );
-    if (error) throw error;
-    return typeof data === 'number' ? data : 0;
-  },
+    async markNotificationsRead(recipientIds) {
+      const uniqueIds = Array.from(new Set(recipientIds.filter(Boolean)));
+      if (uniqueIds.length === 0) return 0;
+      const { data, error } = await client.rpc(
+        "mark_notifications_read" as never,
+        {
+          p_recipient_ids: uniqueIds,
+        } as never,
+      );
+      if (error) throw error;
+      return typeof data === "number" ? data : 0;
+    },
 
-  async markAllNotificationsSeen() {
-    const { data, error } = await client.rpc('mark_all_notifications_seen' as never);
-    if (error) throw error;
-    return typeof data === 'number' ? data : 0;
-  },
+    async markAllNotificationsSeen() {
+      const { data, error } = await client.rpc(
+        "mark_all_notifications_seen" as never,
+      );
+      if (error) throw error;
+      return typeof data === "number" ? data : 0;
+    },
 
-  async dismissNotifications(recipientIds) {
-    const uniqueIds = Array.from(new Set(recipientIds.filter(Boolean)));
-    if (uniqueIds.length === 0) return 0;
-    const { data, error } = await client.rpc(
-      'dismiss_notifications' as never,
-      {
-        p_recipient_ids: uniqueIds,
-      } as never
-    );
-    if (error) throw error;
-    return typeof data === 'number' ? data : 0;
-  },
+    async dismissNotifications(recipientIds) {
+      const uniqueIds = Array.from(new Set(recipientIds.filter(Boolean)));
+      if (uniqueIds.length === 0) return 0;
+      const { data, error } = await client.rpc(
+        "dismiss_notifications" as never,
+        {
+          p_recipient_ids: uniqueIds,
+        } as never,
+      );
+      if (error) throw error;
+      return typeof data === "number" ? data : 0;
+    },
 
-  async getNotificationPreferences() {
-    const { data, error } = await client.rpc('get_my_notification_preferences' as never);
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : null) as NotificationPreferencesRow | null;
-    if (!row) {
-      throw new Error('Notification preferences were not returned.');
-    }
-    return mapNotificationPreferences(row);
-  },
+    async getNotificationPreferences() {
+      const { data, error } = await client.rpc(
+        "get_my_notification_preferences" as never,
+      );
+      if (error) throw error;
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as NotificationPreferencesRow | null;
+      if (!row) {
+        throw new Error("Notification preferences were not returned.");
+      }
+      return mapNotificationPreferences(row);
+    },
 
-  async updateNotificationPreferences(input) {
-    const { data, error } = await client.rpc(
-      'update_my_notification_preferences' as never,
-      {
-        p_friend_request_in_app_enabled: input.friendRequestInAppEnabled,
-        p_friend_request_sound_enabled: input.friendRequestSoundEnabled,
-        p_friend_request_push_enabled: input.friendRequestPushEnabled,
-        p_dm_in_app_enabled: input.dmInAppEnabled,
-        p_dm_sound_enabled: input.dmSoundEnabled,
-        p_dm_push_enabled: input.dmPushEnabled,
-        p_mention_in_app_enabled: input.mentionInAppEnabled,
-        p_mention_sound_enabled: input.mentionSoundEnabled,
-        p_mention_push_enabled: input.mentionPushEnabled,
-      } as never
-    );
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : null) as NotificationPreferencesRow | null;
-    if (!row) {
-      throw new Error('Notification preferences update returned no row.');
-    }
-    return mapNotificationPreferences(row);
-  },
-};
+    async updateNotificationPreferences(input) {
+      const { data, error } = await client.rpc(
+        "update_my_notification_preferences" as never,
+        {
+          p_friend_request_in_app_enabled: input.friendRequestInAppEnabled,
+          p_friend_request_sound_enabled: input.friendRequestSoundEnabled,
+          p_friend_request_push_enabled: input.friendRequestPushEnabled,
+          p_dm_in_app_enabled: input.dmInAppEnabled,
+          p_dm_sound_enabled: input.dmSoundEnabled,
+          p_dm_push_enabled: input.dmPushEnabled,
+          p_mention_in_app_enabled: input.mentionInAppEnabled,
+          p_mention_sound_enabled: input.mentionSoundEnabled,
+          p_mention_push_enabled: input.mentionPushEnabled,
+        } as never,
+      );
+      if (error) throw error;
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as NotificationPreferencesRow | null;
+      if (!row) {
+        throw new Error("Notification preferences update returned no row.");
+      }
+      return mapNotificationPreferences(row);
+    },
+  };
 }
-

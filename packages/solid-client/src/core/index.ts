@@ -1,7 +1,4 @@
-export {
-  HavenSolidCore,
-  type HavenSolidCoreOptions,
-} from "./HavenSolidCore";
+export { HavenSolidCore, type HavenSolidCoreOptions } from "./HavenSolidCore";
 export {
   createSolidHavenCore,
   getHavenSolidCore,

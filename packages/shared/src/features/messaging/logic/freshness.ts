@@ -6,8 +6,7 @@ export function shouldSkipInitialReload(input: {
   freshnessMs?: number;
   now?: number;
 }): boolean {
-  const freshnessMs =
-    input.freshnessMs ?? MESSAGE_RELOAD_FRESHNESS_WINDOW_MS;
+  const freshnessMs = input.freshnessMs ?? MESSAGE_RELOAD_FRESHNESS_WINDOW_MS;
   const now = input.now ?? Date.now();
   return (
     input.initialLoadComplete && now - input.lastInitialLoadedAt < freshnessMs

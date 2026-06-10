@@ -1,6 +1,4 @@
-import {
-  createReactHavenCore as createCore,
-} from "./core/havenCoreRegistry";
+import { createReactHavenCore as createCore } from "./core/havenCoreRegistry";
 import type { HavenReactCoreOptions } from "./core/HavenReactCore";
 import type { HavenReactCore } from "./core/HavenReactCore";
 

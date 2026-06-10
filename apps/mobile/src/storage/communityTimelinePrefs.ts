@@ -46,7 +46,8 @@ export function commitChannelScrollExit(
   sessionExitByChannel.set(key, {
     wasNearBottom: false,
     anchorMessageId: exit.anchorMessageId,
-    anchorOffsetY: typeof exit.anchorOffsetY === "number" ? exit.anchorOffsetY : undefined,
+    anchorOffsetY:
+      typeof exit.anchorOffsetY === "number" ? exit.anchorOffsetY : undefined,
   });
 }
 

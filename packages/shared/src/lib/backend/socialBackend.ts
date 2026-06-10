@@ -1,11 +1,11 @@
-import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
+import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 import type {
   BlockedUserSummary,
   FriendRequestSummary,
   FriendSearchResult,
   FriendSummary,
   SocialCounts,
-} from './types';
+} from "./types";
 
 export interface SocialBackend {
   getSocialCounts(): Promise<SocialCounts>;
@@ -42,8 +42,8 @@ type FriendRow = {
 
 type FriendRequestRow = {
   request_id: string;
-  direction: 'incoming' | 'outgoing';
-  status: FriendRequestSummary['status'];
+  direction: "incoming" | "outgoing";
+  status: FriendRequestSummary["status"];
   sender_user_id: string;
   sender_username: string;
   sender_avatar_url: string | null;
@@ -70,7 +70,7 @@ type FriendSearchRow = {
   user_id: string;
   username: string;
   avatar_url: string | null;
-  relationship_state: FriendSearchResult['relationshipState'];
+  relationship_state: FriendSearchResult["relationshipState"];
   pending_request_id: string | null;
   mutual_community_count: number | null;
   mutual_community_names: string[] | null;
@@ -89,7 +89,9 @@ const mapFriend = (row: FriendRow): FriendSummary => ({
   avatarUrl: row.avatar_url ?? null,
   friendshipCreatedAt: row.friendship_created_at,
   mutualCommunityCount: Number(row.mutual_community_count ?? 0),
-  mutualCommunityNames: Array.isArray(row.mutual_community_names) ? row.mutual_community_names : [],
+  mutualCommunityNames: Array.isArray(row.mutual_community_names)
+    ? row.mutual_community_names
+    : [],
 });
 
 const mapFriendRequest = (row: FriendRequestRow): FriendRequestSummary => ({
@@ -104,7 +106,9 @@ const mapFriendRequest = (row: FriendRequestRow): FriendRequestSummary => ({
   recipientAvatarUrl: row.recipient_avatar_url ?? null,
   createdAt: row.created_at,
   mutualCommunityCount: Number(row.mutual_community_count ?? 0),
-  mutualCommunityNames: Array.isArray(row.mutual_community_names) ? row.mutual_community_names : [],
+  mutualCommunityNames: Array.isArray(row.mutual_community_names)
+    ? row.mutual_community_names
+    : [],
 });
 
 const mapBlockedUser = (row: BlockedUserRow): BlockedUserSummary => ({
@@ -121,10 +125,14 @@ const mapFriendSearchResult = (row: FriendSearchRow): FriendSearchResult => ({
   relationshipState: row.relationship_state,
   pendingRequestId: row.pending_request_id ?? null,
   mutualCommunityCount: Number(row.mutual_community_count ?? 0),
-  mutualCommunityNames: Array.isArray(row.mutual_community_names) ? row.mutual_community_names : [],
+  mutualCommunityNames: Array.isArray(row.mutual_community_names)
+    ? row.mutual_community_names
+    : [],
 });
 
-export function createSocialBackend(client: HavenSupabaseClient): SocialBackend {
+export function createSocialBackend(
+  client: HavenSupabaseClient,
+): SocialBackend {
   const getAuthenticatedUserId = async (): Promise<string> => {
     const {
       data: { user },
@@ -132,7 +140,7 @@ export function createSocialBackend(client: HavenSupabaseClient): SocialBackend 
     } = await client.auth.getUser();
     if (error) throw error;
     if (!user?.id) {
-      throw new Error('Not authenticated.');
+      throw new Error("Not authenticated.");
     }
     return user.id;
   };
@@ -141,132 +149,150 @@ export function createSocialBackend(client: HavenSupabaseClient): SocialBackend 
     functionName: string,
     args: Record<string, unknown>,
   ): Promise<boolean> => {
-    const { data, error } = await client.rpc(functionName as never, args as never);
+    const { data, error } = await client.rpc(
+      functionName as never,
+      args as never,
+    );
     if (error) throw error;
     return Boolean(data);
   };
 
   return {
-  async getSocialCounts() {
-    const { data, error } = await client.rpc('get_my_social_counts' as never);
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : null) as SocialCountsRow | null;
-    return mapSocialCounts(row);
-  },
+    async getSocialCounts() {
+      const { data, error } = await client.rpc("get_my_social_counts" as never);
+      if (error) throw error;
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as SocialCountsRow | null;
+      return mapSocialCounts(row);
+    },
 
-  async listFriends() {
-    const { data, error } = await client.rpc('list_my_friends' as never);
-    if (error) throw error;
-    return ((data ?? []) as FriendRow[]).map(mapFriend);
-  },
+    async listFriends() {
+      const { data, error } = await client.rpc("list_my_friends" as never);
+      if (error) throw error;
+      return ((data ?? []) as FriendRow[]).map(mapFriend);
+    },
 
-  async listFriendRequests() {
-    const { data, error } = await client.rpc('list_my_friend_requests' as never);
-    if (error) throw error;
-    return ((data ?? []) as FriendRequestRow[]).map(mapFriendRequest);
-  },
+    async listFriendRequests() {
+      const { data, error } = await client.rpc(
+        "list_my_friend_requests" as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as FriendRequestRow[]).map(mapFriendRequest);
+    },
 
-  async listBlockedUsers() {
-    const { data, error } = await client.rpc('list_my_blocked_users' as never);
-    if (error) throw error;
-    return ((data ?? []) as BlockedUserRow[]).map(mapBlockedUser);
-  },
+    async listBlockedUsers() {
+      const { data, error } = await client.rpc(
+        "list_my_blocked_users" as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as BlockedUserRow[]).map(mapBlockedUser);
+    },
 
-  async listMyBlocks() {
-    const userId = await getAuthenticatedUserId();
-    const { data, error } = await client
-      .from('user_blocks' as never)
-      .select('blocked_user_id')
-      .eq('blocker_user_id', userId);
-    if (error) throw error;
-    const rows = (data ?? []) as Array<{ blocked_user_id: string | null }>;
-    return Array.from(
-      new Set(
-        rows
-          .map((row) => row.blocked_user_id)
-          .filter((blockedUserId): blockedUserId is string => Boolean(blockedUserId))
-      )
-    );
-  },
+    async listMyBlocks() {
+      const userId = await getAuthenticatedUserId();
+      const { data, error } = await client
+        .from("user_blocks" as never)
+        .select("blocked_user_id")
+        .eq("blocker_user_id", userId);
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{ blocked_user_id: string | null }>;
+      return Array.from(
+        new Set(
+          rows
+            .map((row) => row.blocked_user_id)
+            .filter((blockedUserId): blockedUserId is string =>
+              Boolean(blockedUserId),
+            ),
+        ),
+      );
+    },
 
-  async listUsersBlockingMe() {
-    const { data, error } = await client.rpc('list_users_blocking_me' as never);
-    if (error) throw error;
-    return Array.from(
-      new Set(
-        ((data ?? []) as UserBlockingMeRow[])
-          .map((row) => row.blocker_user_id)
-          .filter((blockerUserId): blockerUserId is string => Boolean(blockerUserId))
-      )
-    );
-  },
+    async listUsersBlockingMe() {
+      const { data, error } = await client.rpc(
+        "list_users_blocking_me" as never,
+      );
+      if (error) throw error;
+      return Array.from(
+        new Set(
+          ((data ?? []) as UserBlockingMeRow[])
+            .map((row) => row.blocker_user_id)
+            .filter((blockerUserId): blockerUserId is string =>
+              Boolean(blockerUserId),
+            ),
+        ),
+      );
+    },
 
-  async searchUsersForFriendAdd(query) {
-    const trimmedQuery = query.trim();
-    if (trimmedQuery.length < 2) return [];
-    const { data, error } = await client.rpc(
-      'search_users_for_friend_add' as never,
-      { p_query: trimmedQuery } as never
-    );
-    if (error) throw error;
-    return ((data ?? []) as FriendSearchRow[]).map(mapFriendSearchResult);
-  },
+    async searchUsersForFriendAdd(query) {
+      const trimmedQuery = query.trim();
+      if (trimmedQuery.length < 2) return [];
+      const { data, error } = await client.rpc(
+        "search_users_for_friend_add" as never,
+        { p_query: trimmedQuery } as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as FriendSearchRow[]).map(mapFriendSearchResult);
+    },
 
-  async sendFriendRequest(username) {
-    const { data, error } = await client.rpc(
-      'send_friend_request' as never,
-      { p_username: username } as never
-    );
-    if (error) throw error;
-    const requestId = data as unknown;
-    if (typeof requestId !== 'string' || requestId.trim().length === 0) {
-      throw new Error('Friend request creation returned no id.');
-    }
-    return requestId;
-  },
+    async sendFriendRequest(username) {
+      const { data, error } = await client.rpc(
+        "send_friend_request" as never,
+        { p_username: username } as never,
+      );
+      if (error) throw error;
+      const requestId = data as unknown;
+      if (typeof requestId !== "string" || requestId.trim().length === 0) {
+        throw new Error("Friend request creation returned no id.");
+      }
+      return requestId;
+    },
 
-  async acceptFriendRequest(requestId) {
-    const { data, error } = await client.rpc(
-      'accept_friend_request' as never,
-      { p_request_id: requestId } as never
-    );
-    if (error) throw error;
-    const otherUserId = data as unknown;
-    if (typeof otherUserId !== 'string' || otherUserId.trim().length === 0) {
-      throw new Error('Friend request accept returned no user id.');
-    }
-    return otherUserId;
-  },
+    async acceptFriendRequest(requestId) {
+      const { data, error } = await client.rpc(
+        "accept_friend_request" as never,
+        { p_request_id: requestId } as never,
+      );
+      if (error) throw error;
+      const otherUserId = data as unknown;
+      if (typeof otherUserId !== "string" || otherUserId.trim().length === 0) {
+        throw new Error("Friend request accept returned no user id.");
+      }
+      return otherUserId;
+    },
 
-  async declineFriendRequest(requestId) {
-    return callBooleanRpc('decline_friend_request', { p_request_id: requestId });
-  },
+    async declineFriendRequest(requestId) {
+      return callBooleanRpc("decline_friend_request", {
+        p_request_id: requestId,
+      });
+    },
 
-  async cancelFriendRequest(requestId) {
-    return callBooleanRpc('cancel_friend_request', { p_request_id: requestId });
-  },
+    async cancelFriendRequest(requestId) {
+      return callBooleanRpc("cancel_friend_request", {
+        p_request_id: requestId,
+      });
+    },
 
-  async removeFriend(otherUserId) {
-    return callBooleanRpc('remove_friend', { p_other_user_id: otherUserId });
-  },
+    async removeFriend(otherUserId) {
+      return callBooleanRpc("remove_friend", { p_other_user_id: otherUserId });
+    },
 
-  async blockUser(targetUserId) {
-    const { error } = await client.rpc(
-      'block_user' as never,
-      { p_target_user_id: targetUserId } as never
-    );
-    if (error) throw error;
-    return true;
-  },
+    async blockUser(targetUserId) {
+      const { error } = await client.rpc(
+        "block_user" as never,
+        { p_target_user_id: targetUserId } as never,
+      );
+      if (error) throw error;
+      return true;
+    },
 
-  async unblockUser(targetUserId) {
-    const { error } = await client.rpc(
-      'unblock_user' as never,
-      { p_target_user_id: targetUserId } as never
-    );
-    if (error) throw error;
-    return true;
-  },
-};
+    async unblockUser(targetUserId) {
+      const { error } = await client.rpc(
+        "unblock_user" as never,
+        { p_target_user_id: targetUserId } as never,
+      );
+      if (error) throw error;
+      return true;
+    },
+  };
 }
-

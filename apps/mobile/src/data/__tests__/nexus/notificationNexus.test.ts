@@ -1,23 +1,23 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createMemoryPersistence } from '@shared/core';
-import { NotificationNexus } from '@mobile-data/notifications/NotificationNexus';
-import type { NotificationItem } from '@shared/lib/backend/types';
+import { describe, expect, it, vi } from "vitest";
+import { createMemoryPersistence } from "@shared/core";
+import { NotificationNexus } from "@mobile-data/notifications/NotificationNexus";
+import type { NotificationItem } from "@shared/lib/backend/types";
 
 const item = (overrides: Partial<NotificationItem> = {}): NotificationItem =>
   ({
-    recipientId: 'r1',
-    eventId: 'e1',
-    kind: 'mention',
-    sourceKind: 'community_message',
-    sourceId: 's1',
+    recipientId: "r1",
+    eventId: "e1",
+    kind: "mention",
+    sourceKind: "community_message",
+    sourceId: "s1",
     actorUserId: null,
     actorUsername: null,
     actorAvatarUrl: null,
     ...overrides,
   }) as NotificationItem;
 
-describe('NotificationNexus', () => {
-  it('loads the inbox and updates counts', async () => {
+describe("NotificationNexus", () => {
+  it("loads the inbox and updates counts", async () => {
     const nexus = new NotificationNexus(createMemoryPersistence(), {
       listNotifications: vi.fn(async () => [item()]),
       getNotificationCounts: vi.fn(async () => ({
@@ -28,11 +28,11 @@ describe('NotificationNexus', () => {
 
     await nexus.loadInbox();
 
-    expect(nexus.getSnapshot('r1')).toBeDefined();
+    expect(nexus.getSnapshot("r1")).toBeDefined();
     expect(nexus.reactiveStore.getState().counts.unseenCount).toBe(1);
   });
 
-  it('dedupes concurrent inbox loads', async () => {
+  it("dedupes concurrent inbox loads", async () => {
     const list = vi.fn(async () => [item()]);
     const nexus = new NotificationNexus(createMemoryPersistence(), {
       listNotifications: list,
@@ -47,7 +47,7 @@ describe('NotificationNexus', () => {
     expect(list).toHaveBeenCalledTimes(1);
   });
 
-  it('skips fresh ensured inbox loads', async () => {
+  it("skips fresh ensured inbox loads", async () => {
     const list = vi.fn(async () => [item()]);
     const getNotificationCounts = vi.fn(async () => ({
       unseenCount: 1,
@@ -65,7 +65,7 @@ describe('NotificationNexus', () => {
     expect(getNotificationCounts).toHaveBeenCalledTimes(1);
   });
 
-  it('dedupes concurrent preference loads', async () => {
+  it("dedupes concurrent preference loads", async () => {
     const getNotificationPreferences = vi.fn(async () => ({
       friendRequestInAppEnabled: true,
       friendRequestSoundEnabled: true,
@@ -87,7 +87,7 @@ describe('NotificationNexus', () => {
     expect(getNotificationPreferences).toHaveBeenCalledTimes(1);
   });
 
-  it('markSeen delegates and refreshes counts', async () => {
+  it("markSeen delegates and refreshes counts", async () => {
     const markSeen = vi.fn(async () => 1);
     const getCounts = vi.fn(async () => ({
       unseenCount: 0,
@@ -98,55 +98,55 @@ describe('NotificationNexus', () => {
       getNotificationCounts: getCounts,
     } as never);
 
-    await nexus.markSeen(['r1']);
+    await nexus.markSeen(["r1"]);
 
-    expect(markSeen).toHaveBeenCalledWith(['r1']);
+    expect(markSeen).toHaveBeenCalledWith(["r1"]);
   });
 
-  it('delegates Expo push subscription registration through the notification backend', async () => {
+  it("delegates Expo push subscription registration through the notification backend", async () => {
     const upsertExpoPushSubscription = vi.fn(async () => ({
-      id: 'sub1',
-      userId: 'u1',
-      expoPushToken: 'ExponentPushToken[test]',
-      platform: 'ios',
-      installationId: 'install1',
-      metadata: { source: 'test' },
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-      lastSeenAt: '2026-01-01T00:00:00.000Z',
+      id: "sub1",
+      userId: "u1",
+      expoPushToken: "ExponentPushToken[test]",
+      platform: "ios",
+      installationId: "install1",
+      metadata: { source: "test" },
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      lastSeenAt: "2026-01-01T00:00:00.000Z",
     }));
     const nexus = new NotificationNexus(createMemoryPersistence(), {
       upsertExpoPushSubscription,
     } as never);
 
     const result = await nexus.upsertExpoPushSubscription({
-      expoPushToken: 'ExponentPushToken[test]',
-      platform: 'ios',
-      installationId: 'install1',
-      metadata: { source: 'test' },
+      expoPushToken: "ExponentPushToken[test]",
+      platform: "ios",
+      installationId: "install1",
+      metadata: { source: "test" },
     });
 
     expect(upsertExpoPushSubscription).toHaveBeenCalledWith({
-      expoPushToken: 'ExponentPushToken[test]',
-      platform: 'ios',
-      installationId: 'install1',
-      metadata: { source: 'test' },
+      expoPushToken: "ExponentPushToken[test]",
+      platform: "ios",
+      installationId: "install1",
+      metadata: { source: "test" },
     });
-    expect(result.id).toBe('sub1');
+    expect(result.id).toBe("sub1");
   });
 
-  it('delegates Expo push subscription deletion through the notification backend', async () => {
+  it("delegates Expo push subscription deletion through the notification backend", async () => {
     const deleteExpoPushSubscription = vi.fn(async () => true);
     const nexus = new NotificationNexus(createMemoryPersistence(), {
       deleteExpoPushSubscription,
     } as never);
 
     await expect(
-      nexus.deleteExpoPushSubscription('ExponentPushToken[test]'),
+      nexus.deleteExpoPushSubscription("ExponentPushToken[test]"),
     ).resolves.toBe(true);
 
     expect(deleteExpoPushSubscription).toHaveBeenCalledWith(
-      'ExponentPushToken[test]',
+      "ExponentPushToken[test]",
     );
   });
 });

@@ -29,7 +29,8 @@ export default function DeleteAccountConfirmationModal({
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const themeTokens = useMobileThemeTokens();
-  const destructiveColor = resolveColorProp(themeTokens, "destructive") ?? "#ef4444";
+  const destructiveColor =
+    resolveColorProp(themeTokens, "destructive") ?? "#ef4444";
 
   const [isPressing, setIsPressing] = useState(false);
   /** 0–1 while holding */
@@ -107,7 +108,11 @@ export default function DeleteAccountConfirmationModal({
       onRequestClose={isDeleting ? undefined : onDismiss}
     >
       {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - full-screen modal scrim overlay, invariant across themes */}
-      <Pressable className="flex-1 justify-end bg-black/60" onPress={isDeleting ? undefined : onDismiss} accessibilityLabel="Dismiss delete account dialog backdrop">
+      <Pressable
+        className="flex-1 justify-end bg-black/60"
+        onPress={isDeleting ? undefined : onDismiss}
+        accessibilityLabel="Dismiss delete account dialog backdrop"
+      >
         <Pressable
           onPress={(e) => e.stopPropagation()}
           className="rounded-t-3xl bg-surface-modal px-5 pt-4"
@@ -141,12 +146,12 @@ export default function DeleteAccountConfirmationModal({
           {!isDeleting ? (
             <>
               <Text className="text-[15px] leading-[22px] text-foreground mb-2">
-                This is irreversible. Your account and its data as they exist now cannot be
-                recovered.
+                This is irreversible. Your account and its data as they exist
+                now cannot be recovered.
               </Text>
               <Text className="text-[15px] leading-[22px] text-muted-foreground mb-6">
-                Press and hold the button below for ten seconds to permanently delete your account,
-                or tap Cancel to go back.
+                Press and hold the button below for ten seconds to permanently
+                delete your account, or tap Cancel to go back.
               </Text>
             </>
           ) : null}
@@ -168,7 +173,9 @@ export default function DeleteAccountConfirmationModal({
                 className="rounded-xl border-2 border-destructive bg-destructive/10 py-4 px-4 mb-3 active:opacity-90"
               >
                 <Text className="text-center text-base font-semibold text-destructive">
-                  {isPressing ? "Keep holding…" : "Yes — permanently delete my account"}
+                  {isPressing
+                    ? "Keep holding…"
+                    : "Yes — permanently delete my account"}
                 </Text>
                 <Text className="text-center text-xs text-destructive/80 mt-2">
                   Hold continuously for 10 seconds
@@ -181,7 +188,9 @@ export default function DeleteAccountConfirmationModal({
                 accessibilityLabel="Cancel and keep account"
                 className="rounded-xl bg-surface-panel py-3.5 mb-1 active:bg-surface-hover"
               >
-                <Text className="text-center text-base font-medium text-primary">Cancel</Text>
+                <Text className="text-center text-base font-medium text-primary">
+                  Cancel
+                </Text>
               </Pressable>
             </>
           )}

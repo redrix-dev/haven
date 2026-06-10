@@ -1,1 +1,4 @@
-export { FeatureFlagNexus, type FeatureFlagNexusState } from "./FeatureFlagNexus";
+export {
+  FeatureFlagNexus,
+  type FeatureFlagNexusState,
+} from "./FeatureFlagNexus";

@@ -13,7 +13,10 @@ export type PermissionsSolidState = {
   permissionsByCommunityId: Record<string, ServerPermissions>;
   elevatedByCommunityId: Record<string, boolean>;
   hydrationByCommunityId: Record<string, HydrationPhase>;
-  revokedAuthorIdsByCommunity: Record<string, Record<string, readonly string[]>>;
+  revokedAuthorIdsByCommunity: Record<
+    string,
+    Record<string, readonly string[]>
+  >;
   revision: number;
 };
 
@@ -42,12 +45,16 @@ export class PermissionsSolidCache {
     this.reactiveStore = wireSolidReadableStore(state);
   }
 
-  setPolicySyncCallback(callback: ((communityId: string) => void) | null): void {
+  setPolicySyncCallback(
+    callback: ((communityId: string) => void) | null,
+  ): void {
     this.policySync = callback;
   }
 
   getPermissions(communityId: string): ServerPermissions {
-    return this.state.permissionsByCommunityId[communityId] ?? EMPTY_PERMISSIONS;
+    return (
+      this.state.permissionsByCommunityId[communityId] ?? EMPTY_PERMISSIONS
+    );
   }
 
   isElevated(communityId: string): boolean {

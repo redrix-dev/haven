@@ -60,9 +60,7 @@ export function useVisibleChannel(
     const policy = {
       hiddenAuthorIds: hiddenAuthorIds ?? new Set<string>(),
       showHiddenMessages,
-      communities: communityPolicy
-        ? { [communityId]: communityPolicy }
-        : {},
+      communities: communityPolicy ? { [communityId]: communityPolicy } : {},
     };
     if (Object.keys(policy.communities).length === 0) {
       return projectVisibleChannelMessagesBlockOnly(
@@ -74,7 +72,15 @@ export function useVisibleChannel(
       communityId,
       channelId,
     });
-  }, [raw, hiddenAuthorIds, showHiddenMessages, communityPolicy, channelId, communityId, policyStore]);
+  }, [
+    raw,
+    hiddenAuthorIds,
+    showHiddenMessages,
+    communityPolicy,
+    channelId,
+    communityId,
+    policyStore,
+  ]);
 }
 
 export function useChannelMeta(

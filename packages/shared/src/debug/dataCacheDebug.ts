@@ -104,26 +104,44 @@ export const dataCacheDebug = {
     level: DataCacheDebugEntry["level"] = "debug",
   ) => pushEntry({ category: "fetch", source, message, data, level }),
 
-  cacheRead: (source: string, message: string, data?: Record<string, unknown>) =>
-    pushEntry({ category: "cache-read", source, message, data }),
+  cacheRead: (
+    source: string,
+    message: string,
+    data?: Record<string, unknown>,
+  ) => pushEntry({ category: "cache-read", source, message, data }),
 
-  cacheWrite: (source: string, message: string, data?: Record<string, unknown>) =>
-    pushEntry({ category: "cache-write", source, message, data }),
+  cacheWrite: (
+    source: string,
+    message: string,
+    data?: Record<string, unknown>,
+  ) => pushEntry({ category: "cache-write", source, message, data }),
 
-  hydration: (source: string, message: string, data?: Record<string, unknown>) =>
-    pushEntry({ category: "hydration", source, message, data }),
+  hydration: (
+    source: string,
+    message: string,
+    data?: Record<string, unknown>,
+  ) => pushEntry({ category: "hydration", source, message, data }),
 
   realtime: (source: string, message: string, data?: Record<string, unknown>) =>
     pushEntry({ category: "realtime", source, message, data }),
 
-  lifecycle: (source: string, message: string, data?: Record<string, unknown>) =>
-    pushEntry({ category: "lifecycle", source, message, data }),
+  lifecycle: (
+    source: string,
+    message: string,
+    data?: Record<string, unknown>,
+  ) => pushEntry({ category: "lifecycle", source, message, data }),
 
-  navigation: (source: string, message: string, data?: Record<string, unknown>) =>
-    pushEntry({ category: "navigation", source, message, data }),
+  navigation: (
+    source: string,
+    message: string,
+    data?: Record<string, unknown>,
+  ) => pushEntry({ category: "navigation", source, message, data }),
 
-  component: (source: string, message: string, data?: Record<string, unknown>) =>
-    pushEntry({ category: "component", source, message, data }),
+  component: (
+    source: string,
+    message: string,
+    data?: Record<string, unknown>,
+  ) => pushEntry({ category: "component", source, message, data }),
 
   setComponentSnapshot: (
     componentId: string,

@@ -11,7 +11,13 @@ import path from "node:path";
  * - browser-global and web-only imports in portable logic paths
  */
 const sharedRoot = path.join("packages", "shared", "src");
-const bannedSingletonFile = path.join("packages", "shared", "src", "lib", "supabase.ts");
+const bannedSingletonFile = path.join(
+  "packages",
+  "shared",
+  "src",
+  "lib",
+  "supabase.ts",
+);
 
 const importSupabaseRe = /@shared\/lib\/supabase\b/;
 const envSupabaseRe =
@@ -63,9 +69,9 @@ if (fs.existsSync(bannedSingletonFile)) {
 
 for (const file of walk(sharedRoot)) {
   const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
-  const shouldCheckPortablePath = portablePathChecks.some((pattern) =>
-    pattern.test(rel),
-  ) && !portablePathExclusions.some((pattern) => pattern.test(rel));
+  const shouldCheckPortablePath =
+    portablePathChecks.some((pattern) => pattern.test(rel)) &&
+    !portablePathExclusions.some((pattern) => pattern.test(rel));
   const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((rawLine, i) => {
     const line = stripComments(rawLine);
@@ -83,7 +89,9 @@ for (const file of walk(sharedRoot)) {
       );
     }
     if (importSupabaseRe.test(line)) {
-      violations.push(`${rel}:${i + 1}: import of deprecated @shared/lib/supabase`);
+      violations.push(
+        `${rel}:${i + 1}: import of deprecated @shared/lib/supabase`,
+      );
     }
     if (envSupabaseRe.test(line)) {
       violations.push(

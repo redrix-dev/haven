@@ -45,16 +45,9 @@ export function resolvePreferredChannelIdForServer(
     previousValid,
   ];
   for (const candidate of candidates) {
-    if (
-      candidate &&
-      channelList.some((channel) => channel.id === candidate)
-    ) {
+    if (candidate && channelList.some((channel) => channel.id === candidate)) {
       return candidate;
     }
   }
-  return (
-    options?.defaultChannelId ??
-    channelList[0]?.id ??
-    null
-  );
+  return options?.defaultChannelId ?? channelList[0]?.id ?? null;
 }

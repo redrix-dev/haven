@@ -18,7 +18,10 @@ import {
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 export type MessageImageAttachmentItem = {
@@ -39,8 +42,11 @@ function extensionForImage(image: MessageImageAttachmentItem): string {
   return "jpg";
 }
 
-async function downloadImageToCache(image: MessageImageAttachmentItem): Promise<string> {
-  const baseDirectory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+async function downloadImageToCache(
+  image: MessageImageAttachmentItem,
+): Promise<string> {
+  const baseDirectory =
+    FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
   if (!baseDirectory) throw new Error("File cache is not available.");
   const fileUri = `${baseDirectory}haven-image-${image.id}.${extensionForImage(image)}`;
   const result = await FileSystem.downloadAsync(image.signedUrl, fileUri);
@@ -53,7 +59,10 @@ export function MessageImageAttachment({
   thumbnailStyle,
 }: MessageImageAttachmentProps) {
   const [viewerOpen, setViewerOpen] = useState(false);
-  const initialIndex = Math.max(0, images.findIndex((item) => item.id === image.id));
+  const initialIndex = Math.max(
+    0,
+    images.findIndex((item) => item.id === image.id),
+  );
 
   return (
     <>
@@ -63,7 +72,11 @@ export function MessageImageAttachment({
           setViewerOpen(true);
         }}
       >
-        <Image source={{ uri: image.signedUrl }} style={thumbnailStyle} resizeMode="contain" />
+        <Image
+          source={{ uri: image.signedUrl }}
+          style={thumbnailStyle}
+          resizeMode="contain"
+        />
       </Pressable>
       <ImageGalleryModal
         visible={viewerOpen}
@@ -101,7 +114,9 @@ function ImageGalleryModal({
   const handleMomentumEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-      setActiveIndex(Math.max(0, Math.min(galleryImages.length - 1, nextIndex)));
+      setActiveIndex(
+        Math.max(0, Math.min(galleryImages.length - 1, nextIndex)),
+      );
     },
     [galleryImages.length, width],
   );
@@ -113,7 +128,10 @@ function ImageGalleryModal({
       const localUri = await downloadImageToCache(activeImage);
       await Sharing.shareAsync(localUri);
     } catch (error) {
-      Alert.alert("Share failed", getErrorMessage(error, "Could not share this image."));
+      Alert.alert(
+        "Share failed",
+        getErrorMessage(error, "Could not share this image."),
+      );
     } finally {
       setSaving(false);
     }
@@ -138,7 +156,10 @@ function ImageGalleryModal({
           await Sharing.shareAsync(localUri);
         }
       } catch {
-        Alert.alert("Save failed", getErrorMessage(error, "Could not save this image."));
+        Alert.alert(
+          "Save failed",
+          getErrorMessage(error, "Could not save this image."),
+        );
       }
     } finally {
       setSaving(false);
@@ -148,7 +169,12 @@ function ImageGalleryModal({
   if (galleryImages.length === 0) return null;
 
   return (
-    <Modal visible={visible} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={styles.viewer}>
         <View
           style={[
@@ -157,9 +183,16 @@ function ImageGalleryModal({
           ]}
         >
           <Text style={styles.viewerCounter}>
-            {galleryImages.length > 1 ? `${activeIndex + 1} / ${galleryImages.length}` : ""}
+            {galleryImages.length > 1
+              ? `${activeIndex + 1} / ${galleryImages.length}`
+              : ""}
           </Text>
-          <Pressable accessibilityRole="button" hitSlop={12} onPress={onClose} style={styles.closeButton}>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={12}
+            onPress={onClose}
+            style={styles.closeButton}
+          >
             <Text style={styles.closeButtonText}>X</Text>
           </Pressable>
         </View>
@@ -170,17 +203,28 @@ function ImageGalleryModal({
           horizontal
           pagingEnabled
           initialScrollIndex={initialIndex}
-          getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+          getItemLayout={(_, index) => ({
+            length: width,
+            offset: width * index,
+            index,
+          })}
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={handleMomentumEnd}
           renderItem={({ item }) => (
             <View
               style={{
                 width,
-                height: Math.max(320, height - 180 - insets.top - insets.bottom),
+                height: Math.max(
+                  320,
+                  height - 180 - insets.top - insets.bottom,
+                ),
               }}
             >
-              <Image source={{ uri: item.signedUrl }} style={styles.viewerImage} resizeMode="contain" />
+              <Image
+                source={{ uri: item.signedUrl }}
+                style={styles.viewerImage}
+                resizeMode="contain"
+              />
             </View>
           )}
           onScrollToIndexFailed={({ index }) => {
@@ -199,7 +243,10 @@ function ImageGalleryModal({
             accessibilityRole="button"
             disabled={saving}
             onPress={() => void saveActiveImage()}
-            style={[styles.viewerActionButton, saving ? styles.disabledButton : null]}
+            style={[
+              styles.viewerActionButton,
+              saving ? styles.disabledButton : null,
+            ]}
           >
             {saving ? (
               // uniwind-theme-allow mobile-theme/no-raw-color-prop - fullscreen media action spinner is invariant white.
@@ -212,7 +259,10 @@ function ImageGalleryModal({
             accessibilityRole="button"
             disabled={saving}
             onPress={() => void shareActiveImage()}
-            style={[styles.viewerActionButton, saving ? styles.disabledButton : null]}
+            style={[
+              styles.viewerActionButton,
+              saving ? styles.disabledButton : null,
+            ]}
           >
             <Text style={styles.viewerActionText}>Share</Text>
           </Pressable>

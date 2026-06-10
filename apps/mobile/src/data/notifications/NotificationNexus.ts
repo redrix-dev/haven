@@ -1,9 +1,9 @@
-import { createStore, type StoreApi } from 'zustand/vanilla'
-import { Nexus, type NexusEntry } from '@mobile-data/Nexus'
-import type { ReadableStore } from '@shared/nexus/storeTypes'
-import type { NotificationNexusState } from '@shared/nexus/notifications/notificationTypes'
-import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
-import type { NotificationBackend } from '@shared/lib/backend/notificationBackend'
+import { createStore, type StoreApi } from "zustand/vanilla";
+import { Nexus, type NexusEntry } from "@mobile-data/Nexus";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
+import type { NotificationNexusState } from "@shared/nexus/notifications/notificationTypes";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { NotificationBackend } from "@shared/lib/backend/notificationBackend";
 import type {
   NotificationCounts,
   ExpoPushSubscriptionRecord,
@@ -11,25 +11,28 @@ import type {
   NotificationItem,
   NotificationPreferenceUpdate,
   NotificationPreferences,
-} from '@shared/lib/backend/types'
+} from "@shared/lib/backend/types";
 
-const STORAGE_KEY = 'haven:nexus:notifications:global'
-const PAGE_SIZE = 50
+const STORAGE_KEY = "haven:nexus:notifications:global";
+const PAGE_SIZE = 50;
 
-const DEFAULT_COUNTS: NotificationCounts = { unseenCount: 0, unreadCount: 0 }
+const DEFAULT_COUNTS: NotificationCounts = { unseenCount: 0, unreadCount: 0 };
 
-export type { NotificationNexusState }
+export type { NotificationNexusState };
 
-export class NotificationNexus extends Nexus<NotificationItem, NotificationItem> {
-  private _notificationStore: StoreApi<NotificationNexusState> | null = null
+export class NotificationNexus extends Nexus<
+  NotificationItem,
+  NotificationItem
+> {
+  private _notificationStore: StoreApi<NotificationNexusState> | null = null;
 
-  private readonly backend: NotificationBackend
-  private listInflight: Promise<void> | null = null
-  private preferencesInflight: Promise<NotificationPreferences> | null = null
+  private readonly backend: NotificationBackend;
+  private listInflight: Promise<void> | null = null;
+  private preferencesInflight: Promise<NotificationPreferences> | null = null;
 
   constructor(persistence: NexusPersistence, backend: NotificationBackend) {
-    super('notifications', 'global', persistence)
-    this.backend = backend
+    super("notifications", "global", persistence);
+    this.backend = backend;
   }
 
   /**
@@ -37,11 +40,11 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
    * only. Also used by tests for state assertions.
    */
   get reactiveStore(): ReadableStore<NotificationNexusState> {
-    return this.store
+    return this.store;
   }
 
   protected transform(raw: NotificationItem): NotificationItem {
-    return raw
+    return raw;
   }
 
   protected override get store(): StoreApi<NotificationNexusState> {
@@ -58,146 +61,160 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
         preferencesSaving: false,
         preferencesLastLoadedAt: 0,
         revision: 0,
-      }))
-      this.rehydrate()
+      }));
+      this.rehydrate();
     }
-    return this._notificationStore
+    return this._notificationStore;
   }
 
   async loadInbox(): Promise<void> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.loadInbox called before backend attached.')
+      throw new Error(
+        "NotificationNexus.loadInbox called before backend attached.",
+      );
     }
-    if (this.listInflight) return this.listInflight
+    if (this.listInflight) return this.listInflight;
 
     this.listInflight = (async () => {
-      this.setIsLoading(true)
+      this.setIsLoading(true);
       try {
         const [items, counts] = await Promise.all([
           this.backend!.listNotifications({ limit: PAGE_SIZE }),
           this.backend!.getNotificationCounts().catch(() => DEFAULT_COUNTS),
-        ])
-        this.setNotifications(items, { hasMore: items.length === PAGE_SIZE })
-        this.setCounts(counts)
-        this.setInboxLastLoadedAt(Date.now())
+        ]);
+        this.setNotifications(items, { hasMore: items.length === PAGE_SIZE });
+        this.setCounts(counts);
+        this.setInboxLastLoadedAt(Date.now());
       } finally {
-        this.setIsLoading(false)
+        this.setIsLoading(false);
       }
     })().finally(() => {
-      this.listInflight = null
-    })
+      this.listInflight = null;
+    });
 
-    return this.listInflight
+    return this.listInflight;
   }
 
   async refreshInbox(): Promise<void> {
-    await this.loadInbox()
+    await this.loadInbox();
   }
 
   async ensureInbox(options?: { freshnessMs?: number }): Promise<void> {
-    if (this.listInflight) return this.listInflight
-    const freshnessMs = options?.freshnessMs ?? 60_000
-    const lastLoadedAt = this.store.getState().inboxLastLoadedAt
-    if (lastLoadedAt > 0 && Date.now() - lastLoadedAt < freshnessMs) return
-    await this.loadInbox()
+    if (this.listInflight) return this.listInflight;
+    const freshnessMs = options?.freshnessMs ?? 60_000;
+    const lastLoadedAt = this.store.getState().inboxLastLoadedAt;
+    if (lastLoadedAt > 0 && Date.now() - lastLoadedAt < freshnessMs) return;
+    await this.loadInbox();
   }
 
   async loadPreferences(): Promise<NotificationPreferences> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.loadPreferences called before backend attached.')
+      throw new Error(
+        "NotificationNexus.loadPreferences called before backend attached.",
+      );
     }
-    if (this.preferencesInflight) return this.preferencesInflight
+    if (this.preferencesInflight) return this.preferencesInflight;
 
     this.preferencesInflight = (async () => {
-      this.setPreferencesLoading(true)
+      this.setPreferencesLoading(true);
       try {
-        const preferences = await this.backend.getNotificationPreferences()
-        this.setPreferences(preferences)
-        this.setPreferencesLastLoadedAt(Date.now())
-        return preferences
+        const preferences = await this.backend.getNotificationPreferences();
+        this.setPreferences(preferences);
+        this.setPreferencesLastLoadedAt(Date.now());
+        return preferences;
       } finally {
-        this.setPreferencesLoading(false)
+        this.setPreferencesLoading(false);
       }
     })().finally(() => {
-      this.preferencesInflight = null
-    })
+      this.preferencesInflight = null;
+    });
 
-    return this.preferencesInflight
+    return this.preferencesInflight;
   }
 
-  async ensurePreferences(
-    options?: { freshnessMs?: number },
-  ): Promise<NotificationPreferences | null> {
-    const freshnessMs = options?.freshnessMs ?? 60_000
-    const state = this.store.getState()
+  async ensurePreferences(options?: {
+    freshnessMs?: number;
+  }): Promise<NotificationPreferences | null> {
+    const freshnessMs = options?.freshnessMs ?? 60_000;
+    const state = this.store.getState();
     if (
       state.preferences &&
       state.preferencesLastLoadedAt > 0 &&
       Date.now() - state.preferencesLastLoadedAt < freshnessMs
     ) {
-      return state.preferences
+      return state.preferences;
     }
-    return this.loadPreferences()
+    return this.loadPreferences();
   }
 
   async savePreferences(
     values: NotificationPreferenceUpdate,
   ): Promise<NotificationPreferences> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.savePreferences called before backend attached.')
+      throw new Error(
+        "NotificationNexus.savePreferences called before backend attached.",
+      );
     }
-    this.setPreferencesSaving(true)
+    this.setPreferencesSaving(true);
     try {
-      const next = await this.backend.updateNotificationPreferences(values)
-      this.setPreferences(next)
-      await this.refreshInbox()
-      return next
+      const next = await this.backend.updateNotificationPreferences(values);
+      this.setPreferences(next);
+      await this.refreshInbox();
+      return next;
     } finally {
-      this.setPreferencesSaving(false)
+      this.setPreferencesSaving(false);
     }
   }
 
   async markAllSeen(): Promise<void> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.markAllSeen called before backend attached.')
+      throw new Error(
+        "NotificationNexus.markAllSeen called before backend attached.",
+      );
     }
-    await this.backend.markAllNotificationsSeen()
-    await this.refreshInbox()
+    await this.backend.markAllNotificationsSeen();
+    await this.refreshInbox();
   }
 
   async markRead(recipientIds: string[]): Promise<void> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.markRead called before backend attached.')
+      throw new Error(
+        "NotificationNexus.markRead called before backend attached.",
+      );
     }
-    if (recipientIds.length === 0) return
-    await this.backend.markNotificationsRead(recipientIds)
-    await this.refreshInbox()
+    if (recipientIds.length === 0) return;
+    await this.backend.markNotificationsRead(recipientIds);
+    await this.refreshInbox();
   }
 
   async dismiss(recipientIds: string[]): Promise<void> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.dismiss called before backend attached.')
+      throw new Error(
+        "NotificationNexus.dismiss called before backend attached.",
+      );
     }
-    if (recipientIds.length === 0) return
-    await this.backend.dismissNotifications(recipientIds)
-    await this.refreshInbox()
+    if (recipientIds.length === 0) return;
+    await this.backend.dismissNotifications(recipientIds);
+    await this.refreshInbox();
   }
 
   async dismissAll(): Promise<void> {
-    const recipientIds = this.store.getState().recipientOrder
-    if (recipientIds.length === 0) return
-    await this.dismiss(recipientIds)
+    const recipientIds = this.store.getState().recipientOrder;
+    if (recipientIds.length === 0) return;
+    await this.dismiss(recipientIds);
   }
 
   async refreshCounts(): Promise<void> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.refreshCounts called before backend attached.')
+      throw new Error(
+        "NotificationNexus.refreshCounts called before backend attached.",
+      );
     }
     try {
-      const counts = await this.backend.getNotificationCounts()
-      this.setCounts(counts)
+      const counts = await this.backend.getNotificationCounts();
+      this.setCounts(counts);
     } catch (err) {
-      console.warn('[NotificationNexus] refreshCounts failed', err)
+      console.warn("[NotificationNexus] refreshCounts failed", err);
     }
   }
 
@@ -205,25 +222,31 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     input: ExpoPushSubscriptionUpsertInput,
   ): Promise<ExpoPushSubscriptionRecord> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.upsertExpoPushSubscription called before backend attached.')
+      throw new Error(
+        "NotificationNexus.upsertExpoPushSubscription called before backend attached.",
+      );
     }
-    return this.backend.upsertExpoPushSubscription(input)
+    return this.backend.upsertExpoPushSubscription(input);
   }
 
   async deleteExpoPushSubscription(expoPushToken: string): Promise<boolean> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.deleteExpoPushSubscription called before backend attached.')
+      throw new Error(
+        "NotificationNexus.deleteExpoPushSubscription called before backend attached.",
+      );
     }
-    return this.backend.deleteExpoPushSubscription(expoPushToken)
+    return this.backend.deleteExpoPushSubscription(expoPushToken);
   }
 
   async markSeen(recipientIds: string[]): Promise<void> {
     if (!this.backend) {
-      throw new Error('NotificationNexus.markSeen called before backend attached.')
+      throw new Error(
+        "NotificationNexus.markSeen called before backend attached.",
+      );
     }
-    if (recipientIds.length === 0) return
-    await this.backend.markNotificationsSeen(recipientIds)
-    void this.refreshCounts()
+    if (recipientIds.length === 0) return;
+    await this.backend.markNotificationsSeen(recipientIds);
+    void this.refreshCounts();
   }
 
   upsertNotification(item: NotificationItem): void {
@@ -249,15 +272,15 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
     items: NotificationItem[],
     options: { hasMore: boolean },
   ): void {
-    const entities: Record<string, NexusEntry<NotificationItem>> = {}
-    const recipientOrder: string[] = []
+    const entities: Record<string, NexusEntry<NotificationItem>> = {};
+    const recipientOrder: string[] = [];
     for (const item of items) {
       entities[item.recipientId] = {
         data: item,
         partial: false,
         cachedAt: Date.now(),
-      }
-      recipientOrder.push(item.recipientId)
+      };
+      recipientOrder.push(item.recipientId);
     }
     this.store.setState((state) => ({
       ...state,
@@ -265,8 +288,8 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       recipientOrder,
       hasMore: options.hasMore,
       revision: state.revision + 1,
-    }))
-    this.persist()
+    }));
+    this.persist();
   }
 
   setCounts(counts: NotificationCounts): void {
@@ -274,8 +297,8 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       ...state,
       counts,
       revision: state.revision + 1,
-    }))
-    this.persist()
+    }));
+    this.persist();
   }
 
   setIsLoading(loading: boolean): void {
@@ -283,7 +306,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       ...state,
       isLoading: loading,
       revision: state.revision + 1,
-    }))
+    }));
   }
 
   setPreferences(preferences: NotificationPreferences | null): void {
@@ -291,8 +314,8 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       ...state,
       preferences,
       revision: state.revision + 1,
-    }))
-    this.persist()
+    }));
+    this.persist();
   }
 
   setInboxLastLoadedAt(loadedAt: number): void {
@@ -300,7 +323,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       ...state,
       inboxLastLoadedAt: loadedAt,
       revision: state.revision + 1,
-    }))
+    }));
   }
 
   setPreferencesLastLoadedAt(loadedAt: number): void {
@@ -308,7 +331,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       ...state,
       preferencesLastLoadedAt: loadedAt,
       revision: state.revision + 1,
-    }))
+    }));
   }
 
   setPreferencesLoading(loading: boolean): void {
@@ -316,7 +339,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       ...state,
       preferencesLoading: loading,
       revision: state.revision + 1,
-    }))
+    }));
   }
 
   setPreferencesSaving(saving: boolean): void {
@@ -324,12 +347,12 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       ...state,
       preferencesSaving: saving,
       revision: state.revision + 1,
-    }))
+    }));
   }
 
   override persist(): void {
     try {
-      const state = this.store.getState()
+      const state = this.store.getState();
       this.persistence.set(
         STORAGE_KEY,
         JSON.stringify({
@@ -338,17 +361,17 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
           counts: state.counts,
           inboxLastLoadedAt: state.inboxLastLoadedAt,
         }),
-      )
+      );
     } catch (error) {
-      console.warn('[NotificationNexus] persist failed', error)
+      console.warn("[NotificationNexus] persist failed", error);
     }
   }
 
   override rehydrate(): void {
     try {
-      const raw = this.persistence.getString(STORAGE_KEY)
-      if (!raw) return
-      const parsed = JSON.parse(raw) as Partial<NotificationNexusState>
+      const raw = this.persistence.getString(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<NotificationNexusState>;
       this.store.setState((state) => ({
         ...state,
         entities: parsed.entities ?? {},
@@ -356,16 +379,16 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
         counts: parsed.counts ?? DEFAULT_COUNTS,
         inboxLastLoadedAt: parsed.inboxLastLoadedAt ?? 0,
         revision: 0,
-      }))
+      }));
     } catch (error) {
-      console.warn('[NotificationNexus] rehydrate failed', error)
-      this.persistence.remove(STORAGE_KEY)
+      console.warn("[NotificationNexus] rehydrate failed", error);
+      this.persistence.remove(STORAGE_KEY);
     }
   }
 
   override clear(): void {
-    this.listInflight = null
-    this.preferencesInflight = null
+    this.listInflight = null;
+    this.preferencesInflight = null;
     this.store.setState({
       entities: {},
       recipientOrder: [],
@@ -378,7 +401,7 @@ export class NotificationNexus extends Nexus<NotificationItem, NotificationItem>
       preferencesSaving: false,
       preferencesLastLoadedAt: 0,
       revision: 0,
-    })
-    this.persistence.remove(STORAGE_KEY)
+    });
+    this.persistence.remove(STORAGE_KEY);
   }
 }

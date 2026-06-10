@@ -13,9 +13,13 @@ export function bootstrapDataCacheDebug(): void {
 
   const unsubscribers = [instrumentZustandStore(useAuthStore, "authStore")];
 
-  dataCacheDebug.lifecycle("bootstrapDataCacheDebug", "Store instrumentation active", {
-    stores: ["authStore"],
-  });
+  dataCacheDebug.lifecycle(
+    "bootstrapDataCacheDebug",
+    "Store instrumentation active",
+    {
+      stores: ["authStore"],
+    },
+  );
 
   if (typeof globalThis !== "undefined") {
     const g = globalThis as typeof globalThis & {

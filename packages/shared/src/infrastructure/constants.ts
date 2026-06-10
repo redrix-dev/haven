@@ -1,17 +1,23 @@
 import type {
   NotificationCounts,
   SocialCounts,
-} from '@shared/lib/backend/types';
-import type { AppSettings, NotificationAudioSettings, VoiceSettings } from '@shared/types/settings';
+} from "@shared/lib/backend/types";
+import type {
+  AppSettings,
+  NotificationAudioSettings,
+  VoiceSettings,
+} from "@shared/types/settings";
 
 export const ENABLE_CHANNEL_RELOAD_DIAGNOSTICS =
-  typeof process !== 'undefined' && process.env.HAVEN_DEBUG_CHANNEL_RELOADS === '1';
+  typeof process !== "undefined" &&
+  process.env.HAVEN_DEBUG_CHANNEL_RELOADS === "1";
 
 export const MESSAGE_PAGE_SIZE = 75;
 export const CHANNEL_BUNDLE_STALE_MS = 60_000;
-export const VOICE_HARDWARE_DEBUG_PANEL_FLAG = 'debug_voice_hardware_panel';
-export const VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL = 'Ctrl/Cmd + Alt + Shift + V';
-export const ENHANCED_COMPOSER_FLAG = 'enhanced_composer_v1';
+export const VOICE_HARDWARE_DEBUG_PANEL_FLAG = "debug_voice_hardware_panel";
+export const VOICE_HARDWARE_DEBUG_PANEL_HOTKEY_LABEL =
+  "Ctrl/Cmd + Alt + Shift + V";
+export const ENHANCED_COMPOSER_FLAG = "enhanced_composer_v1";
 
 export const DEFAULT_NOTIFICATION_AUDIO_SETTINGS: NotificationAudioSettings = {
   masterSoundEnabled: true,
@@ -22,18 +28,18 @@ export const DEFAULT_NOTIFICATION_AUDIO_SETTINGS: NotificationAudioSettings = {
 };
 
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
-  preferredInputDeviceId: 'default',
-  preferredOutputDeviceId: 'default',
-  transmissionMode: 'voice_activity',
+  preferredInputDeviceId: "default",
+  preferredOutputDeviceId: "default",
+  transmissionMode: "voice_activity",
   voiceActivationThreshold: 18,
   pushToTalkBinding: {
-    code: 'F13',
-    key: 'F13',
+    code: "F13",
+    key: "F13",
     ctrlKey: false,
     altKey: false,
     shiftKey: false,
     metaKey: false,
-    label: 'F13',
+    label: "F13",
   },
 };
 

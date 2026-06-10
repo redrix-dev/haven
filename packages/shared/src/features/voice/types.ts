@@ -1,4 +1,7 @@
-import type { VoicePresenceStateRow, VoiceSidebarParticipant } from "@shared/types/types";
+import type {
+  VoicePresenceStateRow,
+  VoiceSidebarParticipant,
+} from "@shared/types/types";
 import type { VoiceSettings } from "@shared/types/settings";
 
 export type VoiceControllerChannel = {

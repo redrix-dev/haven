@@ -2,7 +2,10 @@ import { create } from "zustand";
 import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
-import type { VoiceChannelReference, VoiceSidebarParticipant } from "@shared/types/types";
+import type {
+  VoiceChannelReference,
+  VoiceSidebarParticipant,
+} from "@shared/types/types";
 import type {
   VoiceTokenBackend,
   VoiceTokenResponse,
@@ -30,7 +33,10 @@ export type {
   VoiceRealtimeChannel,
   VoiceRealtimeTransport,
 } from "@shared/features/voice/types";
-export type { VoiceNexusState, VoiceSessionSnapshot } from "@shared/features/voice/voiceNexusTypes";
+export type {
+  VoiceNexusState,
+  VoiceSessionSnapshot,
+} from "@shared/features/voice/voiceNexusTypes";
 
 type ConnectKickChannelInput = {
   communityId: string;
@@ -229,7 +235,8 @@ export class VoiceNexus {
     channelId: string,
     participants: VoiceSidebarParticipant[],
   ): void {
-    const previous = this.store.getState().participantsByChannelId[channelId] ?? [];
+    const previous =
+      this.store.getState().participantsByChannelId[channelId] ?? [];
     if (voiceParticipantListsEqual(previous, participants)) return;
     this.setPartial({
       participantsByChannelId: {
@@ -339,7 +346,10 @@ export class VoiceNexus {
     await this.removeKickChannel();
   }
 
-  async kickParticipant(targetUserId: string, channelId: string): Promise<void> {
+  async kickParticipant(
+    targetUserId: string,
+    channelId: string,
+  ): Promise<void> {
     const channel = this.kickChannel;
     const context = this.kickContext;
     if (!channel || !context) {
@@ -360,7 +370,9 @@ export class VoiceNexus {
     }
   }
 
-  async connectPresenceChannel(input: ConnectPresenceChannelInput): Promise<void> {
+  async connectPresenceChannel(
+    input: ConnectPresenceChannelInput,
+  ): Promise<void> {
     if (!this.realtime) {
       throw new Error("Voice realtime transport is not configured.");
     }
@@ -431,7 +443,10 @@ export class VoiceNexus {
     await this.removePresenceChannel();
   }
 
-  cleanupPresenceChannel(communityId: string, channelId: string): Promise<void> {
+  cleanupPresenceChannel(
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
     const realtime = this.realtime;
     if (!realtime?.getChannels) return Promise.resolve();
 
@@ -445,9 +460,9 @@ export class VoiceNexus {
       );
     });
 
-    return Promise.all(channels.map((channel) => realtime.removeChannel(channel))).then(
-      () => undefined,
-    );
+    return Promise.all(
+      channels.map((channel) => realtime.removeChannel(channel)),
+    ).then(() => undefined);
   }
 
   subscribePresenceChannels(input: SubscribePresenceChannelsInput): () => void {
@@ -504,7 +519,10 @@ export class VoiceNexus {
     return this.store.getState();
   }
 
-  getParticipantsByChannelSnapshot(): Record<string, VoiceSidebarParticipant[]> {
+  getParticipantsByChannelSnapshot(): Record<
+    string,
+    VoiceSidebarParticipant[]
+  > {
     return this.store.getState().participantsByChannelId;
   }
 

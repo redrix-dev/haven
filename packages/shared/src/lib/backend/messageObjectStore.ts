@@ -30,7 +30,8 @@ type GlobalFileReader = new () => {
 };
 
 function getGlobalFileReader(): GlobalFileReader | undefined {
-  const ctor = (globalThis as unknown as { FileReader?: GlobalFileReader }).FileReader;
+  const ctor = (globalThis as unknown as { FileReader?: GlobalFileReader })
+    .FileReader;
   return typeof ctor === "function" ? ctor : undefined;
 }
 
@@ -41,7 +42,9 @@ const blobToArrayBuffer = async (blob: Blob): Promise<ArrayBuffer> => {
   }
   const FileReaderCtor = getGlobalFileReader();
   if (!FileReaderCtor) {
-    throw new Error("Blob.arrayBuffer and FileReader are unavailable in this runtime.");
+    throw new Error(
+      "Blob.arrayBuffer and FileReader are unavailable in this runtime.",
+    );
   }
   return await new Promise<ArrayBuffer>((resolve, reject) => {
     const reader = new FileReaderCtor();
@@ -70,7 +73,9 @@ class SupabaseMessageObjectStore implements MessageObjectStore {
     cacheControl?: string;
   }): Promise<void> {
     const payload =
-      input.body instanceof ArrayBuffer ? input.body : await blobToArrayBuffer(input.body);
+      input.body instanceof ArrayBuffer
+        ? input.body
+        : await blobToArrayBuffer(input.body);
     const { error } = await this.client.storage
       .from(input.bucketName)
       .upload(input.objectPath, payload, {
@@ -81,9 +86,14 @@ class SupabaseMessageObjectStore implements MessageObjectStore {
     if (error) throw error;
   }
 
-  async removeObjects(bucketName: string, objectPaths: string[]): Promise<void> {
+  async removeObjects(
+    bucketName: string,
+    objectPaths: string[],
+  ): Promise<void> {
     if (objectPaths.length === 0) return;
-    const { error } = await this.client.storage.from(bucketName).remove(objectPaths);
+    const { error } = await this.client.storage
+      .from(bucketName)
+      .remove(objectPaths);
     if (error) throw error;
   }
 
@@ -120,6 +130,8 @@ class SupabaseMessageObjectStore implements MessageObjectStore {
   }
 }
 
-export function createMessageObjectStore(client: HavenSupabaseClient): MessageObjectStore {
+export function createMessageObjectStore(
+  client: HavenSupabaseClient,
+): MessageObjectStore {
   return new SupabaseMessageObjectStore(client);
 }

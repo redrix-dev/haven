@@ -1,16 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import {
-  createMemoryPersistence,
-} from '@shared/core';
-import {
-  resetHavenCore,
-  syncFocusFromRoute,
-} from '@mobile-data';
-import { CommunityNexus } from '@mobile-data/communities/CommunityNexus';
-import { ChannelNexus } from '@mobile-data/channels/ChannelNexus';
-import { CommunityMessageCache as CommunityMessageNexus } from '@mobile-data/messages/CommunityMessageCache';
-import { HavenReactCore } from '@mobile-data/core/HavenReactCore';
-import type { ServerSummary } from '@shared/lib/backend/types';
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { createMemoryPersistence } from "@shared/core";
+import { resetHavenCore, syncFocusFromRoute } from "@mobile-data";
+import { CommunityNexus } from "@mobile-data/communities/CommunityNexus";
+import { ChannelNexus } from "@mobile-data/channels/ChannelNexus";
+import { CommunityMessageCache as CommunityMessageNexus } from "@mobile-data/messages/CommunityMessageCache";
+import { HavenReactCore } from "@mobile-data/core/HavenReactCore";
+import type { ServerSummary } from "@shared/lib/backend/types";
 
 /**
  * Bootstrap tests exercise HavenReactCore.bootstrapSession at the integration level
@@ -34,8 +29,10 @@ const makeFakeCore = (input: {
   const messageNexuses = new Map<string, CommunityMessageNexus>();
 
   const phase = {
-    snapshot: { phase: 'idle' as string, error: null as string | null },
-    listeners: new Set<(snapshot: { phase: string; error: string | null }) => void>(),
+    snapshot: { phase: "idle" as string, error: null as string | null },
+    listeners: new Set<
+      (snapshot: { phase: string; error: string | null }) => void
+    >(),
     set(next: string, error: string | null = null) {
       this.snapshot = { phase: next, error };
       for (const l of this.listeners) l(this.snapshot);
@@ -64,7 +61,7 @@ const makeFakeCore = (input: {
         for (const n of messageNexuses.values()) n.clear();
         messageNexuses.clear();
       },
-    } as unknown as HavenReactCore['messages'],
+    } as unknown as HavenReactCore["messages"],
     backends: {
       controlPlane: {
         listUserCommunities: input.listUserCommunities,
@@ -72,10 +69,13 @@ const makeFakeCore = (input: {
           input.subscribeToPrivateUserChannel ?? (() => () => {}),
       },
       communityData: { listChannelMessages: vi.fn() },
-    } as unknown as HavenReactCore['backends'],
+    } as unknown as HavenReactCore["backends"],
     getBootstrapPhase: () => phase.snapshot as never,
     subscribeBootstrapPhase: ((l: unknown) => {
-      const lf = l as (snapshot: { phase: string; error: string | null }) => void;
+      const lf = l as (snapshot: {
+        phase: string;
+        error: string | null;
+      }) => void;
       phase.listeners.add(lf);
       return () => phase.listeners.delete(lf);
     }) as never,
@@ -92,22 +92,23 @@ const makeFakeCore = (input: {
   } as unknown as HavenReactCore;
 
   // Provide a real bootstrapSession that drives the same phases as production.
-  (core as { bootstrapSession: HavenReactCore['bootstrapSession'] }).bootstrapSession =
-    async (userId: string) => {
-      phase.set('rehydrating');
-      communities.rehydrate();
-      channels.rehydrate();
-      phase.set('loading_communities');
-      const list = await input.listUserCommunities(userId);
-      communities.setCommunities(
-        list.map((c) => ({ id: c.id, name: c.name, createdAt: c.created_at })),
-      );
-      phase.set('connecting_realtime');
-      const fakeSubscribe =
-        input.subscribeToPrivateUserChannel ?? (() => () => {});
-      fakeSubscribe(userId, () => {});
-      phase.set('ready');
-    };
+  (
+    core as { bootstrapSession: HavenReactCore["bootstrapSession"] }
+  ).bootstrapSession = async (userId: string) => {
+    phase.set("rehydrating");
+    communities.rehydrate();
+    channels.rehydrate();
+    phase.set("loading_communities");
+    const list = await input.listUserCommunities(userId);
+    communities.setCommunities(
+      list.map((c) => ({ id: c.id, name: c.name, createdAt: c.created_at })),
+    );
+    phase.set("connecting_realtime");
+    const fakeSubscribe =
+      input.subscribeToPrivateUserChannel ?? (() => () => {});
+    fakeSubscribe(userId, () => {});
+    phase.set("ready");
+  };
 
   return core;
 };
@@ -116,11 +117,11 @@ beforeEach(() => {
   resetHavenCore();
 });
 
-describe('bootstrapSession', () => {
-  it('drives phases idle → ready and populates communities', async () => {
+describe("bootstrapSession", () => {
+  it("drives phases idle → ready and populates communities", async () => {
     const phases: string[] = [];
     const listUserCommunities = vi.fn(async () => [
-      { id: 's1', name: 'Alpha', created_at: '2026-01-01T00:00:00.000Z' },
+      { id: "s1", name: "Alpha", created_at: "2026-01-01T00:00:00.000Z" },
     ]);
 
     const core = makeFakeCore({ listUserCommunities });
@@ -128,148 +129,150 @@ describe('bootstrapSession', () => {
       phases.push(snapshot.phase);
     });
 
-    await core.bootstrapSession('u1');
+    await core.bootstrapSession("u1");
 
     expect(phases).toEqual([
-      'rehydrating',
-      'loading_communities',
-      'connecting_realtime',
-      'ready',
+      "rehydrating",
+      "loading_communities",
+      "connecting_realtime",
+      "ready",
     ]);
-    expect(core.communities.reactiveStore.getState().orderedIds).toContain('s1');
-    expect(core.communities.getSnapshot('s1')?.name).toBe('Alpha');
-    expect(listUserCommunities).toHaveBeenCalledWith('u1');
+    expect(core.communities.reactiveStore.getState().orderedIds).toContain(
+      "s1",
+    );
+    expect(core.communities.getSnapshot("s1")?.name).toBe("Alpha");
+    expect(listUserCommunities).toHaveBeenCalledWith("u1");
     unsubscribe();
   });
 
-  it('subscribes the user private channel during bootstrap', async () => {
+  it("subscribes the user private channel during bootstrap", async () => {
     const subscribeToPrivateUserChannel = vi.fn(() => () => {});
     const core = makeFakeCore({
       listUserCommunities: async () => [],
       subscribeToPrivateUserChannel,
     });
 
-    await core.bootstrapSession('u1');
+    await core.bootstrapSession("u1");
 
     expect(subscribeToPrivateUserChannel).toHaveBeenCalledWith(
-      'u1',
+      "u1",
       expect.any(Function),
     );
   });
 });
 
-describe('syncFocusFromRoute', () => {
-  it('sets community + falls back to default channel when none specified', () => {
+describe("syncFocusFromRoute", () => {
+  it("sets community + falls back to default channel when none specified", () => {
     const core = makeFakeCore({ listUserCommunities: async () => [] });
     core.channels.setChannels(
-      's1',
+      "s1",
       [
         {
-          id: 'c1',
-          community_id: 's1',
-          name: 'general',
-          kind: 'text',
+          id: "c1",
+          community_id: "s1",
+          name: "general",
+          kind: "text",
           position: 0,
           topic: null,
-          created_at: '2026-01-01T00:00:00.000Z',
+          created_at: "2026-01-01T00:00:00.000Z",
         } as never,
       ],
-      { groups: [], ungroupedChannelIds: ['c1'], collapsedGroupIds: [] },
+      { groups: [], ungroupedChannelIds: ["c1"], collapsedGroupIds: [] },
     );
 
-    syncFocusFromRoute(core, { communityId: 's1' });
+    syncFocusFromRoute(core, { communityId: "s1" });
 
     expect(core.communities.getSnapshot).toBeDefined();
-    expect(core.channels.getChannelsSnapshot('s1')[0]?.id).toBe('c1');
+    expect(core.channels.getChannelsSnapshot("s1")[0]?.id).toBe("c1");
   });
 
-  it('uses lastChannelByCommunity when present', () => {
+  it("uses lastChannelByCommunity when present", () => {
     const core = makeFakeCore({ listUserCommunities: async () => [] });
     core.channels.setChannels(
-      's1',
+      "s1",
       [
         {
-          id: 'c1',
-          community_id: 's1',
-          name: 'general',
-          kind: 'text',
+          id: "c1",
+          community_id: "s1",
+          name: "general",
+          kind: "text",
           position: 0,
           topic: null,
-          created_at: '2026-01-01T00:00:00.000Z',
+          created_at: "2026-01-01T00:00:00.000Z",
         } as never,
         {
-          id: 'c2',
-          community_id: 's1',
-          name: 'random',
-          kind: 'text',
+          id: "c2",
+          community_id: "s1",
+          name: "random",
+          kind: "text",
           position: 1,
           topic: null,
-          created_at: '2026-01-01T00:00:00.000Z',
+          created_at: "2026-01-01T00:00:00.000Z",
         } as never,
       ],
-      { groups: [], ungroupedChannelIds: ['c1', 'c2'], collapsedGroupIds: [] },
+      { groups: [], ungroupedChannelIds: ["c1", "c2"], collapsedGroupIds: [] },
     );
-    core.channels.setActiveChannelId('c2');
+    core.channels.setActiveChannelId("c2");
 
-    syncFocusFromRoute(core, { communityId: 's1' });
+    syncFocusFromRoute(core, { communityId: "s1" });
 
-    expect(core.channels.getLastChannelId('s1')).toBe('c2');
+    expect(core.channels.getLastChannelId("s1")).toBe("c2");
   });
 
-  it('clears active focus when communityId is null', () => {
+  it("clears active focus when communityId is null", () => {
     const core = makeFakeCore({ listUserCommunities: async () => [] });
     core.channels.setChannels(
-      's1',
+      "s1",
       [
         {
-          id: 'c1',
-          community_id: 's1',
-          name: 'general',
-          kind: 'text',
+          id: "c1",
+          community_id: "s1",
+          name: "general",
+          kind: "text",
           position: 0,
           topic: null,
-          created_at: '2026-01-01T00:00:00.000Z',
+          created_at: "2026-01-01T00:00:00.000Z",
         } as never,
       ],
-      { groups: [], ungroupedChannelIds: ['c1'], collapsedGroupIds: [] },
+      { groups: [], ungroupedChannelIds: ["c1"], collapsedGroupIds: [] },
     );
-    core.channels.setActiveChannelId('c1');
-    core.communities.setActiveId('s1');
+    core.channels.setActiveChannelId("c1");
+    core.communities.setActiveId("s1");
 
     syncFocusFromRoute(core, { communityId: null });
 
-    expect(core.channels.getLastChannelId('s1')).toBe('c1');
+    expect(core.channels.getLastChannelId("s1")).toBe("c1");
   });
 });
 
-describe('prepareCommunityEntry', () => {
-  it('loads channel focus through the Nexus and prepares the selected text channel', async () => {
+describe("prepareCommunityEntry", () => {
+  it("loads channel focus through the Nexus and prepares the selected text channel", async () => {
     const persistence = createMemoryPersistence();
     const communities = new CommunityNexus(persistence, {} as never);
     const channels = new ChannelNexus(persistence, {} as never);
     channels.setChannels(
-      's1',
+      "s1",
       [
         {
-          id: 'c1',
-          community_id: 's1',
-          name: 'general',
-          kind: 'text',
+          id: "c1",
+          community_id: "s1",
+          name: "general",
+          kind: "text",
           position: 0,
           topic: null,
-          created_at: '2026-01-01T00:00:00.000Z',
+          created_at: "2026-01-01T00:00:00.000Z",
         } as never,
         {
-          id: 'c2',
-          community_id: 's1',
-          name: 'random',
-          kind: 'text',
+          id: "c2",
+          community_id: "s1",
+          name: "random",
+          kind: "text",
           position: 1,
           topic: null,
-          created_at: '2026-01-01T00:00:00.000Z',
+          created_at: "2026-01-01T00:00:00.000Z",
         } as never,
       ],
-      { groups: [], ungroupedChannelIds: ['c1', 'c2'], collapsedGroupIds: [] },
+      { groups: [], ungroupedChannelIds: ["c1", "c2"], collapsedGroupIds: [] },
     );
 
     const ensureCommunityPermissions = vi.fn(async () => {});
@@ -283,27 +286,27 @@ describe('prepareCommunityEntry', () => {
 
     const result = await HavenReactCore.prototype.prepareCommunityEntry.call(
       core,
-      's1',
-      { lastVisitedChannelId: 'c2' },
+      "s1",
+      { lastVisitedChannelId: "c2" },
     );
 
-    expect(result.channelId).toBe('c2');
-    expect(communities.getActiveId()).toBe('s1');
-    expect(channels.getActiveChannelId()).toBe('c2');
-    expect(ensureCommunityPermissions).toHaveBeenCalledWith('s1');
-    expect(prepareTextChannelMessages).toHaveBeenCalledWith('s1', 'c2');
+    expect(result.channelId).toBe("c2");
+    expect(communities.getActiveId()).toBe("s1");
+    expect(channels.getActiveChannelId()).toBe("c2");
+    expect(ensureCommunityPermissions).toHaveBeenCalledWith("s1");
+    expect(prepareTextChannelMessages).toHaveBeenCalledWith("s1", "c2");
   });
 });
 
-describe('warmup orchestration', () => {
+describe("warmup orchestration", () => {
   const createWarmCore = (): HavenReactCore =>
     Object.create(HavenReactCore.prototype) as HavenReactCore;
 
-  it('warms session surfaces and isolates individual failures', async () => {
+  it("warms session surfaces and isolates individual failures", async () => {
     const core = createWarmCore();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const ensureViewerProfile = vi.fn(async () => {
-      throw new Error('profile failed');
+      throw new Error("profile failed");
     });
     const ensurePlatformStaff = vi.fn(async () => null);
     const ensureInbox = vi.fn(async () => {});
@@ -328,37 +331,40 @@ describe('warmup orchestration', () => {
         ensureConversationsLoaded,
         ensureMessagesLoaded,
         getConversationsSnapshot: () => [
-          { conversationId: 'dm1', unreadCount: 2 },
-          { conversationId: 'dm2', unreadCount: 0 },
+          { conversationId: "dm1", unreadCount: 2 },
+          { conversationId: "dm2", unreadCount: 0 },
         ],
       },
     });
 
-    await core.warmSessionSurfaces('u1');
+    await core.warmSessionSurfaces("u1");
 
-    expect(ensureViewerProfile).toHaveBeenCalledWith('u1', {
+    expect(ensureViewerProfile).toHaveBeenCalledWith("u1", {
       freshnessMs: 60_000,
     });
-    expect(ensurePlatformStaff).toHaveBeenCalledWith('u1', {
+    expect(ensurePlatformStaff).toHaveBeenCalledWith("u1", {
       freshnessMs: 60_000,
     });
     expect(ensureInbox).toHaveBeenCalledTimes(1);
     expect(ensurePreferences).toHaveBeenCalledTimes(1);
     expect(ensureSocial).toHaveBeenCalledTimes(1);
     expect(ensureConversationsLoaded).toHaveBeenCalled();
-    expect(ensureMessagesLoaded).toHaveBeenCalledWith('dm1', {
+    expect(ensureMessagesLoaded).toHaveBeenCalledWith("dm1", {
       freshnessMs: undefined,
     });
-    expect(ensureMessagesLoaded).not.toHaveBeenCalledWith('dm2', expect.anything());
+    expect(ensureMessagesLoaded).not.toHaveBeenCalledWith(
+      "dm2",
+      expect.anything(),
+    );
     expect(warn).toHaveBeenCalledWith(
-      '[HavenReactCore warmup] viewer profile failed',
+      "[HavenReactCore warmup] viewer profile failed",
       expect.any(Error),
     );
 
     warn.mockRestore();
   });
 
-  it('warms only capped unread DM threads without marking read', async () => {
+  it("warms only capped unread DM threads without marking read", async () => {
     const core = createWarmCore();
     const ensureMessagesLoaded = vi.fn(async () => {});
     const markRead = vi.fn(async () => true);
@@ -369,11 +375,11 @@ describe('warmup orchestration', () => {
         ensureMessagesLoaded,
         markRead,
         getConversationsSnapshot: () => [
-          { conversationId: 'dm1', unreadCount: 1 },
-          { conversationId: 'dm2', unreadCount: 0 },
-          { conversationId: 'dm3', unreadCount: 4 },
-          { conversationId: 'dm4', unreadCount: 2 },
-          { conversationId: 'dm5', unreadCount: 1 },
+          { conversationId: "dm1", unreadCount: 1 },
+          { conversationId: "dm2", unreadCount: 0 },
+          { conversationId: "dm3", unreadCount: 4 },
+          { conversationId: "dm4", unreadCount: 2 },
+          { conversationId: "dm5", unreadCount: 1 },
         ],
       },
     });
@@ -381,72 +387,72 @@ describe('warmup orchestration', () => {
     await core.warmDirectMessageThreads({ unreadOnly: true, limit: 3 });
 
     expect(ensureMessagesLoaded).toHaveBeenCalledTimes(3);
-    expect(ensureMessagesLoaded).toHaveBeenNthCalledWith(1, 'dm1', {
+    expect(ensureMessagesLoaded).toHaveBeenNthCalledWith(1, "dm1", {
       freshnessMs: undefined,
     });
-    expect(ensureMessagesLoaded).toHaveBeenNthCalledWith(2, 'dm3', {
+    expect(ensureMessagesLoaded).toHaveBeenNthCalledWith(2, "dm3", {
       freshnessMs: undefined,
     });
-    expect(ensureMessagesLoaded).toHaveBeenNthCalledWith(3, 'dm4', {
+    expect(ensureMessagesLoaded).toHaveBeenNthCalledWith(3, "dm4", {
       freshnessMs: undefined,
     });
     expect(markRead).not.toHaveBeenCalled();
   });
 
-  it('warms the active community channel and bounded adjacent text channels', async () => {
+  it("warms the active community channel and bounded adjacent text channels", async () => {
     const core = createWarmCore();
     const prepareTextChannelMessages = vi.fn(async () => {});
 
     Object.assign(core, {
       channels: {
         ensureLoaded: vi.fn(async () => {}),
-        getActiveChannelId: () => 'c2',
+        getActiveChannelId: () => "c2",
         setActiveChannelId: vi.fn(),
         getChannelsSnapshot: () => [
           {
-            id: 'c1',
-            communityId: 's1',
-            name: 'one',
-            kind: 'text',
+            id: "c1",
+            communityId: "s1",
+            name: "one",
+            kind: "text",
             position: 0,
             topic: null,
-            createdAt: '2026-01-01T00:00:00.000Z',
+            createdAt: "2026-01-01T00:00:00.000Z",
           },
           {
-            id: 'c2',
-            communityId: 's1',
-            name: 'two',
-            kind: 'text',
+            id: "c2",
+            communityId: "s1",
+            name: "two",
+            kind: "text",
             position: 1,
             topic: null,
-            createdAt: '2026-01-01T00:00:00.000Z',
+            createdAt: "2026-01-01T00:00:00.000Z",
           },
           {
-            id: 'c3',
-            communityId: 's1',
-            name: 'three',
-            kind: 'text',
+            id: "c3",
+            communityId: "s1",
+            name: "three",
+            kind: "text",
             position: 2,
             topic: null,
-            createdAt: '2026-01-01T00:00:00.000Z',
+            createdAt: "2026-01-01T00:00:00.000Z",
           },
           {
-            id: 'c4',
-            communityId: 's1',
-            name: 'voice',
-            kind: 'voice',
+            id: "c4",
+            communityId: "s1",
+            name: "voice",
+            kind: "voice",
             position: 3,
             topic: null,
-            createdAt: '2026-01-01T00:00:00.000Z',
+            createdAt: "2026-01-01T00:00:00.000Z",
           },
           {
-            id: 'c5',
-            communityId: 's1',
-            name: 'five',
-            kind: 'text',
+            id: "c5",
+            communityId: "s1",
+            name: "five",
+            kind: "text",
             position: 4,
             topic: null,
-            createdAt: '2026-01-01T00:00:00.000Z',
+            createdAt: "2026-01-01T00:00:00.000Z",
           },
         ],
       },
@@ -457,18 +463,18 @@ describe('warmup orchestration', () => {
       prepareTextChannelMessages,
     });
 
-    await core.warmCommunitySurface('s1');
+    await core.warmCommunitySurface("s1");
     await Promise.resolve();
 
-    expect(prepareTextChannelMessages).toHaveBeenCalledWith('s1', 'c2');
-    expect(prepareTextChannelMessages).toHaveBeenCalledWith('s1', 'c1');
-    expect(prepareTextChannelMessages).toHaveBeenCalledWith('s1', 'c3');
-    expect(prepareTextChannelMessages).not.toHaveBeenCalledWith('s1', 'c5');
+    expect(prepareTextChannelMessages).toHaveBeenCalledWith("s1", "c2");
+    expect(prepareTextChannelMessages).toHaveBeenCalledWith("s1", "c1");
+    expect(prepareTextChannelMessages).toHaveBeenCalledWith("s1", "c3");
+    expect(prepareTextChannelMessages).not.toHaveBeenCalledWith("s1", "c5");
   });
 });
 
-describe('deleteCommunityMessageForModeration', () => {
-  it('delegates community message deletion to the community data backend', async () => {
+describe("deleteCommunityMessageForModeration", () => {
+  it("delegates community message deletion to the community data backend", async () => {
     const deleteMessage = vi.fn(async () => {});
     const core = {
       backends: {
@@ -476,14 +482,17 @@ describe('deleteCommunityMessageForModeration', () => {
       },
     } as unknown as HavenReactCore;
 
-    await HavenReactCore.prototype.deleteCommunityMessageForModeration.call(core, {
-      communityId: 's1',
-      messageId: 'm1',
-    });
+    await HavenReactCore.prototype.deleteCommunityMessageForModeration.call(
+      core,
+      {
+        communityId: "s1",
+        messageId: "m1",
+      },
+    );
 
     expect(deleteMessage).toHaveBeenCalledWith({
-      communityId: 's1',
-      messageId: 'm1',
+      communityId: "s1",
+      messageId: "m1",
     });
   });
 });

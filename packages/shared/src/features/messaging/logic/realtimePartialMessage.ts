@@ -29,8 +29,7 @@ export function buildPartialMessageFromRealtimePayload(input: {
       input.payload.metadata !== null
         ? (input.payload.metadata as Record<string, unknown>)
         : {},
-    createdAt:
-      normalizeMessageCreatedAt(createdAt) ?? new Date().toISOString(),
+    createdAt: normalizeMessageCreatedAt(createdAt) ?? new Date().toISOString(),
     editedAt: null,
     deletedAt:
       typeof input.payload.deleted_at === "string" &&

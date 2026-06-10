@@ -26,13 +26,16 @@ export const createDefaultViewerMessagePolicyState =
   });
 
 /** Reactive store handle — implementation lives in platform data layers. */
-export type ViewerMessagePolicyStore = ReadableStore<ViewerMessagePolicyState> & {
-  setState: (
-    partial:
-      | Partial<ViewerMessagePolicyState>
-      | ((state: ViewerMessagePolicyState) => Partial<ViewerMessagePolicyState>),
-  ) => void;
-};
+export type ViewerMessagePolicyStore =
+  ReadableStore<ViewerMessagePolicyState> & {
+    setState: (
+      partial:
+        | Partial<ViewerMessagePolicyState>
+        | ((
+            state: ViewerMessagePolicyState,
+          ) => Partial<ViewerMessagePolicyState>),
+    ) => void;
+  };
 
 const hiddenAuthorIdsEqual = (
   a: ReadonlySet<string>,
@@ -73,7 +76,10 @@ export const viewerCommunityPolicyEqual = (
   return (
     a.suppressAuthorFilter === b.suppressAuthorFilter &&
     a.canViewBanHidden === b.canViewBanHidden &&
-    revokedByChannelEqual(a.revokedAuthorIdsByChannel, b.revokedAuthorIdsByChannel)
+    revokedByChannelEqual(
+      a.revokedAuthorIdsByChannel,
+      b.revokedAuthorIdsByChannel,
+    )
   );
 };
 

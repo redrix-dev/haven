@@ -1,8 +1,8 @@
-import type { DirectMessageNexusState } from './dmTypes'
+import type { DirectMessageNexusState } from "./dmTypes";
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
-} from '@shared/lib/backend/types'
+} from "@shared/lib/backend/types";
 
 /**
  * Pure, framework-agnostic projections + equality fns for the DM store.
@@ -10,54 +10,54 @@ import type {
  * `@mobile-data/hooks` and `@solid-client/data` accessors. Memoization lives in the adapters.
  */
 
-const EMPTY_CONVERSATIONS: DirectMessageConversationSummary[] = []
-const EMPTY_MESSAGES: DirectMessage[] = []
+const EMPTY_CONVERSATIONS: DirectMessageConversationSummary[] = [];
+const EMPTY_MESSAGES: DirectMessage[] = [];
 
 export const projectConversations = (
   state: DirectMessageNexusState,
 ): DirectMessageConversationSummary[] => {
-  if (state.conversationIds.length === 0) return EMPTY_CONVERSATIONS
+  if (state.conversationIds.length === 0) return EMPTY_CONVERSATIONS;
   return state.conversationIds
     .map((id) => state.entities[id]?.data)
-    .filter((c): c is DirectMessageConversationSummary => c !== undefined)
-}
+    .filter((c): c is DirectMessageConversationSummary => c !== undefined);
+};
 
 export const projectMessages = (
   state: DirectMessageNexusState,
   conversationId: string,
 ): DirectMessage[] => {
-  const ids = state.messagesByConversation[conversationId] ?? []
-  if (ids.length === 0) return EMPTY_MESSAGES
-  const list: DirectMessage[] = []
+  const ids = state.messagesByConversation[conversationId] ?? [];
+  if (ids.length === 0) return EMPTY_MESSAGES;
+  const list: DirectMessage[] = [];
   for (const id of ids) {
-    const msg = state.messageEntities[id]
-    if (msg) list.push(msg)
+    const msg = state.messageEntities[id];
+    if (msg) list.push(msg);
   }
-  return list
-}
+  return list;
+};
 
 export const selectActiveConversationId = (
   state: DirectMessageNexusState,
-): string | null => state.activeConversationId
+): string | null => state.activeConversationId;
 
 export const selectIsLoadingConversations = (
   state: DirectMessageNexusState,
-): boolean => state.isLoadingConversations
+): boolean => state.isLoadingConversations;
 
 export const selectComposeDraftPeer = (state: DirectMessageNexusState) =>
-  state.composeDraftPeer
+  state.composeDraftPeer;
 
 export const selectIsLoadingMessages = (
   state: DirectMessageNexusState,
   conversationId: string,
-): boolean => state.loadingByConversation[conversationId] ?? false
+): boolean => state.loadingByConversation[conversationId] ?? false;
 
 export const conversationsEqual = (
   a: DirectMessageConversationSummary[],
   b: DirectMessageConversationSummary[],
 ): boolean => {
-  if (a === b) return true
-  if (a.length !== b.length) return false
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (
       a[i].conversationId !== b[i].conversationId ||
@@ -74,20 +74,20 @@ export const conversationsEqual = (
       a[i].isMuted !== b[i].isMuted ||
       a[i].mutedUntil !== b[i].mutedUntil
     ) {
-      return false
+      return false;
     }
   }
-  return true
-}
+  return true;
+};
 
 export const directMessagesEqual = (
   a: DirectMessage[],
   b: DirectMessage[],
 ): boolean => {
-  if (a === b) return true
-  if (a.length !== b.length) return false
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false
+    if (a[i] !== b[i]) return false;
   }
-  return true
-}
+  return true;
+};

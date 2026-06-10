@@ -29,7 +29,8 @@ const inputClassName =
 
 export function SignUpScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -67,10 +68,7 @@ export function SignUpScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior="padding"
-      className="flex-1 bg-background"
-    >
+    <KeyboardAvoidingView behavior="padding" className="flex-1 bg-background">
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
@@ -96,8 +94,8 @@ export function SignUpScreen() {
               </Text>
               <Text className="mb-8 text-center text-sm leading-6 text-muted-foreground">
                 We sent a verification link to{" "}
-                <Text className="text-sm text-foreground">{email.trim()}</Text>. Open the email and
-                confirm your account before signing in.
+                <Text className="text-sm text-foreground">{email.trim()}</Text>.
+                Open the email and confirm your account before signing in.
               </Text>
               <Pressable
                 className="rounded-xl bg-primary py-4"
@@ -195,11 +193,15 @@ export function SignUpScreen() {
                   >
                     <View
                       className={`h-5 w-5 items-center justify-center rounded border-2 ${
-                        acceptedLegal ? "border-primary bg-primary" : "border-border bg-transparent"
+                        acceptedLegal
+                          ? "border-primary bg-primary"
+                          : "border-border bg-transparent"
                       }`}
                     >
                       {acceptedLegal ? (
-                        <Text className="text-xs font-bold text-primary-foreground">✓</Text>
+                        <Text className="text-xs font-bold text-primary-foreground">
+                          ✓
+                        </Text>
                       ) : null}
                     </View>
                   </Pressable>
@@ -207,14 +209,18 @@ export function SignUpScreen() {
                     I agree to the{" "}
                     <Text
                       className="text-sm text-primary"
-                      onPress={() => void openPlatformExternalUrl(HAVEN_TERMS_URL)}
+                      onPress={() =>
+                        void openPlatformExternalUrl(HAVEN_TERMS_URL)
+                      }
                     >
                       Terms of Service
                     </Text>{" "}
                     and{" "}
                     <Text
                       className="text-sm text-primary"
-                      onPress={() => void openPlatformExternalUrl(HAVEN_PRIVACY_URL)}
+                      onPress={() =>
+                        void openPlatformExternalUrl(HAVEN_PRIVACY_URL)
+                      }
                     >
                       Privacy Policy
                     </Text>
@@ -223,7 +229,9 @@ export function SignUpScreen() {
               </View>
 
               {error ? (
-                <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
+                <Text className="mb-4 text-center text-sm text-destructive">
+                  {error}
+                </Text>
               ) : null}
 
               <Pressable
@@ -244,7 +252,9 @@ export function SignUpScreen() {
                   onPress={() => void navigation.navigate("Login")}
                   hitSlop={8}
                 >
-                  <Text className="text-center text-sm text-primary">Sign in</Text>
+                  <Text className="text-center text-sm text-primary">
+                    Sign in
+                  </Text>
                 </Pressable>
               </View>
             </>

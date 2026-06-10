@@ -59,7 +59,8 @@ export function FriendsSurface({
   const core = useHavenCore();
   const social = core.social;
   const themeTokens = useMobileThemeTokens();
-  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const foregroundColor =
+    resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const placeholderColor =
     resolveColorProp(themeTokens, "muted-foreground") ?? "#8b9cbb";
   const liveProfiles = useProfilesRecord(core.profiles);
@@ -178,27 +179,33 @@ export function FriendsSurface({
 
   const labelForFriend = useCallback(
     (friend: FriendSummary) =>
-      resolveLiveUsername(liveProfiles, friend.friendUserId, friend.username)?.trim() ||
-      friend.username,
+      resolveLiveUsername(
+        liveProfiles,
+        friend.friendUserId,
+        friend.username,
+      )?.trim() || friend.username,
     [liveProfiles],
   );
 
-  const renderAvatar = useCallback((label: string, avatarUrl: string | null) => (
-    <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
-      {avatarUrl ? (
-        <Image
-          source={{ uri: avatarUrl }}
-          className="h-12 w-12"
-          resizeMode="cover"
-          accessibilityLabel={`${label} avatar`}
-        />
-      ) : (
-        <Text className="text-base font-semibold text-foreground">
-          {label.trim().charAt(0).toUpperCase() || "U"}
-        </Text>
-      )}
-    </View>
-  ), []);
+  const renderAvatar = useCallback(
+    (label: string, avatarUrl: string | null) => (
+      <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
+        {avatarUrl ? (
+          <Image
+            source={{ uri: avatarUrl }}
+            className="h-12 w-12"
+            resizeMode="cover"
+            accessibilityLabel={`${label} avatar`}
+          />
+        ) : (
+          <Text className="text-base font-semibold text-foreground">
+            {label.trim().charAt(0).toUpperCase() || "U"}
+          </Text>
+        )}
+      </View>
+    ),
+    [],
+  );
 
   const renderFriend: ListRenderItem<FriendSummary> = useCallback(
     ({ item }) => {
@@ -218,7 +225,9 @@ export function FriendsSurface({
         >
           {renderAvatar(label, item.avatarUrl)}
           <View className="min-w-0 flex-1">
-            <Text className="text-base font-semibold text-foreground">{label}</Text>
+            <Text className="text-base font-semibold text-foreground">
+              {label}
+            </Text>
             <Text className="text-xs text-muted-foreground">
               {item.mutualCommunityCount > 0
                 ? `${item.mutualCommunityCount} mutual server${item.mutualCommunityCount === 1 ? "" : "s"}`
@@ -250,10 +259,14 @@ export function FriendsSurface({
     ({ item }: { item: FriendRequestSummary }) => (
       <View
         className={`border-b border-border-panel py-3 pl-2 ${
-          item.requestId === highlightedRequestId ? "border-l-4 border-l-primary" : ""
+          item.requestId === highlightedRequestId
+            ? "border-l-4 border-l-primary"
+            : ""
         }`}
       >
-        <Text className="text-base font-medium text-foreground">{item.senderUsername}</Text>
+        <Text className="text-base font-medium text-foreground">
+          {item.senderUsername}
+        </Text>
         <View className="mt-2 flex-row gap-2">
           <Pressable
             className="rounded-lg bg-primary px-3 py-2 active:bg-primary-hover"
@@ -264,7 +277,9 @@ export function FriendsSurface({
               })
             }
           >
-            <Text className="text-sm font-semibold text-primary-foreground">Accept</Text>
+            <Text className="text-sm font-semibold text-primary-foreground">
+              Accept
+            </Text>
           </Pressable>
           <Pressable
             className="rounded-lg border border-border-control bg-surface-panel px-3 py-2 active:bg-surface-hover"
@@ -286,7 +301,9 @@ export function FriendsSurface({
   const renderOutgoingRequest = useCallback(
     ({ item }: { item: FriendRequestSummary }) => (
       <View className="flex-row items-center justify-between border-b border-border-panel py-3">
-        <Text className="text-base text-foreground">{item.recipientUsername}</Text>
+        <Text className="text-base text-foreground">
+          {item.recipientUsername}
+        </Text>
         <Pressable
           className="rounded-lg border border-border-control bg-surface-panel px-3 py-2 active:bg-surface-hover"
           disabled={busyActionKey !== null}
@@ -325,28 +342,28 @@ export function FriendsSurface({
 
   const renderSearchResult: ListRenderItem<FriendSearchResult> = useCallback(
     ({ item }) => {
-      const busy =
-        busyActionKey?.startsWith(`send:${item.username}`) ?? false;
+      const busy = busyActionKey?.startsWith(`send:${item.username}`) ?? false;
       return (
         <View className="flex-row items-center justify-between border-b border-border-panel py-3">
           <View className="min-w-0 flex-1">
             <Text className="text-base text-foreground">{item.username}</Text>
-            <Text className="text-xs capitalize text-muted-foreground">{item.relationshipState}</Text>
+            <Text className="text-xs capitalize text-muted-foreground">
+              {item.relationshipState}
+            </Text>
           </View>
           {item.relationshipState === "none" ? (
             <Pressable
               className="rounded-lg bg-primary px-3 py-2 active:bg-primary-hover"
               disabled={busy || busyActionKey !== null}
               onPress={() =>
-                void runMutation(
-                  `send:${item.username}`,
-                  async () => {
-                    await social.sendFriendRequest(item.username);
-                  },
-                )
+                void runMutation(`send:${item.username}`, async () => {
+                  await social.sendFriendRequest(item.username);
+                })
               }
             >
-              <Text className="text-sm font-semibold text-primary-foreground">Add</Text>
+              <Text className="text-sm font-semibold text-primary-foreground">
+                Add
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -368,7 +385,9 @@ export function FriendsSurface({
           >
             <Text
               className={`text-sm font-medium ${
-                activeTab === tab.id ? "text-primary-foreground" : "text-foreground"
+                activeTab === tab.id
+                  ? "text-primary-foreground"
+                  : "text-foreground"
               }`}
             >
               {tab.label}
@@ -399,7 +418,9 @@ export function FriendsSurface({
           refreshing={refreshing}
           onRefresh={() => void refreshData({ suppressLoadingState: true })}
           ListEmptyComponent={
-            <Text className="py-6 text-center text-muted-foreground">No friends yet.</Text>
+            <Text className="py-6 text-center text-muted-foreground">
+              No friends yet.
+            </Text>
           }
         />
       ) : null}
@@ -408,7 +429,11 @@ export function FriendsSurface({
         <ScrollView
           className="flex-1"
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => void refreshData({ suppressLoadingState: true })} tintColor={foregroundColor} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void refreshData({ suppressLoadingState: true })}
+              tintColor={foregroundColor}
+            />
           }
         >
           {outgoingRequests.length > 0 ? (
@@ -417,7 +442,9 @@ export function FriendsSurface({
                 Outgoing
               </Text>
               {outgoingRequests.map((item) => (
-                <View key={item.requestId}>{renderOutgoingRequest({ item })}</View>
+                <View key={item.requestId}>
+                  {renderOutgoingRequest({ item })}
+                </View>
               ))}
             </View>
           ) : null}
@@ -430,7 +457,9 @@ export function FriendsSurface({
             </Text>
           ) : (
             incomingRequests.map((item) => (
-              <View key={item.requestId}>{renderIncomingRequest({ item })}</View>
+              <View key={item.requestId}>
+                {renderIncomingRequest({ item })}
+              </View>
             ))
           )}
         </ScrollView>
@@ -458,7 +487,9 @@ export function FriendsSurface({
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               searchQuery.trim().length >= 2 ? (
-                <Text className="py-4 text-center text-muted-foreground">No results.</Text>
+                <Text className="py-4 text-center text-muted-foreground">
+                  No results.
+                </Text>
               ) : (
                 <Text className="py-4 text-center text-muted-foreground">
                   Type at least 2 characters to search.
@@ -477,7 +508,9 @@ export function FriendsSurface({
           refreshing={refreshing}
           onRefresh={() => void refreshData({ suppressLoadingState: true })}
           ListEmptyComponent={
-            <Text className="py-6 text-center text-muted-foreground">No blocked users.</Text>
+            <Text className="py-6 text-center text-muted-foreground">
+              No blocked users.
+            </Text>
           }
         />
       ) : null}

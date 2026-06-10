@@ -5,7 +5,10 @@ import {
   type HavenSupabasePublicConfig,
 } from "@shared/core/backends";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
-import { routeRealtimeEvent, type RealtimeEvent } from "@shared/core/routeRealtimeEvent";
+import {
+  routeRealtimeEvent,
+  type RealtimeEvent,
+} from "@shared/core/routeRealtimeEvent";
 import type { RealtimeMutationTarget } from "@shared/core/realtimeMutationTarget";
 import {
   createDefaultViewerMessagePolicyState,
@@ -13,7 +16,10 @@ import {
   viewerCommunityPolicyEqual,
   viewerPolicyHiddenAuthorIdsEqual,
 } from "@shared/core/viewerMessagePolicy";
-import type { AuthStorePort, UiStorePort } from "@shared/core/sessionStorePorts";
+import type {
+  AuthStorePort,
+  UiStorePort,
+} from "@shared/core/sessionStorePorts";
 import {
   registerSessionBackends,
   resetSessionBackends,
@@ -41,7 +47,11 @@ import {
   createSolidUiSessionStore,
   createSolidViewerMessagePolicyStore,
 } from "@solid-client/data";
-import { BootstrapPhase, type BootstrapPhaseListener, type BootstrapPhaseSnapshot } from "./bootstrapPhase";
+import {
+  BootstrapPhase,
+  type BootstrapPhaseListener,
+  type BootstrapPhaseSnapshot,
+} from "./bootstrapPhase";
 
 const normalizeRealtimeIso = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
@@ -125,8 +135,12 @@ export class HavenSolidCore implements RealtimeMutationTarget {
       options.persistence,
       this.viewerMessagePolicyStore,
     );
-    this.directMessages = createDirectMessageSolidCache(this.backends.directMessages);
-    this.notifications = createNotificationSolidCache(this.backends.notifications);
+    this.directMessages = createDirectMessageSolidCache(
+      this.backends.directMessages,
+    );
+    this.notifications = createNotificationSolidCache(
+      this.backends.notifications,
+    );
     this.social = createSocialSolidCache(this.backends.social);
     this.permissions = createPermissionsSolidCache();
     this.profiles = createProfileSolidCache();
@@ -148,12 +162,13 @@ export class HavenSolidCore implements RealtimeMutationTarget {
 
   subscribeRealtime(userId: string): () => void {
     this.unsubscribeRealtime();
-    const unsubscribe = this.backends.controlPlane.subscribeToPrivateUserChannel(
-      userId,
-      (evt) => {
-        this.routeEvent(evt as RealtimeEvent);
-      },
-    );
+    const unsubscribe =
+      this.backends.controlPlane.subscribeToPrivateUserChannel(
+        userId,
+        (evt) => {
+          this.routeEvent(evt as RealtimeEvent);
+        },
+      );
     this.realtimeUnsubscribe = unsubscribe;
     return () => {
       this.unsubscribeRealtime();
@@ -231,14 +246,18 @@ export class HavenSolidCore implements RealtimeMutationTarget {
       await this.communities.load(userId);
 
       const joinedIds = new Set(this.communities.getCommunityIds());
-      for (const id of Object.keys(this.permissions.getPermissionsByCommunityId())) {
+      for (const id of Object.keys(
+        this.permissions.getPermissionsByCommunityId(),
+      )) {
         if (!joinedIds.has(id)) {
           this.permissions.invalidate(id);
         }
       }
       if (joinedIds.size > 0) {
         await Promise.allSettled(
-          Array.from(joinedIds).map((id) => this.ensureCommunityPermissions(id)),
+          Array.from(joinedIds).map((id) =>
+            this.ensureCommunityPermissions(id),
+          ),
         );
       }
 
@@ -276,7 +295,9 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     this.permissions.clear();
     this.profiles.clear();
     this.moderation.clear();
-    this.viewerMessagePolicyStore.setState(createDefaultViewerMessagePolicyState());
+    this.viewerMessagePolicyStore.setState(
+      createDefaultViewerMessagePolicyState(),
+    );
     this.uiStore.getState().reset();
     resetSessionBackends();
     this.phase.set("idle");
@@ -310,7 +331,10 @@ export class HavenSolidCore implements RealtimeMutationTarget {
 
   onDmConversationEvent(_payload: Record<string, unknown>): void {
     void this.directMessages.loadConversations().catch((err) => {
-      console.warn("[HavenSolidCore] directMessages.loadConversations failed", err);
+      console.warn(
+        "[HavenSolidCore] directMessages.loadConversations failed",
+        err,
+      );
     });
   }
 
@@ -327,12 +351,20 @@ export class HavenSolidCore implements RealtimeMutationTarget {
         if (partial) {
           this.directMessages.upsertMessage(partial);
         }
-        void this.directMessages.receiveMessage(conversationId, messageId).catch((err) => {
-          console.warn("[HavenSolidCore] directMessages.receiveMessage failed", err);
-        });
+        void this.directMessages
+          .receiveMessage(conversationId, messageId)
+          .catch((err) => {
+            console.warn(
+              "[HavenSolidCore] directMessages.receiveMessage failed",
+              err,
+            );
+          });
       } else {
         void this.directMessages.loadConversations().catch((err) => {
-          console.warn("[HavenSolidCore] directMessages.loadConversations failed", err);
+          console.warn(
+            "[HavenSolidCore] directMessages.loadConversations failed",
+            err,
+          );
         });
       }
     }
@@ -344,7 +376,10 @@ export class HavenSolidCore implements RealtimeMutationTarget {
   }
 
   async ensureCommunityPermissions(communityId: string): Promise<void> {
-    await this.permissions.ensureLoaded(communityId, this.backends.communityData);
+    await this.permissions.ensureLoaded(
+      communityId,
+      this.backends.communityData,
+    );
     this.syncViewerMessagePolicy(communityId);
   }
 }

@@ -7,29 +7,14 @@
     "moduleResolution": "bundler",
     "noEmit": true,
     "strict": true,
-    "types": [
-      "react",
-      "node"
-    ],
+    "types": ["react", "node"],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@shared/*": [
-        "../../packages/shared/src/*"
-      ],
-      "@mobile-data": [
-        "../../apps/mobile/src/data"
-      ],
-      "@mobile-data/*": [
-        "../../apps/mobile/src/data/*"
-      ],
-      "@platform/*": [
-        "../../packages/shared/src/platform/*"
-      ],
-      "@test-support/*": [
-        "../../tooling/test-support/*"
-      ]
+      "@/*": ["./src/*"],
+      "@shared/*": ["../../packages/shared/src/*"],
+      "@mobile-data": ["../../apps/mobile/src/data"],
+      "@mobile-data/*": ["../../apps/mobile/src/data/*"],
+      "@platform/*": ["../../packages/shared/src/platform/*"],
+      "@test-support/*": ["../../tooling/test-support/*"]
     }
   },
   "include": [
@@ -39,7 +24,5 @@
     "../../packages/shared/src/types/**/*.d.ts",
     "../../packages/shared/src/nexus/**/*.d.ts"
   ],
-  "exclude": [
-    "./src/screens/deprecated/**"
-  ]
+  "exclude": ["./src/screens/deprecated/**"]
 }

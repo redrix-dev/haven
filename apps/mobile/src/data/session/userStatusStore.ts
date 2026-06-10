@@ -5,7 +5,10 @@ import type {
   UserStatusStoreState,
 } from "@shared/core/sessionStorePorts";
 
-export type { UserStatus, UserStatusStoreState } from "@shared/core/sessionStorePorts";
+export type {
+  UserStatus,
+  UserStatusStoreState,
+} from "@shared/core/sessionStorePorts";
 
 export const useUserStatusStore: UseBoundStore<StoreApi<UserStatusStoreState>> =
   create<UserStatusStoreState>()((set) => ({

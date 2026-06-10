@@ -116,10 +116,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         if (accessToken && refreshToken) {
-          const { error: setSessionError } = await havenAuthClient().auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
+          const { error: setSessionError } =
+            await havenAuthClient().auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
           if (setSessionError) throw setSessionError;
           if (isRecoveryLink) {
             setPasswordRecoveryRequired(true);
@@ -128,10 +129,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (tokenHash && otpType && SUPPORTED_EMAIL_OTP_TYPES.has(otpType)) {
-          const { error: verifyError } = await havenAuthClient().auth.verifyOtp({
-            token_hash: tokenHash,
-            type: otpType,
-          });
+          const { error: verifyError } = await havenAuthClient().auth.verifyOtp(
+            {
+              token_hash: tokenHash,
+              type: otpType,
+            },
+          );
           if (verifyError) throw verifyError;
           if (otpType === "recovery") {
             setPasswordRecoveryRequired(true);
@@ -175,7 +178,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         setStatus(session?.user ? "authenticated" : "unauthenticated");
         setError(null);
-        bootLogger.mark("auth-check-complete", { authenticated: Boolean(session?.user) });
+        bootLogger.mark("auth-check-complete", {
+          authenticated: Boolean(session?.user),
+        });
       } catch (err: unknown) {
         if (!isMounted) return;
         const { setSession, setUser, setIsLoading } = authStore().getState();
@@ -337,7 +342,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const legalValidation = validateLegalAcceptance(acceptedLegal);
     if (!legalValidation.ok) {
       return {
-        error: new Error(legalValidation.error ?? "Legal acceptance is required."),
+        error: new Error(
+          legalValidation.error ?? "Legal acceptance is required.",
+        ),
       };
     }
 
@@ -365,9 +372,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const requestPasswordReset = async (email: string) => {
-    const { error } = await havenAuthClient().auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: getPlatformAuthConfirmRedirectUrl(),
-    });
+    const { error } = await havenAuthClient().auth.resetPasswordForEmail(
+      email.trim(),
+      {
+        redirectTo: getPlatformAuthConfirmRedirectUrl(),
+      },
+    );
 
     return { error };
   };

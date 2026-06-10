@@ -38,7 +38,9 @@ export class CommunityModerationNexus {
   private readonly backend: ServerModmailBackend;
   private loadInflight: Promise<void> | null = null;
 
-  private readonly store: UseBoundStore<StoreApi<CommunityModerationNexusState>>;
+  private readonly store: UseBoundStore<
+    StoreApi<CommunityModerationNexusState>
+  >;
 
   get reactiveStore(): ReadableStore<CommunityModerationNexusState> {
     return this.store;
@@ -115,7 +117,10 @@ export class CommunityModerationNexus {
 
   // ─── Mutations ────────────────────────────────────────────────────────────────
 
-  async updateStatus(reportId: string, status: SupportReportStatus): Promise<void> {
+  async updateStatus(
+    reportId: string,
+    status: SupportReportStatus,
+  ): Promise<void> {
     await this.backend.updateReportStatus(reportId, status);
     // Optimistic update in list
     this.store.setState((s) => ({
@@ -142,7 +147,9 @@ export class CommunityModerationNexus {
     // Optimistic update in list
     this.store.setState((s) => ({
       reports: s.reports.map((r) =>
-        r.reportId === reportId ? { ...r, status: "escalated" as SupportReportStatus } : r,
+        r.reportId === reportId
+          ? { ...r, status: "escalated" as SupportReportStatus }
+          : r,
       ),
     }));
     this.bumpRevision();

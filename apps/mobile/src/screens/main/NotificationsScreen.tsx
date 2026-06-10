@@ -24,13 +24,19 @@ export function NotificationsScreen({ navigation }: Props) {
     }, []),
   );
 
-  const handleOpenFriendsPanel = useCallback((input: NotificationsFriendsPanelOpenInput) => {
-    useMobilePushNavigationStore.getState().handlers?.openFriends(input);
-  }, []);
+  const handleOpenFriendsPanel = useCallback(
+    (input: NotificationsFriendsPanelOpenInput) => {
+      useMobilePushNavigationStore.getState().handlers?.openFriends(input);
+    },
+    [],
+  );
 
   return (
     <View className="flex-1 bg-background">
-      <View style={{ paddingTop: insets.top }} className="border-b border-border-panel bg-surface-panel">
+      <View
+        style={{ paddingTop: insets.top }}
+        className="border-b border-border-panel bg-surface-panel"
+      >
         <View className="flex-row items-center gap-1 px-2 py-2">
           <Pressable
             onPress={navigation.goBack}
@@ -39,9 +45,15 @@ export function NotificationsScreen({ navigation }: Props) {
             accessibilityLabel="Go back"
             className="rounded-xl p-2 active:bg-surface-hover"
           >
-            <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
+            <ThemedIonicons
+              name="chevron-back"
+              size={24}
+              colorClassName="accent-foreground"
+            />
           </Pressable>
-          <Text className="text-lg font-semibold text-foreground">Notifications</Text>
+          <Text className="text-lg font-semibold text-foreground">
+            Notifications
+          </Text>
         </View>
       </View>
       <View className="flex-1 p-4">

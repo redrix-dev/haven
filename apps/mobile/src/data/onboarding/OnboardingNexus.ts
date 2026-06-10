@@ -63,9 +63,8 @@ export class OnboardingNexus {
       }));
 
       try {
-        const campaigns = await this.controlPlane.listMyOnboardingCampaigns(
-          context,
-        );
+        const campaigns =
+          await this.controlPlane.listMyOnboardingCampaigns(context);
         this.store.setState((state) => ({
           campaigns,
           loaded: true,
@@ -170,5 +169,4 @@ export class OnboardingNexus {
   getCompletionError(): string | null {
     return this.store.getState().completionError;
   }
-
 }

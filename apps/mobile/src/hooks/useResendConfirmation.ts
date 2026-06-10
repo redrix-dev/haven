@@ -17,7 +17,10 @@ export function useResendConfirmation() {
   useEffect(() => {
     if (cooldown <= 0) return undefined;
     // setState inside a timer (async) — not a synchronous effect write.
-    const timer = setTimeout(() => setCooldown((current) => Math.max(0, current - 1)), 1000);
+    const timer = setTimeout(
+      () => setCooldown((current) => Math.max(0, current - 1)),
+      1000,
+    );
     return () => clearTimeout(timer);
   }, [cooldown]);
 

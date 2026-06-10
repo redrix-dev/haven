@@ -28,7 +28,10 @@ import {
   loadPickedCommunityMediaForUpload,
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
-import type { DirectMessage, DirectMessageConversationSummary } from "@shared/lib/backend/types";
+import type {
+  DirectMessage,
+  DirectMessageConversationSummary,
+} from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
 import { useHavenCore } from "@mobile-data";
@@ -63,30 +66,44 @@ export function DmChatSurface() {
   const dmComposeDraftPeer = useDmComposeDraftPeer(dm);
   const dmConversations = useDmConversations(dm);
   const dmMessages = useDmMessages(dm, selectedDmConversationId ?? "");
-  const dmMessagesLoading = useDmMessagesLoading(dm, selectedDmConversationId ?? "");
+  const dmMessagesLoading = useDmMessagesLoading(
+    dm,
+    selectedDmConversationId ?? "",
+  );
 
   const [draft, setDraft] = useState("");
   const [isPickingDmMedia, setIsPickingDmMedia] = useState(false);
   const [isSendingDm, setIsSendingDm] = useState(false);
-  const [pendingDmMedia, setPendingDmMedia] = useState<CommunityMediaUploadPayload | null>(null);
-  const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
-  const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(null);
-  const [dmMessageActionsTarget, setDmMessageActionsTarget] = useState<DirectMessage | null>(null);
+  const [pendingDmMedia, setPendingDmMedia] =
+    useState<CommunityMediaUploadPayload | null>(null);
+  const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(
+    null,
+  );
+  const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(
+    null,
+  );
+  const [dmMessageActionsTarget, setDmMessageActionsTarget] =
+    useState<DirectMessage | null>(null);
   const [dmMessagesError, setDmMessagesError] = useState<string | null>(null);
 
-  const selectedDmConversation = useMemo<DirectMessageConversationSummary | null>(
-    () =>
-      selectedDmConversationId
-        ? (dmConversations.find((c) => c.conversationId === selectedDmConversationId) ?? null)
-        : null,
-    [dmConversations, selectedDmConversationId],
-  );
+  const selectedDmConversation =
+    useMemo<DirectMessageConversationSummary | null>(
+      () =>
+        selectedDmConversationId
+          ? (dmConversations.find(
+              (c) => c.conversationId === selectedDmConversationId,
+            ) ?? null)
+          : null,
+      [dmConversations, selectedDmConversationId],
+    );
 
   // Load conversation messages when active conversation changes
   useEffect(() => {
     if (!selectedDmConversationId) return;
     void core
-      .prepareDirectMessageConversation(selectedDmConversationId, { markRead: false })
+      .prepareDirectMessageConversation(selectedDmConversationId, {
+        markRead: false,
+      })
       .catch((error) => {
         console.error("Failed to load selected DM conversation:", error);
         setDmMessagesError(getErrorMessage(error, "Failed to load messages."));
@@ -137,20 +154,26 @@ export function DmChatSurface() {
       const draftPeer = dmComposeDraftPeer;
 
       if (!activeConversationId && draftPeer) {
-        activeConversationId = await dm.getOrCreateDirectConversation(draftPeer.userId);
+        activeConversationId = await dm.getOrCreateDirectConversation(
+          draftPeer.userId,
+        );
         dm.setComposeDraftPeer(null);
         dm.setActiveConversationId(activeConversationId);
         // Refresh conversation list after creating a new conversation
         await dm.loadConversations();
       }
-      if (!activeConversationId) throw new Error("No direct message conversation selected.");
+      if (!activeConversationId)
+        throw new Error("No direct message conversation selected.");
 
       setDmMessagesError(null);
       const hasBlob = options?.imageBody != null;
       const hasBuffer = options?.imageArrayBuffer != null;
-      if (hasBlob && hasBuffer) throw new Error("Cannot send both imageBody and imageArrayBuffer.");
+      if (hasBlob && hasBuffer)
+        throw new Error("Cannot send both imageBody and imageArrayBuffer.");
       if (hasBuffer && !options.imageContentType?.trim()) {
-        throw new Error("imageContentType is required when sending imageArrayBuffer.");
+        throw new Error(
+          "imageContentType is required when sending imageArrayBuffer.",
+        );
       }
       const inferredFilename =
         options?.imageFilename ??
@@ -193,9 +216,13 @@ export function DmChatSurface() {
     if (isPickingDmMedia) return;
     setIsPickingDmMedia(true);
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("Permission needed", "Allow Photos access to attach an image.");
+        Alert.alert(
+          "Permission needed",
+          "Allow Photos access to attach an image.",
+        );
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -206,7 +233,8 @@ export function DmChatSurface() {
         ...(Platform.OS === "ios"
           ? {
               preferredAssetRepresentationMode:
-                ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+                ImagePicker.UIImagePickerPreferredAssetRepresentationMode
+                  .Compatible,
             }
           : {}),
       });
@@ -215,12 +243,18 @@ export function DmChatSurface() {
       if (!asset?.uri) return;
       const payload = await loadPickedCommunityMediaForUpload(asset);
       if (!payload.contentType.trim().toLowerCase().startsWith("image/")) {
-        Alert.alert("Not supported", "Direct messages only support image attachments.");
+        Alert.alert(
+          "Not supported",
+          "Direct messages only support image attachments.",
+        );
         return;
       }
       setPendingDmMedia(payload);
     } catch (e) {
-      Alert.alert("Could not add image", getErrorMessage(e, "Choose a different photo."));
+      Alert.alert(
+        "Could not add image",
+        getErrorMessage(e, "Choose a different photo."),
+      );
     } finally {
       setIsPickingDmMedia(false);
     }
@@ -269,7 +303,10 @@ export function DmChatSurface() {
 
   // toInvertedChatOrder reverses ascending nexus order to descending for
   // ChatInterface's inverted FlatList (newest at data[0] = visual bottom).
-  const orderedDmMessages = useMemo(() => toInvertedChatOrder(dmMessages), [dmMessages]);
+  const orderedDmMessages = useMemo(
+    () => toInvertedChatOrder(dmMessages),
+    [dmMessages],
+  );
 
   const dmActionsPeerLabel = useMemo(() => {
     if (dmComposeDraftPeer) return dmComposeDraftPeer.displayName;
@@ -287,16 +324,22 @@ export function DmChatSurface() {
 
   const renderMessage: ListRenderItem<DirectMessage> = useCallback(
     ({ item }) => {
-      const isSelf = currentUserId != null && item.authorUserId === currentUserId;
+      const isSelf =
+        currentUserId != null && item.authorUserId === currentUserId;
       const hasRenderableImage =
-        item.attachments?.some((a) => a.mediaKind === "image" && a.signedUrl) ?? false;
-      const bubbleMinWidth = hasRenderableImage ? Math.min(windowWidth * 0.72, 360) : undefined;
+        item.attachments?.some((a) => a.mediaKind === "image" && a.signedUrl) ??
+        false;
+      const bubbleMinWidth = hasRenderableImage
+        ? Math.min(windowWidth * 0.72, 360)
+        : undefined;
       // These colors are bubble-specific (depend on self vs other) and are passed to
       // EnrichedMarkdownText's markdownStyle which requires actual color values.
       const textColor = isSelf ? "#ffffff" : "#e6edf7";
       const mutedTextColor = isSelf ? "rgba(255,255,255,0.8)" : "#8b9cbb";
       const blockSurfaceColor = isSelf ? "rgba(12, 20, 34, 0.35)" : "#1a2235";
-      const blockquoteBorderColor = isSelf ? "rgba(255,255,255,0.65)" : "#3F79D8";
+      const blockquoteBorderColor = isSelf
+        ? "rgba(255,255,255,0.65)"
+        : "#3F79D8";
       const linkColor = isSelf ? "#ffffff" : "#3F79D8";
       const markdownStyle = createChatMarkdownStyle({
         textColor,
@@ -308,12 +351,20 @@ export function DmChatSurface() {
         <Pressable
           onPress={dismissDmComposerKeyboard}
           onLongPress={
-            !isSelf ? () => { setDmMessageActionsTarget(item); } : undefined
+            !isSelf
+              ? () => {
+                  setDmMessageActionsTarget(item);
+                }
+              : undefined
           }
-          style={bubbleMinWidth != null ? { minWidth: bubbleMinWidth } : undefined}
+          style={
+            bubbleMinWidth != null ? { minWidth: bubbleMinWidth } : undefined
+          }
           className={`mb-2 max-w-[85%] ${isSelf ? "self-end" : "self-start"}`}
         >
-          <View className={`rounded-2xl px-3 py-2 ${isSelf ? "bg-primary" : "bg-surface-panel"}`}>
+          <View
+            className={`rounded-2xl px-3 py-2 ${isSelf ? "bg-primary" : "bg-surface-panel"}`}
+          >
             <EnrichedMarkdownText
               markdown={item.content}
               flavor="github"
@@ -329,7 +380,9 @@ export function DmChatSurface() {
                   fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
                 },
               }}
-              onLinkPress={({ url }) => { void Linking.openURL(url); }}
+              onLinkPress={({ url }) => {
+                void Linking.openURL(url);
+              }}
             />
             {item.attachments?.map((attachment) => {
               if (!attachment.signedUrl) {
@@ -352,7 +405,11 @@ export function DmChatSurface() {
                       originalFilename: attachment.originalFilename,
                     }}
                     images={(item.attachments ?? [])
-                      .filter((candidate) => candidate.mediaKind === "image" && candidate.signedUrl)
+                      .filter(
+                        (candidate) =>
+                          candidate.mediaKind === "image" &&
+                          candidate.signedUrl,
+                      )
                       .map((candidate) => ({
                         id: candidate.id,
                         signedUrl: candidate.signedUrl!,
@@ -370,7 +427,10 @@ export function DmChatSurface() {
               }
               return null;
             })}
-            <Text className="mt-1 text-xs leading-4" style={{ color: mutedTextColor }}>
+            <Text
+              className="mt-1 text-xs leading-4"
+              style={{ color: mutedTextColor }}
+            >
               {formatDmTime(item.createdAt)}
             </Text>
           </View>
@@ -385,8 +445,14 @@ export function DmChatSurface() {
   if (!selectedDmConversationId && !dmComposeDraftPeer) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
-        <ThemedIonicons name="chatbubble-ellipses-outline" size={48} colorClassName="accent-muted-foreground" />
-        <Text className="mt-4 text-base text-muted-foreground">Select a conversation</Text>
+        <ThemedIonicons
+          name="chatbubble-ellipses-outline"
+          size={48}
+          colorClassName="accent-muted-foreground"
+        />
+        <Text className="mt-4 text-base text-muted-foreground">
+          Select a conversation
+        </Text>
       </View>
     );
   }
@@ -398,14 +464,18 @@ export function DmChatSurface() {
   return (
     <View className="min-h-0 flex-1 bg-card">
       {dmMessagesError ? (
-        <Text className="px-4 pt-2 text-xs text-destructive">{dmMessagesError}</Text>
+        <Text className="px-4 pt-2 text-xs text-destructive">
+          {dmMessagesError}
+        </Text>
       ) : null}
 
       <ChatInterface
         keyboardScrollProps={{ keyboardLiftBehavior: "whenAtEnd" }}
         composerCollapsable={Platform.OS === "android" ? false : undefined}
         listPlaceholder={
-          dmMessagesLoading && dmMessages.length === 0 && !dmComposeDraftPeer ? (
+          dmMessagesLoading &&
+          dmMessages.length === 0 &&
+          !dmComposeDraftPeer ? (
             <View className="flex-1 items-center justify-center">
               <ActivityIndicator color={composerColors.spinner} />
             </View>
@@ -421,11 +491,13 @@ export function DmChatSurface() {
           >
             {dmComposeDraftPeer ? (
               <Text className="text-center text-[13px] leading-5 text-muted-foreground">
-                This is the beginning of your direct messages with {dmComposeDraftPeer.displayName}.
-                Cheers to new friendships!
+                This is the beginning of your direct messages with{" "}
+                {dmComposeDraftPeer.displayName}. Cheers to new friendships!
               </Text>
             ) : (
-              <Text className="text-[13px] text-muted-foreground">No messages yet.</Text>
+              <Text className="text-[13px] text-muted-foreground">
+                No messages yet.
+              </Text>
             )}
           </Pressable>
         }

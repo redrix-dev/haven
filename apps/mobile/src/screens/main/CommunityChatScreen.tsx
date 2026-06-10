@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, Platform, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  Platform,
+  Text,
+  View,
+} from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
 import { type EnrichedMarkdownTextInputInstance } from "react-native-enriched-markdown";
@@ -272,7 +279,10 @@ export function CommunityChatScreen({
   const messages = useMemo<ChatMessage[]>(
     // toInvertedChatOrder reverses ascending nexus order to descending for
     // ChatInterface's inverted FlatList (newest at data[0] = visual bottom).
-    () => toInvertedChatOrder(mapBundlesToChatMessages(visibleMessages, liveProfiles)),
+    () =>
+      toInvertedChatOrder(
+        mapBundlesToChatMessages(visibleMessages, liveProfiles),
+      ),
     [liveProfiles, visibleMessages],
   );
 
@@ -435,7 +445,7 @@ export function CommunityChatScreen({
 
   const canReportMessageTarget = Boolean(
     messageActionsTarget?.authorUserId &&
-      messageActionsTarget.authorUserId !== currentUserId,
+    messageActionsTarget.authorUserId !== currentUserId,
   );
 
   const phase: "loading" | "ready" | "missing" | "error" =
@@ -552,7 +562,8 @@ export function CommunityChatScreen({
         canKick={false}
         canBan={false}
         onReply={() => {
-          if (messageActionsTarget) setPendingReplyToMessageId(messageActionsTarget.messageId);
+          if (messageActionsTarget)
+            setPendingReplyToMessageId(messageActionsTarget.messageId);
         }}
         onReport={() => {
           if (messageActionsTarget && canReportMessageTarget) {
@@ -567,7 +578,8 @@ export function CommunityChatScreen({
         onDismiss={() => setReportMessageTarget(null)}
         communityName={community?.name ?? "Community"}
         onSubmit={async (input) => {
-          if (!activeChannelId || !currentUserId || !reportMessageTarget) return;
+          if (!activeChannelId || !currentUserId || !reportMessageTarget)
+            return;
           await messageNexus.report({
             channelId: activeChannelId,
             messageId: reportMessageTarget.messageId,

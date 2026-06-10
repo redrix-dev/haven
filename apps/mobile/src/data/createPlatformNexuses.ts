@@ -36,11 +36,15 @@ export type PlatformNexusBundle = {
 export function createPlatformNexusBundle(
   ctx: PlatformNexusContext,
 ): PlatformNexusBundle {
-  const { persistence, backends, viewerMessagePolicyStore, voiceRealtime } = ctx;
+  const { persistence, backends, viewerMessagePolicyStore, voiceRealtime } =
+    ctx;
 
   return {
     admin: new CommunityAdminNexus(persistence, backends.controlPlane),
-    moderation: new CommunityModerationNexus(persistence, backends.serverModmail),
+    moderation: new CommunityModerationNexus(
+      persistence,
+      backends.serverModmail,
+    ),
     social: new SocialNexus(persistence, backends.social),
     permissions: new PermissionsNexus(persistence),
     profiles: new ProfileNexus(persistence, backends.controlPlane),

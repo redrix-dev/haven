@@ -1,39 +1,42 @@
-import { createStore, type StoreApi } from 'zustand/vanilla'
-import { Nexus, type NexusEntry } from '@mobile-data/Nexus'
-import type { ReadableStore } from '@shared/nexus/storeTypes'
-import { projectCommunities } from '@shared/nexus/community/communitySelectors'
+import { createStore, type StoreApi } from "zustand/vanilla";
+import { Nexus, type NexusEntry } from "@mobile-data/Nexus";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
+import { projectCommunities } from "@shared/nexus/community/communitySelectors";
 import type {
   Community,
   CommunityNexusState,
-} from '@shared/nexus/community/communityTypes'
-import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
+} from "@shared/nexus/community/communityTypes";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import {
   applyCommunityDisplayOrder,
   clearCommunityDisplayOrder,
   hasSameIdSequence,
   readCommunityDisplayOrder,
   writeCommunityDisplayOrder,
-} from '@shared/core/communityDisplayOrder'
-import type { ControlPlaneBackend } from '@shared/lib/backend/controlPlaneBackend.interface'
-import type { ServerSummary } from '@shared/lib/backend/types'
+} from "@shared/core/communityDisplayOrder";
+import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend.interface";
+import type { ServerSummary } from "@shared/lib/backend/types";
 
-export type { Community, CommunityNexusState }
+export type { Community, CommunityNexusState };
 
-const STORAGE_KEY = 'haven:nexus:communities:global'
+const STORAGE_KEY = "haven:nexus:communities:global";
 
 export class CommunityNexus extends Nexus<Community, ServerSummary> {
-  private _communityStore: StoreApi<CommunityNexusState> | null = null
+  private _communityStore: StoreApi<CommunityNexusState> | null = null;
 
-  private readonly controlPlane: ControlPlaneBackend
-  private onListChanged: (() => void) | null = null
+  private readonly controlPlane: ControlPlaneBackend;
+  private onListChanged: (() => void) | null = null;
 
-  constructor(persistence: NexusPersistence, controlPlane: ControlPlaneBackend) {
-    super('communities', 'global', persistence)
-    this.controlPlane = controlPlane
+  constructor(
+    persistence: NexusPersistence,
+    controlPlane: ControlPlaneBackend,
+  ) {
+    super("communities", "global", persistence);
+    this.controlPlane = controlPlane;
   }
 
   setOnListChanged(listener: (() => void) | null): void {
-    this.onListChanged = listener
+    this.onListChanged = listener;
   }
 
   /**
@@ -43,53 +46,53 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
   async load(userId: string): Promise<void> {
     if (!this.controlPlane) {
       throw new Error(
-        'CommunityNexus.load called before controlPlane was attached. HavenCore must wire backends during construction.',
-      )
+        "CommunityNexus.load called before controlPlane was attached. HavenCore must wire backends during construction.",
+      );
     }
-    this.setIsLoading(true)
-    this.setLoadError(null)
+    this.setIsLoading(true);
+    this.setLoadError(null);
     try {
-      const list = await this.controlPlane.listUserCommunities(userId)
+      const list = await this.controlPlane.listUserCommunities(userId);
       this.setCommunities(
         list.map((community) => ({
           id: community.id,
           name: community.name,
           createdAt: community.created_at,
         })),
-      )
+      );
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to load communities.'
-      this.setLoadError(message)
-      throw error
+        error instanceof Error ? error.message : "Failed to load communities.";
+      this.setLoadError(message);
+      throw error;
     } finally {
-      this.setIsLoading(false)
+      this.setIsLoading(false);
     }
   }
 
   loadDisplayOrder(userId: string | null): void {
     if (!userId) {
-      this.setDisplayOrderIds(null)
-      return
+      this.setDisplayOrderIds(null);
+      return;
     }
-    this.setDisplayOrderIds(readCommunityDisplayOrder(userId))
+    this.setDisplayOrderIds(readCommunityDisplayOrder(userId));
   }
 
   setDisplayOrder(ids: string[], userId: string | null): void {
-    const communities = projectCommunities(this.store.getState())
+    const communities = projectCommunities(this.store.getState());
     const currentOrderedIds = applyCommunityDisplayOrder(
       communities,
       this.store.getState().displayOrderIds,
-    ).map((community) => community.id)
-    if (hasSameIdSequence(currentOrderedIds, ids)) return
+    ).map((community) => community.id);
+    if (hasSameIdSequence(currentOrderedIds, ids)) return;
 
-    this.setDisplayOrderIds(ids)
-    if (userId) writeCommunityDisplayOrder(userId, ids)
+    this.setDisplayOrderIds(ids);
+    if (userId) writeCommunityDisplayOrder(userId, ids);
   }
 
   resetDisplayOrder(userId: string | null): void {
-    this.setDisplayOrderIds(null)
-    if (userId) clearCommunityDisplayOrder(userId)
+    this.setDisplayOrderIds(null);
+    if (userId) clearCommunityDisplayOrder(userId);
   }
 
   protected transform(raw: ServerSummary): Community {
@@ -97,7 +100,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       id: raw.id,
       name: raw.name,
       createdAt: raw.created_at,
-    }
+    };
   }
 
   protected override get store(): StoreApi<CommunityNexusState> {
@@ -110,10 +113,10 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
         loadError: null,
         displayOrderIds: null,
         revision: 0,
-      }))
-      this.rehydrate()
+      }));
+      this.rehydrate();
     }
-    return this._communityStore
+    return this._communityStore;
   }
 
   /**
@@ -121,20 +124,20 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
    * only, no `setState`, so reactivity bindings can't bypass action methods.
    */
   get reactiveStore(): ReadableStore<CommunityNexusState> {
-    return this.store
+    return this.store;
   }
 
   setCommunities(communities: Community[]): void {
-    const entities: Record<string, NexusEntry<Community>> = {}
-    const orderedIds: string[] = []
+    const entities: Record<string, NexusEntry<Community>> = {};
+    const orderedIds: string[] = [];
 
     for (const community of communities) {
       entities[community.id] = {
         data: community,
         partial: false,
         cachedAt: Date.now(),
-      }
-      orderedIds.push(community.id)
+      };
+      orderedIds.push(community.id);
     }
 
     this.store.setState((state) => ({
@@ -143,14 +146,14 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       orderedIds,
       isLoading: false,
       revision: state.revision + 1,
-    }))
-    this.persist()
-    this.onListChanged?.()
+    }));
+    this.persist();
+    this.onListChanged?.();
   }
 
   updateCommunity(id: string, changes: Partial<Community>): void {
-    const existing = this.store.getState().entities[id]
-    if (!existing) return
+    const existing = this.store.getState().entities[id];
+    if (!existing) return;
 
     this.store.setState((state) => ({
       ...state,
@@ -163,49 +166,51 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
         },
       },
       revision: state.revision + 1,
-    }))
-    this.persist()
+    }));
+    this.persist();
   }
 
   removeCommunity(id: string): void {
     this.store.setState((state) => {
-      const { [id]: _, ...restEntities } = state.entities
+      const { [id]: _, ...restEntities } = state.entities;
       return {
         ...state,
         entities: restEntities,
-        orderedIds: state.orderedIds.filter((communityId) => communityId !== id),
+        orderedIds: state.orderedIds.filter(
+          (communityId) => communityId !== id,
+        ),
         activeId: state.activeId === id ? null : state.activeId,
         revision: state.revision + 1,
-      }
-    })
-    this.persist()
-    this.onListChanged?.()
+      };
+    });
+    this.persist();
+    this.onListChanged?.();
   }
 
   setActiveId(id: string | null): void {
-    if (this.store.getState().activeId === id) return
+    if (this.store.getState().activeId === id) return;
     this.store.setState((state) => ({
       ...state,
       activeId: id,
       revision: state.revision + 1,
-    }))
-    this.persist()
+    }));
+    this.persist();
   }
 
   getActiveId(): string | null {
-    return this.store.getState().activeId
+    return this.store.getState().activeId;
   }
 
   getIsLoading(): boolean {
-    return this.store.getState().isLoading
+    return this.store.getState().isLoading;
   }
 
   getCommunityIds(): string[] {
-    return this.store.getState().orderedIds
+    return this.store.getState().orderedIds;
   }
 
   getCommunity(id: string): Community | undefined {
-    return this.store.getState().entities[id]?.data
+    return this.store.getState().entities[id]?.data;
   }
 
   setIsLoading(loading: boolean): void {
@@ -213,7 +218,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       ...state,
       isLoading: loading,
       revision: state.revision + 1,
-    }))
+    }));
   }
 
   setLoadError(error: string | null): void {
@@ -221,11 +226,11 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       ...state,
       loadError: error,
       revision: state.revision + 1,
-    }))
+    }));
   }
 
   clearLoadError(): void {
-    this.setLoadError(null)
+    this.setLoadError(null);
   }
 
   private setDisplayOrderIds(ids: string[] | null): void {
@@ -233,35 +238,35 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       ...state,
       displayOrderIds: ids,
       revision: state.revision + 1,
-    }))
+    }));
   }
 
   override persist(): void {
     try {
-      const state = this.store.getState()
+      const state = this.store.getState();
       const persistable = {
         entities: Object.fromEntries(
           Object.entries(state.entities).filter(([_, entry]) => !entry.partial),
         ),
         orderedIds: state.orderedIds,
         activeId: state.activeId,
-      }
-      this.persistence.set(STORAGE_KEY, JSON.stringify(persistable))
+      };
+      this.persistence.set(STORAGE_KEY, JSON.stringify(persistable));
     } catch (error) {
-      console.warn('[CommunityNexus] Failed to persist', error)
+      console.warn("[CommunityNexus] Failed to persist", error);
     }
   }
 
   override rehydrate(): void {
     try {
-      const raw = this.persistence.getString(STORAGE_KEY)
-      if (!raw) return
+      const raw = this.persistence.getString(STORAGE_KEY);
+      if (!raw) return;
 
       const parsed = JSON.parse(raw) as {
-        entities: Record<string, NexusEntry<Community>>
-        orderedIds: string[]
-        activeId: string | null
-      }
+        entities: Record<string, NexusEntry<Community>>;
+        orderedIds: string[];
+        activeId: string | null;
+      };
 
       this.store.setState((state) => ({
         ...state,
@@ -269,10 +274,10 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
         orderedIds: parsed.orderedIds ?? [],
         activeId: parsed.activeId ?? null,
         revision: 0,
-      }))
+      }));
     } catch (error) {
-      console.warn('[CommunityNexus] Failed to rehydrate', error)
-      this.persistence.remove(STORAGE_KEY)
+      console.warn("[CommunityNexus] Failed to rehydrate", error);
+      this.persistence.remove(STORAGE_KEY);
     }
   }
 
@@ -285,8 +290,7 @@ export class CommunityNexus extends Nexus<Community, ServerSummary> {
       loadError: null,
       displayOrderIds: null,
       revision: 0,
-    })
-    this.persistence.remove(STORAGE_KEY)
+    });
+    this.persistence.remove(STORAGE_KEY);
   }
 }
-

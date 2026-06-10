@@ -10,7 +10,10 @@ import type {
   SocialCounts,
 } from "@shared/lib/backend/types";
 import { DEFAULT_SOCIAL_COUNTS } from "@shared/infrastructure/constants";
-import { normalizeUserIds, unionHiddenAuthorIds } from "@shared/features/social/logic";
+import {
+  normalizeUserIds,
+  unionHiddenAuthorIds,
+} from "@shared/features/social/logic";
 import type { StoreApi, UseBoundStore } from "zustand";
 
 const EMPTY_FRIENDS: FriendSummary[] = [];

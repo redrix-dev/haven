@@ -1,4 +1,4 @@
-import type { Community, CommunityNexusState } from './communityTypes'
+import type { Community, CommunityNexusState } from "./communityTypes";
 
 /**
  * Pure, framework-agnostic projections + equality fns for the community store.
@@ -11,36 +11,34 @@ import type { Community, CommunityNexusState } from './communityTypes'
  */
 
 /** Stable empty array so the no-communities case is referentially constant. */
-const EMPTY_COMMUNITIES: Community[] = []
+const EMPTY_COMMUNITIES: Community[] = [];
 
-export const projectCommunities = (
-  state: CommunityNexusState,
-): Community[] => {
-  if (state.orderedIds.length === 0) return EMPTY_COMMUNITIES
+export const projectCommunities = (state: CommunityNexusState): Community[] => {
+  if (state.orderedIds.length === 0) return EMPTY_COMMUNITIES;
 
   return state.orderedIds
     .map((id) => state.entities[id]?.data)
-    .filter((community): community is Community => community !== undefined)
-}
+    .filter((community): community is Community => community !== undefined);
+};
 
 export const selectActiveId = (state: CommunityNexusState): string | null =>
-  state.activeId
+  state.activeId;
 
 export const selectIsLoading = (state: CommunityNexusState): boolean =>
-  state.isLoading
+  state.isLoading;
 
 export const selectLoadError = (state: CommunityNexusState): string | null =>
-  state.loadError
+  state.loadError;
 
 export const selectDisplayOrderIds = (
   state: CommunityNexusState,
-): string[] | null => state.displayOrderIds
+): string[] | null => state.displayOrderIds;
 
 export const communitiesEqual = (a: Community[], b: Community[]): boolean => {
-  if (a === b) return true
-  if (a.length !== b.length) return false
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    if (a[i].id !== b[i].id || a[i].name !== b[i].name) return false
+    if (a[i].id !== b[i].id || a[i].name !== b[i].name) return false;
   }
-  return true
-}
+  return true;
+};

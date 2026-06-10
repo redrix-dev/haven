@@ -16,7 +16,9 @@
       "@solid-client": ["./packages/solid-client/src"],
       "@solid-client/*": ["./packages/solid-client/src/*"],
       "@shared/*": ["./packages/shared/src/*"],
-      "@platform/assets/runtimeAudio": ["./packages/shared/src/platform/assets/runtimeAudio"],
+      "@platform/assets/runtimeAudio": [
+        "./packages/shared/src/platform/assets/runtimeAudio"
+      ],
       "@platform/*": ["./packages/shared/src/platform/*"],
       "@test-support/*": ["./tooling/test-support/*"]
     }

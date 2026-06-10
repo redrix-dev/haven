@@ -55,7 +55,10 @@ function walk(dir, out = []) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       walk(full, out);
-    } else if (/\.(ts|tsx)$/.test(entry.name) && !entry.name.endsWith(".d.ts")) {
+    } else if (
+      /\.(ts|tsx)$/.test(entry.name) &&
+      !entry.name.endsWith(".d.ts")
+    ) {
       out.push(full);
     }
   }
@@ -133,7 +136,13 @@ for (const file of files) {
     !isAllowed(lines, 0, RULES.markdownDrift)
   ) {
     const line = lineNumberAt(source, source.indexOf("markdownStyle={{"));
-    addFinding(findings, file, line, RULES.markdownDrift, lines[line - 1] ?? "");
+    addFinding(
+      findings,
+      file,
+      line,
+      RULES.markdownDrift,
+      lines[line - 1] ?? "",
+    );
   }
 
   for (const label of ACTION_LABELS) {
@@ -145,14 +154,22 @@ for (const file of files) {
     while ((match = re.exec(source)) !== null) {
       const line = lineNumberAt(source, match.index);
       if (!isAllowed(lines, line - 1, RULES.tinyAction)) {
-        addFinding(findings, file, line, RULES.tinyAction, lines[line - 1] ?? "");
+        addFinding(
+          findings,
+          file,
+          line,
+          RULES.tinyAction,
+          lines[line - 1] ?? "",
+        );
       }
     }
   }
 }
 
 if (findings.length > 0) {
-  console.error(`Mobile typography check failed with ${findings.length} finding(s):`);
+  console.error(
+    `Mobile typography check failed with ${findings.length} finding(s):`,
+  );
   for (const finding of findings) {
     console.error(
       `- ${finding.file}:${finding.line} ${finding.rule} ${finding.excerpt}`,

@@ -7,7 +7,10 @@ import {
   useDmConversations,
   useProfilesRecord,
 } from "@mobile-data/hooks";
-import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
 import { ThemedIonicons } from "@/theme-rn";
 
 const HEADER_ROW_HEIGHT = 82;
@@ -30,7 +33,9 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
   const activeConversation = useMemo(
     () =>
       activeConversationId
-        ? (conversations.find((c) => c.conversationId === activeConversationId) ?? null)
+        ? (conversations.find(
+            (c) => c.conversationId === activeConversationId,
+          ) ?? null)
         : null,
     [activeConversationId, conversations],
   );
@@ -86,12 +91,20 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
           className="h-11 w-11 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
           onPress={onOpenDrawer}
         >
-          <ThemedIonicons name="mail-outline" size={20} colorClassName="accent-foreground" />
+          <ThemedIonicons
+            name="mail-outline"
+            size={20}
+            colorClassName="accent-foreground"
+          />
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={peerName ? `Conversation with ${peerName}, open inbox` : "Open messages inbox"}
+          accessibilityLabel={
+            peerName
+              ? `Conversation with ${peerName}, open inbox`
+              : "Open messages inbox"
+          }
           className="mx-3 min-w-0 flex-1 items-center rounded-xl px-3 py-1.5 active:bg-surface-hover"
           onPress={onOpenDrawer}
         >
@@ -99,12 +112,16 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
             <Image
               source={{ uri: peerAvatarUrl }}
               className="h-9 w-9 rounded-full"
-              accessibilityLabel={peerName ? `${peerName} avatar` : "Conversation avatar"}
+              accessibilityLabel={
+                peerName ? `${peerName} avatar` : "Conversation avatar"
+              }
               accessibilityIgnoresInvertColors
             />
           ) : (
             <View className="h-9 w-9 items-center justify-center rounded-full bg-surface-panel">
-              <Text className="text-base font-semibold text-foreground">{peerInitial}</Text>
+              <Text className="text-base font-semibold text-foreground">
+                {peerInitial}
+              </Text>
             </View>
           )}
           <Text
@@ -140,12 +157,18 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
         onRequestClose={() => setActionsOpen(false)}
       >
         {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal sheet scrim overlay, invariant across themes */}
-        <Pressable className="flex-1 justify-end bg-black/55" onPress={() => setActionsOpen(false)}>
+        <Pressable
+          className="flex-1 justify-end bg-black/55"
+          onPress={() => setActionsOpen(false)}
+        >
           <Pressable
             className="rounded-t-2xl border-t border-border-panel bg-surface-modal px-4 pb-8 pt-3"
             onPress={(event) => event.stopPropagation()}
           >
-            <Text className="mb-3 text-center text-xs text-muted-foreground" numberOfLines={2}>
+            <Text
+              className="mb-3 text-center text-xs text-muted-foreground"
+              numberOfLines={2}
+            >
               {peerName ?? "Direct message"}
             </Text>
             <Pressable
@@ -153,14 +176,18 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
               onPress={() => handleMuteToggle(!activeConversation?.isMuted)}
             >
               <Text className="text-center text-base font-medium text-foreground">
-                {activeConversation?.isMuted ? "Unmute conversation" : "Mute conversation"}
+                {activeConversation?.isMuted
+                  ? "Unmute conversation"
+                  : "Mute conversation"}
               </Text>
             </Pressable>
             <Pressable
               className="mt-1 rounded-xl py-3 active:opacity-90"
               onPress={() => setActionsOpen(false)}
             >
-              <Text className="text-center text-base text-muted-foreground">Cancel</Text>
+              <Text className="text-center text-base text-muted-foreground">
+                Cancel
+              </Text>
             </Pressable>
           </Pressable>
         </Pressable>

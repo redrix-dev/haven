@@ -3,7 +3,7 @@ import type {
   MessageAttachment,
   MessageLinkPreview,
   MessageReaction,
-} from '@shared/lib/backend/types';
+} from "@shared/lib/backend/types";
 
 export type VoiceSidebarParticipant = {
   userId: string;
@@ -43,26 +43,26 @@ export type ChannelMessageBundleCacheEntry = {
   syncMetadata?: ChannelMessageBundleSyncMetadata;
 };
 
-export type FriendsPanelTab = 'friends' | 'add' | 'requests' | 'blocked';
+export type FriendsPanelTab = "friends" | "add" | "requests" | "blocked";
 
 export type PendingUiConfirmation =
   | {
-      kind: 'leave-server';
+      kind: "leave-server";
       communityId: string;
       serverName: string;
     }
   | {
-      kind: 'delete-server';
+      kind: "delete-server";
       communityId: string;
       serverName: string;
     }
   | {
-      kind: 'delete-channel';
+      kind: "delete-channel";
       channelId: string;
       channelName: string;
     }
   | {
-      kind: 'delete-channel-group';
+      kind: "delete-channel-group";
       groupId: string;
       groupName: string;
     };

@@ -10,10 +10,12 @@ export const normalizeUserIds = (userIds: ReadonlyArray<string>): string[] =>
 export const unionHiddenAuthorIds = (
   myBlockedUserIds: readonly string[],
   usersBlockingMeIds: readonly string[],
-): ReadonlySet<string> =>
-  new Set([...myBlockedUserIds, ...usersBlockingMeIds]);
+): ReadonlySet<string> => new Set([...myBlockedUserIds, ...usersBlockingMeIds]);
 
-export const friendsEqual = (a: FriendSummary[], b: FriendSummary[]): boolean => {
+export const friendsEqual = (
+  a: FriendSummary[],
+  b: FriendSummary[],
+): boolean => {
   if (a === b) return true;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {

@@ -21,7 +21,8 @@ export function FriendsScreen({ navigation, route }: Props) {
 
   const handleOpenDmWithUser = useCallback(
     async (targetUserId: string) => {
-      const conversationId = await core.directMessages.openWithUser(targetUserId);
+      const conversationId =
+        await core.directMessages.openWithUser(targetUserId);
       navigation.navigate("Community", {
         pendingDmConversationId: conversationId,
         serverId: null,

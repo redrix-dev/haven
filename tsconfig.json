@@ -4,6 +4,6 @@
     { "path": "./tsconfig.shared.json" },
     { "path": "./tsconfig.node.json" },
     { "path": "./packages/solid-client/tsconfig.json" },
-    { "path": "./apps/tauri/tsconfig.json" },
-  ],
+    { "path": "./apps/tauri/tsconfig.json" }
+  ]
 }

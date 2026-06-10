@@ -6,7 +6,10 @@ import {
   useUserFlairGrantLoading,
   useUserFlairGrants,
 } from "@mobile-data/hooks";
-import type { ProfileVisibility, UserFlairGrant } from "@shared/lib/backend/types";
+import type {
+  ProfileVisibility,
+  UserFlairGrant,
+} from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
@@ -113,7 +116,10 @@ export function ProfileDetailsSettingsCard({
     if (!userId || saving || !dirty) return;
     const trimmedUsername = username.trim();
     if (!trimmedUsername) {
-      Alert.alert("Username required", "Set a username before saving profile details.");
+      Alert.alert(
+        "Username required",
+        "Set a username before saving profile details.",
+      );
       return;
     }
 
@@ -143,7 +149,8 @@ export function ProfileDetailsSettingsCard({
           Profile details
         </Text>
         <Text className="mt-1 text-xs leading-4 text-muted-foreground">
-          {selectedOption?.description ?? "Choose who can see your profile details."}
+          {selectedOption?.description ??
+            "Choose who can see your profile details."}
         </Text>
       </View>
 
@@ -182,7 +189,9 @@ export function ProfileDetailsSettingsCard({
         </View>
 
         <View className="gap-1.5">
-          <Text className="text-xs font-semibold text-muted-foreground">Bio</Text>
+          <Text className="text-xs font-semibold text-muted-foreground">
+            Bio
+          </Text>
           <TextInput
             value={draftBio}
             onChangeText={setDraftBio}
@@ -205,7 +214,9 @@ export function ProfileDetailsSettingsCard({
               Profile flair
             </Text>
             {flairLoading ? (
-              <Text className="text-[11px] text-muted-foreground">Loading...</Text>
+              <Text className="text-[11px] text-muted-foreground">
+                Loading...
+              </Text>
             ) : null}
           </View>
 
@@ -228,7 +239,9 @@ export function ProfileDetailsSettingsCard({
                 onPress={() => void selectFlair(null)}
                 className="flex-row items-center justify-between rounded-xl border border-border-control bg-surface-panel px-3 py-2.5 active:bg-surface-hover"
               >
-                <Text className="text-sm font-medium text-foreground">No flair</Text>
+                <Text className="text-sm font-medium text-foreground">
+                  No flair
+                </Text>
                 {selectedFlair === null ? (
                   <ThemedIonicons
                     name="checkmark-circle"
@@ -240,7 +253,9 @@ export function ProfileDetailsSettingsCard({
 
               {flairGrants.map((grant) => {
                 const disabled =
-                  savingFlairId !== null || !grant.isAvailable || grant.isSelected;
+                  savingFlairId !== null ||
+                  !grant.isAvailable ||
+                  grant.isSelected;
                 return (
                   <Pressable
                     key={grant.userFlairId}

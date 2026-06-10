@@ -39,14 +39,14 @@ This project uses **development clients**, not Expo Go.
 
 ### Script naming (repo root)
 
-| Script | What it does |
-|--------|--------------|
-| `mobile:dev:metro` | **JS only:** starts Metro + `expo start --dev-client`. Does **not** rebuild or reinstall the native app. |
-| `mobile:dev:metro:clear` | Same as above, plus **`--clear`** (Metro / JS cache reset). |
-| `mobile:run:ios:simulator` | **Native:** Xcode build + install on **iOS Simulator** (`expo run:ios`). |
-| `mobile:run:ios:device` | **Native:** Xcode build + install on a **USB / paired iPhone** (`expo run:ios --device`). Use after Info.plist, entitlements, or native dep changes. |
-| `mobile:run:android` | **Native:** `expo run:android`. |
-| `mobile:native:prebuild` | **Regenerates** `ios/` and `android/` from Expo config (`expo prebuild`). Does **not** install an app by itself. |
+| Script                     | What it does                                                                                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mobile:dev:metro`         | **JS only:** starts Metro + `expo start --dev-client`. Does **not** rebuild or reinstall the native app.                                             |
+| `mobile:dev:metro:clear`   | Same as above, plus **`--clear`** (Metro / JS cache reset).                                                                                          |
+| `mobile:run:ios:simulator` | **Native:** Xcode build + install on **iOS Simulator** (`expo run:ios`).                                                                             |
+| `mobile:run:ios:device`    | **Native:** Xcode build + install on a **USB / paired iPhone** (`expo run:ios --device`). Use after Info.plist, entitlements, or native dep changes. |
+| `mobile:run:android`       | **Native:** `expo run:android`.                                                                                                                      |
+| `mobile:native:prebuild`   | **Regenerates** `ios/` and `android/` from Expo config (`expo prebuild`). Does **not** install an app by itself.                                     |
 
 Inside `apps/mobile`, the conventional Expo names (`npm start`, `npm run ios`, `npm run android`, `npm run prebuild`) map to the same commands.
 
@@ -148,7 +148,7 @@ npm run mobile:native:prebuild
 
 ### dev-client crash postmortem (ordering contract)
 
-`expo-dev-launcher` requires **`autoSetupPrepare`** to run before **`autoSetupStart`**. The prepare step happens when the **Expo React Native factory** creates the root view. An older Objective-C delegate that only called `super` never ran the factory + `startReactNative` *before* `super`, so `ExpoAppDelegate`’s subscribers (dev-launcher) ran `autoSetupStart` too early and `EXDevLauncherController` could throw. The **supported fix** (aligned with the Expo SDK 55 bare template) is: create `ExpoReactNativeFactory`, call `startReactNative` **then** `super.application(...)` (Expo SDK 55 removed the old `bindReactNativeFactory` hook), which is what the template `AppDelegate.swift` and plugin enforce.
+`expo-dev-launcher` requires **`autoSetupPrepare`** to run before **`autoSetupStart`**. The prepare step happens when the **Expo React Native factory** creates the root view. An older Objective-C delegate that only called `super` never ran the factory + `startReactNative` _before_ `super`, so `ExpoAppDelegate`’s subscribers (dev-launcher) ran `autoSetupStart` too early and `EXDevLauncherController` could throw. The **supported fix** (aligned with the Expo SDK 55 bare template) is: create `ExpoReactNativeFactory`, call `startReactNative` **then** `super.application(...)` (Expo SDK 55 removed the old `bindReactNativeFactory` hook), which is what the template `AppDelegate.swift` and plugin enforce.
 
 **Build iOS** with **`HavenMobile.xcworkspace`** (CocoaPods), not the raw `.xcodeproj`, when running `xcodebuild` locally or in CI.
 

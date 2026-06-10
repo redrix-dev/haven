@@ -1,1 +1,4 @@
-export { PermissionsNexus, type PermissionsNexusState } from "./PermissionsNexus";
+export {
+  PermissionsNexus,
+  type PermissionsNexusState,
+} from "./PermissionsNexus";

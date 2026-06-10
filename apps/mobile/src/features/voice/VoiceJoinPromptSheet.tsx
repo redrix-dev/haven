@@ -47,7 +47,10 @@ export function VoiceJoinPromptSheet({
             <Text className="mr-3 flex-1 text-sm font-medium text-foreground">
               Do not warn me again
             </Text>
-            <Switch value={skipSwitchPrompt} onValueChange={onSkipSwitchPromptChange} />
+            <Switch
+              value={skipSwitchPrompt}
+              onValueChange={onSkipSwitchPromptChange}
+            />
           </View>
         ) : null}
 
@@ -57,7 +60,9 @@ export function VoiceJoinPromptSheet({
             onPress={onCancel}
             className="flex-1 rounded-lg border border-border-control bg-surface-panel px-4 py-3 active:bg-surface-hover"
           >
-            <Text className="text-center font-semibold text-foreground">No</Text>
+            <Text className="text-center font-semibold text-foreground">
+              No
+            </Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"

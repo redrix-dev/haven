@@ -1,4 +1,5 @@
 # Haven
+
 **Community chat for people who give a damn.**
 
 Haven is a real-time community chat platform across desktop, web, and iOS. It exists because community chat stopped feeling like it was built for communities — and proving that it could be done differently was worth the effort.
@@ -51,17 +52,17 @@ Business logic, types, and domain state live in `packages/shared` and are platfo
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Desktop & Web | Tauri + Solid (in rebuild; previous Electron/React clients retired) |
-| iOS | React Native + Expo (dev client, TestFlight) |
-| Language | TypeScript |
-| UI | Solid (desktop/web), UniWind + RN primitives (iOS) |
-| Backend | Supabase (Auth, Postgres, Realtime, Edge Functions) |
-| OTA Updates (iOS) | Custom Expo Updates-compatible pipeline via Supabase Edge Function |
-| Voice | LiveKit Cloud + WebRTC |
-| State | Framework-free core (`zustand/vanilla`) with per-platform reactive bindings |
-| Monorepo | `packages/shared` across all platforms |
+| Layer             | Technology                                                                  |
+| ----------------- | --------------------------------------------------------------------------- |
+| Desktop & Web     | Tauri + Solid (in rebuild; previous Electron/React clients retired)         |
+| iOS               | React Native + Expo (dev client, TestFlight)                                |
+| Language          | TypeScript                                                                  |
+| UI                | Solid (desktop/web), UniWind + RN primitives (iOS)                          |
+| Backend           | Supabase (Auth, Postgres, Realtime, Edge Functions)                         |
+| OTA Updates (iOS) | Custom Expo Updates-compatible pipeline via Supabase Edge Function          |
+| Voice             | LiveKit Cloud + WebRTC                                                      |
+| State             | Framework-free core (`zustand/vanilla`) with per-platform reactive bindings |
+| Monorepo          | `packages/shared` across all platforms                                      |
 
 ---
 

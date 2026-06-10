@@ -36,18 +36,26 @@ export function useDmBubbleSheetChrome(): DmBubbleSheetChrome {
     const sheetTitleColor =
       typeof primaryForeground === "string" ? primaryForeground : "#f8fafc";
     const sheetPlaceholderColor =
-      typeof mutedForeground === "string" ? `${mutedForeground}b8` : "rgba(248,250,252,0.72)";
+      typeof mutedForeground === "string"
+        ? `${mutedForeground}b8`
+        : "rgba(248,250,252,0.72)";
     const channelPillBackground =
-      pickBackgroundColor(pillBgResolved as ViewStyle) ?? "rgba(255,255,255,0.12)";
+      pickBackgroundColor(pillBgResolved as ViewStyle) ??
+      "rgba(255,255,255,0.12)";
     const channelPillSelectedBackground =
-      pickBackgroundColor(pillSelectedResolved as ViewStyle) ?? "rgba(255,255,255,0.28)";
-    const channelPillBorderColor = typeof border === "string" ? border : "rgba(255,255,255,0.45)";
+      pickBackgroundColor(pillSelectedResolved as ViewStyle) ??
+      "rgba(255,255,255,0.28)";
+    const channelPillBorderColor =
+      typeof border === "string" ? border : "rgba(255,255,255,0.45)";
     const channelPillLabelColor = sheetTitleColor;
     const unreadBadgeBackground =
       typeof destructive === "string" ? destructive : "#ef4444";
     const unreadBadgeTextColor =
-      typeof destructiveForeground === "string" ? destructiveForeground : "#ffffff";
-    const bubbleActiveBorderColor = typeof ring === "string" ? ring : "rgba(255,255,255,0.9)";
+      typeof destructiveForeground === "string"
+        ? destructiveForeground
+        : "#ffffff";
+    const bubbleActiveBorderColor =
+      typeof ring === "string" ? ring : "rgba(255,255,255,0.9)";
 
     return {
       sheetTitleColor,

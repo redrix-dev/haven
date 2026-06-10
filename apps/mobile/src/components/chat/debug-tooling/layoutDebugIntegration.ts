@@ -28,5 +28,8 @@ export type ChatSurfaceLayoutDebugBindings = {
 export type UseChatSurfaceLayoutDebugOptions = {
   surface?: string;
   extraContentPadding: SharedValue<number>;
-  keyboardScrollProps?: Pick<KeyboardChatScrollViewProps, "keyboardLiftBehavior">;
+  keyboardScrollProps?: Pick<
+    KeyboardChatScrollViewProps,
+    "keyboardLiftBehavior"
+  >;
 };

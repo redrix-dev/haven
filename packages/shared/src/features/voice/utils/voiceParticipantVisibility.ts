@@ -1,4 +1,6 @@
-export function filterBlockedUsersFromParticipantList<T extends { userId: string }>(
+export function filterBlockedUsersFromParticipantList<
+  T extends { userId: string },
+>(
   participants: ReadonlyArray<T>,
   blockedUserIds: ReadonlySet<string>,
   isElevatedViewer: boolean,
@@ -12,7 +14,9 @@ export function filterBlockedUsersFromParticipantList<T extends { userId: string
   );
 }
 
-export function filterBlockedUsersFromParticipantRecord<T extends { userId: string }>(
+export function filterBlockedUsersFromParticipantRecord<
+  T extends { userId: string },
+>(
   participantsByChannelId: Record<string, T[]>,
   blockedUserIds: ReadonlySet<string>,
   isElevatedViewer: boolean,

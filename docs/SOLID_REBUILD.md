@@ -8,13 +8,13 @@ completed phases get one line and a pointer to the archive.
 
 ## Where we are
 
-| Phase | Outcome | Record |
-|---|---|---|
-| Spike (shell + Solid composition) | ✅ proven | [_archive/tauri-solid-rebuild.md](./_archive/tauri-solid-rebuild.md) |
-| Gate 1 — go/no-go on the stack | ✅ **GO** (2026-06-07). Both killswitches cleared: two-way LiveKit voice in WKWebView; Solid reactively driving real shared stores | [_archive/tauri-solid-roadmap.md](./_archive/tauri-solid-roadmap.md) |
-| THE CLEAVE — split shared logic from per-platform caches | ✅ complete (2026-06-08). Shared is pure; mobile owns `HavenReactCore` | [_archive/solid-migration-handoff.md](./_archive/solid-migration-handoff.md) |
-| Legacy client removal | ✅ complete (2026-06-09). Electron/React-web deleted; root deps 36→6; scripts and guards repaired | git history (`rewrite/desktop-web-rebuild`) |
-| **Solid app build** | **← current phase** | this file |
+| Phase                                                    | Outcome                                                                                                                            | Record                                                                        |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Spike (shell + Solid composition)                        | ✅ proven                                                                                                                          | [\_archive/tauri-solid-rebuild.md](./_archive/tauri-solid-rebuild.md)         |
+| Gate 1 — go/no-go on the stack                           | ✅ **GO** (2026-06-07). Both killswitches cleared: two-way LiveKit voice in WKWebView; Solid reactively driving real shared stores | [\_archive/tauri-solid-roadmap.md](./_archive/tauri-solid-roadmap.md)         |
+| THE CLEAVE — split shared logic from per-platform caches | ✅ complete (2026-06-08). Shared is pure; mobile owns `HavenReactCore`                                                             | [\_archive/solid-migration-handoff.md](./_archive/solid-migration-handoff.md) |
+| Legacy client removal                                    | ✅ complete (2026-06-09). Electron/React-web deleted; root deps 36→6; scripts and guards repaired                                  | git history (`rewrite/desktop-web-rebuild`)                                   |
+| **Solid app build**                                      | **← current phase**                                                                                                                | this file                                                                     |
 
 **Why Solid, in one paragraph:** the Nexus cache pattern was lifted from the
 stoat/Revolt SDK, which runs it on Solid's fine-grained reactivity — that's why the
@@ -53,19 +53,19 @@ a plain value, so it re-subscribes when the value changes.
 
 Carried from the spike evaluation; verify each on first use.
 
-| Need | Solid choice | Notes |
-|---|---|---|
-| Core | `solid-js` | Components run once; signals, not hooks |
-| Headless primitives | `@kobalte/core` | Replaces radix; API differs |
-| Icons | `lucide-solid` | Near drop-in |
-| Toasts | `solid-sonner` | |
-| Virtualized chat list | `virtua` (Solid) or `@tanstack/solid-virtual` | **Verify chat scroll behavior carefully** |
-| Rich text editor | `@tiptap/core` + manual Solid binding | Tiptap core is framework-agnostic |
-| Markdown | render `marked` output / `solid-markdown` | |
-| Image crop | wrap a vanilla lib | No 1:1 port — known gap |
-| Command palette | `cmdk-solid` or build on Kobalte | **Verify maintenance** before adopting |
-| Gestures | `@use-gesture/vanilla` + wrapper | |
-| Auto-update | `@tauri-apps/plugin-updater` | Same GitHub-releases flow the Electron app used |
+| Need                  | Solid choice                                  | Notes                                           |
+| --------------------- | --------------------------------------------- | ----------------------------------------------- |
+| Core                  | `solid-js`                                    | Components run once; signals, not hooks         |
+| Headless primitives   | `@kobalte/core`                               | Replaces radix; API differs                     |
+| Icons                 | `lucide-solid`                                | Near drop-in                                    |
+| Toasts                | `solid-sonner`                                |                                                 |
+| Virtualized chat list | `virtua` (Solid) or `@tanstack/solid-virtual` | **Verify chat scroll behavior carefully**       |
+| Rich text editor      | `@tiptap/core` + manual Solid binding         | Tiptap core is framework-agnostic               |
+| Markdown              | render `marked` output / `solid-markdown`     |                                                 |
+| Image crop            | wrap a vanilla lib                            | No 1:1 port — known gap                         |
+| Command palette       | `cmdk-solid` or build on Kobalte              | **Verify maintenance** before adopting          |
+| Gestures              | `@use-gesture/vanilla` + wrapper              |                                                 |
+| Auto-update           | `@tauri-apps/plugin-updater`                  | Same GitHub-releases flow the Electron app used |
 
 ## How to run
 

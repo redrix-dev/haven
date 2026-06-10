@@ -1,7 +1,10 @@
 import type { RealtimeMutationTarget } from "./realtimeMutationTarget";
 import { buildPartialMessageFromRealtimePayload } from "@shared/features/messaging/logic/realtimePartialMessage";
 import { mapLiveProfileIdentity } from "@shared/lib/backend/controlPlaneBackend";
-import type { MessageBundle, ReportStatusUpdatedBroadcastPayload } from "@shared/lib/backend/types";
+import type {
+  MessageBundle,
+  ReportStatusUpdatedBroadcastPayload,
+} from "@shared/lib/backend/types";
 import {
   notifyMemberBanned,
   notifyMemberChannelAccessRevoked,
@@ -169,7 +172,8 @@ export function routeRealtimeEvent(
     case "CHANNEL_DELETE": {
       const communityId = evt.payload.community_id;
       const channelId = evt.payload.channel_id;
-      if (typeof communityId !== "string" || typeof channelId !== "string") return;
+      if (typeof communityId !== "string" || typeof channelId !== "string")
+        return;
       target.channels.removeChannel(channelId, communityId);
       target.messages.for(communityId).evictChannel(channelId);
       return;
@@ -249,7 +253,10 @@ export function routeRealtimeEvent(
       if (typeof communityId !== "string" || communityId.trim().length === 0)
         return;
       void target.channels.loadForCommunity(communityId).catch((err) => {
-        console.warn("[routeRealtimeEvent] CHANNEL_GROUP_CHANGE reload failed", err);
+        console.warn(
+          "[routeRealtimeEvent] CHANNEL_GROUP_CHANGE reload failed",
+          err,
+        );
       });
       return;
     }

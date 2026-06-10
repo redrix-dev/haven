@@ -16,7 +16,10 @@ export type FeatureFlagNexusState = {
 
 export class FeatureFlagNexus {
   private readonly store: UseBoundStore<StoreApi<FeatureFlagNexusState>>;
-  private readonly controlPlane: Pick<ControlPlaneBackend, "listMyFeatureFlags">;
+  private readonly controlPlane: Pick<
+    ControlPlaneBackend,
+    "listMyFeatureFlags"
+  >;
   private loadInflight: Promise<FeatureFlagsSnapshot> | null = null;
 
   constructor(

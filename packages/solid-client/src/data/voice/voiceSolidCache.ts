@@ -1,5 +1,8 @@
 import { createStore } from "solid-js/store";
-import type { VoiceChannelReference, VoiceSidebarParticipant } from "@shared/types/types";
+import type {
+  VoiceChannelReference,
+  VoiceSidebarParticipant,
+} from "@shared/types/types";
 import type { VoiceConnectionPhase } from "@shared/features/voice/types";
 
 export type VoiceSolidState = {

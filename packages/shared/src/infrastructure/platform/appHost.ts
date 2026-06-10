@@ -3,7 +3,12 @@ import type {
   VoiceSettings,
   AppSettings,
 } from "@shared/types/settings";
-import type { UpdaterStatus, SaveFileFromUrlResult, VoicePopoutControlAction, VoicePopoutState } from "@shared/infrastructure/platform/desktop/types";
+import type {
+  UpdaterStatus,
+  SaveFileFromUrlResult,
+  VoicePopoutControlAction,
+  VoicePopoutState,
+} from "@shared/infrastructure/platform/desktop/types";
 
 export type DesktopSettingsBridge = {
   getAppSettings: () => Promise<AppSettings>;
@@ -15,7 +20,9 @@ export type DesktopSettingsBridge = {
   setNotificationAudioSettings: (
     values: NotificationAudioSettings,
   ) => Promise<{ settings: AppSettings }>;
-  setVoiceSettings: (values: VoiceSettings) => Promise<{ settings: AppSettings }>;
+  setVoiceSettings: (
+    values: VoiceSettings,
+  ) => Promise<{ settings: AppSettings }>;
   checkForUpdates: () => Promise<UpdaterStatus>;
   installUpdate: () => Promise<void>;
 };
@@ -26,7 +33,9 @@ export type DesktopAuthBridge = {
 };
 
 export type VoicePopoutBridge = {
-  onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => () => void;
+  onVoicePopoutState: (
+    listener: (state: VoicePopoutState) => void,
+  ) => () => void;
   syncVoicePopoutState: (state: VoicePopoutState) => Promise<void>;
   onVoicePopoutControlAction: (
     listener: (action: VoicePopoutControlAction) => void,
@@ -89,10 +98,7 @@ export type VoiceRuntimeBridge = {
  * they exist for external events that cannot reach the router by themselves.
  */
 export type ShellNavigationBridge = {
-  navigateToCommunity?: (
-    serverId: string,
-    channelId?: string | null,
-  ) => void;
+  navigateToCommunity?: (serverId: string, channelId?: string | null) => void;
   navigateToDm?: (conversationId: string) => void;
 };
 

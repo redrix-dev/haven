@@ -1,9 +1,10 @@
-import { Database } from '@shared/types/database';
+import { Database } from "@shared/types/database";
 
-export type Channel = Database['public']['Tables']['channels']['Row'];
-export type Message = Database['public']['Tables']['messages']['Row'];
-export type DeveloperAccessMode = Database['public']['Enums']['developer_access_mode'];
-export type ChannelKind = Database['public']['Enums']['channel_kind'];
+export type Channel = Database["public"]["Tables"]["channels"]["Row"];
+export type Message = Database["public"]["Tables"]["messages"]["Row"];
+export type DeveloperAccessMode =
+  Database["public"]["Enums"]["developer_access_mode"];
+export type ChannelKind = Database["public"]["Enums"]["channel_kind"];
 export type MessageReaction = {
   id: string;
   messageId: string;
@@ -22,7 +23,7 @@ export type MessageAttachment = {
   objectPath: string;
   originalFilename: string | null;
   mimeType: string;
-  mediaKind: 'image' | 'video' | 'file';
+  mediaKind: "image" | "video" | "file";
   sizeBytes: number;
   createdAt: string;
   expiresAt: string;
@@ -38,18 +39,18 @@ export type DirectMessageAttachment = {
   objectPath: string;
   originalFilename: string | null;
   mimeType: string;
-  mediaKind: 'image';
+  mediaKind: "image";
   sizeBytes: number;
   createdAt: string;
   expiresAt: string;
   signedUrl: string | null;
 };
 
-export type LinkPreviewStatus = 'pending' | 'ready' | 'unsupported' | 'failed';
-export type LinkPreviewEmbedProvider = 'none' | 'youtube' | 'vimeo';
+export type LinkPreviewStatus = "pending" | "ready" | "unsupported" | "failed";
+export type LinkPreviewEmbedProvider = "none" | "youtube" | "vimeo";
 
 export type LinkPreviewEmbed = {
-  provider: 'youtube' | 'vimeo';
+  provider: "youtube" | "vimeo";
   embedUrl: string;
   aspectRatio: number;
 };
@@ -116,14 +117,14 @@ export type MessageBundle = {
 export type FeatureFlagKey = string;
 export type FeatureFlagsSnapshot = Record<FeatureFlagKey, boolean>;
 
-export type OnboardingPlatformScope = 'all' | 'ios' | 'android';
+export type OnboardingPlatformScope = "all" | "ios" | "android";
 
 export type OnboardingDistributionScope =
-  | 'all'
-  | 'development'
-  | 'preview'
-  | 'testflight'
-  | 'production';
+  | "all"
+  | "development"
+  | "preview"
+  | "testflight"
+  | "production";
 
 export type OnboardingClientContext = {
   platform: string;
@@ -146,7 +147,7 @@ export type OnboardingCampaign = {
 
 export type OnboardingCompletionResult = {
   campaignKey: string;
-  status: 'completed' | 'skipped';
+  status: "completed" | "skipped";
   communityId: string | null;
   communityName: string | null;
   joined: boolean;
@@ -172,7 +173,7 @@ export type LiveProfileIdentity = {
   updatedAt: string;
 };
 
-export type ProfileVisibility = 'public' | 'friends_only' | 'private';
+export type ProfileVisibility = "public" | "friends_only" | "private";
 
 export type UserFlairBadge = {
   userFlairId: string;
@@ -186,7 +187,7 @@ export type UserFlairBadge = {
 };
 
 export type UserFlairGrant = UserFlairBadge & {
-  scope: 'platform' | 'community';
+  scope: "platform" | "community";
   communityId: string | null;
   grantSource: string;
   sourceCommunityId: string | null;
@@ -405,18 +406,22 @@ export type ChannelGroupState = {
   collapsedGroupIds: string[];
 };
 
-export type MessageReportTarget = 'server_admins' | 'haven_staff' | 'both';
+export type MessageReportTarget = "server_admins" | "haven_staff" | "both";
 
-export type MessageReportKind = 'content_abuse' | 'bug';
+export type MessageReportKind = "content_abuse" | "bug";
 
 export type NotificationKind =
-  | 'friend_request_received'
-  | 'friend_request_accepted'
-  | 'dm_message'
-  | 'channel_mention'
-  | 'system';
+  | "friend_request_received"
+  | "friend_request_accepted"
+  | "dm_message"
+  | "channel_mention"
+  | "system";
 
-export type NotificationSourceKind = 'friend_request' | 'dm_message' | 'message' | 'system_event';
+export type NotificationSourceKind =
+  | "friend_request"
+  | "dm_message"
+  | "message"
+  | "system_event";
 
 export type NotificationItem = {
   recipientId: string;
@@ -511,44 +516,48 @@ export type ExpoPushSubscriptionRecord = {
 
 export type ExpoPushSubscriptionUpsertInput = {
   expoPushToken: string;
-  platform?: 'ios' | 'android' | 'unknown';
+  platform?: "ios" | "android" | "unknown";
   installationId?: string | null;
   metadata?: Record<string, unknown>;
 };
 
 export type NotificationDeliveryTransport =
-  | 'web_push'
-  | 'expo_push'
-  | 'in_app'
-  | 'simulated_push'
-  | 'route_policy';
+  | "web_push"
+  | "expo_push"
+  | "in_app"
+  | "simulated_push"
+  | "route_policy";
 
-export type NotificationDeliveryDecisionStage = 'enqueue' | 'claim' | 'send_time' | 'client_route';
+export type NotificationDeliveryDecisionStage =
+  | "enqueue"
+  | "claim"
+  | "send_time"
+  | "client_route";
 
-export type NotificationDeliveryDecision = 'send' | 'skip' | 'defer';
+export type NotificationDeliveryDecision = "send" | "skip" | "defer";
 
 export type NotificationDeliveryReasonCode =
-  | 'sent'
-  | 'push_pref_disabled'
-  | 'in_app_pref_disabled'
-  | 'sound_pref_disabled'
-  | 'dm_conversation_muted'
-  | 'recipient_dismissed'
-  | 'recipient_read'
-  | 'no_active_push_subscription'
-  | 'sw_focused_window_suppressed'
-  | 'in_app_suppressed_due_to_push_active_background'
-  | 'provider_retryable_failure'
-  | 'provider_terminal_failure'
-  | 'browser_push_unsupported'
-  | 'notification_permission_not_granted'
-  | 'service_worker_not_ready'
-  | 'push_sync_disabled'
-  | 'push_subscription_inactive'
-  | 'app_focused'
-  | 'app_backgrounded'
-  | 'shadow_peek'
-  | 'shadow_mode_no_send';
+  | "sent"
+  | "push_pref_disabled"
+  | "in_app_pref_disabled"
+  | "sound_pref_disabled"
+  | "dm_conversation_muted"
+  | "recipient_dismissed"
+  | "recipient_read"
+  | "no_active_push_subscription"
+  | "sw_focused_window_suppressed"
+  | "in_app_suppressed_due_to_push_active_background"
+  | "provider_retryable_failure"
+  | "provider_terminal_failure"
+  | "browser_push_unsupported"
+  | "notification_permission_not_granted"
+  | "service_worker_not_ready"
+  | "push_sync_disabled"
+  | "push_subscription_inactive"
+  | "app_focused"
+  | "app_backgrounded"
+  | "shadow_peek"
+  | "shadow_mode_no_send";
 
 export type NotificationDeliveryTraceRecord = {
   id: string;
@@ -611,9 +620,13 @@ export type WebPushDispatchWakeupConfigUpdate = {
   minIntervalSeconds?: number | null;
 };
 
-export type FriendRequestStatus = 'pending' | 'accepted' | 'declined' | 'canceled';
+export type FriendRequestStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "canceled";
 
-export type FriendRequestDirection = 'incoming' | 'outgoing';
+export type FriendRequestDirection = "incoming" | "outgoing";
 
 export type FriendSummary = {
   friendUserId: string;
@@ -647,10 +660,10 @@ export type BlockedUserSummary = {
 };
 
 export type FriendSearchRelationshipState =
-  | 'none'
-  | 'friend'
-  | 'incoming_pending'
-  | 'outgoing_pending';
+  | "none"
+  | "friend"
+  | "incoming_pending"
+  | "outgoing_pending";
 
 export type FriendSearchResult = {
   userId: string;
@@ -671,7 +684,7 @@ export type SocialCounts = {
 
 export type DirectMessageConversationSummary = {
   conversationId: string;
-  kind: 'direct' | 'group';
+  kind: "direct" | "group";
   otherUserId: string | null;
   otherUsername: string | null;
   otherAvatarUrl: string | null;
@@ -701,15 +714,16 @@ export type DirectMessage = {
   attachments: DirectMessageAttachment[];
 };
 
-export type DirectMessageReportKind = 'content_abuse' | 'bug';
+export type DirectMessageReportKind = "content_abuse" | "bug";
 
-export type SupportReportStatus = Database['public']['Enums']['support_report_status'];
-export type SupportReportDestination = 'haven_staff' | 'server_admins' | 'both';
+export type SupportReportStatus =
+  Database["public"]["Enums"]["support_report_status"];
+export type SupportReportDestination = "haven_staff" | "server_admins" | "both";
 export type SupportReportKind =
-  | 'message_report'
-  | 'user_report'
-  | 'escalated_report'
-  | 'unknown';
+  | "message_report"
+  | "user_report"
+  | "escalated_report"
+  | "unknown";
 
 export type SupportReportSnapshotMessage = {
   id: string;
@@ -792,12 +806,12 @@ export type ReportStatusUpdatedBroadcastPayload = {
 };
 
 export type DmMessageReportStatus =
-  | 'open'
-  | 'triaged'
-  | 'in_review'
-  | 'resolved_actioned'
-  | 'resolved_no_action'
-  | 'dismissed';
+  | "open"
+  | "triaged"
+  | "in_review"
+  | "resolved_actioned"
+  | "resolved_no_action"
+  | "dismissed";
 
 export type DmMessageReportSummary = {
   reportId: string;

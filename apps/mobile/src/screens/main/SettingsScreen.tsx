@@ -5,7 +5,10 @@ import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHavenCore } from "@mobile-data";
 import { useProfilesRecord, useViewerProfile } from "@mobile-data/hooks";
-import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
@@ -28,11 +31,17 @@ export function SettingsScreen({ navigation }: Props) {
   const identity = useMemo(() => {
     const email = user?.email ?? null;
     const emailLocalPart = email?.split("@")[0]?.trim() ?? "";
-    const fallbackUsername = (viewerProfile?.username ?? emailLocalPart) || "User";
+    const fallbackUsername =
+      (viewerProfile?.username ?? emailLocalPart) || "User";
     const username =
-      resolveLiveUsername(liveProfiles, userId, fallbackUsername) ?? fallbackUsername;
+      resolveLiveUsername(liveProfiles, userId, fallbackUsername) ??
+      fallbackUsername;
     const avatarUrl =
-      resolveLiveAvatarUrl(liveProfiles, userId, viewerProfile?.avatarUrl ?? null) ??
+      resolveLiveAvatarUrl(
+        liveProfiles,
+        userId,
+        viewerProfile?.avatarUrl ?? null,
+      ) ??
       viewerProfile?.avatarUrl ??
       null;
     return { userId, username, avatarUrl };
@@ -49,7 +58,10 @@ export function SettingsScreen({ navigation }: Props) {
     } catch (error) {
       Alert.alert(
         "Sign out failed",
-        getErrorMessage(error, "Something went wrong while signing out. Try again."),
+        getErrorMessage(
+          error,
+          "Something went wrong while signing out. Try again.",
+        ),
       );
     } finally {
       setIsSigningOut(false);
@@ -64,7 +76,10 @@ export function SettingsScreen({ navigation }: Props) {
     } catch (error) {
       Alert.alert(
         "Delete failed",
-        getErrorMessage(error, "Could not delete your account. Try again later."),
+        getErrorMessage(
+          error,
+          "Could not delete your account. Try again later.",
+        ),
       );
     } finally {
       setIsDeletingAccount(false);
@@ -73,7 +88,10 @@ export function SettingsScreen({ navigation }: Props) {
 
   return (
     <View className="flex-1 bg-background">
-      <View style={{ paddingTop: insets.top }} className="border-b border-border-panel bg-surface-panel">
+      <View
+        style={{ paddingTop: insets.top }}
+        className="border-b border-border-panel bg-surface-panel"
+      >
         <View className="flex-row items-center gap-1 px-2 py-2">
           <Pressable
             onPress={navigation.goBack}
@@ -82,15 +100,25 @@ export function SettingsScreen({ navigation }: Props) {
             accessibilityLabel="Go back"
             className="rounded-xl p-2 active:bg-surface-hover"
           >
-            <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
+            <ThemedIonicons
+              name="chevron-back"
+              size={24}
+              colorClassName="accent-foreground"
+            />
           </Pressable>
-          <Text className="text-lg font-semibold text-foreground">Settings</Text>
+          <Text className="text-lg font-semibold text-foreground">
+            Settings
+          </Text>
         </View>
       </View>
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 16 }}
+        contentContainerStyle={{
+          padding: 16,
+          gap: 12,
+          paddingBottom: insets.bottom + 16,
+        }}
         keyboardDismissMode="interactive"
       >
         <ThemeVisualPickerCard
@@ -109,11 +137,19 @@ export function SettingsScreen({ navigation }: Props) {
             disabled={isSigningOut}
             className={`flex-row items-center gap-3 px-4 py-3.5 ${isSigningOut ? "opacity-50" : "opacity-100"} border-b border-border-panel`}
           >
-            <ThemedIonicons name="log-out-outline" size={18} colorClassName="accent-muted-foreground" />
+            <ThemedIonicons
+              name="log-out-outline"
+              size={18}
+              colorClassName="accent-muted-foreground"
+            />
             <Text className="flex-1 text-base font-medium text-foreground">
               {isSigningOut ? "Signing out…" : "Sign Out"}
             </Text>
-            <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
+            <ThemedIonicons
+              name="chevron-forward"
+              size={16}
+              colorClassName="accent-muted-foreground"
+            />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -122,7 +158,11 @@ export function SettingsScreen({ navigation }: Props) {
             disabled={isDeletingAccount}
             className={`flex-row items-center gap-3 px-4 py-3.5 ${isDeletingAccount ? "opacity-50" : "opacity-100"}`}
           >
-            <ThemedIonicons name="trash-outline" size={18} colorClassName="accent-destructive" />
+            <ThemedIonicons
+              name="trash-outline"
+              size={18}
+              colorClassName="accent-destructive"
+            />
             <View className="flex-1">
               <Text className="text-base font-medium text-destructive">
                 {isDeletingAccount ? "Deleting…" : "Delete Account"}
@@ -131,7 +171,11 @@ export function SettingsScreen({ navigation }: Props) {
                 Permanently remove your account
               </Text>
             </View>
-            <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
+            <ThemedIonicons
+              name="chevron-forward"
+              size={16}
+              colorClassName="accent-muted-foreground"
+            />
           </Pressable>
         </View>
       </ScrollView>

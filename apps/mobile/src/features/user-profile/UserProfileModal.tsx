@@ -19,7 +19,10 @@ import {
   useProfileCardLoading,
   useProfilesRecord,
 } from "@mobile-data/hooks";
-import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
@@ -57,7 +60,8 @@ export default function UserProfileModal({
 }: UserProfileModalProps) {
   const core = useHavenCore();
   const themeTokens = useMobileThemeTokens();
-  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const foregroundColor =
+    resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const viewerUserId = useAuthStore((state) => state.user?.id ?? null);
   const liveProfiles = useProfilesRecord(core.profiles);
   const profileCard = useProfileCard(core.profiles, target?.userId);
@@ -97,7 +101,11 @@ export default function UserProfileModal({
       fallbackUsername;
     const avatarUrl =
       profileCard?.avatarUrl ??
-      resolveLiveAvatarUrl(liveProfiles, target?.userId, target?.avatarUrl ?? null) ??
+      resolveLiveAvatarUrl(
+        liveProfiles,
+        target?.userId,
+        target?.avatarUrl ?? null,
+      ) ??
       target?.avatarUrl ??
       null;
 
@@ -147,7 +155,9 @@ export default function UserProfileModal({
       try {
         await fn();
         if (target?.userId) {
-          await core.profiles.loadProfileCard(target.userId).catch(() => undefined);
+          await core.profiles
+            .loadProfileCard(target.userId)
+            .catch(() => undefined);
         }
       } catch (e) {
         setActionError(e instanceof Error ? e.message : "Action failed.");
@@ -181,43 +191,52 @@ export default function UserProfileModal({
 
   const handleRemoveFriend = useCallback(() => {
     if (!target) return;
-    Alert.alert("Remove friend", `Remove ${identity.username} from your friends?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: () =>
-          void runSocialAction("remove", async () => {
-            await core.social.removeFriend(target.userId);
-          }),
-      },
-    ]);
+    Alert.alert(
+      "Remove friend",
+      `Remove ${identity.username} from your friends?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () =>
+            void runSocialAction("remove", async () => {
+              await core.social.removeFriend(target.userId);
+            }),
+        },
+      ],
+    );
   }, [core.social, identity.username, runSocialAction, target]);
 
   const handleToggleBlock = useCallback(() => {
     if (!target) return;
     setActionsOpen(false);
     const nextAction = relationship.isBlocked ? "Unblock" : "Block";
-    Alert.alert(
-      `${nextAction} user`,
-      `${nextAction} ${identity.username}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: nextAction,
-          style: relationship.isBlocked ? "default" : "destructive",
-          onPress: () =>
-            void runSocialAction(relationship.isBlocked ? "unblock" : "block", async () => {
+    Alert.alert(`${nextAction} user`, `${nextAction} ${identity.username}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: nextAction,
+        style: relationship.isBlocked ? "default" : "destructive",
+        onPress: () =>
+          void runSocialAction(
+            relationship.isBlocked ? "unblock" : "block",
+            async () => {
               if (relationship.isBlocked) {
                 await core.social.unblockUser(target.userId);
               } else {
                 await core.social.blockUser(target.userId);
               }
-            }),
-        },
-      ],
-    );
-  }, [core.social, identity.username, relationship.isBlocked, runSocialAction, target]);
+            },
+          ),
+      },
+    ]);
+  }, [
+    core.social,
+    identity.username,
+    relationship.isBlocked,
+    runSocialAction,
+    target,
+  ]);
 
   const canSendMessage =
     Boolean(target) &&
@@ -292,7 +311,9 @@ export default function UserProfileModal({
     >
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-row items-center justify-between border-b border-border-panel px-4 py-3">
-          <Text className="text-base font-semibold text-foreground">Profile</Text>
+          <Text className="text-base font-semibold text-foreground">
+            Profile
+          </Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close profile"
@@ -300,7 +321,11 @@ export default function UserProfileModal({
             onPress={onDismiss}
             className="h-9 w-9 items-center justify-center rounded-full active:bg-muted"
           >
-            <ThemedIonicons name="close" size={22} colorClassName="accent-muted-foreground" />
+            <ThemedIonicons
+              name="close"
+              size={22}
+              colorClassName="accent-muted-foreground"
+            />
           </Pressable>
         </View>
 
@@ -339,7 +364,9 @@ export default function UserProfileModal({
                   onPress={handleRemoveFriend}
                   className="rounded-xl bg-surface-panel px-4 py-2.5 active:bg-surface-hover"
                 >
-                  <Text className="text-sm font-semibold text-foreground">Remove Friend</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    Remove Friend
+                  </Text>
                 </Pressable>
               ) : relationship.incomingRequestId ? (
                 <Pressable
@@ -359,7 +386,9 @@ export default function UserProfileModal({
                   onPress={handleCancelFriendRequest}
                   className="rounded-xl bg-surface-panel px-4 py-2.5 active:bg-surface-hover"
                 >
-                  <Text className="text-sm font-semibold text-foreground">Requested</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    Requested
+                  </Text>
                 </Pressable>
               ) : (
                 <Pressable
@@ -367,10 +396,14 @@ export default function UserProfileModal({
                   disabled={busyAction !== null || relationship.isBlocked}
                   onPress={handleAddFriend}
                   className={`rounded-xl px-4 py-2.5 ${
-                    relationship.isBlocked ? "bg-muted opacity-60" : "bg-primary active:bg-primary-hover"
+                    relationship.isBlocked
+                      ? "bg-muted opacity-60"
+                      : "bg-primary active:bg-primary-hover"
                   }`}
                 >
-                  <Text className="text-sm font-semibold text-primary-foreground">Add Friend</Text>
+                  <Text className="text-sm font-semibold text-primary-foreground">
+                    Add Friend
+                  </Text>
                 </Pressable>
               )}
 
@@ -404,7 +437,9 @@ export default function UserProfileModal({
           ) : null}
 
           {actionError ? (
-            <Text className="mt-3 text-center text-sm text-destructive">{actionError}</Text>
+            <Text className="mt-3 text-center text-sm text-destructive">
+              {actionError}
+            </Text>
           ) : null}
 
           <View className="mt-6 rounded-2xl border border-border-panel bg-card p-4">
@@ -422,12 +457,18 @@ export default function UserProfileModal({
         onRequestClose={() => setActionsOpen(false)}
       >
         {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal sheet scrim overlay, invariant across themes */}
-        <Pressable className="flex-1 justify-end bg-black/55" onPress={() => setActionsOpen(false)}>
+        <Pressable
+          className="flex-1 justify-end bg-black/55"
+          onPress={() => setActionsOpen(false)}
+        >
           <Pressable
             className="rounded-t-2xl border-t border-border-panel bg-surface-modal px-4 pb-8 pt-3"
             onPress={(e) => e.stopPropagation()}
           >
-            <Text className="mb-3 text-center text-xs text-muted-foreground" numberOfLines={2}>
+            <Text
+              className="mb-3 text-center text-xs text-muted-foreground"
+              numberOfLines={2}
+            >
               {identity.username}
             </Text>
             <Pressable
@@ -437,7 +478,9 @@ export default function UserProfileModal({
                 setReportOpen(true);
               }}
             >
-              <Text className="text-center text-base font-medium text-foreground">Report</Text>
+              <Text className="text-center text-base font-medium text-foreground">
+                Report
+              </Text>
             </Pressable>
             <Pressable
               className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
@@ -445,7 +488,9 @@ export default function UserProfileModal({
             >
               <Text
                 className={`text-center text-base font-medium ${
-                  relationship.isBlocked ? "text-foreground" : "text-destructive"
+                  relationship.isBlocked
+                    ? "text-foreground"
+                    : "text-destructive"
                 }`}
               >
                 {relationship.isBlocked ? "Unblock" : "Block"}
@@ -455,7 +500,9 @@ export default function UserProfileModal({
               className="mt-1 rounded-xl py-3 active:opacity-90"
               onPress={() => setActionsOpen(false)}
             >
-              <Text className="text-center text-base text-muted-foreground">Cancel</Text>
+              <Text className="text-center text-base text-muted-foreground">
+                Cancel
+              </Text>
             </Pressable>
           </Pressable>
         </Pressable>

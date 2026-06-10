@@ -51,7 +51,11 @@ export function getReplyTargetLabel(
     return label && label.length > 0 ? label : "a message";
   }
   return (
-    resolveLiveUsername(liveProfiles, parent.authorUserId, parent.displayName) ??
+    resolveLiveUsername(
+      liveProfiles,
+      parent.authorUserId,
+      parent.displayName,
+    ) ??
     parent.displayName ??
     parent.authorUserId.slice(0, 12)
   );
@@ -67,13 +71,20 @@ export function mapBundlesToChatMessages(
     const preserveTombstone = isAuthorProfileTombstone(cachedProfile);
     const liveAvatar =
       bundle.authorUserId != null && !preserveTombstone
-        ? resolveLiveAvatarUrl(liveProfiles, bundle.authorUserId, cachedProfile?.avatarUrl ?? null)
+        ? resolveLiveAvatarUrl(
+            liveProfiles,
+            bundle.authorUserId,
+            cachedProfile?.avatarUrl ?? null,
+          )
         : (cachedProfile?.avatarUrl ?? null);
     const authorName =
       bundle.authorUserId == null
         ? bundle.displayName
-        : (resolveLiveUsername(liveProfiles, bundle.authorUserId, bundle.displayName) ??
-          bundle.displayName);
+        : (resolveLiveUsername(
+            liveProfiles,
+            bundle.authorUserId,
+            bundle.displayName,
+          ) ?? bundle.displayName);
 
     return {
       id: bundle.id,
@@ -85,14 +96,20 @@ export function mapBundlesToChatMessages(
       authorAvatarUrl: liveAvatar,
       isAuthorStaff: Boolean(bundle.authorUserId && bundle.isPlatformStaff),
       timestampLabel: formatTime(bundle.createdAt),
-      replyTargetLabel: getReplyTargetLabel(bundle.replyToMessageId, messageById, liveProfiles),
+      replyTargetLabel: getReplyTargetLabel(
+        bundle.replyToMessageId,
+        messageById,
+        liveProfiles,
+      ),
       attachments: bundle.attachment ? [bundle.attachment] : [],
       linkPreview: bundle.linkPreview,
     };
   });
 }
 
-export function buildChatListItemsFromChatMessages(messages: ChatMessage[]): ChatListItem[] {
+export function buildChatListItemsFromChatMessages(
+  messages: ChatMessage[],
+): ChatListItem[] {
   const items: ChatListItem[] = [];
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
@@ -100,12 +117,17 @@ export function buildChatListItemsFromChatMessages(messages: ChatMessage[]): Cha
     const currentBucket = dayBucket(message.createdAt);
     const prevBucket = dayBucket(prev?.createdAt);
     const shouldInsertDivider = currentBucket !== prevBucket;
-    const isSameDayAsPrev = Boolean(currentBucket) && currentBucket === prevBucket;
-    const isSameAuthor = Boolean(message.authorUserId) && message.authorUserId === prev?.authorUserId;
+    const isSameDayAsPrev =
+      Boolean(currentBucket) && currentBucket === prevBucket;
+    const isSameAuthor =
+      Boolean(message.authorUserId) &&
+      message.authorUserId === prev?.authorUserId;
     const currentTs = message.createdAt ? Date.parse(message.createdAt) : NaN;
     const prevTs = prev?.createdAt ? Date.parse(prev.createdAt) : NaN;
     const hasValidTs = Number.isFinite(currentTs) && Number.isFinite(prevTs);
-    const isCloseInTime = hasValidTs ? Math.abs(currentTs - prevTs) <= GROUP_WINDOW_MS : false;
+    const isCloseInTime = hasValidTs
+      ? Math.abs(currentTs - prevTs) <= GROUP_WINDOW_MS
+      : false;
 
     items.push({
       kind: "message",
@@ -117,7 +139,9 @@ export function buildChatListItemsFromChatMessages(messages: ChatMessage[]): Cha
       items.push({
         kind: "divider",
         id: `divider-${message.id}`,
-        label: formatDateDividerLabel(message.createdAt ?? new Date().toISOString()),
+        label: formatDateDividerLabel(
+          message.createdAt ?? new Date().toISOString(),
+        ),
       });
     }
   }

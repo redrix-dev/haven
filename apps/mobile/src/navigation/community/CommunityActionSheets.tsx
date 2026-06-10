@@ -62,7 +62,11 @@ export function CommunityActionSheets({
       className="flex-row items-center gap-3 rounded-xl bg-surface-panel px-4 py-4 active:bg-surface-hover"
     >
       <View className="h-10 w-10 items-center justify-center rounded-xl bg-surface-hover">
-        <ThemedIonicons name={icon} size={22} colorClassName="accent-foreground" />
+        <ThemedIonicons
+          name={icon}
+          size={22}
+          colorClassName="accent-foreground"
+        />
       </View>
       <View className="min-w-0 flex-1">
         <Text className="text-base font-semibold text-foreground">{title}</Text>
@@ -150,7 +154,11 @@ export function CommunityActionSheets({
         </View>
       </HavenListSheet>
 
-      <HavenFormSheet visible={createOpen} onDismiss={closeCreate} title="Create community">
+      <HavenFormSheet
+        visible={createOpen}
+        onDismiss={closeCreate}
+        title="Create community"
+      >
         <View className="mt-2 gap-4">
           <Text className="text-sm text-muted-foreground">
             Give your community a name. You can change it later in settings.
@@ -169,7 +177,9 @@ export function CommunityActionSheets({
               autoCapitalize="words"
             />
           </View>
-          {createError ? <Text className="text-sm text-destructive">{createError}</Text> : null}
+          {createError ? (
+            <Text className="text-sm text-destructive">{createError}</Text>
+          ) : null}
           <View className="flex-row justify-end gap-3">
             <Pressable
               onPress={closeCreate}
@@ -182,7 +192,9 @@ export function CommunityActionSheets({
               onPress={() => void handleCreateCommunity()}
               disabled={createLoading || !createName.trim() || !userId}
               className={`rounded-xl bg-primary px-5 py-2.5 ${
-                createLoading || !createName.trim() || !userId ? "opacity-45" : ""
+                createLoading || !createName.trim() || !userId
+                  ? "opacity-45"
+                  : ""
               }`}
             >
               <Text className="text-center font-semibold text-primary-foreground">
@@ -193,7 +205,11 @@ export function CommunityActionSheets({
         </View>
       </HavenFormSheet>
 
-      <HavenFormSheet visible={joinOpen} onDismiss={closeJoin} title="Join community">
+      <HavenFormSheet
+        visible={joinOpen}
+        onDismiss={closeJoin}
+        title="Join community"
+      >
         <View className="mt-2 gap-4">
           <Text className="text-sm text-muted-foreground">
             Paste an invite code or invite link to join.
@@ -213,7 +229,9 @@ export function CommunityActionSheets({
               className="rounded-xl border border-border bg-surface-panel px-3 py-3 text-base text-foreground"
             />
           </View>
-          {joinError ? <Text className="text-sm text-destructive">{joinError}</Text> : null}
+          {joinError ? (
+            <Text className="text-sm text-destructive">{joinError}</Text>
+          ) : null}
           <View className="flex-row justify-end gap-3">
             <Pressable
               onPress={closeJoin}

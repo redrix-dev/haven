@@ -1,4 +1,7 @@
-import type { VoiceChannelReference, VoiceSidebarParticipant } from "@shared/types/types";
+import type {
+  VoiceChannelReference,
+  VoiceSidebarParticipant,
+} from "@shared/types/types";
 import type { VoiceConnectionPhase } from "./types";
 
 export type VoiceSessionSnapshot = {

@@ -1,5 +1,8 @@
 import { createStore } from "solid-js/store";
-import { wireSolidReadableStore, type NotifyingReadableStore } from "../solidReadableStore";
+import {
+  wireSolidReadableStore,
+  type NotifyingReadableStore,
+} from "../solidReadableStore";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
 import type { NotificationNexusState } from "@shared/nexus/notifications/notificationTypes";
 import type { NotificationBackend } from "@shared/lib/backend/notificationBackend";

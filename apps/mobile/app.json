@@ -7,13 +7,8 @@
     "scheme": "haven",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/haven-app-icon.png",
-    "platforms": [
-      "ios",
-      "android"
-    ],
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "platforms": ["ios", "android"],
+    "assetBundlePatterns": ["**/*"],
     "plugins": [
       "expo-video",
       "expo-asset",
@@ -69,15 +64,8 @@
         "NSPhotoLibraryAddUsageDescription": "Allow Haven to save shared media to your photo library.",
         "NSFaceIDUsageDescription": "Allow Haven to use Face ID for secure app access.",
         "NSLocalNetworkUsageDescription": "Haven uses your local network so this development build can find and connect to the Metro bundler on your computer.",
-        "NSBonjourServices": [
-          "_expo._tcp",
-          "_http._tcp"
-        ],
-        "UIBackgroundModes": [
-          "audio",
-          "voip",
-          "remote-notification"
-        ]
+        "NSBonjourServices": ["_expo._tcp", "_http._tcp"],
+        "UIBackgroundModes": ["audio", "voip", "remote-notification"]
       }
     },
     "android": {

@@ -53,12 +53,24 @@ export class ProfileNexus {
   }
 
   private readonly controlPlane: ControlPlaneBackend | null;
-  private viewerProfileInflight = new Map<string, Promise<UserProfileInfo | null>>();
-  private profileCardInflight = new Map<string, Promise<UserProfileCard | null>>();
+  private viewerProfileInflight = new Map<
+    string,
+    Promise<UserProfileInfo | null>
+  >();
+  private profileCardInflight = new Map<
+    string,
+    Promise<UserProfileCard | null>
+  >();
   private userFlairGrantInflight = new Map<string, Promise<UserFlairGrant[]>>();
-  private platformStaffInflight = new Map<string, Promise<PlatformStaffInfo | null>>();
+  private platformStaffInflight = new Map<
+    string,
+    Promise<PlatformStaffInfo | null>
+  >();
 
-  constructor(_persistence: NexusPersistence, controlPlane?: ControlPlaneBackend) {
+  constructor(
+    _persistence: NexusPersistence,
+    controlPlane?: ControlPlaneBackend,
+  ) {
     void _persistence;
     this.controlPlane = controlPlane ?? null;
     this.store = create<ProfileNexusState>()(() => ({
@@ -89,7 +101,10 @@ export class ProfileNexus {
     return this.controlPlane;
   }
 
-  private setViewerProfile(userId: string, profile: UserProfileInfo | null): void {
+  private setViewerProfile(
+    userId: string,
+    profile: UserProfileInfo | null,
+  ): void {
     this.store.setState((state) => ({
       viewerProfiles: { ...state.viewerProfiles, [userId]: profile },
       viewerProfileLastLoadedAt: {
@@ -133,7 +148,10 @@ export class ProfileNexus {
     }
   }
 
-  private setPlatformStaff(userId: string, staff: PlatformStaffInfo | null): void {
+  private setPlatformStaff(
+    userId: string,
+    staff: PlatformStaffInfo | null,
+  ): void {
     this.store.setState((state) => ({
       platformStaff: { ...state.platformStaff, [userId]: staff },
       platformStaffLastLoadedAt: {
@@ -174,7 +192,8 @@ export class ProfileNexus {
       }));
 
       try {
-        const profile = await this.requireControlPlane().fetchUserProfile(userId);
+        const profile =
+          await this.requireControlPlane().fetchUserProfile(userId);
         this.setViewerProfile(userId, profile);
         return profile;
       } catch (error) {
@@ -226,7 +245,9 @@ export class ProfileNexus {
     return this.loadViewerProfile(userId);
   }
 
-  async updateViewerProfile(input: ViewerProfileUpdateInput): Promise<UserProfileInfo> {
+  async updateViewerProfile(
+    input: ViewerProfileUpdateInput,
+  ): Promise<UserProfileInfo> {
     const result = await this.requireControlPlane().updateUserProfile(input);
     this.setViewerProfile(input.userId, result);
     return result;
@@ -386,7 +407,8 @@ export class ProfileNexus {
       }));
 
       try {
-        const staff = await this.requireControlPlane().fetchPlatformStaff(userId);
+        const staff =
+          await this.requireControlPlane().fetchPlatformStaff(userId);
         this.setPlatformStaff(userId, staff);
         return staff;
       } catch (error) {

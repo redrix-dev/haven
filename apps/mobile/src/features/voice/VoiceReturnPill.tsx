@@ -34,17 +34,28 @@ export function VoiceReturnPill({ state, onPress }: VoiceReturnPillProps) {
         className="flex-row items-center gap-3 rounded-2xl border border-border-panel bg-surface-modal px-4 py-3 shadow-lg active:bg-surface-hover"
       >
         <View className="h-10 w-10 items-center justify-center rounded-full bg-primary">
-          <ThemedIonicons name="volume-high-outline" size={20} colorClassName="accent-foreground" />
+          <ThemedIonicons
+            name="volume-high-outline"
+            size={20}
+            colorClassName="accent-foreground"
+          />
         </View>
         <View className="min-w-0 flex-1">
-          <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+          <Text
+            className="text-sm font-semibold text-foreground"
+            numberOfLines={1}
+          >
             {state.activeChannel.channelName}
           </Text>
           <Text className="text-xs text-muted-foreground" numberOfLines={1}>
             {status} - {participantCount} in voice
           </Text>
         </View>
-        <ThemedIonicons name="chevron-up" size={18} colorClassName="accent-text-dim" />
+        <ThemedIonicons
+          name="chevron-up"
+          size={18}
+          colorClassName="accent-text-dim"
+        />
       </Pressable>
     </View>
   );

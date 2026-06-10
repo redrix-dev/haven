@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { useCSSVariable } from "uniwind";
-import type { FloatingDmChannelConfig, FloatingDmChannelId } from "@/theme-rn/floatingDmTypes";
+import type {
+  FloatingDmChannelConfig,
+  FloatingDmChannelId,
+} from "@/theme-rn/floatingDmTypes";
 
 type ChannelSeed = {
   id: FloatingDmChannelId;
@@ -10,8 +13,18 @@ type ChannelSeed = {
 };
 
 const SEEDS: readonly ChannelSeed[] = [
-  { id: "inbox", label: "Inbox", sheetTitle: "Direct messages", unreadCount: 2 },
-  { id: "modmail", label: "Mod mail", sheetTitle: "Moderator inbox", unreadCount: 0 },
+  {
+    id: "inbox",
+    label: "Inbox",
+    sheetTitle: "Direct messages",
+    unreadCount: 2,
+  },
+  {
+    id: "modmail",
+    label: "Mod mail",
+    sheetTitle: "Moderator inbox",
+    unreadCount: 0,
+  },
 ];
 
 /** Modmail header entry on legacy `NotificationsContainer` (`Ionicons` amber-400). */
@@ -27,7 +40,8 @@ export function useFloatingDmPlaceholderChannels(): FloatingDmChannelConfig[] {
 
   return useMemo(() => {
     const inboxBubble = typeof primary === "string" ? primary : "#3f79d8";
-    const inboxSheet = typeof surfacePanel === "string" ? surfacePanel : "#142033";
+    const inboxSheet =
+      typeof surfacePanel === "string" ? surfacePanel : "#142033";
     const modSheet =
       typeof destructivePanel === "string" ? destructivePanel : "#2a1821";
 
@@ -39,7 +53,9 @@ export function useFloatingDmPlaceholderChannels(): FloatingDmChannelConfig[] {
         sheetTitle: seed.sheetTitle,
         bubbleColor: isInbox ? inboxBubble : MODMAIL_BUBBLE_GOLD,
         sheetBackgroundColor: isInbox ? inboxSheet : modSheet,
-        bubbleIconName: isInbox ? ("mail-outline" as const) : ("shield-outline" as const),
+        bubbleIconName: isInbox
+          ? ("mail-outline" as const)
+          : ("shield-outline" as const),
         bubbleIconColorClassName: isInbox
           ? ("accent-primary-foreground" as const)
           : ("accent-background" as const),

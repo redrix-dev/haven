@@ -1,7 +1,7 @@
-import React from 'react';
-import { getAppHost } from '@shared/infrastructure/platform/appHost';
+import React from "react";
+import { getAppHost } from "@shared/infrastructure/platform/appHost";
 
-const STORAGE_KEY = 'haven:voice:member-volumes:v1';
+const STORAGE_KEY = "haven:voice:member-volumes:v1";
 const DEFAULT_MEMBER_VOLUME = 100;
 const MIN_MEMBER_VOLUME = 0;
 const MAX_MEMBER_VOLUME = 200;
@@ -15,12 +15,18 @@ type StoredVolumeEntry = {
 
 type StoredVolumeMap = Record<string, StoredVolumeEntry>;
 
-const makeScopedUserKey = (communityId: string, channelId: string, userId: string) =>
-  `${communityId}:${channelId}:${userId}`;
+const makeScopedUserKey = (
+  communityId: string,
+  channelId: string,
+  userId: string,
+) => `${communityId}:${channelId}:${userId}`;
 
 const coerceVolume = (value: number) => {
   if (!Number.isFinite(value)) return DEFAULT_MEMBER_VOLUME;
-  return Math.max(MIN_MEMBER_VOLUME, Math.min(MAX_MEMBER_VOLUME, Math.round(value)));
+  return Math.max(
+    MIN_MEMBER_VOLUME,
+    Math.min(MAX_MEMBER_VOLUME, Math.round(value)),
+  );
 };
 
 const readStoredVolumes = (now: number): StoredVolumeMap => {
@@ -32,17 +38,21 @@ const readStoredVolumes = (now: number): StoredVolumeMap => {
     if (!raw) return {};
 
     const parsed = JSON.parse(raw) as unknown;
-    if (typeof parsed !== 'object' || parsed == null) return {};
+    if (typeof parsed !== "object" || parsed == null) return {};
 
     const entries = Object.entries(parsed as Record<string, unknown>);
     const pruned: StoredVolumeMap = {};
 
     for (const [storageKey, value] of entries) {
-      if (typeof value !== 'object' || value == null) continue;
+      if (typeof value !== "object" || value == null) continue;
       const candidate = value as Partial<StoredVolumeEntry>;
-      if (typeof candidate.updatedAt !== 'number' || !Number.isFinite(candidate.updatedAt)) continue;
+      if (
+        typeof candidate.updatedAt !== "number" ||
+        !Number.isFinite(candidate.updatedAt)
+      )
+        continue;
       if (now - candidate.updatedAt > EXPIRY_WINDOW_MS) continue;
-      if (typeof candidate.volume !== 'number') continue;
+      if (typeof candidate.volume !== "number") continue;
       pruned[storageKey] = {
         volume: coerceVolume(candidate.volume),
         updatedAt: candidate.updatedAt,
@@ -67,16 +77,22 @@ const writeStoredVolumes = (entries: StoredVolumeMap) => {
 };
 
 const pruneMaxEntries = (entries: StoredVolumeMap): StoredVolumeMap => {
-  const sortedEntries = Object.entries(entries).sort(([, left], [, right]) => right.updatedAt - left.updatedAt);
+  const sortedEntries = Object.entries(entries).sort(
+    ([, left], [, right]) => right.updatedAt - left.updatedAt,
+  );
   return Object.fromEntries(sortedEntries.slice(0, MAX_STORED_ENTRIES));
 };
 
 export const getVoiceMemberVolume = (
   volumes: Record<string, number>,
-  userId: string
+  userId: string,
 ): number => coerceVolume(volumes[userId] ?? DEFAULT_MEMBER_VOLUME);
 
-export function useVoiceMemberVolumes(communityId: string, channelId: string, connectedUserIds: string[]) {
+export function useVoiceMemberVolumes(
+  communityId: string,
+  channelId: string,
+  connectedUserIds: string[],
+) {
   const [volumes, setVolumes] = React.useState<Record<string, number>>({});
 
   React.useEffect(() => {
@@ -89,7 +105,9 @@ export function useVoiceMemberVolumes(communityId: string, channelId: string, co
     const nextVolumes: Record<string, number> = {};
     for (const userId of connectedUserIds) {
       const entry = stored[makeScopedUserKey(communityId, channelId, userId)];
-      nextVolumes[userId] = coerceVolume(entry?.volume ?? DEFAULT_MEMBER_VOLUME);
+      nextVolumes[userId] = coerceVolume(
+        entry?.volume ?? DEFAULT_MEMBER_VOLUME,
+      );
     }
     setVolumes(nextVolumes);
   }, [channelId, communityId, connectedUserIds]);
@@ -101,7 +119,7 @@ export function useVoiceMemberVolumes(communityId: string, channelId: string, co
       const next = updater(current, now);
       writeStoredVolumes(pruneMaxEntries(next));
     },
-    []
+    [],
   );
 
   const setMemberVolume = React.useCallback(
@@ -120,14 +138,14 @@ export function useVoiceMemberVolumes(communityId: string, channelId: string, co
         },
       }));
     },
-    [channelId, communityId, persist]
+    [channelId, communityId, persist],
   );
 
   const resetMemberVolume = React.useCallback(
     (userId: string) => {
       setMemberVolume(userId, DEFAULT_MEMBER_VOLUME);
     },
-    [setMemberVolume]
+    [setMemberVolume],
   );
 
   const resetAllMemberVolumes = React.useCallback(() => {

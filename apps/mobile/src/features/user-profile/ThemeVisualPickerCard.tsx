@@ -1,4 +1,11 @@
-import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
 import { ThemedIonicons } from "@/theme-rn";
 import { useCallback, useState } from "react";
 import { useHavenCore } from "@mobile-data";
@@ -17,7 +24,9 @@ type ThemeSwatch = {
 
 // Computed once at module load — these are static values from the built-in theme registry.
 // Intentional: inline style colors here show each theme's own palette, not the active theme.
-const SWATCHES: ThemeSwatch[] = listSelectableBuiltinThemes(new Set<string>()).map((theme) => ({
+const SWATCHES: ThemeSwatch[] = listSelectableBuiltinThemes(
+  new Set<string>(),
+).map((theme) => ({
   id: theme.id,
   name: theme.name,
   bg: (theme.tokens["surface-1"] as string) ?? "#111a2b",
@@ -31,10 +40,18 @@ type ThemeVisualPickerCardProps = {
   avatarUrl: string | null;
 };
 
-export function ThemeVisualPickerCard({ userId, username, avatarUrl }: ThemeVisualPickerCardProps) {
+export function ThemeVisualPickerCard({
+  userId,
+  username,
+  avatarUrl,
+}: ThemeVisualPickerCardProps) {
   const core = useHavenCore();
-  const selectedThemeId = useMobileThemePreferenceStore((s) => s.selectedThemeId);
-  const setSelectedThemeId = useMobileThemePreferenceStore((s) => s.setSelectedThemeId);
+  const selectedThemeId = useMobileThemePreferenceStore(
+    (s) => s.selectedThemeId,
+  );
+  const setSelectedThemeId = useMobileThemePreferenceStore(
+    (s) => s.setSelectedThemeId,
+  );
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -43,7 +60,10 @@ export function ThemeVisualPickerCard({ userId, username, avatarUrl }: ThemeVisu
       if (!userId || pendingId) return;
       const trimmedName = username.trim();
       if (!trimmedName) {
-        Alert.alert("Username required", "Set a username before changing theme.");
+        Alert.alert(
+          "Username required",
+          "Set a username before changing theme.",
+        );
         return;
       }
 
@@ -53,16 +73,32 @@ export function ThemeVisualPickerCard({ userId, username, avatarUrl }: ThemeVisu
       applyMobileTheme(themeId);
 
       try {
-        await core.updateUserProfile({ userId, username: trimmedName, avatarUrl, theme: themeId });
+        await core.updateUserProfile({
+          userId,
+          username: trimmedName,
+          avatarUrl,
+          theme: themeId,
+        });
       } catch (error) {
         setSelectedThemeId(previousId);
         applyMobileTheme(normalizeMobileThemeId(previousId));
-        Alert.alert("Could not save theme", getErrorMessage(error, "Something went wrong. Try again."));
+        Alert.alert(
+          "Could not save theme",
+          getErrorMessage(error, "Something went wrong. Try again."),
+        );
       } finally {
         setPendingId(null);
       }
     },
-    [core, userId, username, avatarUrl, pendingId, selectedThemeId, setSelectedThemeId],
+    [
+      core,
+      userId,
+      username,
+      avatarUrl,
+      pendingId,
+      selectedThemeId,
+      setSelectedThemeId,
+    ],
   );
 
   const renderItem = useCallback(
@@ -92,8 +128,22 @@ export function ThemeVisualPickerCard({ userId, username, avatarUrl }: ThemeVisu
             }}
           >
             <View style={{ flexDirection: "row", gap: 6 }}>
-              <View style={{ backgroundColor: swatch.surface, width: 22, height: 22, borderRadius: 11 }} />
-              <View style={{ backgroundColor: swatch.primary, width: 22, height: 22, borderRadius: 11 }} />
+              <View
+                style={{
+                  backgroundColor: swatch.surface,
+                  width: 22,
+                  height: 22,
+                  borderRadius: 11,
+                }}
+              />
+              <View
+                style={{
+                  backgroundColor: swatch.primary,
+                  width: 22,
+                  height: 22,
+                  borderRadius: 11,
+                }}
+              />
               <View
                 style={{
                   width: 22,
@@ -128,7 +178,9 @@ export function ThemeVisualPickerCard({ userId, username, avatarUrl }: ThemeVisu
       <Pressable
         onPress={() => setIsOpen((prev) => !prev)}
         accessibilityRole="button"
-        accessibilityLabel={isOpen ? "Collapse appearance" : "Expand appearance"}
+        accessibilityLabel={
+          isOpen ? "Collapse appearance" : "Expand appearance"
+        }
         accessibilityState={{ expanded: isOpen }}
         className="flex-row items-center justify-between px-4 py-3.5 active:bg-surface-hover"
       >

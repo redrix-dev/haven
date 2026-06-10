@@ -62,7 +62,8 @@ export function useCommunityMessageColors(): CommunityMessageColors {
     const foreground = resolveColorProp(tokens, "foreground") ?? "#e6edf7";
     const mutedFg = resolveColorProp(tokens, "muted-foreground") ?? "#a9b8cf";
     const primary = resolveColorProp(tokens, "primary") ?? "#3F79D8";
-    const surfaceEmbedded = resolveColorProp(tokens, "surface-embedded") ?? "#1a2235";
+    const surfaceEmbedded =
+      resolveColorProp(tokens, "surface-embedded") ?? "#1a2235";
     const background = resolveColorProp(tokens, "background") ?? "#0F1728";
 
     return {

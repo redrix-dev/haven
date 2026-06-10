@@ -2,10 +2,17 @@
  * Shared nexus surface: entity state types and pure selectors (import subpaths).
  * Concrete reactive cache classes live in `@mobile-data/*`.
  */
-export type { NexusEntry, EntityMapState, NexusState } from "@shared/core/cache/entityTypes";
+export type {
+  NexusEntry,
+  EntityMapState,
+  NexusState,
+} from "@shared/core/cache/entityTypes";
 export type { ReadableStore } from "./storeTypes";
 export type { ChannelMeta } from "@shared/features/messaging/logic/types";
-export type { Community, CommunityNexusState } from "./community/communityTypes";
+export type {
+  Community,
+  CommunityNexusState,
+} from "./community/communityTypes";
 export type { HavenChannel, ChannelNexusState } from "./community/channelTypes";
 export type {
   DmComposeDraftPeer,

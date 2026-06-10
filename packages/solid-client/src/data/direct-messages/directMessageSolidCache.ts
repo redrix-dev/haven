@@ -1,5 +1,8 @@
 import { createStore } from "solid-js/store";
-import { wireSolidReadableStore, type NotifyingReadableStore } from "../solidReadableStore";
+import {
+  wireSolidReadableStore,
+  type NotifyingReadableStore,
+} from "../solidReadableStore";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
 import type { DirectMessageNexusState } from "@shared/nexus/direct-messages/dmTypes";
 import type { DirectMessageBackend } from "@shared/lib/backend/directMessageBackend";
@@ -75,9 +78,9 @@ export class DirectMessageSolidCache {
     return this.conversationsInflight;
   }
 
-  async ensureConversationsLoaded(
-    options?: { freshnessMs?: number },
-  ): Promise<void> {
+  async ensureConversationsLoaded(options?: {
+    freshnessMs?: number;
+  }): Promise<void> {
     if (this.conversationsInflight) return this.conversationsInflight;
     const freshnessMs = options?.freshnessMs ?? 60_000;
     if (
@@ -89,16 +92,24 @@ export class DirectMessageSolidCache {
     await this.loadConversations();
   }
 
-  async receiveMessage(conversationId: string, messageId: string): Promise<void> {
-    const message = await this.backend.getMessage({ conversationId, messageId });
+  async receiveMessage(
+    conversationId: string,
+    messageId: string,
+  ): Promise<void> {
+    const message = await this.backend.getMessage({
+      conversationId,
+      messageId,
+    });
     if (message) {
       this.upsertMessage(message);
     }
   }
 
   setConversations(conversations: DirectMessageConversationSummary[]): void {
-    const entities: Record<string, NexusEntry<DirectMessageConversationSummary>> =
-      {};
+    const entities: Record<
+      string,
+      NexusEntry<DirectMessageConversationSummary>
+    > = {};
     const conversationIds: string[] = [];
     for (const conversation of conversations) {
       entities[conversation.conversationId] = {

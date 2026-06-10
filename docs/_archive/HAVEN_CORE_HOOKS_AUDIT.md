@@ -5,12 +5,12 @@ from `packages/shared`**. Mobile owns selector-hooks, voice hooks, and auth cont
 
 Each remaining hook is classified as:
 
-| Verdict | Meaning |
-|---------|---------|
-| **Existing cache** | Domain state or actions belong on a cache we already have |
-| **New cache / slice** | Warrants a new cache or formal HavenReactCore session slice |
-| **Truly belongs** | React lifecycle, platform bridge, or UI composition — keep as hook/provider |
-| **Selector-hook** | `@mobile-data/hooks` — binds React to cache `reactiveStore` |
+| Verdict               | Meaning                                                                     |
+| --------------------- | --------------------------------------------------------------------------- |
+| **Existing cache**    | Domain state or actions belong on a cache we already have                   |
+| **New cache / slice** | Warrants a new cache or formal HavenReactCore session slice                 |
+| **Truly belongs**     | React lifecycle, platform bridge, or UI composition — keep as hook/provider |
+| **Selector-hook**     | `@mobile-data/hooks` — binds React to cache `reactiveStore`                 |
 
 See [HAVEN_CORE.md](./HAVEN_CORE.md) for orchestration rules and cache registry.
 
@@ -26,13 +26,13 @@ cache reads + HavenReactCore commands.
 
 ### Cleave relocations (2026-06)
 
-| Was in shared | Now |
-|---|---|
-| `useVoice`, `useVoiceMemberVolumes` | `apps/mobile/src/features/voice/hooks/` |
-| `useAuth` (`AuthContext`) | `apps/mobile/src/contexts/AuthContext.tsx` |
-| `useHavenCore`, `useBootstrapPhase` | `apps/mobile/src/data/core/useHavenCore.ts` |
-| `useDataCacheComponentProbe` | `apps/mobile/src/debug/` |
-| Cache `use*` methods on classes | `apps/mobile/src/data/hooks/*` selector-hooks |
+| Was in shared                       | Now                                           |
+| ----------------------------------- | --------------------------------------------- |
+| `useVoice`, `useVoiceMemberVolumes` | `apps/mobile/src/features/voice/hooks/`       |
+| `useAuth` (`AuthContext`)           | `apps/mobile/src/contexts/AuthContext.tsx`    |
+| `useHavenCore`, `useBootstrapPhase` | `apps/mobile/src/data/core/useHavenCore.ts`   |
+| `useDataCacheComponentProbe`        | `apps/mobile/src/debug/`                      |
+| Cache `use*` methods on classes     | `apps/mobile/src/data/hooks/*` selector-hooks |
 
 ### Legacy stores removed
 
@@ -45,20 +45,20 @@ cache reads + HavenReactCore commands.
 **Pattern:** hooks take the cache/nexus as the first argument (or derive it from `core` at the
 call site). They use `useStoreSelector` + shared pure selectors/projections.
 
-| Hook module | Examples | Bound to |
-|-------------|----------|----------|
-| `community.ts` | `useCommunities`, `useActiveCommunityId`, `useOrderedCommunities` | `CommunityNexus` |
-| `channels.ts` | `useChannels`, `useActiveChannelId`, `useChannelsLoading` | `ChannelNexus` |
-| `messages.ts` | `useChannel`, **`useVisibleChannel`**, `useChannelMeta` | `CommunityMessageCache` |
-| `directMessages.ts` | `useDmConversations`, `useDmMessages` | `DirectMessageNexus` |
-| `notifications.ts` | `useNotifications`, `useNotificationCounts` | `NotificationNexus` |
-| `social.ts` | `useFriends`, `useCounts`, `useFriendRequests` | `SocialNexus` |
-| `profiles.ts` | `useProfilesRecord`, `useViewerProfile`, `usePlatformStaff` | `ProfileNexus` |
-| `permissions.ts` | `usePermissions` | `PermissionsNexus` |
-| `voice.ts` | `useVoiceSession`, … | `VoiceNexus` |
-| `admin.ts` | `useServerPanelState`, … | `CommunityAdminNexus` |
-| `onboarding.ts` | `useCampaigns`, … | `OnboardingNexus` |
-| `moderation.ts` | `useReports`, … | `CommunityModerationNexus` |
+| Hook module         | Examples                                                          | Bound to                   |
+| ------------------- | ----------------------------------------------------------------- | -------------------------- |
+| `community.ts`      | `useCommunities`, `useActiveCommunityId`, `useOrderedCommunities` | `CommunityNexus`           |
+| `channels.ts`       | `useChannels`, `useActiveChannelId`, `useChannelsLoading`         | `ChannelNexus`             |
+| `messages.ts`       | `useChannel`, **`useVisibleChannel`**, `useChannelMeta`           | `CommunityMessageCache`    |
+| `directMessages.ts` | `useDmConversations`, `useDmMessages`                             | `DirectMessageNexus`       |
+| `notifications.ts`  | `useNotifications`, `useNotificationCounts`                       | `NotificationNexus`        |
+| `social.ts`         | `useFriends`, `useCounts`, `useFriendRequests`                    | `SocialNexus`              |
+| `profiles.ts`       | `useProfilesRecord`, `useViewerProfile`, `usePlatformStaff`       | `ProfileNexus`             |
+| `permissions.ts`    | `usePermissions`                                                  | `PermissionsNexus`         |
+| `voice.ts`          | `useVoiceSession`, …                                              | `VoiceNexus`               |
+| `admin.ts`          | `useServerPanelState`, …                                          | `CommunityAdminNexus`      |
+| `onboarding.ts`     | `useCampaigns`, …                                                 | `OnboardingNexus`          |
+| `moderation.ts`     | `useReports`, …                                                   | `CommunityModerationNexus` |
 
 **Anti-pattern:** `core.social.useFriends()` — removed from cache classes.
 
@@ -66,9 +66,9 @@ call site). They use `useStoreSelector` + shared pure selectors/projections.
 
 ## HavenReactCore accessors
 
-| Hook | Verdict |
-|------|---------|
-| `useHavenCore` | **Truly belongs** — registry accessor; returns `HavenReactCore` |
+| Hook                | Verdict                                                              |
+| ------------------- | -------------------------------------------------------------------- |
+| `useHavenCore`      | **Truly belongs** — registry accessor; returns `HavenReactCore`      |
 | `useBootstrapPhase` | **Truly belongs** — reactive bootstrap phase (via Core subscription) |
 
 Location: `apps/mobile/src/data/core/useHavenCore.ts`
@@ -77,18 +77,18 @@ Location: `apps/mobile/src/data/core/useHavenCore.ts`
 
 ## Mobile domain / platform hooks (`apps/mobile`)
 
-| Hook / provider | Verdict | Notes |
-|-----------------|---------|-------|
-| `AuthContext` / `useAuth` | **Truly belongs** | Pre-core auth; Supabase → `bootstrapSession` / `clearSession` |
-| `useVoice` | **Split** | Reads `core.voice`; owns WebRTC/session effects. Location: `features/voice/hooks/` |
-| `useVoiceMemberVolumes` | **Existing cache → VoiceNexus** | Host-persisted volume prefs |
-| `useAuthSession` | **Truly belongs** | Mobile session reader |
-| `useMobileExpoPushRegistration` | **Truly belongs** | Native push token lifecycle |
-| `useHydrateMobileThemeFromProfile` | **Truly belongs** | RN theme from profile |
-| `useMobileLiveKitVoiceSession` | **Truly belongs** | LiveKit + mobile voice bridge |
-| `MobileMainSessionContext` | **Split** | Shrink toward direct Core + selector-hooks at landing screens |
-| `useMobileServerAdminActions` | **Existing cache → core.admin** | Collapse into direct `core.admin` calls when touched |
-| `useFriendsModalData` | **Split** | Reads `SocialNexus`; keep search UI state local |
+| Hook / provider                    | Verdict                         | Notes                                                                              |
+| ---------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- |
+| `AuthContext` / `useAuth`          | **Truly belongs**               | Pre-core auth; Supabase → `bootstrapSession` / `clearSession`                      |
+| `useVoice`                         | **Split**                       | Reads `core.voice`; owns WebRTC/session effects. Location: `features/voice/hooks/` |
+| `useVoiceMemberVolumes`            | **Existing cache → VoiceNexus** | Host-persisted volume prefs                                                        |
+| `useAuthSession`                   | **Truly belongs**               | Mobile session reader                                                              |
+| `useMobileExpoPushRegistration`    | **Truly belongs**               | Native push token lifecycle                                                        |
+| `useHydrateMobileThemeFromProfile` | **Truly belongs**               | RN theme from profile                                                              |
+| `useMobileLiveKitVoiceSession`     | **Truly belongs**               | LiveKit + mobile voice bridge                                                      |
+| `MobileMainSessionContext`         | **Split**                       | Shrink toward direct Core + selector-hooks at landing screens                      |
+| `useMobileServerAdminActions`      | **Existing cache → core.admin** | Collapse into direct `core.admin` calls when touched                               |
+| `useFriendsModalData`              | **Split**                       | Reads `SocialNexus`; keep search UI state local                                    |
 
 ---
 
@@ -106,30 +106,30 @@ Debug: `useDataCacheComponentProbe` moved to `apps/mobile/src/debug/`.
 Web/electron React is **not maintained** post-cleave. The hooks below are historical inventory;
 do not extend them — rebuild desktop on Solid.
 
-| Hook | Verdict | Notes |
-|------|---------|-------|
-| `useChatAppSessionState` | **Transitional / frozen** | Quarantined with web typecheck |
-| `useChatAppLifecycleEffects` | **Truly belongs** (when rebuilt) | Lifecycle only |
-| Other `useChatApp*` slices | **Shrink or delete on Solid rebuild** | |
+| Hook                         | Verdict                               | Notes                          |
+| ---------------------------- | ------------------------------------- | ------------------------------ |
+| `useChatAppSessionState`     | **Transitional / frozen**             | Quarantined with web typecheck |
+| `useChatAppLifecycleEffects` | **Truly belongs** (when rebuilt)      | Lifecycle only                 |
+| Other `useChatApp*` slices   | **Shrink or delete on Solid rebuild** |                                |
 
 ---
 
 ## UI / debug hooks (keep on mobile)
 
-| Hook | Verdict |
-|------|---------|
-| `useChatComposerColors`, chat surface chrome hooks | **Truly belongs** — styling/layout |
-| `useDataCacheComponentProbe` | **Truly belongs** — debug only (`apps/mobile/src/debug/`) |
-| `PasswordRecoveryGateContext` | **Truly belongs** — mobile auth gate |
+| Hook                                               | Verdict                                                   |
+| -------------------------------------------------- | --------------------------------------------------------- |
+| `useChatComposerColors`, chat surface chrome hooks | **Truly belongs** — styling/layout                        |
+| `useDataCacheComponentProbe`                       | **Truly belongs** — debug only (`apps/mobile/src/debug/`) |
+| `PasswordRecoveryGateContext`                      | **Truly belongs** — mobile auth gate                      |
 
 ---
 
 ## Recommended new caches (optional)
 
-| Candidate | Owns | Why not existing? |
-|-----------|------|-------------------|
+| Candidate                            | Owns                                    | Why not existing?                                |
+| ------------------------------------ | --------------------------------------- | ------------------------------------------------ |
 | **PlatformNexus** (or session slice) | Feature flags, platform staff bootstrap | `useFeatureFlags` patterns on web (future Solid) |
-| **SettingsNexus** (low priority) | Unified app settings across hosts | Split across Electron IPC / localStorage today |
+| **SettingsNexus** (low priority)     | Unified app settings across hosts       | Split across Electron IPC / localStorage today   |
 
 Do **not** create caches for: navigation interactions, deep links, push routing, WebRTC,
 theme CSS sync, composer chrome.
@@ -149,14 +149,14 @@ theme CSS sync, composer chrome.
 
 ## HavenReactCore orchestration (mobile)
 
-| API | Role |
-|-----|------|
-| `prepareTextChannelMessages(communityId, channelId)` | Policy + revoked authors + message page load |
-| `prepareDirectMessageConversation(conversationId, options?)` | DM thread load + optional mark-read |
-| `refreshCommunities(userId)` | Reload community list + access-loss sync |
-| `syncFocusFromRoute(...)` | Focus-driven channel/DM prep |
-| `syncViewerMessagePolicy(communityId?)` | Viewer message visibility policy |
-| `syncNotificationSounds` | In-app notification sound playback |
+| API                                                          | Role                                         |
+| ------------------------------------------------------------ | -------------------------------------------- |
+| `prepareTextChannelMessages(communityId, channelId)`         | Policy + revoked authors + message page load |
+| `prepareDirectMessageConversation(conversationId, options?)` | DM thread load + optional mark-read          |
+| `refreshCommunities(userId)`                                 | Reload community list + access-loss sync     |
+| `syncFocusFromRoute(...)`                                    | Focus-driven channel/DM prep                 |
+| `syncViewerMessagePolicy(communityId?)`                      | Viewer message visibility policy             |
+| `syncNotificationSounds`                                     | In-app notification sound playback           |
 
 Cache extensions live under `apps/mobile/src/data/` — e.g. `CommunityMessageCache`
 (sendWithMedia, ensureInitialLoaded), `DirectMessageNexus` (openConversation), `NotificationNexus`

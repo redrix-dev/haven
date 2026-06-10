@@ -6,7 +6,11 @@ type CommunityPhaseGateProps = {
   onRetry: () => void;
 };
 
-export function CommunityPhaseGate({ phase, error, onRetry }: CommunityPhaseGateProps) {
+export function CommunityPhaseGate({
+  phase,
+  error,
+  onRetry,
+}: CommunityPhaseGateProps) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   if (phase === "loading") {

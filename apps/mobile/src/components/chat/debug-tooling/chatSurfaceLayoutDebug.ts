@@ -155,8 +155,7 @@ export function buildChatSurfaceLayoutEvaluation(input: {
   const extra = input.extraContentPadding;
   const kb = input.keyboardHeight;
 
-  const legacyBlank =
-    sticky == null ? null : Math.max(sticky - safeBottom, 0);
+  const legacyBlank = sticky == null ? null : Math.max(sticky - safeBottom, 0);
   const baselineDelta =
     sticky == null ? null : Math.max(sticky - CHAT_COMPOSER_MIN_HEIGHT, 0);
   const docGrowth =
@@ -184,15 +183,14 @@ export function buildChatSurfaceLayoutEvaluation(input: {
   const totalLegacy =
     rnkcInsetLegacy == null ? null : CHAT_LIST_TOP_PADDING + rnkcInsetLegacy;
 
-  const composerTop =
-    sticky == null ? null : CHAT_SURFACE_MARGIN + sticky;
-  const shortfall =
-    composerTop == null ? null : composerTop - totalClosed;
+  const composerTop = sticky == null ? null : CHAT_SURFACE_MARGIN + sticky;
+  const shortfall = composerTop == null ? null : composerTop - totalClosed;
   const shortfallLegacy =
-    composerTop == null || totalLegacy == null ? null : composerTop - totalLegacy;
+    composerTop == null || totalLegacy == null
+      ? null
+      : composerTop - totalLegacy;
 
-  const docListPadding =
-    sticky == null ? null : sticky + CHAT_SURFACE_MARGIN;
+  const docListPadding = sticky == null ? null : sticky + CHAT_SURFACE_MARGIN;
 
   return {
     listPaddingTop: CHAT_LIST_TOP_PADDING,
@@ -259,7 +257,8 @@ export function buildChatSurfaceLayoutSnapshot(input: {
     contentInsetSource: "computed-from-rnkc-formula",
     scrollViewLayout: input.diagnostics?.scrollViewLayout ?? null,
     chatHostLayout: input.diagnostics?.chatHostLayout ?? null,
-    keyboardChatScrollViewMounted: input.diagnostics?.keyboardChatScrollViewMounted ?? false,
+    keyboardChatScrollViewMounted:
+      input.diagnostics?.keyboardChatScrollViewMounted ?? false,
     extraPaddingTargetLast: input.composer?.extraContentPaddingTarget ?? null,
     extraPaddingSettledLast: input.composer?.extraContentPaddingSettled ?? null,
   };
@@ -294,10 +293,14 @@ export function buildChatSurfaceLayoutSnapshot(input: {
     composer: {
       stickyLayoutHeight,
       extraContentPaddingLive,
-      extraContentPaddingTarget: input.composer?.extraContentPaddingTarget ?? null,
-      extraContentPaddingSettled: input.composer?.extraContentPaddingSettled ?? null,
+      extraContentPaddingTarget:
+        input.composer?.extraContentPaddingTarget ?? null,
+      extraContentPaddingSettled:
+        input.composer?.extraContentPaddingSettled ?? null,
       legacyBlankSpaceEstimate:
-        stickyLayoutHeight == null ? null : Math.max(stickyLayoutHeight - safeBottom, 0),
+        stickyLayoutHeight == null
+          ? null
+          : Math.max(stickyLayoutHeight - safeBottom, 0),
       deltaAboveBaseline:
         stickyLayoutHeight == null
           ? null
@@ -342,7 +345,9 @@ export function formatChatSurfaceLayoutConclusion(
     if (ev.docFixHints.listPaddingMatchesDocFormula) {
       parts.push("→ paddingTop matches RNKC INPUT_HEIGHT+MARGIN");
     } else if (ev.docFixHints.recommendedListPaddingTop != null) {
-      parts.push(`→ doc paddingTop=${ev.docFixHints.recommendedListPaddingTop}`);
+      parts.push(
+        `→ doc paddingTop=${ev.docFixHints.recommendedListPaddingTop}`,
+      );
     }
     if (ev.docFixHints.measuredStickyBelowMinHeight) {
       parts.push(
@@ -356,7 +361,9 @@ export function formatChatSurfaceLayoutConclusion(
   return parts.join(" | ");
 }
 
-export function logChatSurfaceLayoutSnapshot(snapshot: ChatSurfaceLayoutSnapshot): void {
+export function logChatSurfaceLayoutSnapshot(
+  snapshot: ChatSurfaceLayoutSnapshot,
+): void {
   if (!isChatSurfaceLayoutDebugEnabled()) return;
   const conclusion = formatChatSurfaceLayoutConclusion(snapshot);
   console.log(
@@ -368,6 +375,8 @@ export function logChatSurfaceLayoutSnapshot(snapshot: ChatSurfaceLayoutSnapshot
     snapshot.event === "probe:t+1500ms" ||
     snapshot.event.startsWith("composer:onLayout")
   ) {
-    console.log(`${CHAT_SURFACE_LAYOUT_DEBUG_TAG} CONCLUSION ${snapshot.event} — ${conclusion}`);
+    console.log(
+      `${CHAT_SURFACE_LAYOUT_DEBUG_TAG} CONCLUSION ${snapshot.event} — ${conclusion}`,
+    );
   }
 }

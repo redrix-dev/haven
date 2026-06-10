@@ -10,7 +10,7 @@ import type {
   DmMessageReportDetail,
   DmMessageReportStatus,
   DmMessageReportSummary,
-} from './types';
+} from "./types";
 
 export interface ModerationBackend {
   listDmMessageReportsForReview(input?: {
@@ -19,8 +19,12 @@ export interface ModerationBackend {
     beforeCreatedAt?: string | null;
     beforeReportId?: string | null;
   }): Promise<DmMessageReportSummary[]>;
-  getDmMessageReportDetail(reportId: string): Promise<DmMessageReportDetail | null>;
-  listDmMessageReportActions(reportId: string): Promise<DmMessageReportAction[]>;
+  getDmMessageReportDetail(
+    reportId: string,
+  ): Promise<DmMessageReportDetail | null>;
+  listDmMessageReportActions(
+    reportId: string,
+  ): Promise<DmMessageReportAction[]>;
   listDmMessageContext(input: {
     messageId: string;
     before?: number;
@@ -49,7 +53,7 @@ type DmMessageReportSummaryRow = {
   conversation_id: string;
   message_id: string;
   status: DmMessageReportStatus;
-  kind: DmMessageReportSummary['kind'];
+  kind: DmMessageReportSummary["kind"];
   comment: string;
   created_at: string;
   updated_at: string;
@@ -72,7 +76,7 @@ type DmMessageReportDetailRow = {
   conversation_id: string;
   message_id: string;
   status: DmMessageReportStatus;
-  kind: DmMessageReportDetail['kind'];
+  kind: DmMessageReportDetail["kind"];
   comment: string;
   resolution_notes: string | null;
   created_at: string;
@@ -125,11 +129,13 @@ type DmMessageContextRow = {
 };
 
 const asRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' && !Array.isArray(value)
+  value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 
-const mapSummary = (row: DmMessageReportSummaryRow): DmMessageReportSummary => ({
+const mapSummary = (
+  row: DmMessageReportSummaryRow,
+): DmMessageReportSummary => ({
   reportId: row.report_id,
   conversationId: row.conversation_id,
   messageId: row.message_id,
@@ -208,12 +214,17 @@ const mapContextMessages = async (
   rows: DmMessageContextRow[],
   createSignedUrlMap: MediaAttachmentHelpers["createSignedUrlMap"],
 ): Promise<DmMessageReportContextMessage[]> => {
-  const allAttachmentRows = rows.flatMap((row) => parseDirectMessageAttachmentRows(row.attachments));
+  const allAttachmentRows = rows.flatMap((row) =>
+    parseDirectMessageAttachmentRows(row.attachments),
+  );
   const signedAttachments = await mapDirectMessageAttachmentRowsWithSignedUrls(
     allAttachmentRows,
     createSignedUrlMap,
   );
-  const attachmentsByMessageId = new Map<string, DmMessageReportContextMessage['attachments']>();
+  const attachmentsByMessageId = new Map<
+    string,
+    DmMessageReportContextMessage["attachments"]
+  >();
 
   for (const attachment of signedAttachments) {
     const existing = attachmentsByMessageId.get(attachment.messageId) ?? [];
@@ -245,90 +256,98 @@ export function createModerationBackend(
     functionName: string,
     args: Record<string, unknown>,
   ): Promise<boolean> => {
-    const { data, error } = await client.rpc(functionName as never, args as never);
+    const { data, error } = await client.rpc(
+      functionName as never,
+      args as never,
+    );
     if (error) throw error;
     return Boolean(data);
   };
 
   return {
-  async listDmMessageReportsForReview(input) {
-    const { data, error } = await client.rpc(
-      'list_dm_message_reports_for_review' as never,
-      {
-        p_statuses: input?.statuses?.length ? input.statuses : undefined,
-        p_limit: input?.limit ?? 50,
-        p_before_created_at: input?.beforeCreatedAt ?? undefined,
-        p_before_report_id: input?.beforeReportId ?? undefined,
-      } as never
-    );
-    if (error) throw error;
-    return ((data ?? []) as DmMessageReportSummaryRow[]).map(mapSummary);
-  },
+    async listDmMessageReportsForReview(input) {
+      const { data, error } = await client.rpc(
+        "list_dm_message_reports_for_review" as never,
+        {
+          p_statuses: input?.statuses?.length ? input.statuses : undefined,
+          p_limit: input?.limit ?? 50,
+          p_before_created_at: input?.beforeCreatedAt ?? undefined,
+          p_before_report_id: input?.beforeReportId ?? undefined,
+        } as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as DmMessageReportSummaryRow[]).map(mapSummary);
+    },
 
-  async getDmMessageReportDetail(reportId) {
-    const { data, error } = await client.rpc(
-      'get_dm_message_report_detail' as never,
-      { p_report_id: reportId } as never
-    );
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : null) as DmMessageReportDetailRow | null;
-    return row ? await mapDetail(row, media.createSignedUrlMap) : null;
-  },
+    async getDmMessageReportDetail(reportId) {
+      const { data, error } = await client.rpc(
+        "get_dm_message_report_detail" as never,
+        { p_report_id: reportId } as never,
+      );
+      if (error) throw error;
+      const row = (
+        Array.isArray(data) ? data[0] : null
+      ) as DmMessageReportDetailRow | null;
+      return row ? await mapDetail(row, media.createSignedUrlMap) : null;
+    },
 
-  async listDmMessageReportActions(reportId) {
-    const { data, error } = await client.rpc(
-      'list_dm_message_report_actions' as never,
-      { p_report_id: reportId } as never
-    );
-    if (error) throw error;
-    return ((data ?? []) as DmMessageReportActionRow[]).map(mapAction);
-  },
+    async listDmMessageReportActions(reportId) {
+      const { data, error } = await client.rpc(
+        "list_dm_message_report_actions" as never,
+        { p_report_id: reportId } as never,
+      );
+      if (error) throw error;
+      return ((data ?? []) as DmMessageReportActionRow[]).map(mapAction);
+    },
 
-  async listDmMessageContext(input) {
-    const { data, error } = await client.rpc(
-      'list_dm_message_context' as never,
-      {
-        p_message_id: input.messageId,
-        p_before: input.before ?? 20,
-        p_after: input.after ?? 20,
-      } as never
-    );
-    if (error) throw error;
-    return await mapContextMessages((data ?? []) as DmMessageContextRow[], media.createSignedUrlMap);
-  },
+    async listDmMessageContext(input) {
+      const { data, error } = await client.rpc(
+        "list_dm_message_context" as never,
+        {
+          p_message_id: input.messageId,
+          p_before: input.before ?? 20,
+          p_after: input.after ?? 20,
+        } as never,
+      );
+      if (error) throw error;
+      return await mapContextMessages(
+        (data ?? []) as DmMessageContextRow[],
+        media.createSignedUrlMap,
+      );
+    },
 
-  async assignDmMessageReport(input) {
-    return callBooleanRpc('assign_dm_message_report', {
-      p_report_id: input.reportId,
-      p_assignee_user_id: input.assigneeUserId ?? null,
-      p_notes: input.notes ?? null,
-    });
-  },
-
-  async updateDmMessageReportStatus(input) {
-    return callBooleanRpc('update_dm_message_report_status', {
-      p_report_id: input.reportId,
-      p_status: input.status,
-      p_notes: input.notes ?? null,
-    });
-  },
-
-  async addDmMessageReportAction(input) {
-    const { data, error } = await client.rpc(
-      'add_dm_message_report_action' as never,
-      {
+    async assignDmMessageReport(input) {
+      return callBooleanRpc("assign_dm_message_report", {
         p_report_id: input.reportId,
-        p_action_type: input.actionType,
+        p_assignee_user_id: input.assigneeUserId ?? null,
         p_notes: input.notes ?? null,
-        p_metadata: input.metadata ?? {},
-      } as never
-    );
-    if (error) throw error;
-    const actionId = data as unknown;
-    if (typeof actionId !== 'string' || actionId.trim().length === 0) {
-      throw new Error('DM report action creation returned no id.');
-    }
-    return actionId;
-  },
-};
+      });
+    },
+
+    async updateDmMessageReportStatus(input) {
+      return callBooleanRpc("update_dm_message_report_status", {
+        p_report_id: input.reportId,
+        p_status: input.status,
+        p_notes: input.notes ?? null,
+      });
+    },
+
+    async addDmMessageReportAction(input) {
+      const { data, error } = await client.rpc(
+        "add_dm_message_report_action" as never,
+        {
+          p_report_id: input.reportId,
+          p_action_type: input.actionType,
+          p_notes: input.notes ?? null,
+          p_metadata: input.metadata ?? {},
+        } as never,
+      );
+      if (error) throw error;
+      const actionId = data as unknown;
+      if (typeof actionId !== "string" || actionId.trim().length === 0) {
+        throw new Error("DM report action creation returned no id.");
+      }
+      return actionId;
+    },
+  };
 }

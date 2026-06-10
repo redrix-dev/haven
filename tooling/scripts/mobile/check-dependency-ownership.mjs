@@ -9,8 +9,12 @@ const repoRoot = path.resolve(__dirname, "../../..");
 const rootPackageJsonPath = path.join(repoRoot, "package.json");
 const mobilePackageJsonPath = path.join(repoRoot, "apps/mobile/package.json");
 
-const rootPackageJson = JSON.parse(fs.readFileSync(rootPackageJsonPath, "utf8"));
-const mobilePackageJson = JSON.parse(fs.readFileSync(mobilePackageJsonPath, "utf8"));
+const rootPackageJson = JSON.parse(
+  fs.readFileSync(rootPackageJsonPath, "utf8"),
+);
+const mobilePackageJson = JSON.parse(
+  fs.readFileSync(mobilePackageJsonPath, "utf8"),
+);
 
 const rootDeps = {
   ...(rootPackageJson.dependencies ?? {}),
@@ -46,13 +50,17 @@ const violations = [];
 
 for (const dep of rootForbidden) {
   if (rootDeps[dep]) {
-    violations.push(`Root package.json must not include mobile dependency "${dep}".`);
+    violations.push(
+      `Root package.json must not include mobile dependency "${dep}".`,
+    );
   }
 }
 
 for (const dep of mobileForbidden) {
   if (mobileDeps[dep]) {
-    violations.push(`apps/mobile/package.json must not include desktop/web tooling dependency "${dep}".`);
+    violations.push(
+      `apps/mobile/package.json must not include desktop/web tooling dependency "${dep}".`,
+    );
   }
 }
 

@@ -1,4 +1,7 @@
-import type { VoicePresenceStateRow, VoiceSidebarParticipant } from "@shared/types/types";
+import type {
+  VoicePresenceStateRow,
+  VoiceSidebarParticipant,
+} from "@shared/types/types";
 import type { VoiceKickPayload, VoiceRealtimeEventPayload } from "../types";
 
 export const voiceParticipantListsEqual = (

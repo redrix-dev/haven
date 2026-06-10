@@ -3,7 +3,7 @@ import type {
   NotificationDeliveryReasonCode,
   NotificationDeliveryTransport,
   NotificationRouteDecision,
-} from '@shared/features/notifications/utils/routePolicy';
+} from "@shared/features/notifications/utils/routePolicy";
 
 export type LocalNotificationDeliveryTraceRecord = {
   id: string;
@@ -17,7 +17,7 @@ export type LocalNotificationDeliveryTraceRecord = {
   createdAt: string;
 };
 
-const STORAGE_KEY = 'haven:notifications:dev-traces';
+const STORAGE_KEY = "haven:notifications:dev-traces";
 const MAX_TRACES = 250;
 
 // Access localStorage via globalThis so this module compiles in non-DOM contexts
@@ -28,11 +28,15 @@ const g = globalThis as typeof globalThis & BrowserLike;
 const canUseLocalStorage = (): boolean =>
   g.window !== undefined && g.window.localStorage !== undefined;
 
-const safeParseTraceArray = (raw: string | null): LocalNotificationDeliveryTraceRecord[] => {
+const safeParseTraceArray = (
+  raw: string | null,
+): LocalNotificationDeliveryTraceRecord[] => {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as LocalNotificationDeliveryTraceRecord[]) : [];
+    return Array.isArray(parsed)
+      ? (parsed as LocalNotificationDeliveryTraceRecord[])
+      : [];
   } catch {
     return [];
   }
@@ -50,14 +54,20 @@ const readTraces = (): LocalNotificationDeliveryTraceRecord[] => {
 const writeTraces = (items: LocalNotificationDeliveryTraceRecord[]): void => {
   if (!canUseLocalStorage()) return;
   try {
-    g.window!.localStorage!.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_TRACES)));
+    g.window!.localStorage!.setItem(
+      STORAGE_KEY,
+      JSON.stringify(items.slice(0, MAX_TRACES)),
+    );
   } catch {
     // Ignore storage quota/private mode errors.
   }
 };
 
 const createTraceId = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `trace_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -90,7 +100,7 @@ export const recordLocalNotificationDeliveryTrace = (input: {
 };
 
 export const listLocalNotificationDeliveryTraces = (
-  limit = 100
+  limit = 100,
 ): LocalNotificationDeliveryTraceRecord[] =>
   readTraces().slice(0, Math.max(1, Math.min(500, Math.trunc(limit))));
 
@@ -102,4 +112,3 @@ export const clearLocalNotificationDeliveryTraces = (): void => {
     // Ignore storage errors.
   }
 };
-

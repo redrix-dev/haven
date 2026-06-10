@@ -1,32 +1,35 @@
-import { createStore, type StoreApi } from 'zustand/vanilla'
-import { Nexus, type NexusEntry } from '@mobile-data/Nexus'
-import type { ReadableStore } from '@shared/nexus/storeTypes'
+import { createStore, type StoreApi } from "zustand/vanilla";
+import { Nexus, type NexusEntry } from "@mobile-data/Nexus";
+import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type {
   ChannelNexusState,
   HavenChannel,
-} from '@shared/nexus/community/channelTypes'
-import type { NexusPersistence } from '@shared/core/persistence/NexusPersistence'
-import type { CommunityDataBackend } from '@shared/lib/backend/communityDataBackend.interface'
+} from "@shared/nexus/community/channelTypes";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type {
   Channel,
   ChannelGroup,
   ChannelGroupState,
-} from '@shared/lib/backend/types'
+} from "@shared/lib/backend/types";
 
-export type { HavenChannel, ChannelNexusState }
+export type { HavenChannel, ChannelNexusState };
 
-const STORAGE_KEY = 'haven:nexus:channels:global'
-const EMPTY_CHANNELS: HavenChannel[] = []
+const STORAGE_KEY = "haven:nexus:channels:global";
+const EMPTY_CHANNELS: HavenChannel[] = [];
 
 export class ChannelNexus extends Nexus<HavenChannel, Channel> {
-  private _channelStore: StoreApi<ChannelNexusState> | null = null
+  private _channelStore: StoreApi<ChannelNexusState> | null = null;
 
-  private readonly communityData: CommunityDataBackend
-  private inflight = new Map<string, Promise<void>>()
+  private readonly communityData: CommunityDataBackend;
+  private inflight = new Map<string, Promise<void>>();
 
-  constructor(persistence: NexusPersistence, communityData: CommunityDataBackend) {
-    super('channels', 'global', persistence)
-    this.communityData = communityData
+  constructor(
+    persistence: NexusPersistence,
+    communityData: CommunityDataBackend,
+  ) {
+    super("channels", "global", persistence);
+    this.communityData = communityData;
   }
 
   /**
@@ -36,39 +39,39 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
   async loadForCommunity(communityId: string): Promise<void> {
     if (!this.communityData) {
       throw new Error(
-        'ChannelNexus.loadForCommunity called before communityData was attached.',
-      )
+        "ChannelNexus.loadForCommunity called before communityData was attached.",
+      );
     }
 
-    const existing = this.inflight.get(communityId)
-    if (existing) return existing
+    const existing = this.inflight.get(communityId);
+    if (existing) return existing;
 
     const promise = (async () => {
-      this.setIsLoading(communityId, true)
+      this.setIsLoading(communityId, true);
       try {
-        const channels = await this.communityData!.listChannels(communityId)
-        let groupState: ChannelGroupState
+        const channels = await this.communityData!.listChannels(communityId);
+        let groupState: ChannelGroupState;
         try {
           groupState = await this.communityData!.listChannelGroups({
             communityId,
             channelIds: channels.map((channel) => channel.id),
-          })
+          });
         } catch {
           groupState = {
             groups: [],
             ungroupedChannelIds: channels.map((channel) => channel.id),
             collapsedGroupIds: [],
-          }
+          };
         }
-        this.setChannels(communityId, channels, groupState)
+        this.setChannels(communityId, channels, groupState);
       } finally {
-        this.setIsLoading(communityId, false)
-        this.inflight.delete(communityId)
+        this.setIsLoading(communityId, false);
+        this.inflight.delete(communityId);
       }
-    })()
+    })();
 
-    this.inflight.set(communityId, promise)
-    return promise
+    this.inflight.set(communityId, promise);
+    return promise;
   }
 
   /**
@@ -76,19 +79,19 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
    * The nexus reads `byCommunity` to decide; rehydrated state counts as cached.
    */
   async ensureLoaded(communityId: string): Promise<void> {
-    const ids = this.store.getState().byCommunity[communityId] ?? []
-    if (ids.length > 0) return
-    await this.loadForCommunity(communityId)
+    const ids = this.store.getState().byCommunity[communityId] ?? [];
+    if (ids.length > 0) return;
+    await this.loadForCommunity(communityId);
   }
 
   /**
    * Insert / update a single channel from a realtime event.
    */
   upsertChannel(raw: Channel): void {
-    const channel = this.transform(raw)
+    const channel = this.transform(raw);
     this.store.setState((state) => {
-      const communityIds = state.byCommunity[channel.communityId] ?? []
-      const alreadyIndexed = communityIds.includes(channel.id)
+      const communityIds = state.byCommunity[channel.communityId] ?? [];
+      const alreadyIndexed = communityIds.includes(channel.id);
       const nextEntities = {
         ...state.entities,
         [channel.id]: {
@@ -96,21 +99,21 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
           partial: false,
           cachedAt: Date.now(),
         },
-      }
+      };
       const nextByCommunity = alreadyIndexed
         ? state.byCommunity
         : {
             ...state.byCommunity,
             [channel.communityId]: [...communityIds, channel.id],
-          }
+          };
       return {
         ...state,
         entities: nextEntities,
         byCommunity: nextByCommunity,
         revision: state.revision + 1,
-      }
-    })
-    this.persist()
+      };
+    });
+    this.persist();
   }
 
   protected transform(raw: Channel): HavenChannel {
@@ -122,7 +125,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
       position: raw.position,
       topic: raw.topic,
       createdAt: raw.created_at,
-    }
+    };
   }
 
   /**
@@ -141,10 +144,10 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         loadingByCommunity: {},
         lastChannelByCommunity: {},
         revision: 0,
-      }))
-      this.rehydrate()
+      }));
+      this.rehydrate();
     }
-    return this._channelStore
+    return this._channelStore;
   }
 
   /**
@@ -154,7 +157,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
    * class's action methods, persistence, or revision bookkeeping.
    */
   get reactiveStore(): ReadableStore<ChannelNexusState> {
-    return this.store
+    return this.store;
   }
 
   setChannels(
@@ -162,18 +165,18 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
     channels: Channel[],
     groupState: ChannelGroupState,
   ): void {
-    const entities = { ...this.store.getState().entities }
-    const orderedIds: string[] = []
-    const sorted = [...channels].sort((a, b) => a.position - b.position)
+    const entities = { ...this.store.getState().entities };
+    const orderedIds: string[] = [];
+    const sorted = [...channels].sort((a, b) => a.position - b.position);
 
     for (const raw of sorted) {
-      const channel = this.transform(raw)
+      const channel = this.transform(raw);
       entities[raw.id] = {
         data: channel,
         partial: false,
         cachedAt: Date.now(),
-      }
-      orderedIds.push(raw.id)
+      };
+      orderedIds.push(raw.id);
     }
 
     this.store.setState((state) => ({
@@ -187,20 +190,21 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
       },
       collapsed: {
         ...state.collapsed,
-        [communityId]: state.collapsed[communityId] ?? groupState.collapsedGroupIds,
+        [communityId]:
+          state.collapsed[communityId] ?? groupState.collapsedGroupIds,
       },
       loadingByCommunity: {
         ...state.loadingByCommunity,
         [communityId]: false,
       },
       revision: state.revision + 1,
-    }))
-    this.persist()
+    }));
+    this.persist();
   }
 
   updateChannel(id: string, changes: Partial<HavenChannel>): void {
-    const existing = this.store.getState().entities[id]
-    if (!existing) return
+    const existing = this.store.getState().entities[id];
+    if (!existing) return;
 
     this.store.setState((state) => ({
       ...state,
@@ -213,17 +217,17 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         },
       },
       revision: state.revision + 1,
-    }))
-    this.persist()
+    }));
+    this.persist();
   }
 
   removeChannel(id: string, communityId: string): void {
     this.store.setState((state) => {
-      const { [id]: _, ...restEntities } = state.entities
+      const { [id]: _, ...restEntities } = state.entities;
       const nextGroups = (state.groups[communityId] ?? []).map((group) => ({
         ...group,
         channelIds: group.channelIds.filter((channelId) => channelId !== id),
-      }))
+      }));
 
       return {
         ...state,
@@ -244,43 +248,44 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
             (channelId) => channelId !== id,
           ),
         },
-        activeChannelId: state.activeChannelId === id ? null : state.activeChannelId,
+        activeChannelId:
+          state.activeChannelId === id ? null : state.activeChannelId,
         revision: state.revision + 1,
-      }
-    })
-    this.persist()
+      };
+    });
+    this.persist();
   }
 
   setActiveChannelId(id: string | null): void {
-    if (this.store.getState().activeChannelId === id) return
+    if (this.store.getState().activeChannelId === id) return;
     this.store.setState((state) => {
       const next: Partial<ChannelNexusState> = {
         activeChannelId: id,
         revision: state.revision + 1,
-      }
+      };
 
       if (id) {
-        const entry = state.entities[id]
-        const communityId = entry?.data.communityId
+        const entry = state.entities[id];
+        const communityId = entry?.data.communityId;
         if (communityId) {
           next.lastChannelByCommunity = {
             ...state.lastChannelByCommunity,
             [communityId]: id,
-          }
+          };
         }
       }
 
-      return { ...state, ...next }
-    })
-    this.persist()
+      return { ...state, ...next };
+    });
+    this.persist();
   }
 
   getActiveChannelId(): string | null {
-    return this.store.getState().activeChannelId
+    return this.store.getState().activeChannelId;
   }
 
   getChannel(id: string): HavenChannel | undefined {
-    return this.store.getState().entities[id]?.data
+    return this.store.getState().entities[id]?.data;
   }
 
   /**
@@ -288,25 +293,25 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
    * Used by route focus sync to restore the user's place.
    */
   getLastChannelId(communityId: string): string | null {
-    return this.store.getState().lastChannelByCommunity[communityId] ?? null
+    return this.store.getState().lastChannelByCommunity[communityId] ?? null;
   }
 
   private getGroupStateSnapshot(communityId: string): ChannelGroupState {
-    const state = this.store.getState()
+    const state = this.store.getState();
     return {
       groups: state.groups[communityId] ?? [],
       ungroupedChannelIds: state.ungrouped[communityId] ?? [],
       collapsedGroupIds: state.collapsed[communityId] ?? [],
-    }
+    };
   }
 
   private requireCommunityData(): CommunityDataBackend {
     if (!this.communityData) {
       throw new Error(
-        'ChannelNexus mutation called before communityData was attached.',
-      )
+        "ChannelNexus mutation called before communityData was attached.",
+      );
     }
-    return this.communityData
+    return this.communityData;
   }
 
   async createChannelGroup(
@@ -315,22 +320,22 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
     createdByUserId: string,
     channelIdToAssign?: string | null,
   ): Promise<void> {
-    const normalizedName = name.trim()
-    if (!normalizedName) throw new Error('Group name is required.')
+    const normalizedName = name.trim();
+    if (!normalizedName) throw new Error("Group name is required.");
 
-    const communityData = this.requireCommunityData()
-    const groupState = this.getGroupStateSnapshot(communityId)
+    const communityData = this.requireCommunityData();
+    const groupState = this.getGroupStateSnapshot(communityId);
     const nextPosition =
       groupState.groups.length === 0
         ? 0
-        : Math.max(...groupState.groups.map((group) => group.position)) + 1
+        : Math.max(...groupState.groups.map((group) => group.position)) + 1;
 
     const createdGroup = await communityData.createChannelGroup({
       communityId,
       name: normalizedName,
       position: nextPosition,
       createdByUserId,
-    })
+    });
 
     if (channelIdToAssign) {
       await communityData.setChannelGroupForChannel({
@@ -338,10 +343,10 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         channelId: channelIdToAssign,
         groupId: createdGroup.id,
         position: 0,
-      })
+      });
     }
 
-    await this.loadForCommunity(communityId)
+    await this.loadForCommunity(communityId);
   }
 
   async renameChannelGroup(
@@ -349,14 +354,14 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
     groupId: string,
     name: string,
   ): Promise<void> {
-    const normalizedName = name.trim()
-    if (!normalizedName) throw new Error('Group name is required.')
+    const normalizedName = name.trim();
+    if (!normalizedName) throw new Error("Group name is required.");
 
     await this.requireCommunityData().renameChannelGroup({
       communityId,
       groupId,
       name: normalizedName,
-    })
+    });
 
     this.store.setState((state) => ({
       ...state,
@@ -367,16 +372,19 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         ),
       },
       revision: state.revision + 1,
-    }))
-    this.persist()
+    }));
+    this.persist();
   }
 
-  async deleteChannelGroup(communityId: string, groupId: string): Promise<void> {
+  async deleteChannelGroup(
+    communityId: string,
+    groupId: string,
+  ): Promise<void> {
     await this.requireCommunityData().deleteChannelGroup({
       communityId,
       groupId,
-    })
-    await this.loadForCommunity(communityId)
+    });
+    await this.loadForCommunity(communityId);
   }
 
   async assignChannelToGroup(
@@ -386,16 +394,16 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
   ): Promise<void> {
     const targetGroup = this.getGroupStateSnapshot(communityId).groups.find(
       (group) => group.id === groupId,
-    )
-    if (!targetGroup) throw new Error('Channel group not found.')
+    );
+    if (!targetGroup) throw new Error("Channel group not found.");
 
     await this.requireCommunityData().setChannelGroupForChannel({
       communityId,
       channelId,
       groupId,
       position: targetGroup.channelIds.length,
-    })
-    await this.loadForCommunity(communityId)
+    });
+    await this.loadForCommunity(communityId);
   }
 
   async removeChannelFromGroup(
@@ -407,8 +415,8 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
       channelId,
       groupId: null,
       position: 0,
-    })
-    await this.loadForCommunity(communityId)
+    });
+    await this.loadForCommunity(communityId);
   }
 
   async setChannelGroupCollapsed(
@@ -420,8 +428,8 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
       communityId,
       groupId,
       isCollapsed,
-    })
-    this.setGroupCollapsed(communityId, groupId, isCollapsed)
+    });
+    this.setGroupCollapsed(communityId, groupId, isCollapsed);
   }
 
   setGroupCollapsed(
@@ -430,16 +438,16 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
     collapsed: boolean,
   ): void {
     this.store.setState((state) => {
-      const current = state.collapsed[communityId] ?? []
-      const has = current.includes(groupId)
+      const current = state.collapsed[communityId] ?? [];
+      const has = current.includes(groupId);
 
       if (collapsed === has) {
-        return state
+        return state;
       }
 
       const nextCollapsed = collapsed
         ? [...current, groupId]
-        : current.filter((id) => id !== groupId)
+        : current.filter((id) => id !== groupId);
 
       return {
         ...state,
@@ -448,9 +456,9 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
           [communityId]: nextCollapsed,
         },
         revision: state.revision + 1,
-      }
-    })
-    this.persist()
+      };
+    });
+    this.persist();
   }
 
   setIsLoading(communityId: string, loading: boolean): void {
@@ -461,33 +469,33 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         [communityId]: loading,
       },
       revision: state.revision + 1,
-    }))
+    }));
   }
 
   getChannelsSnapshot(communityId: string): HavenChannel[] {
-    const state = this.store.getState()
-    const ids = state.byCommunity[communityId] ?? []
-    if (ids.length === 0) return EMPTY_CHANNELS
+    const state = this.store.getState();
+    const ids = state.byCommunity[communityId] ?? [];
+    if (ids.length === 0) return EMPTY_CHANNELS;
 
-    const channels: HavenChannel[] = []
+    const channels: HavenChannel[] = [];
     for (const id of ids) {
-      const entry = state.entities[id]
+      const entry = state.entities[id];
       if (entry && !entry.partial) {
-        channels.push(entry.data)
+        channels.push(entry.data);
       }
     }
-    return channels
+    return channels;
   }
 
   getDefaultChannelId(communityId: string): string | null {
-    const channels = this.getChannelsSnapshot(communityId)
-    const textChannel = channels.find((channel) => channel.kind === 'text')
-    return textChannel?.id ?? null
+    const channels = this.getChannelsSnapshot(communityId);
+    const textChannel = channels.find((channel) => channel.kind === "text");
+    return textChannel?.id ?? null;
   }
 
   override persist(): void {
     try {
-      const state = this.store.getState()
+      const state = this.store.getState();
       const persistable = {
         entities: Object.fromEntries(
           Object.entries(state.entities).filter(([_, entry]) => !entry.partial),
@@ -498,27 +506,27 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         collapsed: state.collapsed,
         activeChannelId: state.activeChannelId,
         lastChannelByCommunity: state.lastChannelByCommunity,
-      }
-      this.persistence.set(STORAGE_KEY, JSON.stringify(persistable))
+      };
+      this.persistence.set(STORAGE_KEY, JSON.stringify(persistable));
     } catch (error) {
-      console.warn('[ChannelNexus] Failed to persist', error)
+      console.warn("[ChannelNexus] Failed to persist", error);
     }
   }
 
   override rehydrate(): void {
     try {
-      const raw = this.persistence.getString(STORAGE_KEY)
-      if (!raw) return
+      const raw = this.persistence.getString(STORAGE_KEY);
+      if (!raw) return;
 
       const parsed = JSON.parse(raw) as {
-        entities: Record<string, NexusEntry<HavenChannel>>
-        byCommunity: Record<string, string[]>
-        groups: Record<string, ChannelGroup[]>
-        ungrouped: Record<string, string[]>
-        collapsed: Record<string, string[]>
-        activeChannelId: string | null
-        lastChannelByCommunity?: Record<string, string | null>
-      }
+        entities: Record<string, NexusEntry<HavenChannel>>;
+        byCommunity: Record<string, string[]>;
+        groups: Record<string, ChannelGroup[]>;
+        ungrouped: Record<string, string[]>;
+        collapsed: Record<string, string[]>;
+        activeChannelId: string | null;
+        lastChannelByCommunity?: Record<string, string | null>;
+      };
 
       this.store.setState((state) => ({
         ...state,
@@ -531,10 +539,10 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
         lastChannelByCommunity: parsed.lastChannelByCommunity ?? {},
         loadingByCommunity: {},
         revision: 0,
-      }))
+      }));
     } catch (error) {
-      console.warn('[ChannelNexus] Failed to rehydrate', error)
-      this.persistence.remove(STORAGE_KEY)
+      console.warn("[ChannelNexus] Failed to rehydrate", error);
+      this.persistence.remove(STORAGE_KEY);
     }
   }
 
@@ -549,8 +557,7 @@ export class ChannelNexus extends Nexus<HavenChannel, Channel> {
       loadingByCommunity: {},
       lastChannelByCommunity: {},
       revision: 0,
-    })
-    this.persistence.remove(STORAGE_KEY)
+    });
+    this.persistence.remove(STORAGE_KEY);
   }
 }
-

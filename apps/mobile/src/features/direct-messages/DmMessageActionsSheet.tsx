@@ -18,7 +18,12 @@ export function DmMessageActionsSheet({
   onReport,
 }: DmMessageActionsSheetProps) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal sheet scrim overlay, invariant across themes */}
       <Pressable className="flex-1 justify-end bg-black/55" onPress={onClose}>
         <Pressable
@@ -26,11 +31,16 @@ export function DmMessageActionsSheet({
           onPress={(e) => e.stopPropagation()}
         >
           {peerLabel ? (
-            <Text className="mb-3 text-center text-xs text-muted-foreground" numberOfLines={2}>
+            <Text
+              className="mb-3 text-center text-xs text-muted-foreground"
+              numberOfLines={2}
+            >
               {peerLabel}
             </Text>
           ) : (
-            <Text className="mb-3 text-center text-xs text-muted-foreground">Direct message</Text>
+            <Text className="mb-3 text-center text-xs text-muted-foreground">
+              Direct message
+            </Text>
           )}
           <Pressable
             className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
@@ -39,10 +49,17 @@ export function DmMessageActionsSheet({
               onClose();
             }}
           >
-            <Text className="text-center text-base font-medium text-foreground">Report</Text>
+            <Text className="text-center text-base font-medium text-foreground">
+              Report
+            </Text>
           </Pressable>
-          <Pressable className="mt-1 rounded-xl py-3 active:opacity-90" onPress={onClose}>
-            <Text className="text-center text-base text-muted-foreground">Cancel</Text>
+          <Pressable
+            className="mt-1 rounded-xl py-3 active:opacity-90"
+            onPress={onClose}
+          >
+            <Text className="text-center text-base text-muted-foreground">
+              Cancel
+            </Text>
           </Pressable>
         </Pressable>
       </Pressable>

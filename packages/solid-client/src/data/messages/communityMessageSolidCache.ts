@@ -110,7 +110,10 @@ export class CommunityMessageSolidCache {
     });
     this.setState((s) => ({
       initialLoadComplete: { ...s.initialLoadComplete, [channelId]: true },
-      lastInitialLoadedAt: { ...s.lastInitialLoadedAt, [channelId]: Date.now() },
+      lastInitialLoadedAt: {
+        ...s.lastInitialLoadedAt,
+        [channelId]: Date.now(),
+      },
     }));
     this.bump();
   }
@@ -258,12 +261,16 @@ export class CommunityMessageSolidCache {
   async sendWithMedia(
     channelId: string,
     content: string,
-    options?: { replyToMessageId?: string | null } & SendCommunityMessageMediaOptions,
+    options?: {
+      replyToMessageId?: string | null;
+    } & SendCommunityMessageMediaOptions,
   ): Promise<void> {
     void channelId;
     void content;
     void options;
-    throw new Error("CommunityMessageSolidCache.sendWithMedia not implemented yet");
+    throw new Error(
+      "CommunityMessageSolidCache.sendWithMedia not implemented yet",
+    );
   }
 
   async requestLinkPreviewBackfill(

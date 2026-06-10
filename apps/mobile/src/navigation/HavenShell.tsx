@@ -1,5 +1,17 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
-import { BackHandler, Dimensions, Keyboard, Pressable, View } from "react-native";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
+import {
+  BackHandler,
+  Dimensions,
+  Keyboard,
+  Pressable,
+  View,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -9,7 +21,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-const CHANNEL_DRAWER_WIDTH = Math.min(320, Dimensions.get("window").width * 0.86);
+const CHANNEL_DRAWER_WIDTH = Math.min(
+  320,
+  Dimensions.get("window").width * 0.86,
+);
 const RAIL_WIDTH = 72;
 export const DRAWER_SURFACE_WIDTH = RAIL_WIDTH + CHANNEL_DRAWER_WIDTH;
 const DRAWER_TIMING = { duration: 220, easing: Easing.out(Easing.cubic) };
@@ -50,7 +65,9 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
     ref,
   ) {
     const [drawerOpen, setDrawerOpen] = useState(openDrawerOnMount);
-    const drawerOffset = useSharedValue(openDrawerOnMount ? 0 : -DRAWER_SURFACE_WIDTH);
+    const drawerOffset = useSharedValue(
+      openDrawerOnMount ? 0 : -DRAWER_SURFACE_WIDTH,
+    );
     const dragStartOffset = useSharedValue(0);
     const dismissKeyboard = useCallback(() => {
       Keyboard.dismiss();
@@ -64,16 +81,17 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
         Keyboard.dismiss();
         setDrawerOpen(open);
         onDrawerStateChange?.(open);
-        drawerOffset.value = withTiming(open ? 0 : -DRAWER_SURFACE_WIDTH, DRAWER_TIMING);
+        drawerOffset.value = withTiming(
+          open ? 0 : -DRAWER_SURFACE_WIDTH,
+          DRAWER_TIMING,
+        );
       },
       [drawerOffset, hasContent, onDrawerStateChange],
     );
 
-    useImperativeHandle(
-      ref,
-      () => ({ setDrawerOpen: setDrawerOpenAnimated }),
-      [setDrawerOpenAnimated],
-    );
+    useImperativeHandle(ref, () => ({ setDrawerOpen: setDrawerOpenAnimated }), [
+      setDrawerOpenAnimated,
+    ]);
 
     // Hardware back: close drawer first, then let the navigator handle the press
     useEffect(() => {
@@ -144,7 +162,8 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
       })
       .onEnd((event) => {
         const projected = drawerOffset.value + event.velocityX * 0.12;
-        const shouldOpen = event.velocityX > -350 && projected > -DRAWER_SURFACE_WIDTH / 2;
+        const shouldOpen =
+          event.velocityX > -350 && projected > -DRAWER_SURFACE_WIDTH / 2;
         runOnJS(setDrawerOpenAnimated)(shouldOpen);
       });
 
@@ -155,7 +174,10 @@ export const HavenShell = forwardRef<HavenShellHandle, HavenShellProps>(
     }));
 
     const scrimStyle = useAnimatedStyle(() => {
-      const progress = Math.max(0, Math.min(1, 1 + drawerOffset.value / DRAWER_SURFACE_WIDTH));
+      const progress = Math.max(
+        0,
+        Math.min(1, 1 + drawerOffset.value / DRAWER_SURFACE_WIDTH),
+      );
       return { opacity: progress * 0.45 };
     });
 

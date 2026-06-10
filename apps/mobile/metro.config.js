@@ -25,7 +25,10 @@ config.resolver.extraNodeModules = {
   "react-native": path.join(mobileNodeModules, "react-native"),
   expo: path.join(mobileNodeModules, "expo"),
   "expo-asset": path.join(mobileNodeModules, "expo-asset"),
-  "react-native-reanimated": path.join(mobileNodeModules, "react-native-reanimated"),
+  "react-native-reanimated": path.join(
+    mobileNodeModules,
+    "react-native-reanimated",
+  ),
 };
 
 const finalConfig = withUniwindConfig(config, {
@@ -48,7 +51,11 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
       sharedSrcRoot,
       moduleName.slice("@shared/".length),
     );
-    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
+    return resolve(
+      { ...context, resolveRequest: resolve },
+      absolutePath,
+      platform,
+    );
   }
 
   if (moduleName === "@mobile-data" || moduleName.startsWith("@mobile-data/")) {
@@ -56,10 +63,12 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
       moduleName === "@mobile-data"
         ? ""
         : moduleName.slice("@mobile-data/".length);
-    const absolutePath = sub
-      ? path.join(mobileDataRoot, sub)
-      : mobileDataRoot;
-    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
+    const absolutePath = sub ? path.join(mobileDataRoot, sub) : mobileDataRoot;
+    return resolve(
+      { ...context, resolveRequest: resolve },
+      absolutePath,
+      platform,
+    );
   }
 
   if (moduleName.startsWith("@platform/")) {
@@ -68,12 +77,23 @@ finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
       "platform",
       moduleName.slice("@platform/".length),
     );
-    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
+    return resolve(
+      { ...context, resolveRequest: resolve },
+      absolutePath,
+      platform,
+    );
   }
 
   if (moduleName.startsWith("@/")) {
-    const absolutePath = path.join(mobileSrcRoot, moduleName.slice("@/".length));
-    return resolve({ ...context, resolveRequest: resolve }, absolutePath, platform);
+    const absolutePath = path.join(
+      mobileSrcRoot,
+      moduleName.slice("@/".length),
+    );
+    return resolve(
+      { ...context, resolveRequest: resolve },
+      absolutePath,
+      platform,
+    );
   }
 
   if (upstreamResolveRequest) {

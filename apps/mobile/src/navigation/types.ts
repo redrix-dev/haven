@@ -3,8 +3,14 @@ import type { FriendsPanelTab } from "@shared/types/types";
 
 export type MainStackParamList = {
   CommunityEntry: undefined;
-  Community: { serverId?: string | null; openDrawer?: boolean; pendingDmConversationId?: string };
-  Friends: { initialTab?: FriendsPanelTab; highlightedRequestId?: string | null } | undefined;
+  Community: {
+    serverId?: string | null;
+    openDrawer?: boolean;
+    pendingDmConversationId?: string;
+  };
+  Friends:
+    | { initialTab?: FriendsPanelTab; highlightedRequestId?: string | null }
+    | undefined;
   Notifications: undefined;
   Profile: undefined;
   Settings: undefined;

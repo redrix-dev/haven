@@ -271,7 +271,9 @@ export class CommunityMessageCache {
     },
   ): Promise<{ id: string }> {
     if (!this.communityData) {
-      throw new Error("CommunityMessageCache.send called before backend attached.");
+      throw new Error(
+        "CommunityMessageCache.send called before backend attached.",
+      );
     }
     const result = await this.communityData.sendUserMessage({
       communityId: this.communityId,
@@ -295,7 +297,9 @@ export class CommunityMessageCache {
   async sendWithMedia(
     channelId: string,
     content: string,
-    options?: { replyToMessageId?: string | null } & SendCommunityMessageMediaOptions,
+    options?: {
+      replyToMessageId?: string | null;
+    } & SendCommunityMessageMediaOptions,
   ): Promise<void> {
     if (!this.communityData) {
       throw new Error(
@@ -400,7 +404,9 @@ export class CommunityMessageCache {
 
   async edit(messageId: string, content: string): Promise<void> {
     if (!this.communityData) {
-      throw new Error("CommunityMessageCache.edit called before backend attached.");
+      throw new Error(
+        "CommunityMessageCache.edit called before backend attached.",
+      );
     }
     await this.communityData.editUserMessage({
       communityId: this.communityId,
@@ -448,7 +454,9 @@ export class CommunityMessageCache {
     comment: string;
   }): Promise<void> {
     if (!this.communityData) {
-      throw new Error("CommunityMessageCache.report called before backend attached.");
+      throw new Error(
+        "CommunityMessageCache.report called before backend attached.",
+      );
     }
     await this.communityData.reportMessage({
       communityId: this.communityId,
@@ -513,7 +521,8 @@ export class CommunityMessageCache {
         nextByChannel = insertMessageIntoChannelIndex(
           nextByChannel,
           message,
-          (id) => nextEntities[id]?.data.createdAt ?? this.getSnapshot(id)?.createdAt,
+          (id) =>
+            nextEntities[id]?.data.createdAt ?? this.getSnapshot(id)?.createdAt,
         );
       }
 
@@ -621,7 +630,9 @@ export class CommunityMessageCache {
         "channelState" in parsed &&
         "entities" in parsed
       ) {
-        const snapshot = parsed as ReturnType<typeof buildPersistedMessageSnapshot>;
+        const snapshot = parsed as ReturnType<
+          typeof buildPersistedMessageSnapshot
+        >;
         this.store.setState({
           ...createInitialState(),
           entities: snapshot.entities ?? {},

@@ -23,7 +23,7 @@ docs/              You are here.
 
 The previous production clients — Electron desktop and Vite/React web — shipped,
 proved the product, and were retired in June 2026 in favor of this rebuild. Their
-history lives in git and [docs/_archive/](./_archive/).
+history lives in git and [docs/\_archive/](./_archive/).
 
 ## The three layers (the law)
 
@@ -44,32 +44,32 @@ packages/shared (pure logic)  →  per-platform cache  →  per-platform UI
    Solid-native cache lives in `packages/solid-client/src/data/` (`HavenSolidCore`,
    being built). A reactive store is **never** shared across frameworks.
 
-One sentence: *we share the smarts and let each platform keep its own dumb memory.*
+One sentence: _we share the smarts and let each platform keep its own dumb memory._
 
 ## Where things live in `packages/shared`
 
 Canonical homes (one implementation per module; anything else is a marked
 re-export shim):
 
-| Concern | Home |
-|---|---|
-| Backend clients, RPC wrappers, network shapes | `lib/backend/` |
-| Supabase client construction | `lib/createHavenSupabaseClient.ts` |
-| Domain logic (messaging, auth, notifications, voice, …) | `features/<domain>/` |
-| Realtime routing (pure, over `RealtimeMutationTarget`) | `core/routeRealtimeEvent.ts` |
-| Persistence port + memory adapter | `core/persistence/` |
-| Pure selectors + entity type barrels | `nexus/` (types/selectors only — no classes) |
-| Platform capability port (`AppHost`) | `infrastructure/platform/appHost.ts` |
-| Themes (tokens, registry — the one place hex literals are allowed) | `themes/` |
-| Shared types, DB types | `types/` |
+| Concern                                                            | Home                                         |
+| ------------------------------------------------------------------ | -------------------------------------------- |
+| Backend clients, RPC wrappers, network shapes                      | `lib/backend/`                               |
+| Supabase client construction                                       | `lib/createHavenSupabaseClient.ts`           |
+| Domain logic (messaging, auth, notifications, voice, …)            | `features/<domain>/`                         |
+| Realtime routing (pure, over `RealtimeMutationTarget`)             | `core/routeRealtimeEvent.ts`                 |
+| Persistence port + memory adapter                                  | `core/persistence/`                          |
+| Pure selectors + entity type barrels                               | `nexus/` (types/selectors only — no classes) |
+| Platform capability port (`AppHost`)                               | `infrastructure/platform/appHost.ts`         |
+| Themes (tokens, registry — the one place hex literals are allowed) | `themes/`                                    |
+| Shared types, DB types                                             | `types/`                                     |
 
 ## Platforms
 
-| Platform | Shell | UI | Cache | Status |
-|---|---|---|---|---|
-| iOS | Expo dev client | React Native (UniWind) | `HavenReactCore` (zustand) | **Live** — TestFlight, custom OTA pipeline |
-| Desktop | Tauri v2 (Rust + WKWebView) | Solid | `HavenSolidCore` (Solid stores) | In rebuild |
-| Web | Vite (same Solid app) | Solid | same as desktop | In rebuild |
+| Platform | Shell                       | UI                     | Cache                           | Status                                     |
+| -------- | --------------------------- | ---------------------- | ------------------------------- | ------------------------------------------ |
+| iOS      | Expo dev client             | React Native (UniWind) | `HavenReactCore` (zustand)      | **Live** — TestFlight, custom OTA pipeline |
+| Desktop  | Tauri v2 (Rust + WKWebView) | Solid                  | `HavenSolidCore` (Solid stores) | In rebuild                                 |
+| Web      | Vite (same Solid app)       | Solid                  | same as desktop                 | In rebuild                                 |
 
 Backend for all of them: Supabase (Auth, Postgres + RLS, Realtime, Edge Functions),
 LiveKit Cloud for voice.
@@ -84,24 +84,24 @@ exception). Coverage matrix and open holes:
 
 ## Guardrails (decisions, encoded)
 
-| Guard | Enforces | Why |
-|---|---|---|
-| `check:shared-portable` | No react/solid/react-zustand, no browser globals in portable paths, no `use*` exports under `core/` | The three-layer law, mechanically |
-| `check:shared-hex` | No hex color literals in shared outside `themes/` | Colors flow through the theme system |
-| `mobile:ownership` | Root must not own react/expo deps; mobile must not own solid/tauri/vite | Dependency ownership mirrors the layer split |
-| `check:themes` | Theme bridge outputs match their source | Mobile themes are generated from shared tokens; drift = visual divergence |
-| `check:chat-surface` / `check:mobile-uniwind` / `check:mobile-typography` | Mobile UI conventions | Theme/typography consistency on the live app |
-| eslint boundary rules | UI/features can't import backend factories, construct Supabase clients, touch persistence, or open realtime directly | The HavenCore → cache → UI consumer contract |
-| `mobile:bundle` | Headless Metro export resolves the whole mobile module graph | Catches broken imports/aliases in CI without a simulator |
+| Guard                                                                     | Enforces                                                                                                             | Why                                                                       |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `check:shared-portable`                                                   | No react/solid/react-zustand, no browser globals in portable paths, no `use*` exports under `core/`                  | The three-layer law, mechanically                                         |
+| `check:shared-hex`                                                        | No hex color literals in shared outside `themes/`                                                                    | Colors flow through the theme system                                      |
+| `mobile:ownership`                                                        | Root must not own react/expo deps; mobile must not own solid/tauri/vite                                              | Dependency ownership mirrors the layer split                              |
+| `check:themes`                                                            | Theme bridge outputs match their source                                                                              | Mobile themes are generated from shared tokens; drift = visual divergence |
+| `check:chat-surface` / `check:mobile-uniwind` / `check:mobile-typography` | Mobile UI conventions                                                                                                | Theme/typography consistency on the live app                              |
+| eslint boundary rules                                                     | UI/features can't import backend factories, construct Supabase clients, touch persistence, or open realtime directly | The HavenCore → cache → UI consumer contract                              |
+| `mobile:bundle`                                                           | Headless Metro export resolves the whole mobile module graph                                                         | Catches broken imports/aliases in CI without a simulator                  |
 
 ## Gates
 
-| Gate | Runs | When |
-|---|---|---|
-| `test:cleave` | lint · shared-portable · **typecheck** · mobile:typecheck · mobile:bundle · test:unit | The fast CI bundle; floor for every merge |
-| `test:ci` / `ci:verify` | test:cleave + `test:db` (SQL/RLS suite) + `test:backend` (contract tests) | CI on push/PR (needs local Supabase) |
-| `test:all` | Everything above + theme checks | Pre-release local |
-| `mobile:release:check` | Theme/surface checks + preflight + mobile typecheck | Before any mobile release |
+| Gate                    | Runs                                                                                  | When                                      |
+| ----------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `test:cleave`           | lint · shared-portable · **typecheck** · mobile:typecheck · mobile:bundle · test:unit | The fast CI bundle; floor for every merge |
+| `test:ci` / `ci:verify` | test:cleave + `test:db` (SQL/RLS suite) + `test:backend` (contract tests)             | CI on push/PR (needs local Supabase)      |
+| `test:all`              | Everything above + theme checks                                                       | Pre-release local                         |
+| `mobile:release:check`  | Theme/surface checks + preflight + mobile typecheck                                   | Before any mobile release                 |
 
 ## Module resolution (interim, with an expiry)
 

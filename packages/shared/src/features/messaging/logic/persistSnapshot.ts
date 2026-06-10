@@ -6,9 +6,7 @@ import { PERSIST_MESSAGE_CAP } from "./constants";
  * Signed media URLs expire ~1h after minting; null them before persisting so
  * cold start rehydrate does not surface dead links.
  */
-export function stripEphemeralMediaUrls(
-  bundle: MessageBundle,
-): MessageBundle {
+export function stripEphemeralMediaUrls(bundle: MessageBundle): MessageBundle {
   if (!bundle.attachment && !bundle.linkPreview?.snapshot?.thumbnail) {
     return bundle;
   }

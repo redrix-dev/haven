@@ -18,10 +18,16 @@ type Props = {
   channels: Channel[];
 };
 
-export function CommunityManagementEntry({ serverId, communityName, channels }: Props) {
+export function CommunityManagementEntry({
+  serverId,
+  communityName,
+  channels,
+}: Props) {
   const core = useHavenCore();
   const perms = usePermissions(core.permissions, serverId);
-  const [sheetTab, setSheetTab] = useState<"community" | "channels" | null>(null);
+  const [sheetTab, setSheetTab] = useState<"community" | "channels" | null>(
+    null,
+  );
 
   const canManageAnything =
     perms.canManageServer ||
@@ -49,7 +55,9 @@ export function CommunityManagementEntry({ serverId, communityName, channels }: 
                 size={16}
                 colorClassName="accent-text-dim"
               />
-              <Text className="flex-1 text-sm font-medium text-muted-foreground">Management</Text>
+              <Text className="flex-1 text-sm font-medium text-muted-foreground">
+                Management
+              </Text>
               <ThemedIonicons
                 name="chevron-up"
                 size={14}
@@ -69,7 +77,9 @@ export function CommunityManagementEntry({ serverId, communityName, channels }: 
                   size={16}
                   colorClassName="accent-muted-foreground"
                 />
-                <Text className="text-sm text-foreground">Community settings</Text>
+                <Text className="text-sm text-foreground">
+                  Community settings
+                </Text>
               </Pressable>
             </PopoverClose>
 
@@ -83,7 +93,9 @@ export function CommunityManagementEntry({ serverId, communityName, channels }: 
                   size={16}
                   colorClassName="accent-muted-foreground"
                 />
-                <Text className="text-sm text-foreground">Channel settings</Text>
+                <Text className="text-sm text-foreground">
+                  Channel settings
+                </Text>
               </Pressable>
             </PopoverClose>
           </PopoverContent>

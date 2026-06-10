@@ -15,7 +15,11 @@ export function ChatSurfaceProvider({
   value: ChatSurfaceChrome;
   children: React.ReactNode;
 }) {
-  return <ChatSurfaceContext.Provider value={value}>{children}</ChatSurfaceContext.Provider>;
+  return (
+    <ChatSurfaceContext.Provider value={value}>
+      {children}
+    </ChatSurfaceContext.Provider>
+  );
 }
 
 export function useChatSurfaceChrome(): ChatSurfaceChrome {

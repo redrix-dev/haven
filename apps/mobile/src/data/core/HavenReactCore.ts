@@ -3,7 +3,11 @@ import type {
   VoiceRealtimeChannel,
   VoiceRealtimeTransport,
 } from "@shared/features/voice/types";
-import type { AuthStorePort, UiStorePort, UserStatusStorePort } from "@shared/core/sessionStorePorts";
+import type {
+  AuthStorePort,
+  UiStorePort,
+  UserStatusStorePort,
+} from "@shared/core/sessionStorePorts";
 import { getCommunityDataBackend } from "@shared/lib/backend";
 import type {
   BanEligibleServer,
@@ -20,13 +24,20 @@ import {
   type HavenSupabasePublicConfig,
 } from "@shared/core/backends";
 import { notifyActiveServerAccessLost } from "@shared/core/communityAccessHandlers";
-import { BootstrapPhase, type BootstrapPhaseSnapshot, type BootstrapPhaseListener } from "./bootstrapPhase";
+import {
+  BootstrapPhase,
+  type BootstrapPhaseSnapshot,
+  type BootstrapPhaseListener,
+} from "./bootstrapPhase";
 import {
   resolvePreferredChannelIdForServer,
   toChannel,
 } from "@shared/core/communityChannelUtils";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
-import { routeRealtimeEvent, type RealtimeEvent } from "@shared/core/routeRealtimeEvent";
+import {
+  routeRealtimeEvent,
+  type RealtimeEvent,
+} from "@shared/core/routeRealtimeEvent";
 import type { RealtimeMutationTarget } from "@shared/core/realtimeMutationTarget";
 import {
   createDefaultViewerMessagePolicyState,
@@ -41,7 +52,10 @@ import { createCommunityNexus } from "../communities/factory";
 import { createChannelNexus } from "../channels/factory";
 import { createDirectMessageNexus } from "../direct-messages/factory";
 import { createNotificationNexus } from "../notifications/factory";
-import { createCommunityMessageRegistry, type MessageNexusRegistry } from "../messages/registry";
+import {
+  createCommunityMessageRegistry,
+  type MessageNexusRegistry,
+} from "../messages/registry";
 import { createPlatformNexusBundle } from "../createPlatformNexuses";
 import {
   createMobileViewerMessagePolicyStore,
@@ -294,12 +308,13 @@ export class HavenReactCore implements RealtimeMutationTarget {
   subscribeRealtime(userId: string): () => void {
     this.unsubscribeRealtime();
 
-    const unsubscribe = this.backends.controlPlane.subscribeToPrivateUserChannel(
-      userId,
-      (evt) => {
-        this.routeEvent(evt as RealtimeEvent);
-      },
-    );
+    const unsubscribe =
+      this.backends.controlPlane.subscribeToPrivateUserChannel(
+        userId,
+        (evt) => {
+          this.routeEvent(evt as RealtimeEvent);
+        },
+      );
 
     this.realtimeUnsubscribe = unsubscribe;
     return () => {
@@ -398,9 +413,13 @@ export class HavenReactCore implements RealtimeMutationTarget {
         }
       }
       if (joinedIds.size > 0) {
-        bootLogger.mark("bootstrap-permissions-start", { count: joinedIds.size });
+        bootLogger.mark("bootstrap-permissions-start", {
+          count: joinedIds.size,
+        });
         await Promise.allSettled(
-          Array.from(joinedIds).map((id) => this.ensureCommunityPermissions(id)),
+          Array.from(joinedIds).map((id) =>
+            this.ensureCommunityPermissions(id),
+          ),
         );
         bootLogger.mark("bootstrap-permissions-done");
       }
@@ -493,7 +512,10 @@ export class HavenReactCore implements RealtimeMutationTarget {
 
   onDmConversationEvent(_payload: Record<string, unknown>): void {
     void this.directMessages.loadConversations().catch((err) => {
-      console.warn("[HavenReactCore] directMessages.loadConversations failed", err);
+      console.warn(
+        "[HavenReactCore] directMessages.loadConversations failed",
+        err,
+      );
     });
   }
 
@@ -510,12 +532,20 @@ export class HavenReactCore implements RealtimeMutationTarget {
         if (partial) {
           this.directMessages.upsertMessage(partial);
         }
-        void this.directMessages.receiveMessage(conversationId, messageId).catch((err) => {
-          console.warn("[HavenReactCore] directMessages.receiveMessage failed", err);
-        });
+        void this.directMessages
+          .receiveMessage(conversationId, messageId)
+          .catch((err) => {
+            console.warn(
+              "[HavenReactCore] directMessages.receiveMessage failed",
+              err,
+            );
+          });
       } else {
         void this.directMessages.receiveLatest(conversationId).catch((err) => {
-          console.warn("[HavenReactCore] directMessages.receiveLatest failed", err);
+          console.warn(
+            "[HavenReactCore] directMessages.receiveLatest failed",
+            err,
+          );
         });
       }
     }
@@ -729,7 +759,8 @@ export class HavenReactCore implements RealtimeMutationTarget {
         .map((adjacentChannelId) =>
           this.runWarmTask(
             `community ${communityId} adjacent channel ${adjacentChannelId}`,
-            () => this.prepareTextChannelMessages(communityId, adjacentChannelId),
+            () =>
+              this.prepareTextChannelMessages(communityId, adjacentChannelId),
           ),
         ),
     );
@@ -789,11 +820,17 @@ export class HavenReactCore implements RealtimeMutationTarget {
    * Ensure the viewer is elevated in a community (uses PermissionsNexus cache).
    */
   async ensureElevated(communityId: string): Promise<boolean> {
-    return this.permissions.ensureElevated(communityId, this.backends.communityData);
+    return this.permissions.ensureElevated(
+      communityId,
+      this.backends.communityData,
+    );
   }
 
   async ensureCommunityPermissions(communityId: string): Promise<void> {
-    await this.permissions.ensureLoaded(communityId, this.backends.communityData);
+    await this.permissions.ensureLoaded(
+      communityId,
+      this.backends.communityData,
+    );
     this.syncViewerMessagePolicy(communityId);
   }
 
@@ -805,7 +842,9 @@ export class HavenReactCore implements RealtimeMutationTarget {
     channelId: string;
     revokedUserId: string;
   }): Promise<void> {
-    await this.backends.communityData.broadcastMemberChannelAccessRevoked(input);
+    await this.backends.communityData.broadcastMemberChannelAccessRevoked(
+      input,
+    );
   }
 
   /**
@@ -833,9 +872,14 @@ export class HavenReactCore implements RealtimeMutationTarget {
 
     if (userId) {
       await this.communities.load(userId);
-      await this.profiles.ensureViewerProfile(userId).catch((error: unknown) => {
-        console.warn("[HavenReactCore] onboarding viewer profile refresh failed", error);
-      });
+      await this.profiles
+        .ensureViewerProfile(userId)
+        .catch((error: unknown) => {
+          console.warn(
+            "[HavenReactCore] onboarding viewer profile refresh failed",
+            error,
+          );
+        });
       await this.profiles.loadMyUserFlairs(userId).catch((error: unknown) => {
         console.warn("[HavenReactCore] onboarding flair refresh failed", error);
       });
@@ -843,9 +887,14 @@ export class HavenReactCore implements RealtimeMutationTarget {
 
     if (result.communityId) {
       this.communities.setActiveId(result.communityId);
-      await this.ensureCommunityPermissions(result.communityId).catch((error) => {
-        console.warn("[HavenReactCore] onboarding permissions refresh failed", error);
-      });
+      await this.ensureCommunityPermissions(result.communityId).catch(
+        (error) => {
+          console.warn(
+            "[HavenReactCore] onboarding permissions refresh failed",
+            error,
+          );
+        },
+      );
     }
 
     return result;
@@ -899,8 +948,12 @@ export class HavenReactCore implements RealtimeMutationTarget {
   /**
    * Resolve which servers the caller can ban a target user from.
    */
-  async getBanEligibleServers(targetUserId: string): Promise<BanEligibleServer[]> {
-    return this.backends.controlPlane.listBanEligibleServersForUser(targetUserId);
+  async getBanEligibleServers(
+    targetUserId: string,
+  ): Promise<BanEligibleServer[]> {
+    return this.backends.controlPlane.listBanEligibleServersForUser(
+      targetUserId,
+    );
   }
 
   async reportUserProfile(input: {

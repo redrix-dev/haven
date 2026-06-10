@@ -16,10 +16,10 @@ it with zero blast radius.
 
 ## Two independent migrations
 
-| Axis | From → To | Scope | Difficulty |
-|---|---|---|---|
-| Shell | Electron → Tauri | `apps/electron` main/preload (thin) | Medium, mechanical |
-| UI | React → Solid | `packages/web-client` (~107 files) | Large, the real work |
+| Axis  | From → To        | Scope                               | Difficulty           |
+| ----- | ---------------- | ----------------------------------- | -------------------- |
+| Shell | Electron → Tauri | `apps/electron` main/preload (thin) | Medium, mechanical   |
+| UI    | React → Solid    | `packages/web-client` (~107 files)  | Large, the real work |
 
 They ship independently. Most risk/effort is the Solid rewrite, not Tauri.
 
@@ -47,20 +47,20 @@ Deliberately **not** in scope yet: importing `@shared`, real auth, Supabase, Liv
 
 ## Dependency mapping (React → Solid) — for the real port later
 
-| React (current) | Solid replacement | Notes |
-|---|---|---|
-| `react` / `react-dom` | `solid-js` | Core; components run once, signals not hooks |
-| `radix-ui` / `@radix-ui/*` | `@kobalte/core` | Headless primitives; API differs |
-| `lucide-react` | `lucide-solid` | Drop-in-ish |
-| `sonner` | `solid-sonner` | Toasts |
-| `react-virtuoso` | `virtua` (Solid) / `@tanstack/solid-virtual` | **Verify chat scroll carefully** |
-| `@tiptap/react` | `@tiptap/core` + manual Solid binding | Tiptap core is framework-agnostic |
-| `react-markdown` + remark | `solid-markdown` / render `marked` output | We already use `marked` |
-| `react-image-crop` | no 1:1 port — wrap a vanilla lib | **Gap to plan for** |
-| `@use-gesture/react` | `@use-gesture/vanilla` + Solid wrapper | Core is framework-agnostic |
-| `next-themes` | Kobalte / custom; `themes` pkg is shared | Low effort |
-| `cmdk` | `cmdk-solid` / build on Kobalte | **Verify maintenance** |
-| `zustand` (React bindings) | vanilla store + Solid `from()` | Logic survives |
+| React (current)            | Solid replacement                            | Notes                                        |
+| -------------------------- | -------------------------------------------- | -------------------------------------------- |
+| `react` / `react-dom`      | `solid-js`                                   | Core; components run once, signals not hooks |
+| `radix-ui` / `@radix-ui/*` | `@kobalte/core`                              | Headless primitives; API differs             |
+| `lucide-react`             | `lucide-solid`                               | Drop-in-ish                                  |
+| `sonner`                   | `solid-sonner`                               | Toasts                                       |
+| `react-virtuoso`           | `virtua` (Solid) / `@tanstack/solid-virtual` | **Verify chat scroll carefully**             |
+| `@tiptap/react`            | `@tiptap/core` + manual Solid binding        | Tiptap core is framework-agnostic            |
+| `react-markdown` + remark  | `solid-markdown` / render `marked` output    | We already use `marked`                      |
+| `react-image-crop`         | no 1:1 port — wrap a vanilla lib             | **Gap to plan for**                          |
+| `@use-gesture/react`       | `@use-gesture/vanilla` + Solid wrapper       | Core is framework-agnostic                   |
+| `next-themes`              | Kobalte / custom; `themes` pkg is shared     | Low effort                                   |
+| `cmdk`                     | `cmdk-solid` / build on Kobalte              | **Verify maintenance**                       |
+| `zustand` (React bindings) | vanilla store + Solid `from()`               | Logic survives                               |
 
 Highest-risk items to validate before committing: **LiveKit voice in a native webview**,
 `react-image-crop` replacement, and `cmdk` coverage.

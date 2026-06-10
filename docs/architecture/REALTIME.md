@@ -20,29 +20,29 @@ against this same matrix.
 
 ## Coverage matrix
 
-| Domain | Event | Backend emits? | `routeEvent` routes? | Target |
-|--------|-------|----------------|----------------------|--------|
-| Community | community list change | partial (login fetch) | n/a — fetched on bootstrap | `CommunityNexus.load` |
-| Channel | `CHANNEL_INSERT` | yes | yes | `ChannelNexus.upsertChannel` |
-| Channel | `CHANNEL_UPDATE` | yes | yes | `ChannelNexus.upsertChannel` |
-| Channel | `CHANNEL_DELETE` | yes | yes | `ChannelNexus.removeChannel` + `messages.evictChannel` |
-| Channel access | `member_channel_access_revoked` | yes | yes | `applyAccessRevoked` |
-| Channel group | `CHANNEL_GROUP_CHANGE` | yes | yes | `ChannelNexus.loadForCommunity` |
-| Profile | `PROFILE_IDENTITY_CHANGE` | yes | yes | `ProfileNexus.upsert/remove` |
-| Community | `COMMUNITY_MEMBERSHIP_CHANGE` | yes | yes | `CommunityNexus.load(userId)` |
-| Message | `MESSAGE_INSERT` | yes | yes | `CommunityMessageCache.insertMessage` |
-| Message | `MESSAGE_UPDATE` | yes | yes | `CommunityMessageCache.upsertMessage` |
-| Message | `MESSAGE_DELETE` | yes | yes | `CommunityMessageCache.removeMessage` |
-| Reaction | insert / delete | per-channel sub removed | partial — via message row update | follow-up: route `REACTION_*` |
-| Attachment | insert / delete | per-channel sub removed | partial | follow-up: route `ATTACHMENT_*` |
-| Link preview | insert / update | per-channel sub removed | partial | follow-up: route `LINK_PREVIEW_*` |
-| Roles | `ROLE_CHANGE` | yes | yes | `core.onRoleChange` → hydrate permissions |
-| Notifications | `NOTIFICATION` | yes | yes | `NotificationNexus.loadInbox` + counts refresh |
-| DM | `DM_CONVERSATION` | yes | yes | `DirectMessageNexus.loadConversations` |
-| DM | `DM_MESSAGE` | yes | yes | `DirectMessageNexus.loadMessages(conversationId)` |
-| Social | `SOCIAL_CHANGE` | yes | yes | `SocialNexus.handleSocialChange` + `syncViewerMessagePolicy` |
-| Moderation | `member_banned` | yes | yes | community access handlers |
-| Moderation | `report_status_updated` | yes | yes | `uiStore` revision bump + inbox refresh where needed |
+| Domain         | Event                           | Backend emits?          | `routeEvent` routes?             | Target                                                       |
+| -------------- | ------------------------------- | ----------------------- | -------------------------------- | ------------------------------------------------------------ |
+| Community      | community list change           | partial (login fetch)   | n/a — fetched on bootstrap       | `CommunityNexus.load`                                        |
+| Channel        | `CHANNEL_INSERT`                | yes                     | yes                              | `ChannelNexus.upsertChannel`                                 |
+| Channel        | `CHANNEL_UPDATE`                | yes                     | yes                              | `ChannelNexus.upsertChannel`                                 |
+| Channel        | `CHANNEL_DELETE`                | yes                     | yes                              | `ChannelNexus.removeChannel` + `messages.evictChannel`       |
+| Channel access | `member_channel_access_revoked` | yes                     | yes                              | `applyAccessRevoked`                                         |
+| Channel group  | `CHANNEL_GROUP_CHANGE`          | yes                     | yes                              | `ChannelNexus.loadForCommunity`                              |
+| Profile        | `PROFILE_IDENTITY_CHANGE`       | yes                     | yes                              | `ProfileNexus.upsert/remove`                                 |
+| Community      | `COMMUNITY_MEMBERSHIP_CHANGE`   | yes                     | yes                              | `CommunityNexus.load(userId)`                                |
+| Message        | `MESSAGE_INSERT`                | yes                     | yes                              | `CommunityMessageCache.insertMessage`                        |
+| Message        | `MESSAGE_UPDATE`                | yes                     | yes                              | `CommunityMessageCache.upsertMessage`                        |
+| Message        | `MESSAGE_DELETE`                | yes                     | yes                              | `CommunityMessageCache.removeMessage`                        |
+| Reaction       | insert / delete                 | per-channel sub removed | partial — via message row update | follow-up: route `REACTION_*`                                |
+| Attachment     | insert / delete                 | per-channel sub removed | partial                          | follow-up: route `ATTACHMENT_*`                              |
+| Link preview   | insert / update                 | per-channel sub removed | partial                          | follow-up: route `LINK_PREVIEW_*`                            |
+| Roles          | `ROLE_CHANGE`                   | yes                     | yes                              | `core.onRoleChange` → hydrate permissions                    |
+| Notifications  | `NOTIFICATION`                  | yes                     | yes                              | `NotificationNexus.loadInbox` + counts refresh               |
+| DM             | `DM_CONVERSATION`               | yes                     | yes                              | `DirectMessageNexus.loadConversations`                       |
+| DM             | `DM_MESSAGE`                    | yes                     | yes                              | `DirectMessageNexus.loadMessages(conversationId)`            |
+| Social         | `SOCIAL_CHANGE`                 | yes                     | yes                              | `SocialNexus.handleSocialChange` + `syncViewerMessagePolicy` |
+| Moderation     | `member_banned`                 | yes                     | yes                              | community access handlers                                    |
+| Moderation     | `report_status_updated`         | yes                     | yes                              | `uiStore` revision bump + inbox refresh where needed         |
 
 ## Open holes
 

@@ -74,9 +74,7 @@ export class PermissionsNexus {
   getRevokedAuthorIdsByChannel(
     communityId: string,
   ): Readonly<Record<string, readonly string[]>> {
-    return (
-      this.store.getState().revokedAuthorIdsByCommunity[communityId] ?? {}
-    );
+    return this.store.getState().revokedAuthorIdsByCommunity[communityId] ?? {};
   }
 
   appendRevokedAuthorId(
@@ -191,18 +189,12 @@ export class PermissionsNexus {
 
   invalidate(communityId: string): void {
     this.store.setState((state) => {
-      const {
-        [communityId]: _p,
-        ...permissionsByCommunityId
-      } = state.permissionsByCommunityId;
-      const {
-        [communityId]: _e,
-        ...elevatedByCommunityId
-      } = state.elevatedByCommunityId;
-      const {
-        [communityId]: _h,
-        ...hydrationByCommunityId
-      } = state.hydrationByCommunityId;
+      const { [communityId]: _p, ...permissionsByCommunityId } =
+        state.permissionsByCommunityId;
+      const { [communityId]: _e, ...elevatedByCommunityId } =
+        state.elevatedByCommunityId;
+      const { [communityId]: _h, ...hydrationByCommunityId } =
+        state.hydrationByCommunityId;
       return {
         permissionsByCommunityId,
         elevatedByCommunityId,

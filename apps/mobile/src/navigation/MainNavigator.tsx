@@ -99,8 +99,11 @@ function enrichVoiceParticipant<T extends VoiceParticipantIdentity>(
   liveProfiles: LiveProfilesRecord,
 ): T {
   const displayName =
-    resolveLiveUsername(liveProfiles, participant.userId, participant.displayName) ??
-    participant.displayName;
+    resolveLiveUsername(
+      liveProfiles,
+      participant.userId,
+      participant.displayName,
+    ) ?? participant.displayName;
   const avatarUrl =
     resolveLiveAvatarUrl(
       liveProfiles,
@@ -604,7 +607,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
       const conversationId = await dm.openWithUser(targetUserId);
       navigation.navigate("Main", {
         screen: "Community",
-        params: { pendingDmConversationId: conversationId, serverId: null, openDrawer: false },
+        params: {
+          pendingDmConversationId: conversationId,
+          serverId: null,
+          openDrawer: false,
+        },
       });
     },
     [dm, navigation],
@@ -612,9 +619,12 @@ function MainNavigationShell({ userId }: { userId: string }) {
 
   const [profileCardTarget, setProfileCardTarget] =
     useState<UserProfileModalTarget | null>(null);
-  const handleOpenProfileCard = useCallback((target: UserProfileModalTarget) => {
-    setProfileCardTarget(target);
-  }, []);
+  const handleOpenProfileCard = useCallback(
+    (target: UserProfileModalTarget) => {
+      setProfileCardTarget(target);
+    },
+    [],
+  );
   const handleCloseProfileCard = useCallback(() => {
     setProfileCardTarget(null);
   }, []);
@@ -623,7 +633,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
     (conversationId: string) => {
       navigation.navigate("Main", {
         screen: "Community",
-        params: { pendingDmConversationId: conversationId, serverId: null, openDrawer: false },
+        params: {
+          pendingDmConversationId: conversationId,
+          serverId: null,
+          openDrawer: false,
+        },
       });
     },
     [navigation],
@@ -632,7 +646,10 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const pendingInviteDrainingRef = useRef(false);
   const [pendingInviteSignal, setPendingInviteSignal] = useState(0);
   useEffect(
-    () => subscribePendingInvite(() => setPendingInviteSignal((value) => value + 1)),
+    () =>
+      subscribePendingInvite(() =>
+        setPendingInviteSignal((value) => value + 1),
+      ),
     [],
   );
 
@@ -655,7 +672,10 @@ function MainNavigationShell({ userId }: { userId: string }) {
         clearPendingInvite();
         Alert.alert(
           "Invite could not be joined",
-          getErrorMessage(error, "Open the invite again or ask for a new link."),
+          getErrorMessage(
+            error,
+            "Open the invite again or ask for a new link.",
+          ),
         );
       })
       .finally(() => {
@@ -668,7 +688,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
       openDm: (conversationId) => {
         navigation.navigate("Main", {
           screen: "Community",
-          params: { pendingDmConversationId: conversationId, serverId: null, openDrawer: false },
+          params: {
+            pendingDmConversationId: conversationId,
+            serverId: null,
+            openDrawer: false,
+          },
         });
       },
       openFriends: (input) => {
@@ -746,7 +770,12 @@ function MainNavigationShell({ userId }: { userId: string }) {
                 }}
                 onStartDirectMessage={(targetUserId) => {
                   void handleOpenDmWithUser(targetUserId).catch((error) => {
-                    Alert.alert("Message failed", error instanceof Error ? error.message : "Could not open that conversation.");
+                    Alert.alert(
+                      "Message failed",
+                      error instanceof Error
+                        ? error.message
+                        : "Could not open that conversation.",
+                    );
                   });
                 }}
                 activeVoiceChannelId={voiceState.activeVoiceChannelId}
@@ -795,7 +824,12 @@ function MainNavigationShell({ userId }: { userId: string }) {
         onDismiss={handleCloseProfileCard}
         onStartDirectMessage={(targetUserId) => {
           void handleOpenDmWithUser(targetUserId).catch((error) => {
-            Alert.alert("Message failed", error instanceof Error ? error.message : "Could not open that conversation.");
+            Alert.alert(
+              "Message failed",
+              error instanceof Error
+                ? error.message
+                : "Could not open that conversation.",
+            );
           });
         }}
       />

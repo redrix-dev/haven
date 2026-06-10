@@ -7,7 +7,9 @@ import {
 import { wireSolidReadableStore } from "../solidReadableStore";
 
 export function createSolidViewerMessagePolicyStore(): ViewerMessagePolicyStore {
-  const [state, setState] = createStore(createDefaultViewerMessagePolicyState());
+  const [state, setState] = createStore(
+    createDefaultViewerMessagePolicyState(),
+  );
   const readable = wireSolidReadableStore(state);
 
   return {

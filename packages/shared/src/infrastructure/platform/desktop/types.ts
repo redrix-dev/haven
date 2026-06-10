@@ -1,4 +1,9 @@
-import type { AppSettings, NotificationAudioSettings, VoiceSettings, VoiceTransmissionMode } from "@shared/types/settings";
+import type {
+  AppSettings,
+  NotificationAudioSettings,
+  VoiceSettings,
+  VoiceTransmissionMode,
+} from "@shared/types/settings";
 
 export type UpdaterStatus = {
   supported: boolean;
@@ -7,17 +12,17 @@ export type UpdaterStatus = {
   enabled: boolean;
   initialized: boolean;
   status:
-    | 'idle'
-    | 'ready'
-    | 'checking'
-    | 'update_available'
-    | 'up_to_date'
-    | 'update_downloaded'
-    | 'error'
-    | 'unsupported_platform'
-    | 'dev_mode'
-    | 'disabled'
-    | 'disabled_pending_restart';
+    | "idle"
+    | "ready"
+    | "checking"
+    | "update_available"
+    | "up_to_date"
+    | "update_downloaded"
+    | "error"
+    | "unsupported_platform"
+    | "dev_mode"
+    | "disabled"
+    | "disabled_pending_restart";
   lastCheckedAt: string | null;
   lastError: string | null;
   disableNeedsRestart: boolean;
@@ -64,16 +69,16 @@ export type VoicePopoutState = {
 };
 
 export type VoicePopoutControlAction =
-  | { type: 'join_voice' }
-  | { type: 'leave_voice' }
-  | { type: 'toggle_mute' }
-  | { type: 'toggle_deafen' }
-  | { type: 'set_transmission_mode'; mode: VoiceTransmissionMode }
-  | { type: 'set_input_device'; deviceId: string }
-  | { type: 'set_output_device'; deviceId: string }
-  | { type: 'set_member_volume'; userId: string; volume: number }
-  | { type: 'open_voice_settings' }
-  | { type: 'open_voice_hardware_test' };
+  | { type: "join_voice" }
+  | { type: "leave_voice" }
+  | { type: "toggle_mute" }
+  | { type: "toggle_deafen" }
+  | { type: "set_transmission_mode"; mode: VoiceTransmissionMode }
+  | { type: "set_input_device"; deviceId: string }
+  | { type: "set_output_device"; deviceId: string }
+  | { type: "set_member_volume"; userId: string; volume: number }
+  | { type: "open_voice_settings" }
+  | { type: "open_voice_hardware_test" };
 
 export type DesktopAPI = {
   getAppSettings: () => Promise<AppSettings>;
@@ -103,10 +108,16 @@ export type DesktopAPI = {
   closeVoicePopout: () => Promise<{ closed: boolean }>;
   syncVoicePopoutState: (state: VoicePopoutState) => Promise<void>;
   requestVoicePopoutStateSync: () => Promise<void>;
-  dispatchVoicePopoutControlAction: (action: VoicePopoutControlAction) => Promise<void>;
+  dispatchVoicePopoutControlAction: (
+    action: VoicePopoutControlAction,
+  ) => Promise<void>;
   onProtocolUrl: (listener: (url: string) => void) => () => void;
-  onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => () => void;
-  onVoicePopoutControlAction: (listener: (action: VoicePopoutControlAction) => void) => () => void;
+  onVoicePopoutState: (
+    listener: (state: VoicePopoutState) => void,
+  ) => () => void;
+  onVoicePopoutControlAction: (
+    listener: (action: VoicePopoutControlAction) => void,
+  ) => () => void;
 };
 
 declare global {

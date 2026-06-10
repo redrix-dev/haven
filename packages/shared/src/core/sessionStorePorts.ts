@@ -50,7 +50,9 @@ export type UiStoreState = {
   workspaceMode: WorkspaceMode;
   showHiddenMessages: boolean;
   friendsPanelOpen: boolean;
-  friendsPanelRequestedTab: import("@shared/types/types").FriendsPanelTab | null;
+  friendsPanelRequestedTab:
+    | import("@shared/types/types").FriendsPanelTab
+    | null;
   friendsPanelHighlightedRequestId: string | null;
   notificationsPanelOpen: boolean;
   setShowServerSettingsModal: (open: boolean) => void;
@@ -90,9 +92,7 @@ export type UserStatusStoreState = {
 
 export type SessionStorePort<S> = {
   getState: () => S;
-  subscribe: (
-    listener: (state: S, prevState: S) => void,
-  ) => () => void;
+  subscribe: (listener: (state: S, prevState: S) => void) => () => void;
 };
 
 export type AuthStorePort = SessionStorePort<AuthStoreState>;

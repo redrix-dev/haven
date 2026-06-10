@@ -113,9 +113,15 @@ function chooseCornerTarget(
 ): RestPosition {
   "worklet";
   if (Math.abs(vx) >= Math.abs(vy)) {
-    return { x: vx >= 0 ? maxX : minX, y: clamp(y + vy * THROW_PROJECTION_S, minY, maxY) };
+    return {
+      x: vx >= 0 ? maxX : minX,
+      y: clamp(y + vy * THROW_PROJECTION_S, minY, maxY),
+    };
   }
-  return { x: clamp(x + vx * THROW_PROJECTION_S, minX, maxX), y: vy >= 0 ? maxY : minY };
+  return {
+    x: clamp(x + vx * THROW_PROJECTION_S, minX, maxX),
+    y: vy >= 0 ? maxY : minY,
+  };
 }
 
 function QuickControl({
@@ -145,7 +151,11 @@ function QuickControl({
       <ThemedIonicons
         name={icon}
         size={22}
-        colorClassName={destructive || active ? "accent-primary-foreground" : "accent-foreground"}
+        colorClassName={
+          destructive || active
+            ? "accent-primary-foreground"
+            : "accent-foreground"
+        }
       />
     </Pressable>
   );
@@ -164,7 +174,8 @@ export function VoiceFloatingController({
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const themeTokens = useMobileThemeTokens();
-  const spinnerColor = resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff";
+  const spinnerColor =
+    resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff";
   const [controlsOpen, setControlsOpen] = useState(false);
   const [controlsMounted, setControlsMounted] = useState(false);
   const [restPosition, setRestPosition] = useState<RestPosition | null>(null);
@@ -202,7 +213,10 @@ export function VoiceFloatingController({
   const commitRestPosition = useCallback(
     (x: number, y: number) => {
       setRestPosition({ x, y });
-      onRestPositionCommit?.({ x: x + BUBBLE_SIZE / 2, y: y + BUBBLE_SIZE / 2 });
+      onRestPositionCommit?.({
+        x: x + BUBBLE_SIZE / 2,
+        y: y + BUBBLE_SIZE / 2,
+      });
     },
     [onRestPositionCommit],
   );
@@ -266,7 +280,8 @@ export function VoiceFloatingController({
           const minX = insets.left + EDGE_MARGIN;
           const maxX = layoutW.value - insets.right - BUBBLE_SIZE - EDGE_MARGIN;
           const minY = insets.top + EDGE_MARGIN;
-          const maxY = layoutH.value - insets.bottom - BUBBLE_SIZE - EDGE_MARGIN;
+          const maxY =
+            layoutH.value - insets.bottom - BUBBLE_SIZE - EDGE_MARGIN;
           const nextX = clamp(panStartX.value + event.translationX, minX, maxX);
           const nextY = clamp(panStartY.value + event.translationY, minY, maxY);
 
@@ -283,7 +298,8 @@ export function VoiceFloatingController({
           const minX = insets.left + EDGE_MARGIN;
           const maxX = layoutW.value - insets.right - BUBBLE_SIZE - EDGE_MARGIN;
           const minY = insets.top + EDGE_MARGIN;
-          const maxY = layoutH.value - insets.bottom - BUBBLE_SIZE - EDGE_MARGIN;
+          const maxY =
+            layoutH.value - insets.bottom - BUBBLE_SIZE - EDGE_MARGIN;
           const x = clamp(panStartX.value + event.translationX, minX, maxX);
           const y = clamp(panStartY.value + event.translationY, minY, maxY);
           const vx = event.velocityX;
@@ -296,17 +312,30 @@ export function VoiceFloatingController({
           translateY.value = y;
 
           if (strength >= CORNER_THROW_STRENGTH) {
-            const target = chooseCornerTarget(x, y, vx, vy, minX, maxX, minY, maxY);
+            const target = chooseCornerTarget(
+              x,
+              y,
+              vx,
+              vy,
+              minX,
+              maxX,
+              minY,
+              maxY,
+            );
             translateX.value = withClamp(
               { min: minX, max: maxX },
-              withSpring(target.x, { ...THROW_SETTLE_SPRING, velocity: vx }, (finished) => {
-                "worklet";
-                if (finished) {
-                  restX.value = target.x;
-                  restY.value = target.y;
-                  runOnJS(commitRestPosition)(target.x, target.y);
-                }
-              }),
+              withSpring(
+                target.x,
+                { ...THROW_SETTLE_SPRING, velocity: vx },
+                (finished) => {
+                  "worklet";
+                  if (finished) {
+                    restX.value = target.x;
+                    restY.value = target.y;
+                    runOnJS(commitRestPosition)(target.x, target.y);
+                  }
+                },
+              ),
             );
             translateY.value = withClamp(
               { min: minY, max: maxY },
@@ -373,10 +402,21 @@ export function VoiceFloatingController({
           runOnJS(commitRestPosition)(translateX.value, translateY.value);
           runOnJS(toggleControls)();
         }),
-    [commitRestPosition, interactive, restX, restY, toggleControls, translateX, translateY],
+    [
+      commitRestPosition,
+      interactive,
+      restX,
+      restY,
+      toggleControls,
+      translateX,
+      translateY,
+    ],
   );
 
-  const gesture = useMemo(() => Gesture.Race(panGesture, tapGesture), [panGesture, tapGesture]);
+  const gesture = useMemo(
+    () => Gesture.Race(panGesture, tapGesture),
+    [panGesture, tapGesture],
+  );
 
   const bubbleStyle = useAnimatedStyle(() => {
     const p = morphProgress ? morphProgress.value : 0;
@@ -390,7 +430,8 @@ export function VoiceFloatingController({
     // a fresh join opens straight into the panel with no bubble flash.
     const armedFactor = armed ? 1 : 0;
     return {
-      opacity: interpolate(p, [0, 0.6], [1, 0], Extrapolation.CLAMP) * armedFactor,
+      opacity:
+        interpolate(p, [0, 0.6], [1, 0], Extrapolation.CLAMP) * armedFactor,
       transform: [
         { translateX: baseX + (targetX - baseX) * p },
         { translateY: baseY + (targetY - baseY) * p },
@@ -401,12 +442,19 @@ export function VoiceFloatingController({
 
   const controlPlacement = useMemo<ControlPlacement | null>(() => {
     if (!restPosition) return null;
-    const clusterWidth = CONTROL_COUNT * CONTROL_SIZE + (CONTROL_COUNT - 1) * CONTROL_GAP;
+    const clusterWidth =
+      CONTROL_COUNT * CONTROL_SIZE + (CONTROL_COUNT - 1) * CONTROL_GAP;
     const desiredLeft = restPosition.x + BUBBLE_SIZE / 2 - clusterWidth / 2;
-    const left = clamp(desiredLeft, insets.left + EDGE_MARGIN, width - insets.right - EDGE_MARGIN - clusterWidth);
+    const left = clamp(
+      desiredLeft,
+      insets.left + EDGE_MARGIN,
+      width - insets.right - EDGE_MARGIN - clusterWidth,
+    );
     const spaceAbove = restPosition.y - insets.top;
     const spaceBelow = height - insets.bottom - (restPosition.y + BUBBLE_SIZE);
-    const above = spaceBelow < CONTROL_SIZE + CONTROL_CLUSTER_GAP && spaceAbove > spaceBelow;
+    const above =
+      spaceBelow < CONTROL_SIZE + CONTROL_CLUSTER_GAP &&
+      spaceAbove > spaceBelow;
     const top = above
       ? restPosition.y - CONTROL_CLUSTER_GAP - CONTROL_SIZE
       : restPosition.y + BUBBLE_SIZE + CONTROL_CLUSTER_GAP;
@@ -414,9 +462,21 @@ export function VoiceFloatingController({
       above,
       nearRightEdge: restPosition.x + BUBBLE_SIZE / 2 > width / 2,
       left,
-      top: clamp(top, insets.top + EDGE_MARGIN, height - insets.bottom - EDGE_MARGIN - CONTROL_SIZE),
+      top: clamp(
+        top,
+        insets.top + EDGE_MARGIN,
+        height - insets.bottom - EDGE_MARGIN - CONTROL_SIZE,
+      ),
     };
-  }, [height, insets.bottom, insets.left, insets.right, insets.top, restPosition, width]);
+  }, [
+    height,
+    insets.bottom,
+    insets.left,
+    insets.right,
+    insets.top,
+    restPosition,
+    width,
+  ]);
 
   useEffect(() => {
     if (controlsOpen && controlPlacement) {
@@ -441,23 +501,20 @@ export function VoiceFloatingController({
     };
   }, [controlPlacement, restPosition]);
 
-  const controlsRevealStyle = useAnimatedStyle(
-    () => {
-      const progress = controlsProgress.value;
-      const scale = 0.92 + progress * 0.08;
-      return {
-        opacity: progress,
-        transform: [
-          { translateX: controlAnchor.x },
-          { translateY: controlAnchor.y },
-          { scale },
-          { translateX: -controlAnchor.x },
-          { translateY: -controlAnchor.y },
-        ],
-      };
-    },
-    [controlAnchor.x, controlAnchor.y],
-  );
+  const controlsRevealStyle = useAnimatedStyle(() => {
+    const progress = controlsProgress.value;
+    const scale = 0.92 + progress * 0.08;
+    return {
+      opacity: progress,
+      transform: [
+        { translateX: controlAnchor.x },
+        { translateY: controlAnchor.y },
+        { scale },
+        { translateX: -controlAnchor.x },
+        { translateY: -controlAnchor.y },
+      ],
+    };
+  }, [controlAnchor.x, controlAnchor.y]);
 
   if (!active) return null;
 
@@ -499,7 +556,9 @@ export function VoiceFloatingController({
     <QuickControl
       key="open"
       label="Open voice panel"
-      icon={controlPlacement?.nearRightEdge ? "chevron-back" : "chevron-forward"}
+      icon={
+        controlPlacement?.nearRightEdge ? "chevron-back" : "chevron-forward"
+      }
       onPress={() => {
         setControlsOpen(false);
         onOpenFullSheet();
@@ -521,7 +580,10 @@ export function VoiceFloatingController({
         <Animated.View
           pointerEvents={controlsOpen ? "box-none" : "none"}
           className="absolute"
-          style={[{ left: controlPlacement.left, top: controlPlacement.top }, controlsRevealStyle]}
+          style={[
+            { left: controlPlacement.left, top: controlPlacement.top },
+            controlsRevealStyle,
+          ]}
         >
           <View className="flex-row gap-2 rounded-3xl border border-border-panel bg-surface-modal/95 p-1.5 shadow-lg">
             {orderedControls}
@@ -534,13 +596,20 @@ export function VoiceFloatingController({
           pointerEvents={interactive ? "auto" : "none"}
           entering={armed ? FadeIn.duration(160) : undefined}
           exiting={armed ? FadeOut.duration(120) : undefined}
-          style={[{ position: "absolute", height: BUBBLE_SIZE, width: BUBBLE_SIZE }, bubbleStyle]}
+          style={[
+            { position: "absolute", height: BUBBLE_SIZE, width: BUBBLE_SIZE },
+            bubbleStyle,
+          ]}
         >
           <View className="h-full w-full items-center justify-center rounded-full border border-border-panel bg-primary shadow-lg">
             {state.joining ? (
               <ActivityIndicator color={spinnerColor} size="small" />
             ) : (
-              <ThemedIonicons name={bubbleIcon} size={26} colorClassName="accent-primary-foreground" />
+              <ThemedIonicons
+                name={bubbleIcon}
+                size={26}
+                colorClassName="accent-primary-foreground"
+              />
             )}
             {participantCount > 0 ? (
               <View className="absolute -right-1 -top-1 min-w-6 rounded-full border border-border-panel bg-surface-modal px-1.5 py-0.5">

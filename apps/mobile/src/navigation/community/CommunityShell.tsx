@@ -93,7 +93,9 @@ export function CommunityShell({
     if (!pendingDmConversationId) return;
     if (handledDmConversationIdRef.current === pendingDmConversationId) return;
     handledDmConversationIdRef.current = pendingDmConversationId;
-    void dm.openConversation(pendingDmConversationId, { markRead: true }).catch(() => {});
+    void dm
+      .openConversation(pendingDmConversationId, { markRead: true })
+      .catch(() => {});
     switchToDm();
     shellRef.current?.setDrawerOpen(false);
     navigation.setParams({ pendingDmConversationId: undefined });
@@ -202,7 +204,7 @@ export function CommunityShell({
   );
 
   const community = useMemo(
-    () => (serverId ? servers.find((s) => s.id === serverId) ?? null : null),
+    () => (serverId ? (servers.find((s) => s.id === serverId) ?? null) : null),
     [serverId, servers],
   );
 
@@ -238,19 +240,19 @@ export function CommunityShell({
       navigation.setParams({ serverId: null, openDrawer: true });
     }
     shellRef.current?.setDrawerOpen(true);
-  }, [
-    communitiesLoading,
-    core,
-    navigation,
-    serverId,
-    servers,
-  ]);
+  }, [communitiesLoading, core, navigation, serverId, servers]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [communityActionsOpen, setCommunityActionsOpen] = useState(false);
-  const openCommunityActions = useCallback(() => setCommunityActionsOpen(true), []);
-  const closeCommunityActions = useCallback(() => setCommunityActionsOpen(false), []);
+  const openCommunityActions = useCallback(
+    () => setCommunityActionsOpen(true),
+    [],
+  );
+  const closeCommunityActions = useCallback(
+    () => setCommunityActionsOpen(false),
+    [],
+  );
   const openCreateCommunity = useCallback(() => setCreateOpen(true), []);
   const openJoinCommunity = useCallback(() => setJoinOpen(true), []);
   const chooseCreateCommunity = useCallback(() => {
@@ -307,7 +309,10 @@ export function CommunityShell({
       });
       shellRef.current?.setDrawerOpen(true);
       void core.prepareCommunityEntry(nextServerId).catch((error) => {
-        console.warn("[CommunityShell] prepare selected community failed", error);
+        console.warn(
+          "[CommunityShell] prepare selected community failed",
+          error,
+        );
         applyCommunityFocus(core, nextServerId);
       });
     },
@@ -341,7 +346,9 @@ export function CommunityShell({
         drawerContent={
           mode === "dm" ? (
             <DmInboxDrawer
-              onConversationSelected={() => shellRef.current?.setDrawerOpen(false)}
+              onConversationSelected={() =>
+                shellRef.current?.setDrawerOpen(false)
+              }
               onStartDirectMessage={onStartDirectMessage}
             />
           ) : (
@@ -362,11 +369,15 @@ export function CommunityShell({
         }
         topBar={
           mode === "dm" ? (
-            <DmTopBar onOpenDrawer={() => shellRef.current?.setDrawerOpen(true)} />
+            <DmTopBar
+              onOpenDrawer={() => shellRef.current?.setDrawerOpen(true)}
+            />
           ) : serverId ? (
             <CommunityTopBar
               communityName={community?.name ?? "Communities"}
-              selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
+              selectedChannelName={
+                currentRenderableChannel?.name ?? "Select channel"
+              }
               onPressCommunity={() => shellRef.current?.setDrawerOpen(true)}
               onPressChannel={() => shellRef.current?.setDrawerOpen(true)}
             />

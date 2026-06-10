@@ -59,9 +59,11 @@ export function MobileOnboardingGate({ children }: MobileOnboardingGateProps) {
 
   const completeCampaign = useCallback(() => {
     if (!campaign) return;
-    void core.completeOnboardingCampaign(campaign.key, context).catch((completeError) => {
-      console.warn("[MobileOnboardingGate] completion failed", completeError);
-    });
+    void core
+      .completeOnboardingCampaign(campaign.key, context)
+      .catch((completeError) => {
+        console.warn("[MobileOnboardingGate] completion failed", completeError);
+      });
   }, [campaign, context, core]);
 
   if (!loaded || loading || !assetsLoaded) {
@@ -82,7 +84,10 @@ export function MobileOnboardingGate({ children }: MobileOnboardingGateProps) {
         <Text className="mb-6 text-center text-sm leading-6 text-muted-foreground">
           {error}
         </Text>
-        <Pressable className="rounded-xl bg-primary px-6 py-3" onPress={loadCampaigns}>
+        <Pressable
+          className="rounded-xl bg-primary px-6 py-3"
+          onPress={loadCampaigns}
+        >
           <Text className="text-base font-semibold text-primary-foreground">
             Retry
           </Text>

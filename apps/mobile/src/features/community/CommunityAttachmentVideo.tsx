@@ -6,9 +6,19 @@ type CommunityAttachmentVideoProps = {
   style: StyleProp<ViewStyle>;
 };
 
-export function CommunityAttachmentVideo({ uri, style }: CommunityAttachmentVideoProps) {
+export function CommunityAttachmentVideo({
+  uri,
+  style,
+}: CommunityAttachmentVideoProps) {
   const player = useVideoPlayer(uri, (p) => {
     p.pause();
   });
-  return <VideoView player={player} style={style} nativeControls contentFit="contain" />;
+  return (
+    <VideoView
+      player={player}
+      style={style}
+      nativeControls
+      contentFit="contain"
+    />
+  );
 }

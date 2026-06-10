@@ -20,7 +20,8 @@ export function useChatComposerColors(): ChatComposerColors {
   return useMemo(
     () => ({
       iconMuted: resolveColorProp(themeTokens, "text-dim") ?? "#8b9cbb",
-      iconOnPrimary: resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff",
+      iconOnPrimary:
+        resolveColorProp(themeTokens, "primary-foreground") ?? "#ffffff",
       placeholder: resolveColorProp(themeTokens, "text-dim") ?? "#8e8e93",
       cursor: resolveColorProp(themeTokens, "foreground") ?? "#e6edf7",
       link: resolveColorProp(themeTokens, "primary") ?? "#3F79D8",

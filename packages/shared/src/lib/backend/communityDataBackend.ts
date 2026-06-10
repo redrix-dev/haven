@@ -1,5 +1,5 @@
-import type { HavenSupabaseClient } from '@shared/lib/createHavenSupabaseClient';
-import type { Database } from '@shared/types/database';
+import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
+import type { Database } from "@shared/types/database";
 import type { MessageObjectStore } from "./messageObjectStore";
 import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
 import { createPortableUuid } from "../runtime/uuid";
@@ -39,31 +39,42 @@ import type {
   LinkPreviewEmbedProvider,
   KickCommunityMemberResult,
   MessageBundle,
-} from './types';
+} from "./types";
 import type {
   CommunityDataBackend,
   MessagePageCursor,
   MessagePageResult,
-} from './communityDataBackend.interface';
+} from "./communityDataBackend.interface";
 
 export type {
   CommunityDataBackend,
   MessagePageCursor,
   MessagePageResult,
-} from './communityDataBackend.interface';
+} from "./communityDataBackend.interface";
 
 type CommunityMemberWithProfile = Pick<
-  Database['public']['Tables']['community_members']['Row'],
-  'id' | 'nickname' | 'is_owner' | 'user_id' | 'joined_at'
+  Database["public"]["Tables"]["community_members"]["Row"],
+  "id" | "nickname" | "is_owner" | "user_id" | "joined_at"
 > & {
   profiles:
-    | Pick<Database['public']['Tables']['profiles']['Row'], 'username' | 'avatar_url'>
-    | Array<Pick<Database['public']['Tables']['profiles']['Row'], 'username' | 'avatar_url'>>
+    | Pick<
+        Database["public"]["Tables"]["profiles"]["Row"],
+        "username" | "avatar_url"
+      >
+    | Array<
+        Pick<
+          Database["public"]["Tables"]["profiles"]["Row"],
+          "username" | "avatar_url"
+        >
+      >
     | null;
 };
 
 let havenCommunityClient: HavenSupabaseClient | null = null;
-let havenCommunityEdgeConfig: { supabaseUrl: string; supabaseAnonKey: string } | null = null;
+let havenCommunityEdgeConfig: {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+} | null = null;
 let havenCommunityMedia: MediaAttachmentHelpers | null = null;
 let havenCommunityObjectStore: MessageObjectStore | null = null;
 
@@ -82,7 +93,7 @@ export function configureCommunityDataBackendRuntime(input: {
 function havenCommunitySb(): HavenSupabaseClient {
   if (!havenCommunityClient) {
     throw new Error(
-      'Community data backend used before Haven data runtime was initialized.',
+      "Community data backend used before Haven data runtime was initialized.",
     );
   }
   return havenCommunityClient;
@@ -90,48 +101,53 @@ function havenCommunitySb(): HavenSupabaseClient {
 
 function havenCommunityMediaHelpers(): MediaAttachmentHelpers {
   if (!havenCommunityMedia) {
-    throw new Error('Community media helpers not configured.');
+    throw new Error("Community media helpers not configured.");
   }
   return havenCommunityMedia;
 }
 
 function havenCommunityStore(): MessageObjectStore {
   if (!havenCommunityObjectStore) {
-    throw new Error('Community message object store not configured.');
+    throw new Error("Community message object store not configured.");
   }
   return havenCommunityObjectStore;
 }
 
-const MESSAGE_MEDIA_BUCKET = 'message-media';
-const LINK_PREVIEW_IMAGE_BUCKET = 'link-preview-images';
+const MESSAGE_MEDIA_BUCKET = "message-media";
+const LINK_PREVIEW_IMAGE_BUCKET = "link-preview-images";
 
-const deriveMessageMediaKindFromMimeType = (mimeType: string): 'image' | 'video' | 'file' => {
-  const base = mimeType.toLowerCase().split(';')[0]?.trim() ?? '';
-  if (base.startsWith('image/')) return 'image';
-  if (base.startsWith('video/')) return 'video';
-  return 'file';
+const deriveMessageMediaKindFromMimeType = (
+  mimeType: string,
+): "image" | "video" | "file" => {
+  const base = mimeType.toLowerCase().split(";")[0]?.trim() ?? "";
+  if (base.startsWith("image/")) return "image";
+  if (base.startsWith("video/")) return "video";
+  return "file";
 };
 
-const deriveMessageMediaStorageExtension = (mimeType: string, filename?: string): string => {
+const deriveMessageMediaStorageExtension = (
+  mimeType: string,
+  filename?: string,
+): string => {
   const trimmedName = filename?.trim();
-  if (trimmedName && trimmedName.includes('.')) {
-    const ext = trimmedName.slice(trimmedName.lastIndexOf('.'));
+  if (trimmedName && trimmedName.includes(".")) {
+    const ext = trimmedName.slice(trimmedName.lastIndexOf("."));
     if (ext.length >= 2 && ext.length <= 12) {
-      return ext.startsWith('.') ? ext : `.${ext}`;
+      return ext.startsWith(".") ? ext : `.${ext}`;
     }
   }
-  const base = mimeType.toLowerCase().split(';')[0]?.trim() ?? '';
+  const base = mimeType.toLowerCase().split(";")[0]?.trim() ?? "";
   const mimeMap: Record<string, string> = {
-    'image/jpeg': '.jpg',
-    'image/jpg': '.jpg',
-    'image/png': '.png',
-    'image/gif': '.gif',
-    'image/webp': '.webp',
-    'video/mp4': '.mp4',
-    'video/webm': '.webm',
-    'application/pdf': '.pdf',
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "application/pdf": ".pdf",
   };
-  return mimeMap[base] ?? '.bin';
+  return mimeMap[base] ?? ".bin";
 };
 
 const buildMessageMediaObjectPath = (input: {
@@ -140,7 +156,10 @@ const buildMessageMediaObjectPath = (input: {
   mimeType: string;
   filename?: string;
 }): string => {
-  const ext = deriveMessageMediaStorageExtension(input.mimeType, input.filename);
+  const ext = deriveMessageMediaStorageExtension(
+    input.mimeType,
+    input.filename,
+  );
   const stamp = Date.now();
   const random = createPortableUuid();
   return `${input.communityId}/${input.channelId}/${stamp}-${random}${ext}`;
@@ -164,7 +183,7 @@ type MessageAttachmentRow = {
   object_path: string;
   original_filename: string | null;
   mime_type: string;
-  media_kind: 'image' | 'video' | 'file';
+  media_kind: "image" | "video" | "file";
   size_bytes: number;
   created_at: string;
   expires_at: string;
@@ -192,7 +211,9 @@ type MessageLinkPreviewRow = {
   updated_at: string;
 };
 
-type MessageLinkPreviewThumbnail = NonNullable<LinkPreviewSnapshot['thumbnail']>;
+type MessageLinkPreviewThumbnail = NonNullable<
+  LinkPreviewSnapshot["thumbnail"]
+>;
 
 type BanCommunityMemberRpcRow = {
   banned_user_id?: unknown;
@@ -219,34 +240,38 @@ type ListCommunityBansRpcRow = {
 };
 
 type ReportProfileRow = Pick<
-  Database['public']['Tables']['profiles']['Row'],
-  'id' | 'username' | 'avatar_url'
+  Database["public"]["Tables"]["profiles"]["Row"],
+  "id" | "username" | "avatar_url"
 >;
 
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
 const asOptionalString = (value: unknown): string | null =>
-  typeof value === 'string' && value.trim().length > 0 ? value : null;
+  typeof value === "string" && value.trim().length > 0 ? value : null;
 
 const asOptionalNumber = (value: unknown): number | null =>
-  typeof value === 'number' && Number.isFinite(value) ? value : null;
+  typeof value === "number" && Number.isFinite(value) ? value : null;
 
-const normalizeLinkPreviewSnapshot = (value: unknown): LinkPreviewSnapshot | null => {
+const normalizeLinkPreviewSnapshot = (
+  value: unknown,
+): LinkPreviewSnapshot | null => {
   const obj = asObjectRecord(value);
   if (!obj) return null;
 
   const thumbnailObj = asObjectRecord(obj.thumbnail);
   const embedObj = asObjectRecord(obj.embed);
   const embedProvider =
-    embedObj?.provider === 'youtube' || embedObj?.provider === 'vimeo'
+    embedObj?.provider === "youtube" || embedObj?.provider === "vimeo"
       ? embedObj.provider
       : null;
 
-  const embed: LinkPreviewSnapshot['embed'] =
+  const embed: LinkPreviewSnapshot["embed"] =
     embedObj &&
     embedProvider &&
-    typeof embedObj.embedUrl === 'string' &&
+    typeof embedObj.embedUrl === "string" &&
     embedObj.embedUrl.trim().length > 0
       ? {
           provider: embedProvider,
@@ -284,23 +309,29 @@ const normalizeLinkPreviewSnapshot = (value: unknown): LinkPreviewSnapshot | nul
   };
 };
 
-const getReplyToMessageId = (message: Pick<Message, 'metadata'>): string | null => {
+const getReplyToMessageId = (
+  message: Pick<Message, "metadata">,
+): string | null => {
   const metadata = asObjectRecord(message.metadata);
   const replyToMessageId = metadata?.replyToMessageId;
-  return typeof replyToMessageId === 'string' && replyToMessageId.trim().length > 0
+  return typeof replyToMessageId === "string" &&
+    replyToMessageId.trim().length > 0
     ? replyToMessageId
     : null;
 };
 
-const compareMessagesByCreatedAt = (left: Pick<Message, 'created_at' | 'id'>, right: Pick<Message, 'created_at' | 'id'>): number => {
+const compareMessagesByCreatedAt = (
+  left: Pick<Message, "created_at" | "id">,
+  right: Pick<Message, "created_at" | "id">,
+): number => {
   const createdAtComparison = left.created_at.localeCompare(right.created_at);
   if (createdAtComparison !== 0) return createdAtComparison;
   return left.id.localeCompare(right.id);
 };
 
 const toSupportReportSnapshotMessage = (
-  message: Pick<Message, 'id' | 'content' | 'author_user_id' | 'created_at'>,
-  profile: ReportProfileRow | null
+  message: Pick<Message, "id" | "content" | "author_user_id" | "created_at">,
+  profile: ReportProfileRow | null,
 ): SupportReportSnapshotMessage => ({
   id: message.id,
   content: message.content,
@@ -310,24 +341,32 @@ const toSupportReportSnapshotMessage = (
   createdAt: message.created_at,
 });
 
-const listProfileSnapshotsByUserId = async (userIds: readonly (string | null | undefined)[]) => {
+const listProfileSnapshotsByUserId = async (
+  userIds: readonly (string | null | undefined)[],
+) => {
   const uniqueUserIds = Array.from(
-    new Set(userIds.filter((userId): userId is string => typeof userId === 'string' && userId.length > 0))
+    new Set(
+      userIds.filter(
+        (userId): userId is string =>
+          typeof userId === "string" && userId.length > 0,
+      ),
+    ),
   );
   if (uniqueUserIds.length === 0) {
     return new Map<string, ReportProfileRow>();
   }
 
-  const { data, error } = await havenCommunitySb().from('profiles')
-    .select('id, username, avatar_url')
-    .in('id', uniqueUserIds);
+  const { data, error } = await havenCommunitySb()
+    .from("profiles")
+    .select("id, username, avatar_url")
+    .in("id", uniqueUserIds);
   if (error) throw error;
 
   return new Map((data ?? []).map((row) => [row.id, row as ReportProfileRow]));
 };
 
 const fetchSupportReportProfileSnapshot = async (
-  targetUserId: string
+  targetUserId: string,
 ): Promise<SupportReportProfileSnapshot> => {
   const profileByUserId = await listProfileSnapshotsByUserId([targetUserId]);
   const profile = profileByUserId.get(targetUserId) ?? null;
@@ -345,13 +384,15 @@ const fetchSupportReportMessageSnapshot = async (input: {
   channelId: string;
   messageId: string;
 }): Promise<SupportReportMessageSnapshot | null> => {
-  const { data: reportedMessage, error: reportedMessageError } = await havenCommunitySb().from('messages')
-    .select('*')
-    .eq('community_id', input.communityId)
-    .eq('channel_id', input.channelId)
-    .eq('id', input.messageId)
-    .is('deleted_at', null)
-    .maybeSingle();
+  const { data: reportedMessage, error: reportedMessageError } =
+    await havenCommunitySb()
+      .from("messages")
+      .select("*")
+      .eq("community_id", input.communityId)
+      .eq("channel_id", input.channelId)
+      .eq("id", input.messageId)
+      .is("deleted_at", null)
+      .maybeSingle();
   if (reportedMessageError) throw reportedMessageError;
   if (!reportedMessage) return null;
 
@@ -359,17 +400,21 @@ const fetchSupportReportMessageSnapshot = async (input: {
   let orderedContextMessages: Message[] = [];
 
   if (replyToMessageId) {
-    const { data: channelMessages, error: channelMessagesError } = await havenCommunitySb().from('messages')
-      .select('*')
-      .eq('community_id', input.communityId)
-      .eq('channel_id', input.channelId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true })
-      .order('id', { ascending: true });
+    const { data: channelMessages, error: channelMessagesError } =
+      await havenCommunitySb()
+        .from("messages")
+        .select("*")
+        .eq("community_id", input.communityId)
+        .eq("channel_id", input.channelId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
     if (channelMessagesError) throw channelMessagesError;
 
     const messages = (channelMessages ?? []) as Message[];
-    const messageById = new Map(messages.map((message) => [message.id, message]));
+    const messageById = new Map(
+      messages.map((message) => [message.id, message]),
+    );
     const childIdsByParentId = new Map<string, string[]>();
 
     for (const message of messages) {
@@ -418,22 +463,26 @@ const fetchSupportReportMessageSnapshot = async (input: {
     const [
       { data: contextBeforeRows, error: contextBeforeError },
       { data: contextAfterRows, error: contextAfterError },
-    ] = await Promise.all([havenCommunitySb().from('messages')
-        .select('*')
-        .eq('community_id', input.communityId)
-        .eq('channel_id', input.channelId)
-        .is('deleted_at', null)
+    ] = await Promise.all([
+      havenCommunitySb()
+        .from("messages")
+        .select("*")
+        .eq("community_id", input.communityId)
+        .eq("channel_id", input.channelId)
+        .is("deleted_at", null)
         .or(beforeFilter)
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(5),havenCommunitySb().from('messages')
-        .select('*')
-        .eq('community_id', input.communityId)
-        .eq('channel_id', input.channelId)
-        .is('deleted_at', null)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(5),
+      havenCommunitySb()
+        .from("messages")
+        .select("*")
+        .eq("community_id", input.communityId)
+        .eq("channel_id", input.channelId)
+        .is("deleted_at", null)
         .or(afterFilter)
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
         .limit(5),
     ]);
     if (contextBeforeError) throw contextBeforeError;
@@ -447,43 +496,51 @@ const fetchSupportReportMessageSnapshot = async (input: {
   }
 
   const authorProfilesByUserId = await listProfileSnapshotsByUserId(
-    orderedContextMessages.map((message) => message.author_user_id)
+    orderedContextMessages.map((message) => message.author_user_id),
   );
-  const reportedMessageIndex = orderedContextMessages.findIndex((message) => message.id === reportedMessage.id);
-  const safeReportedMessageIndex = reportedMessageIndex >= 0 ? reportedMessageIndex : 0;
+  const reportedMessageIndex = orderedContextMessages.findIndex(
+    (message) => message.id === reportedMessage.id,
+  );
+  const safeReportedMessageIndex =
+    reportedMessageIndex >= 0 ? reportedMessageIndex : 0;
 
   return {
     reportedMessage: toSupportReportSnapshotMessage(
       reportedMessage,
-      authorProfilesByUserId.get(reportedMessage.author_user_id ?? '') ?? null
+      authorProfilesByUserId.get(reportedMessage.author_user_id ?? "") ?? null,
     ),
     contextBefore: orderedContextMessages
       .slice(0, safeReportedMessageIndex)
       .map((message) =>
         toSupportReportSnapshotMessage(
           message,
-          authorProfilesByUserId.get(message.author_user_id ?? '') ?? null
-        )
+          authorProfilesByUserId.get(message.author_user_id ?? "") ?? null,
+        ),
       ),
     contextAfter: orderedContextMessages
       .slice(safeReportedMessageIndex + 1)
       .map((message) =>
         toSupportReportSnapshotMessage(
           message,
-          authorProfilesByUserId.get(message.author_user_id ?? '') ?? null
-        )
+          authorProfilesByUserId.get(message.author_user_id ?? "") ?? null,
+        ),
       ),
     capturedAt: new Date().toISOString(),
   };
 };
 
-const supabaseFunctionJson = async <TResponse>(functionName: string, body: unknown): Promise<TResponse> => {
+const supabaseFunctionJson = async <TResponse>(
+  functionName: string,
+  body: unknown,
+): Promise<TResponse> => {
   if (!havenCommunityEdgeConfig) {
-    throw new Error('Supabase edge configuration missing for community backend.');
+    throw new Error(
+      "Supabase edge configuration missing for community backend.",
+    );
   }
   const { supabaseUrl, supabaseAnonKey } = havenCommunityEdgeConfig;
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase URL or key is missing.');
+    throw new Error("Supabase URL or key is missing.");
   }
 
   const getAccessToken = async (): Promise<string> => {
@@ -494,25 +551,30 @@ const supabaseFunctionJson = async <TResponse>(functionName: string, body: unkno
     if (sessionError) throw sessionError;
     const accessToken = session?.access_token;
     if (!accessToken) {
-      throw new Error('No authenticated session token available.');
+      throw new Error("No authenticated session token available.");
     }
     return accessToken;
   };
 
-  const callWithToken = async (accessToken: string): Promise<{
+  const callWithToken = async (
+    accessToken: string,
+  ): Promise<{
     ok: boolean;
     status: number;
     parsed: unknown;
   }> => {
-    const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${accessToken}`,
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/${functionName}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(body ?? {}),
       },
-      body: JSON.stringify(body ?? {}),
-    });
+    );
 
     const rawBody = await response.text();
     let parsed: unknown = null;
@@ -534,13 +596,17 @@ const supabaseFunctionJson = async <TResponse>(functionName: string, body: unkno
   let result = await callWithToken(await getAccessToken());
 
   const errorMessageFromParsed = (parsed: unknown, status: number): string =>
-    parsed && typeof parsed === 'object' && 'message' in parsed && typeof (parsed as { message: unknown }).message === 'string'
+    parsed &&
+    typeof parsed === "object" &&
+    "message" in parsed &&
+    typeof (parsed as { message: unknown }).message === "string"
       ? (parsed as { message: string }).message
       : `Function ${functionName} failed (${status}).`;
 
   if (!result.ok && result.status === 401) {
     try {
-      const { data: refreshed, error: refreshError } = await havenCommunitySb().auth.refreshSession();
+      const { data: refreshed, error: refreshError } =
+        await havenCommunitySb().auth.refreshSession();
       if (!refreshError && refreshed.session?.access_token) {
         result = await callWithToken(refreshed.session.access_token);
       }
@@ -561,7 +627,9 @@ const sleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
-const waitForConfirmedSupabaseSession = async (timeoutMs = 4000): Promise<boolean> => {
+const waitForConfirmedSupabaseSession = async (
+  timeoutMs = 4000,
+): Promise<boolean> => {
   const startedAt = Date.now();
   let refreshAttempted = false;
 
@@ -572,7 +640,8 @@ const waitForConfirmedSupabaseSession = async (timeoutMs = 4000): Promise<boolea
     } = await havenCommunitySb().auth.getSession();
 
     if (!sessionError && session?.access_token) {
-      const { data: userData, error: userError } = await havenCommunitySb().auth.getUser(session.access_token);
+      const { data: userData, error: userError } =
+        await havenCommunitySb().auth.getUser(session.access_token);
       if (!userError && userData.user) {
         return true;
       }
@@ -581,11 +650,13 @@ const waitForConfirmedSupabaseSession = async (timeoutMs = 4000): Promise<boolea
     if (!refreshAttempted) {
       refreshAttempted = true;
       try {
-        const { data: refreshed, error: refreshError } = await havenCommunitySb().auth.refreshSession();
+        const { data: refreshed, error: refreshError } =
+          await havenCommunitySb().auth.refreshSession();
         if (!refreshError && refreshed.session?.access_token) {
-          const { data: refreshedUser, error: refreshedUserError } = await havenCommunitySb().auth.getUser(
-            refreshed.session.access_token
-          );
+          const { data: refreshedUser, error: refreshedUserError } =
+            await havenCommunitySb().auth.getUser(
+              refreshed.session.access_token,
+            );
           if (!refreshedUserError && refreshedUser.user) {
             return true;
           }
@@ -601,7 +672,9 @@ const waitForConfirmedSupabaseSession = async (timeoutMs = 4000): Promise<boolea
   return false;
 };
 
-const mapMessageReactionRows = (rows: MessageReactionRow[]): MessageReaction[] =>
+const mapMessageReactionRows = (
+  rows: MessageReactionRow[],
+): MessageReaction[] =>
   rows.map((row) => ({
     id: row.id,
     messageId: row.message_id,
@@ -621,32 +694,36 @@ const normalizeReactionsFromRpc = (value: unknown): MessageReaction[] => {
   for (const item of value) {
     const r = asObjectRecord(item);
     if (!r) continue;
-    const id = typeof r.id === 'string' ? r.id : null;
-    const messageId = typeof r.message_id === 'string' ? r.message_id : null;
-    const userId = typeof r.user_id === 'string' ? r.user_id : null;
-    const emoji = typeof r.emoji === 'string' ? r.emoji : null;
-    const createdAt = typeof r.created_at === 'string' ? r.created_at : null;
+    const id = typeof r.id === "string" ? r.id : null;
+    const messageId = typeof r.message_id === "string" ? r.message_id : null;
+    const userId = typeof r.user_id === "string" ? r.user_id : null;
+    const emoji = typeof r.emoji === "string" ? r.emoji : null;
+    const createdAt = typeof r.created_at === "string" ? r.created_at : null;
     if (!id || !messageId || !userId || !emoji || !createdAt) continue;
     out.push({ id, messageId, userId, emoji, createdAt });
   }
   return out;
 };
 
-const parseMessageAttachmentRowFromRpcJson = (value: unknown): MessageAttachmentRow | null => {
+const parseMessageAttachmentRowFromRpcJson = (
+  value: unknown,
+): MessageAttachmentRow | null => {
   const r = asObjectRecord(value);
   if (!r) return null;
-  const id = typeof r.id === 'string' ? r.id : null;
-  const message_id = typeof r.message_id === 'string' ? r.message_id : null;
-  const community_id = typeof r.community_id === 'string' ? r.community_id : null;
-  const channel_id = typeof r.channel_id === 'string' ? r.channel_id : null;
-  const owner_user_id = typeof r.owner_user_id === 'string' ? r.owner_user_id : null;
-  const bucket_name = typeof r.bucket_name === 'string' ? r.bucket_name : null;
-  const object_path = typeof r.object_path === 'string' ? r.object_path : null;
-  const mime_type = typeof r.mime_type === 'string' ? r.mime_type : null;
+  const id = typeof r.id === "string" ? r.id : null;
+  const message_id = typeof r.message_id === "string" ? r.message_id : null;
+  const community_id =
+    typeof r.community_id === "string" ? r.community_id : null;
+  const channel_id = typeof r.channel_id === "string" ? r.channel_id : null;
+  const owner_user_id =
+    typeof r.owner_user_id === "string" ? r.owner_user_id : null;
+  const bucket_name = typeof r.bucket_name === "string" ? r.bucket_name : null;
+  const object_path = typeof r.object_path === "string" ? r.object_path : null;
+  const mime_type = typeof r.mime_type === "string" ? r.mime_type : null;
   const media_kind = r.media_kind;
-  const size_bytes = typeof r.size_bytes === 'number' ? r.size_bytes : null;
-  const created_at = typeof r.created_at === 'string' ? r.created_at : null;
-  const expires_at = typeof r.expires_at === 'string' ? r.expires_at : null;
+  const size_bytes = typeof r.size_bytes === "number" ? r.size_bytes : null;
+  const created_at = typeof r.created_at === "string" ? r.created_at : null;
+  const expires_at = typeof r.expires_at === "string" ? r.expires_at : null;
   if (
     !id ||
     !message_id ||
@@ -656,7 +733,9 @@ const parseMessageAttachmentRowFromRpcJson = (value: unknown): MessageAttachment
     !bucket_name ||
     !object_path ||
     !mime_type ||
-    (media_kind !== 'image' && media_kind !== 'video' && media_kind !== 'file') ||
+    (media_kind !== "image" &&
+      media_kind !== "video" &&
+      media_kind !== "file") ||
     size_bytes == null ||
     !created_at ||
     !expires_at
@@ -675,7 +754,7 @@ const parseMessageAttachmentRowFromRpcJson = (value: unknown): MessageAttachment
     original_filename:
       r.original_filename === null || r.original_filename === undefined
         ? null
-        : typeof r.original_filename === 'string'
+        : typeof r.original_filename === "string"
           ? r.original_filename
           : null,
     mime_type,
@@ -686,15 +765,18 @@ const parseMessageAttachmentRowFromRpcJson = (value: unknown): MessageAttachment
   };
 };
 
-const parseMessageLinkPreviewRowFromRpcJson = (value: unknown): MessageLinkPreviewRow | null => {
+const parseMessageLinkPreviewRowFromRpcJson = (
+  value: unknown,
+): MessageLinkPreviewRow | null => {
   const r = asObjectRecord(value);
   if (!r) return null;
-  const id = typeof r.id === 'string' ? r.id : null;
-  const message_id = typeof r.message_id === 'string' ? r.message_id : null;
-  const community_id = typeof r.community_id === 'string' ? r.community_id : null;
-  const channel_id = typeof r.channel_id === 'string' ? r.channel_id : null;
-  const created_at = typeof r.created_at === 'string' ? r.created_at : null;
-  const updated_at = typeof r.updated_at === 'string' ? r.updated_at : null;
+  const id = typeof r.id === "string" ? r.id : null;
+  const message_id = typeof r.message_id === "string" ? r.message_id : null;
+  const community_id =
+    typeof r.community_id === "string" ? r.community_id : null;
+  const channel_id = typeof r.channel_id === "string" ? r.channel_id : null;
+  const created_at = typeof r.created_at === "string" ? r.created_at : null;
+  const updated_at = typeof r.updated_at === "string" ? r.updated_at : null;
   const status = r.status;
   const embed_provider = r.embed_provider;
   if (
@@ -704,11 +786,13 @@ const parseMessageLinkPreviewRowFromRpcJson = (value: unknown): MessageLinkPrevi
     !channel_id ||
     !created_at ||
     !updated_at ||
-    (status !== 'pending' &&
-      status !== 'ready' &&
-      status !== 'unsupported' &&
-      status !== 'failed') ||
-    (embed_provider !== 'none' && embed_provider !== 'youtube' && embed_provider !== 'vimeo')
+    (status !== "pending" &&
+      status !== "ready" &&
+      status !== "unsupported" &&
+      status !== "failed") ||
+    (embed_provider !== "none" &&
+      embed_provider !== "youtube" &&
+      embed_provider !== "vimeo")
   ) {
     return null;
   }
@@ -721,20 +805,20 @@ const parseMessageLinkPreviewRowFromRpcJson = (value: unknown): MessageLinkPrevi
     source_url:
       r.source_url === null || r.source_url === undefined
         ? null
-        : typeof r.source_url === 'string'
+        : typeof r.source_url === "string"
           ? r.source_url
           : null,
     normalized_url:
       r.normalized_url === null || r.normalized_url === undefined
         ? null
-        : typeof r.normalized_url === 'string'
+        : typeof r.normalized_url === "string"
           ? r.normalized_url
           : null,
     status,
     cache_id:
       r.cache_id === null || r.cache_id === undefined
         ? null
-        : typeof r.cache_id === 'string'
+        : typeof r.cache_id === "string"
           ? r.cache_id
           : null,
     snapshot: r.snapshot,
@@ -742,13 +826,13 @@ const parseMessageLinkPreviewRowFromRpcJson = (value: unknown): MessageLinkPrevi
     thumbnail_bucket_name:
       r.thumbnail_bucket_name === null || r.thumbnail_bucket_name === undefined
         ? null
-        : typeof r.thumbnail_bucket_name === 'string'
+        : typeof r.thumbnail_bucket_name === "string"
           ? r.thumbnail_bucket_name
           : null,
     thumbnail_object_path:
       r.thumbnail_object_path === null || r.thumbnail_object_path === undefined
         ? null
-        : typeof r.thumbnail_object_path === 'string'
+        : typeof r.thumbnail_object_path === "string"
           ? r.thumbnail_object_path
           : null,
     created_at,
@@ -757,18 +841,22 @@ const parseMessageLinkPreviewRowFromRpcJson = (value: unknown): MessageLinkPrevi
 };
 
 const mapMessageAttachmentRowsWithSignedUrls = async (
-  attachmentRows: MessageAttachmentRow[]
+  attachmentRows: MessageAttachmentRow[],
 ): Promise<MessageAttachment[]> => {
   if (attachmentRows.length === 0) return [];
 
   let signedUrlByBucketAndPath = new Map<string, string>();
   try {
-    signedUrlByBucketAndPath = await havenCommunityMediaHelpers().createSignedUrlMap(
-      attachmentRows,
-      60 * 60,
-    );
+    signedUrlByBucketAndPath =
+      await havenCommunityMediaHelpers().createSignedUrlMap(
+        attachmentRows,
+        60 * 60,
+      );
   } catch (signedError) {
-    console.error('Failed to create signed URLs for message attachments:', signedError);
+    console.error(
+      "Failed to create signed URLs for message attachments:",
+      signedError,
+    );
   }
 
   return attachmentRows.map((row) => ({
@@ -785,20 +873,24 @@ const mapMessageAttachmentRowsWithSignedUrls = async (
     sizeBytes: row.size_bytes,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
-    signedUrl: signedUrlByBucketAndPath.get(`${row.bucket_name}/${row.object_path}`) ?? null,
+    signedUrl:
+      signedUrlByBucketAndPath.get(`${row.bucket_name}/${row.object_path}`) ??
+      null,
   }));
 };
 
 const mapMessageLinkPreviewRowsWithSignedUrls = async (
-  previewRows: MessageLinkPreviewRow[]
+  previewRows: MessageLinkPreviewRow[],
 ): Promise<MessageLinkPreview[]> => {
   if (previewRows.length === 0) return [];
 
   const pathsByBucket = new Map<string, string[]>();
   for (const row of previewRows) {
     const snapshot = normalizeLinkPreviewSnapshot(row.snapshot);
-    const bucketName = row.thumbnail_bucket_name ?? snapshot?.thumbnail?.bucketName ?? null;
-    const objectPath = row.thumbnail_object_path ?? snapshot?.thumbnail?.objectPath ?? null;
+    const bucketName =
+      row.thumbnail_bucket_name ?? snapshot?.thumbnail?.bucketName ?? null;
+    const objectPath =
+      row.thumbnail_object_path ?? snapshot?.thumbnail?.objectPath ?? null;
     if (!bucketName || !objectPath) continue;
     if (bucketName !== LINK_PREVIEW_IMAGE_BUCKET) continue;
     const existing = pathsByBucket.get(bucketName) ?? [];
@@ -809,22 +901,31 @@ const mapMessageLinkPreviewRowsWithSignedUrls = async (
   const signedUrlByBucketAndPath = new Map<string, string>();
   for (const [bucketName, paths] of pathsByBucket.entries()) {
     try {
-      const signedRowsByPath = await havenCommunityStore().createSignedUrls(bucketName, paths, 60 * 30);
+      const signedRowsByPath = await havenCommunityStore().createSignedUrls(
+        bucketName,
+        paths,
+        60 * 30,
+      );
       for (const [path, signedUrl] of Object.entries(signedRowsByPath)) {
         signedUrlByBucketAndPath.set(`${bucketName}/${path}`, signedUrl);
       }
     } catch (signedError) {
-      console.warn('Failed to create signed URLs for link preview thumbnails:', signedError);
+      console.warn(
+        "Failed to create signed URLs for link preview thumbnails:",
+        signedError,
+      );
     }
   }
 
   return previewRows.map((row) => {
     const snapshot = normalizeLinkPreviewSnapshot(row.snapshot);
-    const bucketName = row.thumbnail_bucket_name ?? snapshot?.thumbnail?.bucketName ?? null;
-    const objectPath = row.thumbnail_object_path ?? snapshot?.thumbnail?.objectPath ?? null;
+    const bucketName =
+      row.thumbnail_bucket_name ?? snapshot?.thumbnail?.bucketName ?? null;
+    const objectPath =
+      row.thumbnail_object_path ?? snapshot?.thumbnail?.objectPath ?? null;
     const signedUrl =
       bucketName && objectPath
-        ? signedUrlByBucketAndPath.get(`${bucketName}/${objectPath}`) ?? null
+        ? (signedUrlByBucketAndPath.get(`${bucketName}/${objectPath}`) ?? null)
         : null;
 
     const normalizedSnapshot: LinkPreviewSnapshot | null = snapshot
@@ -874,15 +975,21 @@ const mapChannelMessageRpcRowsToBundles = async (
     if (prev) previewRows.push(prev);
   }
 
-  const signedAttachments = await mapMessageAttachmentRowsWithSignedUrls(attachmentRows);
-  const signedPreviews = await mapMessageLinkPreviewRowsWithSignedUrls(previewRows);
-  const attByMessageId = new Map(signedAttachments.map((a) => [a.messageId, a]));
-  const previewByMessageId = new Map(signedPreviews.map((p) => [p.messageId, p]));
+  const signedAttachments =
+    await mapMessageAttachmentRowsWithSignedUrls(attachmentRows);
+  const signedPreviews =
+    await mapMessageLinkPreviewRowsWithSignedUrls(previewRows);
+  const attByMessageId = new Map(
+    signedAttachments.map((a) => [a.messageId, a]),
+  );
+  const previewByMessageId = new Map(
+    signedPreviews.map((p) => [p.messageId, p]),
+  );
 
   return rows.map((row) => {
     const id = asOptionalString(row.id);
     if (!id) {
-      throw new Error('channel message RPC returned a row without id');
+      throw new Error("channel message RPC returned a row without id");
     }
 
     return {
@@ -892,28 +999,30 @@ const mapChannelMessageRpcRowsToBundles = async (
         row.author_user_id === null || row.author_user_id === undefined
           ? null
           : String(row.author_user_id),
-      displayName: typeof row.display_name === 'string' ? row.display_name : '',
+      displayName: typeof row.display_name === "string" ? row.display_name : "",
       avatarSnapshotUrl:
-        row.avatar_snapshot_url === null || row.avatar_snapshot_url === undefined
+        row.avatar_snapshot_url === null ||
+        row.avatar_snapshot_url === undefined
           ? null
           : asOptionalString(row.avatar_snapshot_url),
-      content: typeof row.content === 'string' ? row.content : '',
+      content: typeof row.content === "string" ? row.content : "",
       metadata: normalizeMessageMetadata(row.metadata),
       replyToMessageId:
-        row.reply_to_message_id === null || row.reply_to_message_id === undefined
+        row.reply_to_message_id === null ||
+        row.reply_to_message_id === undefined
           ? null
           : String(row.reply_to_message_id),
-      createdAt: typeof row.created_at === 'string' ? row.created_at : '',
+      createdAt: typeof row.created_at === "string" ? row.created_at : "",
       editedAt:
         row.edited_at === null || row.edited_at === undefined
           ? null
-          : typeof row.edited_at === 'string'
+          : typeof row.edited_at === "string"
             ? row.edited_at
             : null,
       deletedAt:
         row.deleted_at === null || row.deleted_at === undefined
           ? null
-          : typeof row.deleted_at === 'string'
+          : typeof row.deleted_at === "string"
             ? row.deleted_at
             : null,
       isHidden: Boolean(row.is_hidden),
@@ -946,50 +1055,57 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     };
 
     const { data, error } = await havenCommunitySb().rpc(
-      'get_my_community_permissions' as never,
+      "get_my_community_permissions" as never,
       { p_community_id: communityId } as never,
     );
 
     if (error) return allFalse;
 
     const row = Array.isArray(data) ? data[0] : data;
-    if (row == null || typeof row !== 'object') return allFalse;
+    if (row == null || typeof row !== "object") return allFalse;
 
     const r = row as Record<string, unknown>;
     const bool = (key: string) => Boolean(r[key]);
 
     return {
-      isOwner: bool('is_owner'),
-      canManageServer: bool('can_manage_server'),
-      canManageRoles: bool('can_manage_roles'),
-      canManageMembers: bool('can_manage_members'),
-      canCreateChannels: bool('can_create_channels'),
-      canManageChannelStructure: bool('can_manage_channel_structure'),
-      canManageChannelPermissions: bool('can_manage_channel_permissions'),
-      canManageMessages: bool('can_manage_messages'),
-      canManageBans: bool('can_manage_bans'),
-      canViewBanHidden: bool('can_view_ban_hidden'),
-      canCreateReports: bool('can_create_reports'),
-      canManageReports: bool('can_manage_reports'),
-      canRefreshLinkPreviews: bool('can_refresh_link_previews'),
-      canManageInvites: bool('can_manage_invites'),
-      isElevated: bool('is_elevated'),
+      isOwner: bool("is_owner"),
+      canManageServer: bool("can_manage_server"),
+      canManageRoles: bool("can_manage_roles"),
+      canManageMembers: bool("can_manage_members"),
+      canCreateChannels: bool("can_create_channels"),
+      canManageChannelStructure: bool("can_manage_channel_structure"),
+      canManageChannelPermissions: bool("can_manage_channel_permissions"),
+      canManageMessages: bool("can_manage_messages"),
+      canManageBans: bool("can_manage_bans"),
+      canViewBanHidden: bool("can_view_ban_hidden"),
+      canCreateReports: bool("can_create_reports"),
+      canManageReports: bool("can_manage_reports"),
+      canRefreshLinkPreviews: bool("can_refresh_link_previews"),
+      canManageInvites: bool("can_manage_invites"),
+      isElevated: bool("is_elevated"),
     };
   },
 
   async listCommunityMembers(communityId) {
-    const { data, error } = await havenCommunitySb().from('community_members')
-      .select('id, user_id, nickname, is_owner, joined_at, profiles(username, avatar_url)')
-      .eq('community_id', communityId)
-      .order('joined_at', { ascending: true });
+    const { data, error } = await havenCommunitySb()
+      .from("community_members")
+      .select(
+        "id, user_id, nickname, is_owner, joined_at, profiles(username, avatar_url)",
+      )
+      .eq("community_id", communityId)
+      .order("joined_at", { ascending: true });
     if (error) throw error;
 
     const rows = (data ?? []) as CommunityMemberWithProfile[];
     return rows
       .map((member) => {
-        const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+        const profile = Array.isArray(member.profiles)
+          ? member.profiles[0]
+          : member.profiles;
         const displayName =
-          member.nickname?.trim() || profile?.username || member.user_id.substring(0, 12);
+          member.nickname?.trim() ||
+          profile?.username ||
+          member.user_id.substring(0, 12);
 
         return {
           memberId: member.id,
@@ -1006,31 +1122,39 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       });
   },
 
-  async reportUserProfile({ communityId, targetUserId, reporterUserId, reason }) {
+  async reportUserProfile({
+    communityId,
+    targetUserId,
+    reporterUserId,
+    reason,
+  }) {
     const normalizedReason = reason.trim();
     if (!normalizedReason) {
-      throw new Error('Report reason is required.');
+      throw new Error("Report reason is required.");
     }
 
     let snapshot: SupportReportProfileSnapshot | null = null;
     try {
       snapshot = await fetchSupportReportProfileSnapshot(targetUserId);
     } catch (snapshotError) {
-      console.warn('Failed to capture support report profile snapshot:', snapshotError);
+      console.warn(
+        "Failed to capture support report profile snapshot:",
+        snapshotError,
+      );
     }
 
     const reportId = createPortableUuid();
-    const reportTitle = 'User Report: Profile';
+    const reportTitle = "User Report: Profile";
     const reportNotes = JSON.stringify({
-      type: 'user_report',
+      type: "user_report",
       targetUserId,
       reason: normalizedReason,
     });
 
-    const { error } = await havenCommunitySb().from('support_reports').insert({
+    const { error } = await havenCommunitySb().from("support_reports").insert({
       id: reportId,
       community_id: communityId,
-      destination: 'haven_staff',
+      destination: "haven_staff",
       reporter_user_id: reporterUserId,
       title: reportTitle,
       notes: reportNotes,
@@ -1043,28 +1167,31 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   async reportPlatformUserProfile({ targetUserId, reporterUserId, reason }) {
     const normalizedReason = reason.trim();
     if (!normalizedReason) {
-      throw new Error('Report reason is required.');
+      throw new Error("Report reason is required.");
     }
 
     let snapshot: SupportReportProfileSnapshot | null = null;
     try {
       snapshot = await fetchSupportReportProfileSnapshot(targetUserId);
     } catch (snapshotError) {
-      console.warn('Failed to capture support report profile snapshot:', snapshotError);
+      console.warn(
+        "Failed to capture support report profile snapshot:",
+        snapshotError,
+      );
     }
 
     const reportId = createPortableUuid();
-    const reportTitle = 'User Report: Profile';
+    const reportTitle = "User Report: Profile";
     const reportNotes = JSON.stringify({
-      type: 'user_report',
+      type: "user_report",
       targetUserId,
       reason: normalizedReason,
     });
 
-    const { error } = await havenCommunitySb().from('support_reports').insert({
+    const { error } = await havenCommunitySb().from("support_reports").insert({
       id: reportId,
       community_id: null,
-      destination: 'haven_staff',
+      destination: "haven_staff",
       reporter_user_id: reporterUserId,
       title: reportTitle,
       notes: reportNotes,
@@ -1075,9 +1202,12 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listCommunityBans(communityId) {
-    const { data, error } = await havenCommunitySb().rpc('list_community_bans', {
-      p_community_id: communityId,
-    });
+    const { data, error } = await havenCommunitySb().rpc(
+      "list_community_bans",
+      {
+        p_community_id: communityId,
+      },
+    );
     if (error) throw error;
 
     return ((data ?? []) as ListCommunityBansRpcRow[]).flatMap((row) => {
@@ -1096,12 +1226,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           communityId: returnedCommunityId,
           bannedUserId,
           bannedByUserId: asOptionalString(row.banned_by_user_id),
-          reason: asOptionalString(row.reason) ?? '',
+          reason: asOptionalString(row.reason) ?? "",
           bannedAt,
           revokedAt: asOptionalString(row.revoked_at),
           revokedByUserId: asOptionalString(row.revoked_by_user_id),
           revokedReason: asOptionalString(row.revoked_reason),
-          username: asOptionalString(row.username) ?? bannedUserId.substring(0, 12),
+          username:
+            asOptionalString(row.username) ?? bannedUserId.substring(0, 12),
           avatarUrl: asOptionalString(row.avatar_url),
         } satisfies CommunityBanItem,
       ];
@@ -1111,24 +1242,29 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   async banCommunityMember({ communityId, targetUserId, reason }) {
     const normalizedReason = reason.trim();
     if (!normalizedReason) {
-      throw new Error('Ban reason is required.');
+      throw new Error("Ban reason is required.");
     }
 
-    const { data, error } = await havenCommunitySb().rpc('ban_community_member', {
-      p_community_id: communityId,
-      p_target_user_id: targetUserId,
-      p_reason: normalizedReason,
-    });
+    const { data, error } = await havenCommunitySb().rpc(
+      "ban_community_member",
+      {
+        p_community_id: communityId,
+        p_target_user_id: targetUserId,
+        p_reason: normalizedReason,
+      },
+    );
     if (error) throw error;
 
-    const row = (Array.isArray(data) ? data[0] : data) as BanCommunityMemberRpcRow | null;
+    const row = (
+      Array.isArray(data) ? data[0] : data
+    ) as BanCommunityMemberRpcRow | null;
     const bannedUserId =
-      row && typeof row.banned_user_id === 'string' ? row.banned_user_id : null;
+      row && typeof row.banned_user_id === "string" ? row.banned_user_id : null;
     const returnedCommunityId =
-      row && typeof row.community_id === 'string' ? row.community_id : null;
+      row && typeof row.community_id === "string" ? row.community_id : null;
 
     if (!bannedUserId || !returnedCommunityId) {
-      throw new Error('Ban RPC returned incomplete moderation context.');
+      throw new Error("Ban RPC returned incomplete moderation context.");
     }
 
     return {
@@ -1138,20 +1274,25 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async kickCommunityMember({ communityId, targetUserId }) {
-    const { data, error } = await havenCommunitySb().rpc('kick_community_member', {
-      p_community_id: communityId,
-      p_target_user_id: targetUserId,
-    });
+    const { data, error } = await havenCommunitySb().rpc(
+      "kick_community_member",
+      {
+        p_community_id: communityId,
+        p_target_user_id: targetUserId,
+      },
+    );
     if (error) throw error;
 
-    const row = (Array.isArray(data) ? data[0] : data) as KickCommunityMemberRpcRow | null;
+    const row = (
+      Array.isArray(data) ? data[0] : data
+    ) as KickCommunityMemberRpcRow | null;
     const kickedUserId =
-      row && typeof row.kicked_user_id === 'string' ? row.kicked_user_id : null;
+      row && typeof row.kicked_user_id === "string" ? row.kicked_user_id : null;
     const returnedCommunityId =
-      row && typeof row.community_id === 'string' ? row.community_id : null;
+      row && typeof row.community_id === "string" ? row.community_id : null;
 
     if (!kickedUserId || !returnedCommunityId) {
-      throw new Error('Kick RPC returned incomplete moderation context.');
+      throw new Error("Kick RPC returned incomplete moderation context.");
     }
 
     return {
@@ -1162,10 +1303,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
   async unbanCommunityMember({ communityId, targetUserId, reason }) {
     const normalizedReason = reason?.trim() ?? null;
-    const { error } = await havenCommunitySb().rpc('unban_community_member', {
+    const { error } = await havenCommunitySb().rpc("unban_community_member", {
       p_community_id: communityId,
       p_target_user_id: targetUserId,
-      p_reason: normalizedReason && normalizedReason.length > 0 ? normalizedReason : undefined,
+      p_reason:
+        normalizedReason && normalizedReason.length > 0
+          ? normalizedReason
+          : undefined,
     });
     if (error) throw error;
   },
@@ -1173,9 +1317,12 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   async listBanEligibleServersForUser(targetUserId) {
     if (!targetUserId) return [];
 
-    const { data, error } = await havenCommunitySb().rpc('list_bannable_shared_communities', {
-      p_target_user_id: targetUserId,
-    });
+    const { data, error } = await havenCommunitySb().rpc(
+      "list_bannable_shared_communities",
+      {
+        p_target_user_id: targetUserId,
+      },
+    );
     if (error) throw error;
 
     return (data ?? []).map((row) => ({
@@ -1185,10 +1332,11 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listChannels(communityId) {
-    const { data, error } = await havenCommunitySb().from('channels')
-      .select('*')
-      .eq('community_id', communityId)
-      .order('position', { ascending: true });
+    const { data, error } = await havenCommunitySb()
+      .from("channels")
+      .select("*")
+      .eq("community_id", communityId)
+      .order("position", { ascending: true });
     if (error) throw error;
     return data ?? [];
   },
@@ -1198,13 +1346,17 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: groupRows, error: groupRowsError },
       { data: mappingRows, error: mappingRowsError },
       authResult,
-    ] = await Promise.all([havenCommunitySb().from('channel_groups')
-        .select('id, community_id, name, position')
-        .eq('community_id', communityId)
-        .order('position', { ascending: true }),havenCommunitySb().from('channel_group_channels')
-        .select('channel_id, group_id, position')
-        .eq('community_id', communityId)
-        .order('position', { ascending: true }),
+    ] = await Promise.all([
+      havenCommunitySb()
+        .from("channel_groups")
+        .select("id, community_id, name, position")
+        .eq("community_id", communityId)
+        .order("position", { ascending: true }),
+      havenCommunitySb()
+        .from("channel_group_channels")
+        .select("channel_id, group_id, position")
+        .eq("community_id", communityId)
+        .order("position", { ascending: true }),
       havenCommunitySb().auth.getUser(),
     ]);
 
@@ -1216,11 +1368,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     let collapsedGroupIds: string[] = [];
     if (currentUserId) {
-      const { data: preferenceRows, error: preferenceRowsError } = await havenCommunitySb().from('channel_group_preferences')
-        .select('group_id, is_collapsed')
-        .eq('community_id', communityId)
-        .eq('user_id', currentUserId)
-        .eq('is_collapsed', true);
+      const { data: preferenceRows, error: preferenceRowsError } =
+        await havenCommunitySb()
+          .from("channel_group_preferences")
+          .select("group_id, is_collapsed")
+          .eq("community_id", communityId)
+          .eq("user_id", currentUserId)
+          .eq("is_collapsed", true);
       if (preferenceRowsError) throw preferenceRowsError;
       collapsedGroupIds = (preferenceRows ?? []).map((row) => row.group_id);
     }
@@ -1241,25 +1395,28 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     }));
 
     const groupedChannelIds = new Set(
-      Array.from(channelIdsByGroupId.values()).flat()
+      Array.from(channelIdsByGroupId.values()).flat(),
     );
 
     return {
       groups,
-      ungroupedChannelIds: channelIds.filter((channelId) => !groupedChannelIds.has(channelId)),
+      ungroupedChannelIds: channelIds.filter(
+        (channelId) => !groupedChannelIds.has(channelId),
+      ),
       collapsedGroupIds,
     };
   },
 
   async createChannelGroup({ communityId, name, position, createdByUserId }) {
-    const { data, error } = await havenCommunitySb().from('channel_groups')
+    const { data, error } = await havenCommunitySb()
+      .from("channel_groups")
       .insert({
         community_id: communityId,
         name,
         position,
         created_by_user_id: createdByUserId,
       })
-      .select('id, community_id, name, position')
+      .select("id, community_id, name, position")
       .single();
 
     if (error) throw error;
@@ -1274,32 +1431,41 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async renameChannelGroup({ communityId, groupId, name }) {
-    const { error } = await havenCommunitySb().from('channel_groups')
+    const { error } = await havenCommunitySb()
+      .from("channel_groups")
       .update({ name })
-      .eq('community_id', communityId)
-      .eq('id', groupId);
+      .eq("community_id", communityId)
+      .eq("id", groupId);
     if (error) throw error;
   },
 
   async deleteChannelGroup({ communityId, groupId }) {
-    const { error } = await havenCommunitySb().from('channel_groups')
+    const { error } = await havenCommunitySb()
+      .from("channel_groups")
       .delete()
-      .eq('community_id', communityId)
-      .eq('id', groupId);
+      .eq("community_id", communityId)
+      .eq("id", groupId);
     if (error) throw error;
   },
 
-  async setChannelGroupForChannel({ communityId, channelId, groupId, position }) {
+  async setChannelGroupForChannel({
+    communityId,
+    channelId,
+    groupId,
+    position,
+  }) {
     if (!groupId) {
-      const { error } = await havenCommunitySb().from('channel_group_channels')
+      const { error } = await havenCommunitySb()
+        .from("channel_group_channels")
         .delete()
-        .eq('community_id', communityId)
-        .eq('channel_id', channelId);
+        .eq("community_id", communityId)
+        .eq("channel_id", channelId);
       if (error) throw error;
       return;
     }
 
-    const { error } = await havenCommunitySb().from('channel_group_channels')
+    const { error } = await havenCommunitySb()
+      .from("channel_group_channels")
       .upsert(
         {
           community_id: communityId,
@@ -1307,7 +1473,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           group_id: groupId,
           position,
         },
-        { onConflict: 'community_id,channel_id' }
+        { onConflict: "community_id,channel_id" },
       );
     if (error) throw error;
   },
@@ -1318,19 +1484,21 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       error: authError,
     } = await havenCommunitySb().auth.getUser();
     if (authError) throw authError;
-    if (!user?.id) throw new Error('Not authenticated.');
+    if (!user?.id) throw new Error("Not authenticated.");
 
     if (!isCollapsed) {
-      const { error } = await havenCommunitySb().from('channel_group_preferences')
+      const { error } = await havenCommunitySb()
+        .from("channel_group_preferences")
         .delete()
-        .eq('community_id', communityId)
-        .eq('group_id', groupId)
-        .eq('user_id', user.id);
+        .eq("community_id", communityId)
+        .eq("group_id", groupId)
+        .eq("user_id", user.id);
       if (error) throw error;
       return;
     }
 
-    const { error } = await havenCommunitySb().from('channel_group_preferences')
+    const { error } = await havenCommunitySb()
+      .from("channel_group_preferences")
       .upsert(
         {
           community_id: communityId,
@@ -1338,31 +1506,29 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           user_id: user.id,
           is_collapsed: true,
         },
-        { onConflict: 'community_id,group_id,user_id' }
+        { onConflict: "community_id,group_id,user_id" },
       );
     if (error) throw error;
   },
 
   async fetchMyMemberRoleAssignmentForRealtime(communityId, userId) {
     const { data: memberRow, error: memberErr } = await havenCommunitySb()
-      .from('community_members')
-      .select('id')
-      .eq('community_id', communityId)
-      .eq('user_id', userId)
+      .from("community_members")
+      .select("id")
+      .eq("community_id", communityId)
+      .eq("user_id", userId)
       .maybeSingle();
     if (memberErr) throw memberErr;
     if (!memberRow?.id) return null;
 
     const { data: roleRows, error: roleErr } = await havenCommunitySb()
-      .from('member_roles')
-      .select('role_id')
-      .eq('member_id', memberRow.id)
-      .eq('community_id', communityId);
+      .from("member_roles")
+      .select("role_id")
+      .eq("member_id", memberRow.id)
+      .eq("community_id", communityId);
     if (roleErr) throw roleErr;
 
-    const roleIds = [
-      ...new Set((roleRows ?? []).map((r) => r.role_id)),
-    ];
+    const roleIds = [...new Set((roleRows ?? []).map((r) => r.role_id))];
     return { memberId: memberRow.id, roleIds };
   },
 
@@ -1376,7 +1542,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     revokedUserId,
   }) {
     const { error } = await havenCommunitySb().rpc(
-      'broadcast_member_channel_access_revoked' as never,
+      "broadcast_member_channel_access_revoked" as never,
       {
         p_community_id: communityId,
         p_channel_id: channelId,
@@ -1393,7 +1559,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     updatedBy,
   }) {
     const { error } = await havenCommunitySb().rpc(
-      'broadcast_report_status_updated' as never,
+      "broadcast_report_status_updated" as never,
       {
         p_community_id: communityId,
         p_report_id: reportId,
@@ -1405,12 +1571,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listMessages(communityId, channelId) {
-    const { data, error } = await havenCommunitySb().from('messages')
-      .select('*')
-      .eq('community_id', communityId)
-      .eq('channel_id', channelId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true });
+    const { data, error } = await havenCommunitySb()
+      .from("messages")
+      .select("*")
+      .eq("community_id", communityId)
+      .eq("channel_id", channelId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true });
 
     if (error) throw error;
     return data ?? [];
@@ -1419,17 +1586,23 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   async listChannelMessages(input) {
     const { communityId, channelId, beforeCreatedAt, beforeMessageId } = input;
     const rpcLimit = input.limit ?? 50;
-    const { data, error } = await havenCommunitySb().rpc('list_channel_messages' as never, {
-      p_community_id: communityId,
-      p_channel_id: channelId,
-      p_limit: rpcLimit,
-      p_before_created_at: beforeCreatedAt ?? null,
-      p_before_message_id: beforeMessageId ?? null,
-    } as never);
+    const { data, error } = await havenCommunitySb().rpc(
+      "list_channel_messages" as never,
+      {
+        p_community_id: communityId,
+        p_channel_id: channelId,
+        p_limit: rpcLimit,
+        p_before_created_at: beforeCreatedAt ?? null,
+        p_before_message_id: beforeMessageId ?? null,
+      } as never,
+    );
     if (error) throw error;
 
     const rows = (data ?? []) as Record<string, unknown>[];
-    const messages = await mapChannelMessageRpcRowsToBundles(rows, input.channelId);
+    const messages = await mapChannelMessageRpcRowsToBundles(
+      rows,
+      input.channelId,
+    );
 
     return {
       messages,
@@ -1439,11 +1612,14 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
   async getChannelMessage(input) {
     const { communityId, channelId, messageId } = input;
-    const { data, error } = await havenCommunitySb().rpc('get_channel_message' as never, {
-      p_community_id: communityId,
-      p_channel_id: channelId,
-      p_message_id: messageId,
-    } as never);
+    const { data, error } = await havenCommunitySb().rpc(
+      "get_channel_message" as never,
+      {
+        p_community_id: communityId,
+        p_channel_id: channelId,
+        p_message_id: messageId,
+      } as never,
+    );
     if (error) throw error;
 
     const rows = (data ?? []) as Record<string, unknown>[];
@@ -1454,12 +1630,14 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   async fetchMessageAuthorProfiles(input) {
     const { communityId, authorUserIds } = input;
     const uniqueIds = Array.from(
-      new Set(authorUserIds.filter((id) => typeof id === 'string' && id.length > 0)),
+      new Set(
+        authorUserIds.filter((id) => typeof id === "string" && id.length > 0),
+      ),
     );
     if (uniqueIds.length === 0) return [];
 
     const { data, error } = await havenCommunitySb().rpc(
-      'get_message_author_profiles' as never,
+      "get_message_author_profiles" as never,
       {
         p_author_user_ids: uniqueIds,
         p_community_id: communityId,
@@ -1485,11 +1663,12 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listMessageReactions(communityId, channelId) {
-    const { data, error } = await havenCommunitySb().from('message_reactions' as never)
-      .select('id, message_id, user_id, emoji, created_at')
-      .eq('community_id', communityId)
-      .eq('channel_id', channelId)
-      .order('created_at', { ascending: true });
+    const { data, error } = await havenCommunitySb()
+      .from("message_reactions" as never)
+      .select("id, message_id, user_id, emoji, created_at")
+      .eq("community_id", communityId)
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: true });
 
     if (error) throw error;
 
@@ -1499,10 +1678,10 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   async toggleMessageReaction({ communityId, channelId, messageId, emoji }) {
     const normalizedEmoji = emoji.trim();
     if (normalizedEmoji.length === 0) {
-      throw new Error('Reaction emoji is required.');
+      throw new Error("Reaction emoji is required.");
     }
     if (normalizedEmoji.length > 32) {
-      throw new Error('Reaction emoji exceeds supported length.');
+      throw new Error("Reaction emoji exceeds supported length.");
     }
 
     const {
@@ -1510,37 +1689,49 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       error: authError,
     } = await havenCommunitySb().auth.getUser();
     if (authError) throw authError;
-    if (!user?.id) throw new Error('Not authenticated.');
+    if (!user?.id) throw new Error("Not authenticated.");
 
-    const { data: messageRow, error: messageError } = await havenCommunitySb().from('messages')
-      .select('id, community_id, channel_id, deleted_at')
-      .eq('id', messageId)
+    const { data: messageRow, error: messageError } = await havenCommunitySb()
+      .from("messages")
+      .select("id, community_id, channel_id, deleted_at")
+      .eq("id", messageId)
       .maybeSingle();
     if (messageError) throw messageError;
     if (!messageRow || messageRow.deleted_at) {
-      throw new Error('Message not found.');
+      throw new Error("Message not found.");
     }
-    if (messageRow.community_id !== communityId || messageRow.channel_id !== channelId) {
-      throw new Error('Message does not belong to this channel.');
+    if (
+      messageRow.community_id !== communityId ||
+      messageRow.channel_id !== channelId
+    ) {
+      throw new Error("Message does not belong to this channel.");
     }
 
-    const { data: existingReaction, error: existingReactionError } = await havenCommunitySb().from('message_reactions' as never)
-      .select('id')
-      .eq('message_id', messageId)
-      .eq('user_id', user.id)
-      .eq('emoji', normalizedEmoji)
-      .maybeSingle();
+    const { data: existingReaction, error: existingReactionError } =
+      await havenCommunitySb()
+        .from("message_reactions" as never)
+        .select("id")
+        .eq("message_id", messageId)
+        .eq("user_id", user.id)
+        .eq("emoji", normalizedEmoji)
+        .maybeSingle();
     if (existingReactionError) throw existingReactionError;
 
-    if (existingReaction && typeof existingReaction === 'object' && 'id' in existingReaction) {
-      const { error: deleteError } = await havenCommunitySb().from('message_reactions' as never)
+    if (
+      existingReaction &&
+      typeof existingReaction === "object" &&
+      "id" in existingReaction
+    ) {
+      const { error: deleteError } = await havenCommunitySb()
+        .from("message_reactions" as never)
         .delete()
-        .eq('id', (existingReaction as { id: string }).id);
+        .eq("id", (existingReaction as { id: string }).id);
       if (deleteError) throw deleteError;
       return;
     }
 
-    const { error: insertError } = await havenCommunitySb().from('message_reactions' as never)
+    const { error: insertError } = await havenCommunitySb()
+      .from("message_reactions" as never)
       .insert({
         message_id: messageId,
         community_id: communityId,
@@ -1551,24 +1742,27 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (!insertError) return;
 
     // Concurrent toggles can race; treat duplicate insert as already-reacted.
-    if (insertError.code === '23505') return;
+    if (insertError.code === "23505") return;
     throw insertError;
   },
 
   async listMessageAttachments(communityId, channelId) {
     const nowIso = new Date().toISOString();
-    const { data, error } = await havenCommunitySb().from('message_attachments' as never)
+    const { data, error } = await havenCommunitySb()
+      .from("message_attachments" as never)
       .select(
-        'id, message_id, community_id, channel_id, owner_user_id, bucket_name, object_path, original_filename, mime_type, media_kind, size_bytes, created_at, expires_at'
+        "id, message_id, community_id, channel_id, owner_user_id, bucket_name, object_path, original_filename, mime_type, media_kind, size_bytes, created_at, expires_at",
       )
-      .eq('community_id', communityId)
-      .eq('channel_id', channelId)
-      .gt('expires_at', nowIso)
-      .order('created_at', { ascending: true });
+      .eq("community_id", communityId)
+      .eq("channel_id", channelId)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: true });
 
     if (error) throw error;
 
-    return await mapMessageAttachmentRowsWithSignedUrls((data ?? []) as MessageAttachmentRow[]);
+    return await mapMessageAttachmentRowsWithSignedUrls(
+      (data ?? []) as MessageAttachmentRow[],
+    );
   },
 
   async cleanupExpiredMessageAttachments(limit = 100) {
@@ -1577,28 +1771,35 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       : 100;
 
     const { data, error } = await havenCommunitySb().rpc(
-      'cleanup_expired_message_attachments' as never,
-      { p_limit: boundedLimit } as never
+      "cleanup_expired_message_attachments" as never,
+      { p_limit: boundedLimit } as never,
     );
     if (error) throw error;
     return Number(data ?? 0);
   },
 
   async listMessageLinkPreviews(communityId, channelId) {
-    const { data, error } = await havenCommunitySb().from('message_link_previews' as never)
+    const { data, error } = await havenCommunitySb()
+      .from("message_link_previews" as never)
       .select(
-        'id, message_id, community_id, channel_id, source_url, normalized_url, status, cache_id, snapshot, embed_provider, thumbnail_bucket_name, thumbnail_object_path, created_at, updated_at'
+        "id, message_id, community_id, channel_id, source_url, normalized_url, status, cache_id, snapshot, embed_provider, thumbnail_bucket_name, thumbnail_object_path, created_at, updated_at",
       )
-      .eq('community_id', communityId)
-      .eq('channel_id', channelId)
-      .order('created_at', { ascending: true });
+      .eq("community_id", communityId)
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: true });
 
     if (error) throw error;
 
-    return await mapMessageLinkPreviewRowsWithSignedUrls((data ?? []) as MessageLinkPreviewRow[]);
+    return await mapMessageLinkPreviewRowsWithSignedUrls(
+      (data ?? []) as MessageLinkPreviewRow[],
+    );
   },
 
-  async requestChannelLinkPreviewBackfill({ communityId, channelId, messageIds }) {
+  async requestChannelLinkPreviewBackfill({
+    communityId,
+    channelId,
+    messageIds,
+  }) {
     const boundedMessageIds = messageIds.slice(0, 100);
     const requestedCount = boundedMessageIds.length;
 
@@ -1617,7 +1818,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       skipped: number;
       alreadyPresent: number;
       requested: number;
-    }>('link-preview-backfill', {
+    }>("link-preview-backfill", {
       communityId,
       channelId,
       messageIds: boundedMessageIds,
@@ -1636,8 +1837,8 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       deletedObjects: number;
       retryableFailures: number;
       deadLetters: number;
-    }>('message-media-maintenance', {
-      mode: 'authenticated-fallback',
+    }>("message-media-maintenance", {
+      mode: "authenticated-fallback",
       maxExpiredMessages: boundedLimit,
       maxDeletionJobs: boundedLimit,
     });
@@ -1651,47 +1852,54 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (authError) throw authError;
     if (!user?.id || !communityId) return false;
 
-    const { data: memberRow, error: memberError } = await havenCommunitySb().from('community_members')
-      .select('id, is_owner')
-      .eq('community_id', communityId)
-      .eq('user_id', user.id)
+    const { data: memberRow, error: memberError } = await havenCommunitySb()
+      .from("community_members")
+      .select("id, is_owner")
+      .eq("community_id", communityId)
+      .eq("user_id", user.id)
       .maybeSingle();
     if (memberError) throw memberError;
     if (!memberRow) return false;
     if (memberRow.is_owner) return true;
 
-    const { data: memberRoleRows, error: memberRoleError } = await havenCommunitySb().from('member_roles')
-      .select('role_id')
-      .eq('community_id', communityId)
-      .eq('member_id', memberRow.id);
+    const { data: memberRoleRows, error: memberRoleError } =
+      await havenCommunitySb()
+        .from("member_roles")
+        .select("role_id")
+        .eq("community_id", communityId)
+        .eq("member_id", memberRow.id);
     if (memberRoleError) throw memberRoleError;
 
     const roleIds = Array.from(
       new Set(
         (memberRoleRows ?? [])
           .map((row) => row.role_id)
-          .filter((roleId): roleId is string => Boolean(roleId))
-      )
+          .filter((roleId): roleId is string => Boolean(roleId)),
+      ),
     );
     if (roleIds.length === 0) return false;
 
-    const { data: roleRows, error: roleError } = await havenCommunitySb().from('roles')
-      .select('name, is_system')
-      .eq('community_id', communityId)
-      .in('id', roleIds);
+    const { data: roleRows, error: roleError } = await havenCommunitySb()
+      .from("roles")
+      .select("name, is_system")
+      .eq("community_id", communityId)
+      .in("id", roleIds);
     if (roleError) throw roleError;
 
     return (roleRows ?? []).some(
       (role) =>
         role.is_system === true &&
-        (role.name === 'Admin' || role.name === 'Moderator')
+        (role.name === "Admin" || role.name === "Moderator"),
     );
   },
 
   async canSendInChannel(channelId) {
-    const { data, error } = await havenCommunitySb().rpc('can_send_in_channel', {
-      p_channel_id: channelId,
-    });
+    const { data, error } = await havenCommunitySb().rpc(
+      "can_send_in_channel",
+      {
+        p_channel_id: channelId,
+      },
+    );
 
     if (error) throw error;
     return Boolean(data);
@@ -1701,12 +1909,16 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const [
       { data: community, error: communityError },
       { data: communitySettings, error: communitySettingsError },
-    ] = await Promise.all([havenCommunitySb().from('communities')
-        .select('name, description')
-        .eq('id', communityId)
-        .maybeSingle(),havenCommunitySb().from('community_settings')
-        .select('allow_public_invites, require_report_reason')
-        .eq('community_id', communityId)
+    ] = await Promise.all([
+      havenCommunitySb()
+        .from("communities")
+        .select("name, description")
+        .eq("id", communityId)
+        .maybeSingle(),
+      havenCommunitySb()
+        .from("community_settings")
+        .select("allow_public_invites, require_report_reason")
+        .eq("community_id", communityId)
         .maybeSingle(),
     ]);
 
@@ -1714,7 +1926,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (communitySettingsError) throw communitySettingsError;
 
     return {
-      name: community?.name ?? '',
+      name: community?.name ?? "",
       description: community?.description ?? null,
       allowPublicInvites: communitySettings?.allow_public_invites ?? false,
       requireReportReason: communitySettings?.require_report_reason ?? true,
@@ -1722,20 +1934,24 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async updateServerSettings({ communityId, values }) {
-    const { error: communityError } = await havenCommunitySb().from('communities')
+    const { error: communityError } = await havenCommunitySb()
+      .from("communities")
       .update({
         name: values.name.trim(),
-        description: values.description?.trim() ? values.description.trim() : null,
+        description: values.description?.trim()
+          ? values.description.trim()
+          : null,
       })
-      .eq('id', communityId);
+      .eq("id", communityId);
     if (communityError) throw communityError;
 
-    const { error: communitySettingsError } = await havenCommunitySb().from('community_settings')
+    const { error: communitySettingsError } = await havenCommunitySb()
+      .from("community_settings")
       .update({
         allow_public_invites: values.allowPublicInvites,
         require_report_reason: values.requireReportReason,
       })
-      .eq('community_id', communityId);
+      .eq("community_id", communityId);
     if (communitySettingsError) throw communitySettingsError;
   },
 
@@ -1745,15 +1961,26 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: members, error: membersError },
       { data: memberRoles, error: memberRolesError },
       { data: permissionsCatalog, error: permissionsCatalogError },
-    ] = await Promise.all([havenCommunitySb().from('roles')
-        .select('id, name, color, position, is_default, is_system')
-        .eq('community_id', communityId)
-        .order('position', { ascending: false }),havenCommunitySb().from('community_members')
-        .select('id, user_id, nickname, is_owner, profiles(username, avatar_url)')
-        .eq('community_id', communityId),havenCommunitySb().from('member_roles')
-        .select('member_id, role_id')
-        .eq('community_id', communityId),
-      havenCommunitySb().from('permissions_catalog').select('key, description').order('key', { ascending: true }),
+    ] = await Promise.all([
+      havenCommunitySb()
+        .from("roles")
+        .select("id, name, color, position, is_default, is_system")
+        .eq("community_id", communityId)
+        .order("position", { ascending: false }),
+      havenCommunitySb()
+        .from("community_members")
+        .select(
+          "id, user_id, nickname, is_owner, profiles(username, avatar_url)",
+        )
+        .eq("community_id", communityId),
+      havenCommunitySb()
+        .from("member_roles")
+        .select("member_id, role_id")
+        .eq("community_id", communityId),
+      havenCommunitySb()
+        .from("permissions_catalog")
+        .select("key, description")
+        .order("key", { ascending: true }),
     ]);
 
     if (rolesError) throw rolesError;
@@ -1762,12 +1989,15 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (permissionsCatalogError) throw permissionsCatalogError;
 
     const roleIds = (roles ?? []).map((role) => role.id);
-    let rolePermissions: Array<{ role_id: string; permission_key: string }> = [];
+    let rolePermissions: Array<{ role_id: string; permission_key: string }> =
+      [];
 
     if (roleIds.length > 0) {
-      const { data: rolePermissionRows, error: rolePermissionsError } = await havenCommunitySb().from('role_permissions')
-        .select('role_id, permission_key')
-        .in('role_id', roleIds);
+      const { data: rolePermissionRows, error: rolePermissionsError } =
+        await havenCommunitySb()
+          .from("role_permissions")
+          .select("role_id, permission_key")
+          .in("role_id", roleIds);
 
       if (rolePermissionsError) throw rolePermissionsError;
       rolePermissions = rolePermissionRows ?? [];
@@ -1775,7 +2005,9 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     const rolePermissionsByRoleId = new Map<string, Set<string>>();
     for (const rolePermission of rolePermissions) {
-      const current = rolePermissionsByRoleId.get(rolePermission.role_id) ?? new Set<string>();
+      const current =
+        rolePermissionsByRoleId.get(rolePermission.role_id) ??
+        new Set<string>();
       current.add(rolePermission.permission_key);
       rolePermissionsByRoleId.set(rolePermission.role_id, current);
     }
@@ -1783,12 +2015,13 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     const memberRoleIdsByMemberId = new Map<string, string[]>();
     const memberCountByRoleId = new Map<string, number>();
     for (const memberRole of memberRoles ?? []) {
-      const currentRoles = memberRoleIdsByMemberId.get(memberRole.member_id) ?? [];
+      const currentRoles =
+        memberRoleIdsByMemberId.get(memberRole.member_id) ?? [];
       currentRoles.push(memberRole.role_id);
       memberRoleIdsByMemberId.set(memberRole.member_id, currentRoles);
       memberCountByRoleId.set(
         memberRole.role_id,
-        (memberCountByRoleId.get(memberRole.role_id) ?? 0) + 1
+        (memberCountByRoleId.get(memberRole.role_id) ?? 0) + 1,
       );
     }
 
@@ -1800,7 +2033,9 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         position: role.position,
         isDefault: role.is_default,
         isSystem: role.is_system,
-        permissionKeys: Array.from(rolePermissionsByRoleId.get(role.id) ?? []).sort(),
+        permissionKeys: Array.from(
+          rolePermissionsByRoleId.get(role.id) ?? [],
+        ).sort(),
         memberCount: memberCountByRoleId.get(role.id) ?? 0,
       }))
       .sort((a, b) => {
@@ -1808,18 +2043,29 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         return a.name.localeCompare(b.name);
       });
 
-    const rolePositionByRoleId = new Map(roleRows.map((role) => [role.id, role.position]));
+    const rolePositionByRoleId = new Map(
+      roleRows.map((role) => [role.id, role.position]),
+    );
 
-    const memberRows: ServerMemberRoleItem[] = ((members ?? []) as CommunityMemberWithProfile[])
+    const memberRows: ServerMemberRoleItem[] = (
+      (members ?? []) as CommunityMemberWithProfile[]
+    )
       .map((member) => {
-        const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
-        const displayName = member.nickname?.trim() || profile?.username || member.user_id.substring(0, 12);
+        const profile = Array.isArray(member.profiles)
+          ? member.profiles[0]
+          : member.profiles;
+        const displayName =
+          member.nickname?.trim() ||
+          profile?.username ||
+          member.user_id.substring(0, 12);
         const roleIds = (memberRoleIdsByMemberId.get(member.id) ?? [])
           .slice()
           .sort(
             (leftRoleId, rightRoleId) =>
-              (rolePositionByRoleId.get(rightRoleId) ?? Number.NEGATIVE_INFINITY) -
-              (rolePositionByRoleId.get(leftRoleId) ?? Number.NEGATIVE_INFINITY)
+              (rolePositionByRoleId.get(rightRoleId) ??
+                Number.NEGATIVE_INFINITY) -
+              (rolePositionByRoleId.get(leftRoleId) ??
+                Number.NEGATIVE_INFINITY),
           );
 
         return {
@@ -1836,7 +2082,9 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         return a.displayName.localeCompare(b.displayName);
       });
 
-    const permissionRows: PermissionCatalogItem[] = (permissionsCatalog ?? []).map((permission) => ({
+    const permissionRows: PermissionCatalogItem[] = (
+      permissionsCatalog ?? []
+    ).map((permission) => ({
       key: permission.key,
       description: permission.description,
     }));
@@ -1849,7 +2097,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async createServerRole({ communityId, name, color, position }) {
-    const { error } = await havenCommunitySb().from('roles').insert({
+    const { error } = await havenCommunitySb().from("roles").insert({
       community_id: communityId,
       name,
       color,
@@ -1860,23 +2108,25 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async updateServerRole({ communityId, roleId, name, color, position }) {
-    const { error } = await havenCommunitySb().from('roles')
+    const { error } = await havenCommunitySb()
+      .from("roles")
       .update({
         name,
         color,
         position,
       })
-      .eq('community_id', communityId)
-      .eq('id', roleId);
+      .eq("community_id", communityId)
+      .eq("id", roleId);
 
     if (error) throw error;
   },
 
   async deleteServerRole({ communityId, roleId }) {
-    const { error } = await havenCommunitySb().from('roles')
+    const { error } = await havenCommunitySb()
+      .from("roles")
       .delete()
-      .eq('community_id', communityId)
-      .eq('id', roleId);
+      .eq("community_id", communityId)
+      .eq("id", roleId);
 
     if (error) throw error;
   },
@@ -1884,9 +2134,10 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   async saveServerRolePermissions({ roleId, permissionKeys }) {
     const uniquePermissionKeys = Array.from(new Set(permissionKeys));
 
-    const { error: deleteError } = await havenCommunitySb().from('role_permissions')
+    const { error: deleteError } = await havenCommunitySb()
+      .from("role_permissions")
       .delete()
-      .eq('role_id', roleId);
+      .eq("role_id", roleId);
     if (deleteError) throw deleteError;
 
     if (uniquePermissionKeys.length === 0) return;
@@ -1896,32 +2147,46 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       permission_key: permissionKey,
     }));
 
-    const { error: insertError } = await havenCommunitySb().from('role_permissions').insert(rowsToInsert);
+    const { error: insertError } = await havenCommunitySb()
+      .from("role_permissions")
+      .insert(rowsToInsert);
     if (insertError) throw insertError;
   },
 
-  async saveServerMemberRoles({ communityId, memberId, roleIds, assignedByUserId }) {
+  async saveServerMemberRoles({
+    communityId,
+    memberId,
+    roleIds,
+    assignedByUserId,
+  }) {
     const uniqueRoleIds = Array.from(new Set(roleIds));
 
-    const { data: existingRows, error: existingRowsError } = await havenCommunitySb().from('member_roles')
-      .select('role_id')
-      .eq('community_id', communityId)
-      .eq('member_id', memberId);
+    const { data: existingRows, error: existingRowsError } =
+      await havenCommunitySb()
+        .from("member_roles")
+        .select("role_id")
+        .eq("community_id", communityId)
+        .eq("member_id", memberId);
     if (existingRowsError) throw existingRowsError;
 
     const existingRoleIds = (existingRows ?? []).map((row) => row.role_id);
     const existingRoleIdSet = new Set(existingRoleIds);
     const desiredRoleIdSet = new Set(uniqueRoleIds);
 
-    const roleIdsToDelete = existingRoleIds.filter((roleId) => !desiredRoleIdSet.has(roleId));
-    const roleIdsToInsert = uniqueRoleIds.filter((roleId) => !existingRoleIdSet.has(roleId));
+    const roleIdsToDelete = existingRoleIds.filter(
+      (roleId) => !desiredRoleIdSet.has(roleId),
+    );
+    const roleIdsToInsert = uniqueRoleIds.filter(
+      (roleId) => !existingRoleIdSet.has(roleId),
+    );
 
     if (roleIdsToDelete.length > 0) {
-      const { error: deleteError } = await havenCommunitySb().from('member_roles')
+      const { error: deleteError } = await havenCommunitySb()
+        .from("member_roles")
         .delete()
-        .eq('community_id', communityId)
-        .eq('member_id', memberId)
-        .in('role_id', roleIdsToDelete);
+        .eq("community_id", communityId)
+        .eq("member_id", memberId)
+        .in("role_id", roleIdsToDelete);
       if (deleteError) throw deleteError;
     }
 
@@ -1933,7 +2198,9 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         assigned_by_user_id: assignedByUserId,
       }));
 
-      const { error: insertError } = await havenCommunitySb().from('member_roles').insert(rowsToInsert);
+      const { error: insertError } = await havenCommunitySb()
+        .from("member_roles")
+        .insert(rowsToInsert);
       if (insertError) throw insertError;
     }
   },
@@ -1944,7 +2211,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       error: authError,
     } = await havenCommunitySb().auth.getUser();
     if (authError) throw authError;
-    if (!user?.id) throw new Error('Not authenticated.');
+    if (!user?.id) throw new Error("Not authenticated.");
 
     const insertPayload = {
       community_id: input.communityId,
@@ -1955,11 +2222,12 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       kind: input.kind,
     };
 
-    const { error } = await havenCommunitySb().from('channels')
+    const { error } = await havenCommunitySb()
+      .from("channels")
       .insert(insertPayload);
 
     if (error) {
-      console.error('[createChannel] insert failed', {
+      console.error("[createChannel] insert failed", {
         authUserId: user.id,
         communityId: input.communityId,
         channelName: input.name,
@@ -1971,15 +2239,19 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       });
       throw error;
     }
-    const { data: fallbackChannel, error: fallbackError } = await havenCommunitySb().from('channels')
-      .select('*')
-      .eq('community_id', input.communityId)
-      .eq('name', input.name)
-      .maybeSingle();
+    const { data: fallbackChannel, error: fallbackError } =
+      await havenCommunitySb()
+        .from("channels")
+        .select("*")
+        .eq("community_id", input.communityId)
+        .eq("name", input.name)
+        .maybeSingle();
 
     if (fallbackError) throw fallbackError;
     if (!fallbackChannel) {
-      throw new Error('Channel was created but is not visible to the current user.');
+      throw new Error(
+        "Channel was created but is not visible to the current user.",
+      );
     }
 
     return fallbackChannel;
@@ -1992,21 +2264,31 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       { data: roleOverwrites, error: roleOverwritesError },
       { data: memberOverwrites, error: memberOverwritesError },
       { data: myMember, error: myMemberError },
-    ] = await Promise.all([havenCommunitySb().from('roles')
-        .select('id, name, color, is_default, position')
-        .eq('community_id', communityId)
-        .order('position', { ascending: false }),havenCommunitySb().from('community_members')
-        .select('id, nickname, is_owner, user_id, profiles(username)')
-        .eq('community_id', communityId),havenCommunitySb().from('channel_role_overwrites')
-        .select('role_id, can_view, can_send, can_manage')
-        .eq('community_id', communityId)
-        .eq('channel_id', channelId),havenCommunitySb().from('channel_member_overwrites')
-        .select('member_id, can_view, can_send, can_manage')
-        .eq('community_id', communityId)
-        .eq('channel_id', channelId),havenCommunitySb().from('community_members')
-        .select('id, is_owner')
-        .eq('community_id', communityId)
-        .eq('user_id', userId)
+    ] = await Promise.all([
+      havenCommunitySb()
+        .from("roles")
+        .select("id, name, color, is_default, position")
+        .eq("community_id", communityId)
+        .order("position", { ascending: false }),
+      havenCommunitySb()
+        .from("community_members")
+        .select("id, nickname, is_owner, user_id, profiles(username)")
+        .eq("community_id", communityId),
+      havenCommunitySb()
+        .from("channel_role_overwrites")
+        .select("role_id, can_view, can_send, can_manage")
+        .eq("community_id", communityId)
+        .eq("channel_id", channelId),
+      havenCommunitySb()
+        .from("channel_member_overwrites")
+        .select("member_id, can_view, can_send, can_manage")
+        .eq("community_id", communityId)
+        .eq("channel_id", channelId),
+      havenCommunitySb()
+        .from("community_members")
+        .select("id, is_owner")
+        .eq("community_id", communityId)
+        .eq("user_id", userId)
         .maybeSingle(),
     ]);
 
@@ -2016,10 +2298,17 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (memberOverwritesError) throw memberOverwritesError;
     if (myMemberError) throw myMemberError;
 
-    const allMemberOptions: ChannelMemberOption[] = ((members ?? []) as CommunityMemberWithProfile[])
+    const allMemberOptions: ChannelMemberOption[] = (
+      (members ?? []) as CommunityMemberWithProfile[]
+    )
       .map((member) => {
-        const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
-        const displayName = member.nickname?.trim() || profile?.username || member.user_id.substring(0, 12);
+        const profile = Array.isArray(member.profiles)
+          ? member.profiles[0]
+          : member.profiles;
+        const displayName =
+          member.nickname?.trim() ||
+          profile?.username ||
+          member.user_id.substring(0, 12);
 
         return {
           memberId: member.id,
@@ -2040,17 +2329,22 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           canSend: overwrite.can_send,
           canManage: overwrite.can_manage,
         },
-      ])
+      ]),
     );
 
-    const rolePositionById = new Map((roles ?? []).map((role) => [role.id, role.position]));
+    const rolePositionById = new Map(
+      (roles ?? []).map((role) => [role.id, role.position]),
+    );
     const roleIds = (roles ?? []).map((role) => role.id);
-    let rolePermissionRows: Array<{ role_id: string; permission_key: string }> = [];
+    let rolePermissionRows: Array<{ role_id: string; permission_key: string }> =
+      [];
 
     if (roleIds.length > 0) {
-      const { data: rolePermissionData, error: rolePermissionsError } = await havenCommunitySb().from('role_permissions')
-        .select('role_id, permission_key')
-        .in('role_id', roleIds);
+      const { data: rolePermissionData, error: rolePermissionsError } =
+        await havenCommunitySb()
+          .from("role_permissions")
+          .select("role_id, permission_key")
+          .in("role_id", roleIds);
 
       if (rolePermissionsError) throw rolePermissionsError;
       rolePermissionRows = rolePermissionData ?? [];
@@ -2058,7 +2352,8 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     const rolePermissionKeysByRoleId = new Map<string, Set<string>>();
     for (const row of rolePermissionRows) {
-      const current = rolePermissionKeysByRoleId.get(row.role_id) ?? new Set<string>();
+      const current =
+        rolePermissionKeysByRoleId.get(row.role_id) ?? new Set<string>();
       current.add(row.permission_key);
       rolePermissionKeysByRoleId.set(row.role_id, current);
     }
@@ -2067,39 +2362,47 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     let myHighestRolePosition = Number.NEGATIVE_INFINITY;
 
     if (!canEditAllRoles && myMember?.id) {
-      const { data: myAssignedRoles, error: myAssignedRolesError } = await havenCommunitySb().from('member_roles')
-        .select('role_id')
-        .eq('community_id', communityId)
-        .eq('member_id', myMember.id);
+      const { data: myAssignedRoles, error: myAssignedRolesError } =
+        await havenCommunitySb()
+          .from("member_roles")
+          .select("role_id")
+          .eq("community_id", communityId)
+          .eq("member_id", myMember.id);
 
       if (myAssignedRolesError) throw myAssignedRolesError;
 
-      myHighestRolePosition = (myAssignedRoles ?? []).reduce((highest, roleAssignment) => {
-        const rolePosition = rolePositionById.get(roleAssignment.role_id);
-        if (typeof rolePosition !== 'number') return highest;
-        return Math.max(highest, rolePosition);
-      }, Number.NEGATIVE_INFINITY);
+      myHighestRolePosition = (myAssignedRoles ?? []).reduce(
+        (highest, roleAssignment) => {
+          const rolePosition = rolePositionById.get(roleAssignment.role_id);
+          if (typeof rolePosition !== "number") return highest;
+          return Math.max(highest, rolePosition);
+        },
+        Number.NEGATIVE_INFINITY,
+      );
     }
 
     const roleRows: ChannelRolePermissionItem[] = (roles ?? []).map((role) => {
       const overwrite = roleOverwriteMap.get(role.id);
-      const rolePermissionKeys = rolePermissionKeysByRoleId.get(role.id) ?? new Set<string>();
+      const rolePermissionKeys =
+        rolePermissionKeysByRoleId.get(role.id) ?? new Set<string>();
       return {
         roleId: role.id,
         name: role.name,
         color: role.color,
         isDefault: role.is_default,
         editable: canEditAllRoles || role.position < myHighestRolePosition,
-        defaultCanView: rolePermissionKeys.has('view_channels'),
-        defaultCanSend: rolePermissionKeys.has('send_messages'),
-        defaultCanManage: rolePermissionKeys.has('manage_channels'),
+        defaultCanView: rolePermissionKeys.has("view_channels"),
+        defaultCanSend: rolePermissionKeys.has("send_messages"),
+        defaultCanManage: rolePermissionKeys.has("manage_channels"),
         canView: overwrite?.canView ?? null,
         canSend: overwrite?.canSend ?? null,
         canManage: overwrite?.canManage ?? null,
       };
     });
 
-    const memberById = new Map(allMemberOptions.map((member) => [member.memberId, member]));
+    const memberById = new Map(
+      allMemberOptions.map((member) => [member.memberId, member]),
+    );
 
     const memberRows: ChannelMemberPermissionItem[] = (memberOverwrites ?? [])
       .map((overwrite) => {
@@ -2115,7 +2418,9 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           canManage: overwrite.can_manage,
         };
       })
-      .filter((member): member is ChannelMemberPermissionItem => member !== null)
+      .filter(
+        (member): member is ChannelMemberPermissionItem => member !== null,
+      )
       .sort((a, b) => {
         if (a.isOwner !== b.isOwner) return a.isOwner ? -1 : 1;
         return a.displayName.localeCompare(b.displayName);
@@ -2128,23 +2433,30 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     };
   },
 
-  async saveRoleChannelPermissions({ communityId, channelId, roleId, permissions }) {
+  async saveRoleChannelPermissions({
+    communityId,
+    channelId,
+    roleId,
+    permissions,
+  }) {
     const allInherited =
       permissions.canView === null &&
       permissions.canSend === null &&
       permissions.canManage === null;
 
     if (allInherited) {
-      const { error } = await havenCommunitySb().from('channel_role_overwrites')
+      const { error } = await havenCommunitySb()
+        .from("channel_role_overwrites")
         .delete()
-        .eq('community_id', communityId)
-        .eq('channel_id', channelId)
-        .eq('role_id', roleId);
+        .eq("community_id", communityId)
+        .eq("channel_id", channelId)
+        .eq("role_id", roleId);
       if (error) throw error;
       return;
     }
 
-    const { error } = await havenCommunitySb().from('channel_role_overwrites')
+    const { error } = await havenCommunitySb()
+      .from("channel_role_overwrites")
       .upsert(
         {
           community_id: communityId,
@@ -2154,24 +2466,33 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           can_send: permissions.canSend,
           can_manage: permissions.canManage,
         },
-        { onConflict: 'channel_id,role_id' }
+        { onConflict: "channel_id,role_id" },
       );
     if (error) throw error;
   },
 
-  async saveMemberChannelPermissions({ communityId, channelId, memberId, permissions }) {
+  async saveMemberChannelPermissions({
+    communityId,
+    channelId,
+    memberId,
+    permissions,
+  }) {
     const [
       { data: memberRow, error: memberError },
       { data: existingOverwrite, error: existingOverwriteError },
-    ] = await Promise.all([havenCommunitySb().from('community_members')
-        .select('user_id')
-        .eq('community_id', communityId)
-        .eq('id', memberId)
-        .maybeSingle(),havenCommunitySb().from('channel_member_overwrites')
-        .select('can_view')
-        .eq('community_id', communityId)
-        .eq('channel_id', channelId)
-        .eq('member_id', memberId)
+    ] = await Promise.all([
+      havenCommunitySb()
+        .from("community_members")
+        .select("user_id")
+        .eq("community_id", communityId)
+        .eq("id", memberId)
+        .maybeSingle(),
+      havenCommunitySb()
+        .from("channel_member_overwrites")
+        .select("can_view")
+        .eq("community_id", communityId)
+        .eq("channel_id", channelId)
+        .eq("member_id", memberId)
         .maybeSingle(),
     ]);
     if (memberError) throw memberError;
@@ -2179,7 +2500,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     const revokedUserId = memberRow?.user_id ?? null;
     if (!revokedUserId) {
-      throw new Error('Channel member overwrite target was not found.');
+      throw new Error("Channel member overwrite target was not found.");
     }
 
     const wasExplicitlyRevoked = existingOverwrite?.can_view === false;
@@ -2189,16 +2510,18 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       permissions.canManage === null;
 
     if (allInherited) {
-      const { error } = await havenCommunitySb().from('channel_member_overwrites')
+      const { error } = await havenCommunitySb()
+        .from("channel_member_overwrites")
         .delete()
-        .eq('community_id', communityId)
-        .eq('channel_id', channelId)
-        .eq('member_id', memberId);
+        .eq("community_id", communityId)
+        .eq("channel_id", channelId)
+        .eq("member_id", memberId);
       if (error) throw error;
       return null;
     }
 
-    const { error } = await havenCommunitySb().from('channel_member_overwrites')
+    const { error } = await havenCommunitySb()
+      .from("channel_member_overwrites")
       .upsert(
         {
           community_id: communityId,
@@ -2208,7 +2531,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
           can_send: permissions.canSend,
           can_manage: permissions.canManage,
         },
-        { onConflict: 'channel_id,member_id' }
+        { onConflict: "channel_id,member_id" },
       );
     if (error) throw error;
     if (permissions.canView !== false || wasExplicitlyRevoked) {
@@ -2223,71 +2546,85 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
   },
 
   async listChannelRevokedUserIds({ communityId, channelId }) {
-    const { data: overwriteRows, error: overwriteError } = await havenCommunitySb().from('channel_member_overwrites')
-      .select('member_id')
-      .eq('community_id', communityId)
-      .eq('channel_id', channelId)
-      .eq('can_view', false);
+    const { data: overwriteRows, error: overwriteError } =
+      await havenCommunitySb()
+        .from("channel_member_overwrites")
+        .select("member_id")
+        .eq("community_id", communityId)
+        .eq("channel_id", channelId)
+        .eq("can_view", false);
     if (overwriteError) throw overwriteError;
 
     const memberIds = Array.from(
       new Set(
         (overwriteRows ?? [])
           .map((row) => row.member_id)
-          .filter((memberId): memberId is string => Boolean(memberId))
-      )
+          .filter((memberId): memberId is string => Boolean(memberId)),
+      ),
     );
     if (memberIds.length === 0) {
       return [] as string[];
     }
 
-    const { data: memberRows, error: memberError } = await havenCommunitySb().from('community_members')
-      .select('user_id')
-      .eq('community_id', communityId)
-      .in('id', memberIds);
+    const { data: memberRows, error: memberError } = await havenCommunitySb()
+      .from("community_members")
+      .select("user_id")
+      .eq("community_id", communityId)
+      .in("id", memberIds);
     if (memberError) throw memberError;
 
     return Array.from(
       new Set(
         (memberRows ?? [])
           .map((row) => row.user_id)
-          .filter((userId): userId is string => Boolean(userId))
-      )
+          .filter((userId): userId is string => Boolean(userId)),
+      ),
     );
   },
 
   async updateChannel({ communityId, channelId, name, topic }) {
-    const { error } = await havenCommunitySb().from('channels')
+    const { error } = await havenCommunitySb()
+      .from("channels")
       .update({
         name,
         topic,
       })
-      .eq('community_id', communityId)
-      .eq('id', channelId);
+      .eq("community_id", communityId)
+      .eq("id", channelId);
 
     if (error) throw error;
   },
 
   async deleteChannel({ communityId, channelId }) {
-    const { error } = await havenCommunitySb().from('channels')
+    const { error } = await havenCommunitySb()
+      .from("channels")
       .delete()
-      .eq('community_id', communityId)
-      .eq('id', channelId);
+      .eq("community_id", communityId)
+      .eq("id", channelId);
 
     if (error) throw error;
   },
 
-  async sendUserMessage({ communityId, channelId, content, replyToMessageId, metadata }) {
-    const { data, error } = await havenCommunitySb().rpc('send_user_message' as never, {
-      p_community_id: communityId,
-      p_channel_id: channelId,
-      p_content: content,
-      p_reply_to_message_id: replyToMessageId ?? null,
-      p_metadata: metadata ?? {},
-    } as never);
+  async sendUserMessage({
+    communityId,
+    channelId,
+    content,
+    replyToMessageId,
+    metadata,
+  }) {
+    const { data, error } = await havenCommunitySb().rpc(
+      "send_user_message" as never,
+      {
+        p_community_id: communityId,
+        p_channel_id: channelId,
+        p_content: content,
+        p_reply_to_message_id: replyToMessageId ?? null,
+        p_metadata: metadata ?? {},
+      } as never,
+    );
     if (error) throw error;
-    if (data == null || typeof data !== 'string') {
-      throw new Error('send_user_message did not return a message id');
+    if (data == null || typeof data !== "string") {
+      throw new Error("send_user_message did not return a message id");
     }
     return { id: data };
   },
@@ -2301,15 +2638,15 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     });
     const mediaKind = deriveMessageMediaKindFromMimeType(input.mimeType);
     const sizeBytes =
-      typeof Blob !== 'undefined' && input.file instanceof Blob
+      typeof Blob !== "undefined" && input.file instanceof Blob
         ? input.file.size
         : input.file instanceof ArrayBuffer
           ? input.file.byteLength
           : (input.file as unknown as ArrayBuffer).byteLength;
 
     const uploadContentType = input.contentType ?? input.mimeType;
-    const { error: uploadError } = await havenCommunitySb().storage
-      .from(MESSAGE_MEDIA_BUCKET)
+    const { error: uploadError } = await havenCommunitySb()
+      .storage.from(MESSAGE_MEDIA_BUCKET)
       .upload(objectPath, input.file, {
         contentType: uploadContentType,
         upsert: false,
@@ -2317,7 +2654,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (uploadError) throw uploadError;
 
     const expiresAt = new Date(
-      Date.now() + input.expiresInHours * 60 * 60 * 1000
+      Date.now() + input.expiresInHours * 60 * 60 * 1000,
     ).toISOString();
 
     return {
@@ -2335,48 +2672,57 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       error: authError,
     } = await havenCommunitySb().auth.getUser();
     if (authError) throw authError;
-    if (!user?.id) throw new Error('Not authenticated.');
+    if (!user?.id) throw new Error("Not authenticated.");
 
-    const { error } = await havenCommunitySb().from('message_attachments' as never).insert({
-      message_id: input.messageId,
-      community_id: input.communityId,
-      channel_id: input.channelId,
-      owner_user_id: user.id,
-      bucket_name: MESSAGE_MEDIA_BUCKET,
-      object_path: input.objectPath,
-      original_filename: input.filename ?? null,
-      mime_type: input.mimeType,
-      media_kind: input.mediaKind,
-      size_bytes: input.sizeBytes,
-      expires_at: input.expiresAt,
-    } as never);
+    const { error } = await havenCommunitySb()
+      .from("message_attachments" as never)
+      .insert({
+        message_id: input.messageId,
+        community_id: input.communityId,
+        channel_id: input.channelId,
+        owner_user_id: user.id,
+        bucket_name: MESSAGE_MEDIA_BUCKET,
+        object_path: input.objectPath,
+        original_filename: input.filename ?? null,
+        mime_type: input.mimeType,
+        media_kind: input.mediaKind,
+        size_bytes: input.sizeBytes,
+        expires_at: input.expiresAt,
+      } as never);
     if (error) throw error;
   },
 
   async editUserMessage({ communityId, messageId, content }) {
-    const { error } = await havenCommunitySb().from('messages')
+    const { error } = await havenCommunitySb()
+      .from("messages")
       .update({
         content,
         edited_at: new Date().toISOString(),
       })
-      .eq('community_id', communityId)
-      .eq('id', messageId);
+      .eq("community_id", communityId)
+      .eq("id", messageId);
     if (error) throw error;
   },
 
-  async deleteMessage(input: { communityId: string; messageId: string } | { messageId: string }) {
-    if ('communityId' in input && typeof input.communityId === 'string') {
+  async deleteMessage(
+    input: { communityId: string; messageId: string } | { messageId: string },
+  ) {
+    if ("communityId" in input && typeof input.communityId === "string") {
       const { communityId, messageId } = input;
       // Storage objects must be removed through the Storage API, not direct SQL.
-      const { data: attachmentRows, error: attachmentRowsError } = await havenCommunitySb().from('message_attachments' as never)
-        .select('bucket_name, object_path')
-        .eq('community_id', communityId)
-        .eq('message_id', messageId);
+      const { data: attachmentRows, error: attachmentRowsError } =
+        await havenCommunitySb()
+          .from("message_attachments" as never)
+          .select("bucket_name, object_path")
+          .eq("community_id", communityId)
+          .eq("message_id", messageId);
       if (attachmentRowsError) throw attachmentRowsError;
 
       const attachmentPathsByBucket = new Map<string, string[]>();
-      for (const attachmentRow of (attachmentRows ?? []) as MessageAttachmentStorageRow[]) {
-        const existingPaths = attachmentPathsByBucket.get(attachmentRow.bucket_name) ?? [];
+      for (const attachmentRow of (attachmentRows ??
+        []) as MessageAttachmentStorageRow[]) {
+        const existingPaths =
+          attachmentPathsByBucket.get(attachmentRow.bucket_name) ?? [];
         existingPaths.push(attachmentRow.object_path);
         attachmentPathsByBucket.set(attachmentRow.bucket_name, existingPaths);
       }
@@ -2387,18 +2733,22 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         try {
           await havenCommunityStore().removeObjects(bucketName, paths);
         } catch (removeError) {
-          console.warn('Failed to remove message attachment objects before message delete:', {
-            messageId,
-            bucketName,
-            removeError,
-          });
+          console.warn(
+            "Failed to remove message attachment objects before message delete:",
+            {
+              messageId,
+              bucketName,
+              removeError,
+            },
+          );
         }
       }
 
-      const { error } = await havenCommunitySb().from('messages')
+      const { error } = await havenCommunitySb()
+        .from("messages")
         .delete()
-        .eq('community_id', communityId)
-        .eq('id', messageId);
+        .eq("community_id", communityId)
+        .eq("id", messageId);
       if (error) throw error;
       return;
     }
@@ -2409,21 +2759,30 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
       error: authError,
     } = await havenCommunitySb().auth.getUser();
     if (authError) throw authError;
-    if (!user?.id) throw new Error('Not authenticated.');
+    if (!user?.id) throw new Error("Not authenticated.");
 
-    const { error } = await havenCommunitySb().from('messages')
+    const { error } = await havenCommunitySb()
+      .from("messages")
       .delete()
-      .eq('id', messageId)
-      .eq('author_user_id', user.id);
+      .eq("id", messageId)
+      .eq("author_user_id", user.id);
     if (error) throw error;
   },
 
-  async reportMessage({ communityId, channelId, messageId, reporterUserId, target, kind, comment }) {
+  async reportMessage({
+    communityId,
+    channelId,
+    messageId,
+    reporterUserId,
+    target,
+    kind,
+    comment,
+  }) {
     const reportTitle =
-      kind === 'bug' ? 'Message Report: Bug' : 'Message Report: Content Abuse';
+      kind === "bug" ? "Message Report: Bug" : "Message Report: Content Abuse";
 
     const reportNotes = JSON.stringify({
-      type: 'message_report',
+      type: "message_report",
       messageId,
       channelId,
       target,
@@ -2439,53 +2798,64 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
         messageId,
       });
     } catch (snapshotError) {
-      console.warn('Failed to capture support report message snapshot:', snapshotError);
+      console.warn(
+        "Failed to capture support report message snapshot:",
+        snapshotError,
+      );
     }
 
-    if (target === 'both') {
+    if (target === "both") {
       // Fan-out: insert server_admins row first, then haven_staff row with source_report_id link.
       // 'both' is never stored — each side gets an independent row.
       const serverAdminsId = createPortableUuid();
       const havenStaffId = createPortableUuid();
 
-      const { error: saError } = await havenCommunitySb().from('support_reports').insert({
-        id: serverAdminsId,
-        community_id: communityId,
-        destination: 'server_admins',
-        reporter_user_id: reporterUserId,
-        title: reportTitle,
-        notes: reportNotes,
-        snapshot,
-        include_last_n_messages: null,
-      });
+      const { error: saError } = await havenCommunitySb()
+        .from("support_reports")
+        .insert({
+          id: serverAdminsId,
+          community_id: communityId,
+          destination: "server_admins",
+          reporter_user_id: reporterUserId,
+          title: reportTitle,
+          notes: reportNotes,
+          snapshot,
+          include_last_n_messages: null,
+        });
       if (saError) throw saError;
 
-      const { error: hsError } = await havenCommunitySb().from('support_reports').insert({
-        id: havenStaffId,
-        community_id: communityId,
-        destination: 'haven_staff',
-        reporter_user_id: reporterUserId,
-        title: reportTitle,
-        notes: reportNotes,
-        snapshot,
-        include_last_n_messages: null,
-        source_report_id: serverAdminsId,
-      });
+      const { error: hsError } = await havenCommunitySb()
+        .from("support_reports")
+        .insert({
+          id: havenStaffId,
+          community_id: communityId,
+          destination: "haven_staff",
+          reporter_user_id: reporterUserId,
+          title: reportTitle,
+          notes: reportNotes,
+          snapshot,
+          include_last_n_messages: null,
+          source_report_id: serverAdminsId,
+        });
       if (hsError) throw hsError;
 
       // Link both rows to the same channel and message for context
       for (const reportId of [serverAdminsId, havenStaffId]) {
-        const { error: channelLinkError } = await havenCommunitySb().from('support_report_channels').insert({
-          report_id: reportId,
-          community_id: communityId,
-          channel_id: channelId,
-        });
+        const { error: channelLinkError } = await havenCommunitySb()
+          .from("support_report_channels")
+          .insert({
+            report_id: reportId,
+            community_id: communityId,
+            channel_id: channelId,
+          });
         if (channelLinkError) throw channelLinkError;
 
-        const { error: messageLinkError } = await havenCommunitySb().from('support_report_messages').insert({
-          report_id: reportId,
-          message_id: messageId,
-        });
+        const { error: messageLinkError } = await havenCommunitySb()
+          .from("support_report_messages")
+          .insert({
+            report_id: reportId,
+            message_id: messageId,
+          });
         if (messageLinkError) throw messageLinkError;
       }
       return;
@@ -2494,7 +2864,8 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     // Single destination: server_admins or haven_staff
     const reportId = createPortableUuid();
 
-    const { error: reportError } = await havenCommunitySb().from('support_reports')
+    const { error: reportError } = await havenCommunitySb()
+      .from("support_reports")
       .insert({
         id: reportId,
         community_id: communityId,
@@ -2508,18 +2879,21 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     if (reportError) throw reportError;
 
-    const { error: channelLinkError } = await havenCommunitySb().from('support_report_channels').insert({
-      report_id: reportId,
-      community_id: communityId,
-      channel_id: channelId,
-    });
+    const { error: channelLinkError } = await havenCommunitySb()
+      .from("support_report_channels")
+      .insert({
+        report_id: reportId,
+        community_id: communityId,
+        channel_id: channelId,
+      });
     if (channelLinkError) throw channelLinkError;
 
-    const { error: messageLinkError } = await havenCommunitySb().from('support_report_messages').insert({
-      report_id: reportId,
-      message_id: messageId,
-    });
+    const { error: messageLinkError } = await havenCommunitySb()
+      .from("support_report_messages")
+      .insert({
+        report_id: reportId,
+        message_id: messageId,
+      });
     if (messageLinkError) throw messageLinkError;
   },
-
 };

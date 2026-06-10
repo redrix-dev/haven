@@ -9,5 +9,5 @@
  * and must NOT call this function.
  */
 export function toInvertedChatOrder<T>(items: T[]): T[] {
-  return [...items].reverse()
+  return [...items].reverse();
 }

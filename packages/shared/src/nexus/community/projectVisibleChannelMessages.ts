@@ -27,10 +27,7 @@ export function projectVisibleChannelMessagesBlockOnly(
   const pendingHiddenRootIds: string[] = [];
 
   for (const bundle of raw) {
-    if (
-      !bundle.authorUserId ||
-      !hiddenAuthorIds.has(bundle.authorUserId)
-    ) {
+    if (!bundle.authorUserId || !hiddenAuthorIds.has(bundle.authorUserId)) {
       continue;
     }
     pendingHiddenRootIds.push(bundle.id);
@@ -108,7 +105,10 @@ export function projectVisibleChannelMessages(
         content: BANNED_REPLY_PLACEHOLDER_CONTENT,
         metadata: {
           ...bundle.metadata,
-          moderation: { contentRemoved: true, reason: "channel_access_revoked" },
+          moderation: {
+            contentRemoved: true,
+            reason: "channel_access_revoked",
+          },
         },
         reactions: [],
         attachment: null,

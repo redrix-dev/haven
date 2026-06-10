@@ -23,10 +23,7 @@ function truncateString(value: string): string {
   return `${value.slice(0, MAX_STRING_LENGTH)}…(${value.length} chars)`;
 }
 
-export function safeSerializeDebugValue(
-  value: unknown,
-  depth = 0,
-): unknown {
+export function safeSerializeDebugValue(value: unknown, depth = 0): unknown {
   if (value == null) return value;
   if (depth > MAX_DEPTH) return "[MaxDepth]";
 
@@ -43,9 +40,9 @@ export function safeSerializeDebugValue(
   }
 
   if (Array.isArray(value)) {
-    const slice = value.slice(0, MAX_ARRAY_ITEMS).map((item) =>
-      safeSerializeDebugValue(item, depth + 1),
-    );
+    const slice = value
+      .slice(0, MAX_ARRAY_ITEMS)
+      .map((item) => safeSerializeDebugValue(item, depth + 1));
     if (value.length > MAX_ARRAY_ITEMS) {
       slice.push(`…+${value.length - MAX_ARRAY_ITEMS} more`);
     }

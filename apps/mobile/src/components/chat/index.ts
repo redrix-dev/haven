@@ -4,8 +4,14 @@
  * Screens compose message lists with `ChatInterface` + `ChatComposer` only.
  * Do not import `internal/ChatScrollView` or RNKC scroll primitives directly.
  */
-export { ChatInterface, type ChatInterfaceProps } from "@/components/chat/ChatInterface";
-export { ChatComposer, type ChatComposerProps } from "@/components/chat/ChatComposer";
+export {
+  ChatInterface,
+  type ChatInterfaceProps,
+} from "@/components/chat/ChatInterface";
+export {
+  ChatComposer,
+  type ChatComposerProps,
+} from "@/components/chat/ChatComposer";
 export { ChatReplyStrip } from "@/components/chat/ChatReplyStrip";
 export { ChatMediaAttachmentStrip } from "@/components/chat/ChatMediaAttachmentStrip";
 export {

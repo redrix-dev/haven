@@ -18,7 +18,9 @@ export function validateMediaSendOptions(
     throw new Error("Cannot send both mediaFile and mediaArrayBuffer.");
   }
   if (hasBuffer && !options.mediaContentType?.trim()) {
-    throw new Error("mediaContentType is required when sending mediaArrayBuffer.");
+    throw new Error(
+      "mediaContentType is required when sending mediaArrayBuffer.",
+    );
   }
   return { hasBlob, hasBuffer };
 }

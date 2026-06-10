@@ -9,8 +9,7 @@ export function usePermissions(
 ): ServerPermissions {
   return useStoreSelector(
     nexus.reactiveStore,
-    (state) =>
-      state.permissionsByCommunityId[communityId] ?? EMPTY_PERMISSIONS,
+    (state) => state.permissionsByCommunityId[communityId] ?? EMPTY_PERMISSIONS,
   );
 }
 
