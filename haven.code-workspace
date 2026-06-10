@@ -1,4 +1,9 @@
 {
+  // VSCode/Cursor workspace for Haven. Zed is the primary editor (see
+  // .zed/settings.json); this file is kept roughly in sync with it so Cursor and
+  // VSCode behave the same. Per-machine overrides go in .vscode/ (gitignored).
+  // Intentionally maintained — not a fossil. See docs/ARCHITECTURE.md § Editor
+  // configuration.
   "folders": [
     {
       "path": ".",

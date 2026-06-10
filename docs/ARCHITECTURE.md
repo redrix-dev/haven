@@ -112,3 +112,22 @@ shared packages to real npm workspace packages (`package.json` + `exports`) in o
 dedicated milestone. Details, sequencing rules, and the empirical finding that
 tsconfig paths alone drive Metro resolution:
 [SOLID_REBUILD.md § Standing decision](./SOLID_REBUILD.md#standing-decision--workspace-packages).
+
+## Editor configuration
+
+Haven is developed primarily in **Zed**, occasionally in **Cursor**. Two editor
+config files are **tracked and intentionally kept roughly in sync** so the repo
+behaves the same in either — they are maintained, not leftover cruft:
+
+| File                   | Editor                       | Tracked?        |
+| ---------------------- | ---------------------------- | --------------- |
+| `.zed/settings.json`   | Zed (primary)                | yes             |
+| `haven.code-workspace` | VSCode / Cursor              | yes             |
+| `.vscode/`             | VSCode per-machine overrides | no — gitignored |
+| `.cursor/`             | Cursor per-machine state     | no — gitignored |
+
+The split is deliberate: shared, repo-wide editor behavior lives in the two tracked
+files (kept aligned with each other); anything machine- or person-specific stays in
+the gitignored `.vscode/` and `.cursor/`. When you change one tracked file's
+repo-wide behavior (exclusions, formatter, file associations), mirror it in the
+other. Both carry a header comment pointing back here.
