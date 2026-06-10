@@ -90,8 +90,9 @@ Order of work (each step gated by `test:cleave` + `typecheck:solid` / `build:sol
    through the real `solidAuthService` → `SessionProvider` → `bootstrapSession`
    path. Low domain complexity on purpose: it proves the theme setup renders, and
    exercises the session/accessor read path before tackling a data-heavy screen.
-   Even pre-router, the screen registers through `routes/` — `App.tsx` never
-   imports screens directly.
+   `@solidjs/router` is installed and mounted (`App.tsx` → `routes/index.tsx`,
+   router-mode decision record in the shape doc § Routing); the playground
+   replaces the `DevHarness` entry at `/`.
 4. **Real screens as vertical slices.** One screen at a time as a
    `features/<domain>/` slice (shape doc governs), consuming caches **through
    accessors only**; add a domain's `accessors.ts` when its first screen needs

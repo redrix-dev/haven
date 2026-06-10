@@ -124,9 +124,26 @@ be hacked in on an assumption of shared memory.
 
 ## Routing
 
-`@solidjs/router` is the planned router; it gets installed when the first real
-screen lands. `routes/` is the registration point **even before the router
-exists** — pre-router scaffolding (e.g. the dumb-UI playground) is still exported
-through `routes/` so `App.tsx` never learns to import screens directly. New
-feature = new folder in `features/` + one registration in `routes/`. `App.tsx`
-gains a line only when providers or window chrome change.
+`@solidjs/router` is installed and mounted: `App.tsx` mounts `<Router>`, and
+`routes/index.tsx` exports the `RouteDefinition[]` it renders. New feature = new
+folder in `features/` + one registration in `routes/`. `App.tsx` gains a line
+only when providers or window chrome change.
+
+**Router-mode decision record (2026-06-10):**
+
+1. **History mode is the default.** Route definitions are mode-agnostic — the
+   integration is one line at the mount point in `App.tsx`, so this is a cheap
+   decision to revisit per shell, never a rewrite.
+2. **Web never compromises on history mode.** Real URLs
+   (`haven.app/community/x`) are shareable product surface; hash URLs would be a
+   permanent cosmetic scar. Web production needs the standard one-line SPA
+   rewrite in the Vercel config when that shell lands.
+3. **Tauri production reload is a known-unknown.** Dev is fine (Tauri loads the
+   Vite server, which falls back to `index.html` on any path). The bundled app
+   serves from Tauri's custom protocol, and whether reloading on a deep path
+   like `/community/x` resolves to `index.html` or 404s gets **tested
+   empirically at the first `tauri:build` smoke test** — don't trust anyone's
+   memory of protocol fallback behavior, including ours. If it 404s, the
+   contained fix: flip the Tauri shell to hash routing (desktop has no URL
+   aesthetics — nobody sees the address bar) or configure the protocol
+   fallback. Either way, zero route definitions change.

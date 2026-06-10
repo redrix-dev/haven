@@ -93,6 +93,7 @@
     "vitest": "^4.1.8"
   },
   "dependencies": {
+    "@solidjs/router": "^0.16.1",
     "@supabase/supabase-js": "^2.107.0",
     "@tauri-apps/api": "^2.11.0",
     "clsx": "^2.1.1",
