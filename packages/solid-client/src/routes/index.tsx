@@ -40,7 +40,7 @@ function AppLayout(props: RouteSectionProps) {
       </Match>
 
       <Match when={session()}>
-        <div class="flex h-full w-full overflow-hidden bg-surface-1">
+        <div class="flex h-full w-full overflow-hidden bg-surface-app">
           <CommunitySidebar />
           <main class="flex flex-1 flex-col overflow-hidden">
             {props.children}
