@@ -1,1 +1,2 @@
-export { VoiceSolidCache } from "./voiceSolidCache";
+export { VoiceSolidCache, createVoiceSolidCache } from "./voiceSolidCache";
+export { createVoiceState, createChannelVoiceParticipants } from "./accessors";

@@ -1,15 +1,11 @@
 /**
- * Shell-agnostic capability interface the Solid UI consumes.
+ * Shell-agnostic capability interface the Solid UI consumes — the public
+ * surface shells implement (see apps/tauri/src/bridge.ts).
  *
- * The UI never talks to Tauri/Electron directly — a shell injects an
- * implementation of this interface (see apps/tauri/src/bridge.ts). This mirrors
- * the platform-injection pattern used on mobile and keeps `solid-client`
- * portable (it also runs in a plain browser with no bridge at all).
- *
- * When we wire `@shared` in later, the real backend-access methods get added
- * here and implemented per shell.
+ * The definition lives in contexts/BridgeProvider.tsx (the layer that
+ * distributes it to features); this root file re-exports it so shells keep a
+ * stable import path. The UI never talks to Tauri/Electron directly: a shell
+ * injects an implementation at bootstrap, and `solid-client` stays portable
+ * (it also runs in a plain browser with no bridge at all).
  */
-export interface HavenBridge {
-  /** Demonstrates the Tauri `invoke` round-trip. */
-  ping(name: string): Promise<string>;
-}
+export type { HavenBridge, PopoutOptions } from "./contexts/BridgeProvider";

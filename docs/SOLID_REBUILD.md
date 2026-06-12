@@ -40,16 +40,36 @@ The data and core layers are **done and wired to real backends** — the earlier
   profile, messages. **Still thin / audit before relying:** `feature-flags`,
   `onboarding`, `voice`, `community-management`.
 - **Accessors (the UI read layer)** exist for **channels, communities,
-  direct-messages, notifications** only. The rest are added per the
+  direct-messages, notifications, messages, community-management (members),
+  profile (viewer profile)**. The rest are added per the
   [`data/README.md`](../packages/solid-client/src/data/README.md) rule — _an
   accessor is written when a screen first needs to read that domain_, so a missing
   one is by-design, not debt.
 - **Session stores** (auth, ui, userStatus, viewerMessagePolicy) built.
 
-The frontier is everything **above** the cache: there is no real UI yet
-(`App.tsx` + `DevLogin.tsx` only), and **the theme/styling layer is unwired** —
-`solid-client/src/styles.css` is hand-written placeholder colors, not the shared
-theme.
+**Milestone 1 (2026-06-11) — app shell + community text chat — landed.** The dev
+harness (`DevLogin`, `ThemePlayground`, placeholder CSS) is gone; what exists now:
+
+- **Routes**: `/sign-in`, `/` (auth-guarded `AppLayout`) → home redirect,
+  `/community/:communityId[/channel/:channelId]`, `/settings/appearance`. The URL
+  is the source of truth — `CommunityRouteSync` writes cache active-ids from
+  params, never the reverse.
+- **`components/ui/`**: Kobalte-based Button/TextField/Avatar/Tooltip + the
+  `Markdown/` chat renderer (marked lexer → Solid token renderer; `||spoiler||`
+  as an inline extension mirroring the shared parity contract; html tokens
+  render inert; hrefs protocol-filtered — no innerHTML, no sanitizer needed).
+- **Community chat slice**: virtua-virtualized message list behind a view-model
+  seam (canvas renderer can swap in later), grouped rows + date dividers, reply
+  context, plain-textarea composer (`normalizeCommunityMarkdown` before send),
+  `ensureInitialLoaded`/`loadOlder` pagination with shift-prepend, realtime
+  inserts via the already-routed core. Members panel via the fleshed
+  `CommunityAdminSolidCache`.
+- **Theme lifecycle** (`contexts/ThemeProvider.tsx`): boot from localStorage,
+  viewer-profile hydration wins, optimistic select with revert, persisted via
+  `profiles.updateViewerProfile` so mobile follows. Applying a theme writes
+  primitive **and resolved semantic** vars — the Tailwind bridge maps utilities
+  to semantic vars only, so UI code must use semantic utilities (`bg-card`, not
+  `bg-surface-2`; the latter silently generates nothing).
 
 ## Current phase — UI + theme foundation
 
@@ -86,19 +106,31 @@ Order of work (each step gated by `test:cleave` + `typecheck:solid` / `build:sol
    imports, upward imports, non-barrel feature entry, and any
    `@tauri-apps`/react import inside `solid-client`. `features/`, `routes/`, and
    `components/ui/` are scaffolded with READMEs stating their contracts.
-3. **"Dumb UI behind login" playground.** A minimal authenticated screen reached
-   through the real `solidAuthService` → `SessionProvider` → `bootstrapSession`
-   path. Low domain complexity on purpose: it proves the theme setup renders, and
-   exercises the session/accessor read path before tackling a data-heavy screen.
-   `@solidjs/router` is installed and mounted (`App.tsx` → `routes/index.tsx`,
-   router-mode decision record in the shape doc § Routing); the playground
-   replaces the `DevHarness` entry at `/`.
-4. **Real screens as vertical slices.** One screen at a time as a
-   `features/<domain>/` slice (shape doc governs), consuming caches **through
-   accessors only**; add a domain's `accessors.ts` when its first screen needs
-   it. The community channel chat view is the meatiest slice — it exercises the
-   `messages` cache + realtime end to end; do it once the playground proves the
-   plumbing.
+3. ~~**"Dumb UI behind login" playground.**~~ Superseded — milestone 1 went
+   straight to real vertical slices on the same plumbing.
+4. **Real screens as vertical slices — in progress.** ✅ community channel chat
+   (the meatiest slice — messages cache + realtime end to end), ✅
+   settings/appearance, ✅ **voice (2026-06-12)**: `VoiceSolidCache` is a 1:1
+   port of mobile's VoiceNexus (presence/kick channels, token fetch);
+   `contexts/VoiceProvider.tsx` owns the LiveKit Room (Solid port of
+   `useMobileLiveKitVoiceSession`, plus web audio-element management and
+   autoplay-blocked handling); sidebar voice rows join on click and show live
+   occupants via presence; `VoiceDock` (mute/deafen/leave/popout) renders
+   under the sidebar. **First popout landed**: `/popout/voice` +
+   `bridge.openPopout` (Tauri `WebviewWindow` / browser `window.open`);
+   cross-window sync = mirror + remote-control over BroadcastChannel —
+   decision record in the shape doc § window model. Hard-won lesson recorded
+   in `voiceSync.ts`: BroadcastChannel payloads must be PLAIN objects — Solid
+   store proxies fail structured clone, and the DataCloneError unwinds out of
+   whatever store write triggered the broadcasting effect. Not yet in voice:
+   PTT/voice-activity gating, per-member volumes, device pickers in UI (the
+   controller supports switching), kick UI. Next slices, in order:
+   **direct-messages** (reuses Markdown/list/composer), **friends**,
+   **notifications** (toasts arrive here — `solid-sonner`). Then message
+   actions parity (edit/delete/reactions — the cache methods that currently
+   throw) and the tiptap composer upgrade. Perf note: `livekit-client` puts
+   the bundle at ~1.07 MB — lazy-loading the voice path is the obvious first
+   code-split when perf work begins.
 5. **Shell capabilities.** Map the `AppHost` bridge surface
    (`packages/shared/src/infrastructure/platform/appHost.ts`) onto Tauri
    `invoke()` commands as features need them: window chrome, updater, deep links
@@ -110,17 +142,17 @@ a plain value, so it re-subscribes when the value changes.
 
 ## React → Solid mapping (for the UI build)
 
-Carried from the spike evaluation; verify each on first use.
+Carried from the spike evaluation; ✅ = adopted and in the tree.
 
 | Need                  | Solid choice                                  | Notes                                           |
 | --------------------- | --------------------------------------------- | ----------------------------------------------- |
 | Core                  | `solid-js`                                    | Components run once; signals, not hooks         |
-| Headless primitives   | `@kobalte/core`                               | Replaces radix; API differs                     |
-| Icons                 | `lucide-solid`                                | Near drop-in                                    |
-| Toasts                | `solid-sonner`                                |                                                 |
-| Virtualized chat list | `virtua` (Solid) or `@tanstack/solid-virtual` | **Verify chat scroll behavior carefully**       |
+| Headless primitives   | ✅ `@kobalte/core`                            | Replaces radix; API differs                     |
+| Icons                 | ✅ `lucide-solid`                             | Near drop-in                                    |
+| Toasts                | `solid-sonner`                                | Install with the notifications slice            |
+| Virtualized chat list | ✅ `virtua/solid`                             | `shift` handles prepend; seam allows swap       |
 | Rich text editor      | `@tiptap/core` + manual Solid binding         | Tiptap core is framework-agnostic               |
-| Markdown              | render `marked` output / `solid-markdown`     |                                                 |
+| Markdown              | ✅ `marked` lexer + own Solid token renderer  | No innerHTML; spoilers via inline extension     |
 | Image crop            | wrap a vanilla lib                            | No 1:1 port — known gap                         |
 | Command palette       | `cmdk-solid` or build on Kobalte              | **Verify maintenance** before adopting          |
 | Gestures              | `@use-gesture/vanilla` + wrapper              |                                                 |

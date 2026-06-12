@@ -1,10 +1,12 @@
 import { Router } from "@solidjs/router";
 import type { RouteSectionProps } from "@solidjs/router";
 import type { HavenBridge } from "./bridge";
+import { BridgeProvider } from "./contexts/BridgeProvider";
 import { SessionProvider } from "./contexts/SessionProvider";
+import { ThemeProvider } from "./contexts/ThemeProvider";
+import { VoiceProvider } from "./contexts/VoiceProvider";
 import { routes } from "./routes";
 import "./theme.css";
-import "./styles.css";
 
 /**
  * The app shell: providers + router + (eventually) window chrome. Nothing
@@ -18,10 +20,24 @@ import "./styles.css";
  * first `tauri:build` smoke test — see the shape doc § Routing for the
  * decision record and the contained fix if it 404s.
  */
-export function App(_props: { bridge?: HavenBridge }) {
-  return <Router root={AppRoot}>{routes}</Router>;
+export function App(props: { bridge?: HavenBridge }) {
+  return (
+    <Router
+      root={(rootProps) => <AppRoot bridge={props.bridge} {...rootProps} />}
+    >
+      {routes}
+    </Router>
+  );
 }
 
-function AppRoot(props: RouteSectionProps) {
-  return <SessionProvider>{props.children}</SessionProvider>;
+function AppRoot(props: RouteSectionProps & { bridge?: HavenBridge }) {
+  return (
+    <BridgeProvider bridge={props.bridge}>
+      <SessionProvider>
+        <ThemeProvider>
+          <VoiceProvider>{props.children}</VoiceProvider>
+        </ThemeProvider>
+      </SessionProvider>
+    </BridgeProvider>
+  );
 }

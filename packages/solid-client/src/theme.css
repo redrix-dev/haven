@@ -13,3 +13,18 @@
 
 @source "./";
 @source "../../../apps/tauri/src";
+
+/* The app fills the window; every screen sizes itself with h-full from here. */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--background);
+    color: var(--foreground);
+  }
+}

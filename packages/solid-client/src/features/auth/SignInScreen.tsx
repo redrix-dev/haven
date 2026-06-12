@@ -1,6 +1,7 @@
 import { createSignal, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useSession } from "@solid-client/contexts/SessionProvider";
+import { Button, TextField } from "@solid-client/components/ui";
 
 export function SignInScreen() {
   const { signIn } = useSession();
@@ -37,50 +38,36 @@ export function SignInScreen() {
   return (
     <div class="flex h-full w-full items-center justify-center bg-background">
       <div class="w-full max-w-sm rounded-xl bg-card p-8 shadow-lg">
-        <h1 class="mb-6 text-xl font-bold text-text-primary">
-          Sign in to Haven
-        </h1>
+        <h1 class="mb-6 text-xl font-bold text-foreground">Sign in to Haven</h1>
 
         <form onSubmit={submit} class="flex flex-col gap-4">
-          <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-text-secondary">Email</label>
-            <input
-              type="email"
-              autocomplete="username"
-              required
-              value={email()}
-              onInput={(e) => setEmail(e.currentTarget.value)}
-              class="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
-              placeholder="you@example.com"
-            />
-          </div>
+          <TextField
+            label="Email"
+            type="email"
+            autocomplete="username"
+            required
+            value={email()}
+            onChange={setEmail}
+            placeholder="you@example.com"
+          />
 
-          <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-text-secondary">
-              Password
-            </label>
-            <input
-              type="password"
-              autocomplete="current-password"
-              required
-              value={password()}
-              onInput={(e) => setPassword(e.currentTarget.value)}
-              class="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
-              placeholder="••••••••"
-            />
-          </div>
+          <TextField
+            label="Password"
+            type="password"
+            autocomplete="current-password"
+            required
+            value={password()}
+            onChange={setPassword}
+            placeholder="••••••••"
+          />
 
           <Show when={error()}>
             <p class="text-sm text-destructive">{error()}</p>
           </Show>
 
-          <button
-            type="submit"
-            disabled={busy()}
-            class="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <Button type="submit" disabled={busy()} class="mt-2">
             {busy() ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

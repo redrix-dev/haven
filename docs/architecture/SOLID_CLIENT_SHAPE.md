@@ -118,9 +118,27 @@ code," there are only routes.
 
 **Known cost, written down so future-us isn't surprised:** each Tauri window is a
 separate webview with **separate JS state**. Solid stores do not magically sync
-across windows. When the first popout lands, the sync strategy (shell-relayed
-events vs. popout fetches its own data) gets decided and documented — it must not
-be hacked in on an assumption of shared memory.
+across windows.
+
+**Cross-window sync decision record (2026-06-12, first popout = voice):**
+
+1. **The window that owns the live connection is the single source of truth.**
+   For voice, that's the window that joined LiveKit. A popout is a **mirror +
+   remote control**: it renders state broadcast by the owning window and sends
+   commands (mute/deafen/leave) back. It never opens its own LiveKit
+   connection — two connections would mean double audio and double presence.
+2. **Transport is `BroadcastChannel`** (`contexts/voiceSync.ts`). It works
+   identically across browser tabs and same-origin Tauri webviews, so the
+   protocol needs no bridge capability and no shell-specific code. The popout
+   route renders "Not connected" if no owner ever broadcasts.
+3. **Scope:** this is the pattern for *session-owning* surfaces (voice now,
+   maybe screen-share later). Read-only data surfaces that popout in the
+   future may instead boot their own core and fetch their own data — decide
+   per popout, against this record.
+4. Window creation is shell capability: `bridge.openPopout(path, options)`
+   (Tauri: `WebviewWindow`; browser fallback: `window.open`). The popout
+   window label is stable (`voice-popout`) so re-opening focuses instead of
+   duplicating.
 
 ## Routing
 

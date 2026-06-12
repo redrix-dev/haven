@@ -51,7 +51,7 @@ export class CommunityMessageSolidCache {
   ) => void;
   private communityData: CommunityDataBackend | null = null;
 
-  constructor(private readonly communityId: string) {
+  constructor(readonly communityId: string) {
     const [state, setState] = createStore(initialState());
     this.state = state;
     this.setState = setState as typeof this.setState;
@@ -96,26 +96,32 @@ export class CommunityMessageSolidCache {
         "CommunityMessageSolidCache.loadInitial called before backend attached.",
       );
     }
-    const result = await this.communityData.listChannelMessages({
-      communityId: this.communityId,
-      channelId,
-      limit: MESSAGE_PAGE_SIZE,
-      beforeCreatedAt: null,
-      beforeMessageId: null,
-    });
-    const ascending = ascendingMessagesFromRpcPage(result.messages);
-    this.insertMessages(ascending, channelId, {
-      hasMore: result.hasMore,
-      cursor: oldestMessageCursor(ascending),
-    });
-    this.setState((s) => ({
-      initialLoadComplete: { ...s.initialLoadComplete, [channelId]: true },
-      lastInitialLoadedAt: {
-        ...s.lastInitialLoadedAt,
-        [channelId]: Date.now(),
-      },
-    }));
-    this.bump();
+    if (this.state.loadingInitial[channelId]) return;
+    this.setLoadingFlag("loadingInitial", channelId, true);
+    try {
+      const result = await this.communityData.listChannelMessages({
+        communityId: this.communityId,
+        channelId,
+        limit: MESSAGE_PAGE_SIZE,
+        beforeCreatedAt: null,
+        beforeMessageId: null,
+      });
+      const ascending = ascendingMessagesFromRpcPage(result.messages);
+      this.insertMessages(ascending, channelId, {
+        hasMore: result.hasMore,
+        cursor: oldestMessageCursor(ascending),
+      });
+      this.setState((s) => ({
+        initialLoadComplete: { ...s.initialLoadComplete, [channelId]: true },
+        lastInitialLoadedAt: {
+          ...s.lastInitialLoadedAt,
+          [channelId]: Date.now(),
+        },
+      }));
+      this.bump();
+    } finally {
+      this.setLoadingFlag("loadingInitial", channelId, false);
+    }
   }
 
   async loadOlder(channelId: string): Promise<void> {
@@ -126,22 +132,39 @@ export class CommunityMessageSolidCache {
     }
     const hasMore = this.state.hasMore[channelId] ?? false;
     if (!hasMore) return;
+    if (this.state.loadingOlder[channelId]) return;
     const ids = this.state.byChannel[channelId] ?? [];
     const oldest = this.state.entities[ids[0]]?.data;
     if (!oldest) return;
 
-    const result = await this.communityData.listChannelMessages({
-      communityId: this.communityId,
-      channelId,
-      limit: MESSAGE_PAGE_SIZE,
-      beforeCreatedAt: oldest.createdAt,
-      beforeMessageId: oldest.id,
-    });
-    const ascending = ascendingMessagesFromRpcPage(result.messages);
-    this.insertMessages(ascending, channelId, {
-      hasMore: result.hasMore,
-      cursor: oldestMessageCursor(ascending),
-    });
+    this.setLoadingFlag("loadingOlder", channelId, true);
+    try {
+      const result = await this.communityData.listChannelMessages({
+        communityId: this.communityId,
+        channelId,
+        limit: MESSAGE_PAGE_SIZE,
+        beforeCreatedAt: oldest.createdAt,
+        beforeMessageId: oldest.id,
+      });
+      const ascending = ascendingMessagesFromRpcPage(result.messages);
+      this.insertMessages(ascending, channelId, {
+        hasMore: result.hasMore,
+        cursor: oldestMessageCursor(ascending),
+      });
+    } finally {
+      this.setLoadingFlag("loadingOlder", channelId, false);
+    }
+  }
+
+  private setLoadingFlag(
+    flag: "loadingInitial" | "loadingOlder",
+    channelId: string,
+    value: boolean,
+  ): void {
+    this.setState((s) => ({
+      [flag]: { ...s[flag], [channelId]: value },
+    }));
+    this.bump();
   }
 
   insertMessage(message: MessageBundle): void {

@@ -40,7 +40,10 @@ import {
   createDirectMessageSolidCache,
   NotificationSolidCache,
   createNotificationSolidCache,
+  CommunityAdminSolidCache,
   CommunityModerationSolidCache,
+  VoiceSolidCache,
+  createVoiceSolidCache,
   createMessageSolidRegistry,
   type MessageSolidRegistry,
   createSolidAuthSessionStore,
@@ -111,7 +114,9 @@ export class HavenSolidCore implements RealtimeMutationTarget {
   readonly social: SocialSolidCache;
   readonly permissions: PermissionsSolidCache;
   readonly profiles: ProfileSolidCache;
+  readonly admin: CommunityAdminSolidCache;
   readonly moderation: CommunityModerationSolidCache;
+  readonly voice: VoiceSolidCache;
   readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
   readonly authStore: AuthStorePort;
   readonly uiStore: UiStorePort;
@@ -143,8 +148,24 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     );
     this.social = createSocialSolidCache(this.backends.social);
     this.permissions = createPermissionsSolidCache();
-    this.profiles = createProfileSolidCache();
+    this.profiles = createProfileSolidCache(this.backends.controlPlane);
+    this.admin = new CommunityAdminSolidCache(this.backends.communityData);
     this.moderation = new CommunityModerationSolidCache();
+    this.voice = createVoiceSolidCache(
+      this.viewerMessagePolicyStore,
+      this.backends.voiceToken,
+      {
+        channel: (topic, channelOptions) =>
+          this.backends.client.channel(
+            topic,
+            channelOptions as never,
+          ) as unknown as import("@shared/features/voice/types").VoiceRealtimeChannel,
+        removeChannel: (channel) =>
+          this.backends.client.removeChannel(channel as never),
+        getChannels: () =>
+          this.backends.client.getChannels() as unknown as import("@shared/features/voice/types").VoiceRealtimeChannel[],
+      },
+    );
 
     this.messages.setBackends(this.backends);
 
@@ -294,7 +315,9 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     this.social.clear();
     this.permissions.clear();
     this.profiles.clear();
+    this.admin.clear();
     this.moderation.clear();
+    this.voice.clear();
     this.viewerMessagePolicyStore.setState(
       createDefaultViewerMessagePolicyState(),
     );

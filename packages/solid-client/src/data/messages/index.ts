@@ -4,3 +4,10 @@ export {
 } from "./communityMessageSolidCache";
 export type { CommunityMessageSolidState } from "./communityMessageSolidCache";
 export { MessageSolidRegistry, createMessageSolidRegistry } from "./registry";
+export {
+  createChannelMessages,
+  createVisibleChannelMessages,
+  createChannelMeta,
+  createIsLoadingOlder,
+  createHasInitialLoadCompleted,
+} from "./accessors";
