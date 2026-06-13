@@ -49,6 +49,36 @@ function writeStoredThemeId(id: string): void {
 // instead of inheriting the previous theme's value.
 let appliedTokenKeys: string[] = [];
 
+/**
+ * Apply the locally stored theme without any session machinery — the boot
+ * path for lite shells (popout windows) that mount no SessionProvider.
+ * The full ThemeProvider (profile hydration, selection persistence) is for
+ * the main app branch only.
+ */
+export function applyStoredThemeToDocument(): void {
+  applyDocumentTheme(getTheme(readStoredThemeId() ?? "default"));
+}
+
+// The few colors index.html needs BEFORE any JS loads (window background,
+// splash text). Written on every theme apply; an inline script in index.html
+// reads it pre-paint so a themed user never sees default-theme boot colors.
+const BOOT_PALETTE_KEY = "haven.solid.bootPalette.v1";
+
+function writeBootPalette(entries: Record<string, string>): void {
+  try {
+    localStorage.setItem(
+      BOOT_PALETTE_KEY,
+      JSON.stringify({
+        background: entries["surface-0"] ?? "#0d1626",
+        text: entries["text-primary"] ?? "#e6edf7",
+        muted: entries["text-dim"] ?? "#8898b1",
+      }),
+    );
+  } catch {
+    // Storage unavailable — boot falls back to the defaults baked into index.html.
+  }
+}
+
 function applyDocumentTheme(theme: HavenTheme): void {
   const root = document.documentElement;
   for (const key of appliedTokenKeys) {
@@ -62,6 +92,7 @@ function applyDocumentTheme(theme: HavenTheme): void {
   for (const [key, value] of Object.entries(entries)) {
     root.style.setProperty(`--${key}`, value);
   }
+  writeBootPalette(entries);
 }
 
 type ThemeContextValue = {

@@ -24,6 +24,12 @@ export const tauriBridge: HavenBridge = {
       width: options.width ?? 340,
       height: options.height ?? 520,
       alwaysOnTop: options.alwaysOnTop ?? false,
+      // The CURRENT theme's surface-0 (openPopout runs in the themed main
+      // window), so the new window's pre-paint frame matches the theme.
+      backgroundColor:
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--surface-0")
+          .trim() || "#0d1626",
     });
   },
 };

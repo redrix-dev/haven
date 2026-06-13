@@ -7,6 +7,12 @@ import path from "path";
 // React `vite.config.ts` at the repo root so the two stacks never interfere.
 export default defineConfig({
   plugins: [solid(), tailwindcss()],
+  // virtua's solid build carries an `@jsxImportSource` comment into output
+  // vite-plugin-solid has already compiled — esbuild then warns about the
+  // inert comment on every dev start and build. Silence that one log only.
+  esbuild: {
+    logOverride: { "unsupported-jsx-comment": "silent" },
+  },
   root: __dirname,
   publicDir: false,
   envDir: path.resolve(__dirname, "../.."),

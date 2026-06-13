@@ -432,6 +432,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       deafened: p.deafened,
     })),
     selfDisplayName: viewerProfile()?.username ?? "You",
+    selfAvatarUrl: viewerProfile()?.avatarUrl ?? null,
     error: voice.error,
     notice: voice.notice,
   });
@@ -462,7 +463,10 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       | { kind: "command"; command: string }
       | { kind: "state" };
     if (message.kind === "hello") {
-      broadcast(mirrorState());
+      // Only the session owner answers — an idle provider (another browser
+      // tab) replying joined:false would clobber the owner's reply in the
+      // mirror. Silence here is the answer "not me".
+      if (voice.joined || voice.joining) broadcast(mirrorState());
       return;
     }
     if (message.kind !== "command") return;
@@ -472,6 +476,16 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     else if (message.command === "toggleDeafen") toggleDeafen();
     else if (message.command === "leave") void leave();
   };
+
+  // Sign-out must leave voice: the provider outlives the authed screens, and
+  // nothing else ties the LiveKit room to the session — without this, the mic
+  // keeps transmitting after sign-out.
+  createEffect(() => {
+    if (userId() !== null) return;
+    if (voice.joined || voice.joining || voice.activeChannel) {
+      void cleanup();
+    }
+  });
 
   onCleanup(() => {
     void cleanup();

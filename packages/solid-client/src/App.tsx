@@ -2,9 +2,6 @@ import { Router } from "@solidjs/router";
 import type { RouteSectionProps } from "@solidjs/router";
 import type { HavenBridge } from "./bridge";
 import { BridgeProvider } from "./contexts/BridgeProvider";
-import { SessionProvider } from "./contexts/SessionProvider";
-import { ThemeProvider } from "./contexts/ThemeProvider";
-import { VoiceProvider } from "./contexts/VoiceProvider";
 import { routes } from "./routes";
 import "./theme.css";
 
@@ -30,14 +27,12 @@ export function App(props: { bridge?: HavenBridge }) {
   );
 }
 
+// Only the bridge is universal — every other provider belongs to a route
+// branch. The main branch mounts the session/theme/voice stack; popout
+// branches mount the lightest shell their surface needs (routes/index.tsx).
+// That's what keeps a popout window from booting a second full session.
 function AppRoot(props: RouteSectionProps & { bridge?: HavenBridge }) {
   return (
-    <BridgeProvider bridge={props.bridge}>
-      <SessionProvider>
-        <ThemeProvider>
-          <VoiceProvider>{props.children}</VoiceProvider>
-        </ThemeProvider>
-      </SessionProvider>
-    </BridgeProvider>
+    <BridgeProvider bridge={props.bridge}>{props.children}</BridgeProvider>
   );
 }

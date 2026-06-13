@@ -3,10 +3,90 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Haven — Tauri/Solid spike</title>
+    <title>Haven</title>
+    <style>
+      /* First-paint splash. Defaults match the default theme; the inline
+         script below overrides them from the boot palette the theme system
+         persists (ThemeProvider.writeBootPalette), so a themed user boots in
+         their own colors. Lives inside #root — main.tsx removes it before
+         the app renders. */
+      :root {
+        --boot-bg: #0d1626;
+        --boot-text: #e6edf7;
+        --boot-muted: #8898b1;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: var(--boot-bg);
+      }
+      #root {
+        height: 100%;
+      }
+      .boot-splash {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        color: var(--boot-muted);
+        user-select: none;
+      }
+      .boot-splash strong {
+        color: var(--boot-text);
+        font-size: 18px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .boot-splash span {
+        font-size: 13px;
+        animation: boot-pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes boot-pulse {
+        0%,
+        100% {
+          opacity: 0.45;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+    </style>
+    <script>
+      // Pre-paint theme: read the boot palette the app persisted on its last
+      // theme apply. Synchronous on purpose — it must beat first paint.
+      try {
+        var bootPalette = JSON.parse(
+          localStorage.getItem("haven.solid.bootPalette.v1"),
+        );
+        if (bootPalette) {
+          var rootStyle = document.documentElement.style;
+          if (bootPalette.background)
+            rootStyle.setProperty("--boot-bg", bootPalette.background);
+          if (bootPalette.text)
+            rootStyle.setProperty("--boot-text", bootPalette.text);
+          if (bootPalette.muted)
+            rootStyle.setProperty("--boot-muted", bootPalette.muted);
+        }
+      } catch (e) {
+        // Corrupt/absent palette — defaults above stand.
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-splash">
+        <strong>Haven</strong>
+        <span>Warming up the perch…</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

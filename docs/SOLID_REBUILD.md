@@ -4,6 +4,11 @@ The live plan for replacing the retired Electron/React desktop and web clients w
 a Tauri shell and a Solid UI on the cleaved architecture. Updated as phases land;
 completed phases get one line and a pointer to the archive.
 
+> **Pause point (2026-06-12):** [SOLID_BUILD_HANDOFF.md](./SOLID_BUILD_HANDOFF.md)
+> snapshots the build state, the open platform-direction question (webview feel
+> vs. native bar), the experiments queued to answer it, and the hard constraints
+> that survive any direction change. Read it before resuming work.
+
 ---
 
 ## Where we are

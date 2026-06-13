@@ -13,6 +13,10 @@ const core = createTauriHavenCore();
 //   __haven.communities.getCommunityIds()
 (window as Window & { __haven?: unknown }).__haven = core;
 
+// Solid's render() appends into the container — clear the index.html boot
+// splash first or it stays mounted above the app.
+document.querySelector(".boot-splash")?.remove();
+
 render(
   () => <App bridge={isTauri ? tauriBridge : undefined} />,
   document.getElementById("root")!,

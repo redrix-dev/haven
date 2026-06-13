@@ -93,6 +93,8 @@
     "vitest": "^4.1.8"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.2.9",
+    "@fontsource-variable/geist-mono": "^5.2.8",
     "@kobalte/core": "^0.13.11",
     "@solidjs/router": "^0.16.1",
     "@supabase/supabase-js": "^2.107.0",

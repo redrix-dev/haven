@@ -139,6 +139,16 @@ across windows.
    (Tauri: `WebviewWindow`; browser fallback: `window.open`). The popout
    window label is stable (`voice-popout`) so re-opening focuses instead of
    duplicating.
+5. **Shell weight is a route decision (2026-06-12).** Providers do not wrap
+   the App root — they wrap route branches (`routes/index.tsx`). The main
+   branch mounts the full stack (session bootstrap, realtime, voice). The
+   `/popout` branch mounts the lightest shell its surfaces need: a mirror
+   surface (voice) gets `PopoutLiteShell` — theme from localStorage and
+   nothing else, so a popout window never boots a second session or opens a
+   second realtime subscription. A future *data-backed* popout (e.g. watching
+   a channel's messages in its own window) registers under `/popout` with its
+   own session-equipped shell — the seam is always "add a shell component +
+   a child route," never special window code.
 
 ## Routing
 

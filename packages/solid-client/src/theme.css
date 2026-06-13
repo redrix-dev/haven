@@ -9,10 +9,22 @@
  *
  * Add a @source line if UI class names ever live somewhere new.
  */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 @import "../../shared/src/styles/globals.css";
 
 @source "./";
 @source "../../../apps/tauri/src";
+
+/* Explicit typography: Geist for UI, Geist Mono for code. Overriding the
+   Tailwind font tokens makes `font-sans`/`font-mono` utilities (and the
+   Markdown renderer's code chips) resolve to them everywhere. */
+@theme {
+  --font-sans:
+    "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:
+    "Geist Mono Variable", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
 
 /* The app fills the window; every screen sizes itself with h-full from here. */
 @layer base {
@@ -26,5 +38,6 @@
     overflow: hidden;
     background: var(--background);
     color: var(--foreground);
+    font-family: var(--font-sans);
   }
 }

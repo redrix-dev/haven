@@ -29,6 +29,7 @@ const emptyMirror = (): VoiceMirrorState => ({
   isDeafened: false,
   participants: [],
   selfDisplayName: "You",
+  selfAvatarUrl: null,
   error: null,
   notice: null,
 });
@@ -81,7 +82,7 @@ export function VoicePopout() {
           {/* Self row first, then remotes — same ordering as the sidebar. */}
           <ParticipantRow
             name={`${mirror.selfDisplayName} (you)`}
-            avatarUrl={null}
+            avatarUrl={mirror.selfAvatarUrl}
             speaking={false}
             muted={mirror.isMuted}
           />

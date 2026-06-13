@@ -26,6 +26,7 @@ export type VoiceMirrorState = {
   isDeafened: boolean;
   participants: VoiceParticipant[];
   selfDisplayName: string;
+  selfAvatarUrl: string | null;
   error: string | null;
   notice: string | null;
 };

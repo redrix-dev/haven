@@ -1,7 +1,12 @@
 import { Match, Switch } from "solid-js";
 import { Navigate } from "@solidjs/router";
 import type { RouteDefinition, RouteSectionProps } from "@solidjs/router";
-import { useSession } from "../contexts/SessionProvider";
+import { SessionProvider, useSession } from "../contexts/SessionProvider";
+import {
+  ThemeProvider,
+  applyStoredThemeToDocument,
+} from "../contexts/ThemeProvider";
+import { VoiceProvider } from "../contexts/VoiceProvider";
 import {
   CommunitySidebar,
   CommunityView,
@@ -18,7 +23,40 @@ import { VoiceDock, VoicePopout } from "../features/voice";
  *
  * Adding a feature = its folder in features/ + one entry here. App.tsx does
  * not change.
+ *
+ * SHELL WEIGHT IS A ROUTE DECISION. The main branch mounts the full provider
+ * stack (session bootstrap, realtime, voice session). The /popout branch
+ * mounts only what its surfaces need:
+ *
+ *   - PopoutLiteShell — theme + nothing else. For mirror surfaces (voice)
+ *     whose state arrives over the cross-window sync channel. No session
+ *     boot, no second realtime subscription, no idle VoiceProvider.
+ *   - A future data-backed popout (e.g. watching a channel's messages in its
+ *     own window) registers under /popout with its own shell that mounts
+ *     SessionProvider (+ whatever it needs) — the seam is "add a shell
+ *     component + a child route," never special window code.
  */
+
+// ── shells ───────────────────────────────────────────────────────────────────
+
+/** Full app stack: session bootstrap → theme (profile-synced) → voice session. */
+function MainShell(props: RouteSectionProps) {
+  return (
+    <SessionProvider>
+      <ThemeProvider>
+        <VoiceProvider>{props.children}</VoiceProvider>
+      </ThemeProvider>
+    </SessionProvider>
+  );
+}
+
+/** Lite popout shell: themed viewport, zero session machinery. */
+function PopoutLiteShell(props: RouteSectionProps) {
+  applyStoredThemeToDocument();
+  return <div class="h-full w-full bg-background">{props.children}</div>;
+}
+
+// ── main-branch layout ───────────────────────────────────────────────────────
 
 // Guards all routes under "/" — handles the three states of session():
 //
@@ -26,9 +64,6 @@ import { VoiceDock, VoicePopout } from "../features/voice";
 //              blank screen rather than flashing the sign-in redirect.
 //   null       Confirmed no session. Redirect to /sign-in.
 //   Session    Authenticated. Render the app layout with the sidebar.
-//
-// <Switch> + <Match> is Solid's multi-branch conditional — like a type-safe
-// switch statement in JSX. Only the first matching <Match> renders.
 function AppLayout(props: RouteSectionProps) {
   const { session } = useSession();
 
@@ -60,27 +95,35 @@ function AppLayout(props: RouteSectionProps) {
   );
 }
 
+// ── route table ──────────────────────────────────────────────────────────────
+
 export const routes: RouteDefinition[] = [
-  // Unauthenticated — no layout wrapper, full screen.
-  { path: "/sign-in", component: SignInScreen },
+  // Popout windows — lightest shell per surface (see header comment).
+  {
+    path: "/popout",
+    component: PopoutLiteShell,
+    children: [{ path: "/voice", component: VoicePopout }],
+  },
 
-  // Popout windows: an OS viewport pointed at a route (shape doc § windows).
-  // No app chrome, no auth guard — the popout mirrors the owning window over
-  // the voice sync channel and renders "not connected" without one.
-  { path: "/popout/voice", component: VoicePopout },
-
-  // Authenticated — AppLayout guards entry, sidebar + content shell.
+  // Everything else runs the full stack; AppLayout guards the authed tree.
   {
     path: "/",
-    component: AppLayout,
+    component: MainShell,
     children: [
-      { path: "/", component: CommunityHome },
-      { path: "/community/:communityId", component: CommunityView },
+      { path: "/sign-in", component: SignInScreen },
       {
-        path: "/community/:communityId/channel/:channelId",
-        component: CommunityView,
+        path: "/",
+        component: AppLayout,
+        children: [
+          { path: "/", component: CommunityHome },
+          { path: "/community/:communityId", component: CommunityView },
+          {
+            path: "/community/:communityId/channel/:channelId",
+            component: CommunityView,
+          },
+          { path: "/settings/appearance", component: AppearanceSettings },
+        ],
       },
-      { path: "/settings/appearance", component: AppearanceSettings },
     ],
   },
 ];
