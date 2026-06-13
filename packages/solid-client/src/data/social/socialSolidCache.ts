@@ -1,7 +1,13 @@
 import { createStore } from "solid-js/store";
 import { DEFAULT_SOCIAL_COUNTS } from "@shared/infrastructure/constants";
 import type { SocialBackend } from "@shared/lib/backend/socialBackend";
-import type { SocialCounts } from "@shared/lib/backend/types";
+import type {
+  BlockedUserSummary,
+  FriendRequestSummary,
+  FriendSearchResult,
+  FriendSummary,
+  SocialCounts,
+} from "@shared/lib/backend/types";
 import {
   normalizeUserIds,
   unionHiddenAuthorIds,
@@ -13,6 +19,9 @@ import {
 
 export type SocialSolidState = {
   counts: SocialCounts;
+  friends: FriendSummary[];
+  requests: FriendRequestSummary[];
+  blockedUsers: BlockedUserSummary[];
   hiddenAuthorIds: ReadonlySet<string>;
   myBlockedUserIds: string[];
   usersBlockingMeIds: string[];
@@ -36,6 +45,9 @@ export class SocialSolidCache {
   constructor(private readonly backend: SocialBackend) {
     const [state, setState] = createStore<SocialSolidState>({
       counts: DEFAULT_SOCIAL_COUNTS,
+      friends: [],
+      requests: [],
+      blockedUsers: [],
       hiddenAuthorIds: new Set<string>(),
       myBlockedUserIds: [],
       usersBlockingMeIds: [],
@@ -59,18 +71,31 @@ export class SocialSolidCache {
   async load(): Promise<void> {
     if (this.loadInflight) return this.loadInflight;
 
-    this.setState((s) => ({ isLoading: true, revision: s.revision }));
+    this.setState((s) => ({ isLoading: true, revision: s.revision + 1 }));
+    this.reactiveStore.notify();
     const promise = (async () => {
       try {
-        const [counts, myBlockedUserIds, usersBlockingMeIds] =
-          await Promise.all([
-            this.backend.getSocialCounts(),
-            this.backend.listMyBlocks(),
-            this.backend.listUsersBlockingMe(),
-          ]);
+        const [
+          counts,
+          myBlockedUserIds,
+          usersBlockingMeIds,
+          friends,
+          requests,
+          blockedUsers,
+        ] = await Promise.all([
+          this.backend.getSocialCounts(),
+          this.backend.listMyBlocks(),
+          this.backend.listUsersBlockingMe(),
+          this.backend.listFriends(),
+          this.backend.listFriendRequests(),
+          this.backend.listBlockedUsers(),
+        ]);
         this.setBlockLists({ myBlockedUserIds, usersBlockingMeIds });
         this.setState((s) => ({
           counts,
+          friends,
+          requests,
+          blockedUsers,
           lastLoadedAt: Date.now(),
           isLoading: false,
           revision: s.revision + 1,
@@ -107,9 +132,69 @@ export class SocialSolidCache {
     });
   }
 
+  async blockUser(targetUserId: string): Promise<void> {
+    await this.backend.blockUser(targetUserId);
+    this.setBlockLists({
+      myBlockedUserIds: normalizeUserIds([
+        ...this.state.myBlockedUserIds,
+        targetUserId,
+      ]),
+      usersBlockingMeIds: this.state.usersBlockingMeIds,
+    });
+    await this.load();
+  }
+
+  async unblockUser(targetUserId: string): Promise<void> {
+    await this.backend.unblockUser(targetUserId);
+    this.setBlockLists({
+      myBlockedUserIds: this.state.myBlockedUserIds.filter(
+        (id) => id !== targetUserId,
+      ),
+      usersBlockingMeIds: this.state.usersBlockingMeIds,
+    });
+    await this.load();
+  }
+
+  async sendFriendRequest(username: string): Promise<string> {
+    const requestId = await this.backend.sendFriendRequest(username);
+    await this.load();
+    return requestId;
+  }
+
+  async acceptFriendRequest(requestId: string): Promise<string> {
+    const otherUserId = await this.backend.acceptFriendRequest(requestId);
+    await this.load();
+    return otherUserId;
+  }
+
+  async declineFriendRequest(requestId: string): Promise<boolean> {
+    const ok = await this.backend.declineFriendRequest(requestId);
+    await this.load();
+    return ok;
+  }
+
+  async cancelFriendRequest(requestId: string): Promise<boolean> {
+    const ok = await this.backend.cancelFriendRequest(requestId);
+    await this.load();
+    return ok;
+  }
+
+  async removeFriend(otherUserId: string): Promise<boolean> {
+    const ok = await this.backend.removeFriend(otherUserId);
+    await this.load();
+    return ok;
+  }
+
+  async searchUsers(query: string): Promise<FriendSearchResult[]> {
+    return this.backend.searchUsersForFriendAdd(query);
+  }
+
   clear(): void {
     this.setState(() => ({
       counts: DEFAULT_SOCIAL_COUNTS,
+      friends: [],
+      requests: [],
+      blockedUsers: [],
       hiddenAuthorIds: new Set<string>(),
       myBlockedUserIds: [],
       usersBlockingMeIds: [],

@@ -16,9 +16,11 @@ tests) and live browser/Tauri testing.
 
 **Milestone 1 — shell + community text chat (2026-06-11):**
 
-- Routes: `/sign-in`, auth-guarded `/` → `/community/:communityId[/channel/:channelId]`,
-  `/settings/appearance`, `/popout/voice`. URL is the source of truth —
-  `CommunityRouteSync` writes cache active-ids from params, never the reverse.
+- Routes: `/sign-in`, auth-guarded `/` →
+  `/community/:communityId[/channel/:channelId]`, `/direct-messages[/conversationId]`,
+  `/friends`, `/settings/appearance`, `/popout/voice`. URL is the source of
+  truth — `CommunityRouteSync` writes cache active-ids from params, never the
+  reverse.
 - `components/ui/`: Kobalte-based Button/TextField/Avatar/Tooltip + the
   `Markdown/` chat renderer (marked lexer → Solid token renderer; `||spoiler||`
   as an inline tokenizer extension mirroring the shared parity contract; html
@@ -68,14 +70,14 @@ the same user's other devices get realtime messages (clients dedupe by id).
 
 ## Stack picks (all adopted, in the tree)
 
-| Need | Pick | Note |
-| --- | --- | --- |
-| Headless primitives | `@kobalte/core` | styled by us with semantic tokens |
-| Icons | `lucide-solid` | |
-| Virtualized chat | `virtua/solid` | `shift` for prepend; seam allows swap |
-| Markdown | `marked` lexer + own Solid renderer | parity contract honored at source level |
-| Voice | `livekit-client` | same cloud + token function as mobile |
-| Fonts | `@fontsource-variable/geist(-mono)` | |
+| Need                | Pick                                | Note                                    |
+| ------------------- | ----------------------------------- | --------------------------------------- |
+| Headless primitives | `@kobalte/core`                     | styled by us with semantic tokens       |
+| Icons               | `lucide-solid`                      |                                         |
+| Virtualized chat    | `virtua/solid`                      | `shift` for prepend; seam allows swap   |
+| Markdown            | `marked` lexer + own Solid renderer | parity contract honored at source level |
+| Voice               | `livekit-client`                    | same cloud + token function as mobile   |
+| Fonts               | `@fontsource-variable/geist(-mono)` |                                         |
 
 ## Hard constraints — survive any direction change
 
@@ -88,8 +90,8 @@ the same user's other devices get realtime messages (clients dedupe by id).
    LiveKit room never moves during popout.
 2. **BroadcastChannel payloads must be plain objects.** Solid store proxies
    fail structured clone (`DataCloneError`) — and when the postMessage runs in
-   a `createEffect`, the exception unwinds out of the *store write that
-   triggered the flush*. Symptom: code directly after a `setStore` silently
+   a `createEffect`, the exception unwinds out of the _store write that
+   triggered the flush_. Symptom: code directly after a `setStore` silently
    never runs. This burned a half-day; it's documented in
    `contexts/voiceSync.ts`.
 3. **The Tailwind theme bridge emits utilities for SEMANTIC tokens only.**
@@ -97,7 +99,7 @@ the same user's other devices get realtime messages (clients dedupe by id).
    `bg-card`, `text-foreground`, `bg-surface-panel`, etc. Theme application
    must write `resolveSemanticEntries()` too, not just `theme.tokens`.
 4. **`packages/shared` is TypeScript.** The cleave's payoff — one pure
-   contract layer consumed by every client — survives any *web-technology*
+   contract layer consumed by every client — survives any _web-technology_
    client and dies in a Dart/Kotlin/C# rewrite (hand parity or codegen).
    Price any re-platforming proposal with this line item.
 5. **Solid's `render()` appends into its container** — anything pre-rendered
@@ -153,6 +155,18 @@ an occasional channel watcher → mirror + warm pool covers it forever.
 Tear-everything-into-windows (trading-terminal style) → the webview tax
 compounds per window and the native conversation becomes real.
 
+**Experiment implementation note (2026-06-13):** both cheap experiments now
+exist behind shell capabilities for comparison. Tauri advertises
+`preparePopout` and warms the existing route-based `/popout/voice` window
+hidden, then `openPopout` shows/focuses that same WebView so the native path
+still uses the BroadcastChannel mirror contract. The plain browser shell
+advertises `browserPortalPopout` and opens an `about:blank` same-origin child
+window, prepares a document shell, copies styles/theme attributes, and mounts
+the shared voice panel into it with Solid `<Portal>`. The browser child-window
+lifecycle is covered by `packages/solid-client/src/features/voice/__tests__/`
+so blank-shell and stale-close regressions have a low-level guardrail; still
+judge the feel by hand against Discord in a real joined voice session.
+
 ## Known cosmetic/UX debt (not blockers)
 
 - Loading skeletons: white screens are fixed (dark boot splash, themed via
@@ -161,17 +175,20 @@ compounds per window and the native conversation becomes real.
   kick UI, STAFF badge on own optimistic sends.
 - Bundle is ~1.07 MB (livekit-client). First code-split: lazy-load the voice
   path.
-- Message actions (edit/delete/reactions/report) — cache methods exist and
-  throw; port from mobile when the slice opens.
+- Friends/social surface now exists on `/friends` with friends, add, requests,
+  and blocked tabs. Remaining social polish: block-from-profile/context flows
+  once those profile/message menus exist.
+- Message actions (edit/delete/reactions; DM report is implemented) — cache
+  methods still need porting where mobile supports them.
 - Cache persistence to disk (`rehydrate()` is a no-op) + per-channel scroll
   memory — deliberate later phase.
 
 ## Next slices (order standing from SOLID_REBUILD.md)
 
-1. Direct messages (caches + accessors exist; reuses Markdown/list/composer).
-2. Friends/social. 3. Notifications (+ `solid-sonner`).
-4. Message actions parity. 5. Tiptap composer.
-6. Shell capabilities as needed (`appHost.ts` → Tauri invoke via bridge).
+1. Notifications (+ `solid-sonner`).
+2. Direct messages edit/delete/reaction actions + floating bubble flavor.
+3. Tiptap composer.
+4. Shell capabilities as needed (`appHost.ts` → Tauri invoke via bridge).
 
 ## How to run / verify
 

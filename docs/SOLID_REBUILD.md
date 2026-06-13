@@ -8,6 +8,11 @@ completed phases get one line and a pointer to the archive.
 > snapshots the build state, the open platform-direction question (webview feel
 > vs. native bar), the experiments queued to answer it, and the hard constraints
 > that survive any direction change. Read it before resuming work.
+>
+> **Understandability guardrail (2026-06-13):**
+> [SOLID_UNDERSTANDABILITY_AUDIT.md](./SOLID_UNDERSTANDABILITY_AUDIT.md)
+> records the audit on large-file risk, Nexus alignment, and the proposed
+> internal desktop/web devtools suite.
 
 ---
 
@@ -129,13 +134,24 @@ Order of work (each step gated by `test:cleave` + `typecheck:solid` / `build:sol
    store proxies fail structured clone, and the DataCloneError unwinds out of
    whatever store write triggered the broadcasting effect. Not yet in voice:
    PTT/voice-activity gating, per-member volumes, device pickers in UI (the
-   controller supports switching), kick UI. Next slices, in order:
-   **direct-messages** (reuses Markdown/list/composer), **friends**,
-   **notifications** (toasts arrive here — `solid-sonner`). Then message
-   actions parity (edit/delete/reactions — the cache methods that currently
-   throw) and the tiptap composer upgrade. Perf note: `livekit-client` puts
-   the bundle at ~1.07 MB — lazy-loading the voice path is the obvious first
-   code-split when perf work begins.
+   controller supports switching), kick UI. **Direct messages started
+   (2026-06-13):** Solid DM cache now has mobile-parity load/send/open/read +
+   realtime latest-message merge behavior covered by stale-state tests; the
+   first `/direct-messages[/conversationId]` route renders the conversation
+   inbox, active thread, text/image send, image previews, live-profile
+   names/avatars, friend-backed new conversation picker, report-message flow,
+   and URL-driven active conversation. Still missing from DM parity:
+   edit/delete/reaction message actions, richer friend request/search flows,
+   and the mobile floating bubble flavor. **Friends/social surface landed
+   (2026-06-13):** `/friends` renders the mobile-equivalent friends, add,
+   requests, and blocked tabs against the Solid social cache, with friend
+   search, request send/accept/decline/cancel, unblock, refresh/error states,
+   live-profile names/avatars, and DM handoff to `/direct-messages/:id`. Next
+   slices, in order: **notifications** (toasts arrive here —
+   `solid-sonner`), then message actions parity (edit/delete/reactions — the
+   cache methods that currently throw) and the tiptap composer upgrade. Perf note:
+   `livekit-client` puts the bundle at ~1.07 MB — lazy-loading the voice path
+   is the obvious first code-split when perf work begins.
 5. **Shell capabilities.** Map the `AppHost` bridge surface
    (`packages/shared/src/infrastructure/platform/appHost.ts`) onto Tauri
    `invoke()` commands as features need them: window chrome, updater, deep links
@@ -149,19 +165,19 @@ a plain value, so it re-subscribes when the value changes.
 
 Carried from the spike evaluation; ✅ = adopted and in the tree.
 
-| Need                  | Solid choice                                  | Notes                                           |
-| --------------------- | --------------------------------------------- | ----------------------------------------------- |
-| Core                  | `solid-js`                                    | Components run once; signals, not hooks         |
-| Headless primitives   | ✅ `@kobalte/core`                            | Replaces radix; API differs                     |
-| Icons                 | ✅ `lucide-solid`                             | Near drop-in                                    |
-| Toasts                | `solid-sonner`                                | Install with the notifications slice            |
-| Virtualized chat list | ✅ `virtua/solid`                             | `shift` handles prepend; seam allows swap       |
-| Rich text editor      | `@tiptap/core` + manual Solid binding         | Tiptap core is framework-agnostic               |
-| Markdown              | ✅ `marked` lexer + own Solid token renderer  | No innerHTML; spoilers via inline extension     |
-| Image crop            | wrap a vanilla lib                            | No 1:1 port — known gap                         |
-| Command palette       | `cmdk-solid` or build on Kobalte              | **Verify maintenance** before adopting          |
-| Gestures              | `@use-gesture/vanilla` + wrapper              |                                                 |
-| Auto-update           | `@tauri-apps/plugin-updater`                  | Same GitHub-releases flow the Electron app used |
+| Need                  | Solid choice                                 | Notes                                           |
+| --------------------- | -------------------------------------------- | ----------------------------------------------- |
+| Core                  | `solid-js`                                   | Components run once; signals, not hooks         |
+| Headless primitives   | ✅ `@kobalte/core`                           | Replaces radix; API differs                     |
+| Icons                 | ✅ `lucide-solid`                            | Near drop-in                                    |
+| Toasts                | `solid-sonner`                               | Install with the notifications slice            |
+| Virtualized chat list | ✅ `virtua/solid`                            | `shift` handles prepend; seam allows swap       |
+| Rich text editor      | `@tiptap/core` + manual Solid binding        | Tiptap core is framework-agnostic               |
+| Markdown              | ✅ `marked` lexer + own Solid token renderer | No innerHTML; spoilers via inline extension     |
+| Image crop            | wrap a vanilla lib                           | No 1:1 port — known gap                         |
+| Command palette       | `cmdk-solid` or build on Kobalte             | **Verify maintenance** before adopting          |
+| Gestures              | `@use-gesture/vanilla` + wrapper             |                                                 |
+| Auto-update           | `@tauri-apps/plugin-updater`                 | Same GitHub-releases flow the Electron app used |
 
 ## How to run
 

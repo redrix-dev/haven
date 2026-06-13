@@ -2,4 +2,11 @@ export {
   DirectMessageSolidCache,
   createDirectMessageSolidCache,
 } from "./directMessageSolidCache";
-export { createDmConversations, createDmMessages } from "./accessors";
+export {
+  createActiveDmConversationId,
+  createDmComposeDraftPeer,
+  createDmConversations,
+  createDmConversationsLoading,
+  createDmMessages,
+  createDmMessagesLoading,
+} from "./accessors";

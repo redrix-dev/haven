@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createMemo, onCleanup } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { Settings } from "lucide-solid";
+import { MessageCircle, Settings, Users } from "lucide-solid";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
@@ -83,6 +83,20 @@ export function CommunitySidebar() {
         </For>
 
         <div class="mt-auto">
+          <button
+            title="Friends"
+            onClick={() => navigate("/friends")}
+            class="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
+          >
+            <Users size={20} />
+          </button>
+          <button
+            title="Direct messages"
+            onClick={() => navigate("/direct-messages")}
+            class="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
+          >
+            <MessageCircle size={20} />
+          </button>
           <button
             title="Settings"
             onClick={() => navigate("/settings/appearance")}
@@ -180,7 +194,10 @@ function ChannelRow(props: {
 
 // A voice channel row: click to join, occupants listed underneath (live from
 // the presence subscriptions below).
-function VoiceChannelRow(props: { channel: HavenChannel; communityId: string }) {
+function VoiceChannelRow(props: {
+  channel: HavenChannel;
+  communityId: string;
+}) {
   const core = requireHavenSolidCore();
   const { session } = useSession();
   const { voice, joinChannel } = useVoice();

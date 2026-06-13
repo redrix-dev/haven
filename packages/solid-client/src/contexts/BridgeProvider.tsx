@@ -21,9 +21,22 @@ export type PopoutOptions = {
   alwaysOnTop?: boolean;
 };
 
+export type BridgeCapabilities = {
+  /** Native shell can pre-create hidden route windows, then show on demand. */
+  preparePopout?: boolean;
+  /** Browser shell can portal UI into a same-origin child window. */
+  browserPortalPopout?: boolean;
+};
+
 export interface HavenBridge {
+  capabilities?: BridgeCapabilities;
   /** Demonstrates the Tauri `invoke` round-trip. */
   ping(name: string): Promise<string>;
+  /**
+   * Optionally warm a popout route without showing it yet. Native shells can
+   * use this to hide WebView startup latency; browser shells leave it absent.
+   */
+  preparePopout?(path: string, options: PopoutOptions): Promise<void>;
   /**
    * Open (or focus) a popout window pointed at an app route — the window
    * model from SOLID_CLIENT_SHAPE.md: a window is an OS viewport on a route.
@@ -36,6 +49,7 @@ const BridgeContext = createContext<HavenBridge>();
 
 /** Browser fallback: same capabilities, web primitives. */
 const webBridge: HavenBridge = {
+  capabilities: { browserPortalPopout: true },
   ping: async (name: string) => `pong:${name}`,
   openPopout: async (path: string, options: PopoutOptions) => {
     const width = options.width ?? 340;

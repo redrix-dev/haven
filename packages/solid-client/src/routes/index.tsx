@@ -14,6 +14,8 @@ import {
 } from "../features/community";
 import { SignInScreen } from "../features/auth";
 import { AppearanceSettings } from "../features/settings";
+import { DirectMessagesView } from "../features/direct-messages";
+import { FriendsView } from "../features/friends";
 import { VoiceDock, VoicePopout } from "../features/voice";
 /**
  * The registration point: every screen the app can navigate to is one entry
@@ -116,6 +118,12 @@ export const routes: RouteDefinition[] = [
         component: AppLayout,
         children: [
           { path: "/", component: CommunityHome },
+          { path: "/friends", component: FriendsView },
+          { path: "/direct-messages", component: DirectMessagesView },
+          {
+            path: "/direct-messages/:conversationId",
+            component: DirectMessagesView,
+          },
           { path: "/community/:communityId", component: CommunityView },
           {
             path: "/community/:communityId/channel/:channelId",
