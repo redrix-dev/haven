@@ -2,7 +2,6 @@ import { Show, createMemo } from "solid-js";
 import { Navigate, useParams } from "@solidjs/router";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
-import { createChannels } from "@solid-client/data/channels";
 import {
   createVisibleChannelMessages,
   createChannelMeta,
@@ -26,10 +25,7 @@ export function CommunityView() {
   const params = useParams();
   const core = requireHavenSolidCore();
 
-  const channels = createChannels(
-    core.channels,
-    () => params.communityId ?? "",
-  );
+  const channels = core.channels.channels(() => params.communityId ?? "");
   const activeChannel = createMemo(() =>
     channels().find((c) => c.id === params.channelId),
   );

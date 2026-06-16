@@ -26,10 +26,10 @@ import {
 } from "@shared/lib/backend/sessionBackendRegistry";
 import type { DirectMessage } from "@shared/lib/backend/types";
 import {
-  CommunitySolidCache,
-  createCommunitySolidCache,
-  ChannelSolidCache,
-  createChannelSolidCache,
+  CommunitySolidNexus,
+  createCommunitySolidNexus,
+  ChannelSolidNexus,
+  createChannelSolidNexus,
   SocialSolidCache,
   createSocialSolidCache,
   ProfileSolidCache,
@@ -106,8 +106,8 @@ export type HavenSolidCoreOptions = {
 export class HavenSolidCore implements RealtimeMutationTarget {
   readonly backends: HavenBackends;
   readonly persistence: NexusPersistence;
-  readonly communities: CommunitySolidCache;
-  readonly channels: ChannelSolidCache;
+  readonly communities: CommunitySolidNexus;
+  readonly channels: ChannelSolidNexus;
   readonly messages: MessageSolidRegistry;
   readonly directMessages: DirectMessageSolidCache;
   readonly notifications: NotificationSolidCache;
@@ -134,8 +134,8 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     this.uiStore = createSolidUiSessionStore();
     this.viewerMessagePolicyStore = createSolidViewerMessagePolicyStore();
 
-    this.communities = createCommunitySolidCache(this.backends.controlPlane);
-    this.channels = createChannelSolidCache(this.backends.communityData);
+    this.communities = createCommunitySolidNexus(this.backends.controlPlane);
+    this.channels = createChannelSolidNexus(this.backends.communityData);
     this.messages = createMessageSolidRegistry(
       options.persistence,
       this.viewerMessagePolicyStore,

@@ -1,9 +1,4 @@
 export {
-  CommunitySolidCache,
-  createCommunitySolidCache,
-} from "./communitySolidCache";
-export {
-  createActiveCommunityId,
-  createCommunities,
-  createOrderedCommunities,
-} from "./accessors";
+  CommunitySolidNexus,
+  createCommunitySolidNexus,
+} from "./communitySolidNexus";

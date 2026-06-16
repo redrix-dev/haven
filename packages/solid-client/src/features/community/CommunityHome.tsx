@@ -1,7 +1,6 @@
 import { Show } from "solid-js";
 import { Navigate } from "@solidjs/router";
 import { requireHavenSolidCore } from "@solid-client/core";
-import { createOrderedCommunities } from "@solid-client/data/communities";
 
 /**
  * The "/" landing surface: bounce to the first community once the bootstrap
@@ -10,7 +9,7 @@ import { createOrderedCommunities } from "@solid-client/data/communities";
  */
 export function CommunityHome() {
   const core = requireHavenSolidCore();
-  const communities = createOrderedCommunities(core.communities);
+  const communities = core.communities.orderedCommunities();
 
   return (
     <Show

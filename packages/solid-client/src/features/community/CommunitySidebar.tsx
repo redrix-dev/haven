@@ -6,40 +6,28 @@ import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
 import { Avatar } from "@solid-client/components/ui";
 import { createViewerProfile } from "@solid-client/data/profile";
-import {
-  createOrderedCommunities,
-  createActiveCommunityId,
-} from "@solid-client/data/communities";
-import {
-  createChannels,
-  createActiveChannelId,
-} from "@solid-client/data/channels";
 import { createChannelVoiceParticipants } from "@solid-client/data/voice";
 import type { HavenChannel } from "@shared/nexus/community/channelTypes";
 
 // ─── data wiring ─────────────────────────────────────────────────────────────
 //
-// `requireHavenSolidCore()` hands us the already-bootstrapped core. We pull
-// the two caches off it and pass them into accessor factories.
+// `requireHavenSolidCore()` hands us the already-bootstrapped core. The channel
+// nexus owns its own projections, so we just ask it for the slices we need.
 //
-// Active community/channel are read from the caches but written by the route:
+// Active community/channel are read from the nexus but written by the route:
 // the sidebar NAVIGATES, and CommunityRouteSync writes the active ids from the
 // URL params. The URL is the single source of truth for where you are.
 
 function useSidebarData() {
   const core = requireHavenSolidCore();
 
-  const communities = createOrderedCommunities(core.communities);
-  const activeCommunityId = createActiveCommunityId(core.communities);
-  const activeChannelId = createActiveChannelId(core.channels);
+  const communities = core.communities.orderedCommunities();
+  const activeCommunityId = () => core.communities.activeCommunityId();
+  const activeChannelId = () => core.channels.activeChannelId();
 
-  // createChannels needs to know which community to filter by.
-  // Passing a getter `() => activeCommunityId()` lets the accessor re-derive
-  // automatically when the active community changes.
-  const channels = createChannels(
-    core.channels,
-    () => activeCommunityId() ?? "",
-  );
+  // The channels projection re-derives whenever the active community changes;
+  // passing the getter keeps it reactive to community switches.
+  const channels = core.channels.channels(() => activeCommunityId() ?? "");
 
   return { communities, activeCommunityId, channels, activeChannelId };
 }

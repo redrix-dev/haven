@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tier 3 — functions</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff; --fg: #1b1b1b; --muted: #5c5c5c;
+    --card: #f6f6f4; --border: #e2e2dd; --code: #ededea;
+    --accent: #8a6a3a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18; --fg: #e8e8e3; --muted: #a3a39b;
+      --card: #232320; --border: #34342f; --code: #2b2b27;
+      --accent: #c9a978;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg); margin: 0;
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 28px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-size: 20px; font-weight: 600; margin: 40px 0 8px; }
+  .lede { color: var(--muted); margin: 0 0 8px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 4px 22px 18px; margin: 20px 0;
+  }
+  .tag {
+    display: inline-block; font-size: 13px; color: var(--accent);
+    font-weight: 600; letter-spacing: .02em; margin-top: 16px;
+  }
+  code {
+    background: var(--code); padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  pre {
+    background: var(--code); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; overflow-x: auto; line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; font-size: 13.5px; }
+  .label { font-weight: 600; }
+  .turn {
+    border-left: 3px solid var(--accent); padding: 2px 0 2px 14px;
+    margin-top: 14px; color: var(--fg);
+  }
+  .checkpoint {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 22px; margin-top: 36px;
+  }
+  ul { padding-left: 20px; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tier 3 — functions</h1>
+  <p class="lede">The big tier, built from pieces you already have. A function takes inputs and hands back an output.</p>
+  <p class="lede">Four ideas: writing one (<code>() =&gt;</code>), a function as a value, callbacks, and closures.</p>
+  <p class="lede">Run anything by pasting into <code>scratch.js</code> and running <code>node scratch.js</code>.</p>
+
+  <div class="card">
+    <span class="tag">CARD 3.1 — writing a function: the () =&gt; arrow</span>
+    <p><span class="label">What it does:</span> packages steps under a name, takes inputs in <code>( )</code>, hands back an output with <code>return</code>.</p>
+<pre><code>function add(a, b) {        // classic "declaration" form
+  return a + b;
+}
+const add2 = (a, b) =&gt; {    // arrow form — same thing
+  return a + b;
+};
+console.log(add(2, 3), add2(2, 3)); // → 5 5</code></pre>
+    <p><span class="label">The shortcut behind most arrows:</span> if the body is a single expression, drop <code>{ }</code> and <code>return</code> — the arrow returns it automatically:</p>
+<pre><code>const double = (x) =&gt; x * 2; // returns x * 2
+console.log(double(5));      // → 10</code></pre>
+    <p>So <code>(x) =&gt; x * 2</code> reads as "a function that takes <code>x</code> and gives back <code>x * 2</code>."</p>
+    <p><span class="label">The gotcha — returning an object.</span> Because <code>{</code> starts a body, you must wrap a returned object in parens:</p>
+<pre><code>const broken = () =&gt; { n: 1 };   // ❌ { } read as body, returns nothing
+const fixed  = () =&gt; ({ n: 1 }); // ✅ parens say "return this object"
+console.log(fixed()); // → { n: 1 }</code></pre>
+    <p><span class="label">You've seen it:</span> exactly why your file writes <code>const initialState = () =&gt; ({ ... })</code> and <code>const toHavenChannel = (raw) =&gt; ({ ... })</code>. Those parens are required, not decoration.</p>
+    <div class="turn">Your turn — what prints?
+<pre><code>const shout = (word) =&gt; word + "!";
+console.log(shout("hi"));
+console.log(shout("tier 3"));</code></pre></div>
+  </div>
+
+  <div class="card">
+    <span class="tag">CARD 3.2 — a function is a value</span>
+    <p><span class="label">What it does:</span> the leap. A function can be stored, passed, and returned just like a number or string. A thing, not just an action.</p>
+<pre><code>const double = (x) =&gt; x * 2;
+const sameFn = double;   // pass the function itself — NO parens
+console.log(sameFn(5));  // → 10
+
+function runTwice(fn) {
+  return fn(fn(1));      // fn is whatever you hand in
+}
+console.log(runTwice(double)); // → 4   (double(2) = 4)</code></pre>
+    <p><span class="label">The parens / no-parens distinction is the whole game:</span></p>
+    <ul>
+      <li><code>double</code> — the function itself. The recipe. Held, not run.</li>
+      <li><code>double(5)</code> — run the recipe with <code>5</code>, get a result.</li>
+    </ul>
+    <p><code>runTwice(double)</code> hands over the recipe and lets <code>runTwice</code> decide when to call it.</p>
+    <p><span class="label">You've seen it:</span> <code>createMemo(() =&gt; projectChannels(...))</code> hands a function to <code>createMemo</code>, which runs it later. You give the recipe away.</p>
+    <div class="turn">Your turn — what prints?
+<pre><code>const add1 = (n) =&gt; n + 1;
+function apply(fn, value) {
+  return fn(value);
+}
+console.log(apply(add1, 10));</code></pre></div>
+  </div>
+
+  <div class="card">
+    <span class="tag">CARD 3.3 — callbacks: handing a function to .map / .filter</span>
+    <p><span class="label">What it does:</span> a callback is a function you pass into another function so it runs it for you — usually once per item. (Tier 4 covers what they return; here the point is: you're passing a function.)</p>
+<pre><code>const nums = [1, 2, 3, 4];
+
+const evens = nums.filter((n) =&gt; n % 2 === 0); // keep where true
+console.log(evens);   // → [ 2, 4 ]
+
+const doubled = nums.map((n) =&gt; n * 2);        // transform each
+console.log(doubled); // → [ 2, 4, 6, 8 ]</code></pre>
+    <p>This is a tier-2 loop with a function plugged in. <code>.map</code> is "<code>for...of</code> the array, run my function on each, collect the answers." You supply the what-to-do; it does the looping.</p>
+    <p><span class="label">You've seen it:</span></p>
+    <ul>
+      <li><code>channels().filter((c) =&gt; c.kind === "text")</code> — keep text channels.</li>
+      <li><code>channels.map((channel) =&gt; channel.id)</code> — channels into their ids.</li>
+      <li><code>[...channels].sort((a, b) =&gt; a.position - b.position)</code> — <code>.sort</code> hands your callback two items to compare.</li>
+    </ul>
+    <div class="turn">Your turn — what prints?
+<pre><code>const words = ["hi", "there", "you"];
+const lengths = words.map((w) =&gt; w.length);
+console.log(lengths);
+const long = words.filter((w) =&gt; w.length &gt; 2);
+console.log(long);</code></pre></div>
+  </div>
+
+  <div class="card">
+    <span class="tag">CARD 3.4 — closures: a function remembers where it was born</span>
+    <p><span class="label">What it does:</span> a new function quietly keeps a link to the variables around it, and remembers them even after that outer code finished. That remembered backpack is a closure.</p>
+<pre><code>function makeGreeter(greeting) {
+  return (name) =&gt; greeting + ", " + name; // remembers `greeting`
+}
+const sayHi = makeGreeter("Hi");
+const sayYo = makeGreeter("Yo");
+console.log(sayHi("Cody")); // → Hi, Cody
+console.log(sayYo("Cody")); // → Yo, Cody</code></pre>
+    <p><code>makeGreeter</code> finished both times — but each returned function still remembers the <code>greeting</code> it was born with. <code>sayHi</code> carries "Hi", <code>sayYo</code> carries "Yo". Two private backpacks. That's the closure.</p>
+    <p><span class="label">You've seen it — this is the accessor:</span></p>
+<pre><code>channels(communityId) {
+  return createMemo(() =&gt; projectChannels(this.state, communityId()));
+}</code></pre>
+    <p>The arrow handed to <code>createMemo</code> is a closure: after <code>channels(...)</code> returns, it still remembers <code>this.state</code> and <code>communityId</code> from where it was born. That carried memory is why the accessor keeps working — it brings its inputs along in its backpack.</p>
+    <div class="turn">Your turn — what prints?
+<pre><code>function multiplier(factor) {
+  return (n) =&gt; n * factor;
+}
+const triple = multiplier(3);
+console.log(triple(5));
+console.log(triple(10));</code></pre></div>
+  </div>
+
+  <div class="checkpoint">
+    <h2 style="margin-top:0">Tier 3 checkpoint</h2>
+    <ul>
+      <li><code>(x) =&gt; x * 2</code> reads as "a function that returns <code>x * 2</code>"</li>
+      <li>you know <code>fn</code> is the recipe and <code>fn()</code> runs it — parens matter</li>
+      <li>a callback reads as "a function I hand to another function to run for me"</li>
+      <li>a closure reads as "a function carrying a backpack of the values it was born with"</li>
+    </ul>
+    <p>Next stop, tier 4 — shaping data: objects in full, the <code>.map</code> / <code>.filter</code> / <code>.reduce</code> family for real, destructuring, the spread <code>...</code>, and <code>?.</code> / <code>??</code>. After tier 4, almost every line of the nexus is plain reading.</p>
+  </div>
+</main>
+</body>
+</html>
