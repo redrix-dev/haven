@@ -8,7 +8,6 @@ import {
   createIsLoadingOlder,
   createHasInitialLoadCompleted,
 } from "@solid-client/data/messages";
-import { createLiveProfiles } from "@solid-client/data/profile";
 import { createCommunityRouteSync } from "./CommunityRouteSync";
 import { buildMessageViewItems } from "./messageList/messageViewModel";
 import { MessageList } from "./messageList/MessageList";
@@ -98,7 +97,7 @@ function ChannelChat(props: {
   const meta = createChannelMeta(cache, () => props.channelId);
   const loadingOlder = createIsLoadingOlder(cache, () => props.channelId);
   const loaded = createHasInitialLoadCompleted(cache, () => props.channelId);
-  const liveProfiles = createLiveProfiles(core.profiles);
+  const liveProfiles = core.profiles.liveProfiles();
 
   void cache.ensureInitialLoaded(props.channelId);
 
@@ -112,10 +111,22 @@ function ChannelChat(props: {
     }
   };
 
-  const send = async (content: string) => {
-    await cache.send(props.channelId, content, {
-      senderUserId: session()?.user.id ?? null,
-    });
+  const send = async (
+    content: string,
+    media?: { file: File; previewUrl: string },
+  ) => {
+    if (media) {
+      await cache.sendWithMedia(props.channelId, content, {
+        mediaFile: media.file,
+        mediaContentType: media.file.type,
+        optimisticMediaUri: media.previewUrl,
+        senderUserId: session()?.user.id ?? null,
+      });
+    } else {
+      await cache.send(props.channelId, content, {
+        senderUserId: session()?.user.id ?? null,
+      });
+    }
   };
 
   return (

@@ -5,12 +5,11 @@ import {
   onCleanup,
   untrack,
 } from "solid-js";
-import { render } from "solid-js/web";
+import { delegateEvents, render } from "solid-js/web";
 import type { VoiceMirrorState } from "@solid-client/contexts/voiceSync";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
 import { requireHavenSolidCore } from "@solid-client/core";
-import { createViewerProfile } from "@solid-client/data/profile";
 import { VoicePopoutPanel } from "./VoicePopoutPanel";
 import {
   openVoicePortalWindow,
@@ -28,7 +27,7 @@ export function VoiceBrowserPortalPopout(props: {
   const core = requireHavenSolidCore();
   const { session } = useSession();
   const userId = () => session()?.user.id ?? null;
-  const viewerProfile = createViewerProfile(core.profiles, userId);
+  const viewerProfile = core.profiles.viewerProfile(userId);
   const [target, setTarget] = createSignal<VoicePortalWindowTarget | null>(
     null,
   );
@@ -135,6 +134,11 @@ export function VoiceBrowserPortalPopout(props: {
     const current = target();
     unmountPanel();
     if (!current) return;
+
+    // Solid delegates events on the MAIN window's document; the panel renders
+    // into the popout window's document, so its onClick handlers never fire
+    // there unless we also enable click delegation on the child document.
+    delegateEvents(["click"], current.win.document);
 
     try {
       disposePanel = untrack(() =>

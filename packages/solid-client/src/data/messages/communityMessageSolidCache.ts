@@ -10,13 +10,17 @@ import {
   MESSAGE_PAGE_SIZE,
   ascendingMessagesFromRpcPage,
   buildOptimisticSendBundle,
+  coerceMediaExpiresInHours,
+  inferMediaFilename,
   insertMessageIntoChannelIndex,
   oldestMessageCursor,
   removeMessageIdFromChannelIndex,
   shouldSkipInitialReload,
+  validateMediaSendOptions,
   type ChannelMeta,
   type SendCommunityMessageMediaOptions,
 } from "@shared/features/messaging/logic";
+import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from "@shared/lib/backend/mediaAttachmentUtils";
 
 export type CommunityMessageSolidState = {
   entities: Record<string, NexusEntry<MessageBundle>>;
@@ -236,6 +240,20 @@ export class CommunityMessageSolidCache {
     this.bump();
   }
 
+  updateMessage(messageId: string, changes: Partial<MessageBundle>): void {
+    this.setState((s) => {
+      const entry = s.entities[messageId];
+      if (!entry) return s;
+      return {
+        entities: {
+          ...s.entities,
+          [messageId]: { ...entry, data: { ...entry.data, ...changes } },
+        },
+      };
+    });
+    this.bump();
+  }
+
   evictChannel(channelId: string): void {
     this.setState((s) => {
       const ids = s.byChannel[channelId] ?? [];
@@ -288,32 +306,117 @@ export class CommunityMessageSolidCache {
       replyToMessageId?: string | null;
     } & SendCommunityMessageMediaOptions,
   ): Promise<void> {
-    void channelId;
-    void content;
-    void options;
-    throw new Error(
-      "CommunityMessageSolidCache.sendWithMedia not implemented yet",
-    );
+    if (!this.communityData) throw new Error("backend not attached");
+
+    const { hasBlob, hasBuffer } = validateMediaSendOptions(options);
+
+    // Beat 1 — no file? plain text send and bail.
+    if (!hasBlob && !hasBuffer) {
+      await this.send(channelId, content, {
+        replyToMessageId: options?.replyToMessageId ?? null,
+        senderUserId: options?.senderUserId ?? null,
+        senderIsPlatformStaff: options?.senderIsPlatformStaff === true,
+      });
+      return;
+    }
+
+    // Beat 2 — upload, then send the message it'll attach to.
+    const filename = inferMediaFilename(options);
+    const fileBody = hasBuffer
+      ? (options!.mediaArrayBuffer as ArrayBuffer)
+      : (options!.mediaFile as Blob);
+
+    const upload = await this.communityData.uploadMessageMedia({
+      communityId: this.communityId,
+      channelId,
+      file: fileBody,
+      filename,
+      mimeType:
+        options?.mediaContentType?.trim() ??
+        (options?.mediaFile instanceof Blob
+          ? options.mediaFile.type || "application/octet-stream"
+          : "application/octet-stream"),
+      expiresInHours: coerceMediaExpiresInHours(options?.mediaExpiresInHours),
+      contentType:
+        options?.mediaContentType?.trim() ??
+        (options?.mediaFile instanceof Blob
+          ? options.mediaFile.type || undefined
+          : undefined),
+    });
+
+    const messageContent =
+      content.trim().length > 0 ? content : MEDIA_ONLY_CONTENT_PLACEHOLDER;
+    const { id } = await this.send(channelId, messageContent, {
+      replyToMessageId: options?.replyToMessageId ?? null,
+      senderUserId: options?.senderUserId ?? null,
+      senderIsPlatformStaff: options?.senderIsPlatformStaff === true,
+    });
+
+    // Beat 3 — attach + show optimistically; roll back on failure.
+    try {
+      await this.communityData.insertMessageAttachment({
+        messageId: id,
+        communityId: this.communityId,
+        channelId,
+        objectPath: upload.objectPath,
+        mimeType: upload.mimeType,
+        sizeBytes: upload.sizeBytes,
+        mediaKind: upload.mediaKind,
+        filename,
+        expiresAt: upload.expiresAt,
+      });
+      this.updateMessage(id, {
+        attachment: {
+          id: `optimistic:${id}`,
+          messageId: id,
+          communityId: this.communityId,
+          channelId,
+          ownerUserId: options?.senderUserId ?? "",
+          bucketName: "message-media",
+          objectPath: upload.objectPath,
+          originalFilename: filename,
+          mimeType: upload.mimeType,
+          mediaKind: upload.mediaKind,
+          sizeBytes: upload.sizeBytes,
+          createdAt: new Date().toISOString(),
+          expiresAt: upload.expiresAt,
+          signedUrl: options?.optimisticMediaUri ?? null,
+        },
+      });
+    } catch (error) {
+      this.removeMessage(id, channelId);
+      await this.deleteMessageRpc(id);
+      throw error;
+    }
   }
 
   async requestLinkPreviewBackfill(
     channelId: string,
     messageIds: string[],
   ): Promise<void> {
-    void channelId;
-    void messageIds;
-    throw new Error("not implemented");
+    if (!this.communityData) throw new Error("backend not attached");
+    await this.communityData.requestChannelLinkPreviewBackfill({
+      communityId: this.communityId,
+      channelId,
+      messageIds,
+    });
   }
 
   async edit(messageId: string, content: string): Promise<void> {
-    void messageId;
-    void content;
-    throw new Error("not implemented");
+    if (!this.communityData) throw new Error("backend not attached");
+    await this.communityData.editUserMessage({
+      communityId: this.communityId,
+      messageId,
+      content,
+    });
   }
 
   async deleteMessageRpc(messageId: string): Promise<void> {
-    void messageId;
-    throw new Error("not implemented");
+    if (!this.communityData) throw new Error("backend not attached");
+    await this.communityData.deleteMessage({
+      communityId: this.communityId,
+      messageId,
+    });
   }
 
   async toggleReaction(
@@ -321,10 +424,13 @@ export class CommunityMessageSolidCache {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    void channelId;
-    void messageId;
-    void emoji;
-    throw new Error("not implemented");
+    if (!this.communityData) throw new Error("backend not attached");
+    await this.communityData.toggleMessageReaction({
+      communityId: this.communityId,
+      channelId,
+      messageId,
+      emoji,
+    });
   }
 
   async report(input: {
@@ -335,8 +441,11 @@ export class CommunityMessageSolidCache {
     kind: import("@shared/lib/backend/types").MessageReportKind;
     comment: string;
   }): Promise<void> {
-    void input;
-    throw new Error("not implemented");
+    if (!this.communityData) throw new Error("backend not attached");
+    await this.communityData.reportMessage({
+      communityId: this.communityId,
+      ...input,
+    });
   }
 
   getLastMessageId(channelId: string): string | null {

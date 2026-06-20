@@ -20,9 +20,9 @@ import type {
 } from "@shared/features/voice/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { requireHavenSolidCore } from "../core";
-import { createViewerProfile } from "../data/profile";
 import { useSession } from "./SessionProvider";
 import { openVoiceSyncChannel, type VoiceMirrorState } from "./voiceSync";
+import { playVoiceJoinSound, playVoiceLeaveSound } from "../audio/sounds";
 
 /**
  * The voice session controller — Solid port of mobile's
@@ -106,7 +106,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   const core = requireHavenSolidCore();
   const { session } = useSession();
   const userId = () => session()?.user.id ?? null;
-  const viewerProfile = createViewerProfile(core.profiles, userId);
+  const viewerProfile = core.profiles.viewerProfile(userId);
 
   const [voice, setVoice] = createStore<VoiceUiState>(initialState());
 
@@ -160,8 +160,14 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       .on(RoomEvent.AudioPlaybackStatusChanged, () => {
         setVoice("audioPlaybackBlocked", !next.canPlaybackAudio);
       })
-      .on(RoomEvent.ParticipantConnected, syncParticipants)
-      .on(RoomEvent.ParticipantDisconnected, syncParticipants)
+      .on(RoomEvent.ParticipantConnected, () => {
+        playVoiceJoinSound();
+        syncParticipants();
+      })
+      .on(RoomEvent.ParticipantDisconnected, () => {
+        playVoiceLeaveSound();
+        syncParticipants();
+      })
       .on(RoomEvent.TrackMuted, syncParticipants)
       .on(RoomEvent.TrackUnmuted, syncParticipants)
       .on(RoomEvent.ActiveSpeakersChanged, syncParticipants)
@@ -237,13 +243,17 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   const cleanup = async () => {
     joinGeneration += 1;
     intentionalDisconnect = true;
+    // Clearing activeChannel re-fires the sidebar's presence effect, which
+    // re-subscribes to THIS channel's topic. If our own presence-publish channel
+    // for that topic is still open, Supabase rejects the re-`.on("presence")`.
+    // So clear everything except activeChannel now, release the topic below, then
+    // clear activeChannel last.
     setVoice({
       joined: false,
       joining: false,
       participants: [],
       error: null,
       notice: null,
-      activeChannel: null,
     });
     core.voice.setParticipants([]);
     core.voice.setVoiceConnected(false);
@@ -255,15 +265,22 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     });
     core.voice.completeDisconnect();
     try {
-      await core.voice.disconnectKickChannel();
-    } catch {
-      // Best-effort cleanup.
-    }
-    try {
       await core.voice.disconnectPresenceChannel();
     } catch {
       // Supabase also drops presence on socket close.
     }
+    // Topic released — now it's safe to clear activeChannel and let the sidebar
+    // re-subscribe to this channel's presence on a fresh channel.
+    setVoice({ activeChannel: null });
+    try {
+      await core.voice.disconnectKickChannel();
+    } catch {
+      // Best-effort cleanup.
+    }
+    // room.disconnect() tears down the connection but leaves the local mic
+    // track running in the browser (readyState stays "live"), so the mic stays
+    // engaged after leaving. Stop the local tracks explicitly to release it.
+    room?.localParticipant.trackPublications.forEach((pub) => pub.track?.stop());
     try {
       await room?.disconnect();
     } catch {
@@ -323,6 +340,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
         isDeafened: voice.isDeafened,
       });
       setVoice({ joined: true });
+      playVoiceJoinSound();
       applyParticipants(room);
       applyRemoteVolumes(voice.isDeafened);
       void refreshInputDevices();
@@ -366,6 +384,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   };
 
   const leave = async () => {
+    playVoiceLeaveSound();
     await cleanup();
   };
 

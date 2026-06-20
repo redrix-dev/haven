@@ -22,7 +22,6 @@ import {
   createSocialFriends,
   createSocialLoading,
 } from "@solid-client/data/social";
-import { createLiveProfiles } from "@solid-client/data/profile";
 import { Avatar, Button } from "@solid-client/components/ui";
 
 const TABS: { id: FriendsPanelTab; label: string }[] = [
@@ -40,7 +39,7 @@ export function FriendsView() {
   const requests = createSocialFriendRequests(core.social);
   const blockedUsers = createSocialBlockedUsers(core.social);
   const loading = createSocialLoading(core.social);
-  const liveProfiles = createLiveProfiles(core.profiles);
+  const liveProfiles = core.profiles.liveProfiles();
 
   const [activeTab, setActiveTab] = createSignal<FriendsPanelTab>("friends");
   const [loadError, setLoadError] = createSignal<string | null>(null);

@@ -1,6 +1,5 @@
 export {
-  ProfileSolidCache,
-  createProfileSolidCache,
-} from "./profileSolidCache";
-export type { ViewerProfileUpdateInput } from "./profileSolidCache";
-export { createViewerProfile, createLiveProfiles } from "./accessors";
+  ProfileSolidNexus,
+  createProfileSolidNexus,
+} from "./profileSolidNexus";
+export type { ViewerProfileUpdateInput } from "./profileSolidNexus";

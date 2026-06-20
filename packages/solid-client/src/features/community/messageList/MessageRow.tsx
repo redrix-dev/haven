@@ -84,9 +84,20 @@ function MessageContent(props: { item: MessageRowItem }) {
       </div>
       <Show when={m().attachment}>
         {(attachment) => (
-          <p class="mt-0.5 inline-block rounded bg-surface-embed-chip px-2 py-0.5 text-xs text-attachment-label">
-            📎 {attachment().originalFilename ?? attachment().mediaKind}
-          </p>
+          <Show
+            when={attachment().mediaKind === "image" && attachment().signedUrl}
+            fallback={
+              <p class="mt-0.5 inline-block rounded bg-surface-embed-chip px-2 py-0.5 text-xs text-attachment-label">
+                📎 {attachment().originalFilename ?? attachment().mediaKind}
+              </p>
+            }
+          >
+            <img
+              src={attachment().signedUrl ?? undefined}
+              alt={attachment().originalFilename ?? ""}
+              class="mt-1 max-h-80 max-w-sm rounded object-contain"
+            />
+          </Show>
         )}
       </Show>
     </Show>

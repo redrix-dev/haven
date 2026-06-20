@@ -32,8 +32,8 @@ import {
   createChannelSolidNexus,
   SocialSolidCache,
   createSocialSolidCache,
-  ProfileSolidCache,
-  createProfileSolidCache,
+  ProfileSolidNexus,
+  createProfileSolidNexus,
   PermissionsSolidCache,
   createPermissionsSolidCache,
   DirectMessageSolidCache,
@@ -55,6 +55,7 @@ import {
   type BootstrapPhaseListener,
   type BootstrapPhaseSnapshot,
 } from "./bootstrapPhase";
+import { playNotificationSound } from "@solid-client/audio/sounds";
 
 const normalizeRealtimeIso = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
@@ -113,7 +114,7 @@ export class HavenSolidCore implements RealtimeMutationTarget {
   readonly notifications: NotificationSolidCache;
   readonly social: SocialSolidCache;
   readonly permissions: PermissionsSolidCache;
-  readonly profiles: ProfileSolidCache;
+  readonly profiles: ProfileSolidNexus;
   readonly admin: CommunityAdminSolidCache;
   readonly moderation: CommunityModerationSolidCache;
   readonly voice: VoiceSolidCache;
@@ -148,7 +149,7 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     );
     this.social = createSocialSolidCache(this.backends.social);
     this.permissions = createPermissionsSolidCache();
-    this.profiles = createProfileSolidCache(this.backends.controlPlane);
+    this.profiles = createProfileSolidNexus(this.backends.controlPlane);
     this.admin = new CommunityAdminSolidCache(this.backends.communityData);
     this.moderation = new CommunityModerationSolidCache();
     this.voice = createVoiceSolidCache(
@@ -344,6 +345,7 @@ export class HavenSolidCore implements RealtimeMutationTarget {
   }
 
   onNotificationEvent(_payload: Record<string, unknown>): void {
+    playNotificationSound();
     void this.notifications.loadInbox().catch((err) => {
       console.warn("[HavenSolidCore] notifications.loadInbox failed", err);
     });

@@ -11,7 +11,6 @@ import { listSelectableBuiltinThemes } from "@shared/themes/selectableBuiltinThe
 import { resolveSemanticEntries } from "@shared/themes/semantics";
 import type { HavenTheme } from "@shared/themes/types";
 import { requireHavenSolidCore } from "../core";
-import { createViewerProfile } from "../data/profile";
 import { useSession } from "./SessionProvider";
 
 /**
@@ -114,7 +113,7 @@ export function ThemeProvider(props: { children: JSX.Element }) {
   applyDocumentTheme(getTheme(themeId()));
 
   const userId = () => session()?.user.id ?? null;
-  const viewerProfile = createViewerProfile(core.profiles, userId);
+  const viewerProfile = core.profiles.viewerProfile(userId);
 
   // Load the viewer profile after sign-in so the profile theme can hydrate.
   createEffect(() => {

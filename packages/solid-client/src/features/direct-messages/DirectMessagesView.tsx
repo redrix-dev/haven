@@ -36,7 +36,6 @@ import {
   createDmMessages,
   createDmMessagesLoading,
 } from "@solid-client/data/direct-messages";
-import { createLiveProfiles } from "@solid-client/data/profile";
 import {
   createSocialFriends,
   createSocialLoading,
@@ -75,7 +74,7 @@ export function DirectMessagesView() {
   );
   const friends = createSocialFriends(core.social);
   const loadingSocial = createSocialLoading(core.social);
-  const liveProfiles = createLiveProfiles(core.profiles);
+  const liveProfiles = core.profiles.liveProfiles();
   const [openError, setOpenError] = createSignal<string | null>(null);
   const [friendPickerOpen, setFriendPickerOpen] = createSignal(false);
   const [friendOpenError, setFriendOpenError] = createSignal<string | null>(
@@ -371,7 +370,7 @@ function DmConversation(props: {
 }) {
   const core = requireHavenSolidCore();
   const { session } = useSession();
-  const liveProfiles = createLiveProfiles(core.profiles);
+  const liveProfiles = core.profiles.liveProfiles();
   const messages = createDmMessages(
     core.directMessages,
     () => props.conversationId,
@@ -415,6 +414,18 @@ function DmConversation(props: {
 
   const viewerId = () => session()?.user.id ?? null;
 
+  // Open at the newest message (bottom) and follow new messages — standard chat
+  // behavior. Channels get this from virtua; the DM thread is a plain scroller,
+  // so we pin it to the bottom on conversation switch + when a message arrives.
+  let scrollContainer: HTMLDivElement | undefined;
+  createEffect(() => {
+    void props.conversationId;
+    void messages().length;
+    queueMicrotask(() => {
+      scrollContainer?.scrollTo({ top: scrollContainer.scrollHeight });
+    });
+  });
+
   return (
     <>
       <header class="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
@@ -436,7 +447,10 @@ function DmConversation(props: {
         </span>
       </header>
 
-      <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div
+        ref={scrollContainer}
+        class="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+      >
         <Show when={reportNotice()}>
           <div class="mb-2 rounded border border-border bg-surface-panel px-3 py-2 text-sm text-muted-foreground">
             {reportNotice()}

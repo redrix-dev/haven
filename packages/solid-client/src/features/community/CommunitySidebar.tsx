@@ -5,7 +5,6 @@ import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
 import { Avatar } from "@solid-client/components/ui";
-import { createViewerProfile } from "@solid-client/data/profile";
 import { createChannelVoiceParticipants } from "@solid-client/data/voice";
 import type { HavenChannel } from "@shared/nexus/community/channelTypes";
 
@@ -189,8 +188,7 @@ function VoiceChannelRow(props: {
   const core = requireHavenSolidCore();
   const { session } = useSession();
   const { voice, joinChannel } = useVoice();
-  const viewerProfile = createViewerProfile(
-    core.profiles,
+  const viewerProfile = core.profiles.viewerProfile(
     () => session()?.user.id ?? null,
   );
   const occupants = createChannelVoiceParticipants(
