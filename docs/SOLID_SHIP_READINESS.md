@@ -60,8 +60,8 @@ Legend: ✅ done · ⚠️ backend/read path only, UI absent · ⛔ deferred (fa
 | Direct messages (+ media, report) | ✅ | ✅ | ✅ | — |
 | Friends / social | ✅ | ✅ | ✅ | — |
 | Profile + theme + appearance settings | ✅ | ✅ | ✅ | — |
-| Notifications inbox (counts, mark read) | ✅ | ✅ | ✅ | — |
-| Notification toasts (in-app surface) | ✅ | ✅ | ⛔ | Toast surface (`solid-sonner`) |
+| Notifications inbox (counts, mark read) | ✅ | ✅ | ✅ | Built — bell + unread badge + inbox page (read/dismiss/mark-all) |
+| Notification toasts (in-app surface) | ✅ | ✅ | ✅ | Built — custom themed toast (not solid-sonner) |
 | **Onboarding (new-user flow)** | ✅ | ✅ | ❌ | Port from mobile (~small) |
 | **Community moderation (ban/kick/redact)** | ✅ | ✅ | ❌ | Port from mobile (~medium) |
 | **Feature flags (gating)** | ✅ | ✅ | ❌ | Port from mobile (~small) |
@@ -90,9 +90,9 @@ from background refactor to a ship prerequisite** — done correctly, including 
 persistence wiring, so the missing subsystems get built once, on the clean
 pattern.
 
-**Converted (nexus):** channels, communities, profile.
+**Converted (nexus):** channels, communities, profile, notifications.
 **Still on `XSolidCache` + accessors:** community-management, direct-messages,
-feature-flags, messages, notifications, onboarding, permissions, social, voice.
+feature-flags, messages, onboarding, permissions, social, voice.
 
 What a conversion involves (per [data/README](../packages/solid-client/src/data/README.md),
 template = `channelSolidNexus.ts` / `communitySolidNexus.ts`):

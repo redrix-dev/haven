@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createMemo, onCleanup } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { MessageCircle, Settings, Users } from "lucide-solid";
+import { Bell, MessageCircle, Settings, Users } from "lucide-solid";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
@@ -28,14 +28,27 @@ function useSidebarData() {
   // passing the getter keeps it reactive to community switches.
   const channels = core.channels.channels(() => activeCommunityId() ?? "");
 
-  return { communities, activeCommunityId, channels, activeChannelId };
+  const unreadNotifications = core.notifications.inboxUnreadCount();
+
+  return {
+    communities,
+    activeCommunityId,
+    channels,
+    activeChannelId,
+    unreadNotifications,
+  };
 }
 
 // ─── component ───────────────────────────────────────────────────────────────
 
 export function CommunitySidebar() {
-  const { communities, activeCommunityId, channels, activeChannelId } =
-    useSidebarData();
+  const {
+    communities,
+    activeCommunityId,
+    channels,
+    activeChannelId,
+    unreadNotifications,
+  } = useSidebarData();
   const navigate = useNavigate();
 
   const textChannels = createMemo(() =>
@@ -70,6 +83,18 @@ export function CommunitySidebar() {
         </For>
 
         <div class="mt-auto">
+          <button
+            title="Notifications"
+            onClick={() => navigate("/notifications")}
+            class="relative mb-2 flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
+          >
+            <Bell size={20} />
+            <Show when={unreadNotifications() > 0}>
+              <span class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                {unreadNotifications() > 99 ? "99+" : unreadNotifications()}
+              </span>
+            </Show>
+          </button>
           <button
             title="Friends"
             onClick={() => navigate("/friends")}

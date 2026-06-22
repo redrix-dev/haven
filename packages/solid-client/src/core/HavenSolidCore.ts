@@ -38,8 +38,8 @@ import {
   createPermissionsSolidCache,
   DirectMessageSolidCache,
   createDirectMessageSolidCache,
-  NotificationSolidCache,
-  createNotificationSolidCache,
+  NotificationSolidNexus,
+  createNotificationSolidNexus,
   CommunityAdminSolidCache,
   CommunityModerationSolidCache,
   VoiceSolidCache,
@@ -111,7 +111,7 @@ export class HavenSolidCore implements RealtimeMutationTarget {
   readonly channels: ChannelSolidNexus;
   readonly messages: MessageSolidRegistry;
   readonly directMessages: DirectMessageSolidCache;
-  readonly notifications: NotificationSolidCache;
+  readonly notifications: NotificationSolidNexus;
   readonly social: SocialSolidCache;
   readonly permissions: PermissionsSolidCache;
   readonly profiles: ProfileSolidNexus;
@@ -144,7 +144,7 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     this.directMessages = createDirectMessageSolidCache(
       this.backends.directMessages,
     );
-    this.notifications = createNotificationSolidCache(
+    this.notifications = createNotificationSolidNexus(
       this.backends.notifications,
     );
     this.social = createSocialSolidCache(this.backends.social);
@@ -346,12 +346,16 @@ export class HavenSolidCore implements RealtimeMutationTarget {
 
   onNotificationEvent(_payload: Record<string, unknown>): void {
     playNotificationSound();
-    void this.notifications.loadInbox().catch((err) => {
-      console.warn("[HavenSolidCore] notifications.loadInbox failed", err);
-    });
-    void this.notifications.refreshCounts().catch((err) => {
-      console.warn("[HavenSolidCore] notifications.refreshCounts failed", err);
-    });
+    void this.notifications
+      .loadInbox()
+      .then(() => {
+        // Surface the freshly-arrived notification as a toast. loadInbox already
+        // refreshed counts, so no separate refresh is needed.
+        this.notifications.markIncomingFromNewest();
+      })
+      .catch((err) => {
+        console.warn("[HavenSolidCore] notifications.loadInbox failed", err);
+      });
   }
 
   onDmConversationEvent(_payload: Record<string, unknown>): void {

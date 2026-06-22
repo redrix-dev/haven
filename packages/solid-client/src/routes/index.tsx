@@ -2,6 +2,7 @@ import {
   Match,
   Show,
   Switch,
+  createEffect,
   createSignal,
   onCleanup,
   onMount,
@@ -24,11 +25,19 @@ import { SignInScreen } from "../features/auth";
 import { AppearanceSettings } from "../features/settings";
 import { DirectMessagesView } from "../features/direct-messages";
 import { FriendsView } from "../features/friends";
+import { NotificationsView } from "../features/notifications";
 import { VoiceDock, VoicePopout } from "../features/voice";
 import { useBridge } from "../contexts/BridgeProvider";
 import { UpdaterProvider, useUpdater } from "../contexts/UpdaterProvider";
 import { Titlebar } from "../components/ui/Titlebar";
 import { CriticalUpdateOverlay } from "../components/ui/CriticalUpdateOverlay";
+import { Toaster } from "../components/ui/Toaster";
+import { ToastProvider, useToast } from "../contexts/ToastProvider";
+import { requireHavenSolidCore } from "../core";
+import {
+  getNotificationSummary,
+  getNotificationTitle,
+} from "@shared/features/notifications/notificationCopy";
 /**
  * The registration point: every screen the app can navigate to is one entry
  * here, pointing at a feature's public surface (its index barrel). Popout
@@ -60,9 +69,11 @@ function MainShell(props: RouteSectionProps) {
     <SessionProvider>
       <ThemeProvider>
         <UpdaterProvider>
-          <VoiceProvider>
-            <WindowChrome>{props.children}</WindowChrome>
-          </VoiceProvider>
+          <ToastProvider>
+            <VoiceProvider>
+              <WindowChrome>{props.children}</WindowChrome>
+            </VoiceProvider>
+          </ToastProvider>
         </UpdaterProvider>
       </ThemeProvider>
     </SessionProvider>
@@ -154,6 +165,29 @@ function deepLinkToPath(url: string): string {
   return "/" + stripped;
 }
 
+/**
+ * Watches the notification nexus for realtime arrivals and surfaces each as a
+ * toast, plus renders the toast stack. Mounted in the authed layout, so `core`
+ * is bootstrapped and the ToastProvider sits above it.
+ */
+function NotificationToastLayer() {
+  const toast = useToast();
+  const incoming = requireHavenSolidCore().notifications.incoming();
+  let lastSeq = 0;
+
+  createEffect(() => {
+    const next = incoming();
+    if (!next || next.seq === lastSeq) return;
+    lastSeq = next.seq;
+    toast.show({
+      title: getNotificationTitle(next.item),
+      body: getNotificationSummary(next.item),
+    });
+  });
+
+  return <Toaster toasts={toast.toasts()} onDismiss={toast.dismiss} />;
+}
+
 // ── main-branch layout ───────────────────────────────────────────────────────
 
 // Guards all routes under "/" — handles the three states of session():
@@ -177,17 +211,20 @@ function AppLayout(props: RouteSectionProps) {
       </Match>
 
       <Match when={session()}>
-        <div class="flex h-full w-full overflow-hidden bg-surface-app">
-          <div class="flex h-full flex-col">
-            <div class="min-h-0 flex-1">
-              <CommunitySidebar />
+        <>
+          <div class="flex h-full w-full overflow-hidden bg-surface-app">
+            <div class="flex h-full flex-col">
+              <div class="min-h-0 flex-1">
+                <CommunitySidebar />
+              </div>
+              <VoiceDock />
             </div>
-            <VoiceDock />
+            <main class="flex flex-1 flex-col overflow-hidden">
+              {props.children}
+            </main>
           </div>
-          <main class="flex flex-1 flex-col overflow-hidden">
-            {props.children}
-          </main>
-        </div>
+          <NotificationToastLayer />
+        </>
       </Match>
     </Switch>
   );
@@ -215,6 +252,7 @@ export const routes: RouteDefinition[] = [
         children: [
           { path: "/", component: CommunityHome },
           { path: "/friends", component: FriendsView },
+          { path: "/notifications", component: NotificationsView },
           { path: "/direct-messages", component: DirectMessagesView },
           {
             path: "/direct-messages/:conversationId",
