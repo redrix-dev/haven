@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "//": "macOS overrides merged over tauri.conf.json. macOS keeps native window decorations (traffic lights) but uses an Overlay titlebar with a hidden title, so the custom Titlebar content renders alongside the traffic lights instead of replacing them. The full window object is repeated because platform config replaces arrays rather than deep-merging them. UNVERIFIED on a real Mac — validate at the first macOS build.",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Haven — Tauri/Solid spike",
+        "width": 1100,
+        "height": 740,
+        "minWidth": 800,
+        "minHeight": 560,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "backgroundColor": "#0d1626"
+      }
+    ]
+  }
+}

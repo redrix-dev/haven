@@ -1,5 +1,13 @@
-import { Match, Switch } from "solid-js";
-import { Navigate } from "@solidjs/router";
+import {
+  Match,
+  Show,
+  Switch,
+  createSignal,
+  onCleanup,
+  onMount,
+  type JSX,
+} from "solid-js";
+import { Navigate, useNavigate } from "@solidjs/router";
 import type { RouteDefinition, RouteSectionProps } from "@solidjs/router";
 import { SessionProvider, useSession } from "../contexts/SessionProvider";
 import {
@@ -17,6 +25,10 @@ import { AppearanceSettings } from "../features/settings";
 import { DirectMessagesView } from "../features/direct-messages";
 import { FriendsView } from "../features/friends";
 import { VoiceDock, VoicePopout } from "../features/voice";
+import { useBridge } from "../contexts/BridgeProvider";
+import { UpdaterProvider, useUpdater } from "../contexts/UpdaterProvider";
+import { Titlebar } from "../components/ui/Titlebar";
+import { CriticalUpdateOverlay } from "../components/ui/CriticalUpdateOverlay";
 /**
  * The registration point: every screen the app can navigate to is one entry
  * here, pointing at a feature's public surface (its index barrel). Popout
@@ -41,14 +53,92 @@ import { VoiceDock, VoicePopout } from "../features/voice";
 
 // ── shells ───────────────────────────────────────────────────────────────────
 
-/** Full app stack: session bootstrap → theme (profile-synced) → voice session. */
+/** Full app stack: session bootstrap → theme (profile-synced) → voice session.
+ *  Wraps content in custom window chrome on native (Tauri) windows. */
 function MainShell(props: RouteSectionProps) {
   return (
     <SessionProvider>
       <ThemeProvider>
-        <VoiceProvider>{props.children}</VoiceProvider>
+        <UpdaterProvider>
+          <VoiceProvider>
+            <WindowChrome>{props.children}</WindowChrome>
+          </VoiceProvider>
+        </UpdaterProvider>
       </ThemeProvider>
     </SessionProvider>
+  );
+}
+
+/**
+ * Custom frameless chrome for the native main window: a titlebar with window
+ * controls plus the updater surface — version, a dismissible "update ready"
+ * pill, and a blocking prompt for critical updates. In a plain browser the
+ * bridge exposes no window controls, so content passes through untouched (the
+ * browser keeps its own chrome). Popout windows use PopoutLiteShell and never
+ * reach this.
+ */
+function WindowChrome(props: { children: JSX.Element }) {
+  const bridge = useBridge();
+  const updater = useUpdater();
+  const navigate = useNavigate();
+  const win = bridge.window;
+
+  // Route incoming deep links (haven://…). Native windows only; the web shell
+  // exposes no onDeepLink, so this no-ops in a browser.
+  onMount(() => {
+    const subscribe = bridge.onDeepLink;
+    if (!subscribe) return;
+    let dispose: (() => void) | undefined;
+    void subscribe((url) => navigate(deepLinkToPath(url))).then((d) => {
+      dispose = d;
+    });
+    onCleanup(() => dispose?.());
+  });
+
+  if (!win) return <>{props.children}</>;
+
+  // Track maximize state so the titlebar can show maximize vs restore.
+  const [maximized, setMaximized] = createSignal(false);
+  onMount(() => {
+    void win.isMaximized().then(setMaximized);
+    let dispose: (() => void) | undefined;
+    void win.onMaximizeChange(setMaximized).then((d) => {
+      dispose = d;
+    });
+    onCleanup(() => dispose?.());
+  });
+
+  const pending = () => updater.update();
+  const isCritical = () => pending()?.critical === true;
+  const pillVersion = () => {
+    const u = pending();
+    return u && !u.critical && !updater.dismissed() ? u.version : null;
+  };
+
+  return (
+    <div class="flex h-full w-full flex-col">
+      <Titlebar
+        version={updater.version()}
+        updateVersion={pillVersion()}
+        applying={updater.applying()}
+        maximized={maximized()}
+        platform={bridge.platform}
+        onMinimize={() => void win.minimize()}
+        onToggleMaximize={() => void win.toggleMaximize()}
+        onClose={() => void win.close()}
+        onApplyUpdate={() => void updater.apply()}
+        onDismissUpdate={() => updater.dismiss()}
+      />
+      <div class="min-h-0 flex-1">{props.children}</div>
+      <Show when={isCritical()}>
+        <CriticalUpdateOverlay
+          version={pending()!.version}
+          notes={pending()!.notes}
+          applying={updater.applying()}
+          onApply={() => void updater.apply()}
+        />
+      </Show>
+    </div>
   );
 }
 
@@ -56,6 +146,12 @@ function MainShell(props: RouteSectionProps) {
 function PopoutLiteShell(props: RouteSectionProps) {
   applyStoredThemeToDocument();
   return <div class="h-full w-full bg-background">{props.children}</div>;
+}
+
+/** `haven://community/x/channel/y` → `/community/x/channel/y`. */
+function deepLinkToPath(url: string): string {
+  const stripped = url.replace(/^haven:\/\//i, "").replace(/^\/+/, "");
+  return "/" + stripped;
 }
 
 // ── main-branch layout ───────────────────────────────────────────────────────

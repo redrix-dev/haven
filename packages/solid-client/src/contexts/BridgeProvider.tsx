@@ -28,6 +28,42 @@ export type BridgeCapabilities = {
   browserPortalPopout?: boolean;
 };
 
+export type Platform = "macos" | "windows" | "linux";
+
+/** Native window controls, used to drive custom (frameless) chrome. */
+export type WindowControls = {
+  minimize(): Promise<void>;
+  toggleMaximize(): Promise<void>;
+  close(): Promise<void>;
+  isMaximized(): Promise<boolean>;
+  /** Subscribe to maximize/restore changes; resolves with an unsubscribe fn. */
+  onMaximizeChange(cb: (maximized: boolean) => void): Promise<() => void>;
+};
+
+export type StagedUpdate = {
+  version: string;
+  currentVersion: string;
+  notes?: string;
+  /**
+   * Forced update — surfaced as a blocking, explained prompt instead of a
+   * dismissible pill. Marked by a `[critical]` tag in the release notes.
+   */
+  critical: boolean;
+};
+
+/** Desktop auto-update, mediated by the shell (GitHub Releases + minisign). */
+export type UpdaterControls = {
+  /** Installed app version, e.g. "2.0.0". */
+  currentVersion(): Promise<string>;
+  /**
+   * Check the release endpoint and download in the background. Resolves with a
+   * staged update ready to apply, or null (already current / endpoint down).
+   */
+  checkAndStage(): Promise<StagedUpdate | null>;
+  /** Install the staged update and relaunch into it. */
+  applyAndRestart(): Promise<void>;
+};
+
 export interface HavenBridge {
   capabilities?: BridgeCapabilities;
   /** Demonstrates the Tauri `invoke` round-trip. */
@@ -43,6 +79,20 @@ export interface HavenBridge {
    * Browser shells without a bridge fall back to window.open.
    */
   openPopout(path: string, options: PopoutOptions): Promise<void>;
+  /**
+   * Native window controls for custom (frameless) chrome. Absent in a plain
+   * browser tab, which keeps its own chrome — chrome renders only when present.
+   */
+  window?: WindowControls;
+  /** Desktop auto-update (GitHub Releases). Absent in a plain browser. */
+  updater?: UpdaterControls;
+  /** Host OS — lets chrome differ per platform (e.g. macOS traffic lights). */
+  platform?: Platform;
+  /**
+   * Subscribe to incoming deep links (`haven://…`); resolves with an
+   * unsubscribe fn. Absent in a plain browser, which uses normal URLs.
+   */
+  onDeepLink?(handler: (url: string) => void): Promise<() => void>;
 }
 
 const BridgeContext = createContext<HavenBridge>();

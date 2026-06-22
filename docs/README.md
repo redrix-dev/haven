@@ -1,6 +1,6 @@
 # Haven docs
 
-Small on purpose. Five living documents, one detailed-contract folder, one archive.
+Small on purpose. A handful of living documents, one detailed-contract folder, one archive.
 
 ## Reading order (cold start)
 
@@ -8,6 +8,11 @@ Small on purpose. Five living documents, one detailed-contract folder, one archi
 2. [ARCHITECTURE.md](./ARCHITECTURE.md) — the current truth: monorepo map, the three-layer law, guardrails and gates.
 3. [SOLID_REBUILD.md](./SOLID_REBUILD.md) — the active plan: what's done, what's next, standing decisions.
 4. [BACKLOG.md](./BACKLOG.md) — known debt and worked-out future designs, each with its trigger.
+
+## Shipping
+
+- [SOLID_SHIP_READINESS.md](./SOLID_SHIP_READINESS.md) — what "shipped" means for desktop/web, the feature-parity matrix, and the sequenced, gated path to the 2.0.0 release.
+- [RELEASE_CADENCE.md](./RELEASE_CADENCE.md) — ongoing release mechanics: the three release trains, version semantics, branch workflow, and standard + hotfix paths per platform.
 
 ## Detailed contracts (`architecture/`)
 

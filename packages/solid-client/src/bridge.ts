@@ -8,4 +8,11 @@
  * injects an implementation at bootstrap, and `solid-client` stays portable
  * (it also runs in a plain browser with no bridge at all).
  */
-export type { HavenBridge, PopoutOptions } from "./contexts/BridgeProvider";
+export type {
+  HavenBridge,
+  PopoutOptions,
+  WindowControls,
+  StagedUpdate,
+  UpdaterControls,
+  Platform,
+} from "./contexts/BridgeProvider";

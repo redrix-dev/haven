@@ -2,9 +2,24 @@
 
 **Community chat for people who give a damn.**
 
+[![Platforms](https://img.shields.io/badge/platforms-iOS%20·%20Desktop%20·%20Web-3b82f6)](#platforms)
+[![Stack](https://img.shields.io/badge/TypeScript-Solid%20·%20Tauri%20·%20React%20Native-3178c6)](#stack)
+[![Backend](https://img.shields.io/badge/backend-Supabase%20·%20LiveKit-3ecf8e)](#stack)
+[![CI](https://github.com/redrix-dev/haven/actions/workflows/ci.yml/badge.svg)](https://github.com/redrix-dev/haven/actions/workflows/ci.yml)
+[![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-orange)](./LICENSE.md)
+
 Haven is a real-time community chat platform across desktop, web, and iOS. It exists because community chat stopped feeling like it was built for communities — and proving that it could be done differently was worth the effort.
 
 ![Haven chat interface](docs/assets/screenshot-chat.png)
+
+---
+
+## Highlights
+
+- **Access control enforced in Postgres, not the UI.** Every permission check is an RLS policy or a security-definer RPC — the client reflects what the database says, it does not decide. A user with devtools cannot bypass it. [How it works ↓](#security-lives-in-the-database-not-the-ui) · [Verify it yourself ↓](#verifying-the-security-model)
+- **One framework-free core, three clients.** Domain logic, types, and state live in `packages/shared` with zero React or Solid imports, bound to React Native on iOS and Solid on desktop/web. CI enforces the boundary mechanically. [How it works ↓](#the-monorepo-is-structured-around-a-stable-shared-core)
+- **A custom OTA pipeline for iOS.** A from-scratch Expo Updates-compatible toolchain — asset hashing, bundle generation, manifest serving via a Supabase Edge Function — that replaces EAS Update and keeps update infrastructure under the same roof as the backend. [How it works ↓](#architecture)
+- **Real-time everything.** Markdown text channels, WebRTC voice over LiveKit, direct messages, friends, media upload, moderation, and push notifications — over a single per-user realtime subscription.
 
 ---
 
@@ -68,6 +83,14 @@ Business logic, types, and domain state live in `packages/shared` and are platfo
 
 ## Architecture
 
+At a glance — one law, dependencies point inward:
+
+```
+packages/shared (pure logic)  →  per-platform cache  →  per-platform UI
+   framework-free TypeScript      React (iOS) /            React Native (iOS) /
+   shared by every platform       Solid (desktop, web)     Solid (desktop, web)
+```
+
 Haven is a monorepo with two app targets and two core packages:
 
 - `apps/mobile` — React Native + Expo, actively distributed via TestFlight
@@ -79,7 +102,7 @@ Domain state lives in framework-free stores (`zustand/vanilla`) inside `packages
 
 The iOS OTA pipeline is a custom implementation of the Expo Updates protocol. A local toolchain handles asset fingerprinting, bundle generation, and manifest construction. The manifest is served by a Supabase Edge Function and the client fetches and applies updates at launch without going through EAS. This gives full control over the update cadence and keeps update infrastructure consolidated with the rest of the backend.
 
-Full documentation — engineering principles, architecture, the active rebuild plan, and the backlog — starts at [docs/README.md](docs/README.md).
+Full documentation — engineering principles, architecture, the active rebuild plan, the backlog, and the release cadence — starts at [docs/README.md](docs/README.md).
 
 ---
 

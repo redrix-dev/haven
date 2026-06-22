@@ -18,6 +18,7 @@
         "height": 740,
         "minWidth": 800,
         "minHeight": 560,
+        "decorations": false,
         "backgroundColor": "#0d1626"
       }
     ],
@@ -26,8 +27,9 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,5 +37,18 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE2Q0EyQkM5NDAzNEIzRjgKUldUNHN6UkF5U3ZLRm9kK04wS05mWnR1UE81cy9mYWNId3Btb3RKNGg4TEVHc1VZZkRKZzhSQnoK",
+      "endpoints": [
+        "https://github.com/redrix-dev/haven/releases/latest/download/latest.json"
+      ]
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["haven"]
+      }
+    }
   }
 }
