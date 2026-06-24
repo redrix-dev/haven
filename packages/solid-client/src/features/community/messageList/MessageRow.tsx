@@ -1,6 +1,11 @@
 import { Show } from "solid-js";
-import { CornerUpLeft } from "lucide-solid";
-import { Avatar, Markdown } from "@solid-client/components/ui";
+import { CornerUpLeft, Flag, UserX } from "lucide-solid";
+import {
+  ActionsMenu,
+  Avatar,
+  Markdown,
+  type ActionMenuItem,
+} from "@solid-client/components/ui";
 import type { MessageRowItem } from "./messageViewModel";
 
 function timeLabel(iso: string): string {
@@ -10,10 +15,48 @@ function timeLabel(iso: string): string {
   });
 }
 
-export function MessageRow(props: { item: MessageRowItem }) {
+/** Report-related row props are threaded from the list (renderer seam: no core). */
+export type MessageRowActions = {
+  viewerId?: string | null;
+  canReport?: boolean;
+  onReportMessage?: (messageId: string, preview: string) => void;
+  onReportUser?: (userId: string, name: string) => void;
+};
+
+export function MessageRow(props: { item: MessageRowItem } & MessageRowActions) {
   const m = () => props.item.message;
 
+  const items = (): ActionMenuItem[] => {
+    const msg = m();
+    const authorId = msg.authorUserId;
+    const reportable =
+      Boolean(props.canReport) &&
+      Boolean(props.viewerId) &&
+      Boolean(authorId) &&
+      authorId !== props.viewerId;
+    if (!reportable || !authorId) return [];
+
+    const list: ActionMenuItem[] = [];
+    if (msg.deletedAt === null) {
+      list.push({
+        label: "Report message",
+        icon: Flag,
+        danger: true,
+        onSelect: () =>
+          props.onReportMessage?.(msg.id, reportPreview(msg.content)),
+      });
+    }
+    list.push({
+      label: `Report ${props.item.authorName}`,
+      icon: UserX,
+      danger: true,
+      onSelect: () => props.onReportUser?.(authorId, props.item.authorName),
+    });
+    return list;
+  };
+
   return (
+    <ActionsMenu items={items()} label="Message actions">
     <div
       class="px-4 py-0.5 hover:bg-surface-message-row-hover"
       classList={{ "mt-2": props.item.showHeader }}
@@ -62,7 +105,14 @@ export function MessageRow(props: { item: MessageRowItem }) {
         </div>
       </Show>
     </div>
+    </ActionsMenu>
   );
+}
+
+function reportPreview(content: string): string {
+  const text = content.trim();
+  if (text) return text.length > 280 ? `${text.slice(0, 280)}…` : text;
+  return "Attachment or empty message";
 }
 
 function MessageContent(props: { item: MessageRowItem }) {

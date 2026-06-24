@@ -16,34 +16,41 @@ import {
   viewerCommunityPolicyEqual,
   viewerPolicyHiddenAuthorIdsEqual,
 } from "@shared/core/viewerMessagePolicy";
-import type {
-  AuthStorePort,
-  UiStorePort,
-} from "@shared/core/sessionStorePorts";
 import {
   registerSessionBackends,
   resetSessionBackends,
 } from "@shared/lib/backend/sessionBackendRegistry";
-import type { DirectMessage } from "@shared/lib/backend/types";
+import type {
+  DirectMessage,
+  MessageReportTarget,
+  OnboardingClientContext,
+  OnboardingCompletionResult,
+} from "@shared/lib/backend/types";
 import {
   CommunitySolidNexus,
   createCommunitySolidNexus,
   ChannelSolidNexus,
   createChannelSolidNexus,
-  SocialSolidCache,
-  createSocialSolidCache,
+  SocialSolidNexus,
+  createSocialSolidNexus,
   ProfileSolidNexus,
   createProfileSolidNexus,
-  PermissionsSolidCache,
-  createPermissionsSolidCache,
-  DirectMessageSolidCache,
-  createDirectMessageSolidCache,
+  PermissionsSolidNexus,
+  createPermissionsSolidNexus,
+  FeatureFlagSolidNexus,
+  createFeatureFlagSolidNexus,
+  DirectMessageSolidNexus,
+  createDirectMessageSolidNexus,
   NotificationSolidNexus,
   createNotificationSolidNexus,
-  CommunityAdminSolidCache,
-  CommunityModerationSolidCache,
-  VoiceSolidCache,
-  createVoiceSolidCache,
+  OnboardingSolidNexus,
+  createOnboardingSolidNexus,
+  CommunityAdminSolidNexus,
+  createCommunityAdminSolidNexus,
+  CommunityModerationSolidNexus,
+  createCommunityModerationSolidNexus,
+  VoiceSolidNexus,
+  createVoiceSolidNexus,
   createMessageSolidRegistry,
   type MessageSolidRegistry,
   createSolidAuthSessionStore,
@@ -110,17 +117,19 @@ export class HavenSolidCore implements RealtimeMutationTarget {
   readonly communities: CommunitySolidNexus;
   readonly channels: ChannelSolidNexus;
   readonly messages: MessageSolidRegistry;
-  readonly directMessages: DirectMessageSolidCache;
+  readonly directMessages: DirectMessageSolidNexus;
   readonly notifications: NotificationSolidNexus;
-  readonly social: SocialSolidCache;
-  readonly permissions: PermissionsSolidCache;
+  readonly onboarding: OnboardingSolidNexus;
+  readonly social: SocialSolidNexus;
+  readonly permissions: PermissionsSolidNexus;
+  readonly featureFlags: FeatureFlagSolidNexus;
   readonly profiles: ProfileSolidNexus;
-  readonly admin: CommunityAdminSolidCache;
-  readonly moderation: CommunityModerationSolidCache;
-  readonly voice: VoiceSolidCache;
+  readonly admin: CommunityAdminSolidNexus;
+  readonly moderation: CommunityModerationSolidNexus;
+  readonly voice: VoiceSolidNexus;
   readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
-  readonly authStore: AuthStorePort;
-  readonly uiStore: UiStorePort;
+  readonly authStore: ReturnType<typeof createSolidAuthSessionStore>;
+  readonly uiStore: ReturnType<typeof createSolidUiSessionStore>;
 
   private readonly phase = new BootstrapPhase();
   private realtimeUnsubscribe: (() => void) | null = null;
@@ -135,24 +144,40 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     this.uiStore = createSolidUiSessionStore();
     this.viewerMessagePolicyStore = createSolidViewerMessagePolicyStore();
 
-    this.communities = createCommunitySolidNexus(this.backends.controlPlane);
-    this.channels = createChannelSolidNexus(this.backends.communityData);
+    this.communities = createCommunitySolidNexus(
+      options.persistence,
+      this.backends.controlPlane,
+    );
+    this.channels = createChannelSolidNexus(
+      options.persistence,
+      this.backends.communityData,
+    );
     this.messages = createMessageSolidRegistry(
       options.persistence,
       this.viewerMessagePolicyStore,
     );
-    this.directMessages = createDirectMessageSolidCache(
+    this.directMessages = createDirectMessageSolidNexus(
+      options.persistence,
       this.backends.directMessages,
     );
     this.notifications = createNotificationSolidNexus(
+      options.persistence,
       this.backends.notifications,
     );
-    this.social = createSocialSolidCache(this.backends.social);
-    this.permissions = createPermissionsSolidCache();
+    this.onboarding = createOnboardingSolidNexus(this.backends.controlPlane);
+    this.social = createSocialSolidNexus(this.backends.social);
+    this.permissions = createPermissionsSolidNexus();
+    this.featureFlags = createFeatureFlagSolidNexus(this.backends.controlPlane);
     this.profiles = createProfileSolidNexus(this.backends.controlPlane);
-    this.admin = new CommunityAdminSolidCache(this.backends.communityData);
-    this.moderation = new CommunityModerationSolidCache();
-    this.voice = createVoiceSolidCache(
+    this.admin = createCommunityAdminSolidNexus(
+      this.backends.communityData,
+      this.backends.controlPlane,
+    );
+    this.moderation = createCommunityModerationSolidNexus(
+      options.persistence,
+      this.backends.serverModmail,
+    );
+    this.voice = createVoiceSolidNexus(
       this.viewerMessagePolicyStore,
       this.backends.voiceToken,
       {
@@ -289,6 +314,7 @@ export class HavenSolidCore implements RealtimeMutationTarget {
         this.directMessages.ensureConversationsLoaded(),
         this.notifications.ensureInbox(),
         this.social.ensureLoaded(),
+        this.featureFlags.load(),
       ]);
       this.syncViewerMessagePolicy(activeCommunityId);
 
@@ -313,8 +339,10 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     this.messages.clearAll();
     this.directMessages.clear();
     this.notifications.clear();
+    this.onboarding.reset();
     this.social.clear();
     this.permissions.clear();
+    this.featureFlags.reset();
     this.profiles.clear();
     this.admin.clear();
     this.moderation.clear();
@@ -410,5 +438,53 @@ export class HavenSolidCore implements RealtimeMutationTarget {
       this.backends.communityData,
     );
     this.syncViewerMessagePolicy(communityId);
+  }
+
+  async completeOnboarding(
+    campaignKey: string,
+    context: OnboardingClientContext,
+  ): Promise<OnboardingCompletionResult> {
+    const result = await this.onboarding.complete(campaignKey, context);
+    // If completing the campaign joined a community, surface it right away.
+    if (result.joined && this.sessionUserId) {
+      await this.communities.load(this.sessionUserId);
+    }
+    return result;
+  }
+
+  /**
+   * File a user-account report. Mirrors mobile's core method, extended for the
+   * target choice: `server_admins` → community mods, `haven_staff` → platform,
+   * `both` → both. Community routing needs `communityId`; platform routing never
+   * does (DMs/profile reports are platform-only).
+   */
+  async reportUserProfile(input: {
+    targetUserId: string;
+    reporterUserId: string;
+    reason: string;
+    communityId?: string | null;
+    target: MessageReportTarget;
+  }): Promise<void> {
+    const toCommunity =
+      !!input.communityId &&
+      (input.target === "server_admins" || input.target === "both");
+    const toPlatform =
+      input.target === "haven_staff" || input.target === "both";
+
+    if (toCommunity) {
+      await this.backends.communityData.reportUserProfile({
+        communityId: input.communityId!,
+        targetUserId: input.targetUserId,
+        reporterUserId: input.reporterUserId,
+        reason: input.reason,
+      });
+    }
+    if (toPlatform) {
+      await this.backends.communityData.reportPlatformUserProfile({
+        targetUserId: input.targetUserId,
+        reporterUserId: input.reporterUserId,
+        reason: input.reason,
+      });
+    }
   }
 }

@@ -1,18 +1,18 @@
-import { createStore } from "solid-js/store";
-import type { MessageBundle } from "@shared/lib/backend/types";
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
+import { createMemo, type Accessor } from "solid-js";
+import { createStore, type SetStoreFunction } from "solid-js/store";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
-import {
-  wireSolidReadableStore,
-  type NotifyingReadableStore,
-} from "../solidReadableStore";
+import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
 import {
   MESSAGE_PAGE_SIZE,
   ascendingMessagesFromRpcPage,
   buildOptimisticSendBundle,
+  buildPersistedMessageSnapshot,
   coerceMediaExpiresInHours,
   inferMediaFilename,
   insertMessageIntoChannelIndex,
+  mergePageIntoChannelMeta,
   oldestMessageCursor,
   removeMessageIdFromChannelIndex,
   shouldSkipInitialReload,
@@ -20,7 +20,17 @@ import {
   type ChannelMeta,
   type SendCommunityMessageMediaOptions,
 } from "@shared/features/messaging/logic";
+import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
+import type {
+  MessageBundle,
+  MessageReportKind,
+  MessageReportTarget,
+} from "@shared/lib/backend/types";
 import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from "@shared/lib/backend/mediaAttachmentUtils";
+import {
+  projectVisibleChannelMessages,
+  projectVisibleChannelMessagesBlockOnly,
+} from "@shared/nexus/community/projectVisibleChannelMessages";
 
 export type CommunityMessageSolidState = {
   entities: Record<string, NexusEntry<MessageBundle>>;
@@ -44,27 +54,88 @@ const initialState = (): CommunityMessageSolidState => ({
   lastInitialLoadedAt: {},
 });
 
-/** Solid-native community message cache — calls shared pure logic, no zustand adapter. */
-export class CommunityMessageSolidCache {
+/** Solid-native community message nexus — shared selectors + per-community persistence. */
+export class CommunityMessageSolidNexus {
   readonly state: CommunityMessageSolidState;
-  readonly reactiveStore: NotifyingReadableStore<CommunityMessageSolidState>;
-  private readonly setState: (
-    updater: (
-      state: CommunityMessageSolidState,
-    ) => Partial<CommunityMessageSolidState> | CommunityMessageSolidState,
-  ) => void;
+  private readonly setState: SetStoreFunction<CommunityMessageSolidState>;
   private communityData: CommunityDataBackend | null = null;
+  private initialLoadInflight = new Map<string, Promise<void>>();
+  private olderLoadInflight = new Map<string, Promise<void>>();
 
-  constructor(readonly communityId: string) {
+  constructor(
+    readonly communityId: string,
+    private readonly persistence: NexusPersistence,
+    private readonly viewerMessagePolicyStore: ViewerMessagePolicyStore,
+  ) {
     const [state, setState] = createStore(initialState());
     this.state = state;
-    this.setState = setState as typeof this.setState;
-    this.reactiveStore = wireSolidReadableStore(state);
+    this.setState = setState;
   }
 
-  private bump(): void {
-    this.reactiveStore.notify();
+  private get storageKey(): string {
+    return NEXUS_STORAGE_KEYS.communityMessages(this.communityId);
   }
+
+  // ─── reactive projections ──────────────────────────────────────────────────
+
+  channelMessages(channelId: Accessor<string>): Accessor<MessageBundle[]> {
+    return createMemo(() => {
+      const ids = this.state.byChannel[channelId()] ?? [];
+      const bundles: MessageBundle[] = [];
+      for (const id of ids) {
+        const entry = this.state.entities[id];
+        if (entry) bundles.push(entry.data);
+      }
+      return bundles;
+    });
+  }
+
+  visibleChannelMessages(
+    channelId: Accessor<string>,
+  ): Accessor<MessageBundle[]> {
+    const raw = this.channelMessages(channelId);
+
+    return createMemo(() => {
+      // Read the policy proxy inside the memo so Solid tracks the exact fields.
+      const policy = this.viewerMessagePolicyStore.getState();
+      const communityPolicy = policy.communities[this.communityId];
+      const rawMessages = raw();
+      if (!communityPolicy) {
+        return projectVisibleChannelMessagesBlockOnly(
+          rawMessages,
+          policy.hiddenAuthorIds,
+        );
+      }
+      return projectVisibleChannelMessages(
+        rawMessages,
+        {
+          hiddenAuthorIds: policy.hiddenAuthorIds,
+          showHiddenMessages: policy.showHiddenMessages,
+          communities: { [this.communityId]: communityPolicy },
+        },
+        { communityId: this.communityId, channelId: channelId() },
+      );
+    });
+  }
+
+  channelMeta(channelId: Accessor<string>): Accessor<ChannelMeta> {
+    return createMemo(() => ({
+      hasMore: this.state.hasMore[channelId()] ?? false,
+      cursor: this.state.cursors[channelId()] ?? null,
+    }));
+  }
+
+  isLoadingOlder(channelId: Accessor<string>): Accessor<boolean> {
+    return createMemo(() => this.state.loadingOlder[channelId()] ?? false);
+  }
+
+  hasInitialLoadCompleted(channelId: Accessor<string>): Accessor<boolean> {
+    return createMemo(
+      () => this.state.initialLoadComplete[channelId()] ?? false,
+    );
+  }
+
+  // ─── lifecycle ─────────────────────────────────────────────────────────────
 
   setCommunityData(communityData: CommunityDataBackend): void {
     this.communityData = communityData;
@@ -97,13 +168,15 @@ export class CommunityMessageSolidCache {
   async loadInitial(channelId: string): Promise<void> {
     if (!this.communityData) {
       throw new Error(
-        "CommunityMessageSolidCache.loadInitial called before backend attached.",
+        "CommunityMessageSolidNexus.loadInitial called before backend attached.",
       );
     }
-    if (this.state.loadingInitial[channelId]) return;
-    this.setLoadingFlag("loadingInitial", channelId, true);
-    try {
-      const result = await this.communityData.listChannelMessages({
+    const inflight = this.initialLoadInflight.get(channelId);
+    if (inflight) return inflight;
+
+    this.setLoadingInitial(channelId, true);
+    const promise = (async () => {
+      const result = await this.communityData!.listChannelMessages({
         communityId: this.communityId,
         channelId,
         limit: MESSAGE_PAGE_SIZE,
@@ -115,35 +188,35 @@ export class CommunityMessageSolidCache {
         hasMore: result.hasMore,
         cursor: oldestMessageCursor(ascending),
       });
-      this.setState((s) => ({
-        initialLoadComplete: { ...s.initialLoadComplete, [channelId]: true },
-        lastInitialLoadedAt: {
-          ...s.lastInitialLoadedAt,
-          [channelId]: Date.now(),
-        },
-      }));
-      this.bump();
-    } finally {
-      this.setLoadingFlag("loadingInitial", channelId, false);
-    }
+      this.markInitialLoadComplete(channelId);
+    })().finally(() => {
+      this.initialLoadInflight.delete(channelId);
+      this.setLoadingInitial(channelId, false);
+    });
+
+    this.initialLoadInflight.set(channelId, promise);
+    return promise;
   }
 
   async loadOlder(channelId: string): Promise<void> {
     if (!this.communityData) {
       throw new Error(
-        "CommunityMessageSolidCache.loadOlder called before backend attached.",
+        "CommunityMessageSolidNexus.loadOlder called before backend attached.",
       );
     }
+    const inflight = this.olderLoadInflight.get(channelId);
+    if (inflight) return inflight;
+
     const hasMore = this.state.hasMore[channelId] ?? false;
     if (!hasMore) return;
-    if (this.state.loadingOlder[channelId]) return;
+
     const ids = this.state.byChannel[channelId] ?? [];
     const oldest = this.state.entities[ids[0]]?.data;
     if (!oldest) return;
 
-    this.setLoadingFlag("loadingOlder", channelId, true);
-    try {
-      const result = await this.communityData.listChannelMessages({
+    this.setLoadingOlder(channelId, true);
+    const promise = (async () => {
+      const result = await this.communityData!.listChannelMessages({
         communityId: this.communityId,
         channelId,
         limit: MESSAGE_PAGE_SIZE,
@@ -151,46 +224,101 @@ export class CommunityMessageSolidCache {
         beforeMessageId: oldest.id,
       });
       const ascending = ascendingMessagesFromRpcPage(result.messages);
-      this.insertMessages(ascending, channelId, {
+      const meta = mergePageIntoChannelMeta({
         hasMore: result.hasMore,
         cursor: oldestMessageCursor(ascending),
+        preserveCursorOnEmpty: this.state.cursors[channelId] ?? null,
       });
-    } finally {
-      this.setLoadingFlag("loadingOlder", channelId, false);
+      this.insertMessages(ascending, channelId, meta);
+    })().finally(() => {
+      this.olderLoadInflight.delete(channelId);
+      this.setLoadingOlder(channelId, false);
+    });
+
+    this.olderLoadInflight.set(channelId, promise);
+    return promise;
+  }
+
+  rehydrate(): void {
+    try {
+      const raw = this.persistence.getString(this.storageKey);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as
+        | ReturnType<typeof buildPersistedMessageSnapshot>
+        | Record<string, NexusEntry<MessageBundle>>;
+
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        "channelState" in parsed &&
+        "entities" in parsed
+      ) {
+        const snapshot = parsed as ReturnType<
+          typeof buildPersistedMessageSnapshot
+        >;
+        this.setState({
+          ...initialState(),
+          entities: snapshot.entities ?? {},
+          byChannel: snapshot.channelState?.byChannel ?? {},
+          cursors: snapshot.channelState?.cursors ?? {},
+          hasMore: snapshot.channelState?.hasMore ?? {},
+          initialLoadComplete:
+            snapshot.channelState?.initialLoadComplete ?? {},
+        });
+      } else {
+        this.setState({
+          ...initialState(),
+          entities: parsed as Record<string, NexusEntry<MessageBundle>>,
+        });
+      }
+    } catch (error) {
+      console.warn("[CommunityMessageSolidNexus] Failed to rehydrate", error);
+      this.persistence.remove(this.storageKey);
     }
   }
 
-  private setLoadingFlag(
-    flag: "loadingInitial" | "loadingOlder",
-    channelId: string,
-    value: boolean,
-  ): void {
-    this.setState((s) => ({
-      [flag]: { ...s[flag], [channelId]: value },
-    }));
-    this.bump();
+  clear(): void {
+    this.setState(initialState());
+    this.persistence.remove(this.storageKey);
   }
 
+  // ─── writes + realtime ─────────────────────────────────────────────────────
+
   insertMessage(message: MessageBundle): void {
-    this.setState((s) => ({
+    this.setState((state) => ({
       entities: {
-        ...s.entities,
+        ...state.entities,
         [message.id]: { data: message, partial: false, cachedAt: Date.now() },
       },
       byChannel: {
-        ...s.byChannel,
+        ...state.byChannel,
         [message.channelId]: insertMessageIntoChannelIndex(
-          s.byChannel[message.channelId] ?? [],
+          state.byChannel[message.channelId] ?? [],
           message,
-          (id) => s.entities[id]?.data.createdAt,
+          (id) => state.entities[id]?.data.createdAt,
         ),
       },
     }));
-    this.bump();
+    this.persist();
   }
 
   upsertMessage(message: MessageBundle): void {
-    this.insertMessage(message);
+    this.setState((state) => ({
+      entities: {
+        ...state.entities,
+        [message.id]: { data: message, partial: false, cachedAt: Date.now() },
+      },
+      byChannel: {
+        ...state.byChannel,
+        [message.channelId]: insertMessageIntoChannelIndex(
+          state.byChannel[message.channelId] ?? [],
+          message,
+          (id) => state.entities[id]?.data.createdAt,
+        ),
+      },
+    }));
+    this.persist();
   }
 
   insertMessages(
@@ -198,9 +326,9 @@ export class CommunityMessageSolidCache {
     channelId: string,
     options: ChannelMeta,
   ): void {
-    this.setState((s) => {
-      const nextEntities = { ...s.entities };
-      let nextByChannel = s.byChannel[channelId] ?? [];
+    this.setState((state) => {
+      const nextEntities = { ...state.entities };
+      let nextByChannel = state.byChannel[channelId] ?? [];
       for (const message of messages) {
         nextEntities[message.id] = {
           data: message,
@@ -215,59 +343,62 @@ export class CommunityMessageSolidCache {
       }
       return {
         entities: nextEntities,
-        byChannel: { ...s.byChannel, [channelId]: nextByChannel },
-        cursors: { ...s.cursors, [channelId]: options.cursor },
-        hasMore: { ...s.hasMore, [channelId]: options.hasMore },
+        byChannel: { ...state.byChannel, [channelId]: nextByChannel },
+        cursors: { ...state.cursors, [channelId]: options.cursor },
+        hasMore: { ...state.hasMore, [channelId]: options.hasMore },
       };
     });
-    this.bump();
+    this.persist();
   }
 
   removeMessage(messageId: string, channelId: string): void {
-    this.setState((s) => {
-      const { [messageId]: _, ...restEntities } = s.entities;
+    this.setState((state) => {
+      const { [messageId]: _, ...restEntities } = state.entities;
       return {
         entities: restEntities,
         byChannel: {
-          ...s.byChannel,
+          ...state.byChannel,
           [channelId]: removeMessageIdFromChannelIndex(
-            s.byChannel[channelId] ?? [],
+            state.byChannel[channelId] ?? [],
             messageId,
           ),
         },
       };
     });
-    this.bump();
+    this.persist();
   }
 
   updateMessage(messageId: string, changes: Partial<MessageBundle>): void {
-    this.setState((s) => {
-      const entry = s.entities[messageId];
-      if (!entry) return s;
+    this.setState((state) => {
+      const entry = state.entities[messageId];
+      if (!entry) return state;
       return {
         entities: {
-          ...s.entities,
+          ...state.entities,
           [messageId]: { ...entry, data: { ...entry.data, ...changes } },
         },
       };
     });
-    this.bump();
+    this.persist();
   }
 
   evictChannel(channelId: string): void {
-    this.setState((s) => {
-      const ids = s.byChannel[channelId] ?? [];
-      const nextEntities = { ...s.entities };
+    this.setState((state) => {
+      const ids = state.byChannel[channelId] ?? [];
+      const nextEntities = { ...state.entities };
       for (const id of ids) delete nextEntities[id];
       return {
         entities: nextEntities,
-        byChannel: { ...s.byChannel, [channelId]: [] },
-        cursors: { ...s.cursors, [channelId]: null },
-        hasMore: { ...s.hasMore, [channelId]: false },
-        initialLoadComplete: { ...s.initialLoadComplete, [channelId]: false },
+        byChannel: { ...state.byChannel, [channelId]: [] },
+        cursors: { ...state.cursors, [channelId]: null },
+        hasMore: { ...state.hasMore, [channelId]: false },
+        initialLoadComplete: { ...state.initialLoadComplete, [channelId]: false },
+        loadingInitial: { ...state.loadingInitial, [channelId]: false },
+        loadingOlder: { ...state.loadingOlder, [channelId]: false },
+        lastInitialLoadedAt: { ...state.lastInitialLoadedAt, [channelId]: 0 },
       };
     });
-    this.bump();
+    this.persist();
   }
 
   async send(
@@ -310,7 +441,6 @@ export class CommunityMessageSolidCache {
 
     const { hasBlob, hasBuffer } = validateMediaSendOptions(options);
 
-    // Beat 1 — no file? plain text send and bail.
     if (!hasBlob && !hasBuffer) {
       await this.send(channelId, content, {
         replyToMessageId: options?.replyToMessageId ?? null,
@@ -320,7 +450,6 @@ export class CommunityMessageSolidCache {
       return;
     }
 
-    // Beat 2 — upload, then send the message it'll attach to.
     const filename = inferMediaFilename(options);
     const fileBody = hasBuffer
       ? (options!.mediaArrayBuffer as ArrayBuffer)
@@ -352,7 +481,6 @@ export class CommunityMessageSolidCache {
       senderIsPlatformStaff: options?.senderIsPlatformStaff === true,
     });
 
-    // Beat 3 — attach + show optimistically; roll back on failure.
     try {
       await this.communityData.insertMessageAttachment({
         messageId: id,
@@ -437,8 +565,8 @@ export class CommunityMessageSolidCache {
     channelId: string;
     messageId: string;
     reporterUserId: string;
-    target: import("@shared/lib/backend/types").MessageReportTarget;
-    kind: import("@shared/lib/backend/types").MessageReportKind;
+    target: MessageReportTarget;
+    kind: MessageReportKind;
     comment: string;
   }): Promise<void> {
     if (!this.communityData) throw new Error("backend not attached");
@@ -463,18 +591,44 @@ export class CommunityMessageSolidCache {
     return Array.from(authors);
   }
 
-  clear(): void {
-    this.setState(() => initialState());
-    this.bump();
+  private persist(): void {
+    try {
+      const state = this.state;
+      const snapshot = buildPersistedMessageSnapshot({
+        byChannel: state.byChannel,
+        cursors: state.cursors,
+        hasMore: state.hasMore,
+        initialLoadComplete: state.initialLoadComplete,
+        entities: state.entities,
+      });
+      this.persistence.set(this.storageKey, JSON.stringify(snapshot));
+    } catch (error) {
+      console.warn("[CommunityMessageSolidNexus] Failed to persist", error);
+    }
   }
 
-  rehydrate(): void {
-    // Solid cache persistence wired during app-build phase.
+  private setLoadingInitial(channelId: string, loading: boolean): void {
+    this.setState("loadingInitial", channelId, loading);
+  }
+
+  private setLoadingOlder(channelId: string, loading: boolean): void {
+    this.setState("loadingOlder", channelId, loading);
+  }
+
+  private markInitialLoadComplete(channelId: string): void {
+    this.setState("initialLoadComplete", channelId, true);
+    this.setState("lastInitialLoadedAt", channelId, Date.now());
   }
 }
 
-export function createCommunityMessageSolidCache(
+export function createCommunityMessageSolidNexus(
   communityId: string,
-): CommunityMessageSolidCache {
-  return new CommunityMessageSolidCache(communityId);
+  persistence: NexusPersistence,
+  viewerMessagePolicyStore: ViewerMessagePolicyStore,
+): CommunityMessageSolidNexus {
+  return new CommunityMessageSolidNexus(
+    communityId,
+    persistence,
+    viewerMessagePolicyStore,
+  );
 }

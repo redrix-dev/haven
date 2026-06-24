@@ -2,6 +2,7 @@ import type { HavenBackends } from "./backends";
 import type {
   LiveProfileIdentity,
   MessageBundle,
+  ReportCreatedBroadcastPayload,
   ReportStatusUpdatedBroadcastPayload,
 } from "@shared/lib/backend/types";
 
@@ -35,6 +36,11 @@ export interface RealtimeProfileCache {
 export interface RealtimeModerationCache {
   handleReportChange(payload: ReportStatusUpdatedBroadcastPayload): void;
   handleUserPlatformBanned(userId: string): void;
+  /**
+   * A new community report arrived live. Optional so platform cores that don't
+   * yet surface live modmail (e.g. mobile) satisfy the contract unchanged.
+   */
+  handleReportCreated?(payload: ReportCreatedBroadcastPayload): void;
 }
 
 /**

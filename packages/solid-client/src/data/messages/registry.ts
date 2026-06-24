@@ -1,38 +1,39 @@
 import type { HavenBackends } from "@shared/core/backends";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
-import { CommunityMessageSolidCache } from "./communityMessageSolidCache";
+import { CommunityMessageSolidNexus } from "./communityMessageSolidNexus";
 
 export class MessageSolidRegistry {
-  private readonly byCommunity = new Map<string, CommunityMessageSolidCache>();
+  private readonly byCommunity = new Map<string, CommunityMessageSolidNexus>();
   private backends: HavenBackends | null = null;
 
   constructor(
-    private readonly _persistence: NexusPersistence,
-    private readonly _viewerMessagePolicyStore: ViewerMessagePolicyStore,
-  ) {
-    void this._persistence;
-    void this._viewerMessagePolicyStore;
-  }
+    private readonly persistence: NexusPersistence,
+    private readonly viewerMessagePolicyStore: ViewerMessagePolicyStore,
+  ) {}
 
   setBackends(backends: HavenBackends): void {
     this.backends = backends;
-    for (const cache of this.byCommunity.values()) {
-      cache.setCommunityData(backends.communityData);
+    for (const nexus of this.byCommunity.values()) {
+      nexus.setCommunityData(backends.communityData);
     }
   }
 
-  for(communityId: string): CommunityMessageSolidCache {
-    let cache = this.byCommunity.get(communityId);
-    if (!cache) {
-      cache = new CommunityMessageSolidCache(communityId);
+  for(communityId: string): CommunityMessageSolidNexus {
+    let nexus = this.byCommunity.get(communityId);
+    if (!nexus) {
+      nexus = new CommunityMessageSolidNexus(
+        communityId,
+        this.persistence,
+        this.viewerMessagePolicyStore,
+      );
       if (this.backends) {
-        cache.setCommunityData(this.backends.communityData);
+        nexus.setCommunityData(this.backends.communityData);
       }
-      cache.rehydrate();
-      this.byCommunity.set(communityId, cache);
+      nexus.rehydrate();
+      this.byCommunity.set(communityId, nexus);
     }
-    return cache;
+    return nexus;
   }
 
   has(communityId: string): boolean {
@@ -40,9 +41,9 @@ export class MessageSolidRegistry {
   }
 
   clearCommunity(communityId: string): void {
-    const cache = this.byCommunity.get(communityId);
-    if (cache) {
-      cache.clear();
+    const nexus = this.byCommunity.get(communityId);
+    if (nexus) {
+      nexus.clear();
       this.byCommunity.delete(communityId);
     }
   }

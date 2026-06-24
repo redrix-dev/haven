@@ -1,1 +1,5 @@
-export { OnboardingSolidCache } from "./onboardingSolidCache";
+export {
+  OnboardingSolidNexus,
+  createOnboardingSolidNexus,
+  type OnboardingSolidState,
+} from "./onboardingSolidNexus";

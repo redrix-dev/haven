@@ -10,6 +10,8 @@ import {
 } from "@shared/features/notifications/inboxNotificationFilter";
 import type { NotificationNexusState } from "@shared/nexus/notifications/notificationTypes";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
+import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { NotificationBackend } from "@shared/lib/backend/notificationBackend";
 import type {
   NotificationCounts,
@@ -58,7 +60,10 @@ export class NotificationSolidNexus {
   private readonly incomingSignal: Accessor<IncomingNotification | null>;
   private readonly setIncoming: (value: IncomingNotification | null) => void;
 
-  constructor(private readonly backend: NotificationBackend) {
+  constructor(
+    private readonly persistence: NexusPersistence,
+    private readonly backend: NotificationBackend,
+  ) {
     const [state, setState] = createStore(initialState());
     this.state = state;
     this.setState = setState;
@@ -218,10 +223,12 @@ export class NotificationSolidNexus {
     this.setState("entities", entities);
     this.setState("recipientOrder", recipientOrder);
     this.setState("hasMore", options.hasMore);
+    this.persist();
   }
 
   setCounts(counts: NotificationCounts): void {
     this.setState("counts", counts);
+    this.persist();
   }
 
   /**
@@ -236,16 +243,50 @@ export class NotificationSolidNexus {
     this.setIncoming({ item: newest, seq });
   }
 
-  rehydrate(): void {}
+  rehydrate(): void {
+    try {
+      const raw = this.persistence.getString(NEXUS_STORAGE_KEYS.notifications);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<NotificationNexusState>;
+      this.setState({
+        entities: parsed.entities ?? {},
+        recipientOrder: parsed.recipientOrder ?? [],
+        counts: parsed.counts ?? DEFAULT_COUNTS,
+        inboxLastLoadedAt: parsed.inboxLastLoadedAt ?? 0,
+      });
+    } catch (error) {
+      console.warn("[NotificationSolidNexus] rehydrate failed", error);
+      this.persistence.remove(NEXUS_STORAGE_KEYS.notifications);
+    }
+  }
 
   clear(): void {
     this.setState(initialState());
     this.setIncoming(null);
+    this.persistence.remove(NEXUS_STORAGE_KEYS.notifications);
+  }
+
+  private persist(): void {
+    try {
+      const state = this.state;
+      this.persistence.set(
+        NEXUS_STORAGE_KEYS.notifications,
+        JSON.stringify({
+          entities: state.entities,
+          recipientOrder: state.recipientOrder,
+          counts: state.counts,
+          inboxLastLoadedAt: state.inboxLastLoadedAt,
+        }),
+      );
+    } catch (error) {
+      console.warn("[NotificationSolidNexus] persist failed", error);
+    }
   }
 }
 
 export function createNotificationSolidNexus(
+  persistence: NexusPersistence,
   backend: NotificationBackend,
 ): NotificationSolidNexus {
-  return new NotificationSolidNexus(backend);
+  return new NotificationSolidNexus(persistence, backend);
 }

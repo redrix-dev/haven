@@ -1,12 +1,20 @@
 import { For, Show, createEffect, createMemo, onCleanup } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { Bell, MessageCircle, Settings, Users } from "lucide-solid";
+import {
+  Bell,
+  ChevronDown,
+  MessageCircle,
+  Settings,
+  ShieldAlert,
+  Users,
+} from "lucide-solid";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
 import { Avatar } from "@solid-client/components/ui";
-import { createChannelVoiceParticipants } from "@solid-client/data/voice";
 import type { HavenChannel } from "@shared/nexus/community/channelTypes";
+import { openCommunitySettings } from "./settings/CommunitySettingsPanel";
+import { canOpenCommunitySettingsPanel } from "./settings/communitySettingsAccess";
 
 // ─── data wiring ─────────────────────────────────────────────────────────────
 //
@@ -30,12 +38,23 @@ function useSidebarData() {
 
   const unreadNotifications = core.notifications.inboxUnreadCount();
 
+  // Modmail is visible only to viewers who can moderate at least one community.
+  const canAccessModmail = createMemo(() => {
+    const byCommunity = core.permissions.getPermissionsByCommunityId();
+    return Object.keys(byCommunity).some(
+      (id) => byCommunity[id]?.canManageReports,
+    );
+  });
+  const modmailOpenCount = core.moderation.openCount();
+
   return {
     communities,
     activeCommunityId,
     channels,
     activeChannelId,
     unreadNotifications,
+    canAccessModmail,
+    modmailOpenCount,
   };
 }
 
@@ -48,6 +67,8 @@ export function CommunitySidebar() {
     channels,
     activeChannelId,
     unreadNotifications,
+    canAccessModmail,
+    modmailOpenCount,
   } = useSidebarData();
   const navigate = useNavigate();
 
@@ -109,6 +130,20 @@ export function CommunitySidebar() {
           >
             <MessageCircle size={20} />
           </button>
+          <Show when={canAccessModmail()}>
+            <button
+              title="Modmail"
+              onClick={() => navigate("/modmail")}
+              class="relative mb-2 flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
+            >
+              <ShieldAlert size={20} />
+              <Show when={modmailOpenCount() > 0}>
+                <span class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                  {modmailOpenCount() > 99 ? "99+" : modmailOpenCount()}
+                </span>
+              </Show>
+            </button>
+          </Show>
           <button
             title="Settings"
             onClick={() => navigate("/settings/appearance")}
@@ -129,53 +164,16 @@ export function CommunitySidebar() {
         }
       >
         {(communityId) => (
-          <div class="flex w-56 flex-col bg-surface-panel">
-            <div class="flex h-12 shrink-0 items-center border-b border-border px-4">
-              <span class="font-semibold text-foreground">
-                {activeCommunityName()}
-              </span>
-            </div>
-
-            <div class="flex-1 overflow-y-auto px-2 py-2">
-              <Show when={textChannels().length > 0}>
-                <p class="mb-1 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Text Channels
-                </p>
-                <For each={textChannels()}>
-                  {(channel) => (
-                    <ChannelRow
-                      label={channel.name}
-                      prefix="#"
-                      active={activeChannelId() === channel.id}
-                      onClick={() =>
-                        navigate(
-                          `/community/${communityId()}/channel/${channel.id}`,
-                        )
-                      }
-                    />
-                  )}
-                </For>
-              </Show>
-
-              <Show when={voiceChannels().length > 0}>
-                <p class="mb-1 mt-3 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Voice Channels
-                </p>
-                <For each={voiceChannels()}>
-                  {(channel) => (
-                    <VoiceChannelRow
-                      channel={channel}
-                      communityId={communityId()}
-                    />
-                  )}
-                </For>
-                <VoicePresenceSubscriptions
-                  communityId={communityId()}
-                  channelIds={voiceChannels().map((c) => c.id)}
-                />
-              </Show>
-            </div>
-          </div>
+          <CommunityChannelList
+            communityId={communityId()}
+            communityName={activeCommunityName()}
+            textChannels={textChannels()}
+            voiceChannels={voiceChannels()}
+            activeChannelId={activeChannelId()}
+            onNavigateChannel={(channelId) =>
+              navigate(`/community/${communityId()}/channel/${channelId}`)
+            }
+          />
         )}
       </Show>
     </div>
@@ -184,6 +182,90 @@ export function CommunitySidebar() {
 
 // Small internal components — not exported, not in components/ui/ because
 // nothing outside this feature needs them.
+
+function CommunityChannelList(props: {
+  communityId: string;
+  communityName: string;
+  textChannels: HavenChannel[];
+  voiceChannels: HavenChannel[];
+  activeChannelId: string | null;
+  onNavigateChannel: (channelId: string) => void;
+}) {
+  const core = requireHavenSolidCore();
+
+  const canManage = () =>
+    canOpenCommunitySettingsPanel(
+      core.permissions.getPermissions(props.communityId),
+    );
+
+  createEffect(() => {
+    void core.ensureCommunityPermissions(props.communityId);
+  });
+
+  return (
+    <div class="flex w-56 flex-col bg-surface-panel">
+      <Show
+        when={canManage()}
+        fallback={
+          <div class="flex h-12 shrink-0 items-center border-b border-border px-4">
+            <span class="font-semibold text-foreground">
+              {props.communityName}
+            </span>
+          </div>
+        }
+      >
+        <button
+          type="button"
+          title="Community settings"
+          onClick={() => openCommunitySettings()}
+          class="flex h-12 shrink-0 items-center gap-1 border-b border-border px-4 text-left transition-colors hover:bg-surface-hover"
+        >
+          <span class="min-w-0 flex-1 truncate font-semibold text-foreground">
+            {props.communityName}
+          </span>
+          <ChevronDown size={16} class="shrink-0 text-muted-foreground" />
+        </button>
+      </Show>
+
+      <div class="flex-1 overflow-y-auto px-2 py-2">
+        <Show when={props.textChannels.length > 0}>
+          <p class="mb-1 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Text Channels
+          </p>
+          <For each={props.textChannels}>
+            {(channel) => (
+              <ChannelRow
+                label={channel.name}
+                prefix="#"
+                active={props.activeChannelId === channel.id}
+                onClick={() => props.onNavigateChannel(channel.id)}
+              />
+            )}
+          </For>
+        </Show>
+
+        <Show when={props.voiceChannels.length > 0}>
+          <p class="mb-1 mt-3 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Voice Channels
+          </p>
+          <For each={props.voiceChannels}>
+            {(channel) => (
+              <VoiceChannelRow
+                channel={channel}
+                communityId={props.communityId}
+              />
+            )}
+          </For>
+          <VoicePresenceSubscriptions
+            communityId={props.communityId}
+            channelIds={props.voiceChannels.map((c) => c.id)}
+          />
+        </Show>
+      </div>
+    </div>
+  );
+}
+
 function ChannelRow(props: {
   label: string;
   prefix: string;
@@ -216,8 +298,7 @@ function VoiceChannelRow(props: {
   const viewerProfile = core.profiles.viewerProfile(
     () => session()?.user.id ?? null,
   );
-  const occupants = createChannelVoiceParticipants(
-    core.voice,
+  const occupants = core.voice.channelVoiceParticipants(
     () => props.channel.id,
   );
   const isActive = () => voice.activeChannel?.channelId === props.channel.id;

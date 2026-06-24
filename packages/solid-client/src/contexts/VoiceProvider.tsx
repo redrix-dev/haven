@@ -31,7 +31,7 @@ import { playVoiceJoinSound, playVoiceLeaveSound } from "../audio/sounds";
  * feature) because the session must outlive route changes: you stay connected
  * while browsing channels.
  *
- * Division of labor: VoiceSolidCache owns Supabase presence/kick channels and
+ * Division of labor: VoiceSolidNexus owns Supabase presence/kick channels and
  * the shared session state; this provider owns the LiveKit Room and the
  * UI-facing state/actions. Mirrors mobile's split (VoiceNexus / LiveKit hook).
  *

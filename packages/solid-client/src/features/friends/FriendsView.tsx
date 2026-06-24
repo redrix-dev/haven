@@ -15,13 +15,6 @@ import {
   type LiveProfilesRecord,
 } from "@shared/lib/liveProfiles";
 import { requireHavenSolidCore } from "@solid-client/core";
-import {
-  createSocialBlockedUsers,
-  createSocialCounts,
-  createSocialFriendRequests,
-  createSocialFriends,
-  createSocialLoading,
-} from "@solid-client/data/social";
 import { Avatar, Button } from "@solid-client/components/ui";
 
 const TABS: { id: FriendsPanelTab; label: string }[] = [
@@ -34,11 +27,11 @@ const TABS: { id: FriendsPanelTab; label: string }[] = [
 export function FriendsView() {
   const core = requireHavenSolidCore();
   const navigate = useNavigate();
-  const counts = createSocialCounts(core.social);
-  const friends = createSocialFriends(core.social);
-  const requests = createSocialFriendRequests(core.social);
-  const blockedUsers = createSocialBlockedUsers(core.social);
-  const loading = createSocialLoading(core.social);
+  const counts = core.social.counts();
+  const friends = core.social.friends();
+  const requests = core.social.friendRequests();
+  const blockedUsers = core.social.blockedUsers();
+  const loading = core.social.loading();
   const liveProfiles = core.profiles.liveProfiles();
 
   const [activeTab, setActiveTab] = createSignal<FriendsPanelTab>("friends");

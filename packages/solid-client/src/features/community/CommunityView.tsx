@@ -1,18 +1,19 @@
-import { Show, createMemo } from "solid-js";
+import { Show, createMemo, createSignal } from "solid-js";
 import { Navigate, useParams } from "@solidjs/router";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
-import {
-  createVisibleChannelMessages,
-  createChannelMeta,
-  createIsLoadingOlder,
-  createHasInitialLoadCompleted,
-} from "@solid-client/data/messages";
+import { useToast } from "@solid-client/contexts/ToastProvider";
+import { ReportDialog, type ReportDialogResult } from "@solid-client/components/ui";
 import { createCommunityRouteSync } from "./CommunityRouteSync";
 import { buildMessageViewItems } from "./messageList/messageViewModel";
 import { MessageList } from "./messageList/MessageList";
 import { Composer } from "./Composer";
 import { MembersPanel } from "./MembersPanel";
+
+/** What the report dialog is currently targeting in a channel. */
+type ReportSubject =
+  | { kind: "message"; messageId: string; preview: string }
+  | { kind: "user"; userId: string; name: string };
 
 /**
  * The main surface for /community/:communityId[/channel/:channelId] —
@@ -87,19 +88,63 @@ function ChannelChat(props: {
 }) {
   const core = requireHavenSolidCore();
   const { session } = useSession();
-  const cache = core.messages.for(props.communityId);
+  const toast = useToast();
+  const nexus = core.messages.for(props.communityId);
 
-  const messages = createVisibleChannelMessages(
-    cache,
-    core.viewerMessagePolicyStore,
-    () => props.channelId,
-  );
-  const meta = createChannelMeta(cache, () => props.channelId);
-  const loadingOlder = createIsLoadingOlder(cache, () => props.channelId);
-  const loaded = createHasInitialLoadCompleted(cache, () => props.channelId);
+  const messages = nexus.visibleChannelMessages(() => props.channelId);
+  const meta = nexus.channelMeta(() => props.channelId);
+  const loadingOlder = nexus.isLoadingOlder(() => props.channelId);
+  const loaded = nexus.hasInitialLoadCompleted(() => props.channelId);
   const liveProfiles = core.profiles.liveProfiles();
 
-  void cache.ensureInitialLoaded(props.channelId);
+  void nexus.ensureInitialLoaded(props.channelId);
+  void core.ensureCommunityPermissions(props.communityId);
+
+  const viewerId = () => session()?.user.id ?? null;
+  const canReport = () =>
+    core.permissions.getPermissions(props.communityId).canCreateReports;
+
+  const [report, setReport] = createSignal<ReportSubject | null>(null);
+  const isMessageReport = () => report()?.kind === "message";
+  const dialogTitle = () => {
+    const r = report();
+    if (!r) return "";
+    return r.kind === "message" ? "Report message" : `Report ${r.name}`;
+  };
+  const dialogPreview = () => {
+    const r = report();
+    if (!r) return undefined;
+    return r.kind === "message" ? r.preview : r.name;
+  };
+
+  const submitReport = async (result: ReportDialogResult) => {
+    const subject = report();
+    const reporterUserId = viewerId();
+    if (!subject || !reporterUserId) return;
+    if (subject.kind === "message") {
+      await nexus.report({
+        channelId: props.channelId,
+        messageId: subject.messageId,
+        reporterUserId,
+        target: result.target,
+        kind: result.kind,
+        comment: result.comment,
+      });
+    } else {
+      await core.reportUserProfile({
+        communityId: props.communityId,
+        targetUserId: subject.userId,
+        reporterUserId,
+        reason: result.comment,
+        target: result.target,
+      });
+    }
+    setReport(null);
+    toast.show({
+      title: "Report submitted",
+      body: "Thanks — moderators will review it.",
+    });
+  };
 
   const items = createMemo(() =>
     buildMessageViewItems(messages(), liveProfiles()),
@@ -107,7 +152,7 @@ function ChannelChat(props: {
 
   const onReachTop = () => {
     if (meta().hasMore && !loadingOlder()) {
-      void cache.loadOlder(props.channelId);
+      void nexus.loadOlder(props.channelId);
     }
   };
 
@@ -116,14 +161,14 @@ function ChannelChat(props: {
     media?: { file: File; previewUrl: string },
   ) => {
     if (media) {
-      await cache.sendWithMedia(props.channelId, content, {
+      await nexus.sendWithMedia(props.channelId, content, {
         mediaFile: media.file,
         mediaContentType: media.file.type,
         optimisticMediaUri: media.previewUrl,
         senderUserId: session()?.user.id ?? null,
       });
     } else {
-      await cache.send(props.channelId, content, {
+      await nexus.send(props.channelId, content, {
         senderUserId: session()?.user.id ?? null,
       });
     }
@@ -148,11 +193,32 @@ function ChannelChat(props: {
               </div>
             }
           >
-            <MessageList items={items()} onReachTop={onReachTop} />
+            <MessageList
+              items={items()}
+              onReachTop={onReachTop}
+              viewerId={viewerId()}
+              canReport={canReport()}
+              onReportMessage={(messageId, preview) =>
+                setReport({ kind: "message", messageId, preview })
+              }
+              onReportUser={(userId, name) =>
+                setReport({ kind: "user", userId, name })
+              }
+            />
           </Show>
         </Show>
       </div>
       <Composer channelName={props.channelName} onSend={send} />
+      <ReportDialog
+        open={report() !== null}
+        title={dialogTitle()}
+        subjectLabel={isMessageReport() ? "Reported message" : "Reported user"}
+        subjectPreview={dialogPreview()}
+        showKind={isMessageReport()}
+        showTarget
+        onClose={() => setReport(null)}
+        onSubmit={submitReport}
+      />
     </div>
   );
 }

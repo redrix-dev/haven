@@ -1,11 +1,9 @@
 import type { PermissionCatalogItem } from "@shared/lib/backend/types";
 
 /**
- * Permission display metadata + grouping for the mobile role editor.
- *
- * NOTE: When the Solid desktop client grows a role editor, this metadata
- * should move into a shared module rather than being duplicated. It is the
- * only copy today.
+ * Permission display metadata + grouping for the role editor — shared by mobile
+ * and the Solid desktop/web client (the single canonical home). Turns a raw
+ * permission catalog into ordered, labelled, display-ready groups.
  */
 
 export type PermissionScope =
@@ -148,7 +146,7 @@ const COMMUNITY_PERMISSION_METADATA: Record<string, PermissionMetadata> = {
   },
 };
 
-// Permissions desktop hides from the role editor (managed elsewhere / not user-facing here).
+// Permissions the role editor hides (managed elsewhere / not user-facing here).
 const HIDDEN_PERMISSION_KEYS = new Set([
   "create_reports",
   "manage_developer_access",
@@ -167,7 +165,7 @@ export type PermissionGroup = {
   permissions: { key: string; label: string; description: string }[];
 };
 
-/** Group a permission catalog into ordered, display-ready sections (mirrors desktop). */
+/** Group a permission catalog into ordered, display-ready sections. */
 export function buildVisiblePermissionGroups(
   permissionsCatalog: PermissionCatalogItem[],
 ): PermissionGroup[] {

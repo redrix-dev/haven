@@ -7,7 +7,7 @@ import type {
   FriendSummary,
   SocialCounts,
 } from "@shared/lib/backend/types";
-import { SocialSolidCache } from "../socialSolidCache";
+import { SocialSolidNexus } from "../socialSolidNexus";
 
 const counts: SocialCounts = {
   friendsCount: 1,
@@ -77,7 +77,7 @@ function createBackend(overrides: Partial<SocialBackend> = {}): SocialBackend {
   };
 }
 
-describe("SocialSolidCache", () => {
+describe("SocialSolidNexus", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-13T10:00:00.000Z"));
@@ -91,7 +91,7 @@ describe("SocialSolidCache", () => {
   it("loads counts, friends, requests, blocked summaries, and viewer policy", async () => {
     const policySync = vi.fn();
     const backend = createBackend();
-    const cache = new SocialSolidCache(backend);
+    const cache = new SocialSolidNexus(backend);
     cache.setPolicySyncCallback(policySync);
 
     await cache.load();
@@ -111,7 +111,7 @@ describe("SocialSolidCache", () => {
 
   it("skips fresh ensureLoaded calls", async () => {
     const backend = createBackend();
-    const cache = new SocialSolidCache(backend);
+    const cache = new SocialSolidNexus(backend);
 
     await cache.ensureLoaded();
     await cache.ensureLoaded();
@@ -130,7 +130,7 @@ describe("SocialSolidCache", () => {
           }),
       ),
     });
-    const cache = new SocialSolidCache(backend);
+    const cache = new SocialSolidNexus(backend);
 
     const load = cache.load();
     await Promise.resolve();
@@ -148,7 +148,7 @@ describe("SocialSolidCache", () => {
         .mockResolvedValueOnce(["blocked-1"])
         .mockResolvedValueOnce(["blocked-1", "blocked-2"]),
     });
-    const cache = new SocialSolidCache(backend);
+    const cache = new SocialSolidNexus(backend);
     await cache.load();
 
     await cache.blockUser("blocked-2");
@@ -162,7 +162,7 @@ describe("SocialSolidCache", () => {
     const backend = createBackend({
       searchUsersForFriendAdd: vi.fn().mockResolvedValue([result]),
     });
-    const cache = new SocialSolidCache(backend);
+    const cache = new SocialSolidNexus(backend);
 
     const results = await cache.searchUsers("cand");
 
@@ -174,7 +174,7 @@ describe("SocialSolidCache", () => {
 
   it("reloads social summaries after request and friendship mutations", async () => {
     const backend = createBackend();
-    const cache = new SocialSolidCache(backend);
+    const cache = new SocialSolidNexus(backend);
 
     await expect(cache.sendFriendRequest("Ada")).resolves.toBe("request-1");
     await expect(cache.acceptFriendRequest("request-1")).resolves.toBe(

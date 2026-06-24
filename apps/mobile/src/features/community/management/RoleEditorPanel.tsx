@@ -16,7 +16,7 @@ import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 import { ThemedIonicons } from "@/theme-rn";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
-import { buildVisiblePermissionGroups } from "./communityPermissionMeta";
+import { buildVisiblePermissionGroups } from "@shared/features/permissions/communityPermissionMeta";
 
 const ROLE_COLORS = [
   "#99aab5",

@@ -194,7 +194,13 @@ const mobileBoundaryRestrictions = [
 
 export default [
   {
-    ignores: ["node_modules/**", "dist/**", "**/dist/**"],
+    ignores: [
+      "node_modules/**",
+      "dist/**",
+      "**/dist/**",
+      // Rust/Tauri build output — generated codegen assets, not source.
+      "**/src-tauri/target/**",
+    ],
   },
   {
     files: [

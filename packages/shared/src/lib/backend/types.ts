@@ -805,6 +805,12 @@ export type ReportStatusUpdatedBroadcastPayload = {
   updatedBy: string;
 };
 
+/** Fan-out payload for a newly-created community report (see broadcast_report_created migration). */
+export type ReportCreatedBroadcastPayload = {
+  reportId: string;
+  communityId: string;
+};
+
 export type DmMessageReportStatus =
   | "open"
   | "triaged"

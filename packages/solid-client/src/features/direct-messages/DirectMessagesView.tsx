@@ -24,23 +24,20 @@ import {
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
-  DirectMessageReportKind,
   FriendSummary,
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import {
-  createDmConversations,
-  createDmConversationsLoading,
-  createDmMessages,
-  createDmMessagesLoading,
-} from "@solid-client/data/direct-messages";
-import {
-  createSocialFriends,
-  createSocialLoading,
-} from "@solid-client/data/social";
-import { Avatar, Button, Markdown, Tooltip } from "@solid-client/components/ui";
+  ActionsMenu,
+  Avatar,
+  Button,
+  Markdown,
+  ReportDialog,
+  type ActionMenuItem,
+  type ReportDialogResult,
+} from "@solid-client/components/ui";
 
 type DmSendOptions = {
   imageUpload?: {
@@ -56,24 +53,14 @@ type DmReportTarget = {
   authorName: string;
 };
 
-const DM_REPORT_KIND_OPTIONS: {
-  value: DirectMessageReportKind;
-  label: string;
-}[] = [
-  { value: "content_abuse", label: "Content abuse" },
-  { value: "bug", label: "Bug / platform issue" },
-];
-
 export function DirectMessagesView() {
   const core = requireHavenSolidCore();
   const params = useParams();
   const navigate = useNavigate();
-  const conversations = createDmConversations(core.directMessages);
-  const loadingConversations = createDmConversationsLoading(
-    core.directMessages,
-  );
-  const friends = createSocialFriends(core.social);
-  const loadingSocial = createSocialLoading(core.social);
+  const conversations = core.directMessages.conversations();
+  const loadingConversations = core.directMessages.conversationsLoading();
+  const friends = core.social.friends();
+  const loadingSocial = core.social.loading();
   const liveProfiles = core.profiles.liveProfiles();
   const [openError, setOpenError] = createSignal<string | null>(null);
   const [friendPickerOpen, setFriendPickerOpen] = createSignal(false);
@@ -371,14 +358,8 @@ function DmConversation(props: {
   const core = requireHavenSolidCore();
   const { session } = useSession();
   const liveProfiles = core.profiles.liveProfiles();
-  const messages = createDmMessages(
-    core.directMessages,
-    () => props.conversationId,
-  );
-  const loading = createDmMessagesLoading(
-    core.directMessages,
-    () => props.conversationId,
-  );
+  const messages = core.directMessages.messages(() => props.conversationId);
+  const loading = core.directMessages.messagesLoading(() => props.conversationId);
   const [reportTarget, setReportTarget] = createSignal<DmReportTarget | null>(
     null,
   );
@@ -397,16 +378,14 @@ function DmConversation(props: {
     setReportTarget({ message, authorName });
   };
 
-  const submitReport = async (input: {
-    kind: DirectMessageReportKind;
-    comment: string;
-  }) => {
+  const submitReport = async (result: ReportDialogResult) => {
     const target = reportTarget();
     if (!target) return;
+    // DMs aren't community-scoped — reports always go to Platform Moderation.
     await core.directMessages.reportMessage({
       messageId: target.message.messageId,
-      kind: input.kind,
-      comment: input.comment,
+      kind: result.kind,
+      comment: result.comment,
     });
     setReportTarget(null);
     setReportNotice("Report submitted.");
@@ -500,8 +479,13 @@ function DmConversation(props: {
       </div>
 
       <DmComposer recipientName={props.title} onSend={send} />
-      <DmReportDialog
-        target={reportTarget()}
+      <ReportDialog
+        open={reportTarget() !== null}
+        title="Report direct message"
+        subjectLabel="Reported user"
+        subjectPreview={reportTarget()?.authorName}
+        showKind
+        showTarget={false}
         onClose={() => setReportTarget(null)}
         onSubmit={submitReport}
       />
@@ -516,7 +500,20 @@ function DmMessageRow(props: {
   avatarUrl: string | null;
   onReport: (message: DirectMessage, authorName: string) => void;
 }) {
+  const items = (): ActionMenuItem[] =>
+    props.self || props.message.deletedAt !== null
+      ? []
+      : [
+          {
+            label: "Report to Platform Moderation",
+            icon: Flag,
+            danger: true,
+            onSelect: () => props.onReport(props.message, props.authorName),
+          },
+        ];
+
   return (
+    <ActionsMenu items={items()} label="Message actions">
     <div
       class="group flex gap-2 rounded px-1 py-1.5 hover:bg-surface-message-row-hover"
       classList={{ "flex-row-reverse": props.self }}
@@ -568,182 +565,8 @@ function DmMessageRow(props: {
           </Show>
         </Show>
       </div>
-      <Show when={props.message.deletedAt === null}>
-        <Tooltip content="Report" placement="top">
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label="Report direct message"
-            class="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-            onClick={() => props.onReport(props.message, props.authorName)}
-          >
-            <Flag size={14} />
-          </Button>
-        </Tooltip>
-      </Show>
     </div>
-  );
-}
-
-function DmReportDialog(props: {
-  target: DmReportTarget | null;
-  onClose: () => void;
-  onSubmit: (input: {
-    kind: DirectMessageReportKind;
-    comment: string;
-  }) => Promise<void>;
-}) {
-  const [kind, setKind] =
-    createSignal<DirectMessageReportKind>("content_abuse");
-  const [comment, setComment] = createSignal("");
-  const [submitting, setSubmitting] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
-
-  createEffect(() => {
-    if (!props.target) {
-      setKind("content_abuse");
-      setComment("");
-      setSubmitting(false);
-      setError(null);
-    }
-  });
-
-  const messagePreview = () => {
-    const target = props.target;
-    if (!target) return "";
-    const text = target.message.content.trim();
-    if (text) return text;
-    if (target.message.attachments.length > 0) return "Image attachment";
-    return "Empty message";
-  };
-
-  const submit = async () => {
-    const trimmedComment = comment().trim();
-    if (!trimmedComment) {
-      setError("Please add a brief reason for this report.");
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await props.onSubmit({ kind: kind(), comment: trimmedComment });
-    } catch (submitError) {
-      setError(getErrorMessage(submitError, "Failed to submit report."));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Show when={props.target}>
-      {(target) => (
-        <div
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          onClick={props.onClose}
-        >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="dm-report-title"
-            class="flex max-h-[90vh] w-full max-w-md flex-col rounded-lg border border-border-dialog bg-card p-4 shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div class="flex items-start gap-3">
-              <div class="min-w-0 flex-1">
-                <h2
-                  id="dm-report-title"
-                  class="text-base font-semibold text-foreground"
-                >
-                  Report direct message
-                </h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  Reports go to the Haven Moderation Team.
-                </p>
-              </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                class="h-8 w-8"
-                aria-label="Close report dialog"
-                disabled={submitting()}
-                onClick={props.onClose}
-              >
-                <X size={16} />
-              </Button>
-            </div>
-
-            <div class="mt-4 min-h-0 overflow-y-auto">
-              <div class="rounded border border-border bg-surface-panel p-3">
-                <p class="text-xs uppercase text-muted-foreground">
-                  Reported user
-                </p>
-                <p class="mt-1 truncate text-sm font-semibold text-foreground">
-                  {target().authorName}
-                </p>
-                <p class="mt-2 max-h-28 overflow-y-auto whitespace-pre-wrap text-sm text-body-soft">
-                  {messagePreview()}
-                </p>
-              </div>
-
-              <p class="mb-2 mt-4 text-xs uppercase text-muted-foreground">
-                Type
-              </p>
-              <div class="grid gap-2">
-                <For each={DM_REPORT_KIND_OPTIONS}>
-                  {(option) => (
-                    <button
-                      type="button"
-                      class="rounded border px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover"
-                      classList={{
-                        "border-primary bg-surface-panel":
-                          kind() === option.value,
-                        "border-border-control": kind() !== option.value,
-                      }}
-                      disabled={submitting()}
-                      onClick={() => setKind(option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  )}
-                </For>
-              </div>
-
-              <label class="mb-2 mt-4 block text-xs uppercase text-muted-foreground">
-                Comment
-              </label>
-              <textarea
-                value={comment()}
-                disabled={submitting()}
-                placeholder="Describe what happened"
-                onInput={(event) => setComment(event.currentTarget.value)}
-                class="min-h-24 w-full resize-y rounded border border-border-control bg-surface-panel px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-60"
-              />
-              <Show when={error()}>
-                <p class="mt-2 text-sm text-send-error">{error()}</p>
-              </Show>
-            </div>
-
-            <div class="mt-4 flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={submitting()}
-                onClick={props.onClose}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                disabled={submitting()}
-                onClick={() => void submit()}
-              >
-                {submitting() ? "Submitting..." : "Submit"}
-              </Button>
-            </div>
-          </section>
-        </div>
-      )}
-    </Show>
+    </ActionsMenu>
   );
 }
 

@@ -1,4 +1,5 @@
-import { createStore } from "solid-js/store";
+import { createMemo, type Accessor } from "solid-js";
+import { createStore, type SetStoreFunction } from "solid-js/store";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
 import type {
   VoiceChannelReference,
@@ -23,10 +24,6 @@ import type {
   VoiceNexusState,
   VoiceSessionSnapshot,
 } from "@shared/features/voice/voiceNexusTypes";
-import {
-  wireSolidReadableStore,
-  type NotifyingReadableStore,
-} from "../solidReadableStore";
 
 type ConnectKickChannelInput = {
   communityId: string;
@@ -49,13 +46,17 @@ type SubscribePresenceChannelsInput = {
   activeChannelId?: string | null;
 };
 
+type VoiceSolidNexusState = Omit<VoiceNexusState, "revision">;
+
+const NO_PARTICIPANTS: VoiceSidebarParticipant[] = [];
+
 const defaultSession = (): VoiceSessionSnapshot => ({
   joined: false,
   isMuted: false,
   isDeafened: false,
 });
 
-const defaultState = (): Omit<VoiceNexusState, "revision"> => ({
+const initialState = (): VoiceSolidNexusState => ({
   phase: "idle",
   activeChannel: null,
   pendingChannel: null,
@@ -71,19 +72,16 @@ const defaultState = (): Omit<VoiceNexusState, "revision"> => ({
 });
 
 /**
- * Solid-native voice cache — a 1:1 port of mobile's VoiceNexus
+ * Solid-native voice nexus — a 1:1 port of mobile's VoiceNexus
  * (apps/mobile/src/data/voice/VoiceNexus.ts): session phase/flags state,
  * the voice token fetch, and the Supabase presence/kick channels (the
  * documented exception to the single-private-channel realtime rule).
  * The LiveKit Room itself lives in the session controller
  * (contexts/VoiceProvider), not here.
  */
-export class VoiceSolidCache {
-  readonly state: VoiceNexusState;
-  readonly reactiveStore: NotifyingReadableStore<VoiceNexusState>;
-  private readonly setState: (
-    updater: (state: VoiceNexusState) => Partial<VoiceNexusState>,
-  ) => void;
+export class VoiceSolidNexus {
+  readonly state: VoiceSolidNexusState;
+  private readonly setState: SetStoreFunction<VoiceSolidNexusState>;
 
   private readonly viewerPolicyStore: ViewerMessagePolicyStore;
   private readonly tokenBackend: VoiceTokenBackend | null;
@@ -103,22 +101,32 @@ export class VoiceSolidCache {
     this.viewerPolicyStore = viewerPolicyStore;
     this.tokenBackend = tokenBackend ?? null;
     this.realtime = realtime ?? null;
-    const [state, setState] = createStore<VoiceNexusState>({
-      ...defaultState(),
-      revision: 0,
-    });
+    const [state, setState] = createStore(initialState());
     this.state = state;
-    this.setState = setState as typeof this.setState;
-    this.reactiveStore = wireSolidReadableStore(state);
+    this.setState = setState;
   }
 
-  private setPartial(next: Partial<VoiceNexusState>): void {
-    this.setState((s) => ({ ...next, revision: s.revision + 1 }));
-    this.reactiveStore.notify();
+  voiceState(): Accessor<VoiceSolidNexusState> {
+    return createMemo(() => this.state);
+  }
+
+  /** Occupants of one voice channel — feeds the sidebar rows under each channel. */
+  channelVoiceParticipants(
+    channelId: Accessor<string>,
+  ): Accessor<VoiceSidebarParticipant[]> {
+    return createMemo(() => {
+      const id = channelId();
+      const byChannel = this.state.participantsByChannelId[id];
+      if (byChannel) return byChannel;
+      if (this.state.activeChannel?.id === id || this.state.currentChannelId === id) {
+        return this.state.participants;
+      }
+      return NO_PARTICIPANTS;
+    });
   }
 
   startConnect(channel: VoiceChannelReference): void {
-    this.setPartial({
+    this.setState({
       phase: "connecting",
       activeChannel: channel,
       pendingChannel: null,
@@ -128,21 +136,21 @@ export class VoiceSolidCache {
   }
 
   markConnected(): void {
-    this.setPartial({ phase: "connected", voiceConnected: true, error: null });
+    this.setState({ phase: "connected", voiceConnected: true, error: null });
   }
 
   startSwitch(channel: VoiceChannelReference): void {
-    this.setPartial({ phase: "switching", pendingChannel: channel, error: null });
+    this.setState({ phase: "switching", pendingChannel: channel, error: null });
   }
 
   startDisconnect(): void {
-    this.setPartial({ phase: "disconnecting", error: null });
+    this.setState({ phase: "disconnecting", error: null });
   }
 
   completeDisconnect(): void {
     const pendingChannel = this.state.pendingChannel;
     if (pendingChannel) {
-      this.setPartial({
+      this.setState({
         phase: "connecting",
         activeChannel: pendingChannel,
         pendingChannel: null,
@@ -152,7 +160,7 @@ export class VoiceSolidCache {
       });
       return;
     }
-    this.setPartial({
+    this.setState({
       phase: "idle",
       activeChannel: null,
       pendingChannel: null,
@@ -163,11 +171,11 @@ export class VoiceSolidCache {
   }
 
   setError(message: string): void {
-    this.setPartial({ phase: "error", error: message });
+    this.setState({ phase: "error", error: message });
   }
 
   clearError(): void {
-    this.setPartial({
+    this.setState({
       phase: this.state.activeChannel ? "connected" : "idle",
       error: null,
     });
@@ -175,29 +183,30 @@ export class VoiceSolidCache {
 
   setJoined(joined: boolean): void {
     if (this.state.joined === joined) return;
-    this.setPartial({ joined });
+    this.setState("joined", joined);
   }
 
   setIsMuted(isMuted: boolean): void {
     if (this.state.isMuted === isMuted) return;
-    this.setPartial({ isMuted });
+    this.setState("isMuted", isMuted);
   }
 
   setIsDeafened(isDeafened: boolean): void {
-    const updates: Partial<VoiceNexusState> = { isDeafened };
-    if (isDeafened) updates.isMuted = true;
-    this.setPartial(updates);
+    if (isDeafened) {
+      this.setState({ isDeafened: true, isMuted: true });
+      return;
+    }
+    this.setState("isDeafened", false);
   }
 
   setCurrentChannelId(currentChannelId: string | null): void {
     if (this.state.currentChannelId === currentChannelId) return;
-    this.setPartial({ currentChannelId });
+    this.setState("currentChannelId", currentChannelId);
   }
 
   setParticipants(participants: VoiceSidebarParticipant[]): void {
-    if (voiceParticipantListsEqual(this.state.participants, participants))
-      return;
-    this.setPartial({ participants });
+    if (voiceParticipantListsEqual(this.state.participants, participants)) return;
+    this.setState("participants", participants);
   }
 
   setChannelParticipants(
@@ -206,12 +215,7 @@ export class VoiceSolidCache {
   ): void {
     const previous = this.state.participantsByChannelId[channelId] ?? [];
     if (voiceParticipantListsEqual(previous, participants)) return;
-    this.setPartial({
-      participantsByChannelId: {
-        ...this.state.participantsByChannelId,
-        [channelId]: participants,
-      },
-    });
+    this.setState("participantsByChannelId", channelId, participants);
   }
 
   retainChannelParticipants(channelIds: string[]): void {
@@ -221,12 +225,12 @@ export class VoiceSolidCache {
       Object.entries(current).filter(([channelId]) => keep.has(channelId)),
     );
     if (voiceParticipantRecordsEqual(current, next)) return;
-    this.setPartial({ participantsByChannelId: next });
+    this.setState("participantsByChannelId", next);
   }
 
   setVoiceConnected(voiceConnected: boolean): void {
     if (this.state.voiceConnected === voiceConnected) return;
-    this.setPartial({
+    this.setState({
       voiceConnected,
       phase: voiceConnected ? "connected" : this.state.phase,
     });
@@ -241,7 +245,7 @@ export class VoiceSolidCache {
     ) {
       return;
     }
-    this.setPartial({ sessionState });
+    this.setState("sessionState", sessionState);
   }
 
   async fetchJoinCredentials(
@@ -460,7 +464,7 @@ export class VoiceSolidCache {
     };
   }
 
-  getSnapshot(): VoiceNexusState {
+  getSnapshot(): VoiceSolidNexusState {
     return this.state;
   }
 
@@ -496,21 +500,19 @@ export class VoiceSolidCache {
   }
 
   clear(): void {
-    this.setState(() => ({
-      ...defaultState(),
+    this.setState({
+      ...initialState(),
       sessionState: defaultSession(),
-      revision: 0,
-    }));
-    this.reactiveStore.notify();
+    });
     void this.disconnectKickChannel();
     void this.disconnectPresenceChannel();
   }
 }
 
-export function createVoiceSolidCache(
+export function createVoiceSolidNexus(
   viewerPolicyStore: ViewerMessagePolicyStore,
   tokenBackend?: VoiceTokenBackend,
   realtime?: VoiceRealtimeTransport,
-): VoiceSolidCache {
-  return new VoiceSolidCache(viewerPolicyStore, tokenBackend, realtime);
+): VoiceSolidNexus {
+  return new VoiceSolidNexus(viewerPolicyStore, tokenBackend, realtime);
 }

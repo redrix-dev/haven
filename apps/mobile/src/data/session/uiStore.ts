@@ -7,6 +7,7 @@ import type {
   RenameServerDraft,
   UiStoreState,
   WorkspaceMode,
+  CommunitySettingsTab,
 } from "@shared/core/sessionStorePorts";
 import type { PendingUiConfirmation } from "@shared/types/types";
 
@@ -30,6 +31,7 @@ const createDefaultUiState = () => ({
   showVoiceSettingsModal: false,
   userVoiceHardwareTestOpen: false,
   serverModmailOpen: false,
+  serverSettingsTab: null as CommunitySettingsTab | null,
   renameServerDraft: null as RenameServerDraft | null,
   renameChannelDraft: null as RenameChannelDraft | null,
   renameGroupDraft: null as RenameGroupDraft | null,
@@ -65,6 +67,7 @@ export const useUiStore: UseBoundStore<StoreApi<UiStoreState>> =
     setUserVoiceHardwareTestOpen: (userVoiceHardwareTestOpen) =>
       set({ userVoiceHardwareTestOpen }),
     setServerModmailOpen: (serverModmailOpen) => set({ serverModmailOpen }),
+    setServerSettingsTab: (serverSettingsTab) => set({ serverSettingsTab }),
     setRenameServerDraft: (renameServerDraft) => set({ renameServerDraft }),
     setRenameChannelDraft: (renameChannelDraft) => set({ renameChannelDraft }),
     setRenameGroupDraft: (renameGroupDraft) => set({ renameGroupDraft }),

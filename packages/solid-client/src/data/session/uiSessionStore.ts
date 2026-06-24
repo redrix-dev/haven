@@ -1,7 +1,7 @@
 import { createStore } from "solid-js/store";
 import type { UiStoreState } from "@shared/core/sessionStorePorts";
 
-const defaultUiState = (): Omit<
+type UiData = Omit<
   UiStoreState,
   | "setShowServerSettingsModal"
   | "setShowChannelSettingsModal"
@@ -24,8 +24,11 @@ const defaultUiState = (): Omit<
   | "setFriendsPanelRequestedTab"
   | "setFriendsPanelHighlightedRequestId"
   | "setNotificationsPanelOpen"
+  | "setServerSettingsTab"
   | "reset"
-> => ({
+>;
+
+const defaultUiState = (): UiData => ({
   showServerSettingsModal: false,
   showChannelSettingsModal: false,
   channelSettingsTargetId: null,
@@ -36,6 +39,7 @@ const defaultUiState = (): Omit<
   showVoiceSettingsModal: false,
   userVoiceHardwareTestOpen: false,
   serverModmailOpen: false,
+  serverSettingsTab: null,
   renameServerDraft: null,
   renameChannelDraft: null,
   renameGroupDraft: null,
@@ -49,25 +53,34 @@ const defaultUiState = (): Omit<
   notificationsPanelOpen: false,
 });
 
-/** Solid-native UI session store stub — wired by Tauri host at bootstrap. */
+/**
+ * Solid-native UI session store.
+ *
+ * The `createStore` proxy IS the reactive source: `getState()` returns the live
+ * proxy, so reading a field inside a tracking scope (component / createMemo /
+ * createEffect) subscribes to exactly that field, and a setter's `setState`
+ * wakes only those readers. No `subscribe`, no `notify()`, no snapshot spread —
+ * that adapter machinery was a React/Zustand imitation; Solid does this itself.
+ */
 export function createSolidUiSessionStore() {
   const [state, setState] = createStore<UiStoreState>({
     ...defaultUiState(),
-    setShowServerSettingsModal: (open) =>
-      setState("showServerSettingsModal", open),
+    setShowServerSettingsModal: (open) => {
+      setState("showServerSettingsModal", open);
+      if (!open) setState("serverSettingsTab", null);
+    },
     setShowChannelSettingsModal: (open) =>
       setState("showChannelSettingsModal", open),
     setChannelSettingsTargetId: (id) => setState("channelSettingsTargetId", id),
     setShowCreateModal: (open) => setState("showCreateModal", open),
-    setShowCreateChannelModal: (open) =>
-      setState("showCreateChannelModal", open),
+    setShowCreateChannelModal: (open) => setState("showCreateChannelModal", open),
     setShowJoinServerModal: (open) => setState("showJoinServerModal", open),
     setShowAccountModal: (open) => setState("showAccountModal", open),
-    setShowVoiceSettingsModal: (open) =>
-      setState("showVoiceSettingsModal", open),
+    setShowVoiceSettingsModal: (open) => setState("showVoiceSettingsModal", open),
     setUserVoiceHardwareTestOpen: (open) =>
       setState("userVoiceHardwareTestOpen", open),
     setServerModmailOpen: (open) => setState("serverModmailOpen", open),
+    setServerSettingsTab: (tab) => setState("serverSettingsTab", tab),
     setRenameServerDraft: (draft) => setState("renameServerDraft", draft),
     setRenameChannelDraft: (draft) => setState("renameChannelDraft", draft),
     setRenameGroupDraft: (draft) => setState("renameGroupDraft", draft),
@@ -86,8 +99,5 @@ export function createSolidUiSessionStore() {
     reset: () => setState(defaultUiState()),
   });
 
-  return {
-    getState: () => state,
-    subscribe: () => () => {},
-  };
+  return { getState: () => state };
 }

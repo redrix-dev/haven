@@ -1,4 +1,5 @@
-import { createStore } from "solid-js/store";
+import { createMemo, type Accessor } from "solid-js";
+import { createStore, type SetStoreFunction } from "solid-js/store";
 import { DEFAULT_SOCIAL_COUNTS } from "@shared/infrastructure/constants";
 import type { SocialBackend } from "@shared/lib/backend/socialBackend";
 import type {
@@ -12,10 +13,6 @@ import {
   normalizeUserIds,
   unionHiddenAuthorIds,
 } from "@shared/features/social/logic";
-import {
-  wireSolidReadableStore,
-  type NotifyingReadableStore,
-} from "../solidReadableStore";
 
 export type SocialSolidState = {
   counts: SocialCounts;
@@ -27,37 +24,51 @@ export type SocialSolidState = {
   usersBlockingMeIds: string[];
   isLoading: boolean;
   lastLoadedAt: number;
-  revision: number;
 };
 
-/** Solid-native social cache — block lists drive viewer message policy. */
-export class SocialSolidCache {
+const initialState = (): SocialSolidState => ({
+  counts: DEFAULT_SOCIAL_COUNTS,
+  friends: [],
+  requests: [],
+  blockedUsers: [],
+  hiddenAuthorIds: new Set<string>(),
+  myBlockedUserIds: [],
+  usersBlockingMeIds: [],
+  isLoading: false,
+  lastLoadedAt: 0,
+});
+
+/** Solid-native social nexus — block lists drive viewer message policy. */
+export class SocialSolidNexus {
   readonly state: SocialSolidState;
-  readonly reactiveStore: NotifyingReadableStore<SocialSolidState>;
-  private readonly setState: (
-    updater: (
-      state: SocialSolidState,
-    ) => Partial<SocialSolidState> | SocialSolidState,
-  ) => void;
+  private readonly setState: SetStoreFunction<SocialSolidState>;
   private loadInflight: Promise<void> | null = null;
   private policySync: (() => void) | null = null;
 
   constructor(private readonly backend: SocialBackend) {
-    const [state, setState] = createStore<SocialSolidState>({
-      counts: DEFAULT_SOCIAL_COUNTS,
-      friends: [],
-      requests: [],
-      blockedUsers: [],
-      hiddenAuthorIds: new Set<string>(),
-      myBlockedUserIds: [],
-      usersBlockingMeIds: [],
-      isLoading: false,
-      lastLoadedAt: 0,
-      revision: 0,
-    });
+    const [state, setState] = createStore(initialState());
     this.state = state;
-    this.setState = setState as typeof this.setState;
-    this.reactiveStore = wireSolidReadableStore(state);
+    this.setState = setState;
+  }
+
+  counts(): Accessor<SocialCounts> {
+    return createMemo(() => this.state.counts);
+  }
+
+  friends(): Accessor<FriendSummary[]> {
+    return createMemo(() => this.state.friends);
+  }
+
+  friendRequests(): Accessor<FriendRequestSummary[]> {
+    return createMemo(() => this.state.requests);
+  }
+
+  blockedUsers(): Accessor<BlockedUserSummary[]> {
+    return createMemo(() => this.state.blockedUsers);
+  }
+
+  loading(): Accessor<boolean> {
+    return createMemo(() => this.state.isLoading);
   }
 
   setPolicySyncCallback(callback: (() => void) | null): void {
@@ -71,8 +82,7 @@ export class SocialSolidCache {
   async load(): Promise<void> {
     if (this.loadInflight) return this.loadInflight;
 
-    this.setState((s) => ({ isLoading: true, revision: s.revision + 1 }));
-    this.reactiveStore.notify();
+    this.setState("isLoading", true);
     const promise = (async () => {
       try {
         const [
@@ -91,19 +101,16 @@ export class SocialSolidCache {
           this.backend.listBlockedUsers(),
         ]);
         this.setBlockLists({ myBlockedUserIds, usersBlockingMeIds });
-        this.setState((s) => ({
+        this.setState({
           counts,
           friends,
           requests,
           blockedUsers,
           lastLoadedAt: Date.now(),
           isLoading: false,
-          revision: s.revision + 1,
-        }));
-        this.reactiveStore.notify();
+        });
       } catch (error) {
-        this.setState((s) => ({ isLoading: false, revision: s.revision + 1 }));
-        this.reactiveStore.notify();
+        this.setState("isLoading", false);
         throw error;
       }
     })().finally(() => {
@@ -128,7 +135,7 @@ export class SocialSolidCache {
 
   handleSocialChange(_payload: Record<string, unknown>): void {
     void this.load().catch((err) => {
-      console.warn("[SocialSolidCache] reload after SOCIAL_CHANGE failed", err);
+      console.warn("[SocialSolidNexus] reload after SOCIAL_CHANGE failed", err);
     });
   }
 
@@ -190,19 +197,8 @@ export class SocialSolidCache {
   }
 
   clear(): void {
-    this.setState(() => ({
-      counts: DEFAULT_SOCIAL_COUNTS,
-      friends: [],
-      requests: [],
-      blockedUsers: [],
-      hiddenAuthorIds: new Set<string>(),
-      myBlockedUserIds: [],
-      usersBlockingMeIds: [],
-      isLoading: false,
-      lastLoadedAt: 0,
-      revision: 0,
-    }));
-    this.reactiveStore.notify();
+    this.loadInflight = null;
+    this.setState(initialState());
   }
 
   private setBlockLists(input: {
@@ -211,22 +207,20 @@ export class SocialSolidCache {
   }): void {
     const myBlockedUserIds = normalizeUserIds(input.myBlockedUserIds);
     const usersBlockingMeIds = normalizeUserIds(input.usersBlockingMeIds);
-    this.setState((s) => ({
+    this.setState({
       myBlockedUserIds,
       usersBlockingMeIds,
       hiddenAuthorIds: unionHiddenAuthorIds(
         myBlockedUserIds,
         usersBlockingMeIds,
       ),
-      revision: s.revision + 1,
-    }));
-    this.reactiveStore.notify();
+    });
     this.policySync?.();
   }
 }
 
-export function createSocialSolidCache(
+export function createSocialSolidNexus(
   backend: SocialBackend,
-): SocialSolidCache {
-  return new SocialSolidCache(backend);
+): SocialSolidNexus {
+  return new SocialSolidNexus(backend);
 }

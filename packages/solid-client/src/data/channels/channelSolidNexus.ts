@@ -1,5 +1,8 @@
 import { createMemo, type Accessor } from "solid-js";
 import { createStore, type SetStoreFunction } from "solid-js/store";
+import type { NexusEntry } from "@shared/core/cache/entityTypes";
+import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import {
   projectChannels,
   selectActiveChannelId,
@@ -54,7 +57,10 @@ export class ChannelSolidNexus {
   private readonly setState: SetStoreFunction<ChannelNexusState>;
   private readonly inflight = new Map<string, Promise<void>>();
 
-  constructor(private readonly communityData: CommunityDataBackend) {
+  constructor(
+    private readonly persistence: NexusPersistence,
+    private readonly communityData: CommunityDataBackend,
+  ) {
     const [state, setState] = createStore(initialState());
     this.state = state;
     this.setState = setState;
@@ -116,10 +122,61 @@ export class ChannelSolidNexus {
     await this.loadForCommunity(communityId);
   }
 
-  rehydrate(): void {}
+  rehydrate(): void {
+    try {
+      const raw = this.persistence.getString(NEXUS_STORAGE_KEYS.channels);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        entities: Record<string, NexusEntry<HavenChannel>>;
+        byCommunity: Record<string, string[]>;
+        groups: ChannelNexusState["groups"];
+        ungrouped: ChannelNexusState["ungrouped"];
+        collapsed: ChannelNexusState["collapsed"];
+        activeChannelId: string | null;
+        lastChannelByCommunity?: Record<string, string | null>;
+      };
+      this.setState({
+        entities: parsed.entities ?? {},
+        byCommunity: parsed.byCommunity ?? {},
+        groups: parsed.groups ?? {},
+        ungrouped: parsed.ungrouped ?? {},
+        collapsed: parsed.collapsed ?? {},
+        activeChannelId: parsed.activeChannelId ?? null,
+        lastChannelByCommunity: parsed.lastChannelByCommunity ?? {},
+        loadingByCommunity: {},
+      });
+    } catch (error) {
+      console.warn("[ChannelSolidNexus] Failed to rehydrate", error);
+      this.persistence.remove(NEXUS_STORAGE_KEYS.channels);
+    }
+  }
 
   clear(): void {
     this.setState(initialState());
+    this.persistence.remove(NEXUS_STORAGE_KEYS.channels);
+  }
+
+  private persist(): void {
+    try {
+      const state = this.state;
+      const persistable = {
+        entities: Object.fromEntries(
+          Object.entries(state.entities).filter(([, entry]) => !entry.partial),
+        ),
+        byCommunity: state.byCommunity,
+        groups: state.groups,
+        ungrouped: state.ungrouped,
+        collapsed: state.collapsed,
+        activeChannelId: state.activeChannelId,
+        lastChannelByCommunity: state.lastChannelByCommunity,
+      };
+      this.persistence.set(
+        NEXUS_STORAGE_KEYS.channels,
+        JSON.stringify(persistable),
+      );
+    } catch (error) {
+      console.warn("[ChannelSolidNexus] Failed to persist", error);
+    }
   }
 
   // ─── realtime + writes ───────────────────────────────────────────────────
@@ -139,6 +196,7 @@ export class ChannelSolidNexus {
         channel.id,
       ]);
     }
+    this.persist();
   }
 
   removeChannel(id: string, communityId: string): void {
@@ -155,6 +213,7 @@ export class ChannelSolidNexus {
         channelIds: group.channelIds.filter((channelId) => channelId !== id),
       })),
     );
+    this.persist();
   }
 
   setChannels(
@@ -180,11 +239,13 @@ export class ChannelSolidNexus {
       existing ?? groupState.collapsedGroupIds,
     );
     this.setState("loadingByCommunity", communityId, false);
+    this.persist();
   }
 
   setActiveChannelId(id: string | null): void {
     if (this.state.activeChannelId === id) return;
     this.setState("activeChannelId", id);
+    this.persist();
   }
 
   private setIsLoading(communityId: string, loading: boolean): void {
@@ -193,7 +254,8 @@ export class ChannelSolidNexus {
 }
 
 export function createChannelSolidNexus(
+  persistence: NexusPersistence,
   communityData: CommunityDataBackend,
 ): ChannelSolidNexus {
-  return new ChannelSolidNexus(communityData);
+  return new ChannelSolidNexus(persistence, communityData);
 }

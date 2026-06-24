@@ -1,6 +1,8 @@
 import type { PendingUiConfirmation } from "@shared/types/types";
 import type { Session, User } from "@supabase/supabase-js";
 
+export type CommunitySettingsTab = "overview" | "roles" | "invites";
+
 export type AuthStoreState = {
   user: User | null;
   session: Session | null;
@@ -42,6 +44,7 @@ export type UiStoreState = {
   showVoiceSettingsModal: boolean;
   userVoiceHardwareTestOpen: boolean;
   serverModmailOpen: boolean;
+  serverSettingsTab: CommunitySettingsTab | null;
   renameServerDraft: RenameServerDraft | null;
   renameChannelDraft: RenameChannelDraft | null;
   renameGroupDraft: RenameGroupDraft | null;
@@ -65,6 +68,7 @@ export type UiStoreState = {
   setShowVoiceSettingsModal: (open: boolean) => void;
   setUserVoiceHardwareTestOpen: (open: boolean) => void;
   setServerModmailOpen: (open: boolean) => void;
+  setServerSettingsTab: (tab: CommunitySettingsTab | null) => void;
   setRenameServerDraft: (draft: RenameServerDraft | null) => void;
   setRenameChannelDraft: (draft: RenameChannelDraft | null) => void;
   setRenameGroupDraft: (draft: RenameGroupDraft | null) => void;

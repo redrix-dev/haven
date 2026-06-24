@@ -1,9 +1,20 @@
-import { createStore } from "solid-js/store";
+import { createMemo, type Accessor } from "solid-js";
+import { createStore, type SetStoreFunction } from "solid-js/store";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
+import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type {
   DmComposeDraftPeer,
   DirectMessageNexusState,
 } from "@shared/nexus/direct-messages/dmTypes";
+import {
+  projectConversations,
+  projectMessages,
+  selectActiveConversationId,
+  selectComposeDraftPeer,
+  selectIsLoadingConversations,
+  selectIsLoadingMessages,
+} from "@shared/nexus/direct-messages/dmSelectors";
 import type { DirectMessageBackend } from "@shared/lib/backend/directMessageBackend";
 import { getDirectMessagePreviewText } from "@shared/lib/backend/directMessageUtils";
 import type {
@@ -11,10 +22,8 @@ import type {
   DirectMessageConversationSummary,
   DirectMessageReportKind,
 } from "@shared/lib/backend/types";
-import {
-  wireSolidReadableStore,
-  type NotifyingReadableStore,
-} from "../solidReadableStore";
+
+const STORAGE_KEY = NEXUS_STORAGE_KEYS.directMessages;
 
 const DM_PAGE_SIZE = 50;
 const DM_RELOAD_FRESHNESS_WINDOW_MS = 10_000;
@@ -135,24 +144,44 @@ type SendDirectMessageOptions = {
   optimisticAttachmentUri?: string | null;
 };
 
-/** Solid-native DM cache — calls shared selectors, no zustand. */
-export class DirectMessageSolidCache {
+/** Solid-native DM nexus — shared selectors + persistence. */
+export class DirectMessageSolidNexus {
   readonly state: DirectMessageNexusState;
-  readonly reactiveStore: NotifyingReadableStore<DirectMessageNexusState>;
-
-  private readonly setState: (
-    updater: (
-      state: DirectMessageNexusState,
-    ) => Partial<DirectMessageNexusState>,
-  ) => void;
+  private readonly setState: SetStoreFunction<DirectMessageNexusState>;
   private conversationsInflight: Promise<void> | null = null;
   private messagesInflight = new Map<string, Promise<void>>();
 
-  constructor(private readonly backend: DirectMessageBackend) {
+  constructor(
+    private readonly persistence: NexusPersistence,
+    private readonly backend: DirectMessageBackend,
+  ) {
     const [state, setState] = createStore(initialState());
     this.state = state;
-    this.setState = setState as typeof this.setState;
-    this.reactiveStore = wireSolidReadableStore(state);
+    this.setState = setState;
+  }
+
+  conversations(): Accessor<DirectMessageConversationSummary[]> {
+    return createMemo(() => projectConversations(this.state));
+  }
+
+  conversationsLoading(): Accessor<boolean> {
+    return createMemo(() => selectIsLoadingConversations(this.state));
+  }
+
+  messages(conversationId: Accessor<string>): Accessor<DirectMessage[]> {
+    return createMemo(() => projectMessages(this.state, conversationId()));
+  }
+
+  messagesLoading(conversationId: Accessor<string>): Accessor<boolean> {
+    return createMemo(() => selectIsLoadingMessages(this.state, conversationId()));
+  }
+
+  activeConversationId(): Accessor<string | null> {
+    return createMemo(() => selectActiveConversationId(this.state));
+  }
+
+  composeDraftPeer(): Accessor<DmComposeDraftPeer | null> {
+    return createMemo(() => selectComposeDraftPeer(this.state));
   }
 
   async loadConversations(options?: {
@@ -338,7 +367,7 @@ export class DirectMessageSolidCache {
 
     this.setState((state) => {
       const entry = state.entities[conversationId];
-      if (!entry) return { revision: state.revision };
+      if (!entry) return state;
       return {
         entities: {
           ...state.entities,
@@ -348,10 +377,9 @@ export class DirectMessageSolidCache {
             cachedAt: Date.now(),
           },
         },
-        revision: state.revision + 1,
       };
     });
-    this.reactiveStore.notify();
+    this.persist();
     return true;
   }
 
@@ -406,10 +434,9 @@ export class DirectMessageSolidCache {
         entities,
         conversationIds: sortConversationIds(conversationIds, entities),
         isLoadingConversations: false,
-        revision: state.revision + 1,
       };
     });
-    this.reactiveStore.notify();
+    this.persist();
   }
 
   replaceMessages(
@@ -434,10 +461,8 @@ export class DirectMessageSolidCache {
           ...state.hasMoreByConversation,
           [conversationId]: options.hasMore,
         },
-        revision: state.revision + 1,
       };
     });
-    this.reactiveStore.notify();
   }
 
   prependMessages(
@@ -464,10 +489,8 @@ export class DirectMessageSolidCache {
           ...state.hasMoreByConversation,
           [conversationId]: options.hasMore,
         },
-        revision: state.revision + 1,
       };
     });
-    this.reactiveStore.notify();
   }
 
   upsertMessage(message: DirectMessage): void {
@@ -479,7 +502,7 @@ export class DirectMessageSolidCache {
       const existing =
         state.messagesByConversation[message.conversationId] ?? [];
       if (existing.includes(message.messageId)) {
-        return { messageEntities, revision: state.revision + 1 };
+        return { messageEntities };
       }
 
       const insertAt = existing.findIndex((id) => {
@@ -498,10 +521,8 @@ export class DirectMessageSolidCache {
           ...state.messagesByConversation,
           [message.conversationId]: next,
         },
-        revision: state.revision + 1,
       };
     });
-    this.reactiveStore.notify();
   }
 
   async receiveLatest(conversationId: string): Promise<void> {
@@ -550,26 +571,22 @@ export class DirectMessageSolidCache {
           ...state.messagesByConversation,
           [conversationId]: existing.filter((id) => id !== messageId),
         },
-        revision: state.revision + 1,
       };
     });
-    this.reactiveStore.notify();
   }
 
   setActiveConversationId(id: string | null): void {
     this.setState((state) => ({
       activeConversationId: id,
-      revision: state.revision + 1,
     }));
-    this.reactiveStore.notify();
+    this.persist();
   }
 
   setComposeDraftPeer(peer: DmComposeDraftPeer | null): void {
     this.setState((state) => ({
       composeDraftPeer: peer,
-      revision: state.revision + 1,
     }));
-    this.reactiveStore.notify();
+    this.persist();
   }
 
   clearFocusedConversation(): void {
@@ -580,17 +597,13 @@ export class DirectMessageSolidCache {
   setIsLoadingConversations(loading: boolean): void {
     this.setState((state) => ({
       isLoadingConversations: loading,
-      revision: state.revision + 1,
     }));
-    this.reactiveStore.notify();
   }
 
   setConversationsLastLoadedAt(loadedAt: number): void {
     this.setState((state) => ({
       conversationsLastLoadedAt: loadedAt,
-      revision: state.revision + 1,
     }));
-    this.reactiveStore.notify();
   }
 
   setLoadingForConversation(conversationId: string, loading: boolean): void {
@@ -599,9 +612,7 @@ export class DirectMessageSolidCache {
         ...state.loadingByConversation,
         [conversationId]: loading,
       },
-      revision: state.revision + 1,
     }));
-    this.reactiveStore.notify();
   }
 
   updateConversation(
@@ -610,7 +621,7 @@ export class DirectMessageSolidCache {
   ): void {
     this.setState((state) => {
       const entry = state.entities[conversationId];
-      if (!entry) return { revision: state.revision };
+      if (!entry) return state;
       return {
         entities: {
           ...state.entities,
@@ -620,17 +631,49 @@ export class DirectMessageSolidCache {
             cachedAt: Date.now(),
           },
         },
-        revision: state.revision + 1,
       };
     });
-    this.reactiveStore.notify();
   }
 
-  rehydrate(): void {}
+  rehydrate(): void {
+    try {
+      const raw = this.persistence.getString(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<DirectMessageNexusState>;
+      this.setState({
+        entities: parsed.entities ?? {},
+        conversationIds: parsed.conversationIds ?? [],
+        conversationsLastLoadedAt: parsed.conversationsLastLoadedAt ?? 0,
+        activeConversationId: parsed.activeConversationId ?? null,
+        composeDraftPeer: parsed.composeDraftPeer ?? null,
+      });
+    } catch (error) {
+      console.warn("[DirectMessageSolidNexus] Failed to rehydrate", error);
+      this.persistence.remove(STORAGE_KEY);
+    }
+  }
 
   clear(): void {
-    this.setState(() => initialState());
-    this.reactiveStore.notify();
+    this.setState(initialState());
+    this.persistence.remove(STORAGE_KEY);
+  }
+
+  private persist(): void {
+    try {
+      const state = this.state;
+      this.persistence.set(
+        STORAGE_KEY,
+        JSON.stringify({
+          entities: state.entities,
+          conversationIds: state.conversationIds,
+          conversationsLastLoadedAt: state.conversationsLastLoadedAt,
+          activeConversationId: state.activeConversationId,
+          composeDraftPeer: state.composeDraftPeer,
+        }),
+      );
+    } catch (error) {
+      console.warn("[DirectMessageSolidNexus] Failed to persist", error);
+    }
   }
 
   async reportMessage(input: {
@@ -649,12 +692,12 @@ export class DirectMessageSolidCache {
     let changed = false;
     this.setState((state) => {
       const entry = state.entities[message.conversationId];
-      if (!entry) return { revision: state.revision };
+      if (!entry) return state;
 
       hadConversation = true;
       const current = entry.data;
       if (!isMessageCurrentOrNewerThanSummary(message, current)) {
-        return { revision: state.revision };
+        return state;
       }
 
       const isDuplicateLatest = current.lastMessageId === message.messageId;
@@ -695,10 +738,9 @@ export class DirectMessageSolidCache {
       return {
         entities,
         conversationIds: sortConversationIds(state.conversationIds, entities),
-        revision: state.revision + 1,
       };
     });
-    if (changed) this.reactiveStore.notify();
+    if (changed) this.persist();
     return hadConversation;
   }
 
@@ -713,7 +755,7 @@ export class DirectMessageSolidCache {
     }
     void this.markRead(message.conversationId).catch((error) => {
       console.warn(
-        "[DirectMessageSolidCache] markRead after receive failed",
+        "[DirectMessageSolidNexus] markRead after receive failed",
         error,
       );
     });
@@ -730,7 +772,7 @@ export class DirectMessageSolidCache {
       }
     } catch (error) {
       console.warn(
-        `[DirectMessageSolidCache] loadConversations after ${source} failed`,
+        `[DirectMessageSolidNexus] loadConversations after ${source} failed`,
         error,
       );
     }
@@ -746,14 +788,13 @@ export class DirectMessageSolidCache {
         ...state.messagesLastLoadedAt,
         [conversationId]: Date.now(),
       },
-      revision: state.revision + 1,
     }));
-    this.reactiveStore.notify();
   }
 }
 
-export function createDirectMessageSolidCache(
+export function createDirectMessageSolidNexus(
+  persistence: NexusPersistence,
   backend: DirectMessageBackend,
-): DirectMessageSolidCache {
-  return new DirectMessageSolidCache(backend);
+): DirectMessageSolidNexus {
+  return new DirectMessageSolidNexus(persistence, backend);
 }

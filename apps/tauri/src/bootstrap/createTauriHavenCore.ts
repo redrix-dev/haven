@@ -5,12 +5,13 @@ import {
 } from "../supabase/getTauriSupabase";
 import { createTauriPersistence } from "../lib/createTauriPersistence";
 
-export function createTauriHavenCore(): HavenSolidCore {
+export async function createTauriHavenCore(): Promise<HavenSolidCore> {
   const client = getTauriSupabase();
+  const persistence = await createTauriPersistence();
 
   return createSolidHavenCore({
     client,
     publicConfig: getTauriSupabaseConfig(),
-    persistence: createTauriPersistence(),
+    persistence,
   });
 }

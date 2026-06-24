@@ -132,6 +132,9 @@ dist/
 release/
 *.asar
 
+# Vercel CLI (project link + pulled env)
+.vercel/
+
 # Misc build caches
 .turbo/
 

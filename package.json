@@ -1,6 +1,6 @@
 {
   "name": "haven",
-  "version": "1.8.1",
+  "version": "2.0.0",
   "description": "Haven",
   "private": true,
   "repository": {
@@ -9,8 +9,9 @@
   },
   "scripts": {
     "lint": "eslint \"{apps,packages,tooling}/**/*.{js,ts,tsx}\"",
-    "check:shared-portable": "node tooling/scripts/check-shared-portable.mjs",
+    "check:desktop-version": "node tooling/scripts/check-desktop-version-sync.mjs",
     "check:shared-hex": "node tooling/scripts/check-shared-hex-literals.mjs",
+    "check:shared-portable": "node tooling/scripts/check-shared-portable.mjs",
     "themes:generate": "npx tsx tooling/scripts/generate-theme-bridge.ts",
     "check:themes": "node tooling/scripts/check-theme-bridge.mjs",
     "check:chat-surface": "node tooling/scripts/check-chat-surface.mjs",
@@ -37,6 +38,10 @@
     "ci:verify": "npm run test:ci",
     "dev:solid": "vite --config apps/tauri/vite.config.ts",
     "build:solid": "vite build --config apps/tauri/vite.config.ts",
+    "dev:web": "vite --config apps/web/vite.config.ts",
+    "build:web": "vite build --config apps/web/vite.config.ts",
+    "preview:web": "vite preview --config apps/web/vite.config.ts",
+    "typecheck:web": "tsc --noEmit --project apps/web/tsconfig.json",
     "tauri": "tauri",
     "tauri:dev": "cd apps/tauri && tauri dev",
     "tauri:build": "cd apps/tauri && tauri build",
@@ -101,6 +106,7 @@
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-deep-link": "^2.4.9",
     "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-store": "^2.4.3",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "clsx": "^2.1.1",
     "livekit-client": "^2.19.2",

@@ -1,8 +1,2 @@
-export { SocialSolidCache, createSocialSolidCache } from "./socialSolidCache";
-export {
-  createSocialBlockedUsers,
-  createSocialCounts,
-  createSocialFriendRequests,
-  createSocialFriends,
-  createSocialLoading,
-} from "./accessors";
+export { SocialSolidNexus, createSocialSolidNexus } from "./socialSolidNexus";
+export type { SocialSolidState } from "./socialSolidNexus";

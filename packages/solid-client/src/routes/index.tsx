@@ -20,12 +20,19 @@ import {
   CommunitySidebar,
   CommunityView,
   CommunityHome,
+  RoleManagementView,
+  CommunitySettingsPanel,
 } from "../features/community";
 import { SignInScreen } from "../features/auth";
 import { AppearanceSettings } from "../features/settings";
 import { DirectMessagesView } from "../features/direct-messages";
 import { FriendsView } from "../features/friends";
 import { NotificationsView } from "../features/notifications";
+import { ModmailView, ModmailLoader } from "../features/moderation";
+import {
+  OnboardingScreen,
+  getSolidOnboardingContext,
+} from "../features/onboarding";
 import { VoiceDock, VoicePopout } from "../features/voice";
 import { useBridge } from "../contexts/BridgeProvider";
 import { UpdaterProvider, useUpdater } from "../contexts/UpdaterProvider";
@@ -188,6 +195,67 @@ function NotificationToastLayer() {
   return <Toaster toasts={toast.toasts()} onDismiss={toast.dismiss} />;
 }
 
+/**
+ * Gates the authed app behind any pending onboarding campaigns. On mount it
+ * loads the user's campaigns; while loading it shows a spinner, on error a
+ * retry, and if a campaign is pending it shows the onboarding screen instead of
+ * the app. No campaigns → renders the app (the fallback). Server returns only
+ * not-yet-completed campaigns, so most sessions fall straight through.
+ */
+function OnboardingGate(props: { children: JSX.Element }) {
+  const core = requireHavenSolidCore();
+  const bridge = useBridge();
+  const context = getSolidOnboardingContext(bridge.window != null);
+  const onboarding = core.onboarding;
+
+  const load = () => {
+    void onboarding
+      .load(context)
+      .catch((err) => console.warn("[OnboardingGate] load failed", err));
+  };
+  onMount(load);
+
+  return (
+    <Switch fallback={props.children}>
+      <Match when={!onboarding.state.loaded || onboarding.state.loading}>
+        <div class="flex h-full w-full items-center justify-center bg-background">
+          <div class="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-primary" />
+        </div>
+      </Match>
+      <Match when={onboarding.state.error}>
+        <div class="flex h-full w-full flex-col items-center justify-center gap-3 bg-background p-6 text-center">
+          <p class="text-sm text-muted-foreground">Onboarding couldn't load.</p>
+          <button
+            type="button"
+            onClick={() => load()}
+            class="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            Retry
+          </button>
+        </div>
+      </Match>
+      <Match when={onboarding.state.campaigns[0]}>
+        {(campaign) => (
+          <OnboardingScreen
+            campaign={campaign()}
+            completing={
+              onboarding.state.completingCampaignKey === campaign().key
+            }
+            error={onboarding.state.completionError}
+            onComplete={() =>
+              void core
+                .completeOnboarding(campaign().key, context)
+                .catch((err) =>
+                  console.warn("[OnboardingGate] complete failed", err),
+                )
+            }
+          />
+        )}
+      </Match>
+    </Switch>
+  );
+}
+
 // ── main-branch layout ───────────────────────────────────────────────────────
 
 // Guards all routes under "/" — handles the three states of session():
@@ -211,7 +279,7 @@ function AppLayout(props: RouteSectionProps) {
       </Match>
 
       <Match when={session()}>
-        <>
+        <OnboardingGate>
           <div class="flex h-full w-full overflow-hidden bg-surface-app">
             <div class="flex h-full flex-col">
               <div class="min-h-0 flex-1">
@@ -224,7 +292,9 @@ function AppLayout(props: RouteSectionProps) {
             </main>
           </div>
           <NotificationToastLayer />
-        </>
+          <ModmailLoader />
+          <CommunitySettingsPanel />
+        </OnboardingGate>
       </Match>
     </Switch>
   );
@@ -253,6 +323,7 @@ export const routes: RouteDefinition[] = [
           { path: "/", component: CommunityHome },
           { path: "/friends", component: FriendsView },
           { path: "/notifications", component: NotificationsView },
+          { path: "/modmail", component: ModmailView },
           { path: "/direct-messages", component: DirectMessagesView },
           {
             path: "/direct-messages/:conversationId",
@@ -262,6 +333,10 @@ export const routes: RouteDefinition[] = [
           {
             path: "/community/:communityId/channel/:channelId",
             component: CommunityView,
+          },
+          {
+            path: "/community/:communityId/roles",
+            component: RoleManagementView,
           },
           { path: "/settings/appearance", component: AppearanceSettings },
         ],

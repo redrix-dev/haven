@@ -1,4 +1,5 @@
 export {
-  PermissionsSolidCache,
-  createPermissionsSolidCache,
-} from "./permissionsSolidCache";
+  PermissionsSolidNexus,
+  createPermissionsSolidNexus,
+} from "./permissionsSolidNexus";
+export type { PermissionsSolidState } from "./permissionsSolidNexus";

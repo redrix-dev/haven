@@ -5,7 +5,8 @@ import type {
   DirectMessageAttachment,
   DirectMessageConversationSummary,
 } from "@shared/lib/backend/types";
-import { DirectMessageSolidCache } from "../directMessageSolidCache";
+import { createMemoryPersistence } from "@shared/core";
+import { DirectMessageSolidNexus } from "../directMessageSolidNexus";
 
 const conversation = (
   input: Partial<DirectMessageConversationSummary> & {
@@ -86,7 +87,7 @@ function createBackend(
   };
 }
 
-describe("DirectMessageSolidCache", () => {
+describe("DirectMessageSolidNexus", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-13T10:00:00.000Z"));
@@ -116,7 +117,7 @@ describe("DirectMessageSolidCache", () => {
         .mockResolvedValueOnce(newer)
         .mockResolvedValueOnce(older),
     });
-    const cache = new DirectMessageSolidCache(backend);
+    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
     cache.setConversations([
       conversation({ conversationId: "conversation-1" }),
     ]);
@@ -145,7 +146,7 @@ describe("DirectMessageSolidCache", () => {
     const backend = createBackend({
       getMessage: vi.fn().mockResolvedValue(incoming),
     });
-    const cache = new DirectMessageSolidCache(backend);
+    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
     cache.setConversations([
       conversation({ conversationId: "conversation-1", otherUserId: "peer-1" }),
     ]);
@@ -177,7 +178,7 @@ describe("DirectMessageSolidCache", () => {
           }),
       ),
     });
-    const cache = new DirectMessageSolidCache(backend);
+    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
     cache.setConversations([staleSummary]);
 
     const load = cache.loadConversations();
@@ -227,7 +228,7 @@ describe("DirectMessageSolidCache", () => {
     });
     const sendMessage = vi.fn().mockResolvedValue(sent);
     const backend = createBackend({ sendMessage });
-    const cache = new DirectMessageSolidCache(backend);
+    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
     cache.setConversations([
       conversation({ conversationId: "conversation-1" }),
     ]);
@@ -256,7 +257,7 @@ describe("DirectMessageSolidCache", () => {
   it("forwards direct message reports to the backend", async () => {
     const reportMessage = vi.fn().mockResolvedValue("report-1");
     const backend = createBackend({ reportMessage });
-    const cache = new DirectMessageSolidCache(backend);
+    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
 
     const reportId = await cache.reportMessage({
       messageId: "message-1",

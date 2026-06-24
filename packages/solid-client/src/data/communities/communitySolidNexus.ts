@@ -1,5 +1,8 @@
 import { createMemo, type Accessor } from "solid-js";
 import { createStore, type SetStoreFunction } from "solid-js/store";
+import type { NexusEntry } from "@shared/core/cache/entityTypes";
+import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import {
   projectCommunities,
   selectActiveId,
@@ -37,7 +40,10 @@ export class CommunitySolidNexus {
   private readonly setState: SetStoreFunction<CommunityNexusState>;
   private loadPromise: Promise<void> | null = null;
 
-  constructor(private readonly controlPlane: ControlPlaneBackend) {
+  constructor(
+    private readonly persistence: NexusPersistence,
+    private readonly controlPlane: ControlPlaneBackend,
+  ) {
     const [state, setState] = createStore(initialState());
     this.state = state;
     this.setState = setState;
@@ -92,7 +98,44 @@ export class CommunitySolidNexus {
   }
   // display-order persistence (setDisplayOrder/reset) intentionally not ported —
   // no caller in the Solid app yet; add when a reorder UI lands.
-  rehydrate(): void {}
+  rehydrate(): void {
+    try {
+      const raw = this.persistence.getString(NEXUS_STORAGE_KEYS.communities);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        entities: Record<string, NexusEntry<Community>>;
+        orderedIds: string[];
+        activeId: string | null;
+      };
+      this.setState({
+        entities: parsed.entities ?? {},
+        orderedIds: parsed.orderedIds ?? [],
+        activeId: parsed.activeId ?? null,
+      });
+    } catch (error) {
+      console.warn("[CommunitySolidNexus] Failed to rehydrate", error);
+      this.persistence.remove(NEXUS_STORAGE_KEYS.communities);
+    }
+  }
+
+  private persist(): void {
+    try {
+      const state = this.state;
+      const persistable = {
+        entities: Object.fromEntries(
+          Object.entries(state.entities).filter(([, entry]) => !entry.partial),
+        ),
+        orderedIds: state.orderedIds,
+        activeId: state.activeId,
+      };
+      this.persistence.set(
+        NEXUS_STORAGE_KEYS.communities,
+        JSON.stringify(persistable),
+      );
+    } catch (error) {
+      console.warn("[CommunitySolidNexus] Failed to persist", error);
+    }
+  }
 
   loadDisplayOrder(userId: string | null): void {
     this.setState(
@@ -103,11 +146,13 @@ export class CommunitySolidNexus {
 
   clear(): void {
     this.setState(initialState());
+    this.persistence.remove(NEXUS_STORAGE_KEYS.communities);
   }
 
   setActiveId(id: string | null): void {
     if (this.state.activeId === id) return;
     this.setState("activeId", id);
+    this.persist();
   }
 
   setCommunities(communities: ServerSummary[]): void {
@@ -122,11 +167,13 @@ export class CommunitySolidNexus {
       orderedIds.push(raw.id);
     }
     this.setState("orderedIds", orderedIds);
+    this.persist();
   }
 }
 
 export function createCommunitySolidNexus(
+  persistence: NexusPersistence,
   controlPlane: ControlPlaneBackend,
 ): CommunitySolidNexus {
-  return new CommunitySolidNexus(controlPlane);
+  return new CommunitySolidNexus(persistence, controlPlane);
 }

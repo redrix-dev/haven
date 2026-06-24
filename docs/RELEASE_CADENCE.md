@@ -114,6 +114,27 @@ below from the same fix commit. Web is fixed the instant the fix hits `main`.
 
 ## Web (Vercel)
 
+### First-time setup (one-time, dashboard)
+
+The build target ships in-repo (`apps/web/`, `vercel.json`, `build:web`). To turn
+it into a live deployment, connect Vercel once:
+
+1. **Create the project** — Vercel → Add New → Project → import `redrix-dev/haven`.
+   Leave Framework Preset as **Other**; `vercel.json` already pins the build:
+   `buildCommand: npm run build:web`, `outputDirectory: dist/web`, SPA rewrite.
+   (Root Directory stays the repo root — the build reads `apps/web/vite.config.ts`.)
+2. **Set env vars** (Project → Settings → Environment Variables, Production +
+   Preview): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and
+   `VITE_WEB_PUSH_VAPID_PUBLIC_KEY`. These must keep the `VITE_` prefix to reach
+   the client bundle. No secrets beyond the anon/public keys belong here.
+3. **Git integration** — enabled by default on import: production deploys from
+   `main`, every PR gets a preview URL. Confirm the Production Branch is `main`.
+4. **Verify** — trigger a deploy, open the URL, confirm it boots to the login
+   screen and the in-app build stamp (`document.documentElement.dataset.havenBuild`
+   / `window.__havenBuild`) shows `2.0.0+<shortSha>` matching the deployed commit.
+
+After this, web is continuous (below) and needs no further ceremony.
+
 ### Standard "release" — continuous
 
 There is no web release event. **Vercel's Git integration deploys `main` to

@@ -1,2 +1,1 @@
-export { VoiceSolidCache, createVoiceSolidCache } from "./voiceSolidCache";
-export { createVoiceState, createChannelVoiceParticipants } from "./accessors";
+export { VoiceSolidNexus, createVoiceSolidNexus } from "./voiceSolidNexus";

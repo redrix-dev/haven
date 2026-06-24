@@ -239,6 +239,27 @@ export function routeRealtimeEvent(
       return;
     }
 
+    case "report_created": {
+      // Payload is sent snake_case from SQL; tolerate either casing.
+      const p = evt.payload as Record<string, unknown>;
+      const communityId =
+        typeof p.communityId === "string"
+          ? p.communityId
+          : typeof p.community_id === "string"
+            ? p.community_id
+            : null;
+      const reportId =
+        typeof p.reportId === "string"
+          ? p.reportId
+          : typeof p.report_id === "string"
+            ? p.report_id
+            : null;
+      if (communityId && reportId) {
+        target.moderation.handleReportCreated?.({ communityId, reportId });
+      }
+      return;
+    }
+
     case "USER_PLATFORM_BANNED": {
       const userId =
         typeof evt.payload.user_id === "string" ? evt.payload.user_id : null;

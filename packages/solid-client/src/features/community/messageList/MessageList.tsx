@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { VList, type VListHandle } from "virtua/solid";
 import type { MessageViewItem } from "./messageViewModel";
-import { MessageRow } from "./MessageRow";
+import { MessageRow, type MessageRowActions } from "./MessageRow";
 
 /**
  * The virtualized chat scroller. Props in (view items), callbacks out — no
@@ -14,10 +14,12 @@ import { MessageRow } from "./MessageRow";
  *  - prepending older pages sets virtua's `shift` so the viewport doesn't jump
  *  - nearing the top fires onReachTop (parent guards hasMore/loading)
  */
-export function MessageList(props: {
-  items: MessageViewItem[];
-  onReachTop?: () => void;
-}) {
+export function MessageList(
+  props: {
+    items: MessageViewItem[];
+    onReachTop?: () => void;
+  } & MessageRowActions,
+) {
   let handle: VListHandle | undefined;
   // Plain mutables, deliberately non-reactive: read inside callbacks/effects
   // only, and re-render must not depend on them.
@@ -84,7 +86,13 @@ export function MessageList(props: {
             <span class="h-px flex-1 bg-border" />
           </div>
         ) : (
-          <MessageRow item={item} />
+          <MessageRow
+            item={item}
+            viewerId={props.viewerId}
+            canReport={props.canReport}
+            onReportMessage={props.onReportMessage}
+            onReportUser={props.onReportUser}
+          />
         )
       }
     </VList>

@@ -8,6 +8,7 @@ import {
 } from "solid-js";
 import { getTheme } from "@shared/themes/registry";
 import { listSelectableBuiltinThemes } from "@shared/themes/selectableBuiltinThemes";
+import { featureFlagsToEntitlementKeys } from "@shared/themes/themeEntitlements";
 import { resolveSemanticEntries } from "@shared/themes/semantics";
 import type { HavenTheme } from "@shared/themes/types";
 import { requireHavenSolidCore } from "../core";
@@ -164,9 +165,14 @@ export function ThemeProvider(props: { children: JSX.Element }) {
     }
   };
 
+  // Feature flags double as theme entitlement keys: a flag-gated theme becomes
+  // selectable the moment the viewer's flag is enabled (loaded at bootstrap).
   const value: ThemeContextValue = {
     themeId,
-    selectableThemes: () => listSelectableBuiltinThemes(new Set()),
+    selectableThemes: () =>
+      listSelectableBuiltinThemes(
+        new Set(featureFlagsToEntitlementKeys(core.featureFlags.getFlags())),
+      ),
     setThemeId,
   };
 

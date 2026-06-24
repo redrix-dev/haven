@@ -1,13 +1,6 @@
 export {
-  CommunityMessageSolidCache,
-  createCommunityMessageSolidCache,
-} from "./communityMessageSolidCache";
-export type { CommunityMessageSolidState } from "./communityMessageSolidCache";
+  CommunityMessageSolidNexus,
+  createCommunityMessageSolidNexus,
+} from "./communityMessageSolidNexus";
+export type { CommunityMessageSolidState } from "./communityMessageSolidNexus";
 export { MessageSolidRegistry, createMessageSolidRegistry } from "./registry";
-export {
-  createChannelMessages,
-  createVisibleChannelMessages,
-  createChannelMeta,
-  createIsLoadingOlder,
-  createHasInitialLoadCompleted,
-} from "./accessors";

@@ -16,6 +16,8 @@ export type { HavenBackends, HavenSupabasePublicConfig } from "./backends";
 export { createHavenBackends } from "./backends";
 export type { NexusPersistence } from "./persistence/NexusPersistence";
 export { createMemoryPersistence } from "./persistence/createMemoryPersistence";
+export { createLocalStoragePersistence } from "./persistence/createLocalStoragePersistence";
+export { NEXUS_STORAGE_KEYS } from "./persistence/nexusStorageKeys";
 export {
   toChannel,
   getCachedChannelsForServer,
