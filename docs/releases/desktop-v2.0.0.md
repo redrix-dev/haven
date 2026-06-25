@@ -30,6 +30,7 @@ Once installed, Haven keeps itself up to date automatically.
 ### Known issues
 
 - **Voice pop-out is temporarily disabled** on desktop while its cross-window sync is reworked — voice itself (join/leave, mute/deafen, presence, sounds) works normally. It returns in a follow-up `2.0.x`.
+- **No rich-text composer yet.** The message box is a plain text area. Markdown you type still renders (bold, italic, code, lists, links, spoilers), but the formatting toolbar and keyboard shortcuts from the old desktop client are a `2.0.x` follow-up.
 
 ### Under the hood
 
