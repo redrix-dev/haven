@@ -6,6 +6,13 @@
 # (`releases/latest/download/latest.json`) only serves a published, non-prerelease
 # release, so auto-update activates the moment you publish the draft.
 #
+# Shape: ONE `create-release` job makes the draft and emits its numeric id; the
+# build matrix then uploads every platform's artifacts to THAT release id. This
+# is deliberate — if each matrix job created the release itself (by tag), they
+# race: GitHub's get-release-by-tag API doesn't return drafts, so concurrent jobs
+# can't see each other's draft and end up creating duplicate releases with split,
+# incomplete `latest.json` manifests. Creating once up front avoids that.
+#
 # Required repository secrets:
 #   TAURI_SIGNING_PRIVATE_KEY           — minisign private key (`tauri signer generate`)
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  — its password ("" if none)
@@ -29,12 +36,41 @@ on:
     tags:
       - "desktop-v*"
 
-# tauri-action needs write access to create the release and upload assets.
 permissions:
   contents: write
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create draft release
+        id: create
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const tag = context.ref.replace("refs/tags/", "");
+            const notesPath = `docs/releases/${tag}.md`;
+            const body = fs.existsSync(notesPath)
+              ? fs.readFileSync(notesPath, "utf8")
+              : "Download an installer below. Existing installs update automatically once this release is published.";
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Haven ${tag}`,
+              body,
+              draft: true,
+              prerelease: false,
+            });
+            return data.id;
+
   build:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -77,25 +113,9 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      # Release body = the curated SANITIZED PUBLIC signoff at docs/releases/<tag>.md,
-      # if present (see docs/RELEASE_CADENCE.md). Falls back to a generic body so a
-      # missing file degrades safely and never leaks internal logs.
-      - name: Resolve release notes
-        id: notes
-        shell: bash
-        run: |
-          NOTES_FILE="docs/releases/${GITHUB_REF_NAME}.md"
-          {
-            echo "body<<HAVEN_NOTES_EOF"
-            if [ -f "$NOTES_FILE" ]; then
-              cat "$NOTES_FILE"
-            else
-              echo "Download an installer below. Existing installs update automatically once this release is published."
-            fi
-            echo "HAVEN_NOTES_EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Build, sign, and publish
+      # Upload to the single release created above (by id, never by tag) so all
+      # platforms land in one draft with one combined latest.json.
+      - name: Build, sign, and upload
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -103,10 +123,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/tauri
-          tagName: ${{ github.ref_name }}
-          releaseName: "Haven ${{ github.ref_name }}"
-          releaseBody: ${{ steps.notes.outputs.body }}
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           includeUpdaterJson: true
           args: ${{ matrix.args }}
