@@ -2,8 +2,6 @@
 
 Native UI lives here. Shared **business** logic targets `packages/shared`; read [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) for the three-layer law, then [`docs/architecture/HAVEN_CORE.md`](../../docs/architecture/HAVEN_CORE.md) for the mobile data-layer contract.
 
-Mobile maintenance notes live in [`docs/mobile-todo.md`](docs/mobile-todo.md).
-
 ## Prerequisites (macOS for iOS)
 
 - Xcode + CocoaPods (`brew install cocoapods` or use Homebrew-managed Ruby)

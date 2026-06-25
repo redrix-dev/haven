@@ -37,7 +37,7 @@ Haven gives streamers and their communities a space that works the way they'd ex
 
 ## Platforms
 
-**iOS** is in active TestFlight distribution and is the current production target. **Desktop and web** are being rebuilt on Tauri + Solid — the previous Electron/React clients shipped to production, proved the product, and were retired in favor of a lighter shell and a faster renderer. The rebuild runs against the same shared core and backend that mobile uses today.
+**iOS** is in active TestFlight distribution. **Desktop and web** are rebuilt on Tauri + Solid at their `2.0.0` release — the previous Electron/React clients shipped to production, proved the product, and were retired in favor of a lighter shell and a faster renderer. All three clients run against the same shared core and backend.
 
 The iOS client runs on a custom OTA update pipeline built on top of Expo Updates — asset hashing, bundle generation, and manifest serving are handled by a local toolchain that publishes to a Supabase-backed Edge Function. This replaces EAS Update entirely and keeps the update infrastructure under the same roof as the rest of the backend. Everything outside of voice works on mobile: DMs, reports, modmail, push notifications, community creation, invites, friends, media upload, and full rich text composition and rendering via [`react-native-enriched-markdown`](https://github.com/software-mansion-labs/react-native-enriched-markdown).
 
@@ -61,7 +61,7 @@ The schema, RLS policies, migration history, and voice relay function are all re
 
 ### The monorepo is structured around a stable shared core
 
-Business logic, types, and domain state live in `packages/shared` and are platform-agnostic — framework-free TypeScript with no React or Solid imports allowed (CI enforces this). Platform-specific behavior is isolated to each app target through a registration pattern rather than leaking into shared code. The iOS client and the Tauri/Solid rebuild run against the same tested core.
+Business logic, types, and domain state live in `packages/shared` and are platform-agnostic — framework-free TypeScript with no React or Solid imports allowed (CI enforces this). Platform-specific behavior is isolated to each app target through a registration pattern rather than leaking into shared code. The iOS client and the Tauri/Solid desktop/web client run against the same tested core.
 
 ---
 
@@ -69,7 +69,7 @@ Business logic, types, and domain state live in `packages/shared` and are platfo
 
 | Layer             | Technology                                                                  |
 | ----------------- | --------------------------------------------------------------------------- |
-| Desktop & Web     | Tauri + Solid (in rebuild; previous Electron/React clients retired)         |
+| Desktop & Web     | Tauri + Solid (`2.0.0`; previous Electron/React clients retired)            |
 | iOS               | React Native + Expo (dev client, TestFlight)                                |
 | Language          | TypeScript                                                                  |
 | UI                | Solid (desktop/web), UniWind + RN primitives (iOS)                          |
@@ -94,15 +94,16 @@ packages/shared (pure logic)  →  per-platform cache  →  per-platform UI
 Haven is a monorepo with two app targets and two core packages:
 
 - `apps/mobile` — React Native + Expo, actively distributed via TestFlight
-- `apps/tauri` — Tauri shell for the desktop/web rebuild (in progress)
+- `apps/tauri` — Tauri desktop shell hosting the Solid client
+- `apps/web` — the same Solid client built as a static SPA (Vercel)
 - `packages/shared` — framework-free types, domain state, and business logic shared across all platforms
-- `packages/solid-client` — Solid UI layer for the desktop/web rebuild
+- `packages/solid-client` — Solid UI layer for desktop and web
 
 Domain state lives in framework-free stores (`zustand/vanilla`) inside `packages/shared`; each platform binds those stores to its own reactivity system (React hooks on mobile, Solid signals on desktop). Components subscribe only to the slice of state they need, which produces real and measurable render isolation rather than theoretical benefits.
 
 The iOS OTA pipeline is a custom implementation of the Expo Updates protocol. A local toolchain handles asset fingerprinting, bundle generation, and manifest construction. The manifest is served by a Supabase Edge Function and the client fetches and applies updates at launch without going through EAS. This gives full control over the update cadence and keeps update infrastructure consolidated with the rest of the backend.
 
-Full documentation — engineering principles, architecture, the active rebuild plan, the backlog, and the release cadence — starts at [docs/README.md](docs/README.md).
+Full documentation — engineering principles, architecture, and the release cadence — starts at [docs/README.md](docs/README.md).
 
 ---
 
@@ -131,7 +132,7 @@ npm run test:report    # Human-readable proof report with full logs
 
 ## Status
 
-Haven is in active production use on iOS. The desktop and web clients are being rebuilt on Tauri + Solid against the same shared core; the previous Electron and React web clients shipped to production and were retired in June 2026.
+Haven is in active production use on iOS. The desktop and web clients have been rebuilt on Tauri + Solid (`2.0.0`) against the same shared core; the previous Electron and React web clients shipped to production and were retired in June 2026.
 
 ---
 

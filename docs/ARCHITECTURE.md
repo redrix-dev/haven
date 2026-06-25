@@ -24,7 +24,7 @@ docs/              You are here.
 
 The previous production clients — Electron desktop and Vite/React web — shipped,
 proved the product, and were retired in June 2026 in favor of this rebuild. Their
-history lives in git and [docs/\_archive/](./_archive/).
+history lives in git.
 
 ## The three layers (the law)
 
@@ -111,9 +111,8 @@ exception). Coverage matrix and open holes:
 aliases**, currently mirrored across tsconfig / babel / metro / vitest. This is a
 sanctioned interim, not the destination — the standing decision is to convert
 shared packages to real npm workspace packages (`package.json` + `exports`) in one
-dedicated milestone. Details, sequencing rules, and the empirical finding that
-tsconfig paths alone drive Metro resolution:
-[SOLID_REBUILD.md § Standing decision](./SOLID_REBUILD.md#standing-decision--workspace-packages).
+dedicated milestone — with the empirical finding that tsconfig `paths` alone drive
+Metro resolution today.
 
 ## Editor configuration
 

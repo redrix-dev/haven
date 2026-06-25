@@ -93,9 +93,10 @@ reflects what the database says; it does not decide. The anon key is public on
 purpose — it can't do anything the policies don't permit. The source is public for
 the same reason: if the security model works, it holds up to inspection.
 
-## 11. Docs tell the truth or they move to the archive
+## 11. Docs tell the truth or they leave
 
 A living doc is updated **in the same change** that invalidates it. When work
-completes or a plan is superseded, its documents move to `docs/_archive/` intact —
-history is kept, not rewritten. A doc that describes a world that no longer exists,
-sitting next to docs that describe this one, is worse than no doc.
+completes or a plan is superseded, its document is dropped from the living set —
+git history keeps the record, not a pile of stale files. A doc that describes a
+world that no longer exists, sitting next to docs that describe this one, is worse
+than no doc.

@@ -135,6 +135,16 @@ release/
 # Vercel CLI (project link + pulled env)
 .vercel/
 
+# Internal / personal docs — kept locally, deliberately out of the public tree
+docs/learning/
+docs/_archive/
+docs/SOLID_BUILD_HANDOFF.md
+docs/SOLID_REBUILD.md
+docs/SOLID_SHIP_READINESS.md
+docs/SOLID_UNDERSTANDABILITY_AUDIT.md
+docs/BACKLOG.md
+apps/mobile/docs/mobile-todo.md
+
 # Misc build caches
 .turbo/
 

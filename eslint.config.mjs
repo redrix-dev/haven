@@ -207,7 +207,6 @@ export default [
       "apps/**/*.{ts,tsx,js,jsx}",
       "packages/**/*.{ts,tsx,js,jsx}",
       "tooling/**/*.{ts,tsx,js,jsx}",
-      "services/**/*.{ts,tsx,js,jsx}",
     ],
     languageOptions: {
       parser: tsParser,

@@ -1,8 +1,7 @@
 # Release cadence & branch workflow
 
-How Haven ships, on an ongoing basis, once desktop/web reaches 2.0.0. The one-time
-build-out to that first release lives in
-[SOLID_SHIP_READINESS.md](./SOLID_SHIP_READINESS.md); this doc is the steady state.
+How Haven ships, on an ongoing basis. This is the steady-state release workflow for
+the desktop, web, and mobile trains.
 
 Governing idea: **one repo, three release trains.** Desktop, web, and mobile ship
 on their own clocks against the same shared core. Integration happens on `staging`,

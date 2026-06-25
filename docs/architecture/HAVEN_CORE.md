@@ -7,9 +7,8 @@ Supabase subscriptions.
 
 > **Post-cleave (2026-06):** orchestration and all reactive caches live in
 > `apps/mobile/src/data/`. `packages/shared` is pure logic, types, and backend clients.
-> The legacy web/Electron React clients are **deleted**; desktop/web are being rebuilt on
-> Solid with `HavenSolidCore` mirroring this contract (see
-> [`docs/SOLID_REBUILD.md`](../SOLID_REBUILD.md)). The patterns below describe the
+> The legacy web/Electron React clients are **deleted**; desktop/web are rebuilt on
+> Solid with `HavenSolidCore` mirroring this contract. The patterns below describe the
 > **mobile contract**; shared routing logic is framework-free via `RealtimeMutationTarget`.
 
 ## Onboarding rules
@@ -320,11 +319,10 @@ only construction entrypoint on mobile.
 
 ## Known follow-ups
 
-Tracked in [`docs/BACKLOG.md`](../BACKLOG.md) (mobile data layer + realtime sections).
-The Solid counterpart (`HavenSolidCore`) is the active build — [`docs/SOLID_REBUILD.md`](../SOLID_REBUILD.md).
+The Solid counterpart (`HavenSolidCore`) on the desktop/web client mirrors this
+contract; remaining mobile data-layer + realtime follow-ups are tracked in git history.
 
 ## See also
 
 - [REALTIME.md](./REALTIME.md) — event contract + coverage matrix
 - [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) — the three-layer law this contract implements
-- Historical audits (hooks, consumer refactor, platform injection): [`docs/_archive/`](../_archive/)
