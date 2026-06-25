@@ -11,6 +11,7 @@ import {
 import { Navigate, useNavigate } from "@solidjs/router";
 import type { RouteDefinition, RouteSectionProps } from "@solidjs/router";
 import { SessionProvider, useSession } from "../contexts/SessionProvider";
+import { parseAuthConfirmUrl } from "@shared/features/auth/domain/authConfirm";
 import {
   ThemeProvider,
   applyStoredThemeToDocument,
@@ -23,7 +24,13 @@ import {
   RoleManagementView,
   CommunitySettingsPanel,
 } from "../features/community";
-import { SignInScreen } from "../features/auth";
+import {
+  SignInScreen,
+  SignUpScreen,
+  ForgotPasswordScreen,
+  ResetPasswordScreen,
+  AuthConfirmScreen,
+} from "../features/auth";
 import { AppearanceSettings } from "../features/settings";
 import { DirectMessagesView } from "../features/direct-messages";
 import { FriendsView } from "../features/friends";
@@ -99,15 +106,25 @@ function WindowChrome(props: { children: JSX.Element }) {
   const bridge = useBridge();
   const updater = useUpdater();
   const navigate = useNavigate();
+  const { confirmAuthFromUrl } = useSession();
   const win = bridge.window;
 
   // Route incoming deep links (haven://…). Native windows only; the web shell
-  // exposes no onDeepLink, so this no-ops in a browser.
+  // exposes no onDeepLink, so this no-ops in a browser. Auth confirmation /
+  // recovery links are exchanged for a session (web does this via
+  // detectSessionInUrl; desktop must do it here), then land on /auth/confirm.
   onMount(() => {
     const subscribe = bridge.onDeepLink;
     if (!subscribe) return;
     let dispose: (() => void) | undefined;
-    void subscribe((url) => navigate(deepLinkToPath(url))).then((d) => {
+    void subscribe((url) => {
+      if (parseAuthConfirmUrl(url)) {
+        navigate("/auth/confirm");
+        void confirmAuthFromUrl(url);
+      } else {
+        navigate(deepLinkToPath(url));
+      }
+    }).then((d) => {
       dispose = d;
     });
     onCleanup(() => dispose?.());
@@ -265,7 +282,7 @@ function OnboardingGate(props: { children: JSX.Element }) {
 //   null       Confirmed no session. Redirect to /sign-in.
 //   Session    Authenticated. Render the app layout with the sidebar.
 function AppLayout(props: RouteSectionProps) {
-  const { session } = useSession();
+  const { session, passwordRecoveryRequired } = useSession();
 
   return (
     <Switch>
@@ -276,6 +293,12 @@ function AppLayout(props: RouteSectionProps) {
 
       <Match when={session() === null}>
         <Navigate href="/sign-in" />
+      </Match>
+
+      {/* A recovery link signed the user in only to set a new password — gate
+          the whole app on it until the new password is committed. */}
+      <Match when={session() && passwordRecoveryRequired()}>
+        <ResetPasswordScreen />
       </Match>
 
       <Match when={session()}>
@@ -316,6 +339,9 @@ export const routes: RouteDefinition[] = [
     component: MainShell,
     children: [
       { path: "/sign-in", component: SignInScreen },
+      { path: "/sign-up", component: SignUpScreen },
+      { path: "/forgot-password", component: ForgotPasswordScreen },
+      { path: "/auth/confirm", component: AuthConfirmScreen },
       {
         path: "/",
         component: AppLayout,

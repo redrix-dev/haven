@@ -1,5 +1,5 @@
 import { createSignal, Show } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { Button, TextField } from "@solid-client/components/ui";
 
@@ -61,6 +61,15 @@ export function SignInScreen() {
             placeholder="••••••••"
           />
 
+          <div class="-mt-1 text-right">
+            <A
+              href="/forgot-password"
+              class="text-sm text-primary hover:underline"
+            >
+              Forgot password?
+            </A>
+          </div>
+
           <Show when={error()}>
             <p class="text-sm text-destructive">{error()}</p>
           </Show>
@@ -69,6 +78,13 @@ export function SignInScreen() {
             {busy() ? "Signing in…" : "Sign in"}
           </Button>
         </form>
+
+        <p class="mt-4 text-center text-sm text-muted-foreground">
+          New to Haven?{" "}
+          <A href="/sign-up" class="font-medium text-primary hover:underline">
+            Create an account
+          </A>
+        </p>
       </div>
     </div>
   );

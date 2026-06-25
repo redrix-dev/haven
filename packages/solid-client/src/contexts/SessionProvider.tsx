@@ -6,14 +6,29 @@ import type { Session } from "@supabase/supabase-js";
 import type { BootstrapPhaseSnapshot } from "@solid-client/core";
 import {
   SolidAuthResult,
+  confirmAuthFromUrl,
+  requestPasswordReset,
   signInWithPassword,
   signOutFromAuth,
+  signUpWithPassword,
+  updateRecoveryPassword,
 } from "@solid-client/auth/solidAuthService";
 type SessionValue = {
   session: Accessor<Session | null | undefined>;
   phase: Accessor<BootstrapPhaseSnapshot>;
+  /** True while a recovery email link is establishing a set-new-password session. */
+  passwordRecoveryRequired: Accessor<boolean>;
   signIn: (email: string, password: string) => Promise<SolidAuthResult>;
   signOut: () => Promise<void>;
+  signUp: (input: {
+    email: string;
+    password: string;
+    username: string;
+    acceptedLegal: boolean;
+  }) => Promise<SolidAuthResult>;
+  requestPasswordReset: (email: string) => Promise<SolidAuthResult>;
+  updateRecoveryPassword: (password: string) => Promise<SolidAuthResult>;
+  confirmAuthFromUrl: (href: string) => Promise<SolidAuthResult>;
 };
 
 const SessionContext = createContext<SessionValue>();
@@ -28,6 +43,8 @@ export function SessionProvider(props: { children: JSX.Element }) {
   const [phase, setPhase] = createSignal<BootstrapPhaseSnapshot>(
     core.getBootstrapPhase(),
   );
+  const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
+    createSignal(false);
 
   // Mirror the core's bootstrap phase into a signal so the UI repaints as the
   // session marches idle → … → ready, and log every transition for the console.
@@ -74,15 +91,35 @@ export function SessionProvider(props: { children: JSX.Element }) {
 
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, next) => {
+  } = supabase.auth.onAuthStateChange((event, next) => {
+    // A recovery link lands as a PASSWORD_RECOVERY event carrying a short-lived
+    // session — gate the app on a set-new-password screen until it's used.
+    if (event === "PASSWORD_RECOVERY") setPasswordRecoveryRequired(true);
+    else if (event === "SIGNED_OUT") setPasswordRecoveryRequired(false);
     sync(next ?? null);
   });
   onCleanup(() => subscription.unsubscribe());
 
   const signIn = signInWithPassword;
   const signOut = signOutFromAuth;
+  // Clear the recovery gate once the new password is committed.
+  const updateRecoveryPasswordAndClear = async (password: string) => {
+    const result = await updateRecoveryPassword(password);
+    if (!result.error) setPasswordRecoveryRequired(false);
+    return result;
+  };
 
-  const value: SessionValue = { session, phase, signIn, signOut };
+  const value: SessionValue = {
+    session,
+    phase,
+    passwordRecoveryRequired,
+    signIn,
+    signOut,
+    signUp: signUpWithPassword,
+    requestPasswordReset,
+    updateRecoveryPassword: updateRecoveryPasswordAndClear,
+    confirmAuthFromUrl,
+  };
 
   return (
     <SessionContext.Provider value={value}>
