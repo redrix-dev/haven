@@ -1,27 +1,26 @@
-import { execFileSync } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { execFileSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, '../../..');
-const supabaseWorkdir = path.join(repoRoot, 'services');
+const repoRoot = path.resolve(__dirname, "../../..");
 
 function getSupabaseCliInvocation() {
   try {
-    execFileSync('supabase', ['--version'], {
-      stdio: ['ignore', 'ignore', 'ignore'],
+    execFileSync("supabase", ["--version"], {
+      stdio: ["ignore", "ignore", "ignore"],
       cwd: repoRoot,
     });
     return {
-      command: 'supabase',
-      baseArgs: ['--workdir', supabaseWorkdir],
+      command: "supabase",
+      baseArgs: [],
       shell: false,
     };
   } catch {
     return {
-      command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
-      baseArgs: ['supabase', '--workdir', supabaseWorkdir],
-      shell: process.platform === 'win32',
+      command: process.platform === "win32" ? "npx.cmd" : "npx",
+      baseArgs: ["supabase"],
+      shell: process.platform === "win32",
     };
   }
 }
@@ -30,8 +29,8 @@ export function parseEnvLines(text) {
   const env = {};
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
-    if (!line || line.startsWith('#')) continue;
-    const eqIndex = line.indexOf('=');
+    if (!line || line.startsWith("#")) continue;
+    const eqIndex = line.indexOf("=");
     if (eqIndex <= 0) continue;
     const key = line.slice(0, eqIndex).trim();
     let value = line.slice(eqIndex + 1).trim();
@@ -43,9 +42,9 @@ export function parseEnvLines(text) {
       value = value.slice(1, -1);
     }
     value = value
-      .replace(/\\n/g, '\n')
+      .replace(/\\n/g, "\n")
       .replace(/\\"/g, '"')
-      .replace(/\\\\/g, '\\');
+      .replace(/\\\\/g, "\\");
     env[key] = value;
   }
   return env;
@@ -55,15 +54,19 @@ export function resolveSupabaseLocalEnv() {
   const cli = getSupabaseCliInvocation();
   let output;
   try {
-    output = execFileSync(cli.command, [...cli.baseArgs, 'status', '-o', 'env'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: cli.shell ?? false,
-      cwd: repoRoot,
-    });
+    output = execFileSync(
+      cli.command,
+      [...cli.baseArgs, "status", "-o", "env"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: cli.shell ?? false,
+        cwd: repoRoot,
+      },
+    );
   } catch (error) {
     throw new Error(
-      `Unable to resolve Supabase local env from ${supabaseWorkdir}. Ensure Docker Desktop is running and Supabase local is started (try \`npx supabase start --workdir services\`). Original error: ${error.message}`
+      `Unable to resolve Supabase local env from ${repoRoot}/supabase. Ensure Docker Desktop is running and Supabase local is started (try \`npx supabase start\` from the repo root). Original error: ${error.message}`,
     );
   }
   const raw = parseEnvLines(output);
@@ -75,7 +78,7 @@ export function resolveSupabaseLocalEnv() {
 
   if (!apiUrl || !anonKey || !serviceRoleKey || !postgresUrl) {
     throw new Error(
-      `Could not resolve required Supabase local env values. Received keys: ${Object.keys(raw).join(', ')}`
+      `Could not resolve required Supabase local env values. Received keys: ${Object.keys(raw).join(", ")}`,
     );
   }
 
@@ -92,10 +95,10 @@ export function getSupabaseCliCommand() {
   return getSupabaseCliInvocation();
 }
 
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
-  const mode = process.argv.includes('--shell') ? 'shell' : 'json';
+if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}`) {
+  const mode = process.argv.includes("--shell") ? "shell" : "json";
   const env = resolveSupabaseLocalEnv();
-  if (mode === 'shell') {
+  if (mode === "shell") {
     for (const [key, value] of Object.entries(env)) {
       process.stdout.write(`${key}=${value}\n`);
     }

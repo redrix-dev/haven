@@ -1,5 +1,4 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { Database } from '@shared/types/database';
+import type { Database } from "@shared/types/database";
 import type {
   BanCommunityMemberResult,
   BanEligibleServer,
@@ -13,6 +12,7 @@ import type {
   CommunityBanItem,
   CommunityMemberListItem,
   KickCommunityMemberResult,
+  LiveProfileIdentity,
   MessageAttachment,
   MessageBundle,
   MessageLinkPreview,
@@ -26,9 +26,9 @@ import type {
   ServerRoleManagementSnapshot,
   ServerSettingsSnapshot,
   ServerSettingsUpdate,
-} from './types';
+} from "./types";
 
-type Message = Database['public']['Tables']['messages']['Row'];
+type Message = Database["public"]["Tables"]["messages"]["Row"];
 
 export type MessagePageCursor = {
   createdAt: string;
@@ -51,6 +51,11 @@ export interface CommunityDataBackend {
     reporterUserId: string;
     reason: string;
   }): Promise<void>;
+  reportPlatformUserProfile(input: {
+    targetUserId: string;
+    reporterUserId: string;
+    reason: string;
+  }): Promise<void>;
   listCommunityBans(communityId: string): Promise<CommunityBanItem[]>;
   banCommunityMember(input: {
     communityId: string;
@@ -66,19 +71,10 @@ export interface CommunityDataBackend {
     targetUserId: string;
     reason?: string | null;
   }): Promise<void>;
-  listBanEligibleServersForUser(targetUserId: string): Promise<BanEligibleServer[]>;
+  listBanEligibleServersForUser(
+    targetUserId: string,
+  ): Promise<BanEligibleServer[]>;
   listChannels(communityId: string): Promise<Channel[]>;
-  subscribeToChannels(
-    communityId: string,
-    onChange: () => void,
-    options?: {
-      onMemberBanned?: (payload: MemberBannedBroadcastPayload) => void;
-      onMemberChannelAccessRevoked?: (
-        payload: MemberChannelAccessRevokedBroadcastPayload
-      ) => void;
-      onReportStatusUpdated?: (payload: ReportStatusUpdatedBroadcastPayload) => void;
-    }
-  ): RealtimeChannel;
   /** Resolves the signed-in user's `community_members` row id and assigned `role_id`s in this community. */
   fetchMyMemberRoleAssignmentForRealtime(
     communityId: string,
@@ -86,10 +82,10 @@ export interface CommunityDataBackend {
   ): Promise<{ memberId: string; roleIds: string[] } | null>;
   broadcastMemberBanned(input: MemberBannedBroadcastPayload): Promise<void>;
   broadcastMemberChannelAccessRevoked(
-    input: MemberChannelAccessRevokedBroadcastPayload
+    input: MemberChannelAccessRevokedBroadcastPayload,
   ): Promise<void>;
   broadcastReportStatusUpdated(
-    input: ReportStatusUpdatedBroadcastPayload
+    input: ReportStatusUpdatedBroadcastPayload,
   ): Promise<void>;
   listChannelGroups(input: {
     communityId: string;
@@ -129,25 +125,50 @@ export interface CommunityDataBackend {
     beforeCreatedAt?: string | null;
     beforeMessageId?: string | null;
   }): Promise<{ messages: MessageBundle[]; hasMore: boolean }>;
-  subscribeToMessages(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
-  listMessageReactions(communityId: string, channelId: string): Promise<MessageReaction[]>;
-  subscribeToMessageReactions(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
+  getChannelMessage(input: {
+    communityId: string;
+    channelId: string;
+    messageId: string;
+  }): Promise<MessageBundle | null>;
+  /**
+   * Batch-fetch the *live* identity (current username + avatar) for a set of
+   * message authors. Community messages only carry an avatar snapshot taken at
+   * send time, so this lets the client prime ProfileNexus and render current
+   * avatars that self-heal when an author changes their profile.
+   */
+  fetchMessageAuthorProfiles(input: {
+    communityId: string;
+    authorUserIds: string[];
+  }): Promise<LiveProfileIdentity[]>;
+  listMessageReactions(
+    communityId: string,
+    channelId: string,
+  ): Promise<MessageReaction[]>;
   toggleMessageReaction(input: {
     communityId: string;
     channelId: string;
     messageId: string;
     emoji: string;
   }): Promise<void>;
-  listMessageAttachments(communityId: string, channelId: string): Promise<MessageAttachment[]>;
-  subscribeToMessageAttachments(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
+  listMessageAttachments(
+    communityId: string,
+    channelId: string,
+  ): Promise<MessageAttachment[]>;
   cleanupExpiredMessageAttachments(limit?: number): Promise<number>;
-  listMessageLinkPreviews(communityId: string, channelId: string): Promise<MessageLinkPreview[]>;
-  subscribeToMessageLinkPreviews(channelId: string, onChange: (payload?: unknown) => void): RealtimeChannel;
+  listMessageLinkPreviews(
+    communityId: string,
+    channelId: string,
+  ): Promise<MessageLinkPreview[]>;
   requestChannelLinkPreviewBackfill(input: {
     communityId: string;
     channelId: string;
     messageIds: string[];
-  }): Promise<{ queued: number; skipped: number; alreadyPresent: number; requested: number }>;
+  }): Promise<{
+    queued: number;
+    skipped: number;
+    alreadyPresent: number;
+    requested: number;
+  }>;
   runMessageMediaMaintenance(limit?: number): Promise<{
     deletedMessages: number;
     claimedDeletionJobs: number;
@@ -162,7 +183,9 @@ export interface CommunityDataBackend {
     communityId: string;
     values: ServerSettingsUpdate;
   }): Promise<void>;
-  fetchServerRoleManagement(communityId: string): Promise<ServerRoleManagementSnapshot>;
+  fetchServerRoleManagement(
+    communityId: string,
+  ): Promise<ServerRoleManagementSnapshot>;
   createServerRole(input: {
     communityId: string;
     name: string;
@@ -176,7 +199,10 @@ export interface CommunityDataBackend {
     color: string;
     position: number;
   }): Promise<void>;
-  deleteServerRole(input: { communityId: string; roleId: string }): Promise<void>;
+  deleteServerRole(input: {
+    communityId: string;
+    roleId: string;
+  }): Promise<void>;
   saveServerRolePermissions(input: {
     roleId: string;
     permissionKeys: string[];
@@ -215,7 +241,10 @@ export interface CommunityDataBackend {
     name: string;
     topic: string | null;
   }): Promise<void>;
-  deleteChannel(input: { communityId: string; channelId: string }): Promise<void>;
+  deleteChannel(input: {
+    communityId: string;
+    channelId: string;
+  }): Promise<void>;
   sendUserMessage(input: {
     communityId: string;
     channelId: string;
@@ -235,7 +264,7 @@ export interface CommunityDataBackend {
     objectPath: string;
     mimeType: string;
     sizeBytes: number;
-    mediaKind: 'image' | 'video' | 'file';
+    mediaKind: "image" | "video" | "file";
     expiresAt: string;
   }>;
   insertMessageAttachment(input: {
@@ -245,7 +274,7 @@ export interface CommunityDataBackend {
     objectPath: string;
     mimeType: string;
     sizeBytes: number;
-    mediaKind: 'image' | 'video' | 'file';
+    mediaKind: "image" | "video" | "file";
     filename?: string;
     expiresAt: string;
   }): Promise<void>;
@@ -254,7 +283,10 @@ export interface CommunityDataBackend {
     messageId: string;
     content: string;
   }): Promise<void>;
-  deleteMessage(input: { communityId: string; messageId: string }): Promise<void>;
+  deleteMessage(input: {
+    communityId: string;
+    messageId: string;
+  }): Promise<void>;
   deleteMessage(input: { messageId: string }): Promise<void>;
   reportMessage(input: {
     communityId: string;

@@ -61,7 +61,9 @@ describe("mergeMessageBundle", () => {
   });
 
   it("messageReloadReasonsRequireFullLoad detects fallback reasons", () => {
-    expect(messageReloadReasonsRequireFullLoad(["soft_revalidate"])).toBe(false);
+    expect(messageReloadReasonsRequireFullLoad(["soft_revalidate"])).toBe(
+      false,
+    );
     expect(
       messageReloadReasonsRequireFullLoad(["soft_revalidate", "initial"]),
     ).toBe(true);

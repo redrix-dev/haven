@@ -1,6 +1,0 @@
-{
-  "name": "@haven/web-client",
-  "private": true,
-  "version": "0.0.0",
-  "description": "DOM-only UI primitives and shells used by web and Electron renderer (not React Native)."
-}

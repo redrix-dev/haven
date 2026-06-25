@@ -126,20 +126,24 @@ supabase/functions/.env.*
 supabase/functions/**/.env
 supabase/functions/**/.env.*
 supabase/tests/.generated/
-services/supabase/.temp/
-services/supabase/.branches/
-services/supabase/.env
-services/supabase/.env.*
-services/supabase/functions/.env
-services/supabase/functions/.env.*
-services/supabase/functions/**/.env
-services/supabase/functions/**/.env.*
-services/supabase/tests/.generated/
 
 # Local packaging artifacts
 dist/
 release/
 *.asar
+
+# Vercel CLI (project link + pulled env)
+.vercel/
+
+# Internal / personal docs — kept locally, deliberately out of the public tree
+docs/learning/
+docs/_archive/
+docs/SOLID_BUILD_HANDOFF.md
+docs/SOLID_REBUILD.md
+docs/SOLID_SHIP_READINESS.md
+docs/SOLID_UNDERSTANDABILITY_AUDIT.md
+docs/BACKLOG.md
+apps/mobile/docs/mobile-todo.md
 
 # Misc build caches
 .turbo/
@@ -148,6 +152,7 @@ release/
 apps/mobile/.expo/
 apps/mobile/.tmp-expo-export/
 apps/mobile/ios/
+apps/mobile/android/
 
 # OTA export output (tooling/scripts/mobile/deploy-ota.sh)
 .ota-export/
@@ -167,3 +172,4 @@ test-reports/
 .claude/
 Haven-Obsidian-Vault/
 .cursor/
+.stfolder/

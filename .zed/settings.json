@@ -1,0 +1,25 @@
+{
+  // Zed is the primary editor for Haven (Cursor occasionally). This file and
+  // haven.code-workspace are both tracked and kept roughly in sync on purpose,
+  // so the repo behaves the same in either. Per-machine overrides live in
+  // .vscode/ and .cursor/, which are gitignored. Intentionally maintained — not
+  // a fossil. See docs/ARCHITECTURE.md § Editor configuration.
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/.svn",
+    "**/.hg",
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "**/node_modules",
+    "**/dist",
+    "**/target",
+    "**/test-reports",
+    "**/coverage",
+    "**/local_archives",
+    "**/.expo",
+    "**/.turbo"
+  ],
+  "terminal": {
+    "working_directory": "first_project_directory"
+  }
+}

@@ -22,7 +22,9 @@ describe("auth confirm URL parsing", () => {
   });
 
   it("rejects unrelated URLs", () => {
-    expect(parseAuthConfirmUrl("https://projects.haven.redrixx.com/settings")).toBeNull();
+    expect(
+      parseAuthConfirmUrl("https://projects.haven.redrixx.com/settings"),
+    ).toBeNull();
   });
 
   it("merges search and hash params while preserving first value", () => {

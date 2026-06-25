@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Nexus Framework — Haven Architecture</title>
+  <style>
+    :root {
+      --s0: #020d0d;
+      --s1: #041212;
+      --s2: #061818;
+      --s3: #081f1f;
+      --s4: #0d3030;
+      --bd: #144848;
+      --bdd: #1a5c5c;
+      --acc: #00e5cc;
+      --acc2: #00c9b2;
+      --acc-lo: rgba(0,229,204,0.06);
+      --acc-md: rgba(0,229,204,0.18);
+      --acc-hi: rgba(0,229,204,0.35);
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--s0);
+      color: rgba(0,229,204,0.82);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* scanlines */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,0,0,0.035) 3px, rgba(0,0,0,0.035) 4px);
+      pointer-events: none;
+      z-index: 9000;
+    }
+
+    /* ── HERO ── */
+    #hero {
+      position: relative;
+      height: 100vh;
+      min-height: 500px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #hero-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 0 1.5rem;
+    }
+
+    .hero-eyebrow {
+      font-size: 0.7rem;
+      letter-spacing: 0.45em;
+      color: var(--acc2);
+      opacity: 0.55;
+      margin-bottom: 1.75rem;
+      text-transform: uppercase;
+    }
+
+    .hero-title {
+      font-size: clamp(3.5rem, 12vw, 9rem);
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      line-height: 1;
+      color: var(--acc);
+      text-shadow: 0 0 40px var(--acc-hi), 0 0 100px var(--acc-md);
+      position: relative;
+      display: inline-block;
+    }
+
+    .glitch {
+      position: relative;
+      display: inline-block;
+    }
+    .glitch::before, .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
+    .glitch::before {
+      color: #ff2d78;
+      animation: glitch-r 5s infinite;
+      clip-path: polygon(0 18%, 100% 18%, 100% 38%, 0 38%);
+      opacity: 0;
+    }
+    .glitch::after {
+      color: #00f5ff;
+      animation: glitch-b 5s 0.4s infinite;
+      clip-path: polygon(0 62%, 100% 62%, 100% 80%, 0 80%);
+      opacity: 0;
+    }
+    @keyframes glitch-r {
+      0%,88%,100% { transform: translate(0); opacity: 0; }
+      89% { transform: translate(-4px, 1px); opacity: 0.85; }
+      90% { transform: translate(3px, -1px); opacity: 0.85; }
+      91% { transform: translate(0); opacity: 0; }
+      92% { transform: translate(-2px, 2px); opacity: 0.6; }
+      93% { transform: translate(0); opacity: 0; }
+    }
+    @keyframes glitch-b {
+      0%,82%,100% { transform: translate(0); opacity: 0; }
+      83% { transform: translate(4px, -1px); opacity: 0.85; }
+      84% { transform: translate(-3px, 1px); opacity: 0.85; }
+      85% { transform: translate(0); opacity: 0; }
+      86% { transform: translate(2px, -2px); opacity: 0.6; }
+      87% { transform: translate(0); opacity: 0; }
+    }
+
+    .hero-subtitle {
+      display: block;
+      font-size: 0.9rem;
+      letter-spacing: 0.18em;
+      color: var(--acc2);
+      opacity: 0.55;
+      margin-top: 1.75rem;
+      min-height: 1.4em;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      margin-top: 2.5rem;
+      padding: 0.35rem 1.1rem;
+      border: 1px solid var(--bd);
+      font-size: 0.65rem;
+      letter-spacing: 0.35em;
+      color: var(--acc);
+      animation: badge-pulse 3.5s ease-in-out infinite;
+    }
+    @keyframes badge-pulse {
+      0%,100% { border-color: var(--bd); opacity: 0.35; }
+      50% { border-color: var(--bdd); opacity: 0.65; }
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 1;
+      animation: hint-bob 2.2s ease-in-out infinite;
+      font-size: 0.6rem;
+      letter-spacing: 0.35em;
+      opacity: 0.35;
+    }
+    .scroll-hint::after {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 36px;
+      background: linear-gradient(to bottom, var(--acc), transparent);
+    }
+    @keyframes hint-bob {
+      0%,100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(7px); }
+    }
+
+    /* ── DIAGRAM ── */
+    #diagram-section {
+      background: var(--s1);
+      border-top: 1px solid var(--bd);
+      border-bottom: 1px solid var(--bd);
+      padding: 3rem 0 2rem;
+    }
+
+    #arch-canvas {
+      display: block;
+      width: 100%;
+    }
+
+    /* ── SECTIONS ── */
+    .section {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 5.5rem 2rem;
+    }
+
+    .section-header { margin-bottom: 3rem; }
+
+    .section-num {
+      display: block;
+      font-size: 0.62rem;
+      letter-spacing: 0.45em;
+      color: var(--acc2);
+      opacity: 0.45;
+      margin-bottom: 0.6rem;
+    }
+
+    .section-title {
+      font-size: clamp(1.7rem, 4vw, 2.6rem);
+      font-weight: 700;
+      color: var(--acc);
+      text-shadow: 0 0 20px var(--acc-md);
+      line-height: 1.15;
+    }
+
+    .section-rule {
+      width: 56px;
+      height: 2px;
+      background: linear-gradient(to right, var(--acc), transparent);
+      margin-top: 1.5rem;
+    }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--s1);
+      border: 1px solid var(--bdd);
+      padding: 1.75rem;
+      margin-bottom: 1.25rem;
+      position: relative;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--acc);
+      opacity: 0.35;
+      transition: opacity 0.3s;
+    }
+    .card:hover {
+      border-color: var(--acc);
+      box-shadow: 0 0 28px var(--acc-lo), inset 0 0 24px rgba(0,229,204,0.015);
+    }
+    .card:hover::before { opacity: 1; }
+
+    .card-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.38em;
+      color: var(--acc2);
+      opacity: 0.5;
+      margin-bottom: 0.6rem;
+      text-transform: uppercase;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      color: var(--acc);
+      font-weight: 700;
+      margin-bottom: 0.65rem;
+    }
+
+    .card-body {
+      font-size: 0.88rem;
+      color: rgba(0,229,204,0.6);
+      line-height: 1.85;
+    }
+
+    /* ── PULL QUOTE ── */
+    .pull-quote {
+      border-left: 3px solid var(--acc);
+      padding: 1rem 1.5rem;
+      margin: 2.25rem 0;
+      background: var(--acc-lo);
+      font-size: 1rem;
+      color: var(--acc);
+      font-style: italic;
+      letter-spacing: 0.02em;
+      line-height: 1.7;
+    }
+
+    /* ── CODE BLOCK ── */
+    .code-block {
+      background: var(--s0);
+      border: 1px solid var(--bd);
+      border-left: 3px solid var(--acc);
+      padding: 1.3rem 1.5rem;
+      font-size: 0.8rem;
+      color: rgba(0,229,204,0.68);
+      overflow-x: auto;
+      margin: 1.25rem 0;
+      line-height: 1.65;
+      white-space: pre;
+    }
+
+    .cc { color: #1a5c5c; }
+    .ck { color: var(--acc); }
+    .ct { color: #bd93f9; }
+    .cf { color: #50fa7b; }
+    .cs { color: #f1c40f; opacity: 0.8; }
+
+    /* ── METHOD GRID ── */
+    .method-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .method-card {
+      background: var(--s2);
+      border: 1px solid var(--bd);
+      padding: 1.2rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    }
+    .method-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top left, var(--acc-lo), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .method-card:hover {
+      border-color: var(--acc);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(0,229,204,0.08);
+    }
+    .method-card:hover::after { opacity: 1; }
+
+    .method-sig {
+      font-size: 0.78rem;
+      color: var(--acc);
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      position: relative;
+      z-index: 1;
+    }
+    .method-sig .mn { color: #50fa7b; }
+    .method-sig .mp { color: rgba(0,229,204,0.45); }
+
+    .method-desc {
+      font-size: 0.78rem;
+      color: rgba(0,229,204,0.5);
+      line-height: 1.65;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── STAGE LIST ── */
+    .stage-list {
+      list-style: none;
+      counter-reset: stage;
+      margin: 1.5rem 0;
+    }
+    .stage-list li {
+      counter-increment: stage;
+      display: flex;
+      gap: 1.25rem;
+      padding: 1.1rem 0;
+      border-bottom: 1px solid var(--bd);
+      align-items: flex-start;
+    }
+    .stage-list li::before {
+      content: counter(stage, decimal-leading-zero);
+      font-size: 0.65rem;
+      color: var(--acc);
+      opacity: 0.4;
+      min-width: 2em;
+      margin-top: 0.25rem;
+      flex-shrink: 0;
+    }
+    .stage-label {
+      font-size: 0.82rem;
+      color: var(--acc);
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+    }
+    .stage-desc {
+      font-size: 0.8rem;
+      color: rgba(0,229,204,0.52);
+      line-height: 1.65;
+    }
+
+    /* ── METRICS ── */
+    .metric-row {
+      display: flex;
+      gap: 1px;
+      margin: 1.75rem 0;
+      flex-wrap: wrap;
+    }
+    .metric {
+      flex: 1;
+      min-width: 120px;
+      padding: 1.25rem 0.75rem;
+      background: var(--s2);
+      border: 1px solid var(--bd);
+      text-align: center;
+      transition: background 0.25s, border-color 0.25s;
+    }
+    .metric:hover { background: var(--s3); border-color: var(--bdd); }
+    .metric-val {
+      display: block;
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: var(--acc);
+      text-shadow: 0 0 18px var(--acc-md);
+    }
+    .metric-label {
+      display: block;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: rgba(0,229,204,0.35);
+      margin-top: 0.3rem;
+    }
+
+    /* ── SEPARATOR ── */
+    .sep { border: none; border-top: 1px solid var(--bd); }
+
+    /* ── SCROLL REVEAL ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.65s ease, transform 0.65s ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ── NAV DOTS ── */
+    #nav-dots {
+      position: fixed;
+      right: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+      z-index: 200;
+    }
+    .nav-dot {
+      width: 6px;
+      height: 6px;
+      border: 1px solid var(--bdd);
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .nav-dot.active {
+      background: var(--acc);
+      border-color: var(--acc);
+      box-shadow: 0 0 10px var(--acc-md);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--bd);
+      padding: 3.5rem 2rem;
+      text-align: center;
+      color: rgba(0,229,204,0.18);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+    }
+    footer .glyph {
+      display: block;
+      font-size: 1.4rem;
+      margin-bottom: 1rem;
+      opacity: 0.25;
+    }
+
+    @media (max-width: 600px) {
+      #nav-dots { display: none; }
+      .metric-val { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav id="nav-dots">
+  <div class="nav-dot active" data-target="hero"></div>
+  <div class="nav-dot" data-target="s-problem"></div>
+  <div class="nav-dot" data-target="diagram-section"></div>
+  <div class="nav-dot" data-target="s-nexus"></div>
+  <div class="nav-dot" data-target="s-core"></div>
+  <div class="nav-dot" data-target="s-policy"></div>
+  <div class="nav-dot" data-target="s-perf"></div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Haven // Internal Architecture</p>
+    <h1 class="hero-title">
+      <span class="glitch" data-text="NEXUS">NEXUS</span>
+    </h1>
+    <span class="hero-subtitle" id="typewriter"></span>
+    <div class="hero-badge">FRAMEWORK v2.0 // ENTITY LIFECYCLE MANAGEMENT</div>
+  </div>
+  <div class="scroll-hint">SCROLL</div>
+</section>
+
+<!-- PROBLEM -->
+<section class="section" id="s-problem">
+  <div class="section-header reveal">
+    <span class="section-num">// 01</span>
+    <h2 class="section-title">The God File Problem</h2>
+    <div class="section-rule"></div>
+  </div>
+
+  <div class="pull-quote reveal">
+    "A hook that knows everything about everything is a hook that controls nothing well."
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">context</div>
+    <div class="card-title">What We Started With</div>
+    <div class="card-body">
+      The prior architecture centered on massive orchestration hooks — useChatAppOrchestration and its siblings — managing auth, server state, channels, messages, notifications, voice, and social data simultaneously. At 800+ lines per file, any feature that touched state had to go through them. They were impossible to test in isolation, difficult to trace, and produced unpredictable re-renders whenever any unrelated slice changed.
+    </div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">root cause</div>
+    <div class="card-title">No Domain Boundaries</div>
+    <div class="card-body">
+      The core failure was a flat state namespace. Communities, channels, messages, and social graphs lived in the same hook scope with no enforcement that they stay separate. Cross-domain access wasn't a pattern — it was the default. The result: coupling that made every change a risk and every bug a multi-file investigation with unclear ownership.
+    </div>
+  </div>
+
+  <div class="method-grid reveal">
+    <div class="method-card">
+      <div class="method-sig">Problem → Re-render cascades</div>
+      <div class="method-desc">One state update in auth re-rendered components watching message counts. Everything was subscribed to everything because everything lived together.</div>
+    </div>
+    <div class="method-card">
+      <div class="method-sig">Problem → Implicit contracts</div>
+      <div class="method-desc">Consumers relied on undocumented initialization ordering and shared mutable refs. Break the order, break the app — and nothing told you the order existed.</div>
+    </div>
+    <div class="method-card">
+      <div class="method-sig">Problem → Untestable</div>
+      <div class="method-desc">You can't unit-test a hook that requires 12 other hooks initialized first. Every test needed a full render environment just to touch one feature.</div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- DIAGRAM -->
+<section id="diagram-section">
+  <canvas id="arch-canvas"></canvas>
+</section>
+
+<hr class="sep">
+
+<!-- NEXUS -->
+<section class="section" id="s-nexus">
+  <div class="section-header reveal">
+    <span class="section-num">// 02</span>
+    <h2 class="section-title">The Nexus Primitive</h2>
+    <div class="section-rule"></div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">definition</div>
+    <div class="card-title">A Bounded Domain With One Public Face</div>
+    <div class="card-body">
+      A Nexus is a self-contained domain that owns its entities from creation to deletion. It exposes a typed public API and hides everything else. No external code touches the Zustand store inside — they call the nexus. No external code knows how entities are persisted — the nexus handles it. No external code manages loading state — the nexus reports it.<br><br>
+      The constraint is the feature. When the only interaction path is the public API, you know exactly where every state change originates.
+    </div>
+  </div>
+
+<div class="code-block reveal"><span class="cc">// Generic base — T is your domain type, R is the raw API shape</span>
+<span class="ct">abstract class</span> <span class="cf">Nexus</span>&lt;<span class="ct">T</span>, <span class="ct">R</span>&gt; {
+  <span class="ck">private</span> _store: <span class="ct">StoreApi</span>&lt;<span class="ct">NexusState</span>&lt;<span class="ct">T</span>&gt;&gt; | <span class="ck">null</span> = <span class="ck">null</span>  <span class="cc">// lazy — no allocation until first access</span>
+  <span class="ck">protected get</span> <span class="cf">store</span>() { <span class="ck">return</span> (<span class="ck">this</span>._store ??= <span class="cf">create</span>(<span class="ck">this</span>.<span class="cf">initialState</span>())) }
+
+  <span class="cf">getOrCreate</span>(id: <span class="ct">string</span>, raw: <span class="ct">R</span>): <span class="ct">T</span>
+  <span class="cf">getOrPartial</span>(id: <span class="ct">string</span>, stub: <span class="ct">Partial</span>&lt;<span class="ct">T</span>&gt;): <span class="ct">T</span>
+  <span class="cf">update</span>(id: <span class="ct">string</span>, changes: <span class="ct">Partial</span>&lt;<span class="ct">T</span>&gt;): <span class="ck">void</span>
+  <span class="cf">delete</span>(id: <span class="ct">string</span>): <span class="ck">void</span>
+  <span class="cf">use</span>&lt;<span class="ct">S</span>&gt;(selector: <span class="ct">Selector</span>&lt;<span class="ct">S</span>&gt;, eq?: <span class="ct">EqualityFn</span>&lt;<span class="ct">S</span>&gt;): <span class="ct">S</span>
+  <span class="cf">persist</span>(): <span class="ct">Promise</span>&lt;<span class="ck">void</span>&gt;
+  <span class="cf">rehydrate</span>(): <span class="ct">Promise</span>&lt;<span class="ck">void</span>&gt;
+}</div>
+
+  <div class="pull-quote reveal">
+    "The constraint is the feature. When the only interaction path is the API, you know exactly where every state change originates."
+  </div>
+
+  <h3 class="reveal" style="font-size:0.65rem;letter-spacing:0.38em;color:var(--acc);opacity:0.5;margin-bottom:1rem;">LIFECYCLE METHODS</h3>
+
+  <div class="method-grid reveal">
+    <div class="method-card">
+      <div class="method-sig"><span class="mn">getOrCreate</span><span class="mp">(id, raw)</span></div>
+      <div class="method-desc">Primary insertion. If the entity exists in cache, returns it. Otherwise transforms raw API data via the abstract <code>fromRaw()</code> method, inserts, and stamps a <code>cachedAt</code> timestamp for freshness tracking.</div>
+    </div>
+    <div class="method-card">
+      <div class="method-sig"><span class="mn">getOrPartial</span><span class="mp">(id, stub)</span></div>
+      <div class="method-desc">Placeholder insertion for known-but-not-loaded entities. Marks the entry <code>partial: true</code> so consumers can distinguish "loading" from "not found." Used for optimistic references before full data arrives.</div>
+    </div>
+    <div class="method-card">
+      <div class="method-sig"><span class="mn">update</span><span class="mp">(id, changes)</span></div>
+      <div class="method-desc">Shallow-merges changes into an existing entry and increments the revision counter. Subscribers react to the revision tick — not to deep entity equality — keeping update cost constant.</div>
+    </div>
+    <div class="method-card">
+      <div class="method-sig"><span class="mn">delete</span><span class="mp">(id)</span></div>
+      <div class="method-desc">Removes the entity and fires cleanup callbacks. Downstream reads on a deleted ID get <code>undefined</code>, not stale data — this surfaces missing-reference bugs early rather than silently serving old state.</div>
+    </div>
+    <div class="method-card">
+      <div class="method-sig"><span class="mn">use</span><span class="mp">(selector, eq?)</span></div>
+      <div class="method-desc">The React integration point. Wraps <code>useStoreWithEqualityFn</code>. Callers describe what they want; the nexus owns subscription granularity. The store is never touched directly from component code.</div>
+    </div>
+    <div class="method-card">
+      <div class="method-sig"><span class="mn">persist / rehydrate</span><span class="mp">()</span></div>
+      <div class="method-desc">Storage via injected <code>NexusPersistence</code> adapter — the same nexus runs on Electron (filesystem), web (localStorage), and React Native without any domain logic changing.</div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- HAVENCORE -->
+<section class="section" id="s-core">
+  <div class="section-header reveal">
+    <span class="section-num">// 03</span>
+    <h2 class="section-title">HavenCore — The Router</h2>
+    <div class="section-rule"></div>
+  </div>
+
+  <div class="pull-quote reveal">
+    "HavenCore is not a God file. It doesn't know how to manage channels. It doesn't know how messages are cached. It only knows which nexus to hand an event to."
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">role</div>
+    <div class="card-title">Orchestration Without Domain Knowledge</div>
+    <div class="card-body">
+      HavenCore is the session-scoped composition root. It instantiates every nexus, injects backends, and routes inbound realtime events to the correct domain. What it deliberately does not do: implement any domain logic itself. It doesn't parse messages — it hands them to MessageNexus. It doesn't manage channel membership — it hands it to ChannelNexus. Its responsibility is routing and session lifecycle, nothing more.
+    </div>
+  </div>
+
+  <h3 class="reveal" style="font-size:0.65rem;letter-spacing:0.38em;color:var(--acc);opacity:0.5;margin:2.25rem 0 1rem;">SESSION BOOTSTRAP</h3>
+
+  <ul class="stage-list reveal">
+    <li>
+      <div>
+        <div class="stage-label">rehydrating</div>
+        <div class="stage-desc">Load persisted state from storage. Communities, channel structure, and display order are available before any network request fires — the UI can render meaningful skeleton content immediately.</div>
+      </div>
+    </li>
+    <li>
+      <div>
+        <div class="stage-label">loading_communities</div>
+        <div class="stage-desc">Fetch current community membership. Diffs against cached state — additions, removals, and renames are applied incrementally to the nexus rather than replacing state wholesale.</div>
+      </div>
+    </li>
+    <li>
+      <div>
+        <div class="stage-label">loading_session_data</div>
+        <div class="stage-desc">Parallel load: DM conversations, unread counts, notification preferences, social graph. Each fires independently to its nexus — no sequential dependency, no blocking.</div>
+      </div>
+    </li>
+    <li>
+      <div>
+        <div class="stage-label">connecting_realtime</div>
+        <div class="stage-desc">Subscribe to the Supabase realtime channel. From this point all state changes arrive as events routed through HavenCore. Polling ends permanently.</div>
+      </div>
+    </li>
+    <li>
+      <div>
+        <div class="stage-label">ready</div>
+        <div class="stage-desc">Session is live. Every inbound event now has a known owner nexus and a deterministic, testable update path. UI unlocks.</div>
+      </div>
+    </li>
+  </ul>
+
+  <div class="card reveal" style="margin-top:2rem;">
+    <div class="card-label">pattern</div>
+    <div class="card-title">MessageNexusRegistry — Per-Community Lazy Instantiation</div>
+    <div class="card-body">
+      Each community gets its own <code>CommunityMessageNexus</code>, created on first access and destroyed when the community is removed. The registry lives inside HavenCore as a nested class — it manages the per-community map, handles cache cleanup on removal, and injects the shared <code>viewerMessagePolicyStore</code> into each instance at construction time. Per-community message state stays fully isolated while the cross-cutting policy concern is shared efficiently.
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- POLICY -->
+<section class="section" id="s-policy">
+  <div class="section-header reveal">
+    <span class="section-num">// 04</span>
+    <h2 class="section-title">The Policy Contract</h2>
+    <div class="section-rule"></div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">the hard problem</div>
+    <div class="card-title">Cross-Domain Knowledge Without Coupling</div>
+    <div class="card-body">
+      Two domains need to share information: SocialNexus knows who is blocked. MessageNexus needs to filter those users' messages. The naive solution — have MessageNexus call into SocialNexus directly — creates bidirectional coupling. Now neither can change independently, and you've recreated the God file problem at smaller scale.
+    </div>
+  </div>
+
+  <div class="pull-quote reveal">
+    "The solution is not sharing data. It's sharing a contract — a read-only policy describing what the viewer is allowed to see, computed once by HavenCore and applied everywhere."
+  </div>
+
+<div class="code-block reveal"><span class="cc">// The shared read-only contract — HavenCore writes it, nexuses read it</span>
+<span class="ck">type</span> <span class="ct">ViewerMessagePolicyState</span> = {
+  hiddenAuthorIds:    <span class="ct">ReadonlySet</span>&lt;<span class="ct">string</span>&gt;  <span class="cc">// my blocks ∪ users blocking me</span>
+  showHiddenMessages: <span class="ct">boolean</span>              <span class="cc">// moderator override toggle</span>
+  communities: <span class="ct">Record</span>&lt;<span class="ct">string</span>, {
+    suppressAuthorFilter:      <span class="ct">boolean</span>   <span class="cc">// elevated users bypass block filter</span>
+    canViewBanHidden:          <span class="ct">boolean</span>   <span class="cc">// mods see redacted messages</span>
+    revokedAuthorIdsByChannel: <span class="ct">Record</span>&lt;<span class="ct">string</span>, <span class="ct">string</span>[]&gt;
+  }&gt;
+}</div>
+
+  <div class="card reveal">
+    <div class="card-label">data flow</div>
+    <div class="card-title">One Writer. Many Readers. No Coupling.</div>
+    <div class="card-body">
+      HavenCore is the only entity that writes to the policy store. It aggregates from SocialNexus (blocked IDs), PermissionsNexus (elevated status, revoked authors), and the UI store (mod toggle) into a single coherent policy object. This store is then injected read-only into every MessageNexus instance at construction time.<br><br>
+      MessageNexus reads the policy. It never writes to it. It never touches SocialNexus or PermissionsNexus. The message projection functions (<code>projectVisibleChannelMessages</code>) are pure: canonical messages + policy in → visible messages out. No side effects. No domain knowledge leakage.
+    </div>
+  </div>
+
+  <div class="method-grid reveal">
+    <div class="method-card">
+      <div class="method-sig"><span class="mn">Block filtering</span></div>
+      <div class="method-desc">Blocked author messages are hidden. The cascade: replies to hidden messages are also hidden, reactions from blocked authors are stripped, attachments from hidden messages are removed.</div>
+    </div>
+    <div class="method-card">
+      <div class="method-sig"><span class="mn">Revoked authors</span></div>
+      <div class="method-desc">Channel-specific revocation from moderation actions. Revoked messages become placeholder bundles — canonical data remains untouched in the nexus store, ready for policy recalculation.</div>
+    </div>
+    <div class="method-card">
+      <div class="method-sig"><span class="mn">Elevated users</span></div>
+      <div class="method-desc">Moderators and owners have <code>suppressAuthorFilter</code> set. They see all messages regardless of block state — you cannot block a moderator out of their own moderation visibility.</div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- PERFORMANCE -->
+<section class="section" id="s-perf">
+  <div class="section-header reveal">
+    <span class="section-num">// 05</span>
+    <h2 class="section-title">Performance Philosophy</h2>
+    <div class="section-rule"></div>
+  </div>
+
+  <div class="pull-quote reveal">
+    "Discord achieves sub-100ms perceived state changes through optimistic UI and intelligent cache invalidation. The Nexus framework is the infrastructure that makes this tractable."
+  </div>
+
+  <div class="metric-row reveal">
+    <div class="metric">
+      <span class="metric-val">10s</span>
+      <span class="metric-label">FRESHNESS WINDOW</span>
+    </div>
+    <div class="metric">
+      <span class="metric-val">1×</span>
+      <span class="metric-label">INFLIGHT PER CHANNEL</span>
+    </div>
+    <div class="metric">
+      <span class="metric-val">O(1)</span>
+      <span class="metric-label">ENTITY LOOKUP</span>
+    </div>
+    <div class="metric">
+      <span class="metric-val">0</span>
+      <span class="metric-label">REDUNDANT RE-RENDERS</span>
+    </div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">pattern</div>
+    <div class="card-title">Snapshot Caching + Revision Counters</div>
+    <div class="card-body">
+      Zustand re-runs selectors on every store update. For list selectors over hundreds of messages, this means expensive equality checks on every keystroke, every event, every realtime tick. The nexus solves this with snapshot caching: a private <code>snapshot</code> reference holds the last computed array. The selector reads a <code>revision</code> counter to subscribe, then compares the new projection against the snapshot using a stable equality function. If equal, it returns the same object reference — React bails out of the re-render entirely without touching the DOM.
+    </div>
+  </div>
+
+<div class="code-block reveal"><span class="cc">// Same reference = React bails out, no DOM work</span>
+<span class="ck">private</span> snapshot: <span class="ct">Message</span>[] = EMPTY_ARRAY
+
+<span class="ck">private readonly</span> selector = (state: <span class="ct">ChannelState</span>) => {
+  <span class="ck">void</span> state.revision                           <span class="cc">// subscribe to changes</span>
+  <span class="ck">const</span> next = <span class="cf">projectVisibleMessages</span>(state, <span class="ck">this</span>.policyStore)
+  <span class="ck">if</span> (<span class="cf">messagesEqual</span>(<span class="ck">this</span>.snapshot, next)) <span class="ck">return this</span>.snapshot
+  <span class="ck">return</span> (<span class="ck">this</span>.snapshot = next)
+}
+
+<span class="cf">useMessages</span>(channelId: <span class="ct">string</span>) {
+  <span class="ck">return</span> <span class="cf">useStoreWithEqualityFn</span>(store, <span class="ck">this</span>.selector, Object.is)
+}</div>
+
+  <div class="card reveal">
+    <div class="card-label">pattern</div>
+    <div class="card-title">Inflight Promise Deduplication</div>
+    <div class="card-body">
+      When a user navigates rapidly between channels, multiple load requests can fire before any completes. Without deduplication, each one updates the store on completion — causing multiple renders and potentially out-of-order state. The nexus holds an inflight promise map keyed by channel ID. If a request is already in flight, the second call returns the existing promise. One network request. One state update. One render.
+    </div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">direction — next phase</div>
+    <div class="card-title">Optimistic UI</div>
+    <div class="card-body">
+      Bounded domains with typed update paths make optimistic UI tractable. Message sends should write an optimistic entry to the nexus immediately — the user sees their message in under 16ms. Network latency becomes invisible. On response, reconcile: update the temporary entry with the confirmed ID, or roll back cleanly if the backend rejects. The infrastructure exists. The implementation pattern is the next performance lever.
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span class="glyph">◈</span>
+  HAVEN // THE NEXUS FRAMEWORK // INTERNAL ARCHITECTURE REFERENCE<br>
+  <span style="opacity:0.6;margin-top:0.5rem;display:block;">Entity lifecycle management through bounded domain nexuses. Orchestrated by HavenCore. Targeting Discord-level responsiveness.</span>
+</footer>
+
+<script>
+// ── HERO PARTICLE CANVAS ──────────────────────────────────────
+(function () {
+  const canvas = document.getElementById('hero-canvas');
+  const ctx = canvas.getContext('2d');
+  const ACC = '#00e5cc';
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+
+  const KATAKANA = '日ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾈｦｳｻｼｲｸﾄｹﾁ';
+
+  class Particle {
+    reset(randomY) {
+      this.x = Math.random() * W;
+      this.y = randomY ? Math.random() * H : -20;
+      this.vy = 0.35 + Math.random() * 0.65;
+      this.vx = (Math.random() - 0.5) * 0.2;
+      this.alpha = 0.08 + Math.random() * 0.32;
+      this.size = 10 + Math.random() * 6;
+      this.char = KATAKANA[Math.floor(Math.random() * KATAKANA.length)];
+      this.tick = 0;
+      this.interval = 12 + Math.floor(Math.random() * 24);
+    }
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.tick++;
+      if (this.tick % this.interval === 0) {
+        this.char = KATAKANA[Math.floor(Math.random() * KATAKANA.length)];
+      }
+      if (this.y > H + 20 || this.x < -20 || this.x > W + 20) this.reset(false);
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = ACC;
+      ctx.font = `${this.size}px 'Courier New', monospace`;
+      ctx.fillText(this.char, this.x, this.y);
+      ctx.restore();
+    }
+  }
+
+  function init() {
+    resize();
+    const count = Math.min(55, Math.floor(W * H / 14000));
+    particles = Array.from({ length: count }, () => {
+      const p = new Particle();
+      p.reset(true);
+      return p;
+    });
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    // faint connections
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const d = Math.hypot(dx, dy);
+        if (d < 110) {
+          ctx.save();
+          ctx.globalAlpha = (1 - d / 110) * 0.07;
+          ctx.strokeStyle = ACC;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+    particles.forEach(p => { p.update(); p.draw(); });
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', init);
+  init();
+  loop();
+})();
+
+// ── ARCHITECTURE DIAGRAM ──────────────────────────────────────
+(function () {
+  const canvas = document.getElementById('arch-canvas');
+  const ctx = canvas.getContext('2d');
+  const ACC   = '#00e5cc';
+  const ACC2  = '#00c9b2';
+  const CYAN  = '#00f5ff';
+  const BD    = '#1a5c5c';
+  const BG    = '#020d0d';
+  const BG1   = '#041212';
+
+  const NODES = [
+    { id: 'community',     short: 'Community',  sub: 'ordering & caching',      angle: -90,  policy: false },
+    { id: 'channel',       short: 'Channel',    sub: 'channels & groups',        angle: -45,  policy: false },
+    { id: 'messages',      short: 'Message',    sub: 'per-channel messages',     angle:   0,  policy: true  },
+    { id: 'dm',            short: 'DM',         sub: 'conversations & messages', angle:  45,  policy: false },
+    { id: 'notifications', short: 'Notif',      sub: 'alerts & prefs',           angle:  90,  policy: false },
+    { id: 'social',        short: 'Social',     sub: 'friends, blocks, requests',angle: 135,  policy: true  },
+    { id: 'permissions',   short: 'Permissions',sub: 'roles & revocations',      angle: 180,  policy: true  },
+    { id: 'profile',       short: 'Profile',    sub: 'user profiles & avatars',  angle: 225,  policy: false },
+    { id: 'voice',         short: 'Voice',      sub: 'session state ⚠ LiveKit',  angle: 270,  policy: false },
+  ];
+
+  let W, H, cx, cy, radius, nodeR;
+  let pulses = [];
+  let hovered = null;
+  let dpr = 1;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const section = document.getElementById('diagram-section');
+    W = section.clientWidth;
+    H = Math.round(Math.min(W * 0.68, 580));
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width  = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    cx     = W / 2;
+    cy     = H / 2;
+    radius = Math.min(W, H) * 0.33;
+    nodeR  = Math.min(radius * 0.19, 50);
+
+    NODES.forEach(n => {
+      const rad = n.angle * Math.PI / 180;
+      n.x = cx + Math.cos(rad) * radius;
+      n.y = cy + Math.sin(rad) * radius;
+      n.r = nodeR;
+    });
+  }
+
+  class Pulse {
+    constructor(fx, fy, tx, ty, color, speed) {
+      this.fx = fx; this.fy = fy;
+      this.tx = tx; this.ty = ty;
+      this.color = color;
+      this.speed = speed || 0.006;
+      this.t = 0;
+    }
+    get alive() { return this.t <= 1; }
+    step() { this.t += this.speed; }
+    ease(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+    draw() {
+      const e = this.ease(Math.min(this.t, 1));
+      const x = this.fx + (this.tx - this.fx) * e;
+      const y = this.fy + (this.ty - this.fy) * e;
+      const a = Math.sin(this.t * Math.PI);
+      ctx.save();
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 9);
+      g.addColorStop(0, this.color);
+      g.addColorStop(1, 'transparent');
+      ctx.globalAlpha = a * 0.8;
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = this.color;
+      ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawEdge(x1, y1, x2, y2, alpha, isPolicy) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = isPolicy ? ACC : BD;
+    ctx.lineWidth   = isPolicy ? 1 : 0.75;
+    if (isPolicy) ctx.setLineDash([5, 8]);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  function drawNode(n, isCore) {
+    const r  = isCore ? nodeR * 1.35 : nodeR;
+    const hov = hovered && hovered.id === n.id;
+
+    // glow
+    if (hov || isCore) {
+      const gr = ctx.createRadialGradient(n.x, n.y, r * 0.4, n.x, n.y, r * 2.2);
+      gr.addColorStop(0, `rgba(0,229,204,${isCore ? 0.14 : 0.09})`);
+      gr.addColorStop(1, 'transparent');
+      ctx.save(); ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.arc(n.x, n.y, r * 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    // body
+    ctx.save();
+    ctx.fillStyle = isCore ? BG1 : BG;
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = hov ? ACC : (isCore ? ACC2 : BD);
+    ctx.lineWidth   = isCore ? 1.5 : 0.75;
+    ctx.globalAlpha = hov ? 1 : (isCore ? 0.85 : 0.55);
+    ctx.stroke();
+    ctx.restore();
+
+    // pulse ring on core
+    if (isCore) {
+      const t = (Date.now() % 2400) / 2400;
+      ctx.save();
+      ctx.globalAlpha = (1 - t) * 0.3;
+      ctx.strokeStyle = ACC;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(n.x, n.y, r + t * r * 0.9, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
+    // label
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    if (isCore) {
+      ctx.font = `bold ${Math.max(11, r * 0.23)}px 'Courier New', monospace`;
+      ctx.fillStyle = ACC;
+      ctx.fillText('Haven', n.x, n.y - r * 0.18);
+      ctx.fillText('Core',  n.x, n.y + r * 0.18);
+    } else {
+      ctx.font = `${Math.max(8, r * 0.19)}px 'Courier New', monospace`;
+      ctx.fillStyle = hov ? ACC : 'rgba(0,229,204,0.7)';
+      ctx.fillText(n.short, n.x, n.y - r * 0.15);
+      ctx.font = `${Math.max(6, r * 0.13)}px 'Courier New', monospace`;
+      ctx.fillStyle = 'rgba(0,229,204,0.27)';
+      ctx.fillText('Nexus', n.x, n.y + r * 0.22);
+    }
+    ctx.restore();
+
+    // tooltip
+    if (hov && n.sub) {
+      ctx.save();
+      ctx.font = '9.5px Courier New, monospace';
+      const tw = ctx.measureText(n.sub).width;
+      const tx = n.x - tw / 2 - 8;
+      const ty = n.y + r + 10;
+      ctx.fillStyle = BG1;
+      ctx.strokeStyle = ACC;
+      ctx.lineWidth = 0.75;
+      ctx.fillRect(tx, ty, tw + 16, 22);
+      ctx.strokeRect(tx, ty, tw + 16, 22);
+      ctx.fillStyle = ACC;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(n.sub, tx + 8, ty + 11);
+      ctx.restore();
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // edges
+    NODES.forEach(n => drawEdge(cx, cy, n.x, n.y, n.policy ? 0.22 : 0.13, n.policy));
+
+    // nexus nodes
+    NODES.forEach(n => drawNode(n, false));
+
+    // core node
+    drawNode({ id: '__core', x: cx, y: cy }, true);
+
+    // legend
+    ctx.save();
+    ctx.font = '9px Courier New, monospace';
+    ctx.fillStyle = ACC;
+    ctx.globalAlpha = 0.3;
+    ctx.textAlign = 'right';
+    ctx.fillText('-- policy contract', W - 16, H - 16);
+    ctx.restore();
+
+    // pulses
+    pulses = pulses.filter(p => p.alive);
+    pulses.forEach(p => { p.step(); p.draw(); });
+
+    requestAnimationFrame(draw);
+  }
+
+  function spawnPulse() {
+    const n = NODES[Math.floor(Math.random() * NODES.length)];
+    const toCore = Math.random() > 0.38;
+    const speed  = 0.004 + Math.random() * 0.003;
+    if (toCore) {
+      pulses.push(new Pulse(n.x, n.y, cx, cy, ACC, speed));
+    } else {
+      pulses.push(new Pulse(cx, cy, n.x, n.y, ACC, speed));
+    }
+    // occasional policy chain: social → core → messages
+    if (Math.random() < 0.18) {
+      const social = NODES.find(x => x.id === 'social');
+      const msgs   = NODES.find(x => x.id === 'messages');
+      pulses.push(new Pulse(social.x, social.y, cx, cy, CYAN, 0.007));
+      setTimeout(() => {
+        pulses.push(new Pulse(cx, cy, msgs.x, msgs.y, CYAN, 0.007));
+      }, 900);
+    }
+    setTimeout(spawnPulse, 380 + Math.random() * 1100);
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    hovered = null;
+    for (const n of NODES) {
+      if (Math.hypot(mx - n.x, my - n.y) < n.r) { hovered = n; break; }
+    }
+    canvas.style.cursor = hovered ? 'pointer' : 'default';
+  });
+  canvas.addEventListener('mouseleave', () => { hovered = null; });
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resize, 80);
+  });
+
+  resize();
+  draw();
+  setTimeout(spawnPulse, 600);
+})();
+
+// ── TYPEWRITER ────────────────────────────────────────────────
+(function () {
+  const el   = document.getElementById('typewriter');
+  const text = 'BOUNDED DOMAIN ENTITY LIFECYCLE MANAGEMENT';
+  let i = 0;
+  function type() {
+    el.textContent = text.slice(0, i) + (i < text.length ? '_' : '');
+    if (i++ <= text.length) setTimeout(type, 55 + Math.random() * 45);
+  }
+  setTimeout(type, 900);
+})();
+
+// ── SCROLL REVEAL ─────────────────────────────────────────────
+(function () {
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+})();
+
+// ── NAV DOTS ──────────────────────────────────────────────────
+(function () {
+  const sections = ['hero','s-problem','diagram-section','s-nexus','s-core','s-policy','s-perf'];
+  const dots     = document.querySelectorAll('.nav-dot');
+
+  dots.forEach((dot, i) => {
+    dot.addEventListener('click', () => {
+      document.getElementById(sections[i])?.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const idx = sections.indexOf(e.target.id);
+        if (idx >= 0) {
+          dots.forEach(d => d.classList.remove('active'));
+          dots[idx]?.classList.add('active');
+        }
+      }
+    });
+  }, { threshold: 0.35 });
+
+  sections.forEach(id => { const el = document.getElementById(id); if (el) obs.observe(el); });
+})();
+</script>
+</body>
+</html>

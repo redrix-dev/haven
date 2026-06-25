@@ -2,7 +2,7 @@
  * Swipe actions: dismiss + mark read only. There is no `mark_notifications_unread` RPC yet (Phase B),
  * so we do not expose “Mark unread” in the UI.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -14,14 +14,26 @@ import {
   type ListRenderItem,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import type { NotificationItem } from "@shared/lib/backend/types";
 import {
   getNotificationSummary,
   getNotificationTitle,
 } from "@shared/features/notifications/notificationCopy";
-import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
-import type { LiveProfileIdentity } from "@shared/lib/backend/types";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
+import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
+import { useHavenCore } from "@mobile-data";
+import {
+  useNotifications,
+  useNotificationsLoading,
+  useProfilesRecord,
+} from "@mobile-data/hooks";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { resolveColorProp } from "@shared/themes";
 
 function formatShortTime(iso: string): string {
   const d = new Date(iso);
@@ -35,29 +47,65 @@ function formatShortTime(iso: string): string {
 }
 
 type NotificationInboxListProps = {
-  items: NotificationItem[];
-  liveProfiles: Record<string, LiveProfileIdentity>;
-  refreshing: boolean;
-  loading: boolean;
-  error: string | null;
-  onRefresh: () => void;
-  onDismiss: (recipientId: string) => void;
-  onMarkRead: (recipientId: string) => void;
-  onNavigate: (notification: NotificationItem) => void;
+  navigationError?: string | null;
+  onNavigate: (notification: NotificationItem) => void | Promise<void>;
 };
 
 export function NotificationInboxList({
-  items,
-  liveProfiles,
-  refreshing,
-  loading,
-  error,
-  onRefresh,
-  onDismiss,
-  onMarkRead,
+  navigationError,
   onNavigate,
 }: NotificationInboxListProps) {
+  const core = useHavenCore();
+  const themeTokens = useMobileThemeTokens();
+  const foregroundColor =
+    resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const notificationItems = useNotifications(core.notifications);
+  const items = useMemo(
+    () => filterNotificationsForInbox(notificationItems),
+    [notificationItems],
+  );
+  const liveProfiles = useProfilesRecord(core.profiles);
+  const loading = useNotificationsLoading(core.notifications);
+  const [refreshing, setRefreshing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const withNotificationAction = useCallback(
+    async (action: () => Promise<void>) => {
+      setActionError(null);
+      try {
+        await action();
+      } catch (err) {
+        setActionError(getErrorMessage(err, "Failed to update notifications."));
+      }
+    },
+    [],
+  );
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    setActionError(null);
+    await withNotificationAction(() => core.notifications.refreshInbox());
+    setRefreshing(false);
+  }, [core.notifications, withNotificationAction]);
+
+  const dismiss = useCallback(
+    (recipientId: string) => {
+      void withNotificationAction(() =>
+        core.notifications.dismiss([recipientId]),
+      );
+    },
+    [core.notifications, withNotificationAction],
+  );
+
+  const markRead = useCallback(
+    (recipientId: string) => {
+      void withNotificationAction(() =>
+        core.notifications.markRead([recipientId]),
+      );
+    },
+    [core.notifications, withNotificationAction],
+  );
 
   const toggleExpanded = useCallback((recipientId: string) => {
     setExpandedIds((prev) => {
@@ -68,6 +116,8 @@ export function NotificationInboxList({
     });
   }, []);
 
+  const visibleError = actionError ?? navigationError ?? null;
+
   const renderRightActions = useCallback(
     (notification: NotificationItem) => {
       const unread = notification.readAt == null;
@@ -76,30 +126,38 @@ export function NotificationInboxList({
           {unread ? (
             <Pressable
               accessibilityRole="button"
-              className="w-24 items-center justify-center bg-accent-slider"
-              onPress={() => onMarkRead(notification.recipientId)}
+              className="w-24 items-center justify-center bg-primary"
+              onPress={() => markRead(notification.recipientId)}
             >
-              <Text className="text-center text-xs font-semibold text-white">Read</Text>
+              <Text className="text-center text-sm font-semibold text-primary-foreground">
+                Read
+              </Text>
             </Pressable>
           ) : null}
           <Pressable
             accessibilityRole="button"
-            className="w-24 items-center justify-center bg-red-900/90"
-            onPress={() => onDismiss(notification.recipientId)}
+            className="w-24 items-center justify-center bg-destructive/90"
+            onPress={() => dismiss(notification.recipientId)}
           >
-            <Text className="text-center text-xs font-semibold text-white">Dismiss</Text>
+            <Text className="text-center text-sm font-semibold text-primary-foreground">
+              Dismiss
+            </Text>
           </Pressable>
         </View>
       );
     },
-    [onDismiss, onMarkRead],
+    [dismiss, markRead],
   );
 
   const renderItem: ListRenderItem<NotificationItem> = useCallback(
     ({ item }) => {
       const expanded = expandedIds.has(item.recipientId);
       const actorLabel =
-        resolveLiveUsername(liveProfiles, item.actorUserId, item.actorUsername)?.trim() ||
+        resolveLiveUsername(
+          liveProfiles,
+          item.actorUserId,
+          item.actorUsername,
+        )?.trim() ||
         item.actorUserId ||
         "System";
       const avatarUrl = resolveLiveAvatarUrl(
@@ -113,8 +171,11 @@ export function NotificationInboxList({
       const unread = item.readAt == null;
 
       return (
-        <Swipeable renderRightActions={() => renderRightActions(item)} overshootRight={false}>
-          <View className="border-b border-border bg-card py-3">
+        <Swipeable
+          renderRightActions={() => renderRightActions(item)}
+          overshootRight={false}
+        >
+          <View className="border-b border-border-panel bg-card py-3">
             <Pressable
               onPress={() => toggleExpanded(item.recipientId)}
               className="active:bg-surface-hover"
@@ -130,7 +191,9 @@ export function NotificationInboxList({
                       accessibilityIgnoresInvertColors
                     />
                   ) : (
-                    <Text className="text-lg font-semibold text-foreground">{initial}</Text>
+                    <Text className="text-lg font-semibold text-foreground">
+                      {initial}
+                    </Text>
                   )}
                 </View>
                 <View className="min-w-0 flex-1">
@@ -141,9 +204,14 @@ export function NotificationInboxList({
                     >
                       {title}
                     </Text>
-                    <Text className="text-xs text-muted-foreground">{formatShortTime(item.createdAt)}</Text>
+                    <Text className="text-xs text-muted-foreground">
+                      {formatShortTime(item.createdAt)}
+                    </Text>
                   </View>
-                  <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                  <Text
+                    className="text-xs text-muted-foreground"
+                    numberOfLines={1}
+                  >
                     {actorLabel}
                   </Text>
                   <Text
@@ -158,10 +226,12 @@ export function NotificationInboxList({
             {expanded ? (
               <Pressable
                 accessibilityRole="button"
-                className="mt-3 self-start rounded-lg bg-accent-slider px-3 py-2 active:opacity-90"
+                className="mt-3 self-start rounded-lg bg-primary px-3 py-2 active:bg-primary-hover"
                 onPress={() => onNavigate(item)}
               >
-                <Text className="text-sm font-semibold text-white">Navigate</Text>
+                <Text className="text-sm font-semibold text-primary-foreground">
+                  Navigate
+                </Text>
               </Pressable>
             ) : null}
           </View>
@@ -174,8 +244,10 @@ export function NotificationInboxList({
   if (loading && items.length === 0) {
     return (
       <View className="items-center py-12">
-        <ActivityIndicator color="#e6edf7" />
-        <Text className="mt-3 text-sm text-muted-foreground">Loading notifications…</Text>
+        <ActivityIndicator color={foregroundColor} />
+        <Text className="mt-3 text-sm text-muted-foreground">
+          Loading notifications…
+        </Text>
       </View>
     );
   }
@@ -186,18 +258,27 @@ export function NotificationInboxList({
       keyExtractor={(n) => n.recipientId}
       renderItem={renderItem}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e6edf7" />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void refresh()}
+          tintColor={foregroundColor}
+        />
       }
       ListHeaderComponent={
-        error ? (
-          <Text className="mb-3 text-sm text-red-400">{error}</Text>
+        visibleError ? (
+          <Text className="mb-3 text-sm text-destructive">{visibleError}</Text>
         ) : null
       }
       ListEmptyComponent={
         <View className="items-center py-10">
-          <Ionicons name="notifications-off-outline" size={40} color="#8b9cbb" />
+          <ThemedIonicons
+            name="notifications-off-outline"
+            size={40}
+            colorClassName="accent-muted-foreground"
+          />
           <Text className="mt-3 text-center text-sm text-muted-foreground">
-            No notifications here. Mentions and updates show up once you start chatting.
+            No notifications here. Mentions and updates show up once you start
+            chatting.
           </Text>
         </View>
       }

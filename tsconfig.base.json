@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "jsx": "react",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,11 +11,14 @@
     "allowJs": true,
     "outDir": "./dist",
     "paths": {
-      "@electron/*": ["./apps/electron/src/*"],
-      "@web/*": ["./apps/web/src/*"],
-      "@shared/app/ui/*": ["./packages/web-client/src/app-ui/*"],
+      "@mobile-data": ["./apps/mobile/src/data"],
+      "@mobile-data/*": ["./apps/mobile/src/data/*"],
+      "@solid-client": ["./packages/solid-client/src"],
+      "@solid-client/*": ["./packages/solid-client/src/*"],
       "@shared/*": ["./packages/shared/src/*"],
-      "@client/app/*": ["./packages/shared/src/app/*"],
+      "@platform/assets/runtimeAudio": [
+        "./packages/shared/src/platform/assets/runtimeAudio"
+      ],
       "@platform/*": ["./packages/shared/src/platform/*"],
       "@test-support/*": ["./tooling/test-support/*"]
     }

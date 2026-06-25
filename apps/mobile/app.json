@@ -7,19 +7,28 @@
     "scheme": "haven",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/haven-app-icon.png",
-    "platforms": [
-      "ios",
-      "android"
-    ],
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "platforms": ["ios", "android"],
+    "assetBundlePatterns": ["**/*"],
     "plugins": [
       "expo-video",
       "expo-asset",
       "expo-font",
       "expo-sharing",
       "expo-dev-client",
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "android": {
+            "audioType": "communication",
+            "enableScreenShareService": false
+          },
+          "ios": {
+            "enableMultitaskingCameraAccess": false
+          }
+        }
+      ],
+      "@config-plugins/react-native-webrtc",
+      "./plugins/withAndroidVoiceForegroundService",
       "expo-notifications",
       [
         "expo-camera",
@@ -55,15 +64,8 @@
         "NSPhotoLibraryAddUsageDescription": "Allow Haven to save shared media to your photo library.",
         "NSFaceIDUsageDescription": "Allow Haven to use Face ID for secure app access.",
         "NSLocalNetworkUsageDescription": "Haven uses your local network so this development build can find and connect to the Metro bundler on your computer.",
-        "NSBonjourServices": [
-          "_expo._tcp",
-          "_http._tcp"
-        ],
-        "UIBackgroundModes": [
-          "audio",
-          "voip",
-          "remote-notification"
-        ]
+        "NSBonjourServices": ["_expo._tcp", "_http._tcp"],
+        "UIBackgroundModes": ["audio", "voip", "remote-notification"]
       }
     },
     "android": {
@@ -76,6 +78,8 @@
         "READ_MEDIA_AUDIO",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_MICROPHONE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "POST_NOTIFICATIONS",
         "VIBRATE",
         "USE_BIOMETRIC"
       ]

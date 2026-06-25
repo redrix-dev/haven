@@ -1,11 +1,17 @@
 import type { RootStackParamList } from "@/navigation/types";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getErrorMessage } from "@shared/platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { useState } from "react";
-import { View, Text, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, TextInput, ScrollView } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { signInWithPassword } from "@/auth/mobileAuthService";
+import {
+  isEmailNotConfirmedError,
+  signInWithPassword,
+} from "@/auth/mobileAuthService";
+import { BuildStamp } from "@/components/BuildStamp";
+import { useResendConfirmation } from "@/hooks/useResendConfirmation";
 
 export function MobileLogin() {
   const insets = useSafeAreaInsets();
@@ -13,23 +19,41 @@ export function MobileLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const {
+    resend,
+    resending,
+    note: resendNote,
+    cooldown: resendCooldown,
+  } = useResendConfirmation();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const onSubmit = async () => {
     setError("");
     setLoading(true);
     try {
       const { error } = await signInWithPassword(email, password);
       if (error) throw error;
+      setNeedsConfirmation(false);
     } catch (error) {
       setError(getErrorMessage(error));
+      setNeedsConfirmation(isEmailNotConfirmedError(error));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1 bg-background">
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom, flexGrow: 1,  justifyContent: 'center' }}>
+    <KeyboardAvoidingView behavior="padding" className="flex-1 bg-background">
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          flexGrow: 1,
+          justifyContent: "center",
+        }}
+      >
         <View className="w-full max-w-sm self-center bg-card rounded-3xl p-6">
           <Text className="mb-8 text-center text-2xl font-semibold text-foreground">
             Haven
@@ -41,6 +65,7 @@ export function MobileLogin() {
             autoCorrect={false}
             keyboardType="email-address"
             placeholder="you@example.com"
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
             placeholderTextColor="#a9b8cf"
             value={email}
             onChangeText={setEmail}
@@ -50,12 +75,37 @@ export function MobileLogin() {
             className="mb-6 rounded-xl border border-border bg-card px-4 py-3 text-foreground"
             secureTextEntry
             placeholder="••••••••"
+            // uniwind-theme-allow mobile-theme/no-raw-color-prop - TextInput placeholderTextColor requires raw value; matches muted-foreground
             placeholderTextColor="#a9b8cf"
             value={password}
             onChangeText={setPassword}
           />
           {error ? (
-            <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
+            <Text className="mb-4 text-center text-sm text-destructive">
+              {error}
+            </Text>
+          ) : null}
+          {needsConfirmation ? (
+            <View className="mb-4">
+              <Pressable
+                disabled={resending || resendCooldown > 0}
+                onPress={() => void resend(email)}
+                hitSlop={8}
+              >
+                <Text className="text-center text-sm text-primary">
+                  {resending
+                    ? "Resending…"
+                    : resendCooldown > 0
+                      ? `Resend available in ${resendCooldown}s`
+                      : "Resend confirmation email"}
+                </Text>
+              </Pressable>
+              {resendNote ? (
+                <Text className="mt-2 text-center text-xs text-muted-foreground">
+                  {resendNote}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
           <Pressable
             className={`rounded-xl bg-primary py-4 ${loading ? "opacity-60" : ""}`}
@@ -70,14 +120,21 @@ export function MobileLogin() {
             className="text-sm text-muted-foreground"
             onPress={() => void navigation.navigate("PasswordRecovery")}
           >
-            <Text className="text-center text-sm text-muted-foreground">Forgot password?</Text>
+            <Text className="text-center text-sm text-muted-foreground">
+              Forgot password?
+            </Text>
           </Pressable>
           <Pressable
             className="text-sm text-muted-foreground"
             onPress={() => void navigation.navigate("SignUp")}
           >
-            <Text className="text-center text-sm text-muted-foreground">Don't have an account? Sign up</Text>
+            <Text className="text-center text-sm text-muted-foreground">
+              Don't have an account? Sign up
+            </Text>
           </Pressable>
+        </View>
+        <View className="mt-6 self-center">
+          <BuildStamp />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import { Pressable, Text, View } from "react-native";
 
 type CommunityChannelBarProps = {
@@ -21,7 +21,10 @@ export function CommunityChannelBar({
         className="max-w-[44%] rounded-lg px-2 py-2 active:bg-surface-hover"
         onPress={onPressCommunity}
       >
-        <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+        <Text
+          className="text-sm font-semibold leading-5 text-foreground"
+          numberOfLines={2}
+        >
           {communityName}
         </Text>
       </Pressable>
@@ -32,10 +35,17 @@ export function CommunityChannelBar({
         onPress={onPressSelectedChannel}
       >
         <Text className="mr-1 text-sm text-muted-foreground">#</Text>
-        <Text className="min-w-0 flex-shrink text-sm font-semibold text-foreground" numberOfLines={1}>
+        <Text
+          className="min-w-0 flex-shrink text-sm font-semibold leading-5 text-foreground"
+          numberOfLines={2}
+        >
           {selectedChannelName}
         </Text>
-        <Ionicons name="chevron-down" size={16} color="#a9b8cf" />
+        <ThemedIonicons
+          name="chevron-down"
+          size={16}
+          colorClassName="accent-muted-foreground"
+        />
       </Pressable>
     </View>
   );

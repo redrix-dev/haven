@@ -25,14 +25,20 @@ Semantic colors live in **`apps/mobile/global.css`** (generated from `packages/s
 
 ### `theme-rn` helpers
 
-| Helper | Role |
-|--------|------|
-| `ThemedIonicons` | `withUniwind(Ionicons)` + required `colorClassName`. |
+| Helper                                                        | Role                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------ |
+| `ThemedIonicons`                                              | `withUniwind(Ionicons)` + required `colorClassName`.   |
 | `useFloatingDmPlaceholderChannels` / `useDmBubbleSheetChrome` | DM floating bubble / sheet chrome aligned to CSS vars. |
+
+## Guardrail
+
+Run `npm run check:mobile-uniwind` from the repo root, or `npm run check:uniwind` from `apps/mobile`, to catch mobile UI code that bypasses theme tokens.
+
+The check flags direct `Ionicons` imports, direct Lucide JSX, raw hex color props/styles, arbitrary hex color classes, and raw Tailwind palette color classes. Intentional invariant colors can be marked on the same or previous line with `// uniwind-theme-allow <rule-id> - reason`.
 
 ## Official docs
 
-- [Installation / getting started](https://docs.uniwind.dev/)  
-- [classNames & accent](https://docs.uniwind.dev/class-names.md)  
-- [useResolveClassNames](https://docs.uniwind.dev/api/use-resolve-class-names.md)  
+- [Installation / getting started](https://docs.uniwind.dev/)
+- [classNames & accent](https://docs.uniwind.dev/class-names.md)
+- [useResolveClassNames](https://docs.uniwind.dev/api/use-resolve-class-names.md)
 - [useCSSVariable](https://docs.uniwind.dev/api/use-css-variable.md)

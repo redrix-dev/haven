@@ -1,18 +1,18 @@
-import { describe, beforeAll, afterAll, beforeEach, expect, it } from 'vitest';
-import { getNotificationBackend } from '@shared/lib/backend';
-import { loadBootstrappedTestUsers } from '@test-support/fixtures/users';
+import { describe, beforeAll, afterAll, beforeEach, expect, it } from "vitest";
+import { getNotificationBackend } from "@shared/lib/backend";
+import { loadBootstrappedTestUsers } from "@test-support/fixtures/users";
 import {
   resetFixtureDomainState,
   serviceSupabase,
   signInAsTestUser,
   signOutTestUser,
-} from '@test-support/setup/supabaseLocal';
+} from "@test-support/setup/supabaseLocal";
 
-describe.sequential('NotificationBackend (contract)', () => {
+describe.sequential("NotificationBackend (contract)", () => {
   const users = loadBootstrappedTestUsers();
 
   beforeAll(async () => {
-    await signInAsTestUser('member_a');
+    await signInAsTestUser("member_a");
   });
 
   afterAll(async () => {
@@ -21,11 +21,12 @@ describe.sequential('NotificationBackend (contract)', () => {
 
   beforeEach(async () => {
     await resetFixtureDomainState();
-    await signInAsTestUser('member_a');
+    await signInAsTestUser("member_a");
   });
 
-  it('reads and updates global notification preferences', async () => {
-    const original = await getNotificationBackend().getNotificationPreferences();
+  it("reads and updates global notification preferences", async () => {
+    const original =
+      await getNotificationBackend().getNotificationPreferences();
     expect(original.userId).toBe(users.member_a.id);
 
     const next = await getNotificationBackend().updateNotificationPreferences({
@@ -38,37 +39,44 @@ describe.sequential('NotificationBackend (contract)', () => {
     expect(next.mentionSoundEnabled).toBe(!original.mentionSoundEnabled);
     expect(next.dmPushEnabled).toBe(!original.dmPushEnabled);
 
-    const reloaded = await getNotificationBackend().getNotificationPreferences();
+    const reloaded =
+      await getNotificationBackend().getNotificationPreferences();
     expect(reloaded.mentionSoundEnabled).toBe(next.mentionSoundEnabled);
     expect(reloaded.dmPushEnabled).toBe(next.dmPushEnabled);
   });
 
-  it('lists inbox notifications and supports read/dismiss mutations', async () => {
-    const notifications = await getNotificationBackend().listNotifications({ limit: 20 });
+  it("lists inbox notifications and supports read/dismiss mutations", async () => {
+    const notifications = await getNotificationBackend().listNotifications({
+      limit: 20,
+    });
     expect(Array.isArray(notifications)).toBe(true);
 
     if (notifications.length === 0) return;
 
     const target = notifications[0];
-    const markedRead = await getNotificationBackend().markNotificationsRead([target.recipientId]);
+    const markedRead = await getNotificationBackend().markNotificationsRead([
+      target.recipientId,
+    ]);
     expect(markedRead).toBeGreaterThanOrEqual(0);
 
-    const dismissed = await getNotificationBackend().dismissNotifications([target.recipientId]);
+    const dismissed = await getNotificationBackend().dismissNotifications([
+      target.recipientId,
+    ]);
     expect(dismissed).toBeGreaterThanOrEqual(0);
   });
 
-  it('lists sound-only notifications without changing inbox semantics', async () => {
+  it("lists sound-only notifications without changing inbox semantics", async () => {
     const sourceId = crypto.randomUUID();
     const { error: createError } = await serviceSupabase.rpc(
-      'create_notification_event_with_recipients' as never,
+      "create_notification_event_with_recipients" as never,
       {
-        p_kind: 'system',
-        p_source_kind: 'system_event',
+        p_kind: "system",
+        p_source_kind: "system_event",
         p_source_id: sourceId,
         p_actor_user_id: null,
         p_payload: {
-          title: 'Sound-only contract test',
-          message: 'Should not appear in inbox list',
+          title: "Sound-only contract test",
+          message: "Should not appear in inbox list",
         },
         p_recipients: [
           {
@@ -77,115 +85,139 @@ describe.sequential('NotificationBackend (contract)', () => {
             deliver_sound: true,
           },
         ],
-      } as never
+      } as never,
     );
     expect(createError).toBeNull();
 
-    const inboxNotifications = await getNotificationBackend().listNotifications({ limit: 50 });
-    expect(inboxNotifications.some((item) => item.sourceId === sourceId)).toBe(false);
+    const inboxNotifications = await getNotificationBackend().listNotifications(
+      { limit: 50 },
+    );
+    expect(inboxNotifications.some((item) => item.sourceId === sourceId)).toBe(
+      false,
+    );
 
-    const soundNotifications = await getNotificationBackend().listSoundNotifications({ limit: 50 });
-    const target = soundNotifications.find((item) => item.sourceId === sourceId);
+    const soundNotifications =
+      await getNotificationBackend().listSoundNotifications({ limit: 50 });
+    const target = soundNotifications.find(
+      (item) => item.sourceId === sourceId,
+    );
 
     expect(target).toBeTruthy();
     expect(target?.deliverInApp).toBe(false);
     expect(target?.deliverSound).toBe(true);
   });
 
-  it('manages web push subscriptions with owner isolation', async () => {
+  it("manages web push subscriptions with owner isolation", async () => {
     const endpoint = `https://push.example.test/member-a/${crypto.randomUUID()}`;
     const installationId = `vitest-installation-${crypto.randomUUID()}`;
 
     const created = await getNotificationBackend().upsertWebPushSubscription({
       endpoint,
       installationId,
-      p256dhKey: 'p256dh-member-a',
-      authKey: 'auth-member-a',
-      userAgent: 'vitest/member-a',
-      clientPlatform: 'android',
-      appDisplayMode: 'standalone',
-      metadata: { suite: 'notificationBackend.contract', device: 'a1' },
+      p256dhKey: "p256dh-member-a",
+      authKey: "auth-member-a",
+      userAgent: "vitest/member-a",
+      clientPlatform: "android",
+      appDisplayMode: "standalone",
+      metadata: { suite: "notificationBackend.contract", device: "a1" },
     });
 
     expect(created.userId).toBe(users.member_a.id);
     expect(created.endpoint).toBe(endpoint);
     expect(created.installationId).toBe(installationId);
-    expect(created.clientPlatform).toBe('android');
-    expect(created.metadata).toMatchObject({ device: 'a1' });
+    expect(created.clientPlatform).toBe("android");
+    expect(created.metadata).toMatchObject({ device: "a1" });
 
-    const listedForMemberA = await getNotificationBackend().listWebPushSubscriptions();
-    expect(listedForMemberA.some((row) => row.endpoint === endpoint)).toBe(true);
+    const listedForMemberA =
+      await getNotificationBackend().listWebPushSubscriptions();
+    expect(listedForMemberA.some((row) => row.endpoint === endpoint)).toBe(
+      true,
+    );
 
     const updated = await getNotificationBackend().upsertWebPushSubscription({
       endpoint,
       installationId,
-      p256dhKey: 'p256dh-member-a-updated',
-      authKey: 'auth-member-a-updated',
-      userAgent: 'vitest/member-a-v2',
-      clientPlatform: 'android',
-      appDisplayMode: 'browser',
-      metadata: { suite: 'notificationBackend.contract', device: 'a1', rev: 2 },
+      p256dhKey: "p256dh-member-a-updated",
+      authKey: "auth-member-a-updated",
+      userAgent: "vitest/member-a-v2",
+      clientPlatform: "android",
+      appDisplayMode: "browser",
+      metadata: { suite: "notificationBackend.contract", device: "a1", rev: 2 },
     });
 
     expect(updated.id).toBe(created.id);
-    expect(updated.p256dhKey).toBe('p256dh-member-a-updated');
-    expect(updated.appDisplayMode).toBe('browser');
+    expect(updated.p256dhKey).toBe("p256dh-member-a-updated");
+    expect(updated.appDisplayMode).toBe("browser");
     expect(updated.metadata).toMatchObject({ rev: 2 });
 
     const rotatedEndpoint = `https://push.example.test/member-a/${crypto.randomUUID()}`;
     const rotated = await getNotificationBackend().upsertWebPushSubscription({
       endpoint: rotatedEndpoint,
       installationId,
-      p256dhKey: 'p256dh-member-a-rotated',
-      authKey: 'auth-member-a-rotated',
-      userAgent: 'vitest/member-a-v3',
-      clientPlatform: 'android',
-      appDisplayMode: 'standalone',
-      metadata: { suite: 'notificationBackend.contract', device: 'a1', rev: 3 },
+      p256dhKey: "p256dh-member-a-rotated",
+      authKey: "auth-member-a-rotated",
+      userAgent: "vitest/member-a-v3",
+      clientPlatform: "android",
+      appDisplayMode: "standalone",
+      metadata: { suite: "notificationBackend.contract", device: "a1", rev: 3 },
     });
 
     expect(rotated.endpoint).toBe(rotatedEndpoint);
     expect(rotated.installationId).toBe(installationId);
 
-    const listedAfterRotate = await getNotificationBackend().listWebPushSubscriptions();
-    expect(listedAfterRotate.filter((row) => row.installationId === installationId)).toHaveLength(1);
+    const listedAfterRotate =
+      await getNotificationBackend().listWebPushSubscriptions();
+    expect(
+      listedAfterRotate.filter((row) => row.installationId === installationId),
+    ).toHaveLength(1);
 
-    await signInAsTestUser('member_b');
+    await signInAsTestUser("member_b");
 
-    const listedForMemberB = await getNotificationBackend().listWebPushSubscriptions();
-    expect(listedForMemberB.some((row) => row.endpoint === endpoint)).toBe(false);
+    const listedForMemberB =
+      await getNotificationBackend().listWebPushSubscriptions();
+    expect(listedForMemberB.some((row) => row.endpoint === endpoint)).toBe(
+      false,
+    );
 
-    const deletedByMemberB = await getNotificationBackend().deleteWebPushSubscription(endpoint);
+    const deletedByMemberB =
+      await getNotificationBackend().deleteWebPushSubscription(endpoint);
     expect(deletedByMemberB).toBe(false);
 
-    await signInAsTestUser('member_a');
+    await signInAsTestUser("member_a");
 
-    const stillPresentForMemberA = await getNotificationBackend().listWebPushSubscriptions();
-    expect(stillPresentForMemberA.some((row) => row.endpoint === endpoint)).toBe(false);
-    expect(stillPresentForMemberA.some((row) => row.endpoint === rotatedEndpoint)).toBe(true);
+    const stillPresentForMemberA =
+      await getNotificationBackend().listWebPushSubscriptions();
+    expect(
+      stillPresentForMemberA.some((row) => row.endpoint === endpoint),
+    ).toBe(false);
+    expect(
+      stillPresentForMemberA.some((row) => row.endpoint === rotatedEndpoint),
+    ).toBe(true);
 
-    const deletedByMemberA = await getNotificationBackend().deleteWebPushSubscription(rotatedEndpoint);
+    const deletedByMemberA =
+      await getNotificationBackend().deleteWebPushSubscription(rotatedEndpoint);
     expect(deletedByMemberA).toBe(true);
 
-    const deletedAgain = await getNotificationBackend().deleteWebPushSubscription(rotatedEndpoint);
+    const deletedAgain =
+      await getNotificationBackend().deleteWebPushSubscription(rotatedEndpoint);
     expect(deletedAgain).toBe(false);
   });
 
-  it('manages expo push subscriptions with owner isolation', async () => {
+  it("manages expo push subscriptions with owner isolation", async () => {
     const tokenA = `ExponentPushToken[contract-${crypto.randomUUID()}]`;
     const installationId = `vitest-expo-install-${crypto.randomUUID()}`;
 
     const created = await getNotificationBackend().upsertExpoPushSubscription({
       expoPushToken: tokenA,
-      platform: 'android',
+      platform: "android",
       installationId,
-      metadata: { suite: 'notificationBackend.contract', device: 'expo-a1' },
+      metadata: { suite: "notificationBackend.contract", device: "expo-a1" },
     });
 
     expect(created.userId).toBe(users.member_a.id);
     expect(created.expoPushToken).toBe(tokenA);
     expect(created.installationId).toBe(installationId);
-    expect(created.platform).toBe('android');
+    expect(created.platform).toBe("android");
 
     const listedA = await getNotificationBackend().listExpoPushSubscriptions();
     expect(listedA.some((row) => row.expoPushToken === tokenA)).toBe(true);
@@ -193,45 +225,55 @@ describe.sequential('NotificationBackend (contract)', () => {
     const tokenB = `ExponentPushToken[contract-${crypto.randomUUID()}]`;
     const rotated = await getNotificationBackend().upsertExpoPushSubscription({
       expoPushToken: tokenB,
-      platform: 'android',
+      platform: "android",
       installationId,
-      metadata: { suite: 'notificationBackend.contract', device: 'expo-a1', rev: 2 },
+      metadata: {
+        suite: "notificationBackend.contract",
+        device: "expo-a1",
+        rev: 2,
+      },
     });
 
     expect(rotated.expoPushToken).toBe(tokenB);
-    const listedAfterRotate = await getNotificationBackend().listExpoPushSubscriptions();
-    expect(listedAfterRotate.filter((row) => row.installationId === installationId)).toHaveLength(1);
+    const listedAfterRotate =
+      await getNotificationBackend().listExpoPushSubscriptions();
+    expect(
+      listedAfterRotate.filter((row) => row.installationId === installationId),
+    ).toHaveLength(1);
 
-    await signInAsTestUser('member_b');
+    await signInAsTestUser("member_b");
     const listedB = await getNotificationBackend().listExpoPushSubscriptions();
     expect(listedB.some((row) => row.expoPushToken === tokenB)).toBe(false);
 
-    const deletedByB = await getNotificationBackend().deleteExpoPushSubscription(tokenB);
+    const deletedByB =
+      await getNotificationBackend().deleteExpoPushSubscription(tokenB);
     expect(deletedByB).toBe(false);
 
-    await signInAsTestUser('member_a');
-    const deletedByA = await getNotificationBackend().deleteExpoPushSubscription(tokenB);
+    await signInAsTestUser("member_a");
+    const deletedByA =
+      await getNotificationBackend().deleteExpoPushSubscription(tokenB);
     expect(deletedByA).toBe(true);
-    const deletedAgain = await getNotificationBackend().deleteExpoPushSubscription(tokenB);
+    const deletedAgain =
+      await getNotificationBackend().deleteExpoPushSubscription(tokenB);
     expect(deletedAgain).toBe(false);
   });
 
-  it('lists delivery traces for the current user', async () => {
+  it("lists delivery traces for the current user", async () => {
     const recipientId = crypto.randomUUID();
     const eventId = crypto.randomUUID();
 
     const { error: insertError } = await serviceSupabase
-      .from('notification_delivery_traces' as never)
+      .from("notification_delivery_traces" as never)
       .insert({
         notification_recipient_id: null,
         notification_event_id: null,
         recipient_user_id: users.member_a.id,
-        transport: 'route_policy',
-        stage: 'client_route',
-        decision: 'skip',
-        reason_code: 'sw_focused_window_suppressed',
+        transport: "route_policy",
+        stage: "client_route",
+        decision: "skip",
+        reason_code: "sw_focused_window_suppressed",
         details: {
-          suite: 'notificationBackend.contract',
+          suite: "notificationBackend.contract",
           syntheticRecipientId: recipientId,
           syntheticEventId: eventId,
         },
@@ -239,75 +281,79 @@ describe.sequential('NotificationBackend (contract)', () => {
 
     expect(insertError).toBeNull();
 
-    const traces = await getNotificationBackend().listNotificationDeliveryTraces({ limit: 20 });
+    const traces =
+      await getNotificationBackend().listNotificationDeliveryTraces({
+        limit: 20,
+      });
     const target = traces.find(
       (trace) =>
         trace.details.syntheticRecipientId === recipientId &&
-        trace.details.syntheticEventId === eventId
+        trace.details.syntheticEventId === eventId,
     );
 
     expect(target).toBeTruthy();
-    expect(target?.transport).toBe('route_policy');
-    expect(target?.stage).toBe('client_route');
-    expect(target?.reasonCode).toBe('sw_focused_window_suppressed');
+    expect(target?.transport).toBe("route_policy");
+    expect(target?.stage).toBe("client_route");
+    expect(target?.reasonCode).toBe("sw_focused_window_suppressed");
   });
 
-  it('reads web push dispatch wakeup diagnostics state', async () => {
+  it("reads web push dispatch wakeup diagnostics state", async () => {
     const { error: upsertError } = await serviceSupabase
-      .from('notification_dispatch_wakeups' as never)
+      .from("notification_dispatch_wakeups" as never)
       .upsert(
         {
           id: true,
           enabled: true,
           shadow_mode: true,
           min_interval_seconds: 3,
-          last_mode: 'shadow',
-          last_reason: 'vitest-contract',
-          last_skip_reason: 'debounced',
+          last_mode: "shadow",
+          last_reason: "vitest-contract",
+          last_skip_reason: "debounced",
           total_attempts: 11,
           total_scheduled: 5,
           total_debounced: 6,
         } as never,
-        { onConflict: 'id' }
+        { onConflict: "id" },
       );
 
     expect(upsertError).toBeNull();
 
-    const diagnostics = await getNotificationBackend().getWebPushDispatchWakeupDiagnostics();
+    const diagnostics =
+      await getNotificationBackend().getWebPushDispatchWakeupDiagnostics();
     expect(diagnostics).toBeTruthy();
     expect(diagnostics?.enabled).toBe(true);
     expect(diagnostics?.shadowMode).toBe(true);
     expect(diagnostics?.minIntervalSeconds).toBe(3);
-    expect(diagnostics?.lastMode).toBe('shadow');
-    expect(diagnostics?.lastReason).toBe('vitest-contract');
-    expect(diagnostics?.lastSkipReason).toBe('debounced');
+    expect(diagnostics?.lastMode).toBe("shadow");
+    expect(diagnostics?.lastReason).toBe("vitest-contract");
+    expect(diagnostics?.lastSkipReason).toBe("debounced");
     expect(diagnostics?.totalAttempts).toBeGreaterThanOrEqual(11);
   });
 
-  it('reads web push dispatch queue health diagnostics for active platform staff and rejects non-staff', async () => {
+  it("reads web push dispatch queue health diagnostics for active platform staff and rejects non-staff", async () => {
     const endpoint = `https://push.example.test/member-a/${crypto.randomUUID()}`;
     await getNotificationBackend().upsertWebPushSubscription({
       endpoint,
       installationId: `vitest-queue-health-${crypto.randomUUID()}`,
-      p256dhKey: 'p256dh-queue-health',
-      authKey: 'auth-queue-health',
-      userAgent: 'vitest/queue-health',
-      clientPlatform: 'windows',
-      appDisplayMode: 'standalone',
-      metadata: { suite: 'notificationBackend.contract', queueHealth: true },
+      p256dhKey: "p256dh-queue-health",
+      authKey: "auth-queue-health",
+      userAgent: "vitest/queue-health",
+      clientPlatform: "windows",
+      appDisplayMode: "standalone",
+      metadata: { suite: "notificationBackend.contract", queueHealth: true },
     });
 
     const sourceId = crypto.randomUUID();
     const { error: createError } = await serviceSupabase.rpc(
-      'create_notification_event_with_recipients' as never,
+      "create_notification_event_with_recipients" as never,
       {
-        p_kind: 'system',
-        p_source_kind: 'system_event',
+        p_kind: "system",
+        p_source_kind: "system_event",
         p_source_id: sourceId,
         p_actor_user_id: null,
         p_payload: {
-          title: 'Queue health contract test',
-          message: 'Generate one queued web push job',
+          title: "Queue health contract test",
+          message: "Generate one queued web push job",
         },
         p_recipients: [
           {
@@ -316,45 +362,48 @@ describe.sequential('NotificationBackend (contract)', () => {
             deliver_sound: false,
           },
         ],
-      } as never
+      } as never,
     );
     expect(createError).toBeNull();
 
-    await expect(getNotificationBackend().getWebPushDispatchQueueHealthDiagnostics()).rejects.toBeTruthy();
+    await expect(
+      getNotificationBackend().getWebPushDispatchQueueHealthDiagnostics(),
+    ).rejects.toBeTruthy();
 
-    await signInAsTestUser('platform_staff_active');
+    await signInAsTestUser("platform_staff_active");
 
-    const diagnostics = await getNotificationBackend().getWebPushDispatchQueueHealthDiagnostics();
+    const diagnostics =
+      await getNotificationBackend().getWebPushDispatchQueueHealthDiagnostics();
     expect(diagnostics).toBeTruthy();
     expect(diagnostics?.totalPending).toBeGreaterThanOrEqual(0);
     expect(diagnostics?.claimableNowCount).toBeGreaterThanOrEqual(0);
-    expect(typeof diagnostics?.asOf).toBe('string');
+    expect(typeof diagnostics?.asOf).toBe("string");
 
-    await signInAsTestUser('member_a');
+    await signInAsTestUser("member_a");
   });
 
-  it('allows active platform staff to update wakeup config and rejects non-staff', async () => {
+  it("allows active platform staff to update wakeup config and rejects non-staff", async () => {
     await expect(
       getNotificationBackend().updateWebPushDispatchWakeupConfig({
         enabled: false,
         shadowMode: false,
         minIntervalSeconds: 1,
-      })
+      }),
     ).rejects.toBeTruthy();
 
-    await signInAsTestUser('platform_staff_active');
+    await signInAsTestUser("platform_staff_active");
 
-    const updated = await getNotificationBackend().updateWebPushDispatchWakeupConfig({
-      enabled: true,
-      shadowMode: true,
-      minIntervalSeconds: 2,
-    });
+    const updated =
+      await getNotificationBackend().updateWebPushDispatchWakeupConfig({
+        enabled: true,
+        shadowMode: true,
+        minIntervalSeconds: 2,
+      });
 
     expect(updated.enabled).toBe(true);
     expect(updated.shadowMode).toBe(true);
     expect(updated.minIntervalSeconds).toBe(2);
 
-    await signInAsTestUser('member_a');
+    await signInAsTestUser("member_a");
   });
 });
-

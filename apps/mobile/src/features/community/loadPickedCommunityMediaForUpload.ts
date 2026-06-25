@@ -14,6 +14,7 @@ export type CommunityMediaUploadPayload = {
   body: ArrayBuffer;
   contentType: string;
   fileName: string;
+  localUri: string;
 };
 
 function base64ToUint8Array(b64: string): Uint8Array {
@@ -34,7 +35,9 @@ function uint8ArrayToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return out;
 }
 
-export function resolveCommunityMediaMimeType(asset: ImagePicker.ImagePickerAsset): string {
+export function resolveCommunityMediaMimeType(
+  asset: ImagePicker.ImagePickerAsset,
+): string {
   if (asset.mimeType?.trim()) return asset.mimeType;
   if (asset.type === "video") return "video/mp4";
   return "image/jpeg";
@@ -66,7 +69,10 @@ export async function loadPickedCommunityMediaForUpload(
     throw new Error("Could not read the selected file.");
   }
 
-  if (typeof file.size === "number" && file.size > COMMUNITY_MEDIA_UPLOAD_MAX_BYTES) {
+  if (
+    typeof file.size === "number" &&
+    file.size > COMMUNITY_MEDIA_UPLOAD_MAX_BYTES
+  ) {
     throwTooLarge();
   }
   if (typeof file.size === "number" && file.size <= 0) {
@@ -74,14 +80,21 @@ export async function loadPickedCommunityMediaForUpload(
   }
 
   const resolvedContentType =
-    typeof file.type === "string" && file.type.trim().length > 0 ? file.type : contentType;
+    typeof file.type === "string" && file.type.trim().length > 0
+      ? file.type
+      : contentType;
 
   let buffer = await file.arrayBuffer();
   if (buffer.byteLength > COMMUNITY_MEDIA_UPLOAD_MAX_BYTES) {
     throwTooLarge();
   }
   if (buffer.byteLength > 0) {
-    return { body: buffer, contentType: resolvedContentType, fileName };
+    return {
+      body: buffer,
+      contentType: resolvedContentType,
+      fileName,
+      localUri: asset.uri,
+    };
   }
 
   const legacyB64 = await LegacyFs.readAsStringAsync(asset.uri, {
@@ -98,5 +111,6 @@ export async function loadPickedCommunityMediaForUpload(
     body: uint8ArrayToArrayBuffer(bytes),
     contentType: resolvedContentType,
     fileName,
+    localUri: asset.uri,
   };
 }

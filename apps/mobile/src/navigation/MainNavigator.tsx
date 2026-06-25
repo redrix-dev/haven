@@ -1,0 +1,910 @@
+import { useNavigation } from "@react-navigation/native";
+import type { NavigationProp } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSharedValue, withTiming } from "react-native-reanimated";
+import { useHydrateMobileThemeFromProfile } from "@/hooks/useHydrateMobileThemeFromProfile";
+import { CommunityEntry } from "@/navigation/community/CommunityEntry";
+import { CommunityShell } from "@/navigation/community/CommunityShell";
+import type {
+  MainStackParamList,
+  RootStackParamList,
+} from "@/navigation/types";
+import { NAV_THEME } from "@/lib/theme";
+import { setMobileNavigationDelegate } from "@/lib/registerMobileAppHost";
+import { toChannel, toServerSummaries } from "@shared/core";
+import {
+  bootstrapNotificationSoundSync,
+  createNotificationSoundSyncState,
+  requireHavenCore,
+  resetNotificationSoundSyncState,
+  syncFocusFromRoute,
+  syncNotificationSounds,
+  useHavenCore,
+} from "@mobile-data";
+import {
+  useActiveChannelId,
+  useActiveCommunityId,
+  useChannels,
+  useCounts,
+  useDmConversations,
+  useNotifications,
+  useOrderedCommunities,
+  useProfilesRecord,
+  useViewerProfile,
+} from "@mobile-data/hooks";
+import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
+import UserProfileModal, {
+  type UserProfileModalTarget,
+} from "@/features/user-profile/UserProfileModal";
+import { useUiStore } from "@mobile-data/session/uiStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
+import type { VoiceSidebarParticipant } from "@shared/types/types";
+import type { NotificationAudioSettings } from "@shared/types/settings";
+import { useVoice } from "@/features/voice/hooks/useVoice";
+import {
+  type LiveProfilesRecord,
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
+import { useMobilePushNotificationRouting } from "@/hooks/useMobilePushNotificationRouting";
+import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
+import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
+import { resolveColorProp } from "@shared/themes";
+import { countFilteredUnreadInInbox } from "@shared/features/notifications/inboxNotificationFilter";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { VoiceJoinPromptSheet } from "@/features/voice/VoiceJoinPromptSheet";
+import { VoiceSessionSheet } from "@/features/voice/VoiceSessionSheet";
+import { VoiceFloatingController } from "@/features/voice/VoiceFloatingController";
+import {
+  loadSkipVoiceSwitchPrompt,
+  saveSkipVoiceSwitchPrompt,
+  useMobileVoiceSettings,
+} from "@/features/voice/mobileVoicePreferences";
+import { addVoiceNotificationOpenListener } from "@/features/voice/mobileVoiceForegroundService";
+import { useMobileLiveKitVoiceSession } from "@/features/voice/useMobileLiveKitVoiceSession";
+import { HavenListSheet } from "@/components/HavenListSheet";
+import { NotificationsScreen } from "@/screens/main/NotificationsScreen";
+import { ProfileScreen } from "@/screens/main/ProfileScreen";
+import { SettingsScreen } from "@/screens/main/SettingsScreen";
+import { FriendsScreen } from "@/screens/main/FriendsScreen";
+import {
+  clearPendingInvite,
+  readPendingInvite,
+  subscribePendingInvite,
+} from "@/features/invites/mobilePendingInvite";
+
+const Stack = createNativeStackNavigator<MainStackParamList>();
+
+const mainStackScreenBackground = NAV_THEME.dark.colors.background;
+const VOICE_PROMPT_CLOSE_DELAY_MS = 380;
+
+function logVoiceJoinPromptTiming(
+  label: string,
+  details?: Record<string, unknown>,
+): void {
+  if (typeof __DEV__ === "undefined" || !__DEV__) return;
+  console.info("[voice:join]", label, details ?? {});
+}
+
+type VoiceParticipantIdentity = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+};
+
+function enrichVoiceParticipant<T extends VoiceParticipantIdentity>(
+  participant: T,
+  liveProfiles: LiveProfilesRecord,
+): T {
+  const displayName =
+    resolveLiveUsername(
+      liveProfiles,
+      participant.userId,
+      participant.displayName,
+    ) ?? participant.displayName;
+  const avatarUrl =
+    resolveLiveAvatarUrl(
+      liveProfiles,
+      participant.userId,
+      participant.avatarUrl ?? null,
+    ) ??
+    participant.avatarUrl ??
+    null;
+
+  if (
+    displayName === participant.displayName &&
+    avatarUrl === (participant.avatarUrl ?? null)
+  ) {
+    return participant;
+  }
+
+  return { ...participant, displayName, avatarUrl };
+}
+
+function enrichVoiceParticipantRecord(
+  participantsByChannelId: Record<string, VoiceSidebarParticipant[]>,
+  liveProfiles: LiveProfilesRecord,
+): Record<string, VoiceSidebarParticipant[]> {
+  return Object.fromEntries(
+    Object.entries(participantsByChannelId).map(([channelId, participants]) => [
+      channelId,
+      participants.map((participant) =>
+        enrichVoiceParticipant(participant, liveProfiles),
+      ),
+    ]),
+  );
+}
+
+/**
+ * Bridges React Navigation imperative API into the shared AppHost so external
+ * events (notification taps, deep links, access-revoked redirects) can move
+ * the user without a navigation ref reaching into shared code.
+ */
+function MainNavigationDelegateBridge({
+  onNavigateToDm,
+}: {
+  onNavigateToDm: (conversationId: string) => void;
+}) {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+
+  useEffect(() => {
+    setMobileNavigationDelegate({
+      navigateToCommunity: (serverId, channelId) => {
+        try {
+          requireHavenCore().communities.setActiveId(serverId);
+          if (channelId) {
+            requireHavenCore().channels.setActiveChannelId(channelId);
+          }
+        } catch {
+          // HavenCore may not be ready during cold-start race; navigation alone is fine.
+        }
+        navigation.navigate("Main", {
+          screen: "Community",
+          params: { serverId },
+        });
+      },
+      navigateToDm: (conversationId) => {
+        onNavigateToDm(conversationId);
+      },
+    });
+    return () => setMobileNavigationDelegate(null);
+  }, [navigation, onNavigateToDm]);
+
+  return null;
+}
+
+function MobileNotificationSoundSync({
+  userId,
+  audioSettings,
+}: {
+  userId: string;
+  audioSettings: NotificationAudioSettings;
+}) {
+  const core = useHavenCore();
+  const notificationItems = useNotifications(core.notifications);
+  const soundSyncRef = useRef(createNotificationSoundSyncState());
+  const audioRef = useRef(audioSettings);
+
+  useEffect(() => {
+    audioRef.current = audioSettings;
+  }, [audioSettings]);
+
+  useEffect(() => {
+    if (!userId) {
+      resetNotificationSoundSyncState(soundSyncRef.current);
+      return;
+    }
+    void bootstrapNotificationSoundSync(core, soundSyncRef.current);
+  }, [core, userId]);
+
+  useEffect(() => {
+    if (!userId || !soundSyncRef.current.bootstrapped) return;
+    void syncNotificationSounds(
+      core,
+      audioRef.current,
+      soundSyncRef.current,
+    ).catch((error) => {
+      console.error("Failed to play notification sounds:", error);
+    });
+  }, [core, notificationItems.length, userId]);
+
+  return null;
+}
+
+function MainNavigationShell({ userId }: { userId: string }) {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const core = useHavenCore();
+  const dm = core.directMessages;
+  const authUser = useAuthStore((s) => s.user);
+  const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
+  const notificationItems = useNotifications(core.notifications);
+  const dmConversations = useDmConversations(dm);
+  const socialCounts = useCounts(core.social);
+  const currentServerId = useActiveCommunityId(core.communities);
+  const currentChannelId = useActiveChannelId(core.channels);
+  const activeCommunityChannels = useChannels(
+    core.channels,
+    currentServerId ?? "__none__",
+  );
+  const channels = useMemo(
+    () => activeCommunityChannels.map(toChannel),
+    [activeCommunityChannels],
+  );
+  const setCurrentChannelId = useCallback(
+    (id: string | null) => {
+      core.channels.setActiveChannelId(id);
+    },
+    [core],
+  );
+  const viewerProfile = useViewerProfile(core.profiles, userId);
+  const liveProfiles = useProfilesRecord(core.profiles);
+  const orderedCommunities = useOrderedCommunities(core.communities);
+  const servers = useMemo(
+    () => toServerSummaries(orderedCommunities),
+    [orderedCommunities],
+  );
+  useMobilePushNotificationRouting();
+
+  useEffect(() => {
+    void core.profiles.ensureViewerProfile(userId).catch(() => {
+      // The auth email fallback keeps voice usable if profile hydration fails.
+    });
+  }, [core.profiles, userId]);
+
+  const currentUserIdentity = useMemo(() => {
+    const email = authUser?.email ?? null;
+    const fallbackName =
+      viewerProfile?.username ?? email?.split("@")[0]?.trim() ?? "User";
+    const displayName =
+      resolveLiveUsername(liveProfiles, userId, fallbackName) ?? fallbackName;
+    const avatarUrl =
+      resolveLiveAvatarUrl(
+        liveProfiles,
+        userId,
+        viewerProfile?.avatarUrl ?? null,
+      ) ??
+      viewerProfile?.avatarUrl ??
+      null;
+
+    return {
+      id: userId,
+      displayName,
+      avatarUrl,
+    };
+  }, [authUser?.email, liveProfiles, userId, viewerProfile]);
+
+  const notificationsUnreadCount = useMemo(
+    () => countFilteredUnreadInInbox(notificationItems),
+    [notificationItems],
+  );
+  const dmUnreadCount = useMemo(
+    () =>
+      dmConversations.reduce(
+        (total, conversation) => total + conversation.unreadCount,
+        0,
+      ),
+    [dmConversations],
+  );
+
+  const mobileVoiceSettings = useMobileVoiceSettings();
+  const voice = useVoice({
+    currentServerId,
+    currentUserId: userId,
+    currentUserDisplayName: currentUserIdentity.displayName,
+    currentUserAvatarUrl: currentUserIdentity.avatarUrl,
+    currentChannelId,
+    setCurrentChannelId,
+    voiceHardwareDebugPanelEnabled: false,
+    channels,
+  });
+  const voiceState = voice.state;
+  const voiceDerived = voice.derived;
+  const {
+    cancelVoiceChannelJoinPrompt,
+    confirmVoiceChannelJoin,
+    disconnectVoiceSession,
+    forceDisconnectVoice,
+    requestVoiceChannelJoin,
+    setVoiceControlActions,
+  } = voice.actions;
+  const [voiceSheetOpen, setVoiceSheetOpen] = useState(false);
+  // Single 0→1 progress shared by the floating bubble and the session panel so
+  // they morph as one coordinated motion (0 = bubble, 1 = panel) anchored at the
+  // bubble's on-screen position.
+  const voiceMorph = useSharedValue(0);
+  const [voiceBubbleAnchor, setVoiceBubbleAnchor] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  // The floating bubble is the panel's *minimized* form, so it stays suppressed
+  // on a fresh join (which opens straight into the panel) and is only revealed
+  // once the user first minimizes. Resets when the session ends.
+  const [voiceBubbleArmed, setVoiceBubbleArmed] = useState(false);
+  const [interruptionNoticeVisible, setInterruptionNoticeVisible] =
+    useState(false);
+  const [skipVoiceSwitchPrompt, setSkipVoiceSwitchPrompt] = useState(false);
+  const voiceSheetOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadSkipVoiceSwitchPrompt().then((skip) => {
+      if (!cancelled) setSkipVoiceSwitchPrompt(skip);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSkipVoiceSwitchPromptChange = useCallback((skip: boolean) => {
+    setSkipVoiceSwitchPrompt(skip);
+    void saveSkipVoiceSwitchPrompt(skip);
+  }, []);
+
+  // Drive the morph in lockstep with the sheet toggle.
+  useEffect(() => {
+    voiceMorph.value = withTiming(voiceSheetOpen ? 1 : 0, {
+      duration: voiceSheetOpen ? 300 : 260,
+    });
+  }, [voiceMorph, voiceSheetOpen]);
+
+  const handleVoiceBubbleAnchor = useCallback(
+    (center: { x: number; y: number }) => {
+      setVoiceBubbleAnchor(center);
+    },
+    [],
+  );
+
+  const openVoiceSheet = useCallback(() => {
+    if (voiceSheetOpenTimeoutRef.current) {
+      clearTimeout(voiceSheetOpenTimeoutRef.current);
+      voiceSheetOpenTimeoutRef.current = null;
+    }
+    setVoiceSheetOpen(true);
+  }, []);
+
+  const openVoiceSheetAfterPromptClose = useCallback(() => {
+    if (voiceSheetOpenTimeoutRef.current) {
+      clearTimeout(voiceSheetOpenTimeoutRef.current);
+    }
+    voiceSheetOpenTimeoutRef.current = setTimeout(() => {
+      voiceSheetOpenTimeoutRef.current = null;
+      setVoiceSheetOpen(true);
+    }, VOICE_PROMPT_CLOSE_DELAY_MS);
+  }, []);
+
+  const clearPendingVoiceSheetOpen = useCallback(() => {
+    if (!voiceSheetOpenTimeoutRef.current) return;
+    clearTimeout(voiceSheetOpenTimeoutRef.current);
+    voiceSheetOpenTimeoutRef.current = null;
+  }, []);
+
+  // Close the panel without revealing the bubble — used for teardown (leave /
+  // kick / error) so the session exits cleanly instead of flashing the bubble.
+  const dismissVoiceSheet = useCallback(() => {
+    clearPendingVoiceSheetOpen();
+    setVoiceSheetOpen(false);
+  }, [clearPendingVoiceSheetOpen]);
+
+  const closeVoiceSheet = useCallback(() => {
+    // User-initiated minimize: reveal the bubble; from now on the panel morphs
+    // to/from it.
+    setVoiceBubbleArmed(true);
+    dismissVoiceSheet();
+  }, [dismissVoiceSheet]);
+
+  useEffect(() => {
+    return () => {
+      if (voiceSheetOpenTimeoutRef.current) {
+        clearTimeout(voiceSheetOpenTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(
+    () => addVoiceNotificationOpenListener(openVoiceSheet),
+    [openVoiceSheet],
+  );
+
+  const activeVoiceControllerChannel = useMemo(() => {
+    const activeVoiceChannel = voiceDerived.activeVoiceChannel;
+    if (!activeVoiceChannel) return null;
+    return {
+      communityId: activeVoiceChannel.community_id,
+      channelId: activeVoiceChannel.id,
+      channelName: activeVoiceChannel.name,
+    };
+  }, [voiceDerived.activeVoiceChannel]);
+  const activeVoiceControllerChannelKey = activeVoiceControllerChannel
+    ? `${activeVoiceControllerChannel.communityId}:${activeVoiceControllerChannel.channelId}`
+    : null;
+
+  const handleVoiceSessionError = useCallback(
+    (message: string) => {
+      dismissVoiceSheet();
+      Alert.alert("Voice connection failed", message);
+      void disconnectVoiceSession({ triggerPaneLeave: false }).catch(
+        (error: unknown) => {
+          console.warn("[voice] Failed to reset after session error.", error);
+        },
+      );
+    },
+    [dismissVoiceSheet, disconnectVoiceSession],
+  );
+
+  const handleVoiceKick = useCallback(() => {
+    dismissVoiceSheet();
+    void forceDisconnectVoice("kicked")
+      .then(() => {
+        Alert.alert(
+          "Removed from voice",
+          "You were removed from the voice channel.",
+        );
+      })
+      .catch((error: unknown) => {
+        console.warn("[voice] Failed to disconnect after kick.", error);
+      });
+  }, [dismissVoiceSheet, forceDisconnectVoice]);
+
+  const handleVoiceInterrupted = useCallback(() => {
+    setInterruptionNoticeVisible(true);
+  }, []);
+
+  const voiceController = useMobileLiveKitVoiceSession({
+    activeChannel: activeVoiceControllerChannel,
+    currentUserId: userId,
+    currentUserDisplayName: currentUserIdentity.displayName,
+    currentUserAvatarUrl: currentUserIdentity.avatarUrl,
+    voiceSettings: mobileVoiceSettings.settings,
+    onUpdateVoiceSettings: mobileVoiceSettings.updateVoiceSettingsPatch,
+    onSessionError: handleVoiceSessionError,
+    onVoiceKick: handleVoiceKick,
+    onInterrupted: handleVoiceInterrupted,
+  });
+
+  const { joinVoiceChannel, leaveVoiceChannel, toggleMute, toggleDeafen } =
+    voiceController.actions;
+
+  // Re-arm (suppress) the bubble whenever a voice session ends so the next join
+  // opens straight into the panel again.
+  const voiceSessionActive =
+    voiceController.state.joined || voiceController.state.joining;
+  useEffect(() => {
+    if (!voiceSessionActive) setVoiceBubbleArmed(false);
+  }, [voiceSessionActive]);
+
+  const handleLeaveVoiceSession = useCallback(() => {
+    // Leaving dismisses the panel without arming the bubble, so teardown is a
+    // clean exit rather than a flash of the bubble appearing then disappearing.
+    dismissVoiceSheet();
+    void (async () => {
+      try {
+        await leaveVoiceChannel();
+      } catch (error: unknown) {
+        console.warn("[voice] Failed to stop mobile voice transport.", error);
+      }
+      try {
+        await disconnectVoiceSession({ triggerPaneLeave: false });
+      } catch (error: unknown) {
+        console.warn("[voice] Failed to clear voice session state.", error);
+      }
+    })();
+  }, [dismissVoiceSheet, disconnectVoiceSession, leaveVoiceChannel]);
+
+  useEffect(() => {
+    if (!activeVoiceControllerChannelKey) {
+      setVoiceControlActions(null);
+      return;
+    }
+
+    setVoiceControlActions({
+      join: () => {
+        void joinVoiceChannel();
+      },
+      leave: () => {
+        void leaveVoiceChannel();
+      },
+      toggleMute,
+      toggleDeafen,
+    });
+    return () => setVoiceControlActions(null);
+  }, [
+    activeVoiceControllerChannelKey,
+    joinVoiceChannel,
+    leaveVoiceChannel,
+    setVoiceControlActions,
+    toggleDeafen,
+    toggleMute,
+  ]);
+
+  useEffect(() => {
+    const prompt = voiceState.voiceJoinPrompt;
+    if (prompt?.mode !== "switch" || !skipVoiceSwitchPrompt) return;
+    void confirmVoiceChannelJoin().then(openVoiceSheetAfterPromptClose);
+  }, [
+    confirmVoiceChannelJoin,
+    openVoiceSheetAfterPromptClose,
+    skipVoiceSwitchPrompt,
+    voiceState.voiceJoinPrompt,
+  ]);
+
+  const handleConfirmVoiceJoin = useCallback(() => {
+    const startedAt = Date.now();
+    logVoiceJoinPromptTiming("confirm tapped");
+    void confirmVoiceChannelJoin().then(() => {
+      logVoiceJoinPromptTiming("confirm resolved", {
+        elapsedMs: Date.now() - startedAt,
+      });
+      openVoiceSheetAfterPromptClose();
+    });
+  }, [confirmVoiceChannelJoin, openVoiceSheetAfterPromptClose]);
+
+  const handleSelectVoiceChannel = useCallback(
+    (channelId: string) => {
+      if (channelId === voiceState.activeVoiceChannelId) {
+        if (!voiceController.state.joined && !voiceController.state.joining) {
+          void joinVoiceChannel();
+        }
+        openVoiceSheet();
+        return;
+      }
+      requestVoiceChannelJoin(channelId);
+    },
+    [
+      openVoiceSheet,
+      requestVoiceChannelJoin,
+      voiceState.activeVoiceChannelId,
+      joinVoiceChannel,
+      voiceController.state.joined,
+      voiceController.state.joining,
+    ],
+  );
+
+  const activeVoiceCommunityName = useMemo(() => {
+    const communityId = voiceDerived.activeVoiceChannel?.community_id;
+    if (!communityId) return null;
+    return servers.find((server) => server.id === communityId)?.name ?? null;
+  }, [servers, voiceDerived.activeVoiceChannel]);
+  const enrichedVoiceChannelParticipants = useMemo(
+    () =>
+      enrichVoiceParticipantRecord(
+        voiceDerived.voiceChannelParticipants,
+        liveProfiles,
+      ),
+    [liveProfiles, voiceDerived.voiceChannelParticipants],
+  );
+  const enrichedVoiceControllerState = useMemo(
+    () => ({
+      ...voiceController.state,
+      participants: voiceController.state.participants.map((participant) =>
+        enrichVoiceParticipant(participant, liveProfiles),
+      ),
+    }),
+    [liveProfiles, voiceController.state],
+  );
+
+  const handleOpenFriendsFromNotification = useCallback(
+    (input: {
+      tab: "requests" | "friends";
+      highlightedRequestId: string | null;
+    }) => {
+      navigation.navigate("Main", {
+        screen: "Friends",
+        params: {
+          initialTab: input.tab === "requests" ? "requests" : "friends",
+          highlightedRequestId: input.highlightedRequestId,
+        },
+      });
+    },
+    [navigation],
+  );
+
+  const handleOpenDmWithUser = useCallback(
+    async (targetUserId: string) => {
+      const conversationId = await dm.openWithUser(targetUserId);
+      navigation.navigate("Main", {
+        screen: "Community",
+        params: {
+          pendingDmConversationId: conversationId,
+          serverId: null,
+          openDrawer: false,
+        },
+      });
+    },
+    [dm, navigation],
+  );
+
+  const [profileCardTarget, setProfileCardTarget] =
+    useState<UserProfileModalTarget | null>(null);
+  const handleOpenProfileCard = useCallback(
+    (target: UserProfileModalTarget) => {
+      setProfileCardTarget(target);
+    },
+    [],
+  );
+  const handleCloseProfileCard = useCallback(() => {
+    setProfileCardTarget(null);
+  }, []);
+
+  const handleNavigateToDm = useCallback(
+    (conversationId: string) => {
+      navigation.navigate("Main", {
+        screen: "Community",
+        params: {
+          pendingDmConversationId: conversationId,
+          serverId: null,
+          openDrawer: false,
+        },
+      });
+    },
+    [navigation],
+  );
+
+  const pendingInviteDrainingRef = useRef(false);
+  const [pendingInviteSignal, setPendingInviteSignal] = useState(0);
+  useEffect(
+    () =>
+      subscribePendingInvite(() =>
+        setPendingInviteSignal((value) => value + 1),
+      ),
+    [],
+  );
+
+  useEffect(() => {
+    if (pendingInviteDrainingRef.current) return;
+    const pendingInvite = readPendingInvite();
+    if (!pendingInvite) return;
+    pendingInviteDrainingRef.current = true;
+    void core
+      .joinCommunityByInvite(pendingInvite.code)
+      .then((result) => {
+        clearPendingInvite();
+        setWorkspaceMode("community");
+        navigation.navigate("Main", {
+          screen: "Community",
+          params: { serverId: result.communityId, openDrawer: false },
+        });
+      })
+      .catch((error) => {
+        clearPendingInvite();
+        Alert.alert(
+          "Invite could not be joined",
+          getErrorMessage(
+            error,
+            "Open the invite again or ask for a new link.",
+          ),
+        );
+      })
+      .finally(() => {
+        pendingInviteDrainingRef.current = false;
+      });
+  }, [core, navigation, pendingInviteSignal, setWorkspaceMode]);
+
+  useEffect(() => {
+    useMobilePushNavigationStore.getState().setHandlers({
+      openDm: (conversationId) => {
+        navigation.navigate("Main", {
+          screen: "Community",
+          params: {
+            pendingDmConversationId: conversationId,
+            serverId: null,
+            openDrawer: false,
+          },
+        });
+      },
+      openFriends: (input) => {
+        handleOpenFriendsFromNotification(input);
+      },
+      openMention: (communityId, channelId) => {
+        setWorkspaceMode("community");
+        syncFocusFromRoute(core, { communityId, channelId });
+        navigation.navigate("Main", {
+          screen: "Community",
+          params: { serverId: communityId, openDrawer: false },
+        });
+      },
+      openNotifications: () => {
+        navigation.navigate("Main", { screen: "Notifications" });
+      },
+      refreshUrgentSurfaces: () => {
+        void dm.loadConversations();
+        void core.social.load();
+        void core.notifications.refreshInbox();
+      },
+    });
+
+    return () => {
+      useMobilePushNavigationStore.getState().setHandlers(null);
+    };
+  }, [
+    core,
+    dm,
+    handleOpenFriendsFromNotification,
+    navigation,
+    setWorkspaceMode,
+  ]);
+
+  return (
+    <>
+      <MainNavigationDelegateBridge onNavigateToDm={handleNavigateToDm} />
+      <View className="flex-1">
+        <Stack.Navigator
+          initialRouteName="CommunityEntry"
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: mainStackScreenBackground },
+          }}
+        >
+          <Stack.Screen name="CommunityEntry" component={CommunityEntry} />
+          <Stack.Screen
+            name="Community"
+            options={{
+              animation: "slide_from_right",
+              gestureEnabled: true,
+            }}
+          >
+            {(props) => (
+              <CommunityShell
+                {...props}
+                onOpenProfile={() =>
+                  navigation.navigate("Main", { screen: "Profile" })
+                }
+                onOpenProfileCard={handleOpenProfileCard}
+                onOpenNotifications={() =>
+                  navigation.navigate("Main", { screen: "Notifications" })
+                }
+                notificationsUnreadCount={notificationsUnreadCount}
+                inboxUnreadCount={dmUnreadCount}
+                friendRequestCount={socialCounts.incomingPendingRequestCount}
+                onOpenFriends={() => {
+                  navigation.navigate("Main", {
+                    screen: "Friends",
+                    params: {
+                      initialTab: "friends",
+                      highlightedRequestId: null,
+                    },
+                  });
+                }}
+                onStartDirectMessage={(targetUserId) => {
+                  void handleOpenDmWithUser(targetUserId).catch((error) => {
+                    Alert.alert(
+                      "Message failed",
+                      error instanceof Error
+                        ? error.message
+                        : "Could not open that conversation.",
+                    );
+                  });
+                }}
+                activeVoiceChannelId={voiceState.activeVoiceChannelId}
+                voiceChannelParticipants={enrichedVoiceChannelParticipants}
+                onSelectVoiceChannel={handleSelectVoiceChannel}
+                onOpenVoiceSession={openVoiceSheet}
+              />
+            )}
+          </Stack.Screen>
+          <Stack.Screen
+            name="Friends"
+            component={FriendsScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
+        </Stack.Navigator>
+        <VoiceFloatingController
+          visible={!voiceSheetOpen}
+          state={enrichedVoiceControllerState}
+          actions={voiceController.actions}
+          onLeave={handleLeaveVoiceSession}
+          onOpenFullSheet={openVoiceSheet}
+          morphProgress={voiceMorph}
+          onRestPositionCommit={handleVoiceBubbleAnchor}
+          armed={voiceBubbleArmed}
+        />
+      </View>
+
+      <UserProfileModal
+        visible={Boolean(profileCardTarget)}
+        target={profileCardTarget}
+        onDismiss={handleCloseProfileCard}
+        onStartDirectMessage={(targetUserId) => {
+          void handleOpenDmWithUser(targetUserId).catch((error) => {
+            Alert.alert(
+              "Message failed",
+              error instanceof Error
+                ? error.message
+                : "Could not open that conversation.",
+            );
+          });
+        }}
+      />
+      <VoiceJoinPromptSheet
+        prompt={voiceState.voiceJoinPrompt}
+        currentChannelName={voiceDerived.activeVoiceChannel?.name ?? null}
+        skipSwitchPrompt={skipVoiceSwitchPrompt}
+        onSkipSwitchPromptChange={handleSkipVoiceSwitchPromptChange}
+        onCancel={cancelVoiceChannelJoinPrompt}
+        onConfirm={handleConfirmVoiceJoin}
+      />
+      <VoiceSessionSheet
+        visible={voiceSheetOpen}
+        communityName={activeVoiceCommunityName}
+        currentUser={currentUserIdentity}
+        voiceSettings={mobileVoiceSettings.settings}
+        state={enrichedVoiceControllerState}
+        actions={voiceController.actions}
+        onLeave={handleLeaveVoiceSession}
+        onDismiss={closeVoiceSheet}
+        morphProgress={voiceMorph}
+        // First open (pre-minimize) rises from bottom-center; once the bubble is
+        // revealed, subsequent opens morph from its on-screen position.
+        morphAnchor={voiceBubbleArmed ? voiceBubbleAnchor : null}
+      />
+      <HavenListSheet
+        visible={interruptionNoticeVisible}
+        onDismiss={() => setInterruptionNoticeVisible(false)}
+        title="Voice paused"
+      >
+        <View className="gap-4">
+          <Text className="text-sm leading-5 text-muted-foreground">
+            We kept you connected to your friends but muted and deafened the
+            voice session. You can unmute and undeafen whenever you're ready to
+            be back in the conversation.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            className="rounded-lg bg-primary px-4 py-3 active:bg-primary-hover"
+            onPress={() => {
+              setInterruptionNoticeVisible(false);
+              setVoiceSheetOpen(true);
+            }}
+          >
+            <Text className="text-center font-semibold text-primary-foreground">
+              Return to voice
+            </Text>
+          </Pressable>
+        </View>
+      </HavenListSheet>
+    </>
+  );
+}
+
+export function MainNavigator() {
+  const userId = useAuthStore((s) => s.user?.id ?? null);
+  const themeTokens = useMobileThemeTokens();
+  const spinnerFg = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  useHydrateMobileThemeFromProfile(userId);
+
+  if (!userId) {
+    return (
+      <View className="flex-1 items-center justify-center bg-surface-app">
+        <ActivityIndicator color={spinnerFg} size="large" />
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <MobileNotificationSoundSync
+        userId={userId}
+        audioSettings={MOBILE_DEFAULT_NOTIFICATION_AUDIO}
+      />
+      <MainNavigationShell userId={userId} />
+    </>
+  );
+}

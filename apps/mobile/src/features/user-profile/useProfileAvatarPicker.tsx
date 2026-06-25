@@ -24,7 +24,9 @@ function resolveMimeType(asset: ImagePicker.ImagePickerAsset): string {
   return "image/jpeg";
 }
 
-export function useProfileAvatarPicker(options: UseProfileAvatarPickerOptions = {}) {
+export function useProfileAvatarPicker(
+  options: UseProfileAvatarPickerOptions = {},
+) {
   const { onPicked } = options;
   const [isPicking, setIsPicking] = useState(false);
 
@@ -40,22 +42,31 @@ export function useProfileAvatarPicker(options: UseProfileAvatarPickerOptions = 
     avatarPickLog(session, "05_called_setIsPicking_true_scheduled");
 
     try {
-      avatarPickLog(session, "06_await_requestMediaLibraryPermissionsAsync_start", {
-        stack: new Error().stack?.split("\n").slice(0, 8).join("\n"),
-      });
+      avatarPickLog(
+        session,
+        "06_await_requestMediaLibraryPermissionsAsync_start",
+        {
+          stack: new Error().stack?.split("\n").slice(0, 8).join("\n"),
+        },
+      );
       const permStart = globalThis.performance?.now?.() ?? 0;
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       const permEnd = globalThis.performance?.now?.() ?? 0;
-      avatarPickLog(session, "07_await_requestMediaLibraryPermissionsAsync_done", {
-        durationMs: Number((permEnd - permStart).toFixed(3)),
-        granted: permission.granted,
-        status: permission.status,
-        canAskAgain: permission.canAskAgain,
-        iosAccessPrivileges:
-          "accessPrivileges" in permission
-            ? (permission as { accessPrivileges?: string }).accessPrivileges
-            : undefined,
-      });
+      avatarPickLog(
+        session,
+        "07_await_requestMediaLibraryPermissionsAsync_done",
+        {
+          durationMs: Number((permEnd - permStart).toFixed(3)),
+          granted: permission.granted,
+          status: permission.status,
+          canAskAgain: permission.canAskAgain,
+          iosAccessPrivileges:
+            "accessPrivileges" in permission
+              ? (permission as { accessPrivileges?: string }).accessPrivileges
+              : undefined,
+        },
+      );
 
       if (!permission.granted) {
         avatarPickLog(session, "08_permission_not_granted_showing_alert");
@@ -75,8 +86,9 @@ export function useProfileAvatarPicker(options: UseProfileAvatarPickerOptions = 
         base64: true,
         ...(Platform.OS === "ios"
           ? {
-                preferredAssetRepresentationMode:
-                    ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+              preferredAssetRepresentationMode:
+                ImagePicker.UIImagePickerPreferredAssetRepresentationMode
+                  .Compatible,
             }
           : {}),
       };

@@ -1,352 +1,463 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   getVitestMarkdownOutputPath,
   getVitestReporterEnv,
   sanitizeCapturedText,
-} from './report-output-utils.mjs';
+} from "./report-output-utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, '../../..');
+const repoRoot = path.resolve(__dirname, "../../..");
 
-const mode = process.argv[2] ?? 'full';
+const mode = process.argv[2] ?? "full";
 
 const commandSets = {
   full: [
-    { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
-    { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
-    { id: 'unit', label: 'Unit / Component Tests', command: 'npm', args: ['run', 'test:unit'] },
-    { id: 'db', label: 'DB / RLS Suite', command: 'npm', args: ['run', 'test:db'] },
-    { id: 'backend', label: 'Backend Contract Tests', command: 'npm', args: ['run', 'test:backend'] },
+    { id: "lint", label: "ESLint", command: "npm", args: ["run", "lint"] },
+    {
+      id: "typecheck",
+      label: "TypeScript",
+      command: "npm",
+      args: ["run", "typecheck"],
+    },
+    {
+      id: "unit",
+      label: "Unit / Component Tests",
+      command: "npm",
+      args: ["run", "test:unit"],
+    },
+    {
+      id: "db",
+      label: "DB / RLS Suite",
+      command: "npm",
+      args: ["run", "test:db"],
+    },
+    {
+      id: "backend",
+      label: "Backend Contract Tests",
+      command: "npm",
+      args: ["run", "test:backend"],
+    },
   ],
   ci: [
-    { id: 'ci', label: 'CI Aggregate', command: 'npm', args: ['run', 'test:ci'] },
+    {
+      id: "ci",
+      label: "CI Aggregate",
+      command: "npm",
+      args: ["run", "test:ci"],
+    },
   ],
   db: [
-    { id: 'db', label: 'DB / RLS Suite', command: 'npm', args: ['run', 'test:db'] },
-    { id: 'backend', label: 'Backend Contract Tests', command: 'npm', args: ['run', 'test:backend'] },
+    {
+      id: "db",
+      label: "DB / RLS Suite",
+      command: "npm",
+      args: ["run", "test:db"],
+    },
+    {
+      id: "backend",
+      label: "Backend Contract Tests",
+      command: "npm",
+      args: ["run", "test:backend"],
+    },
   ],
 };
 
 if (!(mode in commandSets)) {
-  console.error(`Unknown mode "${mode}". Supported modes: ${Object.keys(commandSets).join(', ')}`);
+  console.error(
+    `Unknown mode "${mode}". Supported modes: ${Object.keys(commandSets).join(", ")}`,
+  );
   process.exit(1);
 }
 
 const explainedScenarioCatalog = {
   sqlSuites: {
-    '01_core_permissions_rls.sql': {
-      title: 'Core Community / Channel / Message Permissions (RLS)',
+    "01_core_permissions_rls.sql": {
+      title: "Core Community / Channel / Message Permissions (RLS)",
       scenarios: [
         {
-          actor: 'non_member',
-          action: 'Attempts to read a channel row and insert a message in a community they do not belong to.',
-          expected: 'Channel row is hidden by RLS and message insert is rejected by row-level security.',
+          actor: "non_member",
+          action:
+            "Attempts to read a channel row and insert a message in a community they do not belong to.",
+          expected:
+            "Channel row is hidden by RLS and message insert is rejected by row-level security.",
         },
         {
-          actor: 'member_a',
-          action: 'Reads regular channel vs a moderator-only channel.',
-          expected: 'General channel is visible, moderator-only channel is hidden due to overwrite rules.',
+          actor: "member_a",
+          action: "Reads regular channel vs a moderator-only channel.",
+          expected:
+            "General channel is visible, moderator-only channel is hidden due to overwrite rules.",
         },
         {
-          actor: 'server_mod',
-          action: "Views a mod-only channel and deletes another user's message.",
-          expected: 'Moderator can view the mod channel and delete the target message because manage-messages is granted.',
+          actor: "server_mod",
+          action:
+            "Views a mod-only channel and deletes another user's message.",
+          expected:
+            "Moderator can view the mod channel and delete the target message because manage-messages is granted.",
         },
         {
-          actor: 'member_a',
-          action: 'Deletes their own message without moderator permissions.',
-          expected: 'Self-delete succeeds while manage-messages remains denied.',
+          actor: "member_a",
+          action: "Deletes their own message without moderator permissions.",
+          expected:
+            "Self-delete succeeds while manage-messages remains denied.",
         },
       ],
     },
-    '02_notifications_rls.sql': {
-      title: 'Notification Foundation RLS + RPCs',
+    "02_notifications_rls.sql": {
+      title: "Notification Foundation RLS + RPCs",
       scenarios: [
         {
-          actor: 'member_a',
-          action: "Lists notification recipients/events and tries to mark another user's notification read.",
-          expected: 'Only own inbox rows/events are visible; cross-user mark-read is ignored/denied.',
+          actor: "member_a",
+          action:
+            "Lists notification recipients/events and tries to mark another user's notification read.",
+          expected:
+            "Only own inbox rows/events are visible; cross-user mark-read is ignored/denied.",
         },
         {
-          actor: 'member_a',
-          action: 'Marks own notification seen and checks unread/unseen counts.',
-          expected: 'Seen mutation succeeds and counts update correctly.',
+          actor: "member_a",
+          action:
+            "Marks own notification seen and checks unread/unseen counts.",
+          expected: "Seen mutation succeeds and counts update correctly.",
         },
         {
-          actor: 'member_a',
-          action: 'Paginates notification inbox via cursor parameters.',
-          expected: 'Page 1 returns a single row and page 2 returns remaining rows in stable order.',
+          actor: "member_a",
+          action: "Paginates notification inbox via cursor parameters.",
+          expected:
+            "Page 1 returns a single row and page 2 returns remaining rows in stable order.",
         },
         {
-          actor: 'member_a / member_b',
-          action: 'Updates member_a notification preferences, then member_b attempts to mutate member_a preferences.',
-          expected: 'Self-update persists; cross-user update has no effect due to RLS.',
+          actor: "member_a / member_b",
+          action:
+            "Updates member_a notification preferences, then member_b attempts to mutate member_a preferences.",
+          expected:
+            "Self-update persists; cross-user update has no effect due to RLS.",
         },
       ],
     },
-    '03_social_graph_rls_and_rpcs.sql': {
-      title: 'Social Graph (Friends / Requests / Blocks) RLS + RPCs',
+    "03_social_graph_rls_and_rpcs.sql": {
+      title: "Social Graph (Friends / Requests / Blocks) RLS + RPCs",
       scenarios: [
         {
-          actor: 'member_a',
-          action: 'Attempts invalid friend request actions (self-request, duplicate paths, blocked paths).',
-          expected: 'RPCs reject invalid states with explicit errors.',
+          actor: "member_a",
+          action:
+            "Attempts invalid friend request actions (self-request, duplicate paths, blocked paths).",
+          expected: "RPCs reject invalid states with explicit errors.",
         },
         {
-          actor: 'member_a -> member_b',
-          action: 'Sends friend request via RPC.',
-          expected: 'Pending request is created and friend-request notification side effect is emitted.',
+          actor: "member_a -> member_b",
+          action: "Sends friend request via RPC.",
+          expected:
+            "Pending request is created and friend-request notification side effect is emitted.",
         },
         {
-          actor: 'member_b',
-          action: 'Accepts incoming friend request and checks friend state.',
-          expected: 'Friendship row is created and request transitions out of pending.',
+          actor: "member_b",
+          action: "Accepts incoming friend request and checks friend state.",
+          expected:
+            "Friendship row is created and request transitions out of pending.",
         },
         {
-          actor: 'member_a / member_b',
-          action: 'Exercises block/remove behavior around existing social relationships.',
-          expected: 'Friendship/request state is cleaned up and blocked paths reject new requests.',
+          actor: "member_a / member_b",
+          action:
+            "Exercises block/remove behavior around existing social relationships.",
+          expected:
+            "Friendship/request state is cleaned up and blocked paths reject new requests.",
         },
       ],
     },
-    '04_dm_rls_and_rpcs.sql': {
-      title: 'Direct Messages RLS + RPCs',
+    "04_dm_rls_and_rpcs.sql": {
+      title: "Direct Messages RLS + RPCs",
       scenarios: [
         {
-          actor: 'member_a + member_b',
-          action: 'Become friends, create/load a direct conversation, and send a DM.',
-          expected: 'Conversation creation is canonical and message send succeeds with returned message payload.',
+          actor: "member_a + member_b",
+          action:
+            "Become friends, create/load a direct conversation, and send a DM.",
+          expected:
+            "Conversation creation is canonical and message send succeeds with returned message payload.",
         },
         {
-          actor: 'recipient user',
-          action: 'Reads DM messages and marks the conversation read.',
-          expected: 'Only conversation members can list messages and read-state RPC updates succeed.',
+          actor: "recipient user",
+          action: "Reads DM messages and marks the conversation read.",
+          expected:
+            "Only conversation members can list messages and read-state RPC updates succeed.",
         },
         {
-          actor: 'system side-effect check',
-          action: 'Verifies DM send emits notification rows when allowed and suppresses them when muted/blocked.',
-          expected: 'Notification recipients are created only when delivery rules permit them.',
+          actor: "system side-effect check",
+          action:
+            "Verifies DM send emits notification rows when allowed and suppresses them when muted/blocked.",
+          expected:
+            "Notification recipients are created only when delivery rules permit them.",
         },
         {
-          actor: 'non_member / blocked pair',
-          action: 'Attempts DM access or sends after block.',
-          expected: 'RPCs reject access/send paths for non-members and blocked relationships.',
+          actor: "non_member / blocked pair",
+          action: "Attempts DM access or sends after block.",
+          expected:
+            "RPCs reject access/send paths for non-members and blocked relationships.",
         },
       ],
     },
-    '05_dm_moderation_review_rls_and_rpcs.sql': {
-      title: 'DM Moderation Review (Staff RPCs + RLS)',
+    "05_dm_moderation_review_rls_and_rpcs.sql": {
+      title: "DM Moderation Review (Staff RPCs + RLS)",
       scenarios: [
         {
-          actor: 'member users',
-          action: 'Create a DM and submit a DM report as the reporter.',
-          expected: 'Report is created for accessible DM content only.',
+          actor: "member users",
+          action: "Create a DM and submit a DM report as the reporter.",
+          expected: "Report is created for accessible DM content only.",
         },
         {
-          actor: 'platform_staff_active',
-          action: 'Lists reports, loads detail/context, assigns, and updates status with audit trail.',
-          expected: 'Staff review RPCs succeed and action history is recorded.',
+          actor: "platform_staff_active",
+          action:
+            "Lists reports, loads detail/context, assigns, and updates status with audit trail.",
+          expected: "Staff review RPCs succeed and action history is recorded.",
         },
         {
-          actor: 'platform_staff_inactive / non-staff',
-          action: 'Attempts to access moderation review RPCs.',
-          expected: 'Access is rejected with Haven-staff authorization errors.',
+          actor: "platform_staff_inactive / non-staff",
+          action: "Attempts to access moderation review RPCs.",
+          expected: "Access is rejected with Haven-staff authorization errors.",
         },
         {
-          actor: 'staff workflow',
-          action: 'Attempts invalid report status transitions before valid triage/in-review/resolution path.',
-          expected: 'Invalid transitions fail; valid transitions succeed and are auditable.',
+          actor: "staff workflow",
+          action:
+            "Attempts invalid report status transitions before valid triage/in-review/resolution path.",
+          expected:
+            "Invalid transitions fail; valid transitions succeed and are auditable.",
         },
       ],
     },
-    '06_channel_mentions_trigger_notifications.sql': {
-      title: 'Channel Mention Trigger Notifications',
+    "06_channel_mentions_trigger_notifications.sql": {
+      title: "Channel Mention Trigger Notifications",
       scenarios: [
         {
-          actor: 'member_a',
-          action: 'Sends a channel message mentioning member_b.',
-          expected: 'DB trigger emits a channel_mention notification for member_b.',
+          actor: "member_a",
+          action: "Sends a channel message mentioning member_b.",
+          expected:
+            "DB trigger emits a channel_mention notification for member_b.",
         },
         {
-          actor: 'mention target / policy checks',
-          action: 'Exercises suppression cases (self-mention, blocked relationships, non-member targets).',
-          expected: 'No notification is emitted for suppressed targets.',
+          actor: "mention target / policy checks",
+          action:
+            "Exercises suppression cases (self-mention, blocked relationships, non-member targets).",
+          expected: "No notification is emitted for suppressed targets.",
         },
         {
-          actor: 'member_b',
-          action: 'Toggles mention notification preferences and re-tests mention delivery.',
-          expected: 'Delivery rows reflect global mention preference settings.',
+          actor: "member_b",
+          action:
+            "Toggles mention notification preferences and re-tests mention delivery.",
+          expected: "Delivery rows reflect global mention preference settings.",
         },
         {
-          actor: 'parser/guardrails',
-          action: 'Sends messages containing multiple mentions / duplicates.',
-          expected: 'Trigger dedupes recipients and respects mention fan-out caps.',
+          actor: "parser/guardrails",
+          action: "Sends messages containing multiple mentions / duplicates.",
+          expected:
+            "Trigger dedupes recipients and respects mention fan-out caps.",
         },
       ],
     },
-    '12_channel_overwrite_permission_split.sql': {
-      title: 'Channel Structure vs Overwrite Permission Split',
+    "12_channel_overwrite_permission_split.sql": {
+      title: "Channel Structure vs Overwrite Permission Split",
       scenarios: [
         {
-          actor: 'member_a (structure-only role)',
-          action: 'Renames a channel with manage_channels but without manage_channel_permissions.',
-          expected: 'Channel structure edit succeeds.',
+          actor: "member_a (structure-only role)",
+          action:
+            "Renames a channel with manage_channels but without manage_channel_permissions.",
+          expected: "Channel structure edit succeeds.",
         },
         {
-          actor: 'member_a (structure-only role)',
-          action: 'Attempts to mutate role/member channel overwrites before explicit overwrite permission.',
-          expected: 'Overwrite mutations are rejected by row-level security.',
+          actor: "member_a (structure-only role)",
+          action:
+            "Attempts to mutate role/member channel overwrites before explicit overwrite permission.",
+          expected: "Overwrite mutations are rejected by row-level security.",
         },
         {
-          actor: 'owner migration/backfill path',
-          action: 'Backfills manage_channel_permissions for roles that already have manage_channels.',
-          expected: 'Target role gains explicit overwrite-management permission.',
+          actor: "owner migration/backfill path",
+          action:
+            "Backfills manage_channel_permissions for roles that already have manage_channels.",
+          expected:
+            "Target role gains explicit overwrite-management permission.",
         },
         {
-          actor: 'member_a (after backfill)',
-          action: 'Mutates both role and member channel overwrites on allowed hierarchy targets.',
-          expected: 'Overwrite mutations succeed once manage_channel_permissions is present.',
+          actor: "member_a (after backfill)",
+          action:
+            "Mutates both role and member channel overwrites on allowed hierarchy targets.",
+          expected:
+            "Overwrite mutations succeed once manage_channel_permissions is present.",
         },
       ],
     },
-    '13_recent_schema_alignment.sql': {
-      title: 'Recent Schema Alignment (Permissions / Avatars / ToS / Account Deletion)',
+    "13_recent_schema_alignment.sql": {
+      title:
+        "Recent Schema Alignment (Permissions / Avatars / ToS / Account Deletion)",
       scenarios: [
         {
-          actor: 'schema parity checks',
-          action: 'Verifies removed developer permission keys are gone and support report statuses match the current enum.',
-          expected: 'The test suite reflects the current prod-parity permission catalog and report lifecycle schema.',
+          actor: "schema parity checks",
+          action:
+            "Verifies removed developer permission keys are gone and support report statuses match the current enum.",
+          expected:
+            "The test suite reflects the current prod-parity permission catalog and report lifecycle schema.",
         },
         {
-          actor: 'community_owner',
-          action: 'Creates a fresh community after the developer-permission cleanup migrations.',
-          expected: 'Default community bootstrap succeeds and no removed permission keys are assigned to the Admin role.',
+          actor: "community_owner",
+          action:
+            "Creates a fresh community after the developer-permission cleanup migrations.",
+          expected:
+            "Default community bootstrap succeeds and no removed permission keys are assigned to the Admin role.",
         },
         {
-          actor: 'member_a / anon',
-          action: 'Uploads a profile avatar object to their own path and verifies public read plus foreign-path rejection.',
-          expected: 'Avatar storage policies allow only self-scoped writes while keeping the bucket publicly readable.',
+          actor: "member_a / anon",
+          action:
+            "Uploads a profile avatar object to their own path and verifies public read plus foreign-path rejection.",
+          expected:
+            "Avatar storage policies allow only self-scoped writes while keeping the bucket publicly readable.",
         },
         {
-          actor: 'member_a / member_b / platform_staff_active',
-          action: 'Exercises ToS acceptance self-read, cross-user denial, staff visibility, and validates account-deletion FK delete rules.',
-          expected: 'ToS acceptance RLS matches the current policy model and account deletion blockers now use SET NULL.',
+          actor: "member_a / member_b / platform_staff_active",
+          action:
+            "Exercises ToS acceptance self-read, cross-user denial, staff visibility, and validates account-deletion FK delete rules.",
+          expected:
+            "ToS acceptance RLS matches the current policy model and account deletion blockers now use SET NULL.",
         },
       ],
     },
-    '14_hidden_message_visibility.sql': {
-      title: 'Hidden Message Visibility (Ban Hide / RLS Cascade / Rejoin Restore)',
+    "14_hidden_message_visibility.sql": {
+      title:
+        "Hidden Message Visibility (Ban Hide / RLS Cascade / Rejoin Restore)",
       scenarios: [
         {
-          actor: 'member_a -> community_owner',
-          action: 'Creates a channel message with child reaction/attachment/link-preview rows, then the owner bans member_a.',
-          expected: 'Ban RPC marks the author message hidden and removes the member without deleting the historical content.',
+          actor: "member_a -> community_owner",
+          action:
+            "Creates a channel message with child reaction/attachment/link-preview rows, then the owner bans member_a.",
+          expected:
+            "Ban RPC marks the author message hidden and removes the member without deleting the historical content.",
         },
         {
-          actor: 'member_b',
-          action: 'Queries the hidden message and its child rows after the ban.',
-          expected: 'Message, reactions, attachments, and link previews are all hidden by RLS because child-table visibility cascades through the parent message.',
+          actor: "member_b",
+          action:
+            "Queries the hidden message and its child rows after the ban.",
+          expected:
+            "Message, reactions, attachments, and link previews are all hidden by RLS because child-table visibility cascades through the parent message.",
         },
         {
-          actor: 'server_mod',
-          action: 'Receives an explicit role grant for can_view_ban_hidden and reads the hidden message thread.',
-          expected: 'Moderator can still view the hidden message and its child rows while regular members cannot.',
+          actor: "server_mod",
+          action:
+            "Receives an explicit role grant for can_view_ban_hidden and reads the hidden message thread.",
+          expected:
+            "Moderator can still view the hidden message and its child rows while regular members cannot.",
         },
         {
-          actor: 'community_owner + member_a',
-          action: 'Revokes the ban, then member_a rejoins through invite redemption.',
-          expected: 'The rejoin path restores is_hidden to false and the message thread becomes visible again to regular members.',
+          actor: "community_owner + member_a",
+          action:
+            "Revokes the ban, then member_a rejoins through invite redemption.",
+          expected:
+            "The rejoin path restores is_hidden to false and the message thread becomes visible again to regular members.",
         },
       ],
     },
   },
   backendFiles: {
-    'packages/shared/src/lib/backend/__tests__/notificationBackend.contract.test.ts': {
-      title: 'NotificationBackend Contract',
-      scenarios: [
-        {
-          actor: 'member_a',
-          action: 'Reads and updates global notification preferences through the backend seam.',
-          expected: 'Backend DTO mapping works and persisted preferences reload correctly.',
-        },
-        {
-          actor: 'member_a',
-          action: 'Lists inbox notifications and calls read/dismiss mutations.',
-          expected: 'Backend seam can round-trip inbox rows and notification state changes.',
-        },
-      ],
-    },
-    'packages/shared/src/lib/backend/__tests__/socialBackend.contract.test.ts': {
-      title: 'SocialBackend Contract',
-      scenarios: [
-        {
-          actor: 'member_a',
-          action: 'Searches by exact username and sends a friend request to member_b.',
-          expected: 'Search returns the target user and sendFriendRequest creates or reuses expected pending state.',
-        },
-        {
-          actor: 'member_b',
-          action: "Lists incoming requests and accepts member_a's request.",
-          expected: 'Friendship is visible through listFriends and notification side effects are reachable.',
-        },
-      ],
-    },
-    'packages/shared/src/lib/backend/__tests__/directMessageBackend.contract.test.ts': {
-      title: 'DirectMessageBackend Contract',
-      scenarios: [
-        {
-          actor: 'member_a + member_b',
-          action: 'Create or load a 1:1 DM, send a message, read it, mute the conversation, and file a report.',
-          expected: 'All DM seam methods succeed and return correctly shaped DTOs.',
-        },
-        {
-          actor: 'non_member',
-          action: 'Attempts to read a conversation they do not belong to.',
-          expected: 'Backend seam surfaces an access error from the underlying RPC/RLS checks.',
-        },
-      ],
-    },
-    'packages/shared/src/lib/backend/__tests__/moderationBackend.contract.test.ts': {
-      title: 'ModerationBackend Contract',
-      scenarios: [
-        {
-          actor: 'platform_staff_active',
-          action: 'Lists DM reports, fetches detail/context, assigns report, and performs valid status transitions.',
-          expected: 'Staff moderation backend flows succeed and audit actions are created.',
-        },
-        {
-          actor: 'platform_staff_inactive / member_a',
-          action: 'Calls staff-only moderation endpoints.',
-          expected: 'Backend seam rejects access with Haven staff authorization errors.',
-        },
-      ],
-    },
-    'packages/shared/src/lib/backend/__tests__/communityDataBackend.mentions.contract.test.ts': {
-      title: 'CommunityDataBackend Mention Integration Contract',
-      scenarios: [
-        {
-          actor: 'member_a -> member_b',
-          action: 'Sends a channel message via CommunityDataBackend that mentions member_b.',
-          expected: 'The DB trigger produces a channel_mention notification visible to member_b.',
-        },
-      ],
-    },
+    "packages/shared/src/lib/backend/__tests__/notificationBackend.contract.test.ts":
+      {
+        title: "NotificationBackend Contract",
+        scenarios: [
+          {
+            actor: "member_a",
+            action:
+              "Reads and updates global notification preferences through the backend seam.",
+            expected:
+              "Backend DTO mapping works and persisted preferences reload correctly.",
+          },
+          {
+            actor: "member_a",
+            action:
+              "Lists inbox notifications and calls read/dismiss mutations.",
+            expected:
+              "Backend seam can round-trip inbox rows and notification state changes.",
+          },
+        ],
+      },
+    "packages/shared/src/lib/backend/__tests__/socialBackend.contract.test.ts":
+      {
+        title: "SocialBackend Contract",
+        scenarios: [
+          {
+            actor: "member_a",
+            action:
+              "Searches by exact username and sends a friend request to member_b.",
+            expected:
+              "Search returns the target user and sendFriendRequest creates or reuses expected pending state.",
+          },
+          {
+            actor: "member_b",
+            action: "Lists incoming requests and accepts member_a's request.",
+            expected:
+              "Friendship is visible through listFriends and notification side effects are reachable.",
+          },
+        ],
+      },
+    "packages/shared/src/lib/backend/__tests__/directMessageBackend.contract.test.ts":
+      {
+        title: "DirectMessageBackend Contract",
+        scenarios: [
+          {
+            actor: "member_a + member_b",
+            action:
+              "Create or load a 1:1 DM, send a message, read it, mute the conversation, and file a report.",
+            expected:
+              "All DM seam methods succeed and return correctly shaped DTOs.",
+          },
+          {
+            actor: "non_member",
+            action: "Attempts to read a conversation they do not belong to.",
+            expected:
+              "Backend seam surfaces an access error from the underlying RPC/RLS checks.",
+          },
+        ],
+      },
+    "packages/shared/src/lib/backend/__tests__/moderationBackend.contract.test.ts":
+      {
+        title: "ModerationBackend Contract",
+        scenarios: [
+          {
+            actor: "platform_staff_active",
+            action:
+              "Lists DM reports, fetches detail/context, assigns report, and performs valid status transitions.",
+            expected:
+              "Staff moderation backend flows succeed and audit actions are created.",
+          },
+          {
+            actor: "platform_staff_inactive / member_a",
+            action: "Calls staff-only moderation endpoints.",
+            expected:
+              "Backend seam rejects access with Haven staff authorization errors.",
+          },
+        ],
+      },
+    "packages/shared/src/lib/backend/__tests__/communityDataBackend.mentions.contract.test.ts":
+      {
+        title: "CommunityDataBackend Mention Integration Contract",
+        scenarios: [
+          {
+            actor: "member_a -> member_b",
+            action:
+              "Sends a channel message via CommunityDataBackend that mentions member_b.",
+            expected:
+              "The DB trigger produces a channel_mention notification visible to member_b.",
+          },
+        ],
+      },
   },
 };
 
 function timestampForPath(date = new Date()) {
-  return date.toISOString().replace(/[:.]/g, '-');
+  return date.toISOString().replace(/[:.]/g, "-");
 }
 
 function resolveCommandInvocation(command) {
-  if (process.platform !== 'win32') {
+  if (process.platform !== "win32") {
     return { command, shell: false };
   }
 
-  if (command === 'npm' || command === 'npx') {
+  if (command === "npm" || command === "npx") {
     return { command: `${command}.cmd`, shell: true };
   }
 
@@ -362,8 +473,8 @@ function runCapture(command, args, options = {}) {
     const stdout = execFileSync(invocation.command, args, {
       cwd: repoRoot,
       shell: invocation.shell,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
         ...options.env,
@@ -374,8 +485,8 @@ function runCapture(command, args, options = {}) {
     return {
       ok: true,
       status: 0,
-      stdout: sanitizeCapturedText(stdout ?? ''),
-      stderr: '',
+      stdout: sanitizeCapturedText(stdout ?? ""),
+      stderr: "",
       startedAt,
       endedAt: new Date(),
       durationMs: Date.now() - startedMs,
@@ -386,12 +497,16 @@ function runCapture(command, args, options = {}) {
   } catch (error) {
     return {
       ok: false,
-      status: typeof error.status === 'number' ? error.status : 1,
+      status: typeof error.status === "number" ? error.status : 1,
       stdout: sanitizeCapturedText(
-        typeof error.stdout === 'string' ? error.stdout : (error.stdout?.toString?.() ?? '')
+        typeof error.stdout === "string"
+          ? error.stdout
+          : (error.stdout?.toString?.() ?? ""),
       ),
       stderr: sanitizeCapturedText(
-        typeof error.stderr === 'string' ? error.stderr : (error.stderr?.toString?.() ?? '')
+        typeof error.stderr === "string"
+          ? error.stderr
+          : (error.stderr?.toString?.() ?? ""),
       ),
       startedAt,
       endedAt: new Date(),
@@ -409,28 +524,37 @@ function safeCapture(command, args) {
   if (!result.ok) {
     return {
       ok: false,
-      text: [result.stdout, result.stderr, result.errorMessage ?? ''].filter(Boolean).join('\n').trim(),
+      text: [result.stdout, result.stderr, result.errorMessage ?? ""]
+        .filter(Boolean)
+        .join("\n")
+        .trim(),
     };
   }
-  return { ok: true, text: [result.stdout, result.stderr].filter(Boolean).join('\n').trim() };
+  return {
+    ok: true,
+    text: [result.stdout, result.stderr].filter(Boolean).join("\n").trim(),
+  };
 }
 
 function redactEnvOutput(text) {
   return text
-    .replace(/(ANON_KEY|SERVICE_ROLE_KEY)=.+/g, '$1=[redacted]')
-    .replace(/(SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=.+/g, '$1=[redacted]');
+    .replace(/(ANON_KEY|SERVICE_ROLE_KEY)=.+/g, "$1=[redacted]")
+    .replace(
+      /(SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=.+/g,
+      "$1=[redacted]",
+    );
 }
 
 function summarizeOutput(text, maxLines = 40) {
-  const trimmed = (text ?? '').trim();
-  if (!trimmed) return '_No output captured._';
+  const trimmed = (text ?? "").trim();
+  if (!trimmed) return "_No output captured._";
   const lines = trimmed.split(/\r?\n/);
   if (lines.length <= maxLines) return `\`\`\`\n${trimmed}\n\`\`\``;
 
   const headCount = Math.max(10, Math.floor(maxLines / 2));
   const tailCount = Math.max(10, maxLines - headCount);
-  const head = lines.slice(0, headCount).join('\n');
-  const tail = lines.slice(-tailCount).join('\n');
+  const head = lines.slice(0, headCount).join("\n");
+  const tail = lines.slice(-tailCount).join("\n");
   return `\`\`\`\n${head}\n... (${lines.length - headCount - tailCount} lines omitted) ...\n${tail}\n\`\`\``;
 }
 
@@ -440,49 +564,50 @@ function formatDuration(ms) {
 }
 
 function writeLogFiles(runDir, index, step, result, markdownPath = null) {
-  const baseName = `${String(index).padStart(2, '0')}-${step.id}`;
+  const baseName = `${String(index).padStart(2, "0")}-${step.id}`;
   const combinedPath = path.join(runDir, `${baseName}.log`);
   const stdoutPath = path.join(runDir, `${baseName}.stdout.log`);
   const stderrPath = path.join(runDir, `${baseName}.stderr.log`);
 
   const combined = [
-    `$ ${step.command} ${step.args.join(' ')}`,
-    '',
-    result.stdout?.trim() ? '--- stdout ---' : '',
-    result.stdout?.trim() ?? '',
-    result.stderr?.trim() ? '--- stderr ---' : '',
-    result.stderr?.trim() ?? '',
-    result.errorMessage ? `--- error ---\n${result.errorMessage}` : '',
+    `$ ${step.command} ${step.args.join(" ")}`,
+    "",
+    result.stdout?.trim() ? "--- stdout ---" : "",
+    result.stdout?.trim() ?? "",
+    result.stderr?.trim() ? "--- stderr ---" : "",
+    result.stderr?.trim() ?? "",
+    result.errorMessage ? `--- error ---\n${result.errorMessage}` : "",
   ]
     .filter(Boolean)
-    .join('\n');
+    .join("\n");
 
-  fs.writeFileSync(combinedPath, `${combined}\n`, 'utf8');
-  fs.writeFileSync(stdoutPath, `${result.stdout ?? ''}`, 'utf8');
-  fs.writeFileSync(stderrPath, `${result.stderr ?? ''}`, 'utf8');
+  fs.writeFileSync(combinedPath, `${combined}\n`, "utf8");
+  fs.writeFileSync(stdoutPath, `${result.stdout ?? ""}`, "utf8");
+  fs.writeFileSync(stderrPath, `${result.stderr ?? ""}`, "utf8");
 
   return {
-    combined: path.relative(repoRoot, combinedPath).replace(/\\/g, '/'),
+    combined: path.relative(repoRoot, combinedPath).replace(/\\/g, "/"),
     markdown:
       markdownPath && fs.existsSync(markdownPath)
-        ? path.relative(repoRoot, markdownPath).replace(/\\/g, '/')
+        ? path.relative(repoRoot, markdownPath).replace(/\\/g, "/")
         : null,
-    stdout: path.relative(repoRoot, stdoutPath).replace(/\\/g, '/'),
-    stderr: path.relative(repoRoot, stderrPath).replace(/\\/g, '/'),
+    stdout: path.relative(repoRoot, stdoutPath).replace(/\\/g, "/"),
+    stderr: path.relative(repoRoot, stderrPath).replace(/\\/g, "/"),
   };
 }
 
 function summarizeMarkdown(text, maxLines = 80) {
-  const trimmed = (text ?? '').trim();
-  if (!trimmed) return '_No markdown summary captured._';
+  const trimmed = (text ?? "").trim();
+  if (!trimmed) return "_No markdown summary captured._";
   const lines = trimmed.split(/\r?\n/);
   if (lines.length <= maxLines) return trimmed;
-  return `${lines.slice(0, maxLines).join('\n')}\n\n_... ${lines.length - maxLines} more lines in the linked markdown artifact._`;
+  return `${lines.slice(0, maxLines).join("\n")}\n\n_... ${lines.length - maxLines} more lines in the linked markdown artifact._`;
 }
 
 function extractSqlSuiteBasenames(text) {
   const matches = [];
-  const regex = /\[sql-suite\]\s+Running\s+.+?[\\/]tests[\\/]sql[\\/](\d{2}_[^\\/\r\n]+\.sql)/g;
+  const regex =
+    /\[sql-suite\]\s+Running\s+.+?[\\/]tests[\\/]sql[\\/](\d{2}_[^\\/\r\n]+\.sql)/g;
   let m;
   while ((m = regex.exec(text)) !== null) {
     matches.push(m[1]);
@@ -492,7 +617,8 @@ function extractSqlSuiteBasenames(text) {
 
 function extractBackendContractFiles(text) {
   const matches = [];
-  const resetRegex = /\[vitest-local-env\]\s+resetting[^\r\n]*\sbefore\s+(src\/lib\/backend\/__tests__\/[^\r\n]+)/g;
+  const resetRegex =
+    /\[vitest-local-env\]\s+resetting[^\r\n]*\sbefore\s+(src\/lib\/backend\/__tests__\/[^\r\n]+)/g;
   let m;
   while ((m = resetRegex.exec(text)) !== null) {
     matches.push(m[1].trim());
@@ -512,157 +638,189 @@ function pushScenarioBlock(lines, scenario, index) {
 
 function buildExplainedBreakdown(results) {
   const lines = [];
-  lines.push('## Explained Breakdown (Learning View)');
-  lines.push('');
+  lines.push("## Explained Breakdown (Learning View)");
+  lines.push("");
   lines.push(
-    'This section translates the executed suites into human-readable scenarios. It is generated from the files that actually ran plus a maintained scenario catalog.'
+    "This section translates the executed suites into human-readable scenarios. It is generated from the files that actually ran plus a maintained scenario catalog.",
   );
-  lines.push('');
+  lines.push("");
 
   let added = false;
 
   for (const { step, result } of results) {
-    const combinedText = [result.stdout, result.stderr].filter(Boolean).join('\n');
+    const combinedText = [result.stdout, result.stderr]
+      .filter(Boolean)
+      .join("\n");
 
-    if (step.id === 'db' || step.id === 'ci') {
+    if (step.id === "db" || step.id === "ci") {
       const sqlSuites = extractSqlSuiteBasenames(combinedText);
       if (sqlSuites.length > 0) {
         added = true;
         lines.push(`### ${step.label}: SQL / RLS Scenarios`);
-        lines.push('');
+        lines.push("");
         for (const suiteFile of sqlSuites) {
           const entry = explainedScenarioCatalog.sqlSuites[suiteFile];
           lines.push(`- Suite File: \`${suiteFile}\``);
           if (!entry) {
-            lines.push('  - No catalog entry yet (suite ran, but no learning summary is defined yet).');
+            lines.push(
+              "  - No catalog entry yet (suite ran, but no learning summary is defined yet).",
+            );
             continue;
           }
           lines.push(`  - Focus: ${entry.title}`);
-          lines.push('  - Scenarios:');
+          lines.push("  - Scenarios:");
           entry.scenarios.forEach((scenario, index) => {
             lines.push(`    ${index + 1}. Actor: \`${scenario.actor}\``);
             lines.push(`       Action: ${scenario.action}`);
             lines.push(`       Expected: ${scenario.expected}`);
           });
         }
-        lines.push('');
+        lines.push("");
       }
     }
 
-    if (step.id === 'backend' || step.id === 'ci') {
+    if (step.id === "backend" || step.id === "ci") {
       const backendFiles = extractBackendContractFiles(combinedText);
       if (backendFiles.length > 0) {
         added = true;
         lines.push(`### ${step.label}: Backend Contract Scenarios`);
-        lines.push('');
+        lines.push("");
         for (const file of backendFiles) {
           const entry = explainedScenarioCatalog.backendFiles[file];
           lines.push(`- Test File: \`${file}\``);
           if (!entry) {
-            lines.push('  - No catalog entry yet (file ran, but no learning summary is defined yet).');
+            lines.push(
+              "  - No catalog entry yet (file ran, but no learning summary is defined yet).",
+            );
             continue;
           }
           lines.push(`  - Focus: ${entry.title}`);
-          lines.push('  - Scenarios:');
+          lines.push("  - Scenarios:");
           entry.scenarios.forEach((scenario, index) => {
             lines.push(`    ${index + 1}. Actor: \`${scenario.actor}\``);
             lines.push(`       Action: ${scenario.action}`);
             lines.push(`       Expected: ${scenario.expected}`);
           });
         }
-        lines.push('');
+        lines.push("");
       }
     }
   }
 
   if (!added) {
-    lines.push('_No explained scenarios were detected for the steps that ran in this report._');
-    lines.push('');
+    lines.push(
+      "_No explained scenarios were detected for the steps that ran in this report._",
+    );
+    lines.push("");
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
-function buildReport({ runId, modeName, startedAt, endedAt, envInfo, gitInfo, nodeInfo, results }) {
+function buildReport({
+  runId,
+  modeName,
+  startedAt,
+  endedAt,
+  envInfo,
+  gitInfo,
+  nodeInfo,
+  results,
+}) {
   const totalMs = endedAt.getTime() - startedAt.getTime();
   const passed = results.filter((r) => r.result.ok).length;
   const failed = results.length - passed;
-  const status = failed === 0 ? 'PASS' : 'FAIL';
+  const status = failed === 0 ? "PASS" : "FAIL";
 
   const lines = [];
   lines.push(`# Local Test Suite Report (${status})`);
-  lines.push('');
+  lines.push("");
   lines.push(`- Run ID: \`${runId}\``);
   lines.push(`- Mode: \`${modeName}\``);
   lines.push(`- Started: ${startedAt.toISOString()}`);
   lines.push(`- Finished: ${endedAt.toISOString()}`);
   lines.push(`- Duration: ${formatDuration(totalMs)}`);
   lines.push(`- Summary: ${passed} passed / ${failed} failed`);
-  lines.push('');
-  lines.push('## Environment Snapshot');
-  lines.push('');
-  lines.push(`- Git branch: \`${gitInfo.branch || 'unknown'}\``);
-  lines.push(`- Git commit: \`${gitInfo.commit || 'unknown'}\``);
-  lines.push(`- Node: \`${nodeInfo.node || 'unknown'}\``);
-  lines.push(`- npm: \`${nodeInfo.npm || 'unknown'}\``);
-  lines.push(`- Supabase CLI: \`${nodeInfo.supabase || 'unknown'}\``);
-  lines.push(`- psql: \`${nodeInfo.psql || 'unknown'}\``);
-  lines.push('');
+  lines.push("");
+  lines.push("## Environment Snapshot");
+  lines.push("");
+  lines.push(`- Git branch: \`${gitInfo.branch || "unknown"}\``);
+  lines.push(`- Git commit: \`${gitInfo.commit || "unknown"}\``);
+  lines.push(`- Node: \`${nodeInfo.node || "unknown"}\``);
+  lines.push(`- npm: \`${nodeInfo.npm || "unknown"}\``);
+  lines.push(`- Supabase CLI: \`${nodeInfo.supabase || "unknown"}\``);
+  lines.push(`- psql: \`${nodeInfo.psql || "unknown"}\``);
+  lines.push("");
   if (envInfo.statusText) {
-    lines.push('### Local Supabase Status (`supabase status -o env`)');
-    lines.push('');
+    lines.push("### Local Supabase Status (`supabase status -o env`)");
+    lines.push("");
     lines.push(`\`\`\`\n${redactEnvOutput(envInfo.statusText)}\n\`\`\``);
-    lines.push('');
+    lines.push("");
   }
 
-  lines.push('## Command Results');
-  lines.push('');
-  lines.push('| Step | Result | Duration | Command | Logs |');
-  lines.push('|---|---|---:|---|---|');
+  lines.push("## Command Results");
+  lines.push("");
+  lines.push("| Step | Result | Duration | Command | Logs |");
+  lines.push("|---|---|---:|---|---|");
   for (const { step, result, logs } of results) {
-    const outcome = result.ok ? 'PASS' : `FAIL (${result.status})`;
+    const outcome = result.ok ? "PASS" : `FAIL (${result.status})`;
     lines.push(
-      `| ${step.label} | ${outcome} | ${formatDuration(result.durationMs)} | \`${step.command} ${step.args.join(' ')}\` | \`${logs.combined}\` |`
+      `| ${step.label} | ${outcome} | ${formatDuration(result.durationMs)} | \`${step.command} ${step.args.join(" ")}\` | \`${logs.combined}\` |`,
     );
   }
 
   for (const { step, result, logs } of results) {
-    const combinedText = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+    const combinedText = [result.stdout, result.stderr]
+      .filter(Boolean)
+      .join("\n")
+      .trim();
     const markdownText = logs.markdown
-      ? fs.readFileSync(path.join(repoRoot, logs.markdown), 'utf8')
+      ? fs.readFileSync(path.join(repoRoot, logs.markdown), "utf8")
       : null;
-    lines.push('');
+    lines.push("");
     lines.push(`## ${step.label}`);
-    lines.push('');
-    lines.push(`- Result: ${result.ok ? 'PASS' : `FAIL (${result.status})`}`);
+    lines.push("");
+    lines.push(`- Result: ${result.ok ? "PASS" : `FAIL (${result.status})`}`);
     lines.push(`- Duration: ${formatDuration(result.durationMs)}`);
     lines.push(`- Started: ${result.startedAt.toISOString()}`);
     lines.push(`- Finished: ${result.endedAt.toISOString()}`);
-    lines.push(`- Logs: \`${logs.combined}\`, \`${logs.stdout}\`, \`${logs.stderr}\``);
+    lines.push(
+      `- Logs: \`${logs.combined}\`, \`${logs.stdout}\`, \`${logs.stderr}\``,
+    );
     if (logs.markdown) {
       lines.push(`- Vitest Markdown: \`${logs.markdown}\``);
     }
     if (!result.ok && result.errorMessage) {
-      lines.push(`- Error: \`${result.errorMessage.replace(/\r?\n/g, ' ')}\``);
+      lines.push(`- Error: \`${result.errorMessage.replace(/\r?\n/g, " ")}\``);
     }
-    lines.push('');
-    lines.push(markdownText ? '### Markdown Summary' : '### Output Excerpt');
-    lines.push('');
-    lines.push(markdownText ? summarizeMarkdown(markdownText) : summarizeOutput(combinedText));
+    lines.push("");
+    lines.push(markdownText ? "### Markdown Summary" : "### Output Excerpt");
+    lines.push("");
+    lines.push(
+      markdownText
+        ? summarizeMarkdown(markdownText)
+        : summarizeOutput(combinedText),
+    );
   }
 
-  lines.push('');
+  lines.push("");
   lines.push(buildExplainedBreakdown(results));
 
-  lines.push('');
-  lines.push('## Notes');
-  lines.push('');
-  lines.push('- This report is generated locally and written under `test-reports/` (git-ignored).');
-  lines.push('- Raw per-step logs are saved alongside this report for troubleshooting.');
-  lines.push('- `DEP0190` warnings on Windows are currently expected from `npx.cmd` shell fallback in test runners.');
-  lines.push('');
+  lines.push("");
+  lines.push("## Notes");
+  lines.push("");
+  lines.push(
+    "- This report is generated locally and written under `test-reports/` (git-ignored).",
+  );
+  lines.push(
+    "- Raw per-step logs are saved alongside this report for troubleshooting.",
+  );
+  lines.push(
+    "- `DEP0190` warnings on Windows are currently expected from `npx.cmd` shell fallback in test runners.",
+  );
+  lines.push("");
 
-  return `${lines.join('\n')}\n`;
+  return `${lines.join("\n")}\n`;
 }
 
 function ensureDir(dir) {
@@ -672,23 +830,30 @@ function ensureDir(dir) {
 function main() {
   const startedAt = new Date();
   const runId = timestampForPath(startedAt);
-  const runDir = path.join(repoRoot, 'test-reports', `${runId}.local`);
+  const runDir = path.join(repoRoot, "test-reports", `${runId}.local`);
   ensureDir(runDir);
 
-  const gitBranch = safeCapture('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
-  const gitCommit = safeCapture('git', ['rev-parse', 'HEAD']);
-  const nodeVersion = safeCapture('node', ['-v']);
-  const npmVersion = safeCapture('npm', ['-v']);
-  const supabaseVersion = safeCapture('npx', ['supabase', '--version']);
-  const psqlVersion = safeCapture('psql', ['--version']);
-  const supabaseStatus = safeCapture('npx', ['supabase', 'status', '-o', 'env']);
+  const gitBranch = safeCapture("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+  const gitCommit = safeCapture("git", ["rev-parse", "HEAD"]);
+  const nodeVersion = safeCapture("node", ["-v"]);
+  const npmVersion = safeCapture("npm", ["-v"]);
+  const supabaseVersion = safeCapture("npx", ["supabase", "--version"]);
+  const psqlVersion = safeCapture("psql", ["--version"]);
+  const supabaseStatus = safeCapture("npx", [
+    "supabase",
+    "status",
+    "-o",
+    "env",
+  ]);
 
   const steps = commandSets[mode];
   const results = [];
   let failed = false;
 
   for (const [index, step] of steps.entries()) {
-    console.log(`[test-report] Running: ${step.command} ${step.args.join(' ')}`);
+    console.log(
+      `[test-report] Running: ${step.command} ${step.args.join(" ")}`,
+    );
     const markdownPath = getVitestMarkdownOutputPath(runDir, index + 1, step);
     const result = runCapture(step.command, step.args, {
       env: getVitestReporterEnv(markdownPath, step.label),
@@ -709,7 +874,9 @@ function main() {
     startedAt,
     endedAt,
     envInfo: {
-      statusText: supabaseStatus.ok ? supabaseStatus.text : `Unavailable: ${supabaseStatus.text}`,
+      statusText: supabaseStatus.ok
+        ? supabaseStatus.text
+        : `Unavailable: ${supabaseStatus.text}`,
     },
     gitInfo: {
       branch: gitBranch.ok ? gitBranch.text : null,
@@ -724,11 +891,15 @@ function main() {
     results,
   });
 
-  const reportPath = path.join(runDir, 'report.local.md');
-  fs.writeFileSync(reportPath, report, 'utf8');
+  const reportPath = path.join(runDir, "report.local.md");
+  fs.writeFileSync(reportPath, report, "utf8");
 
-  console.log(`[test-report] Report written: ${path.relative(repoRoot, reportPath).replace(/\\/g, '/')}`);
-  console.log(`[test-report] Raw logs dir: ${path.relative(repoRoot, runDir).replace(/\\/g, '/')}`);
+  console.log(
+    `[test-report] Report written: ${path.relative(repoRoot, reportPath).replace(/\\/g, "/")}`,
+  );
+  console.log(
+    `[test-report] Raw logs dir: ${path.relative(repoRoot, runDir).replace(/\\/g, "/")}`,
+  );
 
   if (failed) {
     process.exitCode = 1;

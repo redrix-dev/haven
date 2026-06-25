@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { ThemedIonicons } from "@/theme-rn";
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import { useCallback, useMemo, useState } from "react";
@@ -46,9 +46,11 @@ type InfoRowProps = {
 function InfoRow({ label, value, mono = false }: InfoRowProps) {
   return (
     <View className="flex-row items-start gap-3">
-      <Text className="w-24 text-[#8E8E93] text-[12px] font-semibold">{label}</Text>
+      <Text className="w-24 text-muted-foreground text-[12px] font-semibold">
+        {label}
+      </Text>
       <Text
-        className={`flex-1 text-white text-[13px] ${mono ? "font-mono" : ""}`}
+        className={`flex-1 text-foreground text-[13px] ${mono ? "font-mono" : ""}`}
         selectable={mono}
       >
         {value}
@@ -106,7 +108,9 @@ export default function AppUpdatesCard() {
     }
     if (isDownloading) {
       const progressLabel = formatProgress(downloadProgress);
-      return progressLabel ? `Downloading update (${progressLabel})…` : "Downloading update…";
+      return progressLabel
+        ? `Downloading update (${progressLabel})…`
+        : "Downloading update…";
     }
     if (isChecking || isManuallyChecking) {
       return "Checking for updates…";
@@ -135,15 +139,19 @@ export default function AppUpdatesCard() {
   ]);
 
   const handleReload = useCallback(() => {
-    Alert.alert("Apply downloaded update?", "Restart the app now to run the downloaded OTA?", [
-      { text: "Later", style: "cancel" },
-      {
-        text: "Restart now",
-        onPress: () => {
-          void Updates.reloadAsync();
+    Alert.alert(
+      "Apply downloaded update?",
+      "Restart the app now to run the downloaded OTA?",
+      [
+        { text: "Later", style: "cancel" },
+        {
+          text: "Restart now",
+          onPress: () => {
+            void Updates.reloadAsync();
+          },
         },
-      },
-    ]);
+      ],
+    );
   }, []);
 
   const handleCheckNow = useCallback(async () => {
@@ -198,7 +206,8 @@ export default function AppUpdatesCard() {
 
       if (fetchResult.isNew) {
         const updateId =
-          "id" in fetchResult.manifest && typeof fetchResult.manifest.id === "string"
+          "id" in fetchResult.manifest &&
+          typeof fetchResult.manifest.id === "string"
             ? fetchResult.manifest.id
             : undefined;
         setManualStatus(
@@ -206,15 +215,19 @@ export default function AppUpdatesCard() {
             ? `Update downloaded (${formatUpdateId(updateId)}). Restart to apply.`
             : "Update downloaded. Restart to apply.",
         );
-        Alert.alert("Update ready", "A new OTA update was downloaded. Restart now to apply it?", [
-          { text: "Later", style: "cancel" },
-          {
-            text: "Restart now",
-            onPress: () => {
-              void Updates.reloadAsync();
+        Alert.alert(
+          "Update ready",
+          "A new OTA update was downloaded. Restart now to apply it?",
+          [
+            { text: "Later", style: "cancel" },
+            {
+              text: "Restart now",
+              onPress: () => {
+                void Updates.reloadAsync();
+              },
             },
-          },
-        ]);
+          ],
+        );
         return;
       }
 
@@ -237,13 +250,20 @@ export default function AppUpdatesCard() {
       ? "Checking…"
       : "Check for Updates";
 
-  const primaryActionDisabled = isChecking || isDownloading || isManuallyChecking;
+  const primaryActionDisabled =
+    isChecking || isDownloading || isManuallyChecking;
 
   return (
-    <View className="rounded-2xl bg-[#1C1C1E] px-4 py-3 gap-3">
+    <View className="rounded-2xl bg-surface-panel px-4 py-3 gap-3">
       <View className="flex-row items-center gap-2">
-        <Ionicons name="cloud-download-outline" size={18} color="#8E8E93" />
-        <Text className="text-white text-[16px] font-semibold">App Updates</Text>
+        <ThemedIonicons
+          name="cloud-download-outline"
+          size={18}
+          colorClassName="accent-muted-foreground"
+        />
+        <Text className="text-foreground text-[16px] font-semibold">
+          App Updates
+        </Text>
       </View>
 
       <View className="gap-2.5">
@@ -257,7 +277,11 @@ export default function AppUpdatesCard() {
         />
         <InfoRow
           label="Launch Source"
-          value={currentlyRunning.isEmbeddedLaunch ? "Embedded binary" : "Downloaded OTA"}
+          value={
+            currentlyRunning.isEmbeddedLaunch
+              ? "Embedded binary"
+              : "Downloaded OTA"
+          }
         />
         <InfoRow
           label="Created"
@@ -272,8 +296,8 @@ export default function AppUpdatesCard() {
             label="Available OTA"
             value={formatUpdateId(
               (downloadedUpdate &&
-                "updateId" in downloadedUpdate &&
-                typeof downloadedUpdate.updateId === "string"
+              "updateId" in downloadedUpdate &&
+              typeof downloadedUpdate.updateId === "string"
                 ? downloadedUpdate.updateId
                 : undefined) ||
                 (availableUpdate &&
@@ -287,20 +311,28 @@ export default function AppUpdatesCard() {
         ) : null}
       </View>
 
-      <View className="rounded-xl bg-[#2C2C2E] px-3 py-2.5">
-        <Text className="text-[#C7C7CC] text-[12px] leading-5">{statusLabel}</Text>
+      <View className="rounded-xl bg-surface-embedded px-3 py-2.5">
+        <Text className="text-muted-foreground text-[12px] leading-5">
+          {statusLabel}
+        </Text>
       </View>
 
       <Pressable
-        onPress={() => void (isUpdatePending ? handleReload() : handleCheckNow())}
+        onPress={() =>
+          void (isUpdatePending ? handleReload() : handleCheckNow())
+        }
         disabled={primaryActionDisabled}
         accessibilityRole="button"
         accessibilityLabel={primaryActionLabel}
         className={`rounded-xl py-2.5 items-center justify-center ${
-          primaryActionDisabled ? "bg-[#3A3A3C] opacity-70" : "bg-[#0A84FF]"
+          primaryActionDisabled
+            ? "bg-surface-embedded opacity-70"
+            : "bg-primary active:bg-primary-hover"
         }`}
       >
-        <Text className="text-white text-[15px] font-semibold">{primaryActionLabel}</Text>
+        <Text className="text-foreground text-[15px] font-semibold">
+          {primaryActionLabel}
+        </Text>
       </Pressable>
     </View>
   );

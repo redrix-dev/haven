@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - uses: supabase/setup-cli@v1
         with:
@@ -32,9 +32,13 @@ jobs:
       - run: node tooling/scripts/mobile/run-in-mobile.mjs npx expo config --type public
       - name: Lockfile discipline
         run: git diff --exit-code -- package-lock.json apps/mobile/package-lock.json
+      # Headless RN bundle smoke: runs the full Metro+Babel graph (JS-only, no
+      # Xcode) so a broken import / missing module / total alias break fails CI
+      # without a simulator. Placed before Supabase so mobile breakage fails fast.
+      - name: Mobile bundle smoke
+        run: npm run mobile:bundle
       - run: supabase start
       - run: npm run ci:verify
       - name: Stop Supabase
         if: always()
         run: supabase stop
-

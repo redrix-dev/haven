@@ -1,12 +1,6 @@
 import { builtinThemes } from "@shared/themes";
 import { useMemo, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { applyMobileTheme } from "@/lib/theme";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
 
@@ -52,7 +46,9 @@ export function MobileDevThemeMenu() {
         accessibilityRole="button"
         accessibilityLabel="Dev theme menu"
       >
-        <Text className="text-sm font-semibold text-primary-foreground">Theme</Text>
+        <Text className="text-sm font-semibold text-primary-foreground">
+          Theme
+        </Text>
       </Pressable>
 
       <Modal
@@ -61,6 +57,7 @@ export function MobileDevThemeMenu() {
         transparent
         onRequestClose={() => setIsOpen(false)}
       >
+        {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - dev-only modal scrim overlay */}
         <Pressable
           className="flex-1 justify-end bg-black/50"
           onPress={() => setIsOpen(false)}
@@ -70,7 +67,9 @@ export function MobileDevThemeMenu() {
             onPress={(e) => e.stopPropagation()}
           >
             <View className="px-4 pb-2 pt-4">
-              <Text className="text-lg font-bold text-foreground">Dev Theme</Text>
+              <Text className="text-lg font-bold text-foreground">
+                Dev Theme
+              </Text>
               <Text className="text-sm text-muted-foreground">
                 Session only. Current: {selectedThemeName}
               </Text>
@@ -91,10 +90,7 @@ export function MobileDevThemeMenu() {
                   </Text>
                 </Pressable>
               ))}
-              <Pressable
-                onPress={restorePersistedTheme}
-                className="px-4 py-3"
-              >
+              <Pressable onPress={restorePersistedTheme} className="px-4 py-3">
                 <Text className="text-base text-foreground">
                   Restore saved preference
                 </Text>

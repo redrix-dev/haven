@@ -1,0 +1,981 @@
+import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
+import type {
+  VoiceRealtimeChannel,
+  VoiceRealtimeTransport,
+} from "@shared/features/voice/types";
+import type {
+  AuthStorePort,
+  UiStorePort,
+  UserStatusStorePort,
+} from "@shared/core/sessionStorePorts";
+import { getCommunityDataBackend } from "@shared/lib/backend";
+import type {
+  BanEligibleServer,
+  DirectMessage,
+  OnboardingClientContext,
+  OnboardingCompletionResult,
+  ProfileVisibility,
+  UserFlairBadge,
+  UserFlairGrant,
+} from "@shared/lib/backend/types";
+import {
+  createHavenBackends,
+  type HavenBackends,
+  type HavenSupabasePublicConfig,
+} from "@shared/core/backends";
+import { notifyActiveServerAccessLost } from "@shared/core/communityAccessHandlers";
+import {
+  BootstrapPhase,
+  type BootstrapPhaseSnapshot,
+  type BootstrapPhaseListener,
+} from "./bootstrapPhase";
+import {
+  resolvePreferredChannelIdForServer,
+  toChannel,
+} from "@shared/core/communityChannelUtils";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import {
+  routeRealtimeEvent,
+  type RealtimeEvent,
+} from "@shared/core/routeRealtimeEvent";
+import type { RealtimeMutationTarget } from "@shared/core/realtimeMutationTarget";
+import {
+  createDefaultViewerMessagePolicyState,
+  type ViewerMessagePolicyStore,
+} from "@shared/core/viewerMessagePolicy";
+import { bootLogger } from "@shared/debug/bootLogger";
+import {
+  viewerCommunityPolicyEqual,
+  viewerPolicyHiddenAuthorIdsEqual,
+} from "@shared/core/viewerMessagePolicy";
+import { createCommunityNexus } from "../communities/factory";
+import { createChannelNexus } from "../channels/factory";
+import { createDirectMessageNexus } from "../direct-messages/factory";
+import { createNotificationNexus } from "../notifications/factory";
+import {
+  createCommunityMessageRegistry,
+  type MessageNexusRegistry,
+} from "../messages/registry";
+import { createPlatformNexusBundle } from "../createPlatformNexuses";
+import {
+  createMobileViewerMessagePolicyStore,
+  useAuthStore,
+  useUiStore,
+  useUserStatusStore,
+} from "../session";
+import type { CommunityNexus } from "../communities/CommunityNexus";
+import type { ChannelNexus } from "../channels/ChannelNexus";
+import type { DirectMessageNexus } from "../direct-messages/DirectMessageNexus";
+import type { NotificationNexus } from "../notifications/NotificationNexus";
+import type { CommunityAdminNexus } from "../community-management/CommunityAdminNexus";
+import type { CommunityModerationNexus } from "../community-management/CommunityModerationNexus";
+import type { SocialNexus } from "../social/SocialNexus";
+import type { PermissionsNexus } from "../permissions/PermissionsNexus";
+import type { ProfileNexus } from "../profile/ProfileNexus";
+import type { FeatureFlagNexus } from "../feature-flags/FeatureFlagNexus";
+import type { OnboardingNexus } from "../onboarding/OnboardingNexus";
+import type { VoiceNexus } from "../voice/VoiceNexus";
+import { registerSessionStores } from "./sessionStoreRegistry";
+import {
+  registerSessionBackends,
+  resetSessionBackends,
+} from "@shared/lib/backend/sessionBackendRegistry";
+
+const normalizeRealtimeIso = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const timestamp = Date.parse(trimmed);
+  if (!Number.isFinite(timestamp)) return null;
+  return new Date(timestamp).toISOString();
+};
+
+const realtimeMetadata = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const DEFAULT_WARM_FRESHNESS_MS = 60_000;
+const DEFAULT_DM_WARM_LIMIT = 3;
+const DEFAULT_ADJACENT_CHANNEL_WARM_LIMIT = 2;
+
+const directMessageFromRealtimePayload = (
+  conversationId: string,
+  messageId: string,
+  payload: Record<string, unknown>,
+): DirectMessage | null => {
+  const createdAt = normalizeRealtimeIso(payload.created_at);
+  if (!createdAt || typeof payload.content !== "string") return null;
+  return {
+    messageId,
+    conversationId,
+    authorUserId:
+      typeof payload.author_user_id === "string" ? payload.author_user_id : "",
+    authorUsername: "",
+    authorAvatarUrl: null,
+    content: payload.content,
+    metadata: realtimeMetadata(payload.metadata),
+    createdAt,
+    editedAt: normalizeRealtimeIso(payload.edited_at),
+    deletedAt: normalizeRealtimeIso(payload.deleted_at),
+    attachments: [],
+  };
+};
+
+export type HavenReactCoreOptions = {
+  client: HavenSupabaseClient;
+  publicConfig: HavenSupabasePublicConfig;
+  persistence: NexusPersistence;
+};
+
+export type {
+  VoiceRealtimeChannel,
+  VoiceRealtimeTransport,
+} from "@shared/features/voice/types";
+
+/**
+ * React-platform session-scoped composition root (mobile + transitional web/electron).
+ *
+ * HavenReactCore assumes auth has already established a Supabase session. It owns
+ * the authenticated domain runtime, not sign-in/sign-out/recovery flows.
+ */
+export class HavenReactCore implements RealtimeMutationTarget {
+  readonly backends: HavenBackends;
+  readonly persistence: NexusPersistence;
+  readonly communities: CommunityNexus;
+  readonly channels: ChannelNexus;
+  readonly admin: CommunityAdminNexus;
+  readonly moderation: CommunityModerationNexus;
+  readonly messages: MessageNexusRegistry;
+  readonly directMessages: DirectMessageNexus;
+  readonly notifications: NotificationNexus;
+  readonly social: SocialNexus;
+  readonly permissions: PermissionsNexus;
+  readonly profiles: ProfileNexus;
+  readonly featureFlags: FeatureFlagNexus;
+  readonly onboarding: OnboardingNexus;
+  readonly voice: VoiceNexus;
+
+  readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
+  readonly authStore: AuthStorePort;
+  readonly uiStore: UiStorePort;
+  readonly userStatusStore: UserStatusStorePort;
+
+  private readonly phase = new BootstrapPhase();
+  private realtimeUnsubscribe: (() => void) | null = null;
+  private sessionUserId: string | null = null;
+  private lastNotifiedAccessLostCommunityId: string | null = null;
+
+  constructor(options: HavenReactCoreOptions) {
+    registerSessionStores({
+      authStore: useAuthStore,
+      uiStore: useUiStore,
+      userStatusStore: useUserStatusStore,
+    });
+
+    this.persistence = options.persistence;
+    this.backends = createHavenBackends(options.client, options.publicConfig);
+    registerSessionBackends(this.backends);
+    this.authStore = useAuthStore;
+    this.uiStore = useUiStore;
+    this.userStatusStore = useUserStatusStore;
+    this.viewerMessagePolicyStore = createMobileViewerMessagePolicyStore();
+
+    this.communities = createCommunityNexus(
+      options.persistence,
+      this.backends.controlPlane,
+    );
+    this.channels = createChannelNexus(
+      options.persistence,
+      this.backends.communityData,
+    );
+    this.messages = createCommunityMessageRegistry(
+      options.persistence,
+      this.viewerMessagePolicyStore,
+    );
+    this.directMessages = createDirectMessageNexus(
+      options.persistence,
+      this.backends.directMessages,
+    );
+    this.notifications = createNotificationNexus(
+      options.persistence,
+      this.backends.notifications,
+    );
+
+    const voiceRealtime: VoiceRealtimeTransport = {
+      channel: (topic, channelOptions) =>
+        this.backends.client.channel(
+          topic,
+          channelOptions as never,
+        ) as unknown as VoiceRealtimeChannel,
+      removeChannel: (channel) =>
+        this.backends.client.removeChannel(channel as never),
+      getChannels: () =>
+        this.backends.client.getChannels() as unknown as VoiceRealtimeChannel[],
+    };
+
+    const platformNexuses = createPlatformNexusBundle({
+      persistence: options.persistence,
+      backends: this.backends,
+      viewerMessagePolicyStore: this.viewerMessagePolicyStore,
+      voiceRealtime,
+    });
+    this.admin = platformNexuses.admin;
+    this.moderation = platformNexuses.moderation;
+    this.social = platformNexuses.social;
+    this.permissions = platformNexuses.permissions;
+    this.profiles = platformNexuses.profiles;
+    this.featureFlags = platformNexuses.featureFlags;
+    this.onboarding = platformNexuses.onboarding;
+    this.voice = platformNexuses.voice;
+
+    this.messages.setBackends(this.backends);
+
+    this.social.setPolicySyncCallback(() => {
+      this.syncViewerMessagePolicy();
+    });
+    this.permissions.setPolicySyncCallback((communityId: string) => {
+      this.syncViewerMessagePolicy(communityId);
+    });
+
+    this.communities.setOnListChanged(() => {
+      this.syncActiveCommunityAccess();
+    });
+
+    // Auto-sync policy when the mod "show hidden messages" toggle changes.
+    // This eliminates the need for call sites to manually invoke syncViewerMessagePolicy.
+    this.uiStore.subscribe((state, prevState) => {
+      if (state.showHiddenMessages !== prevState.showHiddenMessages) {
+        this.syncViewerMessagePolicy();
+      }
+    });
+  }
+
+  /**
+   * Notify host handlers when the active community disappears from the list.
+   */
+  syncActiveCommunityAccess(): void {
+    if (this.communities.getIsLoading()) return;
+
+    const communityIds = this.communities.getCommunityIds();
+    const activeCommunityId = this.communities.getActiveId();
+    if (!activeCommunityId) {
+      this.lastNotifiedAccessLostCommunityId = null;
+      return;
+    }
+
+    if (communityIds.includes(activeCommunityId)) {
+      if (this.lastNotifiedAccessLostCommunityId === activeCommunityId) {
+        this.lastNotifiedAccessLostCommunityId = null;
+      }
+      return;
+    }
+
+    if (communityIds.length === 0) {
+      // Wait until a non-empty refresh confirms access loss vs transient load.
+      return;
+    }
+
+    if (this.lastNotifiedAccessLostCommunityId === activeCommunityId) return;
+    this.lastNotifiedAccessLostCommunityId = activeCommunityId;
+    notifyActiveServerAccessLost(activeCommunityId);
+  }
+
+  async refreshCommunities(userId: string): Promise<void> {
+    if (!userId) return;
+    await this.communities.load(userId);
+  }
+
+  async createCommunity(userId: string, name: string): Promise<{ id: string }> {
+    if (!userId) throw new Error("Not authenticated");
+    const community = await this.backends.controlPlane.createCommunity(name);
+    await this.refreshCommunities(userId);
+    return community;
+  }
+
+  setCommunityDisplayOrder(ids: string[]): void {
+    this.communities.setDisplayOrder(ids, this.sessionUserId);
+  }
+
+  resetCommunityDisplayOrder(): void {
+    this.communities.resetDisplayOrder(this.sessionUserId);
+  }
+
+  routeEvent(evt: RealtimeEvent): void {
+    routeRealtimeEvent(this, evt);
+  }
+
+  subscribeRealtime(userId: string): () => void {
+    this.unsubscribeRealtime();
+
+    const unsubscribe =
+      this.backends.controlPlane.subscribeToPrivateUserChannel(
+        userId,
+        (evt) => {
+          this.routeEvent(evt as RealtimeEvent);
+        },
+      );
+
+    this.realtimeUnsubscribe = unsubscribe;
+    return () => {
+      this.unsubscribeRealtime();
+    };
+  }
+
+  private unsubscribeRealtime(): void {
+    if (this.realtimeUnsubscribe) {
+      try {
+        this.realtimeUnsubscribe();
+      } catch (err) {
+        console.warn("[HavenReactCore] realtime unsubscribe failed", err);
+      }
+      this.realtimeUnsubscribe = null;
+    }
+  }
+
+  /**
+   * Sync viewer message policy from SocialNexus + PermissionsNexus + uiStore.
+   * All CommunityMessageNexus instances share viewerMessagePolicyStore.
+   */
+  syncViewerMessagePolicy(communityId?: string | null): void {
+    const activeCommunityId =
+      communityId ?? this.communities.getActiveId() ?? null;
+    const hiddenAuthorIds = this.social.getHiddenAuthorIdsForViewer();
+    const showHiddenMessages = this.uiStore.getState().showHiddenMessages;
+
+    const prev = this.viewerMessagePolicyStore.getState();
+    const prevCommunities = prev.communities;
+    const communities = { ...prevCommunities };
+
+    if (activeCommunityId) {
+      const perms = this.permissions.getPermissions(activeCommunityId);
+      communities[activeCommunityId] = {
+        suppressAuthorFilter: this.permissions.isElevated(activeCommunityId),
+        canViewBanHidden: perms.canViewBanHidden,
+        revokedAuthorIdsByChannel:
+          this.permissions.getRevokedAuthorIdsByChannel(activeCommunityId),
+      };
+    }
+
+    const nextCommunityPolicy = activeCommunityId
+      ? communities[activeCommunityId]
+      : undefined;
+    const prevCommunityPolicy = activeCommunityId
+      ? prevCommunities[activeCommunityId]
+      : undefined;
+
+    if (
+      viewerPolicyHiddenAuthorIdsEqual(prev.hiddenAuthorIds, hiddenAuthorIds) &&
+      prev.showHiddenMessages === showHiddenMessages &&
+      viewerCommunityPolicyEqual(prevCommunityPolicy, nextCommunityPolicy)
+    ) {
+      return;
+    }
+
+    this.viewerMessagePolicyStore.setState({
+      hiddenAuthorIds,
+      showHiddenMessages,
+      communities,
+    });
+  }
+
+  /**
+   * Called by the auth boundary after a session exists. This is where the
+   * authenticated domain graph starts: rehydrate, load, subscribe, route events.
+   */
+  async bootstrapSession(userId: string): Promise<void> {
+    if (!userId) {
+      throw new Error("bootstrapSession requires a userId");
+    }
+
+    this.sessionUserId = userId;
+
+    try {
+      this.phase.set("rehydrating");
+      this.communities.rehydrate();
+      this.communities.loadDisplayOrder(userId);
+      this.channels.rehydrate();
+      this.directMessages.rehydrate();
+      this.notifications.rehydrate();
+      bootLogger.mark("bootstrap-rehydrated");
+
+      this.phase.set("loading_communities");
+      bootLogger.mark("bootstrap-communities-start");
+      await this.communities.load(userId);
+      bootLogger.mark("bootstrap-communities-done");
+
+      const joinedIds = new Set(this.communities.getCommunityIds());
+      for (const id of Object.keys(
+        this.permissions.getPermissionsByCommunityId(),
+      )) {
+        if (!joinedIds.has(id)) {
+          this.permissions.invalidate(id);
+        }
+      }
+      if (joinedIds.size > 0) {
+        bootLogger.mark("bootstrap-permissions-start", {
+          count: joinedIds.size,
+        });
+        await Promise.allSettled(
+          Array.from(joinedIds).map((id) =>
+            this.ensureCommunityPermissions(id),
+          ),
+        );
+        bootLogger.mark("bootstrap-permissions-done");
+      }
+
+      this.phase.set("loading_session_data");
+      bootLogger.mark("bootstrap-session-data-start");
+      const activeCommunityId = this.communities.getActiveId();
+      await Promise.allSettled([
+        this.profiles.ensureViewerProfile(userId),
+        this.profiles.ensurePlatformStaff(userId),
+        this.featureFlags.load(),
+        this.directMessages.ensureConversationsLoaded(),
+        this.notifications.ensureInbox(),
+        this.notifications.ensurePreferences(),
+        this.social.ensureLoaded(),
+      ]);
+      bootLogger.mark("bootstrap-session-data-done");
+      this.syncViewerMessagePolicy(activeCommunityId);
+
+      this.phase.set("connecting_realtime");
+      bootLogger.mark("bootstrap-realtime-start");
+      this.subscribeRealtime(userId);
+      bootLogger.mark("bootstrap-realtime-done");
+
+      this.phase.set("ready");
+      bootLogger.mark("bootstrap-ready");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error ?? "unknown");
+      console.error("[HavenReactCore] bootstrapSession failed", error);
+      this.phase.set("error", message);
+      throw error;
+    }
+  }
+
+  /**
+   * Clears session-scoped domain state. The auth boundary owns ending the
+   * Supabase session itself and calls this as the domain cleanup handoff.
+   */
+  async clearSession(): Promise<void> {
+    this.lastNotifiedAccessLostCommunityId = null;
+    this.unsubscribeRealtime();
+    this.sessionUserId = null;
+    this.communities.clear();
+    this.channels.clear();
+    this.admin.clear();
+    this.moderation.clear();
+    this.messages.clearAll();
+    this.directMessages.clear();
+    this.notifications.clear();
+    this.social.clear();
+    this.permissions.clear();
+    this.profiles.clear();
+    this.featureFlags.reset();
+    this.onboarding.reset();
+    this.voice.clear();
+    this.viewerMessagePolicyStore.setState(
+      createDefaultViewerMessagePolicyState(),
+    );
+    this.uiStore.getState().reset();
+    resetSessionBackends();
+    this.phase.set("idle");
+  }
+
+  getBootstrapPhase(): BootstrapPhaseSnapshot {
+    return this.phase.get();
+  }
+
+  subscribeBootstrapPhase(listener: BootstrapPhaseListener): () => void {
+    return this.phase.subscribe(listener);
+  }
+
+  onRoleChange(communityId: string): void {
+    this.permissions.invalidate(communityId);
+    void this.permissions
+      .ensureLoaded(communityId, this.backends.communityData)
+      .then(() => {
+        this.syncViewerMessagePolicy(communityId);
+      });
+  }
+
+  onNotificationEvent(_payload: Record<string, unknown>): void {
+    void this.notifications.loadInbox().catch((err) => {
+      console.warn("[HavenReactCore] notifications.loadInbox failed", err);
+    });
+    void this.notifications.refreshCounts().catch((err) => {
+      console.warn("[HavenReactCore] notifications.refreshCounts failed", err);
+    });
+  }
+
+  onDmConversationEvent(_payload: Record<string, unknown>): void {
+    void this.directMessages.loadConversations().catch((err) => {
+      console.warn(
+        "[HavenReactCore] directMessages.loadConversations failed",
+        err,
+      );
+    });
+  }
+
+  onDmMessageEvent(payload: Record<string, unknown>): void {
+    const conversationId = payload.conversation_id;
+    const messageId = payload.message_id;
+    if (typeof conversationId === "string") {
+      if (typeof messageId === "string") {
+        const partial = directMessageFromRealtimePayload(
+          conversationId,
+          messageId,
+          payload,
+        );
+        if (partial) {
+          this.directMessages.upsertMessage(partial);
+        }
+        void this.directMessages
+          .receiveMessage(conversationId, messageId)
+          .catch((err) => {
+            console.warn(
+              "[HavenReactCore] directMessages.receiveMessage failed",
+              err,
+            );
+          });
+      } else {
+        void this.directMessages.receiveLatest(conversationId).catch((err) => {
+          console.warn(
+            "[HavenReactCore] directMessages.receiveLatest failed",
+            err,
+          );
+        });
+      }
+    }
+  }
+
+  onSocialChange(payload: Record<string, unknown>): void {
+    this.social.handleSocialChange(payload);
+    this.syncViewerMessagePolicy();
+  }
+
+  /**
+   * Prepare a focused text channel for display: viewer policy, revoked-author
+   * ids, and initial message page (with freshness dedupe on the nexus).
+   */
+  async prepareTextChannelMessages(
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    this.syncViewerMessagePolicy(communityId);
+
+    const channel = this.channels.getChannel(channelId);
+    if (channel?.kind !== "text") return;
+
+    const messageNexus = this.messages.for(communityId);
+    if (!messageNexus.isCommunityDataAttached()) return;
+
+    try {
+      await this.permissions.loadRevokedAuthorIdsForChannel(
+        communityId,
+        channelId,
+        getCommunityDataBackend(communityId),
+      );
+      this.syncViewerMessagePolicy(communityId);
+    } catch (err) {
+      console.warn("[HavenReactCore] loadRevokedAuthorIds failed", err);
+    }
+
+    await messageNexus.ensureInitialLoaded(channelId);
+    // Prime live author identities so snapshot avatars render current and
+    // self-heal. Fire-and-forget: never blocks message rendering.
+    void this.primeMessageAuthorProfiles(communityId, channelId);
+  }
+
+  /**
+   * Batch-fetch current identities for a channel's message authors that we
+   * haven't cached yet and feed them into ProfileNexus. The render path already
+   * prefers a live profile over the message's avatar snapshot, so this makes
+   * blank/stale avatars resolve without a restart.
+   */
+  private async primeMessageAuthorProfiles(
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    try {
+      const messageNexus = this.messages.for(communityId);
+      const authorIds = messageNexus
+        .getChannelAuthorIds(channelId)
+        .filter((id) => this.profiles.getProfile(id) === undefined);
+      if (authorIds.length === 0) return;
+
+      const profiles = await getCommunityDataBackend(
+        communityId,
+      ).fetchMessageAuthorProfiles({ communityId, authorUserIds: authorIds });
+      this.profiles.upsertProfiles(profiles);
+    } catch (error) {
+      console.warn("[HavenReactCore] primeMessageAuthorProfiles failed", error);
+    }
+  }
+
+  private async runWarmTask(
+    label: string,
+    task: () => Promise<unknown>,
+  ): Promise<void> {
+    try {
+      await task();
+    } catch (error) {
+      console.warn(`[HavenReactCore warmup] ${label} failed`, error);
+    }
+  }
+
+  async warmSessionSurfaces(userId: string): Promise<void> {
+    if (!userId.trim()) return;
+
+    await Promise.all([
+      this.runWarmTask("viewer profile", () =>
+        this.profiles.ensureViewerProfile(userId, {
+          freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+        }),
+      ),
+      this.runWarmTask("platform staff", () =>
+        this.profiles.ensurePlatformStaff(userId, {
+          freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+        }),
+      ),
+    ]);
+
+    await this.runWarmTask("notification inbox", () =>
+      this.notifications.ensureInbox({
+        freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+      }),
+    );
+    await this.runWarmTask("notification preferences", () =>
+      this.notifications.ensurePreferences({
+        freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+      }),
+    );
+    await this.runWarmTask("social state", () =>
+      this.social.ensureLoaded({ freshnessMs: DEFAULT_WARM_FRESHNESS_MS }),
+    );
+    await this.runWarmTask("direct message inbox", () =>
+      this.directMessages.ensureConversationsLoaded({
+        freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+      }),
+    );
+    await this.warmDirectMessageThreads({
+      limit: DEFAULT_DM_WARM_LIMIT,
+      unreadOnly: true,
+    });
+  }
+
+  async warmDirectMessageThreads(options?: {
+    limit?: number;
+    unreadOnly?: boolean;
+    freshnessMs?: number;
+  }): Promise<void> {
+    const limit = Math.max(0, options?.limit ?? DEFAULT_DM_WARM_LIMIT);
+    if (limit === 0) return;
+
+    await this.runWarmTask("direct message conversations", () =>
+      this.directMessages.ensureConversationsLoaded({
+        freshnessMs: DEFAULT_WARM_FRESHNESS_MS,
+      }),
+    );
+
+    const conversations = this.directMessages
+      .getConversationsSnapshot()
+      .filter((conversation) =>
+        options?.unreadOnly === false ? true : conversation.unreadCount > 0,
+      )
+      .slice(0, limit);
+
+    await Promise.all(
+      conversations.map((conversation) =>
+        this.runWarmTask(
+          `direct message thread ${conversation.conversationId}`,
+          () =>
+            this.directMessages.ensureMessagesLoaded(
+              conversation.conversationId,
+              { freshnessMs: options?.freshnessMs },
+            ),
+        ),
+      ),
+    );
+  }
+
+  async warmCommunitySurface(
+    communityId: string,
+    options?: { includeAdjacentChannels?: boolean },
+  ): Promise<void> {
+    if (!communityId.trim()) return;
+
+    await this.runWarmTask(`community ${communityId} channels`, () =>
+      this.channels.ensureLoaded(communityId),
+    );
+    await this.runWarmTask(`community ${communityId} permissions`, () =>
+      this.ensureCommunityPermissions(communityId),
+    );
+
+    const channelList = this.channels
+      .getChannelsSnapshot(communityId)
+      .map(toChannel);
+    const activeChannelId = this.channels.getActiveChannelId();
+    const activeBelongsToCommunity =
+      activeChannelId != null &&
+      channelList.some((channel) => channel.id === activeChannelId);
+    const channelId = activeBelongsToCommunity
+      ? activeChannelId
+      : resolvePreferredChannelIdForServer(channelList, {
+          previousChannelId: activeChannelId,
+          lastChannelId: this.channels.getLastChannelId(communityId),
+          defaultChannelId: this.channels.getDefaultChannelId(communityId),
+        });
+
+    this.communities.setActiveId(communityId);
+    this.channels.setActiveChannelId(channelId);
+
+    if (channelId) {
+      await this.runWarmTask(`community ${communityId} active channel`, () =>
+        this.prepareTextChannelMessages(communityId, channelId),
+      );
+    }
+
+    if (options?.includeAdjacentChannels === false || !channelId) return;
+
+    const textChannelIds = channelList
+      .filter((channel) => channel.kind === "text")
+      .map((channel) => channel.id);
+    const activeIndex = textChannelIds.indexOf(channelId);
+    if (activeIndex === -1) return;
+
+    const adjacentIds = [
+      textChannelIds[activeIndex - 1],
+      textChannelIds[activeIndex + 1],
+      textChannelIds[activeIndex - 2],
+      textChannelIds[activeIndex + 2],
+    ].filter((id): id is string => Boolean(id));
+
+    void Promise.all(
+      adjacentIds
+        .slice(0, DEFAULT_ADJACENT_CHANNEL_WARM_LIMIT)
+        .map((adjacentChannelId) =>
+          this.runWarmTask(
+            `community ${communityId} adjacent channel ${adjacentChannelId}`,
+            () =>
+              this.prepareTextChannelMessages(communityId, adjacentChannelId),
+          ),
+        ),
+    );
+  }
+
+  /**
+   * Prepare a focused DM thread: load messages and optionally mark read.
+   */
+  async prepareDirectMessageConversation(
+    conversationId: string,
+    options?: { markRead?: boolean; freshnessMs?: number },
+  ): Promise<void> {
+    await this.directMessages.ensureMessagesLoaded(conversationId, {
+      freshnessMs: options?.freshnessMs,
+    });
+    if (options?.markRead !== false) {
+      await this.directMessages.markRead(conversationId);
+    }
+  }
+
+  /**
+   * Prepare a community before navigating into it: channels, permissions,
+   * preferred focus, and the initial text message page.
+   */
+  async prepareCommunityEntry(
+    communityId: string,
+    options?: { lastVisitedChannelId?: string | null },
+  ): Promise<{ channelId: string | null }> {
+    await this.channels.ensureLoaded(communityId);
+    try {
+      await this.ensureCommunityPermissions(communityId);
+    } catch (error) {
+      console.warn("[HavenReactCore] ensureCommunityPermissions failed", error);
+    }
+
+    const channelList = this.channels
+      .getChannelsSnapshot(communityId)
+      .map(toChannel);
+    const channelId = resolvePreferredChannelIdForServer(channelList, {
+      lastVisitedChannelId: options?.lastVisitedChannelId,
+      previousChannelId: this.channels.getActiveChannelId(),
+      lastChannelId: this.channels.getLastChannelId(communityId),
+      defaultChannelId: this.channels.getDefaultChannelId(communityId),
+    });
+
+    this.communities.setActiveId(communityId);
+    this.channels.setActiveChannelId(channelId);
+
+    if (channelId) {
+      await this.prepareTextChannelMessages(communityId, channelId);
+    }
+
+    return { channelId };
+  }
+
+  /**
+   * Ensure the viewer is elevated in a community (uses PermissionsNexus cache).
+   */
+  async ensureElevated(communityId: string): Promise<boolean> {
+    return this.permissions.ensureElevated(
+      communityId,
+      this.backends.communityData,
+    );
+  }
+
+  async ensureCommunityPermissions(communityId: string): Promise<void> {
+    await this.permissions.ensureLoaded(
+      communityId,
+      this.backends.communityData,
+    );
+    this.syncViewerMessagePolicy(communityId);
+  }
+
+  /**
+   * Broadcast a channel access revocation to realtime subscribers.
+   */
+  async broadcastChannelAccessRevoked(input: {
+    communityId: string;
+    channelId: string;
+    revokedUserId: string;
+  }): Promise<void> {
+    await this.backends.communityData.broadcastMemberChannelAccessRevoked(
+      input,
+    );
+  }
+
+  /**
+   * Redeem an invite code, reload communities, and activate the joined community.
+   */
+  async joinCommunityByInvite(
+    code: string,
+  ): Promise<{ communityId: string; communityName: string; joined: boolean }> {
+    const result = await this.backends.controlPlane.redeemCommunityInvite(code);
+    await this.communities.load(this.sessionUserId!);
+    this.communities.setActiveId(result.communityId);
+    return {
+      communityId: result.communityId,
+      communityName: result.communityName,
+      joined: result.joined,
+    };
+  }
+
+  async completeOnboardingCampaign(
+    campaignKey: string,
+    context: OnboardingClientContext,
+  ): Promise<OnboardingCompletionResult> {
+    const result = await this.onboarding.complete(campaignKey, context);
+    const userId = this.sessionUserId;
+
+    if (userId) {
+      await this.communities.load(userId);
+      await this.profiles
+        .ensureViewerProfile(userId)
+        .catch((error: unknown) => {
+          console.warn(
+            "[HavenReactCore] onboarding viewer profile refresh failed",
+            error,
+          );
+        });
+      await this.profiles.loadMyUserFlairs(userId).catch((error: unknown) => {
+        console.warn("[HavenReactCore] onboarding flair refresh failed", error);
+      });
+    }
+
+    if (result.communityId) {
+      this.communities.setActiveId(result.communityId);
+      await this.ensureCommunityPermissions(result.communityId).catch(
+        (error) => {
+          console.warn(
+            "[HavenReactCore] onboarding permissions refresh failed",
+            error,
+          );
+        },
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Update the authenticated user's profile via the control plane.
+   */
+  async updateUserProfile(input: {
+    userId: string;
+    username: string;
+    avatarUrl: string | null;
+    avatarFile?: Blob | ArrayBuffer | null;
+    avatarContentType?: string;
+    theme?: string;
+    profileVisibility?: ProfileVisibility;
+    profileBio?: string | null;
+  }): Promise<{
+    username: string;
+    avatarUrl: string | null;
+    theme?: string;
+    profileVisibility?: ProfileVisibility;
+    profileBio?: string | null;
+    activeFlair?: UserFlairBadge | null;
+  }> {
+    return this.profiles.updateViewerProfile(input);
+  }
+
+  async loadMyUserFlairs(userId: string): Promise<UserFlairGrant[]> {
+    return this.profiles.loadMyUserFlairs(userId);
+  }
+
+  async setActiveUserFlair(
+    userId: string,
+    userFlairId: string | null,
+  ): Promise<void> {
+    await this.profiles.setActiveUserFlair(userId, userFlairId);
+  }
+
+  /**
+   * Delete a community message as part of community moderation.
+   * Report status remains a separate community modmail action.
+   */
+  async deleteCommunityMessageForModeration(input: {
+    communityId: string;
+    messageId: string;
+  }): Promise<void> {
+    await this.backends.communityData.deleteMessage(input);
+  }
+
+  /**
+   * Resolve which servers the caller can ban a target user from.
+   */
+  async getBanEligibleServers(
+    targetUserId: string,
+  ): Promise<BanEligibleServer[]> {
+    return this.backends.controlPlane.listBanEligibleServersForUser(
+      targetUserId,
+    );
+  }
+
+  async reportUserProfile(input: {
+    communityId?: string | null;
+    targetUserId: string;
+    reporterUserId: string;
+    reason: string;
+  }): Promise<void> {
+    if (input.communityId) {
+      await this.backends.communityData.reportUserProfile({
+        communityId: input.communityId,
+        targetUserId: input.targetUserId,
+        reporterUserId: input.reporterUserId,
+        reason: input.reason,
+      });
+      return;
+    }
+
+    await this.backends.communityData.reportPlatformUserProfile({
+      targetUserId: input.targetUserId,
+      reporterUserId: input.reporterUserId,
+      reason: input.reason,
+    });
+  }
+}

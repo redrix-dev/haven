@@ -1,4 +1,8 @@
-import type { VoiceSettings } from '@shared/app/types/settings';
+import type {
+  VoicePresenceStateRow,
+  VoiceSidebarParticipant,
+} from "@shared/types/types";
+import type { VoiceSettings } from "@shared/types/settings";
 
 export type VoiceControllerChannel = {
   communityId: string;
@@ -6,7 +10,7 @@ export type VoiceControllerChannel = {
   channelName: string;
 };
 
-export type ForceDisconnectVoiceReason = 'access_lost' | 'kicked' | 'ban';
+export type ForceDisconnectVoiceReason = "access_lost" | "kicked" | "ban";
 
 export type VoiceParticipant = {
   userId: string;
@@ -43,7 +47,7 @@ export type VoiceSessionControllerState = {
   isDeafened: boolean;
   error: string | null;
   notice: string | null;
-  iceSource: 'xirsys' | 'fallback' | null;
+  iceSource: "xirsys" | "fallback" | null;
   inputDevices: MediaDeviceInfo[];
   outputDevices: MediaDeviceInfo[];
   selectedInputDeviceId: string;
@@ -76,3 +80,54 @@ export type VoiceSessionControllerActions = {
   getMemberVolume: (userId: string) => number;
   bindAudioElement: (userId: string, element: HTMLAudioElement | null) => void;
 };
+
+export type VoiceConnectionPhase =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "switching"
+  | "disconnecting"
+  | "error";
+
+export type VoiceKickPayload = {
+  targetUserId: string;
+  channelId: string;
+  kickedBy: string;
+};
+
+export type VoiceRealtimeStatus =
+  | "SUBSCRIBED"
+  | "CHANNEL_ERROR"
+  | "TIMED_OUT"
+  | "CLOSED"
+  | string;
+
+export type VoiceRealtimeEventPayload = {
+  payload?: unknown;
+};
+
+export type VoiceRealtimeChannel = {
+  topic?: string;
+  on: (
+    type: "broadcast" | "presence",
+    filter: { event: string },
+    callback: (payload: VoiceRealtimeEventPayload) => void,
+  ) => VoiceRealtimeChannel;
+  subscribe: (callback?: (status: VoiceRealtimeStatus) => void) => unknown;
+  send: (payload: {
+    type: "broadcast";
+    event: string;
+    payload: unknown;
+  }) => Promise<string>;
+  track?: (payload: VoicePresenceStateRow) => Promise<string>;
+  untrack?: () => Promise<string>;
+  presenceState: () => Record<string, VoicePresenceStateRow[]>;
+};
+
+export type VoiceRealtimeTransport = {
+  channel: (topic: string, options?: unknown) => VoiceRealtimeChannel;
+  removeChannel: (channel: VoiceRealtimeChannel) => Promise<unknown> | unknown;
+  getChannels?: () => VoiceRealtimeChannel[];
+};
+
+export type { VoiceSidebarParticipant };

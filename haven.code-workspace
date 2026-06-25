@@ -1,29 +1,31 @@
 {
+  // VSCode/Cursor workspace for Haven. Zed is the primary editor (see
+  // .zed/settings.json); this file is kept roughly in sync with it so Cursor and
+  // VSCode behave the same. Per-machine overrides go in .vscode/ (gitignored).
+  // Intentionally maintained — not a fossil. See docs/ARCHITECTURE.md § Editor
+  // configuration.
   "folders": [
     {
-      "path": "."
-    }
+      "path": ".",
+    },
   ],
   "settings": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "files.eol": "\n",
     "files.associations": {
-      "*.css": "tailwindcss"
+      "*.css": "tailwindcss",
     },
     "typescript.tsdk": "node_modules/typescript/lib",
     "tailwindCSS.experimental.configFile": {
       "apps/mobile/global.css": [
         "apps/mobile/**/*.{js,jsx,ts,tsx}",
-        "apps/mobile/global.css"
+        "apps/mobile/global.css",
       ],
       "packages/shared/src/styles/globals.css": [
-        "apps/web/src/**/*.{js,jsx,ts,tsx}",
-        "apps/electron/src/**/*.{js,jsx,ts,tsx}",
         "packages/shared/src/**/*.{js,jsx,ts,tsx}",
-        "packages/web-client/src/**/*.{js,jsx,ts,tsx}",
-        "packages/shared/src/styles/globals.css"
-      ]
-    }
-  }
+        "packages/shared/src/styles/globals.css",
+      ],
+    },
+    "workbench.activityBar.orientation": "vertical",
+  },
 }
-

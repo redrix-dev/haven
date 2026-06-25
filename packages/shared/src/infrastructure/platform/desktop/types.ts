@@ -1,0 +1,127 @@
+import type {
+  AppSettings,
+  NotificationAudioSettings,
+  VoiceSettings,
+  VoiceTransmissionMode,
+} from "@shared/types/settings";
+
+export type UpdaterStatus = {
+  supported: boolean;
+  isPackaged: boolean;
+  platform: string;
+  enabled: boolean;
+  initialized: boolean;
+  status:
+    | "idle"
+    | "ready"
+    | "checking"
+    | "update_available"
+    | "up_to_date"
+    | "update_downloaded"
+    | "error"
+    | "unsupported_platform"
+    | "dev_mode"
+    | "disabled"
+    | "disabled_pending_restart";
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  disableNeedsRestart: boolean;
+  repository: string;
+};
+
+export type SaveFileFromUrlResult = {
+  saved: boolean;
+  filePath: string | null;
+};
+
+export type VoicePopoutMemberState = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  isSpeaking?: boolean;
+  isMuted: boolean;
+  isDeafened: boolean;
+  volume: number;
+};
+
+export type VoicePopoutDeviceOption = {
+  deviceId: string;
+  label: string;
+};
+
+export type VoicePopoutState = {
+  isOpen: boolean;
+  serverName: string | null;
+  channelName: string | null;
+  connected: boolean;
+  joined: boolean;
+  joining: boolean;
+  isMuted: boolean;
+  isDeafened: boolean;
+  transmissionMode: VoiceTransmissionMode;
+  participantCount: number;
+  selectedInputDeviceId: string;
+  selectedOutputDeviceId: string;
+  inputDevices: VoicePopoutDeviceOption[];
+  outputDevices: VoicePopoutDeviceOption[];
+  supportsOutputSelection: boolean;
+  members: VoicePopoutMemberState[];
+};
+
+export type VoicePopoutControlAction =
+  | { type: "join_voice" }
+  | { type: "leave_voice" }
+  | { type: "toggle_mute" }
+  | { type: "toggle_deafen" }
+  | { type: "set_transmission_mode"; mode: VoiceTransmissionMode }
+  | { type: "set_input_device"; deviceId: string }
+  | { type: "set_output_device"; deviceId: string }
+  | { type: "set_member_volume"; userId: string; volume: number }
+  | { type: "open_voice_settings" }
+  | { type: "open_voice_hardware_test" };
+
+export type DesktopAPI = {
+  getAppSettings: () => Promise<AppSettings>;
+  setAutoUpdateEnabled: (enabled: boolean) => Promise<{
+    settings: AppSettings;
+    updaterStatus: UpdaterStatus;
+  }>;
+  setNotificationAudioSettings: (input: NotificationAudioSettings) => Promise<{
+    settings: AppSettings;
+  }>;
+  setVoiceSettings: (input: VoiceSettings) => Promise<{
+    settings: AppSettings;
+  }>;
+  getUpdaterStatus: () => Promise<UpdaterStatus>;
+  checkForUpdates: () => Promise<UpdaterStatus>;
+  installUpdate: () => Promise<void>;
+  saveFileFromUrl: (input: {
+    url: string;
+    suggestedName?: string | null;
+  }) => Promise<SaveFileFromUrlResult>;
+  openExternalUrl: (url: string) => Promise<void>;
+  consumeNextProtocolUrl: () => Promise<string | null>;
+  minimizeWindow: () => Promise<void>;
+  maximizeWindow: () => Promise<void>;
+  closeWindow: () => Promise<void>;
+  openVoicePopout: () => Promise<{ opened: boolean }>;
+  closeVoicePopout: () => Promise<{ closed: boolean }>;
+  syncVoicePopoutState: (state: VoicePopoutState) => Promise<void>;
+  requestVoicePopoutStateSync: () => Promise<void>;
+  dispatchVoicePopoutControlAction: (
+    action: VoicePopoutControlAction,
+  ) => Promise<void>;
+  onProtocolUrl: (listener: (url: string) => void) => () => void;
+  onVoicePopoutState: (
+    listener: (state: VoicePopoutState) => void,
+  ) => () => void;
+  onVoicePopoutControlAction: (
+    listener: (action: VoicePopoutControlAction) => void,
+  ) => () => void;
+};
+
+declare global {
+  interface Window {
+    desktop?: DesktopAPI;
+  }
+}

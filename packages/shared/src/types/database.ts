@@ -66,6 +66,62 @@ export type Database = {
         }
         Relationships: []
       }
+      flairs: {
+        Row: {
+          background_token: string
+          color_token: string
+          community_id: string | null
+          created_at: string
+          description: string | null
+          icon_key: string | null
+          id: string
+          is_active: boolean
+          is_retired: boolean
+          key: string
+          label: string
+          scope: string
+          updated_at: string
+        }
+        Insert: {
+          background_token?: string
+          color_token?: string
+          community_id?: string | null
+          created_at?: string
+          description?: string | null
+          icon_key?: string | null
+          id?: string
+          is_active?: boolean
+          is_retired?: boolean
+          key: string
+          label: string
+          scope?: string
+          updated_at?: string
+        }
+        Update: {
+          background_token?: string
+          color_token?: string
+          community_id?: string | null
+          created_at?: string
+          description?: string | null
+          icon_key?: string | null
+          id?: string
+          is_active?: boolean
+          is_retired?: boolean
+          key?: string
+          label?: string
+          scope?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flairs_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_group_channels: {
         Row: {
           channel_id: string
@@ -417,6 +473,51 @@ export type Database = {
             columns: ["community_id"]
             isOneToOne: true
             referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_flair_grant_rules: {
+        Row: {
+          community_id: string
+          created_at: string
+          flair_id: string
+          grant_source: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          community_id: string
+          created_at?: string
+          flair_id: string
+          grant_source?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          community_id?: string
+          created_at?: string
+          flair_id?: string
+          grant_source?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_flair_grant_rules_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_flair_grant_rules_flair_id_fkey"
+            columns: ["flair_id"]
+            isOneToOne: false
+            referencedRelation: "flairs"
             referencedColumns: ["id"]
           },
         ]
@@ -1522,6 +1623,8 @@ export type Database = {
           id: string
           is_hidden: boolean
           metadata: Json
+          platform_expunged_at: string | null
+          platform_quarantined_at: string | null
         }
         Insert: {
           author_type?: Database["public"]["Enums"]["message_author_type"]
@@ -1535,6 +1638,8 @@ export type Database = {
           id?: string
           is_hidden?: boolean
           metadata?: Json
+          platform_expunged_at?: string | null
+          platform_quarantined_at?: string | null
         }
         Update: {
           author_type?: Database["public"]["Enums"]["message_author_type"]
@@ -1548,6 +1653,8 @@ export type Database = {
           id?: string
           is_hidden?: boolean
           metadata?: Json
+          platform_expunged_at?: string | null
+          platform_quarantined_at?: string | null
         }
         Relationships: [
           {
@@ -1632,32 +1739,131 @@ export type Database = {
           },
         ]
       }
+      onboarding_campaigns: {
+        Row: {
+          created_at: string
+          description: string | null
+          distribution_scope: string
+          ends_at: string | null
+          feature_flag_key: string
+          is_active: boolean
+          key: string
+          max_app_version: string | null
+          min_app_version: string | null
+          platform_scope: string
+          required: boolean
+          sort_order: number
+          starts_at: string | null
+          target_community_id: string | null
+          target_flair_key: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          distribution_scope?: string
+          ends_at?: string | null
+          feature_flag_key: string
+          is_active?: boolean
+          key: string
+          max_app_version?: string | null
+          min_app_version?: string | null
+          platform_scope?: string
+          required?: boolean
+          sort_order?: number
+          starts_at?: string | null
+          target_community_id?: string | null
+          target_flair_key?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          distribution_scope?: string
+          ends_at?: string | null
+          feature_flag_key?: string
+          is_active?: boolean
+          key?: string
+          max_app_version?: string | null
+          min_app_version?: string | null
+          platform_scope?: string
+          required?: boolean
+          sort_order?: number
+          starts_at?: string | null
+          target_community_id?: string | null
+          target_flair_key?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_campaigns_feature_flag_key_fkey"
+            columns: ["feature_flag_key"]
+            isOneToOne: false
+            referencedRelation: "feature_flags_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "onboarding_campaigns_target_community_id_fkey"
+            columns: ["target_community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_campaigns_target_flair_key_fkey"
+            columns: ["target_flair_key"]
+            isOneToOne: false
+            referencedRelation: "flairs"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          active_user_flair_id: string | null
           avatar_url: string | null
           created_at: string
           id: string
+          profile_bio: string | null
+          profile_visibility: string
           theme: string
           updated_at: string
           username: string
         }
         Insert: {
+          active_user_flair_id?: string | null
           avatar_url?: string | null
           created_at?: string
           id: string
+          profile_bio?: string | null
+          profile_visibility?: string
           theme?: string
           updated_at?: string
           username: string
         }
         Update: {
+          active_user_flair_id?: string | null
           avatar_url?: string | null
           created_at?: string
           id?: string
+          profile_bio?: string | null
+          profile_visibility?: string
           theme?: string
           updated_at?: string
           username?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_active_user_flair_id_fkey"
+            columns: ["active_user_flair_id"]
+            isOneToOne: false
+            referencedRelation: "user_flairs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_identities: {
         Row: {
@@ -1830,40 +2036,46 @@ export type Database = {
       }
       support_reports: {
         Row: {
-          community_id: string
+          community_id: string | null
           created_at: string
           destination: string
           id: string
           include_last_n_messages: number | null
           notes: string | null
+          platform_action: Json | null
           reporter_user_id: string
           snapshot: Json | null
+          source_report_id: string | null
           status: Database["public"]["Enums"]["support_report_status"]
           title: string
           updated_at: string
         }
         Insert: {
-          community_id: string
+          community_id?: string | null
           created_at?: string
           destination?: string
           id?: string
           include_last_n_messages?: number | null
           notes?: string | null
+          platform_action?: Json | null
           reporter_user_id: string
           snapshot?: Json | null
+          source_report_id?: string | null
           status?: Database["public"]["Enums"]["support_report_status"]
           title: string
           updated_at?: string
         }
         Update: {
-          community_id?: string
+          community_id?: string | null
           created_at?: string
           destination?: string
           id?: string
           include_last_n_messages?: number | null
           notes?: string | null
+          platform_action?: Json | null
           reporter_user_id?: string
           snapshot?: Json | null
+          source_report_id?: string | null
           status?: Database["public"]["Enums"]["support_report_status"]
           title?: string
           updated_at?: string
@@ -1879,6 +2091,129 @@ export type Database = {
           {
             foreignKeyName: "support_reports_reporter_user_id_fkey"
             columns: ["reporter_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_onboarding_campaigns: {
+        Row: {
+          campaign_key: string
+          completed_at: string | null
+          created_at: string
+          joined_community_id: string | null
+          skipped_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_key: string
+          completed_at?: string | null
+          created_at?: string
+          joined_community_id?: string | null
+          skipped_at?: string | null
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_key?: string
+          completed_at?: string | null
+          created_at?: string
+          joined_community_id?: string | null
+          skipped_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_onboarding_campaigns_campaign_key_fkey"
+            columns: ["campaign_key"]
+            isOneToOne: false
+            referencedRelation: "onboarding_campaigns"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "user_onboarding_campaigns_joined_community_id_fkey"
+            columns: ["joined_community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_onboarding_campaigns_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_flairs: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          flair_id: string
+          grant_source: string
+          granted_by_user_id: string | null
+          id: string
+          revoked_at: string | null
+          source_community_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          flair_id: string
+          grant_source: string
+          granted_by_user_id?: string | null
+          id?: string
+          revoked_at?: string | null
+          source_community_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          flair_id?: string
+          grant_source?: string
+          granted_by_user_id?: string | null
+          id?: string
+          revoked_at?: string | null
+          source_community_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_flairs_flair_id_fkey"
+            columns: ["flair_id"]
+            isOneToOne: false
+            referencedRelation: "flairs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_flairs_granted_by_user_id_fkey"
+            columns: ["granted_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_flairs_source_community_id_fkey"
+            columns: ["source_community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_flairs_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1997,6 +2332,21 @@ export type Database = {
         }
         Returns: undefined
       }
+      complete_onboarding_campaign: {
+        Args: {
+          p_app_version?: string | null
+          p_campaign_key: string
+          p_distribution?: string
+          p_platform?: string
+        }
+        Returns: {
+          campaign_key: string
+          community_id: string | null
+          community_name: string | null
+          joined: boolean
+          status: string
+        }[]
+      }
       configure_haven_background_cron_jobs: { Args: never; Returns: undefined }
       create_community: {
         Args: { p_description?: string; p_name: string }
@@ -2039,11 +2389,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_community_flair_grant_rule: {
+        Args: {
+          p_community_id: string
+          p_flair_key: string
+          p_grant_source?: string
+        }
+        Returns: string
+      }
       current_user_highest_role_position: {
         Args: { p_community_id: string }
         Returns: number
       }
       delete_own_account: { Args: never; Returns: undefined }
+      disable_community_flair_grant_rule: {
+        Args: { p_rule_id: string }
+        Returns: undefined
+      }
       add_dm_message_report_action: {
         Args: {
           p_action_type: string
@@ -2076,12 +2438,76 @@ export type Database = {
           queued: boolean
         }[]
       }
+      ensure_user_flair_grant: {
+        Args: {
+          p_flair_id: string
+          p_grant_source: string
+          p_granted_by_user_id?: string | null
+          p_source_community_id?: string | null
+          p_user_id: string
+        }
+        Returns: string
+      }
       extract_first_http_url: { Args: { p_content: string }; Returns: string }
+      grant_user_flair: {
+        Args: {
+          p_flair_key: string
+          p_grant_source: string
+          p_source_community_id?: string | null
+          p_user_id: string
+        }
+        Returns: string
+      }
+      get_profile_card: {
+        Args: { p_user_id: string }
+        Returns: {
+          active_flair_background_token: string | null
+          active_flair_color_token: string | null
+          active_flair_description: string | null
+          active_flair_icon_key: string | null
+          active_flair_id: string | null
+          active_flair_key: string | null
+          active_flair_label: string | null
+          active_flair_user_flair_id: string | null
+          avatar_url: string | null
+          can_view_details: boolean
+          profile_bio: string | null
+          profile_visibility: string
+          user_id: string
+          username: string
+        }[]
+      }
+      get_channel_message: {
+        Args: {
+          p_channel_id: string
+          p_community_id: string
+          p_message_id: string
+        }
+        Returns: {
+          attachment: Json | null
+          author_user_id: string | null
+          avatar_snapshot_url: string | null
+          channel_id: string
+          content: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string
+          edited_at: string | null
+          id: string
+          is_hidden: boolean
+          is_platform_staff: boolean
+          link_preview: Json | null
+          metadata: Json
+          reactions: Json | null
+          reply_to_message_id: string | null
+        }[]
+      }
       get_message_author_profiles: {
         Args: { p_author_user_ids: string[]; p_community_id: string }
         Returns: {
           avatar_url: string | null
           id: string
+          updated_at: string
           username: string
         }[]
       }
@@ -2135,11 +2561,51 @@ export type Database = {
         Returns: boolean
       }
       is_platform_staff: { Args: { p_user_id?: string }; Returns: boolean }
+      list_my_user_flairs: {
+        Args: never
+        Returns: {
+          background_token: string
+          color_token: string
+          community_id: string | null
+          description: string | null
+          expires_at: string | null
+          flair_id: string
+          flair_key: string
+          grant_source: string
+          granted_at: string
+          icon_key: string | null
+          is_available: boolean
+          is_selected: boolean
+          label: string
+          scope: string
+          source_community_id: string | null
+          user_flair_id: string
+        }[]
+      }
       list_bannable_shared_communities: {
         Args: { p_target_user_id: string }
         Returns: {
           community_id: string
           community_name: string
+        }[]
+      }
+      list_my_onboarding_campaigns: {
+        Args: {
+          p_app_version?: string | null
+          p_distribution?: string
+          p_platform?: string
+        }
+        Returns: {
+          campaign_key: string
+          description: string | null
+          distribution_scope: string
+          feature_flag_key: string
+          platform_scope: string
+          required: boolean
+          sort_order: number
+          target_community_id: string | null
+          target_flair_key: string | null
+          title: string
         }[]
       }
       list_community_bans: {
@@ -2217,6 +2683,22 @@ export type Database = {
           reporter_username: string | null
           status: Database["public"]["Enums"]["dm_message_report_status"]
           updated_at: string
+        }[]
+      }
+      get_dm_message: {
+        Args: { p_conversation_id: string; p_message_id: string }
+        Returns: {
+          attachments: Json
+          author_avatar_url: string | null
+          author_user_id: string
+          author_username: string
+          content: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          message_id: string
+          metadata: Json
         }[]
       }
       list_dm_messages: {
@@ -2306,6 +2788,10 @@ export type Database = {
           joined: boolean
         }[]
       }
+      revoke_user_flair: {
+        Args: { p_user_flair_id: string }
+        Returns: undefined
+      }
       resolve_dm_notification_delivery_for_user: {
         Args: { p_conversation_id: string; p_recipient_user_id: string }
         Returns: {
@@ -2337,6 +2823,10 @@ export type Database = {
       set_dm_conversation_muted: {
         Args: { p_conversation_id: string; p_muted: boolean }
         Returns: boolean
+      }
+      set_active_user_flair: {
+        Args: { p_user_flair_id: string | null }
+        Returns: undefined
       }
       set_haven_background_cron_config: {
         Args: {
@@ -2407,6 +2897,7 @@ export type Database = {
         | "resolved"
         | "dismissed"
         | "escalated"
+        | "resolved_by_platform"
     }
     CompositeTypes: {
       [_ in never]: never

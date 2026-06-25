@@ -1,0 +1,43 @@
+/*
+ * App-owned Tailwind entry for the Solid client.
+ *
+ * The theme itself (globals.css) is GENERATED and shared across apps — never edit
+ * it by hand. But Tailwind v4 roots its automatic class-scanning near that file's
+ * package (packages/shared), which misses the real UI source in this package and
+ * in apps/tauri. So the app declares its own content sources here, and imports
+ * THIS file instead of globals.css directly.
+ *
+ * Add a @source line if UI class names ever live somewhere new.
+ */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "../../shared/src/styles/globals.css";
+
+@source "./";
+@source "../../../apps/tauri/src";
+
+/* Explicit typography: Geist for UI, Geist Mono for code. Overriding the
+   Tailwind font tokens makes `font-sans`/`font-mono` utilities (and the
+   Markdown renderer's code chips) resolve to them everywhere. */
+@theme {
+  --font-sans:
+    "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:
+    "Geist Mono Variable", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+/* The app fills the window; every screen sizes itself with h-full from here. */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+}

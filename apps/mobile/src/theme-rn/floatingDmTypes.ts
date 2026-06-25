@@ -9,7 +9,7 @@ export type FloatingDmChannelConfig = {
   id: FloatingDmChannelId;
   /** Navbar / bubble chrome label (short). */
   label: string;
-  /** Sheet header — maps to HavenModalShell `title` + body context. */
+  /** Sheet header — maps to HavenFormSheet / HavenListSheet `title` + body context. */
   sheetTitle: string;
   bubbleColor: string;
   sheetBackgroundColor: string;

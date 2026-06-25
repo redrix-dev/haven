@@ -4,7 +4,8 @@ type PasswordRecoveryGateValue = {
   clearPasswordRecoveryGate: () => void;
 };
 
-const PasswordRecoveryGateContext = createContext<PasswordRecoveryGateValue | null>(null);
+const PasswordRecoveryGateContext =
+  createContext<PasswordRecoveryGateValue | null>(null);
 
 export function PasswordRecoveryGateProvider({
   children,

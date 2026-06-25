@@ -4,12 +4,16 @@ import {
   Pressable,
   TextInput,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getErrorMessage } from "@shared/platform/lib/errors";
-import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import {
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from "@react-navigation/native";
 import { useState } from "react";
 import type { RootStackParamList } from "@/navigation/types";
 import { usePasswordRecoveryGate } from "@/navigation/PasswordRecoveryGateContext";
@@ -27,7 +31,8 @@ const inputClassName =
 
 export function PasswordRecoveryScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, "PasswordRecovery">>();
   const recoveryGate = usePasswordRecoveryGate();
 
@@ -88,10 +93,7 @@ export function PasswordRecoveryScreen() {
 
   if (flow === "setNewPassword") {
     return (
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1 bg-background"
-      >
+      <KeyboardAvoidingView behavior="padding" className="flex-1 bg-background">
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
@@ -106,12 +108,15 @@ export function PasswordRecoveryScreen() {
             className="w-full max-w-sm self-center rounded-3xl border border-border bg-card p-6 shadow-xl shadow-background/40"
             style={Platform.OS === "android" ? { elevation: 8 } : undefined}
           >
-            <Text className="mb-1 text-center text-2xl font-semibold text-foreground">Haven</Text>
+            <Text className="mb-1 text-center text-2xl font-semibold text-foreground">
+              Haven
+            </Text>
             <Text className="mb-2 text-center text-lg font-semibold text-foreground">
               Set a new password
             </Text>
             <Text className="mb-8 text-center text-sm leading-5 text-muted-foreground">
-              Your reset link is verified. Set a new password to finish account recovery.
+              Your reset link is verified. Set a new password to finish account
+              recovery.
             </Text>
 
             <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">
@@ -143,7 +148,9 @@ export function PasswordRecoveryScreen() {
             />
 
             {setPasswordError ? (
-              <Text className="mb-4 text-center text-sm text-destructive">{setPasswordError}</Text>
+              <Text className="mb-4 text-center text-sm text-destructive">
+                {setPasswordError}
+              </Text>
             ) : null}
 
             <Pressable
@@ -156,8 +163,14 @@ export function PasswordRecoveryScreen() {
               </Text>
             </Pressable>
 
-            <Pressable className="py-2" onPress={() => void signOutFromRecovery()} hitSlop={8}>
-              <Text className="text-center text-sm text-muted-foreground">Sign out</Text>
+            <Pressable
+              className="py-2"
+              onPress={() => void signOutFromRecovery()}
+              hitSlop={8}
+            >
+              <Text className="text-center text-sm text-muted-foreground">
+                Sign out
+              </Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -166,10 +179,7 @@ export function PasswordRecoveryScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-background"
-    >
+    <KeyboardAvoidingView behavior="padding" className="flex-1 bg-background">
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
@@ -184,7 +194,9 @@ export function PasswordRecoveryScreen() {
           className="w-full max-w-sm self-center rounded-3xl border border-border bg-card p-6 shadow-xl shadow-background/40"
           style={Platform.OS === "android" ? { elevation: 8 } : undefined}
         >
-          <Text className="mb-1 text-center text-2xl font-semibold text-foreground">Haven</Text>
+          <Text className="mb-1 text-center text-2xl font-semibold text-foreground">
+            Haven
+          </Text>
 
           {submitSuccess ? (
             <>
@@ -193,8 +205,8 @@ export function PasswordRecoveryScreen() {
               </Text>
               <Text className="mb-8 text-center text-sm leading-6 text-muted-foreground">
                 We sent a password reset link to{" "}
-                <Text className="text-sm text-foreground">{email.trim()}</Text>. Open the email and
-                follow the link to choose a new password.
+                <Text className="text-sm text-foreground">{email.trim()}</Text>.
+                Open the email and follow the link to choose a new password.
               </Text>
               <Pressable
                 className="rounded-xl bg-primary py-4"
@@ -211,7 +223,9 @@ export function PasswordRecoveryScreen() {
                 Reset your password
               </Text>
 
-              <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">Email</Text>
+              <Text className="mb-2 uppercase text-xs tracking-wide text-muted-foreground">
+                Email
+              </Text>
               <TextInput
                 className={inputClassName}
                 autoCapitalize="none"
@@ -224,7 +238,9 @@ export function PasswordRecoveryScreen() {
               />
 
               {error ? (
-                <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
+                <Text className="mb-4 text-center text-sm text-destructive">
+                  {error}
+                </Text>
               ) : null}
 
               <Pressable
@@ -238,12 +254,22 @@ export function PasswordRecoveryScreen() {
               </Pressable>
 
               <View className="flex-row flex-wrap items-center justify-center gap-x-1 gap-y-1">
-                <Pressable hitSlop={8} onPress={() => void navigation.navigate("Login")}>
-                  <Text className="text-center text-sm text-primary">Back to login</Text>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => void navigation.navigate("Login")}
+                >
+                  <Text className="text-center text-sm text-primary">
+                    Back to login
+                  </Text>
                 </Pressable>
                 <Text className="text-sm text-muted-foreground"> · </Text>
-                <Pressable hitSlop={8} onPress={() => void navigation.navigate("SignUp")}>
-                  <Text className="text-center text-sm text-primary">Sign up</Text>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => void navigation.navigate("SignUp")}
+                >
+                  <Text className="text-center text-sm text-primary">
+                    Sign up
+                  </Text>
                 </Pressable>
               </View>
             </>

@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect } from "react";
@@ -14,6 +13,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { RootStackParamList } from "@/navigation/types";
+import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
 
 type HavenNavbarProps = {
   onPressSettings?: () => void;
@@ -28,9 +28,14 @@ type HavenNavbarProps = {
   onPressFriends?: () => void;
 };
 
-const goHome = (navigation: NativeStackNavigationProp<RootStackParamList>) =>
+const goCommunityEntry = (
+  navigation: NativeStackNavigationProp<RootStackParamList>,
+) =>
   navigation.dispatch(
-    CommonActions.navigate({ name: "Main", params: { screen: "Home" } }),
+    CommonActions.navigate({
+      name: "Main",
+      params: { screen: "CommunityEntry" },
+    }),
   );
 
 function NotificationsBellButton({
@@ -67,16 +72,22 @@ function NotificationsBellButton({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
-          unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"
+          unreadCount > 0
+            ? `Notifications, ${unreadCount} unread`
+            : "Notifications"
         }
         className="h-11 w-11 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
         onPress={onPress}
       >
         <View>
-          <Ionicons name="notifications-outline" size={22} color="#e6edf7" />
+          <ThemedIonicons
+            name="notifications-outline"
+            size={22}
+            colorClassName="accent-foreground"
+          />
           {unreadCount > 0 ? (
-            <View className="absolute -right-0.5 -top-0.5 min-w-[10px] rounded-full bg-accent-slider px-[3px] py-0.5">
-              <Text className="text-center text-[9px] font-bold leading-none text-white">
+            <View className="absolute -right-1 -top-1 min-w-5 rounded-full bg-accent-slider px-1 py-0.5">
+              <Text className="text-center text-xs font-bold leading-4 text-primary-foreground">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </Text>
             </View>
@@ -98,8 +109,8 @@ function IconWithBadge({
     <View>
       {children}
       {count > 0 ? (
-        <View className="absolute -right-0.5 -top-0.5 min-w-[10px] rounded-full bg-accent-slider px-[3px] py-0.5">
-          <Text className="text-center text-[9px] font-bold leading-none text-white">
+        <View className="absolute -right-1 -top-1 min-w-5 rounded-full bg-accent-slider px-1 py-0.5">
+          <Text className="text-center text-xs font-bold leading-4 text-primary-foreground">
             {count > 99 ? "99+" : count}
           </Text>
         </View>
@@ -118,18 +129,20 @@ export function HavenNavbar({
   onPressFriends,
 }: HavenNavbarProps) {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const iconBtn = (
-    name: keyof typeof Ionicons.glyphMap,
-    onPress: () => void,
-  ) => (
+  const iconBtn = (name: ThemedIoniconsProps["name"], onPress: () => void) => (
     <Pressable
       accessibilityRole="button"
       className="h-11 w-11 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
       onPress={onPress}
     >
-      <Ionicons name={name} size={22} color="#e6edf7" />
+      <ThemedIonicons
+        name={name}
+        size={22}
+        colorClassName="accent-foreground"
+      />
     </Pressable>
   );
 
@@ -142,9 +155,9 @@ export function HavenNavbar({
         <View className="z-10 flex-row gap-2">
           {iconBtn("chevron-back", () => {
             if (navigation.canGoBack()) navigation.goBack();
-            else goHome(navigation);
+            else goCommunityEntry(navigation);
           })}
-          {iconBtn("home", () => goHome(navigation))}
+          {iconBtn("home", () => goCommunityEntry(navigation))}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
@@ -156,7 +169,11 @@ export function HavenNavbar({
             onPress={onPressFriends ?? (() => undefined)}
           >
             <IconWithBadge count={friendRequestCount}>
-              <Ionicons name="people" size={22} color="#e6edf7" />
+              <ThemedIonicons
+                name="people"
+                size={22}
+                colorClassName="accent-foreground"
+              />
             </IconWithBadge>
           </Pressable>
         </View>
@@ -183,7 +200,11 @@ export function HavenNavbar({
             onPress={onPressDirectMessages ?? (() => undefined)}
           >
             <IconWithBadge count={dmUnreadCount}>
-              <Ionicons name="chatbubble-outline" size={22} color="#e6edf7" />
+              <ThemedIonicons
+                name="chatbubble-outline"
+                size={22}
+                colorClassName="accent-foreground"
+              />
             </IconWithBadge>
           </Pressable>
           {iconBtn("cog-outline", onPressSettings ?? (() => undefined))}

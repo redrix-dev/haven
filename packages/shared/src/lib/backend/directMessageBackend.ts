@@ -19,6 +19,10 @@ export interface DirectMessageBackend {
     beforeCreatedAt?: string | null;
     beforeMessageId?: string | null;
   }): Promise<DirectMessage[]>;
+  getMessage(input: {
+    conversationId: string;
+    messageId: string;
+  }): Promise<DirectMessage | null>;
   sendMessage(input: {
     conversationId: string;
     content: string;
@@ -32,7 +36,10 @@ export interface DirectMessageBackend {
     };
   }): Promise<DirectMessage>;
   markConversationRead(conversationId: string): Promise<boolean>;
-  setConversationMuted(input: { conversationId: string; muted: boolean }): Promise<boolean>;
+  setConversationMuted(input: {
+    conversationId: string;
+    muted: boolean;
+  }): Promise<boolean>;
   reportMessage(input: {
     messageId: string;
     kind: DirectMessageReportKind;
@@ -77,7 +84,9 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
-const mapConversation = (row: DirectMessageConversationRow): DirectMessageConversationSummary => ({
+const mapConversation = (
+  row: DirectMessageConversationRow,
+): DirectMessageConversationSummary => ({
   conversationId: row.conversation_id,
   kind: row.kind,
   otherUserId: row.other_user_id ?? null,
@@ -99,13 +108,21 @@ export function createDirectMessageBackend(
   client: HavenSupabaseClient,
   media: MediaAttachmentHelpers,
 ): DirectMessageBackend {
-  const mapMessages = async (rows: DirectMessageRow[]): Promise<DirectMessage[]> => {
-    const allAttachmentRows = rows.flatMap((row) => parseDirectMessageAttachmentRows(row.attachments));
-    const signedAttachments = await mapDirectMessageAttachmentRowsWithSignedUrls(
-      allAttachmentRows,
-      media.createSignedUrlMap,
+  const mapMessages = async (
+    rows: DirectMessageRow[],
+  ): Promise<DirectMessage[]> => {
+    const allAttachmentRows = rows.flatMap((row) =>
+      parseDirectMessageAttachmentRows(row.attachments),
     );
-    const attachmentsByMessageId = new Map<string, DirectMessage["attachments"]>();
+    const signedAttachments =
+      await mapDirectMessageAttachmentRowsWithSignedUrls(
+        allAttachmentRows,
+        media.createSignedUrlMap,
+      );
+    const attachmentsByMessageId = new Map<
+      string,
+      DirectMessage["attachments"]
+    >();
 
     for (const attachment of signedAttachments) {
       const existing = attachmentsByMessageId.get(attachment.messageId) ?? [];
@@ -128,17 +145,27 @@ export function createDirectMessageBackend(
     }));
   };
 
-  const callBooleanRpc = async (functionName: string, args: Record<string, unknown>): Promise<boolean> => {
-    const { data, error } = await client.rpc(functionName as never, args as never);
+  const callBooleanRpc = async (
+    functionName: string,
+    args: Record<string, unknown>,
+  ): Promise<boolean> => {
+    const { data, error } = await client.rpc(
+      functionName as never,
+      args as never,
+    );
     if (error) throw error;
     return Boolean(data);
   };
 
   return {
     async listConversations() {
-      const { data, error } = await client.rpc("list_my_dm_conversations" as never);
+      const { data, error } = await client.rpc(
+        "list_my_dm_conversations" as never,
+      );
       if (error) throw error;
-      return ((data ?? []) as DirectMessageConversationRow[]).map(mapConversation);
+      return ((data ?? []) as DirectMessageConversationRow[]).map(
+        mapConversation,
+      );
     },
 
     async getOrCreateDirectConversation(otherUserId) {
@@ -166,6 +193,19 @@ export function createDirectMessageBackend(
       );
       if (error) throw error;
       return await mapMessages((data ?? []) as DirectMessageRow[]);
+    },
+
+    async getMessage(input) {
+      const { data, error } = await client.rpc(
+        "get_dm_message" as never,
+        {
+          p_conversation_id: input.conversationId,
+          p_message_id: input.messageId,
+        } as never,
+      );
+      if (error) throw error;
+      const [message] = await mapMessages((data ?? []) as DirectMessageRow[]);
+      return message ?? null;
     },
 
     async sendMessage(input) {
@@ -204,7 +244,9 @@ export function createDirectMessageBackend(
           } as never,
         );
         if (error) throw error;
-        const row = (Array.isArray(data) ? data[0] : null) as DirectMessageRow | null;
+        const row = (
+          Array.isArray(data) ? data[0] : null
+        ) as DirectMessageRow | null;
         if (!row) {
           throw new Error("DM send returned no message row.");
         }
@@ -220,7 +262,9 @@ export function createDirectMessageBackend(
     },
 
     async markConversationRead(conversationId) {
-      return callBooleanRpc("mark_dm_conversation_read", { p_conversation_id: conversationId });
+      return callBooleanRpc("mark_dm_conversation_read", {
+        p_conversation_id: conversationId,
+      });
     },
 
     async setConversationMuted({ conversationId, muted }) {
