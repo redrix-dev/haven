@@ -16,7 +16,7 @@ export function MobileDevToolsOverlay() {
   const showBootLog = () => {
     const report = bootLogger.getReport();
     // Print to Metro/console for full detail, show summary in Alert.
-    // eslint-disable-next-line no-console
+
     console.log("\n" + report);
     const events = bootLogger.getEvents();
     const total = events[events.length - 1]?.elapsed ?? 0;
@@ -45,13 +45,18 @@ export function MobileDevToolsOverlay() {
           accessibilityRole="button"
           accessibilityLabel="Data cache debug"
         >
-          <Text className="text-sm font-semibold text-primary-foreground">Data</Text>
+          <Text className="text-sm font-semibold text-primary-foreground">
+            Data
+          </Text>
         </Pressable>
       </View>
 
       <MobileDevThemeMenu />
 
-      <DataCacheDebugModal visible={dataDebugOpen} onClose={() => setDataDebugOpen(false)} />
+      <DataCacheDebugModal
+        visible={dataDebugOpen}
+        onClose={() => setDataDebugOpen(false)}
+      />
     </>
   );
 }

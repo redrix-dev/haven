@@ -1,4 +1,10 @@
-import { Modal, Pressable, Text, View, useWindowDimensions } from "react-native";
+import {
+  Modal,
+  Pressable,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   interpolate,
@@ -93,10 +99,17 @@ export function VoiceMorphShell({
       transparent
       onRequestClose={onDismiss}
     >
-      <View className="flex-1 justify-end" pointerEvents={visible ? "auto" : "none"}>
+      <View
+        className="flex-1 justify-end"
+        pointerEvents={visible ? "auto" : "none"}
+      >
         {/* Scrim — fades independently */}
         {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal scrim overlay, invariant across all themes */}
-        <Animated.View className="absolute inset-0 bg-black/50" style={scrimStyle} pointerEvents="none" />
+        <Animated.View
+          className="absolute inset-0 bg-black/50"
+          style={scrimStyle}
+          pointerEvents="none"
+        />
         <Pressable className="absolute inset-0" onPress={onDismiss} />
 
         <Animated.View
@@ -104,11 +117,16 @@ export function VoiceMorphShell({
             "rounded-t-3xl border-t border-border bg-card px-6 pt-6",
             cardClassName,
           )}
-          style={[cardStyle, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}
+          style={[
+            cardStyle,
+            { paddingBottom: Math.max(insets.bottom, 16) + 16 },
+          ]}
         >
           {title ? (
             <View className="mb-4 flex-row items-center justify-between">
-              <Text className="text-lg font-semibold text-foreground">{title}</Text>
+              <Text className="text-lg font-semibold text-foreground">
+                {title}
+              </Text>
               <Pressable onPress={onDismiss} hitSlop={12}>
                 <Text className="text-lg text-muted-foreground">✕</Text>
               </Pressable>

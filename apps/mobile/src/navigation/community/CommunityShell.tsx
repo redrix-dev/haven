@@ -1,12 +1,17 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { Channel } from "@shared/lib/backend/types";
 import {
-  applyCommunityFocus,
   resolvePreferredChannelIdForServer,
   toChannel,
   toServerSummaries,
-  useHavenCore,
 } from "@shared/core";
+import { applyCommunityFocus, useHavenCore } from "@mobile-data";
+import {
+  useActiveChannelId,
+  useChannels,
+  useCommunitiesLoading,
+  useOrderedCommunities,
+} from "@mobile-data/hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackHandler, View } from "react-native";
 import { CommunityChatScreen } from "@/screens/main/CommunityChatScreen";
@@ -14,14 +19,14 @@ import type { UserProfileModalTarget } from "@/features/user-profile/UserProfile
 import type { MainStackParamList } from "@/navigation/types";
 import { CommunityChannelDrawer } from "@/navigation/community/CommunityChannelDrawer";
 import { CommunityTopBar } from "@/navigation/community/CommunityTopBar";
-import { useDataCacheComponentProbe } from "@shared/debug";
+import { useDataCacheComponentProbe } from "@/debug/useDataCacheComponentProbe";
 import { CommunityRail } from "./CommunityRail";
 import { CommunityActionSheets } from "./CommunityActionSheets";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
 import { HavenShell, type HavenShellHandle } from "@/navigation/HavenShell";
-import { useUiStore } from "@shared/stores/uiStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import { DmInboxDrawer } from "@/features/direct-messages/DmInboxDrawer";
 import { DmChatSurface } from "@/features/direct-messages/DmChatSurface";
 import { DmTopBar } from "@/features/direct-messages/DmTopBar";
@@ -88,7 +93,9 @@ export function CommunityShell({
     if (!pendingDmConversationId) return;
     if (handledDmConversationIdRef.current === pendingDmConversationId) return;
     handledDmConversationIdRef.current = pendingDmConversationId;
-    void dm.openConversation(pendingDmConversationId, { markRead: true }).catch(() => {});
+    void dm
+      .openConversation(pendingDmConversationId, { markRead: true })
+      .catch(() => {});
     switchToDm();
     shellRef.current?.setDrawerOpen(false);
     navigation.setParams({ pendingDmConversationId: undefined });
@@ -140,14 +147,14 @@ export function CommunityShell({
     applyCommunityFocus(core, serverId);
   }, [core, serverId]);
 
-  const nexusCommunities = core.communities.useOrderedCommunities();
-  const communitiesLoading = core.communities.useIsLoading();
+  const nexusCommunities = useOrderedCommunities(core.communities);
+  const communitiesLoading = useCommunitiesLoading(core.communities);
   const servers = useMemo(
     () => toServerSummaries(nexusCommunities),
     [nexusCommunities],
   );
-  const currentChannelId = core.channels.useActiveChannelId();
-  const havenChannels = core.channels.useChannels(serverId ?? "__empty__");
+  const currentChannelId = useActiveChannelId(core.channels);
+  const havenChannels = useChannels(core.channels, serverId ?? "__empty__");
   const channels = useMemo(() => havenChannels.map(toChannel), [havenChannels]);
 
   useEffect(() => {
@@ -167,12 +174,11 @@ export function CommunityShell({
       currentChannelId != null &&
       channels.some((channel) => channel.id === currentChannelId);
     if (valid) return;
-    const preferred = resolvePreferredChannelIdForServer(
-      core,
-      serverId,
-      channels,
-      { previousChannelId: currentChannelId },
-    );
+    const preferred = resolvePreferredChannelIdForServer(channels, {
+      previousChannelId: currentChannelId,
+      lastChannelId: core.channels.getLastChannelId(serverId),
+      defaultChannelId: core.channels.getDefaultChannelId(serverId),
+    });
     core.communities.setActiveId(serverId);
     core.channels.setActiveChannelId(preferred);
   }, [channels, core, currentChannelId, serverId]);
@@ -198,7 +204,7 @@ export function CommunityShell({
   );
 
   const community = useMemo(
-    () => (serverId ? servers.find((s) => s.id === serverId) ?? null : null),
+    () => (serverId ? (servers.find((s) => s.id === serverId) ?? null) : null),
     [serverId, servers],
   );
 
@@ -234,19 +240,19 @@ export function CommunityShell({
       navigation.setParams({ serverId: null, openDrawer: true });
     }
     shellRef.current?.setDrawerOpen(true);
-  }, [
-    communitiesLoading,
-    core,
-    navigation,
-    serverId,
-    servers,
-  ]);
+  }, [communitiesLoading, core, navigation, serverId, servers]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [communityActionsOpen, setCommunityActionsOpen] = useState(false);
-  const openCommunityActions = useCallback(() => setCommunityActionsOpen(true), []);
-  const closeCommunityActions = useCallback(() => setCommunityActionsOpen(false), []);
+  const openCommunityActions = useCallback(
+    () => setCommunityActionsOpen(true),
+    [],
+  );
+  const closeCommunityActions = useCallback(
+    () => setCommunityActionsOpen(false),
+    [],
+  );
   const openCreateCommunity = useCallback(() => setCreateOpen(true), []);
   const openJoinCommunity = useCallback(() => setJoinOpen(true), []);
   const chooseCreateCommunity = useCallback(() => {
@@ -303,7 +309,10 @@ export function CommunityShell({
       });
       shellRef.current?.setDrawerOpen(true);
       void core.prepareCommunityEntry(nextServerId).catch((error) => {
-        console.warn("[CommunityShell] prepare selected community failed", error);
+        console.warn(
+          "[CommunityShell] prepare selected community failed",
+          error,
+        );
         applyCommunityFocus(core, nextServerId);
       });
     },
@@ -337,7 +346,9 @@ export function CommunityShell({
         drawerContent={
           mode === "dm" ? (
             <DmInboxDrawer
-              onConversationSelected={() => shellRef.current?.setDrawerOpen(false)}
+              onConversationSelected={() =>
+                shellRef.current?.setDrawerOpen(false)
+              }
               onStartDirectMessage={onStartDirectMessage}
             />
           ) : (
@@ -358,11 +369,15 @@ export function CommunityShell({
         }
         topBar={
           mode === "dm" ? (
-            <DmTopBar onOpenDrawer={() => shellRef.current?.setDrawerOpen(true)} />
+            <DmTopBar
+              onOpenDrawer={() => shellRef.current?.setDrawerOpen(true)}
+            />
           ) : serverId ? (
             <CommunityTopBar
               communityName={community?.name ?? "Communities"}
-              selectedChannelName={currentRenderableChannel?.name ?? "Select channel"}
+              selectedChannelName={
+                currentRenderableChannel?.name ?? "Select channel"
+              }
               onPressCommunity={() => shellRef.current?.setDrawerOpen(true)}
               onPressChannel={() => shellRef.current?.setDrawerOpen(true)}
             />

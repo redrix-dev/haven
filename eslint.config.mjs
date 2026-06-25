@@ -1,36 +1,7 @@
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import reactHooks from "eslint-plugin-react-hooks";
-
-const rendererBoundaryFiles = [
-  "packages/shared/src/client/**/*.{ts,tsx,js,jsx}",
-  "packages/shared/src/components/**/*.{ts,tsx,js,jsx}",
-  "packages/shared/src/contexts/**/*.{ts,tsx,js,jsx}",
-  "packages/shared/src/lib/hooks/**/*.{ts,tsx,js,jsx}",
-  "packages/shared/src/lib/voice/**/*.{ts,tsx,js,jsx}",
-  "apps/web/src/**/*.{ts,tsx,js,jsx}",
-  "apps/electron/src/renderer/**/*.{ts,tsx,js,jsx}",
-];
-
-const rendererBoundaryRestrictions = [
-  {
-    group: ["@platform/ipc/*", "**/platform/ipc/*"],
-    message:
-      "Renderer/features must not import shared/ipc. Use getAppHost() from @shared/platform/appHost (registered in the Electron renderer) for desktop capabilities.",
-  },
-  {
-    group: ["@electron/main/*", "**/apps/electron/src/main/*"],
-    message: "Renderer/features must not import Electron main-process modules.",
-  },
-  {
-    group: ["electron", "electron/*"],
-    message: "Renderer/features must not import electron APIs directly.",
-  },
-  {
-    group: ["node:*"],
-    message: "Renderer/features must not import Node built-ins.",
-  },
-];
+import boundaries from "eslint-plugin-boundaries";
 
 /**
  * HavenCore architecture boundary restrictions.
@@ -41,7 +12,7 @@ const rendererBoundaryRestrictions = [
 const havenCoreDeprecatedImports = [
   {
     group: [
-      "@shared/stores/navigationStore",
+      "@mobile-data/session/navigationStore",
       "**/stores/navigationStore",
       "@shared/features/community/hooks/useCommunityWorkspace",
       "**/useCommunityWorkspace",
@@ -57,7 +28,6 @@ const havenCoreDeprecatedImports = [
       "**/useMessageNexus",
       "@shared/features/profile/hooks/useLiveProfiles",
       "**/useLiveProfiles",
-      "@web-client/hooks/useChatAppOrchestration",
       "**/useChatAppOrchestration",
     ],
     message:
@@ -93,10 +63,6 @@ const havenCoreNexusBoundary = [
   },
 ];
 
-const havenCoreWebConsumerFiles = [
-  "packages/web-client/src/**/*.{ts,tsx,js,jsx}",
-];
-
 /**
  * Temporary quarantine for known pre-finality migration seams. New UI/feature
  * files are held to the HavenCore -> Nexus -> UI Consumer boundary; remove
@@ -106,6 +72,7 @@ const havenCoreConsumerBoundaryIgnores = [
   "**/__tests__/**",
   "**/*.test.{ts,tsx,js,jsx}",
   "apps/mobile/src/auth/mobileAuthService.ts",
+  "apps/mobile/src/data/**",
   "apps/mobile/src/lib/createMmkvPersistence.ts",
   "apps/mobile/src/lib/react-native-mmkv.d.ts",
   "apps/mobile/src/supabase/**",
@@ -128,11 +95,6 @@ const havenCoreConsumerRestrictedImportPaths = [
     importNames: havenCoreBackendFactoryImportNames,
     message:
       "UI/features must not import backend factories directly. Route reads/writes through useHavenCore()/requireHavenCore() and a domain Nexus/HavenCore command.",
-  },
-  {
-    name: "@shared/infrastructure/client/createHavenSupabaseClient",
-    message:
-      "Supabase client construction belongs to host bootstrap. UI/features consume the registered HavenCore instead.",
   },
   {
     name: "@shared/lib/createHavenSupabaseClient",
@@ -217,20 +179,12 @@ const havenCoreConsumerRestrictedSyntax = [
 
 const mobileBoundaryRestrictions = [
   {
-    group: ["@web/*", "**/apps/web/src/*"],
-    message: "Mobile code must not import web modules.",
-  },
-  {
-    group: ["@electron/*", "**/apps/electron/src/*"],
-    message: "Mobile code must not import Electron modules.",
-  },
-  {
     group: ["@platform/desktop/*", "**/platform/desktop/*"],
     message: "Mobile code must not import desktop platform bridges.",
   },
   {
-    group: ["electron", "electron/*"],
-    message: "Mobile code must not import Electron APIs.",
+    group: ["@solid-client/*", "solid-js", "solid-js/*"],
+    message: "Mobile code must not import Solid modules.",
   },
   {
     group: ["node:*"],
@@ -242,10 +196,10 @@ export default [
   {
     ignores: [
       "node_modules/**",
-      ".webpack/**",
-      "out/**",
       "dist/**",
       "**/dist/**",
+      // Rust/Tauri build output — generated codegen assets, not source.
+      "**/src-tauri/target/**",
     ],
   },
   {
@@ -267,7 +221,6 @@ export default [
     },
     plugins: {
       "@typescript-eslint": tsPlugin,
-      "react-hooks": reactHooks,
     },
     rules: {
       "no-restricted-properties": [
@@ -276,47 +229,20 @@ export default [
           object: "window",
           property: "desktop",
           message:
-            "Use getAppHost() from @shared/platform/appHost in app code; only packages/shared/src/platform/desktop/client.ts may read window.desktop.",
+            "Use getAppHost() from @shared/infrastructure/platform/appHost in app code; the legacy window.desktop Electron bridge is gone.",
         },
         {
           object: "window",
           property: "havenDesktop",
           message:
-            "Use getAppHost() from @shared/platform/appHost instead of legacy window.havenDesktop access.",
+            "Use getAppHost() from @shared/infrastructure/platform/appHost instead of legacy window.havenDesktop access.",
         },
       ],
-    },
-  },
-  {
-    files: [
-      "packages/shared/src/platform/desktop/client.ts",
-      "packages/shared/src/infrastructure/platform/desktop/client.ts",
-    ],
-    rules: {
-      "no-restricted-properties": "off",
-    },
-  },
-  {
-    files: havenCoreWebConsumerFiles,
-    ignores: havenCoreConsumerBoundaryIgnores,
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          paths: havenCoreConsumerRestrictedImportPaths,
-          patterns: havenCoreConsumerRestrictedImportPatterns,
-        },
-      ],
-      "no-restricted-syntax": ["error", ...havenCoreConsumerRestrictedSyntax],
     },
   },
   {
     files: ["packages/shared/src/**/*.{ts,tsx}"],
-    ignores: [
-      "packages/shared/src/core/persistence/createMmkvPersistence.ts",
-      "packages/shared/src/platform/desktop/client.ts",
-      "packages/shared/src/infrastructure/platform/desktop/client.ts",
-    ],
+    ignores: ["packages/shared/src/core/persistence/createMmkvPersistence.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -325,7 +251,7 @@ export default [
             {
               name: "@platform/desktop/client",
               message:
-                "Import getAppHost from @shared/platform/appHost instead. Electron registers the real bridge in apps/electron/src/renderer/registerElectronAppHost.ts.",
+                "Import getAppHost from @shared/infrastructure/platform/appHost instead. Each shell registers its own bridge at bootstrap.",
             },
           ],
           patterns: [...havenCoreNexusBoundary, ...havenCoreDeprecatedImports],
@@ -344,7 +270,7 @@ export default [
             {
               name: "@platform/desktop/client",
               message:
-                "Import getAppHost from @shared/platform/appHost instead. Electron registers the real bridge in apps/electron/src/renderer/registerElectronAppHost.ts.",
+                "Import getAppHost from @shared/infrastructure/platform/appHost instead. Each shell registers its own bridge at bootstrap.",
             },
             ...havenCoreConsumerRestrictedImportPaths,
           ],
@@ -355,17 +281,6 @@ export default [
         },
       ],
       "no-restricted-syntax": ["error", ...havenCoreConsumerRestrictedSyntax],
-    },
-  },
-  {
-    files: rendererBoundaryFiles,
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: rendererBoundaryRestrictions,
-        },
-      ],
     },
   },
   {
@@ -383,7 +298,7 @@ export default [
         {
           name: "window",
           message:
-            "Mobile code should use platform-safe abstractions from @shared/platform/appHost.",
+            "Mobile code should use platform-safe abstractions from @shared/infrastructure/platform/appHost.",
         },
         {
           name: "document",
@@ -412,6 +327,156 @@ export default [
         },
       ],
       "no-restricted-syntax": ["error", ...havenCoreConsumerRestrictedSyntax],
+    },
+  },
+  {
+    // ── Solid client shape boundaries ──────────────────────────────────────
+    // The committed folder shape of packages/solid-client and the one-way
+    // dependency flow between its layers. Full reasoning + the shape itself:
+    // docs/architecture/SOLID_CLIENT_SHAPE.md. If a rule here blocks you, the
+    // answer is almost always "move the shared thing DOWN a layer", not "allow
+    // the import".
+    files: ["packages/solid-client/src/**/*.{ts,tsx}"],
+    plugins: { boundaries },
+    settings: {
+      "import/resolver": {
+        typescript: {
+          project: "packages/solid-client/tsconfig.json",
+        },
+      },
+      "boundaries/elements": [
+        // Order matters: first match wins, so deeper/more-specific first.
+        {
+          type: "feature",
+          pattern: "packages/solid-client/src/features/*",
+          mode: "folder",
+          capture: ["featureName"],
+        },
+        {
+          type: "routes",
+          pattern: "packages/solid-client/src/routes",
+          mode: "folder",
+        },
+        {
+          type: "ui",
+          pattern: "packages/solid-client/src/components/ui",
+          mode: "folder",
+        },
+        {
+          type: "contexts",
+          pattern: "packages/solid-client/src/contexts",
+          mode: "folder",
+        },
+        {
+          type: "auth",
+          pattern: "packages/solid-client/src/auth",
+          mode: "folder",
+        },
+        {
+          type: "core",
+          pattern: "packages/solid-client/src/core",
+          mode: "folder",
+        },
+        {
+          type: "data",
+          pattern: "packages/solid-client/src/data",
+          mode: "folder",
+        },
+        {
+          type: "app",
+          pattern: "packages/solid-client/src/*.{ts,tsx}",
+          mode: "file",
+        },
+      ],
+    },
+    rules: {
+      "boundaries/dependencies": [
+        "error",
+        {
+          // Anything not explicitly allowed is a violation.
+          default: "disallow",
+          message:
+            "${file.type} may not import this from ${dependency.type}. Dependencies flow one way (app → routes → features → data/ui/contexts/auth/core), and features are entered only through their index barrel. See docs/architecture/SOLID_CLIENT_SHAPE.md.",
+          rules: [
+            // App.tsx mounts providers + routes + chrome. It does not reach
+            // into features or data — that's how it stays small forever.
+            // (app → app covers root files importing each other, e.g. bridge.ts.)
+            {
+              from: { type: "app" },
+              allow: {
+                to: { type: ["app", "routes", "contexts", "core", "ui"] },
+              },
+            },
+            // routes/ is the registration point: maps addresses to feature
+            // views. The only layer above features — and it may only enter a
+            // feature through its index barrel (the feature's public surface).
+            {
+              from: { type: "routes" },
+              allow: { to: { type: ["contexts", "core", "ui"] } },
+            },
+            {
+              from: { type: "routes" },
+              allow: {
+                to: { type: "feature", internalPath: "index.{ts,tsx}" },
+              },
+            },
+            // Features import shared infrastructure, never each other.
+            // (Same-feature imports are internal and always fine.) If two
+            // features need the same thing, it moves down a layer.
+            {
+              from: { type: "feature" },
+              allow: {
+                to: { type: ["data", "ui", "contexts", "auth", "core"] },
+              },
+            },
+            {
+              from: { type: "contexts" },
+              allow: { to: { type: ["core", "auth", "data"] } },
+            },
+            { from: { type: "auth" }, allow: { to: { type: "core" } } },
+            { from: { type: "core" }, allow: { to: { type: "data" } } },
+            // data and ui appear in no `from` rule on purpose: they are the
+            // bottom — they import @shared and solid-js, never upward.
+          ],
+        },
+      ],
+      // Shell-agnosticism and framework purity, enforced. solid-client must
+      // run identically under Tauri and a plain browser tab.
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@tauri-apps/*"],
+              message:
+                "solid-client is shell-agnostic: it must run under Tauri AND a plain browser. Shell capabilities are injected at bootstrap (see bridge.ts / apps/tauri).",
+            },
+            {
+              group: ["react", "react-dom", "react-native", "react-*"],
+              message:
+                "solid-client is a Solid app. React belongs to mobile only.",
+            },
+            {
+              group: ["@mobile-data/*"],
+              message:
+                "Reactive caches are never shared across frameworks. Solid reads its own data layer (@solid-client/data).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // React hooks correctness — scoped to mobile (the only React app).
+    // rules-of-hooks catches genuine bugs (conditional/looped/class hooks) and
+    // is clean, so it's enforced as error. exhaustive-deps is advisory (warn):
+    // it has known false positives on Reanimated shared values, which are stable
+    // refs that intentionally stay out of dependency arrays.
+    files: ["apps/mobile/**/*.{ts,tsx,js,jsx}"],
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
 ];

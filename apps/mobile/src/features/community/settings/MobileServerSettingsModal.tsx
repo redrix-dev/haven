@@ -16,8 +16,12 @@ import DraggableFlatList, {
   ScaleDecorator,
   type RenderItemParams,
 } from "react-native-draggable-flatlist";
-import type { ServerRoleItem, ServerSettingsUpdate } from "@shared/lib/backend/types";
-import { useHavenCore } from "@shared/core";
+import type {
+  ServerRoleItem,
+  ServerSettingsUpdate,
+} from "@shared/lib/backend/types";
+import { useHavenCore } from "@mobile-data";
+import { useServerPanelState } from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 import {
@@ -66,7 +70,8 @@ export function MobileServerSettingsModal({
   const core = useHavenCore();
   const admin = core.admin;
   const themeTokens = useMobileThemeTokens();
-  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const foregroundColor =
+    resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const switchColors = useMemo(
     () => ({
       false: resolveColorProp(themeTokens, "border-panel") ?? "#3d4f6a",
@@ -75,7 +80,7 @@ export function MobileServerSettingsModal({
     }),
     [foregroundColor, themeTokens],
   );
-  const serverPanel = admin.useServerPanelState();
+  const serverPanel = useServerPanelState(admin);
   const [tab, setTab] = useState<TabKey>("general");
 
   const [draftName, setDraftName] = useState("");
@@ -84,7 +89,9 @@ export function MobileServerSettingsModal({
   const [draftReportReason, setDraftReportReason] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
 
-  const [customRolesOrder, setCustomRolesOrder] = useState<ServerRoleItem[]>([]);
+  const [customRolesOrder, setCustomRolesOrder] = useState<ServerRoleItem[]>(
+    [],
+  );
 
   const loading =
     serverPanel.serverSettingsLoading ||
@@ -132,8 +139,12 @@ export function MobileServerSettingsModal({
     await Promise.allSettled([
       admin.loadServerSettings(communityId),
       admin.loadServerRoleManagement(communityId),
-      canManageInvites ? admin.loadServerInvites(communityId) : Promise.resolve(admin.resetServerInvites()),
-      canManageBans ? admin.loadCommunityBans(communityId) : Promise.resolve(admin.resetCommunityBans()),
+      canManageInvites
+        ? admin.loadServerInvites(communityId)
+        : Promise.resolve(admin.resetServerInvites()),
+      canManageBans
+        ? admin.loadCommunityBans(communityId)
+        : Promise.resolve(admin.resetCommunityBans()),
     ]);
   }, [admin, canManageBans, canManageInvites, communityId, currentUserId]);
 
@@ -159,19 +170,24 @@ export function MobileServerSettingsModal({
 
   const systemRoles = useMemo(() => {
     if (!snapshots) return [];
-    return snapshots.roles.filter((r) => r.isSystem).sort((a, b) => b.position - a.position);
+    return snapshots.roles
+      .filter((r) => r.isSystem)
+      .sort((a, b) => b.position - a.position);
   }, [snapshots]);
 
   const handleSaveGeneral = async () => {
     if (!snapshots.settings) return;
     setSavingSettings(true);
     try {
-      await admin.saveServerSettings({
-        name: draftName,
-        description: draftDesc.trim() || null,
-        allowPublicInvites: draftPublicInvites,
-        requireReportReason: draftReportReason,
-      }, communityId);
+      await admin.saveServerSettings(
+        {
+          name: draftName,
+          description: draftDesc.trim() || null,
+          allowPublicInvites: draftPublicInvites,
+          requireReportReason: draftReportReason,
+        },
+        communityId,
+      );
       await refreshServers();
       Alert.alert("Saved", "Community settings updated.");
     } catch (e) {
@@ -188,7 +204,10 @@ export function MobileServerSettingsModal({
       const merged = [...systemRoles, ...data];
       await admin.reorderServerRoles(merged, communityId);
     } catch (e) {
-      Alert.alert("Reorder failed", getErrorMessage(e, "Could not update role order."));
+      Alert.alert(
+        "Reorder failed",
+        getErrorMessage(e, "Could not update role order."),
+      );
       void reloadSnapshots();
     }
   };
@@ -204,10 +223,17 @@ export function MobileServerSettingsModal({
           }`}
         >
           <View className="flex-row items-center gap-2">
-            <View className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+            <View
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
             <Text className="text-base text-foreground">{item.name}</Text>
           </View>
-          <ThemedIonicons name="reorder-three" size={22} colorClassName="accent-muted-foreground" />
+          <ThemedIonicons
+            name="reorder-three"
+            size={22}
+            colorClassName="accent-muted-foreground"
+          />
         </Pressable>
       </ScaleDecorator>
     ),
@@ -217,18 +243,30 @@ export function MobileServerSettingsModal({
   const tabs: { key: TabKey; label: string }[] = [
     { key: "general", label: "Overview" },
     ...(canManageRoles ? [{ key: "roles" as const, label: "Roles" }] : []),
-    ...(canManageMembers ? [{ key: "members" as const, label: "Members" }] : []),
-    ...(canManageInvites ? [{ key: "invites" as const, label: "Invites" }] : []),
+    ...(canManageMembers
+      ? [{ key: "members" as const, label: "Members" }]
+      : []),
+    ...(canManageInvites
+      ? [{ key: "invites" as const, label: "Invites" }]
+      : []),
     ...(canManageBans ? [{ key: "bans" as const, label: "Bans" }] : []),
   ];
 
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onDismiss}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onDismiss}
+    >
       <View className="flex-1 bg-card pt-14">
         <View className="flex-row items-center justify-between border-b border-border-panel px-4 pb-3">
-          <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
+          <Text
+            className="text-lg font-semibold text-foreground"
+            numberOfLines={1}
+          >
             {communityName}
           </Text>
           <Pressable onPress={onDismiss} hitSlop={12}>
@@ -248,7 +286,9 @@ export function MobileServerSettingsModal({
               onPress={() => setTab(t.key)}
               className={`rounded-full px-4 py-1.5 ${tab === t.key ? "bg-primary" : "bg-surface-panel"}`}
             >
-              <Text className={`text-sm font-medium ${tab === t.key ? "text-primary-foreground" : "text-foreground"}`}>
+              <Text
+                className={`text-sm font-medium ${tab === t.key ? "text-primary-foreground" : "text-foreground"}`}
+              >
                 {t.label}
               </Text>
             </Pressable>
@@ -271,29 +311,49 @@ export function MobileServerSettingsModal({
                 }
                 hitSlop={8}
               >
-                <ThemedIonicons name="information-circle-outline" size={22} colorClassName="accent-muted-foreground" />
+                <ThemedIonicons
+                  name="information-circle-outline"
+                  size={22}
+                  colorClassName="accent-muted-foreground"
+                />
               </Pressable>
               <Text className="flex-1 text-sm text-muted-foreground">
-                Long-press a row to drag. System roles are fixed above custom roles.
+                Long-press a row to drag. System roles are fixed above custom
+                roles.
               </Text>
             </View>
-            {loadErrors.roles ? <Text className="mb-2 text-sm text-destructive">{loadErrors.roles}</Text> : null}
+            {loadErrors.roles ? (
+              <Text className="mb-2 text-sm text-destructive">
+                {loadErrors.roles}
+              </Text>
+            ) : null}
             {systemRoles.length > 0 ? (
               <View className="mb-3">
-                <Text className="mb-2 text-xs font-semibold uppercase text-muted-foreground">System roles</Text>
+                <Text className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                  System roles
+                </Text>
                 {systemRoles.map((r) => (
                   <View
                     key={r.id}
                     className="mb-2 flex-row items-center gap-2 rounded-xl border border-border-panel bg-surface-embedded px-3 py-3"
                   >
-                    <View className="h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
+                    <View
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: r.color }}
+                    />
                     <Text className="flex-1 text-foreground">{r.name}</Text>
-                    <ThemedIonicons name="lock-closed" size={16} colorClassName="accent-muted-foreground" />
+                    <ThemedIonicons
+                      name="lock-closed"
+                      size={16}
+                      colorClassName="accent-muted-foreground"
+                    />
                   </View>
                 ))}
               </View>
             ) : null}
-            <Text className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Custom roles</Text>
+            <Text className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+              Custom roles
+            </Text>
             <DraggableFlatList
               style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: 32 }}
@@ -304,20 +364,29 @@ export function MobileServerSettingsModal({
             />
           </View>
         ) : (
-          <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled">
+          <ScrollView
+            className="flex-1 px-4 pt-4"
+            keyboardShouldPersistTaps="handled"
+          >
             {tab === "general" ? (
               <View className="gap-4 pb-24">
                 {loadErrors.settings ? (
-                  <Text className="text-sm text-destructive">{loadErrors.settings}</Text>
+                  <Text className="text-sm text-destructive">
+                    {loadErrors.settings}
+                  </Text>
                 ) : null}
-                <Text className="text-xs uppercase text-muted-foreground">Community name</Text>
+                <Text className="text-xs uppercase text-muted-foreground">
+                  Community name
+                </Text>
                 <TextInput
                   value={draftName}
                   onChangeText={setDraftName}
                   editable={canManageServer}
                   className="rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
                 />
-                <Text className="text-xs uppercase text-muted-foreground">Description</Text>
+                <Text className="text-xs uppercase text-muted-foreground">
+                  Description
+                </Text>
                 <TextInput
                   value={draftDesc}
                   onChangeText={setDraftDesc}
@@ -331,7 +400,10 @@ export function MobileServerSettingsModal({
                     value={draftPublicInvites}
                     onValueChange={setDraftPublicInvites}
                     disabled={!canManageServer}
-                    trackColor={{ false: switchColors.false, true: switchColors.true }}
+                    trackColor={{
+                      false: switchColors.false,
+                      true: switchColors.true,
+                    }}
                     thumbColor={switchColors.thumb}
                   />
                 </View>
@@ -341,7 +413,10 @@ export function MobileServerSettingsModal({
                     value={draftReportReason}
                     onValueChange={setDraftReportReason}
                     disabled={!canManageServer}
-                    trackColor={{ false: switchColors.false, true: switchColors.true }}
+                    trackColor={{
+                      false: switchColors.false,
+                      true: switchColors.true,
+                    }}
                     thumbColor={switchColors.thumb}
                   />
                 </View>
@@ -362,12 +437,17 @@ export function MobileServerSettingsModal({
             {tab === "members" && canManageMembers ? (
               <View className="pb-24">
                 <Text className="mb-3 text-sm text-muted-foreground">
-                  Members and role assignment match desktop. Granular role edits are safest on desktop; this list is for
-                  visibility.
+                  Members and role assignment match desktop. Granular role edits
+                  are safest on desktop; this list is for visibility.
                 </Text>
                 {(snapshots?.members ?? []).map((m) => (
-                  <View key={m.memberId} className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3">
-                    <Text className="font-medium text-foreground">{m.displayName}</Text>
+                  <View
+                    key={m.memberId}
+                    className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3"
+                  >
+                    <Text className="font-medium text-foreground">
+                      {m.displayName}
+                    </Text>
                     <Text className="text-xs text-muted-foreground">
                       {m.isOwner ? "Owner · " : ""}
                       {m.roleIds.length} role{m.roleIds.length === 1 ? "" : "s"}
@@ -382,7 +462,9 @@ export function MobileServerSettingsModal({
                 communityId={communityId}
                 invites={snapshots?.invites ?? []}
                 loadError={loadErrors.invites}
-                onCreateInvite={(input) => admin.createServerInvite(input, communityId)}
+                onCreateInvite={(input) =>
+                  admin.createServerInvite(input, communityId)
+                }
                 onRevoke={(id) => admin.revokeServerInvite(id, communityId)}
               />
             ) : null}
@@ -397,9 +479,17 @@ export function MobileServerSettingsModal({
                     {
                       text: "Unban",
                       onPress: () =>
-                        void admin.unbanUserFromCurrentServer({ targetUserId: bannedUserId }, communityId).catch((e) =>
-                          Alert.alert("Error", getErrorMessage(e, "Unban failed.")),
-                        ),
+                        void admin
+                          .unbanUserFromCurrentServer(
+                            { targetUserId: bannedUserId },
+                            communityId,
+                          )
+                          .catch((e) =>
+                            Alert.alert(
+                              "Error",
+                              getErrorMessage(e, "Unban failed."),
+                            ),
+                          ),
                     },
                   ])
                 }
@@ -434,7 +524,10 @@ function MobileInvitesSection({
     if (!communityId) return;
     setCreating(true);
     try {
-      const inv = (await onCreateInvite({ maxUses: null, expiresInHours: 24 })) as {
+      const inv = (await onCreateInvite({
+        maxUses: null,
+        expiresInHours: 24,
+      })) as {
         code: string;
       };
       await shareCommunityInvite(inv.code);
@@ -447,19 +540,31 @@ function MobileInvitesSection({
 
   return (
     <View className="pb-24">
-      {loadError ? <Text className="mb-2 text-sm text-destructive">{loadError}</Text> : null}
+      {loadError ? (
+        <Text className="mb-2 text-sm text-destructive">{loadError}</Text>
+      ) : null}
       <Pressable
         onPress={() => void handleCreate()}
         disabled={creating}
         className="mb-4 rounded-xl bg-primary py-3"
       >
-        <Text className="text-center font-semibold text-primary-foreground">{creating ? "Creating…" : "Create invite (24h)"}</Text>
+        <Text className="text-center font-semibold text-primary-foreground">
+          {creating ? "Creating…" : "Create invite (24h)"}
+        </Text>
       </Pressable>
       {invites.map((inv) => (
-        <View key={inv.id} className="mb-2 flex-row items-center justify-between rounded-xl border border-border-panel px-3 py-2">
+        <View
+          key={inv.id}
+          className="mb-2 flex-row items-center justify-between rounded-xl border border-border-panel px-3 py-2"
+        >
           <View className="min-w-0 flex-1 pr-3">
-            <Text className="font-mono text-xs text-foreground">{inv.code}</Text>
-            <Text className="mt-1 text-[11px] text-muted-foreground" numberOfLines={1}>
+            <Text className="font-mono text-xs text-foreground">
+              {inv.code}
+            </Text>
+            <Text
+              className="mt-1 text-[11px] text-muted-foreground"
+              numberOfLines={1}
+            >
               {buildCommunityInviteUrl(inv.code)}
             </Text>
           </View>
@@ -488,12 +593,22 @@ function MobileBansSection({
 }) {
   return (
     <View className="pb-24">
-      {loadError ? <Text className="mb-2 text-sm text-destructive">{loadError}</Text> : null}
+      {loadError ? (
+        <Text className="mb-2 text-sm text-destructive">{loadError}</Text>
+      ) : null}
       {bans.map((b) => (
-        <View key={b.id} className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3">
-          <Text className="font-medium text-foreground">{b.username ?? b.bannedUserId}</Text>
+        <View
+          key={b.id}
+          className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3"
+        >
+          <Text className="font-medium text-foreground">
+            {b.username ?? b.bannedUserId}
+          </Text>
           <Text className="text-xs text-muted-foreground">{b.reason}</Text>
-          <Pressable className="mt-2 self-start" onPress={() => onUnban(b.bannedUserId)}>
+          <Pressable
+            className="mt-2 self-start"
+            onPress={() => onUnban(b.bannedUserId)}
+          >
             <Text className="text-sm text-primary">Unban</Text>
           </Pressable>
         </View>

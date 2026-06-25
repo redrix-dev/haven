@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tier 1 — language bedrock</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff; --fg: #1b1b1b; --muted: #5c5c5c;
+    --card: #f6f6f4; --border: #e2e2dd; --code: #ededea;
+    --accent: #8a6a3a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18; --fg: #e8e8e3; --muted: #a3a39b;
+      --card: #232320; --border: #34342f; --code: #2b2b27;
+      --accent: #c9a978;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg); margin: 0;
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 28px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-size: 20px; font-weight: 600; margin: 40px 0 8px; }
+  .lede { color: var(--muted); margin: 0 0 8px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 4px 22px 18px; margin: 20px 0;
+  }
+  .tag {
+    display: inline-block; font-size: 13px; color: var(--accent);
+    font-weight: 600; letter-spacing: .02em; margin-top: 16px;
+  }
+  code {
+    background: var(--code); padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  pre {
+    background: var(--code); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; overflow-x: auto; line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; font-size: 13.5px; }
+  .label { font-weight: 600; }
+  .turn {
+    border-left: 3px solid var(--accent); padding: 2px 0 2px 14px;
+    margin-top: 14px; color: var(--fg);
+  }
+  .checkpoint {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 22px; margin-top: 36px;
+  }
+  ul { padding-left: 20px; }
+  li { margin: 4px 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tier 1 — language bedrock</h1>
+  <p class="lede">Names, values, and the one idea that explains half the "why is the code doing that" moments later: value vs reference.</p>
+  <p class="lede">Run anything here by pasting it into <code>scratch.js</code> and running <code>node scratch.js</code>. The <code>// →</code> lines show what prints.</p>
+
+  <div class="card">
+    <span class="tag">CARD 1.1 — const and let</span>
+    <p><span class="label">What it does:</span> binds a name to a value. <code>const</code> = a box you fill once and can't refill. <code>let</code> = a box you can refill later.</p>
+<pre><code>const name = "general"; // filled once
+let count = 0;          // can change later
+count = count + 1;      // fine
+console.log(name, count); // → general 1
+
+// name = "random";     // would crash: Assignment to constant variable</code></pre>
+    <p><code>const</code> doesn't mean "the value can never change" — it means the <span class="label">name</span> can't be re-pointed. (A <code>const</code> array can still have things pushed into it. That's value-vs-reference, card 1.3.)</p>
+    <p><span class="label">You've seen it:</span> nearly every line. <code>const channel = toHavenChannel(...)</code>. The one <code>let</code> in the file is <code>let groupState</code> in <code>loadForCommunity</code> — declared empty, then filled in either the <code>try</code> or the <code>catch</code>. That's why it's <code>let</code>.</p>
+    <div class="turn">Your turn — what prints?
+<pre><code>let x = 5;
+const y = x;
+x = 10;
+console.log(x, y);</code></pre></div>
+  </div>
+
+  <div class="card">
+    <span class="tag">CARD 1.2 — the five primitive values</span>
+    <p><span class="label">What it does:</span> the atoms — text, numbers, true/false, and two flavors of "nothing."</p>
+<pre><code>const text = "hello"; // string
+const n = 42;         // number
+const ok = true;      // boolean
+
+let notSetYet;        // never assigned → undefined
+console.log(notSetYet); // → undefined
+
+let cleared = null;   // empty on purpose
+console.log(cleared); // → null</code></pre>
+    <ul>
+      <li><code>undefined</code> = "never given a value." The language hands it to you.</li>
+      <li><code>null</code> = "I am intentionally setting this empty." You choose it.</li>
+    </ul>
+    <p><span class="label">You've seen it:</span> <code>activeChannelId: string | null</code> — an id, or deliberately nothing. A community you never loaded reads back as <code>undefined</code> — nobody ever put anything there.</p>
+    <div class="turn">Your turn — what prints?
+<pre><code>const obj = { a: 1 };
+console.log(obj.a); // ?
+console.log(obj.b); // ? (b was never set)</code></pre></div>
+  </div>
+
+  <div class="card">
+    <span class="tag">CARD 1.3 — value vs reference (the big one)</span>
+    <p><span class="label">What it does:</span> decides what <code>=</code> actually copies. Primitives copy their value. Objects and arrays copy a <span class="label">pointer</span> to the same thing.</p>
+<pre><code>// primitives: independent copies
+let a = 1;
+let b = a;   // b gets its own copy
+b = 2;
+console.log(a, b); // → 1 2   (a untouched)
+
+// objects/arrays: shared pointer
+const list1 = ["x"];
+const list2 = list1; // SAME array, two names
+list2.push("y");
+console.log(list1);  // → [ 'x', 'y' ]   (list1 changed too!)</code></pre>
+    <p><code>list1</code> and <code>list2</code> are two names for <span class="label">one</span> array in memory. That "wait, I only changed list2" surprise is the #1 mystery-bug source, and it's why you'll constantly see <code>[...]</code> make a fresh copy instead of reusing an array.</p>
+    <p><span class="label">You've seen it:</span> <code>[...communityIds, channel.id]</code> in <code>upsertChannel</code> builds a <span class="label">new</span> array instead of pushing into the old one — so the old reference stays untouched and Solid can tell something changed.</p>
+    <div class="turn">Your turn — what prints?
+<pre><code>const original = { count: 1 };
+const alias = original;
+alias.count = 99;
+console.log(original.count);</code></pre></div>
+  </div>
+
+  <div class="card">
+    <span class="tag">CARD 1.4 — truthiness</span>
+    <p><span class="label">What it does:</span> when you put a value in <code>if (...)</code>, JavaScript bends it to true or false. Most values are truthy. A short list is falsy.</p>
+    <p>The falsy six: <code>false</code>, <code>0</code>, <code>""</code>, <code>null</code>, <code>undefined</code>, <code>NaN</code>. Everything else is truthy.</p>
+<pre><code>if ("hello") console.log("non-empty string → truthy");
+if (0) console.log("never runs");
+else console.log("0 → falsy");
+
+const ids = [];
+if (ids.length) console.log("never runs"); // 0 → falsy
+else console.log("empty list → falsy");</code></pre>
+    <p><span class="label">You've seen it:</span> <code>if (existing) return existing;</code> — <code>existing</code> is a Promise (truthy, reuse it) or <code>undefined</code> (falsy, keep going). No <code>=== undefined</code> needed.</p>
+    <div class="turn">Your turn — which of these print?
+<pre><code>if ("") console.log("A");
+if ("0") console.log("B"); // string "0", not number 0
+if (null) console.log("C");
+if (42) console.log("D");</code></pre></div>
+  </div>
+
+  <div class="checkpoint">
+    <h2 style="margin-top:0">Tier 1 checkpoint</h2>
+    <p>You can leave tier 1 when these feel obvious:</p>
+    <ul>
+      <li><code>const</code> locks the name, not the contents</li>
+      <li><code>null</code> is chosen-empty, <code>undefined</code> is never-set</li>
+      <li>assigning an object/array shares it; assigning a primitive copies it</li>
+      <li>you can recite the falsy six</li>
+    </ul>
+    <p>Next stop, tier 2 — control flow: <code>if</code> / <code>else</code>, the loops (<code>for...of</code> is the one this codebase uses), and <code>===</code> vs <code>==</code>.</p>
+  </div>
+</main>
+</body>
+</html>

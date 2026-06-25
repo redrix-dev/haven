@@ -27,4 +27,5 @@ export const COMPOSER_SELECTION_COLOR = "rgba(63, 121, 216, 0.4)";
  * Inverted list `paddingTop` — RNKC: `INPUT_HEIGHT + MARGIN` (visual gap above composer).
  * @see https://kirillzyusko.github.io/react-native-keyboard-controller/docs/guides/building-chat-app
  */
-export const CHAT_LIST_TOP_PADDING = CHAT_COMPOSER_MIN_HEIGHT + CHAT_SURFACE_MARGIN;
+export const CHAT_LIST_TOP_PADDING =
+  CHAT_COMPOSER_MIN_HEIGHT + CHAT_SURFACE_MARGIN;

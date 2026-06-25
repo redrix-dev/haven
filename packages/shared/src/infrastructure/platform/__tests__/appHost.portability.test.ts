@@ -21,7 +21,7 @@ describe("appHost portability runtime", () => {
     const resolvedHost = getAppHost();
 
     // Platform-specific runtimes are only available when the platform
-    // explicitly registers them (e.g. registerWebAppHost, registerElectronAppHost).
+    // shell explicitly registers them at bootstrap.
     expect(resolvedHost.browserRuntime).toBeUndefined();
     expect(resolvedHost.voiceRuntime).toBeUndefined();
   });

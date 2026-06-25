@@ -1,5 +1,5 @@
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
-import { getPlatformAuthConfirmRedirectUrl } from "@shared/platform/urls";
+import { getPlatformAuthConfirmRedirectUrl } from "@shared/infrastructure/platform/urls";
 import {
   buildSignUpMetadata,
   parseAuthConfirmParams,
@@ -11,8 +11,13 @@ import {
 
 export type MobileAuthResult = { error: unknown | null };
 
-type MobileVerifyOtpParams = Parameters<ReturnType<typeof getMobileSupabase>["auth"]["verifyOtp"]>[0];
-type MobileEmailOtpType = Extract<MobileVerifyOtpParams, { token_hash: string }>["type"];
+type MobileVerifyOtpParams = Parameters<
+  ReturnType<typeof getMobileSupabase>["auth"]["verifyOtp"]
+>[0];
+type MobileEmailOtpType = Extract<
+  MobileVerifyOtpParams,
+  { token_hash: string }
+>["type"];
 
 const SUPPORTED_MOBILE_EMAIL_OTP_TYPES = new Set<MobileEmailOtpType>([
   "signup",
@@ -23,7 +28,9 @@ const SUPPORTED_MOBILE_EMAIL_OTP_TYPES = new Set<MobileEmailOtpType>([
   "email",
 ]);
 
-function parseMobileEmailOtpType(value: string | undefined): MobileEmailOtpType | null {
+function parseMobileEmailOtpType(
+  value: string | undefined,
+): MobileEmailOtpType | null {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return null;
   return SUPPORTED_MOBILE_EMAIL_OTP_TYPES.has(normalized as MobileEmailOtpType)
@@ -51,7 +58,11 @@ export const signUpWithPassword = async (input: {
 }): Promise<MobileAuthResult> => {
   const legalValidation = validateLegalAcceptance(input.acceptedLegal);
   if (!legalValidation.ok) {
-    return { error: new Error(legalValidation.error ?? "Legal acceptance is required.") };
+    return {
+      error: new Error(
+        legalValidation.error ?? "Legal acceptance is required.",
+      ),
+    };
   }
 
   const passwordValidation = validatePasswordConfirmation(
@@ -59,7 +70,9 @@ export const signUpWithPassword = async (input: {
     input.confirmPassword,
   );
   if (!passwordValidation.ok) {
-    return { error: new Error(passwordValidation.error ?? "Passwords do not match.") };
+    return {
+      error: new Error(passwordValidation.error ?? "Passwords do not match."),
+    };
   }
 
   const { error } = await getMobileSupabase().auth.signUp({
@@ -78,13 +91,18 @@ export const signUpWithPassword = async (input: {
 export const isEmailNotConfirmedError = (error: unknown): boolean => {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { code?: unknown; message?: unknown };
-  const code = typeof candidate.code === "string" ? candidate.code.toLowerCase() : "";
+  const code =
+    typeof candidate.code === "string" ? candidate.code.toLowerCase() : "";
   const message =
-    typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+    typeof candidate.message === "string"
+      ? candidate.message.toLowerCase()
+      : "";
   return code === "email_not_confirmed" || message.includes("not confirmed");
 };
 
-export const resendConfirmation = async (email: string): Promise<MobileAuthResult> => {
+export const resendConfirmation = async (
+  email: string,
+): Promise<MobileAuthResult> => {
   const trimmed = email.trim();
   if (!trimmed) {
     return { error: new Error("Enter your email address.") };
@@ -101,14 +119,19 @@ export const resendConfirmation = async (email: string): Promise<MobileAuthResul
   return { error };
 };
 
-export const requestPasswordReset = async (email: string): Promise<MobileAuthResult> => {
+export const requestPasswordReset = async (
+  email: string,
+): Promise<MobileAuthResult> => {
   const trimmed = email.trim();
   if (!trimmed) {
     return { error: new Error("Enter your email address.") };
   }
-  const { error } = await getMobileSupabase().auth.resetPasswordForEmail(trimmed, {
-    redirectTo: getPlatformAuthConfirmRedirectUrl(),
-  });
+  const { error } = await getMobileSupabase().auth.resetPasswordForEmail(
+    trimmed,
+    {
+      redirectTo: getPlatformAuthConfirmRedirectUrl(),
+    },
+  );
   return { error };
 };
 
@@ -116,9 +139,14 @@ export const completePasswordRecovery = async (
   newPassword: string,
   confirmPassword: string,
 ): Promise<MobileAuthResult> => {
-  const passwordValidation = validateRecoveryPassword(newPassword, confirmPassword);
+  const passwordValidation = validateRecoveryPassword(
+    newPassword,
+    confirmPassword,
+  );
   if (!passwordValidation.ok) {
-    return { error: new Error(passwordValidation.error ?? "Invalid password.") };
+    return {
+      error: new Error(passwordValidation.error ?? "Invalid password."),
+    };
   }
 
   const { error } = await getMobileSupabase().auth.updateUser({
@@ -163,10 +191,11 @@ export const consumeAuthConfirmUrl = async (
   const isRecovery = otpType === "recovery";
 
   if (accessToken && refreshToken) {
-    const { error: setSessionError } = await getMobileSupabase().auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    const { error: setSessionError } =
+      await getMobileSupabase().auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
     if (setSessionError) throw setSessionError;
     return { didProcess: true, requiresPasswordRecovery: isRecovery };
   }

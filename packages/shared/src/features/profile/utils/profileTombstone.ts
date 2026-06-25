@@ -10,7 +10,7 @@ export const isAuthorProfileTombstone = (
 ): boolean =>
   Boolean(
     authorProfile &&
-      authorProfile.avatarUrl === null &&
-      (authorProfile.username === "Banned User" ||
-        authorProfile.username === "Unknown User"),
+    authorProfile.avatarUrl === null &&
+    (authorProfile.username === "Banned User" ||
+      authorProfile.username === "Unknown User"),
   );

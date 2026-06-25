@@ -24,7 +24,10 @@ export function computeEffectiveShellTheme(input: {
   featureFlagsLoaded: boolean;
   userId: string | null | undefined;
 }): HavenTheme {
-  const requestedId = getRequestedShellThemeId(input.profileThemeId, input.userId);
+  const requestedId = getRequestedShellThemeId(
+    input.profileThemeId,
+    input.userId,
+  );
   const allowedEntitlements = input.featureFlagsLoaded
     ? featureFlagsToEntitlementKeys(input.featureFlags)
     : [];

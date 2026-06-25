@@ -19,7 +19,11 @@ type SignedUrlRow = {
   object_path: string;
 };
 
-const DEFAULT_ALLOWED_MEDIA_KINDS: AttachmentMediaKind[] = ["image", "video", "file"];
+const DEFAULT_ALLOWED_MEDIA_KINDS: AttachmentMediaKind[] = [
+  "image",
+  "video",
+  "file",
+];
 
 export const DEFAULT_MEDIA_EXPIRES_IN_HOURS = 24;
 export const MAX_MEDIA_EXPIRES_IN_HOURS = 24 * 30;
@@ -34,14 +38,18 @@ export const sanitizeAttachmentFileName = (value: string): string => {
   return sanitized.length > 0 ? sanitized.slice(0, 120) : "media";
 };
 
-export const resolveAttachmentMediaKind = (mimeType: string): AttachmentMediaKind => {
+export const resolveAttachmentMediaKind = (
+  mimeType: string,
+): AttachmentMediaKind => {
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType.startsWith("video/")) return "video";
   return "file";
 };
 
-export const getSignedUrlMapKey = (bucketName: string, objectPath: string): string =>
-  `${bucketName}/${objectPath}`;
+export const getSignedUrlMapKey = (
+  bucketName: string,
+  objectPath: string,
+): string => `${bucketName}/${objectPath}`;
 
 export type MessageMediaUploadBody = {
   body: Blob | ArrayBuffer;
@@ -59,7 +67,10 @@ export type MediaAttachmentHelpers = {
     allowedMediaKinds?: AttachmentMediaKind[];
   }) => Promise<UploadedMessageMedia | null>;
   removeUploadedMediaObject: (
-    uploadedMedia: Pick<UploadedMessageMedia, "bucketName" | "objectPath"> | null,
+    uploadedMedia: Pick<
+      UploadedMessageMedia,
+      "bucketName" | "objectPath"
+    > | null,
   ) => Promise<void>;
   createSignedUrlMap: (
     rows: SignedUrlRow[],
@@ -67,7 +78,9 @@ export type MediaAttachmentHelpers = {
   ) => Promise<Map<string, string>>;
 };
 
-export function createMediaAttachmentHelpers(store: MessageObjectStore): MediaAttachmentHelpers {
+export function createMediaAttachmentHelpers(
+  store: MessageObjectStore,
+): MediaAttachmentHelpers {
   const uploadMediaToObjectStore = async (input: {
     bucketName: string;
     objectPathPrefix: string;
@@ -77,7 +90,8 @@ export function createMediaAttachmentHelpers(store: MessageObjectStore): MediaAt
     if (!input.mediaUpload?.body) return null;
 
     const body = input.mediaUpload.body;
-    const expiresInHours = input.mediaUpload.expiresInHours ?? DEFAULT_MEDIA_EXPIRES_IN_HOURS;
+    const expiresInHours =
+      input.mediaUpload.expiresInHours ?? DEFAULT_MEDIA_EXPIRES_IN_HOURS;
     const boundedExpiresInHours = Math.min(
       Math.max(Math.floor(expiresInHours), 1),
       MAX_MEDIA_EXPIRES_IN_HOURS,
@@ -89,15 +103,19 @@ export function createMediaAttachmentHelpers(store: MessageObjectStore): MediaAt
     if (!(body instanceof Blob)) {
       const ct = input.mediaUpload.contentType?.trim();
       if (!ct) {
-        throw new Error("contentType is required when uploading message media from an ArrayBuffer.");
+        throw new Error(
+          "contentType is required when uploading message media from an ArrayBuffer.",
+        );
       }
     }
     const mimeType =
       body instanceof Blob
         ? body.type?.trim() || "application/octet-stream"
-        : (input.mediaUpload.contentType ?? "").trim() || "application/octet-stream";
+        : (input.mediaUpload.contentType ?? "").trim() ||
+          "application/octet-stream";
     const mediaKind = resolveAttachmentMediaKind(mimeType);
-    const allowedMediaKinds = input.allowedMediaKinds ?? DEFAULT_ALLOWED_MEDIA_KINDS;
+    const allowedMediaKinds =
+      input.allowedMediaKinds ?? DEFAULT_ALLOWED_MEDIA_KINDS;
 
     if (!allowedMediaKinds.includes(mediaKind)) {
       throw new Error("Unsupported media type for this message.");
@@ -120,17 +138,24 @@ export function createMediaAttachmentHelpers(store: MessageObjectStore): MediaAt
       mimeType,
       mediaKind,
       sizeBytes,
-      expiresAt: new Date(Date.now() + boundedExpiresInHours * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(
+        Date.now() + boundedExpiresInHours * 60 * 60 * 1000,
+      ).toISOString(),
       expiresInHours: boundedExpiresInHours,
     };
   };
 
   const removeUploadedMediaObject = async (
-    uploadedMedia: Pick<UploadedMessageMedia, "bucketName" | "objectPath"> | null,
+    uploadedMedia: Pick<
+      UploadedMessageMedia,
+      "bucketName" | "objectPath"
+    > | null,
   ): Promise<void> => {
     if (!uploadedMedia) return;
     try {
-      await store.removeObjects(uploadedMedia.bucketName, [uploadedMedia.objectPath]);
+      await store.removeObjects(uploadedMedia.bucketName, [
+        uploadedMedia.objectPath,
+      ]);
     } catch {
       // Best-effort rollback/cleanup.
     }
@@ -151,9 +176,16 @@ export function createMediaAttachmentHelpers(store: MessageObjectStore): MediaAt
 
     const signedUrlByBucketAndPath = new Map<string, string>();
     for (const [bucketName, paths] of pathsByBucket.entries()) {
-      const signedRowsByPath = await store.createSignedUrls(bucketName, paths, expiresInSeconds);
+      const signedRowsByPath = await store.createSignedUrls(
+        bucketName,
+        paths,
+        expiresInSeconds,
+      );
       for (const [path, signedUrl] of Object.entries(signedRowsByPath)) {
-        signedUrlByBucketAndPath.set(getSignedUrlMapKey(bucketName, path), signedUrl);
+        signedUrlByBucketAndPath.set(
+          getSignedUrlMapKey(bucketName, path),
+          signedUrl,
+        );
       }
     }
 

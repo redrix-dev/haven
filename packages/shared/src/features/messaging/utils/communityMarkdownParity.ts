@@ -25,14 +25,19 @@ export type SpoilerSegment =
 /**
  * Splits markdown on non-nested `||spoiler||` regions for legacy rendering parity with mobile.
  */
-export function splitCommunitySpoilerSegments(markdown: string): SpoilerSegment[] {
+export function splitCommunitySpoilerSegments(
+  markdown: string,
+): SpoilerSegment[] {
   const segments: SpoilerSegment[] = [];
   const re = /\|\|([\s\S]*?)\|\|/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = re.exec(markdown)) !== null) {
     if (match.index > lastIndex) {
-      segments.push({ kind: "markdown", value: markdown.slice(lastIndex, match.index) });
+      segments.push({
+        kind: "markdown",
+        value: markdown.slice(lastIndex, match.index),
+      });
     }
     segments.push({ kind: "spoiler", value: match[1] ?? "" });
     lastIndex = re.lastIndex;

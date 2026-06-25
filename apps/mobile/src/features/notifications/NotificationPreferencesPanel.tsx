@@ -5,7 +5,12 @@ import type {
   NotificationPreferences,
   NotificationPreferenceUpdate,
 } from "@shared/lib/backend/types";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useNotificationPreferences,
+  useNotificationPreferencesLoading,
+  useNotificationPreferencesSaving,
+} from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 
@@ -14,9 +19,12 @@ function buildUpdateFromPreferences(
   patch: Partial<NotificationPreferenceUpdate>,
 ): NotificationPreferenceUpdate {
   return {
-    friendRequestInAppEnabled: patch.friendRequestInAppEnabled ?? prefs.friendRequestInAppEnabled,
-    friendRequestSoundEnabled: patch.friendRequestSoundEnabled ?? prefs.friendRequestSoundEnabled,
-    friendRequestPushEnabled: patch.friendRequestPushEnabled ?? prefs.friendRequestPushEnabled,
+    friendRequestInAppEnabled:
+      patch.friendRequestInAppEnabled ?? prefs.friendRequestInAppEnabled,
+    friendRequestSoundEnabled:
+      patch.friendRequestSoundEnabled ?? prefs.friendRequestSoundEnabled,
+    friendRequestPushEnabled:
+      patch.friendRequestPushEnabled ?? prefs.friendRequestPushEnabled,
     dmInAppEnabled: patch.dmInAppEnabled ?? prefs.dmInAppEnabled,
     dmSoundEnabled: patch.dmSoundEnabled ?? prefs.dmSoundEnabled,
     dmPushEnabled: patch.dmPushEnabled ?? prefs.dmPushEnabled,
@@ -46,7 +54,9 @@ function ToggleRow({
       <View className="max-w-[72%] shrink">
         <Text className="text-base text-foreground">{label}</Text>
         {description ? (
-          <Text className="mt-0.5 text-xs text-muted-foreground">{description}</Text>
+          <Text className="mt-0.5 text-xs text-muted-foreground">
+            {description}
+          </Text>
         ) : null}
       </View>
       <Switch
@@ -64,7 +74,8 @@ export function NotificationPreferencesPanel() {
   const core = useHavenCore();
   const inbox = core.notifications;
   const themeTokens = useMobileThemeTokens();
-  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const foregroundColor =
+    resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const switchColors = useMemo(
     () => ({
       false: resolveColorProp(themeTokens, "border-panel") ?? "#3d4f6a",
@@ -74,16 +85,18 @@ export function NotificationPreferencesPanel() {
     [foregroundColor, themeTokens],
   );
 
-  const preferences = inbox.usePreferences();
-  const loading = inbox.usePreferencesLoading();
-  const saving = inbox.usePreferencesSaving();
+  const preferences = useNotificationPreferences(inbox);
+  const loading = useNotificationPreferencesLoading(inbox);
+  const saving = useNotificationPreferencesSaving(inbox);
 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setError(null);
     void inbox.ensurePreferences().catch((error) => {
-      setError(getErrorMessage(error, "Failed to load notification preferences."));
+      setError(
+        getErrorMessage(error, "Failed to load notification preferences."),
+      );
     });
   }, [inbox]);
 
@@ -92,7 +105,9 @@ export function NotificationPreferencesPanel() {
     try {
       await inbox.savePreferences(values);
     } catch (error) {
-      setError(getErrorMessage(error, "Failed to save notification preferences."));
+      setError(
+        getErrorMessage(error, "Failed to save notification preferences."),
+      );
     }
   };
 
@@ -122,9 +137,21 @@ export function NotificationPreferencesPanel() {
       {
         title: "Direct messages",
         rows: [
-          { key: "dmInAppEnabled", label: "In-app", value: preferences.dmInAppEnabled },
-          { key: "dmSoundEnabled", label: "Sound", value: preferences.dmSoundEnabled },
-          { key: "dmPushEnabled", label: "Push", value: preferences.dmPushEnabled },
+          {
+            key: "dmInAppEnabled",
+            label: "In-app",
+            value: preferences.dmInAppEnabled,
+          },
+          {
+            key: "dmSoundEnabled",
+            label: "Sound",
+            value: preferences.dmSoundEnabled,
+          },
+          {
+            key: "dmPushEnabled",
+            label: "Push",
+            value: preferences.dmPushEnabled,
+          },
         ] as const,
       },
       {
@@ -154,7 +181,9 @@ export function NotificationPreferencesPanel() {
     return (
       <View className="items-center py-10">
         <ActivityIndicator color={foregroundColor} />
-        <Text className="mt-3 text-sm text-muted-foreground">Loading preferences…</Text>
+        <Text className="mt-3 text-sm text-muted-foreground">
+          Loading preferences…
+        </Text>
       </View>
     );
   }
@@ -186,7 +215,11 @@ export function NotificationPreferencesPanel() {
                 disabled={saving}
                 switchColors={switchColors}
                 onValueChange={(next) => {
-                  void onSave(buildUpdateFromPreferences(preferences, { [row.key]: next }));
+                  void onSave(
+                    buildUpdateFromPreferences(preferences, {
+                      [row.key]: next,
+                    }),
+                  );
                 }}
               />
             ))}
@@ -194,7 +227,9 @@ export function NotificationPreferencesPanel() {
         </View>
       ))}
       {saving ? (
-        <Text className="text-center text-xs text-muted-foreground">Saving…</Text>
+        <Text className="text-center text-xs text-muted-foreground">
+          Saving…
+        </Text>
       ) : null}
     </View>
   );

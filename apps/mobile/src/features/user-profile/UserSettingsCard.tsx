@@ -38,18 +38,24 @@ export default function UserSettingsCard({ rows }: UserSettingsCardProps) {
               <ThemedIonicons
                 name={row.icon}
                 size={18}
-                colorClassName={row.danger ? "accent-destructive" : "accent-muted-foreground"}
+                colorClassName={
+                  row.danger ? "accent-destructive" : "accent-muted-foreground"
+                }
               />
             ) : (
               <View className="w-4.5" />
             )}
 
             <View className="flex-1">
-              <Text className={`text-base font-medium ${row.danger ? "text-destructive" : "text-foreground"}`}>
+              <Text
+                className={`text-base font-medium ${row.danger ? "text-destructive" : "text-foreground"}`}
+              >
                 {row.label}
               </Text>
               {row.subtitle ? (
-                <Text className={`text-xs mt-0.5 ${row.danger ? "text-destructive/80" : "text-muted-foreground"}`}>
+                <Text
+                  className={`text-xs mt-0.5 ${row.danger ? "text-destructive/80" : "text-muted-foreground"}`}
+                >
                   {row.subtitle}
                 </Text>
               ) : null}
@@ -58,7 +64,9 @@ export default function UserSettingsCard({ rows }: UserSettingsCardProps) {
             <ThemedIonicons
               name="chevron-forward"
               size={16}
-              colorClassName={row.danger ? "accent-destructive" : "accent-muted-foreground"}
+              colorClassName={
+                row.danger ? "accent-destructive" : "accent-muted-foreground"
+              }
             />
           </Pressable>
         );

@@ -17,9 +17,11 @@ export type PendingInvite = {
 function parseCustomSchemeInviteCode(url: string): string | null {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "haven:" || parsed.hostname !== "invite") return null;
+    if (parsed.protocol !== "haven:" || parsed.hostname !== "invite")
+      return null;
     const fromPath = parsed.pathname.split("/").filter(Boolean)[0];
-    const fromQuery = parsed.searchParams.get("code") ?? parsed.searchParams.get("invite");
+    const fromQuery =
+      parsed.searchParams.get("code") ?? parsed.searchParams.get("invite");
     const rawCode = fromPath ?? fromQuery;
     return rawCode ? normalizeInviteCode(decodeURIComponent(rawCode)) : null;
   } catch {
@@ -27,7 +29,9 @@ function parseCustomSchemeInviteCode(url: string): string | null {
   }
 }
 
-export function parseInviteCodeFromUrl(url: string | null | undefined): string | null {
+export function parseInviteCodeFromUrl(
+  url: string | null | undefined,
+): string | null {
   if (!url) return null;
   const parsed = parseWebAppDeepLinkUrl(url);
   if (parsed?.kind === "invite") {
@@ -36,7 +40,9 @@ export function parseInviteCodeFromUrl(url: string | null | undefined): string |
   return parseCustomSchemeInviteCode(url);
 }
 
-export function savePendingInviteFromUrl(url: string | null | undefined): boolean {
+export function savePendingInviteFromUrl(
+  url: string | null | undefined,
+): boolean {
   const code = parseInviteCodeFromUrl(url);
   if (!code) return false;
   pendingInviteStorage.set(PENDING_INVITE_CODE_KEY, code);
@@ -52,7 +58,9 @@ export function readPendingInvite(): PendingInvite | null {
   return {
     code,
     sourceUrl: pendingInviteStorage.getString(PENDING_INVITE_URL_KEY) || null,
-    createdAt: Number(pendingInviteStorage.getString(PENDING_INVITE_CREATED_AT_KEY) ?? 0),
+    createdAt: Number(
+      pendingInviteStorage.getString(PENDING_INVITE_CREATED_AT_KEY) ?? 0,
+    ),
   };
 }
 

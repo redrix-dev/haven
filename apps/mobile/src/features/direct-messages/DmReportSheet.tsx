@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import type { DirectMessageReportKind } from "@shared/lib/backend/types";
 import { resolveColorProp } from "@shared/themes";
@@ -9,7 +16,10 @@ type DmReportSheetProps = {
   onClose: () => void;
   authorUsername: string;
   messagePreview: string;
-  onSubmit: (input: { kind: DirectMessageReportKind; comment: string }) => Promise<void>;
+  onSubmit: (input: {
+    kind: DirectMessageReportKind;
+    comment: string;
+  }) => Promise<void>;
 };
 
 const KIND_OPTIONS: { value: DirectMessageReportKind; label: string }[] = [
@@ -60,31 +70,52 @@ export function DmReportSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal scrim overlay, invariant across themes */}
-      <Pressable className="flex-1 justify-center bg-black/60 px-4" onPress={onClose}>
+      <Pressable
+        className="flex-1 justify-center bg-black/60 px-4"
+        onPress={onClose}
+      >
         <Pressable
           className="max-h-[90%] rounded-2xl bg-card border border-border-panel p-4"
           onPress={(e) => e.stopPropagation()}
         >
-          <Text className="text-lg font-semibold text-foreground">Report direct message</Text>
+          <Text className="text-lg font-semibold text-foreground">
+            Report direct message
+          </Text>
           <Text className="mt-1 text-sm text-muted-foreground">
-            Reports go to the Haven Moderation Team only. Direct messages are moderated by Haven, not community owners.
+            Reports go to the Haven Moderation Team only. Direct messages are
+            moderated by Haven, not community owners.
           </Text>
 
           <ScrollView className="mt-4" keyboardShouldPersistTaps="handled">
             <View className="mb-4 rounded-xl border border-border-panel bg-surface-panel p-3">
-              <Text className="text-xs uppercase text-muted-foreground">Reported user</Text>
-              <Text className="mt-1 font-semibold text-foreground">{authorUsername}</Text>
-              <Text className="mt-2 whitespace-pre-wrap text-sm text-foreground/90">{messagePreview}</Text>
+              <Text className="text-xs uppercase text-muted-foreground">
+                Reported user
+              </Text>
+              <Text className="mt-1 font-semibold text-foreground">
+                {authorUsername}
+              </Text>
+              <Text className="mt-2 whitespace-pre-wrap text-sm text-foreground/90">
+                {messagePreview}
+              </Text>
             </View>
 
-            <Text className="mb-2 text-xs uppercase text-muted-foreground">Type</Text>
+            <Text className="mb-2 text-xs uppercase text-muted-foreground">
+              Type
+            </Text>
             {KIND_OPTIONS.map((opt) => (
               <Pressable
                 key={opt.value}
                 className={`mb-2 rounded-xl border px-3 py-3 ${
-                  kind === opt.value ? "border-primary bg-surface-panel" : "border-border-control"
+                  kind === opt.value
+                    ? "border-primary bg-surface-panel"
+                    : "border-border-control"
                 }`}
                 onPress={() => setKind(opt.value)}
               >
@@ -92,7 +123,9 @@ export function DmReportSheet({
               </Pressable>
             ))}
 
-            <Text className="mb-2 mt-2 text-xs uppercase text-muted-foreground">Comment *</Text>
+            <Text className="mb-2 mt-2 text-xs uppercase text-muted-foreground">
+              Comment *
+            </Text>
             <TextInput
               value={comment}
               onChangeText={setComment}
@@ -101,7 +134,9 @@ export function DmReportSheet({
               multiline
               className="min-h-24 rounded-xl border border-border-control bg-surface-panel px-3 py-2 text-sm text-foreground"
             />
-            {error ? <Text className="mt-2 text-sm text-destructive">{error}</Text> : null}
+            {error ? (
+              <Text className="mt-2 text-sm text-destructive">{error}</Text>
+            ) : null}
           </ScrollView>
 
           <View className="mt-4 flex-row justify-end gap-3">
@@ -113,7 +148,9 @@ export function DmReportSheet({
               disabled={submitting}
               className={`rounded-xl bg-primary px-5 py-2.5 ${submitting ? "opacity-50" : ""}`}
             >
-              <Text className="font-semibold text-primary-foreground">{submitting ? "Submitting…" : "Submit"}</Text>
+              <Text className="font-semibold text-primary-foreground">
+                {submitting ? "Submitting…" : "Submit"}
+              </Text>
             </Pressable>
           </View>
         </Pressable>

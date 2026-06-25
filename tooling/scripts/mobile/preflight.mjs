@@ -19,10 +19,13 @@ function fail(message) {
   process.exit(1);
 }
 
-const nodeMajor = Number.parseInt(process.versions.node.split(".")[0] ?? "", 10);
+const nodeMajor = Number.parseInt(
+  process.versions.node.split(".")[0] ?? "",
+  10,
+);
 if (nodeMajor !== requiredNodeMajor) {
   fail(
-    `Expected Node ${requiredNodeMajor}.x LTS but found ${process.version}. Run \`nvm use\`, \`fnm use\`, or another Node version manager from the repo root.`
+    `Expected Node ${requiredNodeMajor}.x LTS but found ${process.version}. Run \`nvm use\`, \`fnm use\`, or another Node version manager from the repo root.`,
   );
 }
 
@@ -30,7 +33,9 @@ if (!fs.existsSync(mobilePackageJsonPath)) {
   fail(`Could not find mobile package.json at ${mobilePackageJsonPath}`);
 }
 
-const mobilePackageJson = JSON.parse(fs.readFileSync(mobilePackageJsonPath, "utf8"));
+const mobilePackageJson = JSON.parse(
+  fs.readFileSync(mobilePackageJsonPath, "utf8"),
+);
 const dependencies = {
   ...(mobilePackageJson.dependencies ?? {}),
   ...(mobilePackageJson.devDependencies ?? {}),
@@ -45,7 +50,9 @@ const requiredPackages = [
 ];
 
 if (strictMode && process.cwd() !== mobileRoot) {
-  fail(`Expected cwd ${mobileRoot} but found ${process.cwd()}. Run through root wrappers or cd into apps/mobile.`);
+  fail(
+    `Expected cwd ${mobileRoot} but found ${process.cwd()}. Run through root wrappers or cd into apps/mobile.`,
+  );
 }
 
 const mobileRequire = createRequire(path.join(mobileRoot, "package.json"));
@@ -58,17 +65,24 @@ for (const pkg of requiredPackages) {
   try {
     mobileRequire.resolve(`${pkg}/package.json`);
   } catch {
-    fail(`Package ${pkg} is declared but not installed in apps/mobile/node_modules.`);
+    fail(
+      `Package ${pkg} is declared but not installed in apps/mobile/node_modules.`,
+    );
   }
 }
 
 try {
   mobileRequire.resolve("react-native-reanimated/plugin");
 } catch {
-  fail("Missing react-native-reanimated Babel plugin. Ensure react-native-reanimated is installed.");
+  fail(
+    "Missing react-native-reanimated Babel plugin. Ensure react-native-reanimated is installed.",
+  );
 }
 
-const checkChatSurface = path.join(repoRoot, "tooling/scripts/check-chat-surface.mjs");
+const checkChatSurface = path.join(
+  repoRoot,
+  "tooling/scripts/check-chat-surface.mjs",
+);
 if (fs.existsSync(checkChatSurface)) {
   const result = spawnSync(process.execPath, [checkChatSurface], {
     cwd: repoRoot,

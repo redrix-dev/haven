@@ -1,12 +1,15 @@
 import type { RootStackParamList } from "@/navigation/types";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getErrorMessage } from "@shared/platform/lib/errors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { useState } from "react";
 import { View, Text, Pressable, TextInput, ScrollView } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { isEmailNotConfirmedError, signInWithPassword } from "@/auth/mobileAuthService";
+import {
+  isEmailNotConfirmedError,
+  signInWithPassword,
+} from "@/auth/mobileAuthService";
 import { BuildStamp } from "@/components/BuildStamp";
 import { useResendConfirmation } from "@/hooks/useResendConfirmation";
 
@@ -23,7 +26,8 @@ export function MobileLogin() {
     note: resendNote,
     cooldown: resendCooldown,
   } = useResendConfirmation();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const onSubmit = async () => {
     setError("");
     setLoading(true);
@@ -77,7 +81,9 @@ export function MobileLogin() {
             onChangeText={setPassword}
           />
           {error ? (
-            <Text className="mb-4 text-center text-sm text-destructive">{error}</Text>
+            <Text className="mb-4 text-center text-sm text-destructive">
+              {error}
+            </Text>
           ) : null}
           {needsConfirmation ? (
             <View className="mb-4">
@@ -114,13 +120,17 @@ export function MobileLogin() {
             className="text-sm text-muted-foreground"
             onPress={() => void navigation.navigate("PasswordRecovery")}
           >
-            <Text className="text-center text-sm text-muted-foreground">Forgot password?</Text>
+            <Text className="text-center text-sm text-muted-foreground">
+              Forgot password?
+            </Text>
           </Pressable>
           <Pressable
             className="text-sm text-muted-foreground"
             onPress={() => void navigation.navigate("SignUp")}
           >
-            <Text className="text-center text-sm text-muted-foreground">Don't have an account? Sign up</Text>
+            <Text className="text-center text-sm text-muted-foreground">
+              Don't have an account? Sign up
+            </Text>
           </Pressable>
         </View>
         <View className="mt-6 self-center">

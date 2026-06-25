@@ -1,60 +1,44 @@
-export { HavenCore } from "./HavenCore";
-export type { HavenCoreOptions } from "./HavenCore";
-export {
-  createHavenCore,
-  getHavenCore,
-  registerHavenCore,
-  requireHavenCore,
-  resetHavenCore,
-} from "./havenCoreRegistry";
+export type {
+  RealtimeMutationTarget,
+  RealtimeMessageCache,
+  RealtimeMessageRegistry,
+  RealtimeChannelCache,
+  RealtimeCommunityCache,
+  RealtimeProfileCache,
+  RealtimeModerationCache,
+} from "./realtimeMutationTarget";
+export { routeRealtimeEvent } from "./routeRealtimeEvent";
 export type {
   RealtimeEvent,
   RealtimeMessageSyncEvent,
 } from "./routeRealtimeEvent";
-export { routeRealtimeEvent } from "./routeRealtimeEvent";
-export {
-  BootstrapPhase,
-  type BootstrapPhaseListener,
-  type BootstrapPhaseSnapshot,
-  type BootstrapPhaseValue,
-} from "./bootstrapPhase";
 export type { HavenBackends, HavenSupabasePublicConfig } from "./backends";
+export { createHavenBackends } from "./backends";
 export type { NexusPersistence } from "./persistence/NexusPersistence";
 export { createMemoryPersistence } from "./persistence/createMemoryPersistence";
-// Note: createMmkvPersistence lives in apps/mobile/src/lib/createMmkvPersistence.ts
-// and is not part of the shared package (it imports react-native-mmkv).
-export { applyAccessRevoked } from "./commands/applyAccessRevoked";
-export { applyModerationEvent } from "./commands/applyModerationEvent";
-export { syncFocusFromRoute, applyCommunityFocus } from "./syncFocusFromRoute";
-export type {
-  FocusFromRouteInput,
-  ApplyCommunityFocusOptions,
-} from "./syncFocusFromRoute";
+export { createLocalStoragePersistence } from "./persistence/createLocalStoragePersistence";
+export { NEXUS_STORAGE_KEYS } from "./persistence/nexusStorageKeys";
 export {
   toChannel,
   getCachedChannelsForServer,
   resolvePreferredChannelIdForServer,
+  type ResolvePreferredChannelOptions,
 } from "./communityChannelUtils";
 export {
   resolveCommunityEntrypointTarget,
   type CommunityEntrypointTarget,
 } from "./communityEntrypoint";
-export { toServerSummary, toServerSummaries, deriveCommunitiesLoadStatus } from "./communitySummaries";
+export {
+  toServerSummary,
+  toServerSummaries,
+  deriveCommunitiesLoadStatus,
+} from "./communitySummaries";
 export type { CommunitiesLoadStatus } from "./communitySummaries";
 export {
   applyCommunityDisplayOrder,
   readCommunityDisplayOrder,
   writeCommunityDisplayOrder,
 } from "./communityDisplayOrder";
-export { prefetchCommunityChannelMessages } from "./prefetchCommunityChannelMessages";
-export type { PrefetchCommunityChannelMessagesInput } from "./prefetchCommunityChannelMessages";
-export {
-  bootstrapNotificationSoundSync,
-  createNotificationSoundSyncState,
-  resetNotificationSoundSyncState,
-  syncNotificationSounds,
-} from "./syncNotificationSounds";
-export type { NotificationSoundSyncState } from "./syncNotificationSounds";
 export {
   registerCommunityAccessHandlers,
   notifyActiveServerAccessLost,
@@ -64,8 +48,23 @@ export {
 } from "./communityAccessHandlers";
 export {
   createDefaultViewerMessagePolicyState,
-  createViewerMessagePolicyStore,
+  viewerCommunityPolicyEqual,
+  viewerPolicyHiddenAuthorIdsEqual,
   type ViewerMessagePolicyState,
   type ViewerMessagePolicyStore,
 } from "./viewerMessagePolicy";
-export { useHavenCore, useBootstrapPhase } from "./useHavenCore";
+export type {
+  AuthStorePort,
+  AuthStoreState,
+  UiStorePort,
+  UiStoreState,
+  UserStatusStorePort,
+  UserStatusStoreState,
+  UserStatus,
+  WorkspaceMode,
+} from "./sessionStorePorts";
+export type {
+  NexusEntry,
+  EntityMapState,
+  NexusState,
+} from "./cache/entityTypes";

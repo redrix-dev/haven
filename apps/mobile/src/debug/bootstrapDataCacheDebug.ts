@@ -1,5 +1,5 @@
 import { dataCacheDebug, instrumentZustandStore } from "@shared/debug";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 
 let bootstrapped = false;
 
@@ -13,9 +13,13 @@ export function bootstrapDataCacheDebug(): void {
 
   const unsubscribers = [instrumentZustandStore(useAuthStore, "authStore")];
 
-  dataCacheDebug.lifecycle("bootstrapDataCacheDebug", "Store instrumentation active", {
-    stores: ["authStore"],
-  });
+  dataCacheDebug.lifecycle(
+    "bootstrapDataCacheDebug",
+    "Store instrumentation active",
+    {
+      stores: ["authStore"],
+    },
+  );
 
   if (typeof globalThis !== "undefined") {
     const g = globalThis as typeof globalThis & {

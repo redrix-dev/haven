@@ -39,7 +39,8 @@ export default function UserAccountCard({
   const trimmedDisplayUsername = displayUsername.trim();
   const trimmedInputUsername = inputUsername.trim();
   const isChanged = trimmedInputUsername !== trimmedDisplayUsername;
-  const showSave = isEditingName && trimmedInputUsername.length > 0 && isChanged;
+  const showSave =
+    isEditingName && trimmedInputUsername.length > 0 && isChanged;
   const canSave = !isSaving && showSave;
   const avatarInitial = trimmedDisplayUsername.charAt(0).toUpperCase() || "U";
   const subtitle = email ?? "No email";
@@ -56,28 +57,42 @@ export default function UserAccountCard({
           className="rounded-full"
         >
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} className="h-15 w-15 rounded-full" />
+            <Image
+              source={{ uri: avatarUrl }}
+              className="h-15 w-15 rounded-full"
+            />
           ) : (
             <View className="h-15 w-15 rounded-full bg-surface-embedded items-center justify-center">
-              <Text className="text-foreground text-[22px] font-semibold">{avatarInitial}</Text>
+              <Text className="text-foreground text-[22px] font-semibold">
+                {avatarInitial}
+              </Text>
             </View>
           )}
 
           <View className="absolute -bottom-0.5 -right-0.5 h-5.5 w-5.5 rounded-full bg-primary border-2 border-surface-panel items-center justify-center">
-            <ThemedIonicons name="camera" size={12} colorClassName="accent-primary-foreground" />
+            <ThemedIonicons
+              name="camera"
+              size={12}
+              colorClassName="accent-primary-foreground"
+            />
           </View>
         </Pressable>
 
         <View className="flex-1">
           <View className="flex-row items-center gap-2">
-            <Text numberOfLines={1} className="flex-1 text-foreground text-[17px] font-semibold">
+            <Text
+              numberOfLines={1}
+              className="flex-1 text-foreground text-[17px] font-semibold"
+            >
               {trimmedDisplayUsername || "User"}
             </Text>
             <Pressable
               onPress={isEditingName ? onPressCancelEditName : onPressEditName}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel={isEditingName ? "Cancel editing username" : "Edit username"}
+              accessibilityLabel={
+                isEditingName ? "Cancel editing username" : "Edit username"
+              }
             >
               <ThemedIonicons
                 name={isEditingName ? "close-outline" : "pencil-outline"}
@@ -86,7 +101,10 @@ export default function UserAccountCard({
               />
             </Pressable>
           </View>
-          <Text numberOfLines={1} className="mt-0.5 text-muted-foreground text-[13px]">
+          <Text
+            numberOfLines={1}
+            className="mt-0.5 text-muted-foreground text-[13px]"
+          >
             {subtitle}
           </Text>
         </View>
@@ -94,7 +112,9 @@ export default function UserAccountCard({
 
       {isEditingName ? (
         <View className="gap-1.5">
-          <Text className="text-muted-foreground text-xs font-semibold">Username</Text>
+          <Text className="text-muted-foreground text-xs font-semibold">
+            Username
+          </Text>
           <TextInput
             value={inputUsername}
             onChangeText={onChangeUsername}
@@ -119,7 +139,9 @@ export default function UserAccountCard({
           accessibilityRole="button"
           accessibilityLabel="Save account settings"
           className={`rounded-xl py-2.5 items-center justify-center ${
-            canSave ? "bg-primary active:bg-primary-hover" : "bg-surface-embedded opacity-70"
+            canSave
+              ? "bg-primary active:bg-primary-hover"
+              : "bg-surface-embedded opacity-70"
           }`}
         >
           <Text className="text-foreground text-[15px] font-semibold">

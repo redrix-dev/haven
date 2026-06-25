@@ -1,4 +1,4 @@
-import type { StoreApi } from "zustand";
+import type { StoreApi } from "zustand/vanilla";
 import { dataCacheDebug } from "./dataCacheDebug";
 import { safeSerializeDebugValue } from "./safeSerializeDebugValue";
 

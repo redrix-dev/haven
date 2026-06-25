@@ -4,8 +4,8 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ThemedIonicons } from "@/theme-rn";
 import type { NotificationItem } from "@shared/lib/backend/types";
-import { syncFocusFromRoute, useHavenCore } from "@shared/core";
-import { useUiStore } from "@shared/stores/uiStore";
+import { syncFocusFromRoute, useHavenCore } from "@mobile-data";
+import { useUiStore } from "@mobile-data/session/uiStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { getNotificationPayloadString } from "@shared/infrastructure/utils/appUtils";
 import type { MainStackParamList } from "@/navigation/types";
@@ -24,11 +24,13 @@ type NotificationsContainerProps = {
 export default function NotificationsContainer({
   onOpenFriendsPanel,
 }: NotificationsContainerProps) {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const core = useHavenCore();
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
   const [subScreen, setSubScreen] = useState<"list" | "preferences">("list");
-  const [notificationNavigationError, setNotificationNavigationError] = useState<string | null>(null);
+  const [notificationNavigationError, setNotificationNavigationError] =
+    useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -49,11 +51,18 @@ export default function NotificationsContainer({
       try {
         switch (notification.kind) {
           case "dm_message": {
-            const conversationId = getNotificationPayloadString(notification, "conversationId");
+            const conversationId = getNotificationPayloadString(
+              notification,
+              "conversationId",
+            );
             if (!conversationId) {
-              throw new Error("This notification does not include a DM conversation target.");
+              throw new Error(
+                "This notification does not include a DM conversation target.",
+              );
             }
-            void core.notifications.markRead([notification.recipientId]).catch(() => {});
+            void core.notifications
+              .markRead([notification.recipientId])
+              .catch(() => {});
             navigation.navigate("Community", {
               pendingDmConversationId: conversationId,
               serverId: null,
@@ -64,7 +73,10 @@ export default function NotificationsContainer({
           case "friend_request_received": {
             onOpenFriendsPanel({
               tab: "requests",
-              highlightedRequestId: getNotificationPayloadString(notification, "friendRequestId"),
+              highlightedRequestId: getNotificationPayloadString(
+                notification,
+                "friendRequestId",
+              ),
             });
             break;
           }
@@ -73,15 +85,28 @@ export default function NotificationsContainer({
             break;
           }
           case "channel_mention": {
-            const communityId = getNotificationPayloadString(notification, "communityId");
-            const channelId = getNotificationPayloadString(notification, "channelId");
+            const communityId = getNotificationPayloadString(
+              notification,
+              "communityId",
+            );
+            const channelId = getNotificationPayloadString(
+              notification,
+              "channelId",
+            );
             if (!communityId || !channelId) {
-              throw new Error("This mention notification does not include a channel target.");
+              throw new Error(
+                "This mention notification does not include a channel target.",
+              );
             }
             setWorkspaceMode("community");
             syncFocusFromRoute(core, { communityId, channelId });
-            void core.notifications.markRead([notification.recipientId]).catch(() => {});
-            navigation.replace("Community", { serverId: communityId, openDrawer: false });
+            void core.notifications
+              .markRead([notification.recipientId])
+              .catch(() => {});
+            navigation.replace("Community", {
+              serverId: communityId,
+              openDrawer: false,
+            });
             return;
           }
           default:
@@ -108,19 +133,31 @@ export default function NotificationsContainer({
             onPress={() => setSubScreen("list")}
             className="flex-row items-center gap-2 active:opacity-80"
           >
-            <ThemedIonicons name="chevron-back" size={22} colorClassName="accent-foreground" />
-            <Text className="text-lg font-semibold text-foreground">Preferences</Text>
+            <ThemedIonicons
+              name="chevron-back"
+              size={22}
+              colorClassName="accent-foreground"
+            />
+            <Text className="text-lg font-semibold text-foreground">
+              Preferences
+            </Text>
           </Pressable>
         ) : (
           <>
-            <Text className="text-lg font-semibold text-foreground">Notifications</Text>
+            <Text className="text-lg font-semibold text-foreground">
+              Notifications
+            </Text>
             <Pressable
               accessibilityRole="button"
               hitSlop={10}
               onPress={() => setSubScreen("preferences")}
               className="rounded-xl bg-surface-panel p-2 active:bg-surface-hover"
             >
-              <ThemedIonicons name="settings-outline" size={22} colorClassName="accent-foreground" />
+              <ThemedIonicons
+                name="settings-outline"
+                size={22}
+                colorClassName="accent-foreground"
+              />
             </Pressable>
           </>
         )}
@@ -131,7 +168,9 @@ export default function NotificationsContainer({
       ) : (
         <NotificationInboxList
           navigationError={notificationNavigationError}
-          onNavigate={(n) => { void handleNavigate(n); }}
+          onNavigate={(n) => {
+            void handleNavigate(n);
+          }}
         />
       )}
     </View>

@@ -39,7 +39,11 @@ export function CommunityManagementSheet({
   ];
 
   return (
-    <HavenListSheet visible={visible} onDismiss={onDismiss} bodyScrollable={false}>
+    <HavenListSheet
+      visible={visible}
+      onDismiss={onDismiss}
+      bodyScrollable={false}
+    >
       {/* Top-level tab pills */}
       <View className="mb-4 flex-row gap-2">
         {tabs.map((t) => (
@@ -50,7 +54,9 @@ export function CommunityManagementSheet({
           >
             <Text
               className={`text-center text-sm font-semibold ${
-                tab === t.key ? "text-primary-foreground" : "text-muted-foreground"
+                tab === t.key
+                  ? "text-primary-foreground"
+                  : "text-muted-foreground"
               }`}
             >
               {t.label}

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { LayoutChangeEvent } from "react-native";
-import { KeyboardController, useKeyboardHandler } from "react-native-keyboard-controller";
+import {
+  KeyboardController,
+  useKeyboardHandler,
+} from "react-native-keyboard-controller";
 import { runOnJS, useAnimatedReaction } from "react-native-reanimated";
 import type { SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,8 +44,12 @@ export function useChatSurfaceLayoutDebug({
   const stickyHeightRef = useRef<number | null>(null);
   const scrollInvertedRef = useRef<boolean | undefined>(undefined);
   const scrollInvertedExplicitRef = useRef(false);
-  const scrollViewLayoutRef = useRef<{ width: number; height: number } | null>(null);
-  const chatHostLayoutRef = useRef<{ width: number; height: number } | null>(null);
+  const scrollViewLayoutRef = useRef<{ width: number; height: number } | null>(
+    null,
+  );
+  const chatHostLayoutRef = useRef<{ width: number; height: number } | null>(
+    null,
+  );
   const kcsvMountedRef = useRef(false);
   const extraTargetRef = useRef<number | null>(null);
   const extraSettledRef = useRef<number | null>(null);
@@ -93,11 +100,22 @@ export function useChatSurfaceLayoutDebug({
 
       logChatSurfaceLayoutSnapshot(snapshot);
     },
-    [bottom, enabled, extraContentPadding, keyboardScrollProps?.keyboardLiftBehavior, surface],
+    [
+      bottom,
+      enabled,
+      extraContentPadding,
+      keyboardScrollProps?.keyboardLiftBehavior,
+      surface,
+    ],
   );
 
   const syncKeyboardTrack = useCallback(
-    (phase: ChatSurfaceKeyboardPhase, height: number, progress: number, shouldEmit: boolean) => {
+    (
+      phase: ChatSurfaceKeyboardPhase,
+      height: number,
+      progress: number,
+      shouldEmit: boolean,
+    ) => {
       const visible = height > 0 || progress > 0.01;
       const prevVisible = keyboardRef.current.visible;
 
@@ -111,11 +129,12 @@ export function useChatSurfaceLayoutDebug({
 
       if (!shouldEmit) return;
 
-      const eventLabel = !prevVisible && visible
-        ? "keyboard:OPENED"
-        : prevVisible && !visible
-          ? "keyboard:CLOSED"
-          : `keyboard:${phase}`;
+      const eventLabel =
+        !prevVisible && visible
+          ? "keyboard:OPENED"
+          : prevVisible && !visible
+            ? "keyboard:CLOSED"
+            : `keyboard:${phase}`;
 
       emit(eventLabel, phase);
     },
@@ -126,7 +145,12 @@ export function useChatSurfaceLayoutDebug({
     {
       onStart: (event) => {
         "worklet";
-        runOnJS(syncKeyboardTrack)("willShow", event.height, event.progress, true);
+        runOnJS(syncKeyboardTrack)(
+          "willShow",
+          event.height,
+          event.progress,
+          true,
+        );
       },
       onMove: (event) => {
         "worklet";
@@ -134,11 +158,17 @@ export function useChatSurfaceLayoutDebug({
       },
       onInteractive: (event) => {
         "worklet";
-        runOnJS(syncKeyboardTrack)("interactive", event.height, event.progress, true);
+        runOnJS(syncKeyboardTrack)(
+          "interactive",
+          event.height,
+          event.progress,
+          true,
+        );
       },
       onEnd: (event) => {
         "worklet";
-        const phase: ChatSurfaceKeyboardPhase = event.progress > 0.01 ? "didShow" : "didHide";
+        const phase: ChatSurfaceKeyboardPhase =
+          event.progress > 0.01 ? "didShow" : "didHide";
         runOnJS(syncKeyboardTrack)(phase, event.height, event.progress, true);
       },
     },
@@ -209,7 +239,9 @@ export function useChatSurfaceLayoutDebug({
       scrollViewLayoutRef.current = next;
       if (!enabled) return;
       if (!prev || prev.width !== next.width || prev.height !== next.height) {
-        emit(`scrollView:onLayout ${prev?.width ?? "?"}x${prev?.height ?? "?"} -> ${next.width}x${next.height}`);
+        emit(
+          `scrollView:onLayout ${prev?.width ?? "?"}x${prev?.height ?? "?"} -> ${next.width}x${next.height}`,
+        );
       }
     },
     [emit, enabled],
@@ -226,7 +258,9 @@ export function useChatSurfaceLayoutDebug({
       chatHostLayoutRef.current = next;
       if (!enabled) return;
       if (!prev || prev.width !== next.width || prev.height !== next.height) {
-        emit(`chatHost:onLayout ${prev?.width ?? "?"}x${prev?.height ?? "?"} -> ${next.width}x${next.height}`);
+        emit(
+          `chatHost:onLayout ${prev?.width ?? "?"}x${prev?.height ?? "?"} -> ${next.width}x${next.height}`,
+        );
       }
     },
     [emit, enabled],
@@ -254,7 +288,9 @@ export function useChatSurfaceLayoutDebug({
       if (scrollInvertedRef.current !== props.inverted) {
         scrollInvertedRef.current = props.inverted;
         if (enabled) {
-          emit(`scrollView:FlatList renderScrollComponent inverted=${String(props.inverted)}`);
+          emit(
+            `scrollView:FlatList renderScrollComponent inverted=${String(props.inverted)}`,
+          );
         }
       }
     },

@@ -16,7 +16,7 @@ import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 import { ThemedIonicons } from "@/theme-rn";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
-import { buildVisiblePermissionGroups } from "./communityPermissionMeta";
+import { buildVisiblePermissionGroups } from "@shared/features/permissions/communityPermissionMeta";
 
 const ROLE_COLORS = [
   "#99aab5",
@@ -51,7 +51,8 @@ export function RoleEditorPanel({
   onDelete,
 }: RoleEditorPanelProps) {
   const themeTokens = useMobileThemeTokens();
-  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const foregroundColor =
+    resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const switchColors = useMemo(
     () => ({
       false: resolveColorProp(themeTokens, "border-panel") ?? "#3d4f6a",
@@ -117,7 +118,10 @@ export function RoleEditorPanel({
               await onDelete();
               onBack();
             } catch (e) {
-              Alert.alert("Delete failed", getErrorMessage(e, "Could not delete role."));
+              Alert.alert(
+                "Delete failed",
+                getErrorMessage(e, "Could not delete role."),
+              );
             } finally {
               setDeleting(false);
             }
@@ -134,13 +138,22 @@ export function RoleEditorPanel({
         hitSlop={8}
         className="mb-3 flex-row items-center gap-1"
       >
-        <ThemedIonicons name="chevron-back" size={20} colorClassName="accent-muted-foreground" />
+        <ThemedIonicons
+          name="chevron-back"
+          size={20}
+          colorClassName="accent-muted-foreground"
+        />
         <Text className="text-sm text-muted-foreground">Roles</Text>
       </Pressable>
 
       <View className="mb-4 flex-row items-center gap-2">
-        <View className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: color }} />
-        <Text className="flex-1 text-lg font-semibold text-foreground">{role.name}</Text>
+        <View
+          className="h-3.5 w-3.5 rounded-full"
+          style={{ backgroundColor: color }}
+        />
+        <Text className="flex-1 text-lg font-semibold text-foreground">
+          {role.name}
+        </Text>
         {role.isDefault ? (
           <Text className="text-xs text-muted-foreground">Default</Text>
         ) : role.isSystem ? (
@@ -155,14 +168,18 @@ export function RoleEditorPanel({
       >
         {canEditDetails ? (
           <View className="mb-5 gap-3">
-            <Text className="text-xs uppercase text-muted-foreground">Role name</Text>
+            <Text className="text-xs uppercase text-muted-foreground">
+              Role name
+            </Text>
             <TextInput
               value={name}
               onChangeText={setName}
               editable={!busy}
               className="rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
             />
-            <Text className="text-xs uppercase text-muted-foreground">Color</Text>
+            <Text className="text-xs uppercase text-muted-foreground">
+              Color
+            </Text>
             <View className="flex-row flex-wrap gap-2">
               {ROLE_COLORS.map((swatch) => (
                 <Pressable
@@ -170,10 +187,15 @@ export function RoleEditorPanel({
                   onPress={() => setColor(swatch)}
                   disabled={busy}
                   className={`h-9 w-9 items-center justify-center rounded-full border ${
-                    color === swatch ? "border-foreground" : "border-border-panel"
+                    color === swatch
+                      ? "border-foreground"
+                      : "border-border-panel"
                   }`}
                 >
-                  <View className="h-6 w-6 rounded-full" style={{ backgroundColor: swatch }} />
+                  <View
+                    className="h-6 w-6 rounded-full"
+                    style={{ backgroundColor: swatch }}
+                  />
                 </Pressable>
               ))}
             </View>
@@ -210,14 +232,19 @@ export function RoleEditorPanel({
                 <View className="flex-1 pr-3">
                   <Text className="text-foreground">{permission.label}</Text>
                   {permission.description ? (
-                    <Text className="text-xs text-muted-foreground">{permission.description}</Text>
+                    <Text className="text-xs text-muted-foreground">
+                      {permission.description}
+                    </Text>
                   ) : null}
                 </View>
                 <Switch
                   value={pendingPermissionKeys.includes(permission.key)}
                   onValueChange={() => togglePermission(permission.key)}
                   disabled={!canEditPermissions || busy}
-                  trackColor={{ false: switchColors.false, true: switchColors.true }}
+                  trackColor={{
+                    false: switchColors.false,
+                    true: switchColors.true,
+                  }}
                   thumbColor={switchColors.thumb}
                 />
               </View>

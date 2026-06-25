@@ -13,6 +13,7 @@ import type {
 } from "@/navigation/types";
 import { NAV_THEME } from "@/lib/theme";
 import { setMobileNavigationDelegate } from "@/lib/registerMobileAppHost";
+import { toChannel, toServerSummaries } from "@shared/core";
 import {
   bootstrapNotificationSoundSync,
   createNotificationSoundSyncState,
@@ -20,19 +21,28 @@ import {
   resetNotificationSoundSyncState,
   syncFocusFromRoute,
   syncNotificationSounds,
-  toChannel,
-  toServerSummaries,
   useHavenCore,
-} from "@shared/core";
+} from "@mobile-data";
+import {
+  useActiveChannelId,
+  useActiveCommunityId,
+  useChannels,
+  useCounts,
+  useDmConversations,
+  useNotifications,
+  useOrderedCommunities,
+  useProfilesRecord,
+  useViewerProfile,
+} from "@mobile-data/hooks";
 import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
 import UserProfileModal, {
   type UserProfileModalTarget,
 } from "@/features/user-profile/UserProfileModal";
-import { useUiStore } from "@shared/stores/uiStore";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useUiStore } from "@mobile-data/session/uiStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
 import type { NotificationAudioSettings } from "@shared/types/settings";
-import { useVoice } from "@shared/features/voice/hooks/useVoice";
+import { useVoice } from "@/features/voice/hooks/useVoice";
 import {
   type LiveProfilesRecord,
   resolveLiveAvatarUrl,
@@ -89,8 +99,11 @@ function enrichVoiceParticipant<T extends VoiceParticipantIdentity>(
   liveProfiles: LiveProfilesRecord,
 ): T {
   const displayName =
-    resolveLiveUsername(liveProfiles, participant.userId, participant.displayName) ??
-    participant.displayName;
+    resolveLiveUsername(
+      liveProfiles,
+      participant.userId,
+      participant.displayName,
+    ) ?? participant.displayName;
   const avatarUrl =
     resolveLiveAvatarUrl(
       liveProfiles,
@@ -170,7 +183,7 @@ function MobileNotificationSoundSync({
   audioSettings: NotificationAudioSettings;
 }) {
   const core = useHavenCore();
-  const notificationItems = core.notifications.useNotifications();
+  const notificationItems = useNotifications(core.notifications);
   const soundSyncRef = useRef(createNotificationSoundSyncState());
   const audioRef = useRef(audioSettings);
 
@@ -206,12 +219,13 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const dm = core.directMessages;
   const authUser = useAuthStore((s) => s.user);
   const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
-  const notificationItems = core.notifications.useNotifications();
-  const dmConversations = dm.useConversations();
-  const socialCounts = core.social.useCounts();
-  const currentServerId = core.communities.useActiveId();
-  const currentChannelId = core.channels.useActiveChannelId();
-  const activeCommunityChannels = core.channels.useChannels(
+  const notificationItems = useNotifications(core.notifications);
+  const dmConversations = useDmConversations(dm);
+  const socialCounts = useCounts(core.social);
+  const currentServerId = useActiveCommunityId(core.communities);
+  const currentChannelId = useActiveChannelId(core.channels);
+  const activeCommunityChannels = useChannels(
+    core.channels,
     currentServerId ?? "__none__",
   );
   const channels = useMemo(
@@ -224,9 +238,9 @@ function MainNavigationShell({ userId }: { userId: string }) {
     },
     [core],
   );
-  const viewerProfile = core.profiles.useViewerProfile(userId);
-  const liveProfiles = core.profiles.useProfilesRecord();
-  const orderedCommunities = core.communities.useOrderedCommunities();
+  const viewerProfile = useViewerProfile(core.profiles, userId);
+  const liveProfiles = useProfilesRecord(core.profiles);
+  const orderedCommunities = useOrderedCommunities(core.communities);
   const servers = useMemo(
     () => toServerSummaries(orderedCommunities),
     [orderedCommunities],
@@ -593,7 +607,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
       const conversationId = await dm.openWithUser(targetUserId);
       navigation.navigate("Main", {
         screen: "Community",
-        params: { pendingDmConversationId: conversationId, serverId: null, openDrawer: false },
+        params: {
+          pendingDmConversationId: conversationId,
+          serverId: null,
+          openDrawer: false,
+        },
       });
     },
     [dm, navigation],
@@ -601,9 +619,12 @@ function MainNavigationShell({ userId }: { userId: string }) {
 
   const [profileCardTarget, setProfileCardTarget] =
     useState<UserProfileModalTarget | null>(null);
-  const handleOpenProfileCard = useCallback((target: UserProfileModalTarget) => {
-    setProfileCardTarget(target);
-  }, []);
+  const handleOpenProfileCard = useCallback(
+    (target: UserProfileModalTarget) => {
+      setProfileCardTarget(target);
+    },
+    [],
+  );
   const handleCloseProfileCard = useCallback(() => {
     setProfileCardTarget(null);
   }, []);
@@ -612,7 +633,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
     (conversationId: string) => {
       navigation.navigate("Main", {
         screen: "Community",
-        params: { pendingDmConversationId: conversationId, serverId: null, openDrawer: false },
+        params: {
+          pendingDmConversationId: conversationId,
+          serverId: null,
+          openDrawer: false,
+        },
       });
     },
     [navigation],
@@ -621,7 +646,10 @@ function MainNavigationShell({ userId }: { userId: string }) {
   const pendingInviteDrainingRef = useRef(false);
   const [pendingInviteSignal, setPendingInviteSignal] = useState(0);
   useEffect(
-    () => subscribePendingInvite(() => setPendingInviteSignal((value) => value + 1)),
+    () =>
+      subscribePendingInvite(() =>
+        setPendingInviteSignal((value) => value + 1),
+      ),
     [],
   );
 
@@ -644,7 +672,10 @@ function MainNavigationShell({ userId }: { userId: string }) {
         clearPendingInvite();
         Alert.alert(
           "Invite could not be joined",
-          getErrorMessage(error, "Open the invite again or ask for a new link."),
+          getErrorMessage(
+            error,
+            "Open the invite again or ask for a new link.",
+          ),
         );
       })
       .finally(() => {
@@ -657,7 +688,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
       openDm: (conversationId) => {
         navigation.navigate("Main", {
           screen: "Community",
-          params: { pendingDmConversationId: conversationId, serverId: null, openDrawer: false },
+          params: {
+            pendingDmConversationId: conversationId,
+            serverId: null,
+            openDrawer: false,
+          },
         });
       },
       openFriends: (input) => {
@@ -735,7 +770,12 @@ function MainNavigationShell({ userId }: { userId: string }) {
                 }}
                 onStartDirectMessage={(targetUserId) => {
                   void handleOpenDmWithUser(targetUserId).catch((error) => {
-                    Alert.alert("Message failed", error instanceof Error ? error.message : "Could not open that conversation.");
+                    Alert.alert(
+                      "Message failed",
+                      error instanceof Error
+                        ? error.message
+                        : "Could not open that conversation.",
+                    );
                   });
                 }}
                 activeVoiceChannelId={voiceState.activeVoiceChannelId}
@@ -784,7 +824,12 @@ function MainNavigationShell({ userId }: { userId: string }) {
         onDismiss={handleCloseProfileCard}
         onStartDirectMessage={(targetUserId) => {
           void handleOpenDmWithUser(targetUserId).catch((error) => {
-            Alert.alert("Message failed", error instanceof Error ? error.message : "Could not open that conversation.");
+            Alert.alert(
+              "Message failed",
+              error instanceof Error
+                ? error.message
+                : "Could not open that conversation.",
+            );
           });
         }}
       />

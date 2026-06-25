@@ -1,6 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DEFAULT_VOICE_SETTINGS } from "@shared/infrastructure/constants";
-import type { VoiceSettings, VoiceTransmissionMode } from "@shared/types/settings";
+import type {
+  VoiceSettings,
+  VoiceTransmissionMode,
+} from "@shared/types/settings";
 import { useCallback, useEffect, useState } from "react";
 
 const MOBILE_VOICE_SETTINGS_KEY = "haven.mobile.voice.settings";
@@ -23,7 +26,8 @@ function coerceTransmissionMode(value: unknown): MobileTransmissionMode {
 
 function coerceThreshold(value: unknown): number {
   const numeric = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(numeric)) return MOBILE_DEFAULT_VOICE_SETTINGS.voiceActivationThreshold;
+  if (!Number.isFinite(numeric))
+    return MOBILE_DEFAULT_VOICE_SETTINGS.voiceActivationThreshold;
   return Math.max(0, Math.min(100, Math.round(numeric)));
 }
 
@@ -57,7 +61,9 @@ export async function loadMobileVoiceSettings(): Promise<VoiceSettings> {
   }
 }
 
-export async function saveMobileVoiceSettings(settings: VoiceSettings): Promise<void> {
+export async function saveMobileVoiceSettings(
+  settings: VoiceSettings,
+): Promise<void> {
   try {
     await AsyncStorage.setItem(
       MOBILE_VOICE_SETTINGS_KEY,
@@ -85,7 +91,9 @@ export async function saveSkipVoiceSwitchPrompt(skip: boolean): Promise<void> {
 }
 
 export function useMobileVoiceSettings() {
-  const [settings, setSettings] = useState<VoiceSettings>(MOBILE_DEFAULT_VOICE_SETTINGS);
+  const [settings, setSettings] = useState<VoiceSettings>(
+    MOBILE_DEFAULT_VOICE_SETTINGS,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -97,13 +105,16 @@ export function useMobileVoiceSettings() {
     };
   }, []);
 
-  const updateVoiceSettingsPatch = useCallback((patch: Partial<VoiceSettings>) => {
-    setSettings((current) => {
-      const next = coerceVoiceSettings({ ...current, ...patch });
-      void saveMobileVoiceSettings(next);
-      return next;
-    });
-  }, []);
+  const updateVoiceSettingsPatch = useCallback(
+    (patch: Partial<VoiceSettings>) => {
+      setSettings((current) => {
+        const next = coerceVoiceSettings({ ...current, ...patch });
+        void saveMobileVoiceSettings(next);
+        return next;
+      });
+    },
+    [],
+  );
 
   return { settings, updateVoiceSettingsPatch };
 }

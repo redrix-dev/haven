@@ -1,46 +1,76 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import readline from 'node:readline/promises';
-import { fileURLToPath } from 'node:url';
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import readline from "node:readline/promises";
+import { fileURLToPath } from "node:url";
 import {
   getVitestMarkdownOutputPath,
   getVitestReporterEnv,
   sanitizeCapturedText,
-} from './report-output-utils.mjs';
+} from "./report-output-utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, '../../..');
+const repoRoot = path.resolve(__dirname, "../../..");
 
 const commandSets = {
   release: [
-    { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
-    { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
-    { id: 'unit', label: 'Unit / Component Tests', command: 'npm', args: ['run', 'test:unit'] },
-    { id: 'db', label: 'DB / RLS Suite', command: 'npm', args: ['run', 'test:db'] },
-    { id: 'backend', label: 'Backend Contract Tests', command: 'npm', args: ['run', 'test:backend'] },
-    { id: 'build_web', label: 'Web Build', command: 'npm', args: ['run', 'build:web'] },
+    { id: "lint", label: "ESLint", command: "npm", args: ["run", "lint"] },
     {
-      id: 'notif_smoke',
-      label: 'Notification Dispatch Smoke',
-      command: 'npm',
-      args: ['run', 'test:notifications:smoke', '--', '--skip-worker', '--json'],
+      id: "typecheck",
+      label: "TypeScript",
+      command: "npm",
+      args: ["run", "typecheck"],
+    },
+    {
+      id: "unit",
+      label: "Unit / Component Tests",
+      command: "npm",
+      args: ["run", "test:unit"],
+    },
+    {
+      id: "db",
+      label: "DB / RLS Suite",
+      command: "npm",
+      args: ["run", "test:db"],
+    },
+    {
+      id: "backend",
+      label: "Backend Contract Tests",
+      command: "npm",
+      args: ["run", "test:backend"],
+    },
+    {
+      id: "build_solid",
+      label: "Solid Build",
+      command: "npm",
+      args: ["run", "build:solid"],
+    },
+    {
+      id: "notif_smoke",
+      label: "Notification Dispatch Smoke",
+      command: "npm",
+      args: [
+        "run",
+        "test:notifications:smoke",
+        "--",
+        "--skip-worker",
+        "--json",
+      ],
     },
   ],
   quick: [
-    { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
-    { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
-    { id: 'unit', label: 'Unit / Component Tests', command: 'npm', args: ['run', 'test:unit'] },
-  ],
-  web: [
-    { id: 'lint', label: 'ESLint', command: 'npm', args: ['run', 'lint'] },
-    { id: 'typecheck', label: 'TypeScript', command: 'npm', args: ['run', 'typecheck'] },
-    { id: 'build_web', label: 'Web Build', command: 'npm', args: ['run', 'build:web'] },
+    { id: "lint", label: "ESLint", command: "npm", args: ["run", "lint"] },
     {
-      id: 'notif_smoke',
-      label: 'Notification Dispatch Smoke',
-      command: 'npm',
-      args: ['run', 'test:notifications:smoke', '--', '--skip-worker', '--json'],
+      id: "typecheck",
+      label: "TypeScript",
+      command: "npm",
+      args: ["run", "typecheck"],
+    },
+    {
+      id: "unit",
+      label: "Unit / Component Tests",
+      command: "npm",
+      args: ["run", "test:unit"],
     },
   ],
 };
@@ -57,7 +87,7 @@ Required:
   --run-by <name>             person who executed the run
 
 Optional:
-  --mode <release|quick|web>   default: release
+  --mode <release|quick>       default: release
   --candidate-commit <sha>
   --notes <text>
   --json                          print summary JSON to stdout
@@ -65,7 +95,7 @@ Optional:
 
 Examples:
   npm run test:signoff -- --release-label staging-2026-02-26 --environment staging
-  npm run test:signoff -- --release-label v1.4.0-rc1 --environment staging --test-author "Test Owner" --run-by "Runner Name" --mode web --json
+  npm run test:signoff -- --release-label v1.4.0-rc1 --environment staging --test-author "Test Owner" --run-by "Runner Name" --mode quick --json
 `;
 
 function parseArgs(argv) {
@@ -74,7 +104,7 @@ function parseArgs(argv) {
     environment: null,
     testAuthor: null,
     runBy: null,
-    mode: 'release',
+    mode: "release",
     candidateCommit: null,
     notes: null,
     json: false,
@@ -82,11 +112,11 @@ function parseArgs(argv) {
   };
 
   const takeValue = (i, key, raw) => {
-    if (raw.includes('=')) {
-      return { value: raw.slice(raw.indexOf('=') + 1), nextIndex: i };
+    if (raw.includes("=")) {
+      return { value: raw.slice(raw.indexOf("=") + 1), nextIndex: i };
     }
     const value = argv[i + 1];
-    if (typeof value !== 'string' || value.startsWith('--')) {
+    if (typeof value !== "string" || value.startsWith("--")) {
       throw new Error(`Missing value for ${key}`);
     }
     return { value, nextIndex: i + 1 };
@@ -94,56 +124,56 @@ function parseArgs(argv) {
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--help' || arg === '-h') {
+    if (arg === "--help" || arg === "-h") {
       out.help = true;
       continue;
     }
-    if (arg === '--json') {
+    if (arg === "--json") {
       out.json = true;
       continue;
     }
-    if (!arg.startsWith('--')) {
+    if (!arg.startsWith("--")) {
       throw new Error(`Unexpected argument: ${arg}`);
     }
 
-    if (arg.startsWith('--release-label')) {
-      const { value, nextIndex } = takeValue(i, '--release-label', arg);
+    if (arg.startsWith("--release-label")) {
+      const { value, nextIndex } = takeValue(i, "--release-label", arg);
       out.releaseLabel = value.trim() || null;
       i = nextIndex;
       continue;
     }
-    if (arg.startsWith('--environment')) {
-      const { value, nextIndex } = takeValue(i, '--environment', arg);
+    if (arg.startsWith("--environment")) {
+      const { value, nextIndex } = takeValue(i, "--environment", arg);
       out.environment = value.trim() || null;
       i = nextIndex;
       continue;
     }
-    if (arg.startsWith('--test-author')) {
-      const { value, nextIndex } = takeValue(i, '--test-author', arg);
+    if (arg.startsWith("--test-author")) {
+      const { value, nextIndex } = takeValue(i, "--test-author", arg);
       out.testAuthor = value.trim() || null;
       i = nextIndex;
       continue;
     }
-    if (arg.startsWith('--run-by')) {
-      const { value, nextIndex } = takeValue(i, '--run-by', arg);
+    if (arg.startsWith("--run-by")) {
+      const { value, nextIndex } = takeValue(i, "--run-by", arg);
       out.runBy = value.trim() || null;
       i = nextIndex;
       continue;
     }
-    if (arg.startsWith('--mode')) {
-      const { value, nextIndex } = takeValue(i, '--mode', arg);
+    if (arg.startsWith("--mode")) {
+      const { value, nextIndex } = takeValue(i, "--mode", arg);
       out.mode = value.trim() || out.mode;
       i = nextIndex;
       continue;
     }
-    if (arg.startsWith('--candidate-commit')) {
-      const { value, nextIndex } = takeValue(i, '--candidate-commit', arg);
+    if (arg.startsWith("--candidate-commit")) {
+      const { value, nextIndex } = takeValue(i, "--candidate-commit", arg);
       out.candidateCommit = value.trim() || null;
       i = nextIndex;
       continue;
     }
-    if (arg.startsWith('--notes')) {
-      const { value, nextIndex } = takeValue(i, '--notes', arg);
+    if (arg.startsWith("--notes")) {
+      const { value, nextIndex } = takeValue(i, "--notes", arg);
       out.notes = value.trim() || null;
       i = nextIndex;
       continue;
@@ -156,11 +186,11 @@ function parseArgs(argv) {
 }
 
 function timestampForPath(date = new Date()) {
-  return date.toISOString().replace(/[:.]/g, '-');
+  return date.toISOString().replace(/[:.]/g, "-");
 }
 
 function formatDuration(ms) {
-  if (!Number.isFinite(ms) || ms < 0) return '0ms';
+  if (!Number.isFinite(ms) || ms < 0) return "0ms";
   if (ms < 1000) return `${Math.round(ms)}ms`;
   const seconds = ms / 1000;
   if (seconds < 60) return `${seconds.toFixed(seconds >= 10 ? 1 : 2)}s`;
@@ -180,10 +210,11 @@ async function promptForSignatureNames(args) {
 
   try {
     if (!args.testAuthor) {
-      args.testAuthor = (await rl.question('Test author name: ')).trim() || null;
+      args.testAuthor =
+        (await rl.question("Test author name: ")).trim() || null;
     }
     if (!args.runBy) {
-      args.runBy = (await rl.question('Run by name: ')).trim() || null;
+      args.runBy = (await rl.question("Run by name: ")).trim() || null;
     }
   } finally {
     rl.close();
@@ -195,12 +226,16 @@ function ensureDir(dir) {
 }
 
 function resolveCommandInvocation(command, args) {
-  if (process.platform !== 'win32') {
+  if (process.platform !== "win32") {
     return { command, args, shell: false };
   }
 
-  if (command === 'npm' || command === 'npx') {
-    return { command: 'cmd', args: ['/c', `${command}.cmd`, ...args], shell: false };
+  if (command === "npm" || command === "npx") {
+    return {
+      command: "cmd",
+      args: ["/c", `${command}.cmd`, ...args],
+      shell: false,
+    };
   }
 
   return { command, args, shell: false };
@@ -210,15 +245,17 @@ function safeCapture(command, args) {
   const invocation = resolveCommandInvocation(command, args);
   const result = spawnSync(invocation.command, invocation.args, {
     cwd: repoRoot,
-    encoding: 'utf8',
+    encoding: "utf8",
     shell: invocation.shell,
     windowsHide: true,
   });
   if (result.error) {
     return { ok: false, text: sanitizeCapturedText(result.error.message) };
   }
-  const text = sanitizeCapturedText(`${result.stdout || ''}${result.stderr || ''}`).trim();
-  return { ok: result.status === 0, text: text || '' };
+  const text = sanitizeCapturedText(
+    `${result.stdout || ""}${result.stderr || ""}`,
+  ).trim();
+  return { ok: result.status === 0, text: text || "" };
 }
 
 function runCapture(command, args, options = {}) {
@@ -227,7 +264,7 @@ function runCapture(command, args, options = {}) {
   const startedMs = Date.now();
   const result = spawnSync(invocation.command, invocation.args, {
     cwd: repoRoot,
-    encoding: 'utf8',
+    encoding: "utf8",
     shell: invocation.shell,
     env: {
       ...process.env,
@@ -241,9 +278,11 @@ function runCapture(command, args, options = {}) {
     ok: result.status === 0,
     status: result.status ?? 1,
     signal: result.signal ?? null,
-    stdout: sanitizeCapturedText(result.stdout ?? ''),
-    stderr: sanitizeCapturedText(result.stderr ?? ''),
-    errorMessage: result.error ? sanitizeCapturedText(String(result.error.message || result.error)) : null,
+    stdout: sanitizeCapturedText(result.stdout ?? ""),
+    stderr: sanitizeCapturedText(result.stderr ?? ""),
+    errorMessage: result.error
+      ? sanitizeCapturedText(String(result.error.message || result.error))
+      : null,
     startedAt,
     endedAt,
     durationMs,
@@ -251,20 +290,24 @@ function runCapture(command, args, options = {}) {
 }
 
 function writeStepLogs(runDir, index, step, result, markdownPath = null) {
-  const stepPrefix = `${String(index).padStart(2, '0')}-${step.id}`;
+  const stepPrefix = `${String(index).padStart(2, "0")}-${step.id}`;
   const stdoutPath = path.join(runDir, `${stepPrefix}.stdout.log`);
   const stderrPath = path.join(runDir, `${stepPrefix}.stderr.log`);
   const combinedPath = path.join(runDir, `${stepPrefix}.combined.log`);
-  fs.writeFileSync(stdoutPath, result.stdout || '', 'utf8');
-  fs.writeFileSync(stderrPath, result.stderr || '', 'utf8');
-  fs.writeFileSync(combinedPath, [result.stdout, result.stderr].filter(Boolean).join('\n'), 'utf8');
+  fs.writeFileSync(stdoutPath, result.stdout || "", "utf8");
+  fs.writeFileSync(stderrPath, result.stderr || "", "utf8");
+  fs.writeFileSync(
+    combinedPath,
+    [result.stdout, result.stderr].filter(Boolean).join("\n"),
+    "utf8",
+  );
   return {
-    stdout: path.relative(repoRoot, stdoutPath).replace(/\\/g, '/'),
-    stderr: path.relative(repoRoot, stderrPath).replace(/\\/g, '/'),
-    combined: path.relative(repoRoot, combinedPath).replace(/\\/g, '/'),
+    stdout: path.relative(repoRoot, stdoutPath).replace(/\\/g, "/"),
+    stderr: path.relative(repoRoot, stderrPath).replace(/\\/g, "/"),
+    combined: path.relative(repoRoot, combinedPath).replace(/\\/g, "/"),
     markdown:
       markdownPath && fs.existsSync(markdownPath)
-        ? path.relative(repoRoot, markdownPath).replace(/\\/g, '/')
+        ? path.relative(repoRoot, markdownPath).replace(/\\/g, "/")
         : null,
   };
 }
@@ -272,151 +315,161 @@ function writeStepLogs(runDir, index, step, result, markdownPath = null) {
 function buildMarkdownSignoff(data) {
   const lines = [];
   lines.push(`# Test Signoff (${data.status})`);
-  lines.push('');
-  lines.push('## Release Metadata');
-  lines.push('');
+  lines.push("");
+  lines.push("## Release Metadata");
+  lines.push("");
   lines.push(`- Release label: \`${data.release.label}\``);
   lines.push(`- Environment: \`${data.environment}\``);
   if (data.release.candidateCommit) {
-    lines.push(`- Candidate commit (declared): \`${data.release.candidateCommit}\``);
+    lines.push(
+      `- Candidate commit (declared): \`${data.release.candidateCommit}\``,
+    );
   }
   lines.push(`- Mode: \`${data.mode}\``);
   lines.push(`- Started: ${data.startedAt}`);
   lines.push(`- Finished: ${data.endedAt}`);
   lines.push(`- Duration: ${formatDuration(data.durationMs)}`);
-  lines.push(`- Summary: ${data.summary.passed} passed / ${data.summary.failed} failed`);
-  lines.push('');
+  lines.push(
+    `- Summary: ${data.summary.passed} passed / ${data.summary.failed} failed`,
+  );
+  lines.push("");
 
-  lines.push('## Git Snapshot');
-  lines.push('');
-  lines.push(`- Branch: \`${data.git.branch || 'unknown'}\``);
-  lines.push(`- Commit: \`${data.git.commit || 'unknown'}\``);
-  lines.push('');
+  lines.push("## Git Snapshot");
+  lines.push("");
+  lines.push(`- Branch: \`${data.git.branch || "unknown"}\``);
+  lines.push(`- Commit: \`${data.git.commit || "unknown"}\``);
+  lines.push("");
 
-  lines.push('## Tooling Snapshot');
-  lines.push('');
-  lines.push(`- Node: \`${data.system.node || 'unknown'}\``);
-  lines.push(`- npm: \`${data.system.npm || 'unknown'}\``);
-  lines.push(`- Supabase CLI: \`${data.system.supabase || 'unknown'}\``);
-  lines.push(`- psql: \`${data.system.psql || 'unknown'}\``);
-  lines.push('');
+  lines.push("## Tooling Snapshot");
+  lines.push("");
+  lines.push(`- Node: \`${data.system.node || "unknown"}\``);
+  lines.push(`- npm: \`${data.system.npm || "unknown"}\``);
+  lines.push(`- Supabase CLI: \`${data.system.supabase || "unknown"}\``);
+  lines.push(`- psql: \`${data.system.psql || "unknown"}\``);
+  lines.push("");
 
-  lines.push('## Command Results');
-  lines.push('');
-  lines.push('| Step | Result | Duration | Command | Logs |');
-  lines.push('|---|---|---:|---|---|');
+  lines.push("## Command Results");
+  lines.push("");
+  lines.push("| Step | Result | Duration | Command | Logs |");
+  lines.push("|---|---|---:|---|---|");
   for (const result of data.results) {
-    const outcome = result.ok ? 'PASS' : `FAIL (${result.status})`;
+    const outcome = result.ok ? "PASS" : `FAIL (${result.status})`;
     lines.push(
-      `| ${result.label} | ${outcome} | ${formatDuration(result.durationMs)} | \`${result.command}\` | \`${result.logs.combined}\` |`
+      `| ${result.label} | ${outcome} | ${formatDuration(result.durationMs)} | \`${result.command}\` | \`${result.logs.combined}\` |`,
     );
   }
-  lines.push('');
+  lines.push("");
 
   const vitestArtifacts = data.results.filter((result) => result.logs.markdown);
   if (vitestArtifacts.length > 0) {
-    lines.push('## Vitest Markdown Artifacts');
-    lines.push('');
+    lines.push("## Vitest Markdown Artifacts");
+    lines.push("");
     for (const result of vitestArtifacts) {
       lines.push(`- ${result.label}: \`${result.logs.markdown}\``);
     }
-    lines.push('');
+    lines.push("");
   }
 
-  lines.push('## Signature');
-  lines.push('');
+  lines.push("## Signature");
+  lines.push("");
   lines.push(`- Test Author: ${data.signatures.testAuthor}`);
   lines.push(`- Run By: ${data.signatures.runBy}`);
   lines.push(`- Run Timestamp: ${data.endedAt}`);
   lines.push(`- Run ID: \`${data.runId}\``);
-  lines.push('');
+  lines.push("");
 
   if (data.notes) {
-    lines.push('## Notes / Known Issues');
-    lines.push('');
+    lines.push("## Notes / Known Issues");
+    lines.push("");
     lines.push(data.notes);
-    lines.push('');
+    lines.push("");
   }
 
-  lines.push('## Artifacts');
-  lines.push('');
+  lines.push("## Artifacts");
+  lines.push("");
   lines.push(`- JSON summary: \`${data.artifacts.json}\``);
   lines.push(`- Markdown summary: \`${data.artifacts.markdown}\``);
   if (data.artifacts.publicMarkdown) {
-    lines.push(`- Public markdown summary: \`${data.artifacts.publicMarkdown}\``);
+    lines.push(
+      `- Public markdown summary: \`${data.artifacts.publicMarkdown}\``,
+    );
   }
   lines.push(`- Raw step logs: \`${data.artifacts.logsDir}\``);
-  lines.push('');
+  lines.push("");
 
-  return `${lines.join('\n')}\n`;
+  return `${lines.join("\n")}\n`;
 }
 
 function firstLine(value) {
-  if (!value) return 'unknown';
-  return String(value).split(/\r?\n/)[0]?.trim() || 'unknown';
+  if (!value) return "unknown";
+  return String(value).split(/\r?\n/)[0]?.trim() || "unknown";
 }
 
 function buildPublicMarkdownSignoff(data) {
   const lines = [];
   lines.push(`# Test Signoff (${data.status})`);
-  lines.push('');
-  lines.push('## Release Metadata');
-  lines.push('');
+  lines.push("");
+  lines.push("## Release Metadata");
+  lines.push("");
   lines.push(`- Release label: \`${data.release.label}\``);
   lines.push(`- Environment: \`${data.environment}\``);
   if (data.release.candidateCommit) {
     lines.push(`- Candidate commit: \`${data.release.candidateCommit}\``);
   } else {
-    lines.push(`- Commit: \`${data.git.commit || 'unknown'}\``);
+    lines.push(`- Commit: \`${data.git.commit || "unknown"}\``);
   }
   lines.push(`- Mode: \`${data.mode}\``);
   lines.push(`- Started: ${data.startedAt}`);
   lines.push(`- Finished: ${data.endedAt}`);
   lines.push(`- Duration: ${formatDuration(data.durationMs)}`);
-  lines.push(`- Summary: ${data.summary.passed} passed / ${data.summary.failed} failed`);
-  lines.push('');
+  lines.push(
+    `- Summary: ${data.summary.passed} passed / ${data.summary.failed} failed`,
+  );
+  lines.push("");
 
-  lines.push('## Tooling Snapshot');
-  lines.push('');
+  lines.push("## Tooling Snapshot");
+  lines.push("");
   lines.push(`- Node: \`${firstLine(data.system.node)}\``);
   lines.push(`- npm: \`${firstLine(data.system.npm)}\``);
   lines.push(`- Supabase CLI: \`${firstLine(data.system.supabase)}\``);
   lines.push(`- psql: \`${firstLine(data.system.psql)}\``);
-  lines.push('');
+  lines.push("");
 
-  lines.push('## Command Results');
-  lines.push('');
-  lines.push('| Step | Result | Duration | Command |');
-  lines.push('|---|---|---:|---|');
+  lines.push("## Command Results");
+  lines.push("");
+  lines.push("| Step | Result | Duration | Command |");
+  lines.push("|---|---|---:|---|");
   for (const result of data.results) {
-    const outcome = result.ok ? 'PASS' : `FAIL (${result.status})`;
+    const outcome = result.ok ? "PASS" : `FAIL (${result.status})`;
     lines.push(
-      `| ${result.label} | ${outcome} | ${formatDuration(result.durationMs)} | \`${result.command}\` |`
+      `| ${result.label} | ${outcome} | ${formatDuration(result.durationMs)} | \`${result.command}\` |`,
     );
   }
-  lines.push('');
+  lines.push("");
 
-  lines.push('## Signature');
-  lines.push('');
+  lines.push("## Signature");
+  lines.push("");
   lines.push(`- Test Author: ${data.signatures.testAuthor}`);
   lines.push(`- Run By: ${data.signatures.runBy}`);
   lines.push(`- Run Timestamp: ${data.endedAt}`);
   lines.push(`- Run ID: \`${data.runId}\``);
-  lines.push('');
+  lines.push("");
 
   if (data.notes) {
-    lines.push('## Notes / Known Issues');
-    lines.push('');
+    lines.push("## Notes / Known Issues");
+    lines.push("");
     lines.push(data.notes);
-    lines.push('');
+    lines.push("");
   }
 
-  lines.push('## Public Artifact Note');
-  lines.push('');
-  lines.push('This public signoff intentionally omits raw command logs and local artifact paths.');
-  lines.push('');
+  lines.push("## Public Artifact Note");
+  lines.push("");
+  lines.push(
+    "This public signoff intentionally omits raw command logs and local artifact paths.",
+  );
+  lines.push("");
 
-  return `${lines.join('\n')}\n`;
+  return `${lines.join("\n")}\n`;
 }
 
 async function main() {
@@ -424,8 +477,10 @@ async function main() {
   try {
     args = parseArgs(process.argv.slice(2));
   } catch (error) {
-    console.error(`[test-signoff] ${error instanceof Error ? error.message : String(error)}`);
-    console.error('');
+    console.error(
+      `[test-signoff] ${error instanceof Error ? error.message : String(error)}`,
+    );
+    console.error("");
     console.error(usage);
     process.exit(1);
   }
@@ -436,48 +491,56 @@ async function main() {
   }
 
   if (!commandSets[args.mode]) {
-    console.error(`[test-signoff] Unknown mode "${args.mode}". Supported: ${Object.keys(commandSets).join(', ')}`);
+    console.error(
+      `[test-signoff] Unknown mode "${args.mode}". Supported: ${Object.keys(commandSets).join(", ")}`,
+    );
     process.exit(1);
   }
 
   const missing = [];
-  if (!args.releaseLabel) missing.push('--release-label');
-  if (!args.environment) missing.push('--environment');
+  if (!args.releaseLabel) missing.push("--release-label");
+  if (!args.environment) missing.push("--environment");
   if (missing.length > 0) {
-    console.error(`[test-signoff] Missing required option(s): ${missing.join(', ')}`);
-    console.error('');
+    console.error(
+      `[test-signoff] Missing required option(s): ${missing.join(", ")}`,
+    );
+    console.error("");
     console.error(usage);
     process.exit(1);
   }
 
   await promptForSignatureNames(args);
 
-  if (!args.testAuthor) missing.push('--test-author');
-  if (!args.runBy) missing.push('--run-by');
+  if (!args.testAuthor) missing.push("--test-author");
+  if (!args.runBy) missing.push("--run-by");
   if (missing.length > 0) {
-    console.error(`[test-signoff] Missing required option(s): ${missing.join(', ')}`);
-    console.error('');
+    console.error(
+      `[test-signoff] Missing required option(s): ${missing.join(", ")}`,
+    );
+    console.error("");
     console.error(usage);
     process.exit(1);
   }
 
   const startedAt = new Date();
   const runId = timestampForPath(startedAt);
-  const runDir = path.join(repoRoot, 'test-reports', `${runId}.local`);
+  const runDir = path.join(repoRoot, "test-reports", `${runId}.local`);
   ensureDir(runDir);
 
-  const gitBranch = safeCapture('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
-  const gitCommit = safeCapture('git', ['rev-parse', 'HEAD']);
-  const nodeVersion = safeCapture('node', ['-v']);
-  const npmVersion = safeCapture('npm', ['-v']);
-  const supabaseVersion = safeCapture('npx', ['supabase', '--version']);
-  const psqlVersion = safeCapture('psql', ['--version']);
+  const gitBranch = safeCapture("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+  const gitCommit = safeCapture("git", ["rev-parse", "HEAD"]);
+  const nodeVersion = safeCapture("node", ["-v"]);
+  const npmVersion = safeCapture("npm", ["-v"]);
+  const supabaseVersion = safeCapture("npx", ["supabase", "--version"]);
+  const psqlVersion = safeCapture("psql", ["--version"]);
 
   const results = [];
   let failed = false;
 
   for (const [index, step] of commandSets[args.mode].entries()) {
-    console.log(`[test-signoff] Running: ${step.command} ${step.args.join(' ')}`);
+    console.log(
+      `[test-signoff] Running: ${step.command} ${step.args.join(" ")}`,
+    );
     const markdownPath = getVitestMarkdownOutputPath(runDir, index + 1, step);
     const result = runCapture(step.command, step.args, {
       env: getVitestReporterEnv(markdownPath, step.label),
@@ -486,7 +549,7 @@ async function main() {
     results.push({
       id: step.id,
       label: step.label,
-      command: `${step.command} ${step.args.join(' ')}`,
+      command: `${step.command} ${step.args.join(" ")}`,
       ok: result.ok,
       status: result.status,
       signal: result.signal,
@@ -507,7 +570,7 @@ async function main() {
   const durationMs = endedAt.getTime() - startedAt.getTime();
   const passed = results.filter((r) => r.ok).length;
   const failedCount = results.length - passed;
-  const status = failed ? 'FAIL' : 'PASS';
+  const status = failed ? "FAIL" : "PASS";
 
   const jsonSummary = {
     schemaVersion: 1,
@@ -545,29 +608,47 @@ async function main() {
     results,
     notes: args.notes ?? null,
     artifacts: {
-      logsDir: path.relative(repoRoot, runDir).replace(/\\/g, '/'),
+      logsDir: path.relative(repoRoot, runDir).replace(/\\/g, "/"),
       json: null,
       markdown: null,
       publicMarkdown: null,
     },
   };
 
-  const publicDir = path.join(runDir, 'public');
-  const jsonPath = path.join(runDir, 'signoff.local.json');
-  const mdPath = path.join(runDir, 'signoff.local.md');
-  const publicMdPath = path.join(publicDir, 'signoff.local.md');
+  const publicDir = path.join(runDir, "public");
+  const jsonPath = path.join(runDir, "signoff.local.json");
+  const mdPath = path.join(runDir, "signoff.local.md");
+  const publicMdPath = path.join(publicDir, "signoff.local.md");
   ensureDir(publicDir);
-  jsonSummary.artifacts.json = path.relative(repoRoot, jsonPath).replace(/\\/g, '/');
-  jsonSummary.artifacts.markdown = path.relative(repoRoot, mdPath).replace(/\\/g, '/');
-  jsonSummary.artifacts.publicMarkdown = path.relative(repoRoot, publicMdPath).replace(/\\/g, '/');
+  jsonSummary.artifacts.json = path
+    .relative(repoRoot, jsonPath)
+    .replace(/\\/g, "/");
+  jsonSummary.artifacts.markdown = path
+    .relative(repoRoot, mdPath)
+    .replace(/\\/g, "/");
+  jsonSummary.artifacts.publicMarkdown = path
+    .relative(repoRoot, publicMdPath)
+    .replace(/\\/g, "/");
 
-  fs.writeFileSync(jsonPath, `${JSON.stringify(jsonSummary, null, 2)}\n`, 'utf8');
-  fs.writeFileSync(mdPath, buildMarkdownSignoff(jsonSummary), 'utf8');
-  fs.writeFileSync(publicMdPath, buildPublicMarkdownSignoff(jsonSummary), 'utf8');
+  fs.writeFileSync(
+    jsonPath,
+    `${JSON.stringify(jsonSummary, null, 2)}\n`,
+    "utf8",
+  );
+  fs.writeFileSync(mdPath, buildMarkdownSignoff(jsonSummary), "utf8");
+  fs.writeFileSync(
+    publicMdPath,
+    buildPublicMarkdownSignoff(jsonSummary),
+    "utf8",
+  );
 
   console.log(`[test-signoff] JSON summary: ${jsonSummary.artifacts.json}`);
-  console.log(`[test-signoff] Markdown summary: ${jsonSummary.artifacts.markdown}`);
-  console.log(`[test-signoff] Public markdown summary: ${jsonSummary.artifacts.publicMarkdown}`);
+  console.log(
+    `[test-signoff] Markdown summary: ${jsonSummary.artifacts.markdown}`,
+  );
+  console.log(
+    `[test-signoff] Public markdown summary: ${jsonSummary.artifacts.publicMarkdown}`,
+  );
   console.log(`[test-signoff] Raw logs dir: ${jsonSummary.artifacts.logsDir}`);
 
   if (args.json) {
@@ -580,6 +661,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`[test-signoff] ${error instanceof Error ? error.message : String(error)}`);
+  console.error(
+    `[test-signoff] ${error instanceof Error ? error.message : String(error)}`,
+  );
   process.exit(1);
 });

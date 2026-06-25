@@ -1,12 +1,6 @@
 import { ArrowLeft, ArrowRight, Check } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -42,7 +36,7 @@ function MockBars({ count = 3 }: { count?: number }) {
           className={`h-3 rounded-full ${
             index === 0 ? "bg-primary" : "bg-muted-foreground/30"
           }`}
-          style={{ width: `${index === 0 ? 72 : 52 + ((index % 2) * 14)}%` }}
+          style={{ width: `${index === 0 ? 72 : 52 + (index % 2) * 14}%` }}
         />
       ))}
     </View>
@@ -176,7 +170,7 @@ export function MobileOnboardingScreen({
   const card = MOBILE_ONBOARDING_CARDS[index] ?? MOBILE_ONBOARDING_CARDS[0];
   const isFinalCard = index === MOBILE_ONBOARDING_CARDS.length - 1;
   const title = isFinalCard ? campaign.title : card.title;
-  const body = isFinalCard ? campaign.description ?? card.body : card.body;
+  const body = isFinalCard ? (campaign.description ?? card.body) : card.body;
 
   useEffect(() => {
     progress.value = 0;
@@ -290,12 +284,15 @@ export function MobileOnboardingScreen({
           ) : (
             <>
               <Text className="text-base font-semibold text-primary-foreground">
-                {isFinalCard ? card.cta ?? "Continue" : "Next"}
+                {isFinalCard ? (card.cta ?? "Continue") : "Next"}
               </Text>
               {isFinalCard ? (
                 <Icon as={Check} className="size-5 text-primary-foreground" />
               ) : (
-                <Icon as={ArrowRight} className="size-5 text-primary-foreground" />
+                <Icon
+                  as={ArrowRight}
+                  className="size-5 text-primary-foreground"
+                />
               )}
             </>
           )}

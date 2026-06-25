@@ -65,7 +65,10 @@ const rawColorPropRe = new RegExp(
   `\\b(${COLOR_PROPS.join("|")})\\s*=\\s*(?:"${rawHex}"|'${rawHex}'|\\{\\s*["']${rawHex}["']\\s*\\})`,
   "g",
 );
-const trackColorRe = new RegExp(`\\btrackColor\\s*=\\s*\\{\\{[^}]*${rawHex}`, "g");
+const trackColorRe = new RegExp(
+  `\\btrackColor\\s*=\\s*\\{\\{[^}]*${rawHex}`,
+  "g",
+);
 const rawStyleColorRe = new RegExp(
   `\\b(backgroundColor|borderColor|borderTopColor|borderRightColor|borderBottomColor|borderLeftColor|color|shadowColor|textDecorationColor|tintColor|overlayColor)\\s*:\\s*["']${rawHex}["']`,
   "g",
@@ -140,9 +143,14 @@ function walk(dir, out = []) {
     const fullPath = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
+      // Tests aren't rendered UI — fixture data (e.g. role colors) is allowed
+      // to contain raw color values.
+      if (entry.name === "__tests__") continue;
       walk(fullPath, out);
       continue;
     }
+
+    if (/\.test\.(ts|tsx)$/.test(entry.name)) continue;
 
     if (/\.(ts|tsx)$/.test(entry.name) && !entry.name.endsWith(".d.ts")) {
       out.push(fullPath);
@@ -184,7 +192,10 @@ function stripComments(source) {
       const lineComment = rawLine.indexOf("//", index);
       const blockStart = rawLine.indexOf("/*", index);
 
-      if (lineComment !== -1 && (blockStart === -1 || lineComment < blockStart)) {
+      if (
+        lineComment !== -1 &&
+        (blockStart === -1 || lineComment < blockStart)
+      ) {
         code += rawLine.slice(index, lineComment);
         break;
       }
@@ -415,7 +426,9 @@ const violationLines = visibleViolations
 
 const hiddenCount = violations.length - visibleViolations.length;
 const hiddenMessage =
-  hiddenCount > 0 ? `\n\n... ${hiddenCount} more violation(s). Re-run with --max=${violations.length} to show all.` : "";
+  hiddenCount > 0
+    ? `\n\n... ${hiddenCount} more violation(s). Re-run with --max=${violations.length} to show all.`
+    : "";
 
 console.error(
   `check:mobile-uniwind failed - ${violations.length} theme usage violation(s).\n\n` +

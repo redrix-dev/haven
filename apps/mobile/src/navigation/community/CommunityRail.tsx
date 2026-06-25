@@ -48,20 +48,26 @@ function RailActionButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={
-        badgeCount > 0 ? `${accessibilityLabel}, ${badgeCount} unread` : accessibilityLabel
+        badgeCount > 0
+          ? `${accessibilityLabel}, ${badgeCount} unread`
+          : accessibilityLabel
       }
       accessibilityState={{ selected: isActive }}
       onPress={onPress}
       className={[
         "h-11 w-11 items-center justify-center rounded-2xl",
-        isActive ? "bg-primary active:bg-primary/80" : "bg-surface-panel active:bg-surface-hover",
+        isActive
+          ? "bg-primary active:bg-primary/80"
+          : "bg-surface-panel active:bg-surface-hover",
       ].join(" ")}
     >
       <View className="relative">
         <ThemedIonicons
           name={icon}
           size={iconSize}
-          colorClassName={isActive ? "accent-primary-foreground" : "accent-foreground"}
+          colorClassName={
+            isActive ? "accent-primary-foreground" : "accent-foreground"
+          }
         />
         {badgeCount > 0 ? (
           <View className="absolute -right-2 -top-2 min-w-5 rounded-full bg-accent-slider px-1 py-0.5">

@@ -2,8 +2,8 @@ import { useCallback, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHavenCore } from "@shared/core";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useHavenCore } from "@mobile-data";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
 import UserProfileModal from "@/features/user-profile/UserProfileModal";
 import { FriendsSurface } from "@/features/friends/FriendsSurface";
@@ -21,7 +21,8 @@ export function FriendsScreen({ navigation, route }: Props) {
 
   const handleOpenDmWithUser = useCallback(
     async (targetUserId: string) => {
-      const conversationId = await core.directMessages.openWithUser(targetUserId);
+      const conversationId =
+        await core.directMessages.openWithUser(targetUserId);
       navigation.navigate("Community", {
         pendingDmConversationId: conversationId,
         serverId: null,

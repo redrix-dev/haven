@@ -44,7 +44,9 @@ describe("parseExpoPushNotificationData", () => {
 
 describe("parseExpoPushUrl", () => {
   it("extracts query pairs", () => {
-    expect(parseExpoPushUrl("/?kind=dm_message&conversationId=abc")).toMatchObject({
+    expect(
+      parseExpoPushUrl("/?kind=dm_message&conversationId=abc"),
+    ).toMatchObject({
       kind: "dm_message",
       conversationId: "abc",
     });

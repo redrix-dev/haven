@@ -1,23 +1,37 @@
-export { Nexus } from "./Nexus";
-export type { NexusEntry, NexusState } from "./Nexus";
-export { CommunityMessageNexus } from "./community/CommunityMessageNexus";
-export type { ChannelMeta } from "./community/CommunityMessageNexus";
-export { CommunityNexus } from "./community/CommunityNexus";
-export type { Community } from "./community/CommunityNexus";
-export { ChannelNexus } from "./community/ChannelNexus";
-export type { HavenChannel } from "./community/ChannelNexus";
-export { CommunityAdminNexus } from "./community/CommunityAdminNexus";
+/**
+ * Shared nexus surface: entity state types and pure selectors (import subpaths).
+ * Concrete reactive cache classes live in `@mobile-data/*`.
+ */
 export type {
-  CommunityAdminNexusState,
-  CommunityAdminMembersModalState,
-  CommunityAdminServerPanelState,
+  NexusEntry,
+  EntityMapState,
+  NexusState,
+} from "@shared/core/cache/entityTypes";
+export type { ReadableStore } from "./storeTypes";
+export type { ChannelMeta } from "@shared/features/messaging/logic/types";
+export type {
+  Community,
+  CommunityNexusState,
+} from "./community/communityTypes";
+export type { HavenChannel, ChannelNexusState } from "./community/channelTypes";
+export type {
+  DmComposeDraftPeer,
+  DirectMessageNexusState,
+} from "./direct-messages/dmTypes";
+export type { NotificationNexusState } from "./notifications/notificationTypes";
+export type {
   CommunityAdminChannelPermissionsState,
-} from "./community/CommunityAdminNexus";
-export { DirectMessageNexus } from "./direct-messages/DirectMessageNexus";
-export type { DirectMessageNexusState } from "./direct-messages/DirectMessageNexus";
-export { NotificationNexus } from "./notifications/NotificationNexus";
-export type { NotificationNexusState } from "./notifications/NotificationNexus";
-export { FeatureFlagNexus } from "./feature-flags/FeatureFlagNexus";
-export type { FeatureFlagNexusState } from "./feature-flags/FeatureFlagNexus";
-export { OnboardingNexus } from "./onboarding/OnboardingNexus";
-export type { OnboardingNexusState } from "./onboarding/OnboardingNexus";
+  CommunityAdminMembersModalState,
+  CommunityAdminNexusState,
+  CommunityAdminServerPanelState,
+} from "./community/communityAdminTypes";
+export type {
+  VoiceConnectionPhase,
+  VoiceKickPayload,
+  VoiceRealtimeChannel,
+  VoiceRealtimeTransport,
+} from "@shared/features/voice/types";
+export type {
+  VoiceNexusState,
+  VoiceSessionSnapshot,
+} from "@shared/features/voice/voiceNexusTypes";

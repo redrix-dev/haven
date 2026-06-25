@@ -3,7 +3,12 @@ import type {
   VoiceSettings,
   AppSettings,
 } from "@shared/types/settings";
-import type { UpdaterStatus, SaveFileFromUrlResult, VoicePopoutControlAction, VoicePopoutState } from "@shared/infrastructure/platform/desktop/types";
+import type {
+  UpdaterStatus,
+  SaveFileFromUrlResult,
+  VoicePopoutControlAction,
+  VoicePopoutState,
+} from "@shared/infrastructure/platform/desktop/types";
 
 export type DesktopSettingsBridge = {
   getAppSettings: () => Promise<AppSettings>;
@@ -15,7 +20,9 @@ export type DesktopSettingsBridge = {
   setNotificationAudioSettings: (
     values: NotificationAudioSettings,
   ) => Promise<{ settings: AppSettings }>;
-  setVoiceSettings: (values: VoiceSettings) => Promise<{ settings: AppSettings }>;
+  setVoiceSettings: (
+    values: VoiceSettings,
+  ) => Promise<{ settings: AppSettings }>;
   checkForUpdates: () => Promise<UpdaterStatus>;
   installUpdate: () => Promise<void>;
 };
@@ -26,7 +33,9 @@ export type DesktopAuthBridge = {
 };
 
 export type VoicePopoutBridge = {
-  onVoicePopoutState: (listener: (state: VoicePopoutState) => void) => () => void;
+  onVoicePopoutState: (
+    listener: (state: VoicePopoutState) => void,
+  ) => () => void;
   syncVoicePopoutState: (state: VoicePopoutState) => Promise<void>;
   onVoicePopoutControlAction: (
     listener: (action: VoicePopoutControlAction) => void,
@@ -61,7 +70,7 @@ export type BrowserRuntimeBridge = {
 /**
  * Portable device info — structurally matches the browser MediaDeviceInfo
  * interface but defined here so it's usable in non-DOM compilation contexts
- * (Electron main, backend tests) without requiring lib.dom.d.ts.
+ * (backend tests, native shells) without requiring lib.dom.d.ts.
  */
 export type AudioDeviceInfo = {
   deviceId: string;
@@ -72,8 +81,8 @@ export type AudioDeviceInfo = {
 
 /**
  * Minimal voice runtime bridge — only device enumeration remains after LiveKit
- * took over media capture, VAD, and PTT in web-client. The Electron host
- * implements these; web uses browser APIs directly.
+ * took over media capture, VAD, and PTT. A desktop shell may implement these;
+ * a browser shell uses browser APIs directly.
  */
 export type VoiceRuntimeBridge = {
   enumerateDevices: () => Promise<AudioDeviceInfo[]>;
@@ -89,10 +98,7 @@ export type VoiceRuntimeBridge = {
  * they exist for external events that cannot reach the router by themselves.
  */
 export type ShellNavigationBridge = {
-  navigateToCommunity?: (
-    serverId: string,
-    channelId?: string | null,
-  ) => void;
+  navigateToCommunity?: (serverId: string, channelId?: string | null) => void;
   navigateToDm?: (conversationId: string) => void;
 };
 
@@ -116,8 +122,8 @@ export type AppHost = {
 /**
  * No-op fallback host used before any platform registers.
  * All capabilities return safe empty values — real implementations are
- * provided by each platform's registration call (registerWebAppHost,
- * registerElectronAppHost, registerMobileAppHost).
+ * provided by each platform shell's registration call at bootstrap
+ * (e.g. registerMobileAppHost; the Tauri shell registers its own).
  */
 const noOpHost: AppHost = {
   isDesktopApp: () => false,

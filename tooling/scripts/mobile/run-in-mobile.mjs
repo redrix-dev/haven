@@ -23,7 +23,9 @@ const mobileRoot = path.join(repoRoot, "apps/mobile");
 const args = process.argv.slice(2);
 
 if (args.length === 0) {
-  console.error("Usage: node tooling/scripts/mobile/run-in-mobile.mjs <command> [args...]");
+  console.error(
+    "Usage: node tooling/scripts/mobile/run-in-mobile.mjs <command> [args...]",
+  );
   process.exit(1);
 }
 

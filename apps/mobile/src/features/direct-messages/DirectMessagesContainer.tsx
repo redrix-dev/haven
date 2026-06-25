@@ -37,8 +37,17 @@ import type {
 } from "@shared/lib/backend/types";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveLiveUsername } from "@shared/lib/liveProfiles";
-import { useHavenCore } from "@shared/core";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useHavenCore } from "@mobile-data";
+import {
+  useActiveDmConversationId,
+  useDmComposeDraftPeer,
+  useDmConversations,
+  useDmConversationsLoading,
+  useDmMessages,
+  useDmMessagesLoading,
+  useProfilesRecord,
+} from "@mobile-data/hooks";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { DmMessageActionsSheet } from "@/features/direct-messages/DmMessageActionsSheet";
@@ -76,30 +85,43 @@ export function DirectMessagesContainer() {
   const { width: windowWidth } = useWindowDimensions();
   const core = useHavenCore();
   const dm = core.directMessages;
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const liveProfiles = useProfilesRecord(core.profiles);
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
-  const dmConversations = dm.useConversations();
-  const dmConversationsLoading = dm.useIsLoadingConversations();
-  const selectedDmConversationId = dm.useActiveConversationId();
-  const dmComposeDraftPeer = dm.useComposeDraftPeer();
-  const dmMessages = dm.useMessages(selectedDmConversationId ?? "");
-  const dmMessagesLoading = dm.useIsLoadingMessages(selectedDmConversationId ?? "");
+  const dmConversations = useDmConversations(dm);
+  const dmConversationsLoading = useDmConversationsLoading(dm);
+  const selectedDmConversationId = useActiveDmConversationId(dm);
+  const dmComposeDraftPeer = useDmComposeDraftPeer(dm);
+  const dmMessages = useDmMessages(dm, selectedDmConversationId ?? "");
+  const dmMessagesLoading = useDmMessagesLoading(
+    dm,
+    selectedDmConversationId ?? "",
+  );
   const [draft, setDraft] = useState("");
   const [isPickingDmMedia, setIsPickingDmMedia] = useState(false);
   const [isSendingDm, setIsSendingDm] = useState(false);
-  const [pendingDmMedia, setPendingDmMedia] = useState<CommunityMediaUploadPayload | null>(null);
-  const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(null);
-  const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(null);
-  const [dmMessageActionsTarget, setDmMessageActionsTarget] = useState<DirectMessage | null>(null);
-  const [dmConversationsRefreshing, setDmConversationsRefreshing] = useState(false);
-  const [dmConversationsError, setDmConversationsError] = useState<string | null>(null);
+  const [pendingDmMedia, setPendingDmMedia] =
+    useState<CommunityMediaUploadPayload | null>(null);
+  const composerInputRef = useRef<EnrichedMarkdownTextInputInstance | null>(
+    null,
+  );
+  const [dmReportTarget, setDmReportTarget] = useState<DirectMessage | null>(
+    null,
+  );
+  const [dmMessageActionsTarget, setDmMessageActionsTarget] =
+    useState<DirectMessage | null>(null);
+  const [dmConversationsRefreshing, setDmConversationsRefreshing] =
+    useState(false);
+  const [dmConversationsError, setDmConversationsError] = useState<
+    string | null
+  >(null);
   const [dmMessagesError, setDmMessagesError] = useState<string | null>(null);
 
   const selectedDmConversation = useMemo(
     () =>
       selectedDmConversationId
-        ? (dmConversations.find((c) => c.conversationId === selectedDmConversationId) ??
-          null)
+        ? (dmConversations.find(
+            (c) => c.conversationId === selectedDmConversationId,
+          ) ?? null)
         : null,
     [dmConversations, selectedDmConversationId],
   );
@@ -111,7 +133,9 @@ export function DirectMessagesContainer() {
       try {
         await dm.loadConversations();
       } catch (error) {
-        setDmConversationsError(getErrorMessage(error, "Failed to load direct messages."));
+        setDmConversationsError(
+          getErrorMessage(error, "Failed to load direct messages."),
+        );
       } finally {
         setDmConversationsRefreshing(false);
       }
@@ -126,7 +150,10 @@ export function DirectMessagesContainer() {
       try {
         await dm.openConversation(conversationId, { markRead: true });
       } catch (error) {
-        const message = getErrorMessage(error, "Failed to load direct messages.");
+        const message = getErrorMessage(
+          error,
+          "Failed to load direct messages.",
+        );
         setDmMessagesError(message);
         throw new Error(message);
       }
@@ -149,12 +176,15 @@ export function DirectMessagesContainer() {
       let activeConversationId = selectedDmConversationId;
       const draftPeer = dmComposeDraftPeer;
       if (!activeConversationId && draftPeer) {
-        activeConversationId = await dm.getOrCreateDirectConversation(draftPeer.userId);
+        activeConversationId = await dm.getOrCreateDirectConversation(
+          draftPeer.userId,
+        );
         dm.setComposeDraftPeer(null);
         dm.setActiveConversationId(activeConversationId);
         await refreshDmConversations({ suppressLoadingState: true });
       }
-      if (!activeConversationId) throw new Error("No direct message conversation selected.");
+      if (!activeConversationId)
+        throw new Error("No direct message conversation selected.");
 
       setDmMessagesError(null);
       try {
@@ -164,7 +194,9 @@ export function DirectMessagesContainer() {
           throw new Error("Cannot send both imageBody and imageArrayBuffer.");
         }
         if (hasBuffer && !options.imageContentType?.trim()) {
-          throw new Error("imageContentType is required when sending imageArrayBuffer.");
+          throw new Error(
+            "imageContentType is required when sending imageArrayBuffer.",
+          );
         }
         const inferredFilename =
           options?.imageFilename ??
@@ -191,7 +223,10 @@ export function DirectMessagesContainer() {
           optimisticAttachmentUri: options?.optimisticAttachmentUri ?? null,
         });
       } catch (error) {
-        const message = getErrorMessage(error, "Failed to send direct message.");
+        const message = getErrorMessage(
+          error,
+          "Failed to send direct message.",
+        );
         setDmMessagesError(message);
         throw new Error(message);
       }
@@ -231,17 +266,22 @@ export function DirectMessagesContainer() {
   useEffect(() => {
     if (!selectedDmConversationId) return;
     void core
-      .prepareDirectMessageConversation(selectedDmConversationId, { markRead: false })
+      .prepareDirectMessageConversation(selectedDmConversationId, {
+        markRead: false,
+      })
       .catch((error) => {
         console.error("Failed to load selected DM conversation:", error);
-        setDmMessagesError(getErrorMessage(error, "Failed to load direct messages."));
+        setDmMessagesError(
+          getErrorMessage(error, "Failed to load direct messages."),
+        );
       });
   }, [core, selectedDmConversationId]);
 
   useEffect(() => {
     if (!selectedDmConversationId) return;
     const stillExists = dmConversations.some(
-      (conversation) => conversation.conversationId === selectedDmConversationId,
+      (conversation) =>
+        conversation.conversationId === selectedDmConversationId,
     );
     if (!stillExists) dm.setActiveConversationId(null);
   }, [dm, dmConversations, selectedDmConversationId]);
@@ -253,59 +293,74 @@ export function DirectMessagesContainer() {
 
   // toInvertedChatOrder reverses ascending nexus order to descending for
   // ChatInterface's inverted FlatList (newest at data[0] = visual bottom).
-  const orderedDmMessages = useMemo(() => toInvertedChatOrder(dmMessages), [dmMessages]);
+  const orderedDmMessages = useMemo(
+    () => toInvertedChatOrder(dmMessages),
+    [dmMessages],
+  );
 
   const otherLabel = useCallback(
     (c: DirectMessageConversationSummary) => {
       const uid = c.otherUserId;
       const name =
-        resolveLiveUsername(liveProfiles, uid, c.otherUsername)?.trim() || c.otherUsername || "Direct";
+        resolveLiveUsername(liveProfiles, uid, c.otherUsername)?.trim() ||
+        c.otherUsername ||
+        "Direct";
       return name;
     },
     [liveProfiles],
   );
 
-  const renderConversation: ListRenderItem<DirectMessageConversationSummary> = useCallback(
-    ({ item }) => {
-      const unread = item.unreadCount > 0;
-      const title = otherLabel(item);
-      return (
-        <Pressable
-          onPress={() => void openDirectMessageConversation(item.conversationId)}
-          className="flex-row items-center gap-3 border-b border-border-panel py-3 active:bg-surface-hover"
-        >
-          <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
-            <Text className="text-lg font-semibold text-foreground">
-              {title.slice(0, 1).toUpperCase()}
-            </Text>
-          </View>
-          <View className="min-w-0 flex-1">
-            <Text
-              className={`text-base leading-6 ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-              numberOfLines={2}
-            >
-              {title}
-            </Text>
-            <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={2}>
-              {item.lastMessagePreview ?? "No messages yet"}
-            </Text>
-          </View>
-          {unread ? (
-            <View className="min-w-5.5 rounded-full bg-primary px-2 py-0.5">
-              <Text className="text-center text-xs font-bold text-primary-foreground">{item.unreadCount}</Text>
+  const renderConversation: ListRenderItem<DirectMessageConversationSummary> =
+    useCallback(
+      ({ item }) => {
+        const unread = item.unreadCount > 0;
+        const title = otherLabel(item);
+        return (
+          <Pressable
+            onPress={() =>
+              void openDirectMessageConversation(item.conversationId)
+            }
+            className="flex-row items-center gap-3 border-b border-border-panel py-3 active:bg-surface-hover"
+          >
+            <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
+              <Text className="text-lg font-semibold text-foreground">
+                {title.slice(0, 1).toUpperCase()}
+              </Text>
             </View>
-          ) : null}
-        </Pressable>
-      );
-    },
-    [liveProfiles, openDirectMessageConversation, otherLabel],
-  );
+            <View className="min-w-0 flex-1">
+              <Text
+                className={`text-base leading-6 ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+                numberOfLines={2}
+              >
+                {title}
+              </Text>
+              <Text
+                className="text-xs leading-4 text-muted-foreground"
+                numberOfLines={2}
+              >
+                {item.lastMessagePreview ?? "No messages yet"}
+              </Text>
+            </View>
+            {unread ? (
+              <View className="min-w-5.5 rounded-full bg-primary px-2 py-0.5">
+                <Text className="text-center text-xs font-bold text-primary-foreground">
+                  {item.unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        );
+      },
+      [liveProfiles, openDirectMessageConversation, otherLabel],
+    );
 
   const renderMessage: ListRenderItem<DirectMessage> = useCallback(
     ({ item }) => {
-      const isSelf = currentUserId != null && item.authorUserId === currentUserId;
+      const isSelf =
+        currentUserId != null && item.authorUserId === currentUserId;
       const hasRenderableImage =
-        item.attachments?.some((a) => a.mediaKind === "image" && a.signedUrl) ?? false;
+        item.attachments?.some((a) => a.mediaKind === "image" && a.signedUrl) ??
+        false;
       /** Avoid a narrow bubble (text-only width) forcing wide photos into a thin cropped strip. */
       const bubbleMinWidth = hasRenderableImage
         ? Math.min(windowWidth * 0.72, 360)
@@ -313,7 +368,9 @@ export function DirectMessagesContainer() {
       const textColor = isSelf ? "#ffffff" : "#e6edf7";
       const mutedTextColor = isSelf ? "rgba(255,255,255,0.8)" : "#8b9cbb";
       const blockSurfaceColor = isSelf ? "rgba(12, 20, 34, 0.35)" : "#1a2235";
-      const blockquoteBorderColor = isSelf ? "rgba(255,255,255,0.65)" : "#3F79D8";
+      const blockquoteBorderColor = isSelf
+        ? "rgba(255,255,255,0.65)"
+        : "#3F79D8";
       const linkColor = isSelf ? "#ffffff" : "#3F79D8";
       const markdownStyle = createChatMarkdownStyle({
         textColor,
@@ -331,7 +388,9 @@ export function DirectMessagesContainer() {
                 }
               : undefined
           }
-          style={bubbleMinWidth != null ? { minWidth: bubbleMinWidth } : undefined}
+          style={
+            bubbleMinWidth != null ? { minWidth: bubbleMinWidth } : undefined
+          }
           className={`mb-2 max-w-[85%] ${isSelf ? "self-end" : "self-start"}`}
         >
           <View
@@ -361,7 +420,10 @@ export function DirectMessagesContainer() {
             {item.attachments?.map((attachment) => {
               if (!attachment.signedUrl) {
                 return (
-                  <Text key={attachment.id} style={styles.attachmentUnavailable}>
+                  <Text
+                    key={attachment.id}
+                    style={styles.attachmentUnavailable}
+                  >
                     Attachment unavailable.
                   </Text>
                 );
@@ -376,7 +438,11 @@ export function DirectMessagesContainer() {
                       originalFilename: attachment.originalFilename,
                     }}
                     images={(item.attachments ?? [])
-                      .filter((candidate) => candidate.mediaKind === "image" && candidate.signedUrl)
+                      .filter(
+                        (candidate) =>
+                          candidate.mediaKind === "image" &&
+                          candidate.signedUrl,
+                      )
                       .map((candidate) => ({
                         id: candidate.id,
                         signedUrl: candidate.signedUrl!,
@@ -411,9 +477,13 @@ export function DirectMessagesContainer() {
     if (isPickingDmMedia) return;
     setIsPickingDmMedia(true);
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("Permission needed", "Allow Photos access to attach an image.");
+        Alert.alert(
+          "Permission needed",
+          "Allow Photos access to attach an image.",
+        );
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -424,7 +494,8 @@ export function DirectMessagesContainer() {
         ...(Platform.OS === "ios"
           ? {
               preferredAssetRepresentationMode:
-                ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+                ImagePicker.UIImagePickerPreferredAssetRepresentationMode
+                  .Compatible,
             }
           : {}),
       });
@@ -433,12 +504,18 @@ export function DirectMessagesContainer() {
       if (!asset?.uri) return;
       const payload = await loadPickedCommunityMediaForUpload(asset);
       if (!payload.contentType.trim().toLowerCase().startsWith("image/")) {
-        Alert.alert("Not supported", "Direct messages only support image attachments.");
+        Alert.alert(
+          "Not supported",
+          "Direct messages only support image attachments.",
+        );
         return;
       }
       setPendingDmMedia(payload);
     } catch (e) {
-      Alert.alert("Could not add image", getErrorMessage(e, "Choose a different photo."));
+      Alert.alert(
+        "Could not add image",
+        getErrorMessage(e, "Choose a different photo."),
+      );
     } finally {
       setIsPickingDmMedia(false);
     }
@@ -480,7 +557,9 @@ export function DirectMessagesContainer() {
     return (
       <View className="min-h-0 flex-1">
         {dmConversationsError ? (
-          <Text className="mb-2 text-sm text-destructive">{dmConversationsError}</Text>
+          <Text className="mb-2 text-sm text-destructive">
+            {dmConversationsError}
+          </Text>
         ) : null}
         {dmConversationsLoading && dmConversations.length === 0 ? (
           <ActivityIndicator color={composerColors.spinner} />
@@ -490,7 +569,9 @@ export function DirectMessagesContainer() {
             keyExtractor={(c) => c.conversationId}
             renderItem={renderConversation}
             refreshing={dmConversationsRefreshing}
-            onRefresh={() => void refreshDmConversations({ suppressLoadingState: true })}
+            onRefresh={() =>
+              void refreshDmConversations({ suppressLoadingState: true })
+            }
             ListEmptyComponent={
               <Text className="py-8 text-center text-muted-foreground">
                 No direct messages yet.
@@ -519,10 +600,17 @@ export function DirectMessagesContainer() {
           onPress={() => clearSelectedDmConversation()}
           className="flex-row items-center gap-1 active:opacity-80"
         >
-          <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
+          <ThemedIonicons
+            name="chevron-back"
+            size={24}
+            colorClassName="accent-foreground"
+          />
           <Text className="text-sm text-foreground">Inbox</Text>
         </Pressable>
-        <Text className="max-w-[50%] flex-1 text-center text-base font-semibold leading-6 text-foreground" numberOfLines={2}>
+        <Text
+          className="max-w-[50%] flex-1 text-center text-base font-semibold leading-6 text-foreground"
+          numberOfLines={2}
+        >
           {threadTitle}
         </Text>
         {selectedDmConversation ? (
@@ -533,7 +621,10 @@ export function DirectMessagesContainer() {
               onValueChange={(v) => {
                 void toggleSelectedDmConversationMuted(v);
               }}
-              trackColor={{ false: switchColors.false, true: switchColors.true }}
+              trackColor={{
+                false: switchColors.false,
+                true: switchColors.true,
+              }}
               thumbColor={switchColors.thumb}
             />
           </View>
@@ -550,7 +641,9 @@ export function DirectMessagesContainer() {
         keyboardScrollProps={{ keyboardLiftBehavior: "whenAtEnd" }}
         composerCollapsable={Platform.OS === "android" ? false : undefined}
         listPlaceholder={
-          dmMessagesLoading && dmMessages.length === 0 && !dmComposeDraftPeer ? (
+          dmMessagesLoading &&
+          dmMessages.length === 0 &&
+          !dmComposeDraftPeer ? (
             <View className="flex-1 items-center justify-center">
               <ActivityIndicator color={composerColors.spinner} />
             </View>
@@ -566,11 +659,13 @@ export function DirectMessagesContainer() {
           >
             {dmComposeDraftPeer ? (
               <Text className="text-center text-[13px] leading-5 text-muted-foreground">
-                This is the beginning of your direct messages with {dmComposeDraftPeer.displayName}. Cheers to new
-                friendships!
+                This is the beginning of your direct messages with{" "}
+                {dmComposeDraftPeer.displayName}. Cheers to new friendships!
               </Text>
             ) : (
-              <Text className="text-[13px] text-muted-foreground">No messages yet.</Text>
+              <Text className="text-[13px] text-muted-foreground">
+                No messages yet.
+              </Text>
             )}
           </Pressable>
         }

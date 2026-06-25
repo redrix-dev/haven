@@ -6,7 +6,7 @@ import {
   parseJsonBody,
   requireSupabaseEnv,
   verifyCronSecret,
-} from '../_shared/common.ts';
+} from "../_shared/common.ts";
 import {
   extractFirstHttpUrl,
   mirrorPreviewThumbnail,
@@ -15,10 +15,10 @@ import {
   resolvePreviewForUrl,
   RetryablePreviewError,
   type PreviewSnapshot,
-} from '../_shared/link-preview.ts';
+} from "../_shared/link-preview.ts";
 
 type WorkerRequest = {
-  mode?: 'cron' | 'manual';
+  mode?: "cron" | "manual";
   maxJobs?: number;
 };
 
@@ -43,7 +43,7 @@ type MessageRow = {
 type CacheRow = {
   id: string;
   normalized_url: string;
-  status: 'pending' | 'ready' | 'unsupported' | 'failed';
+  status: "pending" | "ready" | "unsupported" | "failed";
   payload: unknown;
   final_url: string | null;
   thumbnail_bucket_name: string | null;
@@ -52,23 +52,36 @@ type CacheRow = {
   stale_after: string | null;
 };
 
-const LINK_PREVIEW_IMAGE_BUCKET = 'link-preview-images';
+const LINK_PREVIEW_IMAGE_BUCKET = "link-preview-images";
 
-const clampInt = (value: unknown, min: number, max: number, fallback: number): number => {
-  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
+const clampInt = (
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number => {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : Number.parseInt(String(value ?? ""), 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(Math.max(Math.floor(parsed), min), max);
 };
 
 const nowIso = () => new Date().toISOString();
 
-const computeRetryDelaySeconds = (attempts: number) => Math.min(3600, Math.max(30, 30 * (attempts + 1)));
+const computeRetryDelaySeconds = (attempts: number) =>
+  Math.min(3600, Math.max(30, 30 * (attempts + 1)));
 
 const asObject = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
-const asString = (value: unknown): string | null => (typeof value === 'string' && value.trim().length > 0 ? value : null);
-const asNumber = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+const asString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value : null;
+const asNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
 
 const snapshotFromUnknown = (value: unknown): PreviewSnapshot | null => {
   const obj = asObject(value);
@@ -78,8 +91,8 @@ const snapshotFromUnknown = (value: unknown): PreviewSnapshot | null => {
   const embedObj = asObject(obj.embed);
 
   return {
-    sourceUrl: asString(obj.sourceUrl) ?? '',
-    normalizedUrl: asString(obj.normalizedUrl) ?? '',
+    sourceUrl: asString(obj.sourceUrl) ?? "",
+    normalizedUrl: asString(obj.normalizedUrl) ?? "",
     finalUrl: asString(obj.finalUrl),
     title: asString(obj.title),
     description: asString(obj.description),
@@ -95,23 +108,34 @@ const snapshotFromUnknown = (value: unknown): PreviewSnapshot | null => {
           mimeType: asString(thumbnailObj.mimeType),
         }
       : null,
-    embed: embedObj && (embedObj.provider === 'youtube' || embedObj.provider === 'vimeo') && asString(embedObj.embedUrl)
-      ? {
-          provider: embedObj.provider,
-          embedUrl: asString(embedObj.embedUrl)!,
-          aspectRatio: asNumber(embedObj.aspectRatio) ?? 16 / 9,
-        }
-      : null,
+    embed:
+      embedObj &&
+      (embedObj.provider === "youtube" || embedObj.provider === "vimeo") &&
+      asString(embedObj.embedUrl)
+        ? {
+            provider: embedObj.provider,
+            embedUrl: asString(embedObj.embedUrl)!,
+            aspectRatio: asNumber(embedObj.aspectRatio) ?? 16 / 9,
+          }
+        : null,
   };
 };
 
 const isCacheFresh = (row: CacheRow | null): boolean => {
   if (!row || !row.stale_after) return false;
   const staleAt = Date.parse(row.stale_after);
-  return Number.isFinite(staleAt) && staleAt > Date.now() && (row.status === 'ready' || row.status === 'unsupported');
+  return (
+    Number.isFinite(staleAt) &&
+    staleAt > Date.now() &&
+    (row.status === "ready" || row.status === "unsupported")
+  );
 };
 
-const buildUnsupportedSnapshot = (rawUrl: string, normalizedUrl: string, reason?: string): PreviewSnapshot => ({
+const buildUnsupportedSnapshot = (
+  rawUrl: string,
+  normalizedUrl: string,
+  reason?: string,
+): PreviewSnapshot => ({
   sourceUrl: rawUrl,
   normalizedUrl,
   finalUrl: rawUrl,
@@ -124,15 +148,22 @@ const buildUnsupportedSnapshot = (rawUrl: string, normalizedUrl: string, reason?
 });
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return okOptionsResponse();
-  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
+  if (req.method === "OPTIONS") return okOptionsResponse();
+  if (req.method !== "POST")
+    return jsonResponse({ error: "Method not allowed" }, 405);
 
   const isCron = verifyCronSecret(req);
   if (!isCron) {
     try {
       await authenticateUser(req);
     } catch (error) {
-      return jsonResponse({ code: 401, message: error instanceof Error ? error.message : 'Unauthorized' }, 401);
+      return jsonResponse(
+        {
+          code: 401,
+          message: error instanceof Error ? error.message : "Unauthorized",
+        },
+        401,
+      );
     }
   }
 
@@ -140,15 +171,29 @@ Deno.serve(async (req) => {
   try {
     env = requireSupabaseEnv();
   } catch (error) {
-    return jsonResponse({ code: 500, message: error instanceof Error ? error.message : 'Missing env' }, 500);
+    return jsonResponse(
+      {
+        code: 500,
+        message: error instanceof Error ? error.message : "Missing env",
+      },
+      500,
+    );
   }
 
   const body = (await parseJsonBody<WorkerRequest>(req)) ?? {};
-  const maxJobs = clampInt(body.maxJobs, 1, isCron ? 100 : 25, isCron ? 25 : 10);
-  const supabaseAdmin = createServiceClient(env.supabaseUrl, env.serviceRoleKey);
+  const maxJobs = clampInt(
+    body.maxJobs,
+    1,
+    isCron ? 100 : 25,
+    isCron ? 25 : 10,
+  );
+  const supabaseAdmin = createServiceClient(
+    env.supabaseUrl,
+    env.serviceRoleKey,
+  );
 
   const stats = {
-    mode: isCron ? 'cron' : 'manual',
+    mode: isCron ? "cron" : "manual",
     claimedJobs: 0,
     completed: 0,
     cacheHits: 0,
@@ -159,14 +204,20 @@ Deno.serve(async (req) => {
     terminalFailures: 0,
   };
 
-  const { data: claimRows, error: claimError } = await supabaseAdmin.rpc('claim_link_preview_jobs', {
-    p_limit: maxJobs,
-    p_lease_seconds: isCron ? 180 : 120,
-  });
+  const { data: claimRows, error: claimError } = await supabaseAdmin.rpc(
+    "claim_link_preview_jobs",
+    {
+      p_limit: maxJobs,
+      p_lease_seconds: isCron ? 180 : 120,
+    },
+  );
 
   if (claimError) {
-    console.error('link-preview-worker claim rpc failed:', claimError);
-    return jsonResponse({ code: 500, message: 'Failed to claim link preview jobs' }, 500);
+    console.error("link-preview-worker claim rpc failed:", claimError);
+    return jsonResponse(
+      { code: 500, message: "Failed to claim link preview jobs" },
+      500,
+    );
   }
 
   const jobs = (claimRows ?? []) as LinkPreviewJobRow[];
@@ -175,62 +226,84 @@ Deno.serve(async (req) => {
   for (const job of jobs) {
     try {
       const { data: messageRowRaw, error: messageError } = await supabaseAdmin
-        .from('messages')
-        .select('id, community_id, channel_id, content, deleted_at')
-        .eq('id', job.message_id)
+        .from("messages")
+        .select("id, community_id, channel_id, content, deleted_at")
+        .eq("id", job.message_id)
         .maybeSingle();
 
       if (messageError) {
-        throw new RetryablePreviewError(`Failed to load message: ${messageError.message}`);
+        throw new RetryablePreviewError(
+          `Failed to load message: ${messageError.message}`,
+        );
       }
 
       const messageRow = (messageRowRaw ?? null) as MessageRow | null;
       if (!messageRow || messageRow.deleted_at) {
-        await supabaseAdmin.from('message_link_previews' as never).delete().eq('message_id', job.message_id);
-        const { error: completeError } = await supabaseAdmin.rpc('complete_link_preview_job', {
-          p_job_id: job.id,
-          p_outcome: 'done',
-          p_error: null,
-          p_retry_delay_seconds: 120,
-        });
-        if (completeError) console.error('Failed to complete deleted-message job:', completeError);
+        await supabaseAdmin
+          .from("message_link_previews" as never)
+          .delete()
+          .eq("message_id", job.message_id);
+        const { error: completeError } = await supabaseAdmin.rpc(
+          "complete_link_preview_job",
+          {
+            p_job_id: job.id,
+            p_outcome: "done",
+            p_error: null,
+            p_retry_delay_seconds: 120,
+          },
+        );
+        if (completeError)
+          console.error(
+            "Failed to complete deleted-message job:",
+            completeError,
+          );
         stats.completed += 1;
         continue;
       }
 
       const sourceUrl = extractFirstHttpUrl(messageRow.content);
       if (!sourceUrl) {
-        await supabaseAdmin.from('message_link_previews' as never).delete().eq('message_id', job.message_id);
-        const { error: completeError } = await supabaseAdmin.rpc('complete_link_preview_job', {
-          p_job_id: job.id,
-          p_outcome: 'done',
-          p_error: null,
-          p_retry_delay_seconds: 120,
-        });
-        if (completeError) console.error('Failed to complete no-link job:', completeError);
+        await supabaseAdmin
+          .from("message_link_previews" as never)
+          .delete()
+          .eq("message_id", job.message_id);
+        const { error: completeError } = await supabaseAdmin.rpc(
+          "complete_link_preview_job",
+          {
+            p_job_id: job.id,
+            p_outcome: "done",
+            p_error: null,
+            p_retry_delay_seconds: 120,
+          },
+        );
+        if (completeError)
+          console.error("Failed to complete no-link job:", completeError);
         stats.completed += 1;
         continue;
       }
 
       const normalizedUrl = normalizeUrl(sourceUrl);
 
-      const { data: cacheRowData, error: cacheLookupError } = await supabaseAdmin
-        .from('link_preview_cache' as never)
-        .select(
-          'id, normalized_url, status, payload, final_url, thumbnail_bucket_name, thumbnail_object_path, thumbnail_source_url, stale_after'
-        )
-        .eq('normalized_url', normalizedUrl)
-        .maybeSingle();
+      const { data: cacheRowData, error: cacheLookupError } =
+        await supabaseAdmin
+          .from("link_preview_cache" as never)
+          .select(
+            "id, normalized_url, status, payload, final_url, thumbnail_bucket_name, thumbnail_object_path, thumbnail_source_url, stale_after",
+          )
+          .eq("normalized_url", normalizedUrl)
+          .maybeSingle();
 
       if (cacheLookupError) {
-        throw new RetryablePreviewError(`Failed to lookup preview cache: ${cacheLookupError.message}`);
+        throw new RetryablePreviewError(
+          `Failed to lookup preview cache: ${cacheLookupError.message}`,
+        );
       }
 
       const cacheRow = (cacheRowData ?? null) as CacheRow | null;
 
-      let finalStatus: 'ready' | 'unsupported';
+      let finalStatus: "ready" | "unsupported";
       let finalSnapshot: PreviewSnapshot;
-      let finalEmbedProvider: 'none' | 'youtube' | 'vimeo';
+      let finalEmbedProvider: "none" | "youtube" | "vimeo";
       let cacheId: string | null = cacheRow?.id ?? null;
       let thumbnailBucketName: string | null = null;
       let thumbnailObjectPath: string | null = null;
@@ -241,14 +314,16 @@ Deno.serve(async (req) => {
       if (cacheRow && isCacheFresh(cacheRow)) {
         const cachedSnapshot = snapshotFromUnknown(cacheRow.payload);
         if (!cachedSnapshot) {
-          throw new RetryablePreviewError('Cached preview payload is invalid');
+          throw new RetryablePreviewError("Cached preview payload is invalid");
         }
-        finalStatus = cacheRow!.status === 'unsupported' ? 'unsupported' : 'ready';
+        finalStatus =
+          cacheRow!.status === "unsupported" ? "unsupported" : "ready";
         finalSnapshot = cachedSnapshot;
         finalEmbedProvider =
-          cachedSnapshot.embed?.provider === 'youtube' || cachedSnapshot.embed?.provider === 'vimeo'
+          cachedSnapshot.embed?.provider === "youtube" ||
+          cachedSnapshot.embed?.provider === "vimeo"
             ? cachedSnapshot.embed.provider
-            : 'none';
+            : "none";
         cachePayload = asObject(cacheRow!.payload) ?? {};
         finalUrl = cacheRow!.final_url;
         thumbnailBucketName = cacheRow!.thumbnail_bucket_name;
@@ -266,7 +341,7 @@ Deno.serve(async (req) => {
         thumbnailSourceUrl = resolved.thumbnailSourceUrl;
         cachePayload = resolved.cachePayload;
 
-        if (resolved.status === 'ready' && resolved.thumbnailSourceUrl) {
+        if (resolved.status === "ready" && resolved.thumbnailSourceUrl) {
           try {
             const mirrored = await mirrorPreviewThumbnail({
               supabaseAdmin,
@@ -286,10 +361,16 @@ Deno.serve(async (req) => {
               }
             }
           } catch (mirrorError) {
-            console.warn('link-preview-worker thumbnail mirror failed; continuing without mirror', {
-              messageId: job.message_id,
-              error: mirrorError instanceof Error ? mirrorError.message : String(mirrorError),
-            });
+            console.warn(
+              "link-preview-worker thumbnail mirror failed; continuing without mirror",
+              {
+                messageId: job.message_id,
+                error:
+                  mirrorError instanceof Error
+                    ? mirrorError.message
+                    : String(mirrorError),
+              },
+            );
           }
         }
 
@@ -302,30 +383,39 @@ Deno.serve(async (req) => {
           thumbnail_object_path: thumbnailObjectPath,
           thumbnail_source_url: thumbnailSourceUrl,
           fetched_at: nowIso(),
-          stale_after: new Date(Date.now() + (finalStatus === 'ready' ? 24 : 12) * 60 * 60 * 1000).toISOString(),
+          stale_after: new Date(
+            Date.now() + (finalStatus === "ready" ? 24 : 12) * 60 * 60 * 1000,
+          ).toISOString(),
           last_error_code: null,
           last_error_message: null,
           updated_at: nowIso(),
         };
 
-        const { data: cacheUpsertRow, error: cacheUpsertError } = await supabaseAdmin
-          .from('link_preview_cache' as never)
-          .upsert(cacheUpsertPayload as never, { onConflict: 'normalized_url' })
-          .select('id')
-          .single();
+        const { data: cacheUpsertRow, error: cacheUpsertError } =
+          await supabaseAdmin
+            .from("link_preview_cache" as never)
+            .upsert(cacheUpsertPayload as never, {
+              onConflict: "normalized_url",
+            })
+            .select("id")
+            .single();
 
         if (cacheUpsertError) {
-          throw new RetryablePreviewError(`Failed to upsert preview cache: ${cacheUpsertError.message}`);
+          throw new RetryablePreviewError(
+            `Failed to upsert preview cache: ${cacheUpsertError.message}`,
+          );
         }
 
         cacheId =
-          cacheUpsertRow && typeof cacheUpsertRow === 'object' && 'id' in cacheUpsertRow
+          cacheUpsertRow &&
+          typeof cacheUpsertRow === "object" &&
+          "id" in cacheUpsertRow
             ? String((cacheUpsertRow as { id: unknown }).id)
             : cacheId;
       }
 
       const { error: previewUpsertError } = await supabaseAdmin
-        .from('message_link_previews' as never)
+        .from("message_link_previews" as never)
         .upsert(
           {
             message_id: messageRow.id,
@@ -341,38 +431,44 @@ Deno.serve(async (req) => {
             thumbnail_object_path: thumbnailObjectPath,
             updated_at: nowIso(),
           } as never,
-          { onConflict: 'message_id' },
+          { onConflict: "message_id" },
         );
 
       if (previewUpsertError) {
-        throw new RetryablePreviewError(`Failed to upsert message preview row: ${previewUpsertError.message}`);
+        throw new RetryablePreviewError(
+          `Failed to upsert message preview row: ${previewUpsertError.message}`,
+        );
       }
 
-      const { error: completeError } = await supabaseAdmin.rpc('complete_link_preview_job', {
-        p_job_id: job.id,
-        p_outcome: 'done',
-        p_error: null,
-        p_retry_delay_seconds: 120,
-      });
+      const { error: completeError } = await supabaseAdmin.rpc(
+        "complete_link_preview_job",
+        {
+          p_job_id: job.id,
+          p_outcome: "done",
+          p_error: null,
+          p_retry_delay_seconds: 120,
+        },
+      );
 
       if (completeError) {
-        console.error('Failed to complete link preview job:', completeError);
+        console.error("Failed to complete link preview job:", completeError);
       } else {
         stats.completed += 1;
       }
 
-      if (finalStatus === 'unsupported') stats.unsupported += 1;
+      if (finalStatus === "unsupported") stats.unsupported += 1;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       const isRetryable = error instanceof RetryablePreviewError;
       const isPermanentUnsupported = error instanceof PermanentPreviewError;
 
       // Best-effort row update for UI visibility of failures/unsupported states.
       try {
         const { data: messageRowRaw } = await supabaseAdmin
-          .from('messages')
-          .select('id, community_id, channel_id, content, deleted_at')
-          .eq('id', job.message_id)
+          .from("messages")
+          .select("id, community_id, channel_id, content, deleted_at")
+          .eq("id", job.message_id)
           .maybeSingle();
         const messageRow = (messageRowRaw ?? null) as MessageRow | null;
         if (messageRow && !messageRow.deleted_at) {
@@ -386,13 +482,15 @@ Deno.serve(async (req) => {
               }
             })();
 
-            const fallbackStatus = isPermanentUnsupported ? 'unsupported' : 'failed';
+            const fallbackStatus = isPermanentUnsupported
+              ? "unsupported"
+              : "failed";
             const fallbackSnapshot = buildUnsupportedSnapshot(
               sourceUrl,
               normalizedUrl,
               isPermanentUnsupported ? errorMessage : undefined,
             );
-            await supabaseAdmin.from('message_link_previews' as never).upsert(
+            await supabaseAdmin.from("message_link_previews" as never).upsert(
               {
                 message_id: messageRow.id,
                 community_id: messageRow.community_id,
@@ -402,30 +500,41 @@ Deno.serve(async (req) => {
                 status: fallbackStatus,
                 cache_id: null,
                 snapshot: fallbackSnapshot,
-                embed_provider: 'none',
+                embed_provider: "none",
                 thumbnail_bucket_name: null,
                 thumbnail_object_path: null,
                 updated_at: nowIso(),
               } as never,
-              { onConflict: 'message_id' },
+              { onConflict: "message_id" },
             );
           }
         }
       } catch (updateError) {
-        console.error('Failed to write fallback preview row status:', updateError);
+        console.error(
+          "Failed to write fallback preview row status:",
+          updateError,
+        );
       }
 
       const terminal = isPermanentUnsupported || (job.attempts ?? 1) >= 5;
-      const outcome = terminal ? 'failed' : 'retryable_failed';
-      const retryDelaySeconds = terminal ? 300 : computeRetryDelaySeconds(job.attempts ?? 1);
-      const { error: completeError } = await supabaseAdmin.rpc('complete_link_preview_job', {
-        p_job_id: job.id,
-        p_outcome: outcome,
-        p_error: errorMessage,
-        p_retry_delay_seconds: retryDelaySeconds,
-      });
+      const outcome = terminal ? "failed" : "retryable_failed";
+      const retryDelaySeconds = terminal
+        ? 300
+        : computeRetryDelaySeconds(job.attempts ?? 1);
+      const { error: completeError } = await supabaseAdmin.rpc(
+        "complete_link_preview_job",
+        {
+          p_job_id: job.id,
+          p_outcome: outcome,
+          p_error: errorMessage,
+          p_retry_delay_seconds: retryDelaySeconds,
+        },
+      );
       if (completeError) {
-        console.error('Failed to complete failed link preview job:', completeError);
+        console.error(
+          "Failed to complete failed link preview job:",
+          completeError,
+        );
       }
 
       if (terminal) {

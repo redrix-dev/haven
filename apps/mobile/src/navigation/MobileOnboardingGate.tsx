@@ -1,4 +1,12 @@
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useCampaigns,
+  useCompletingCampaignKey,
+  useCompletionError,
+  useError,
+  useLoaded,
+  useLoading,
+} from "@mobile-data/hooks";
 import { Asset } from "expo-asset";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,12 +23,12 @@ export function MobileOnboardingGate({ children }: MobileOnboardingGateProps) {
   const core = useHavenCore();
   const context = useMemo(() => getMobileOnboardingContext(), []);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
-  const campaigns = core.onboarding.useCampaigns();
-  const loaded = core.onboarding.useLoaded();
-  const loading = core.onboarding.useLoading();
-  const error = core.onboarding.useError();
-  const completingCampaignKey = core.onboarding.useCompletingCampaignKey();
-  const completionError = core.onboarding.useCompletionError();
+  const campaigns = useCampaigns(core.onboarding);
+  const loaded = useLoaded(core.onboarding);
+  const loading = useLoading(core.onboarding);
+  const error = useError(core.onboarding);
+  const completingCampaignKey = useCompletingCampaignKey(core.onboarding);
+  const completionError = useCompletionError(core.onboarding);
 
   const loadCampaigns = useCallback(() => {
     void core.onboarding.load(context).catch((loadError) => {
@@ -51,9 +59,11 @@ export function MobileOnboardingGate({ children }: MobileOnboardingGateProps) {
 
   const completeCampaign = useCallback(() => {
     if (!campaign) return;
-    void core.completeOnboardingCampaign(campaign.key, context).catch((completeError) => {
-      console.warn("[MobileOnboardingGate] completion failed", completeError);
-    });
+    void core
+      .completeOnboardingCampaign(campaign.key, context)
+      .catch((completeError) => {
+        console.warn("[MobileOnboardingGate] completion failed", completeError);
+      });
   }, [campaign, context, core]);
 
   if (!loaded || loading || !assetsLoaded) {
@@ -74,7 +84,10 @@ export function MobileOnboardingGate({ children }: MobileOnboardingGateProps) {
         <Text className="mb-6 text-center text-sm leading-6 text-muted-foreground">
           {error}
         </Text>
-        <Pressable className="rounded-xl bg-primary px-6 py-3" onPress={loadCampaigns}>
+        <Pressable
+          className="rounded-xl bg-primary px-6 py-3"
+          onPress={loadCampaigns}
+        >
           <Text className="text-base font-semibold text-primary-foreground">
             Retry
           </Text>

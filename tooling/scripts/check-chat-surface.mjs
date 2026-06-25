@@ -39,8 +39,7 @@ const files = walk(path.join(mobileRoot, "src"));
 const importKcsvRe =
   /import\s*\{[^}]*\bKeyboardChatScrollView\b[^}]*\}\s*from\s*["']react-native-keyboard-controller["']/;
 const blankSpaceJsxRe = /\bblankSpace\s*=/;
-const paddingTopInContainerRe =
-  /contentContainerStyle\s*=\s*\{[^}]*paddingTop/;
+const paddingTopInContainerRe = /contentContainerStyle\s*=\s*\{[^}]*paddingTop/;
 const safeAreaBottomRe = /edges\s*=\s*\{[^}]*["']bottom["']/;
 const stickyRe = /\bKeyboardStickyView\b/;
 const gestureRe = /\bKeyboardGestureArea\b/;
@@ -61,7 +60,9 @@ for (const file of files) {
 
   const source = fs.readFileSync(file, "utf8");
   const lines = source.split(/\r?\n/);
-  const isChatModule = normalized.startsWith("apps/mobile/src/components/chat/");
+  const isChatModule = normalized.startsWith(
+    "apps/mobile/src/components/chat/",
+  );
   const isKcsvWrapper = normalized === allowedKcsvWrapper;
   const isChatInterface = normalized === chatInterface.replace(/\\/g, "/");
   const isDebugTs = normalized.startsWith(
@@ -84,11 +85,7 @@ for (const file of files) {
       );
     }
 
-    if (
-      isChatLike &&
-      paddingTopInContainerRe.test(line) &&
-      !isChatInterface
-    ) {
+    if (isChatLike && paddingTopInContainerRe.test(line) && !isChatInterface) {
       violations.push(
         `${normalized}:${i + 1}: contentContainerStyle.paddingTop belongs in ChatInterface only`,
       );

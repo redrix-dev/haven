@@ -11,15 +11,17 @@ export type MobileThemePreferenceState = {
   resetToDefault: () => void;
 };
 
-export const useMobileThemePreferenceStore = create<MobileThemePreferenceState>((set) => ({
-  selectedThemeId: "default",
-  setSelectedThemeId: (id) => {
-    const normalized = normalizeMobileThemeId(id);
-    set({ selectedThemeId: normalized });
-    void persistThemeId(normalized);
-  },
-  resetToDefault: () => {
-    set({ selectedThemeId: "default" });
-    void clearPersistedThemeId();
-  },
-}));
+export const useMobileThemePreferenceStore = create<MobileThemePreferenceState>(
+  (set) => ({
+    selectedThemeId: "default",
+    setSelectedThemeId: (id) => {
+      const normalized = normalizeMobileThemeId(id);
+      set({ selectedThemeId: normalized });
+      void persistThemeId(normalized);
+    },
+    resetToDefault: () => {
+      set({ selectedThemeId: "default" });
+      void clearPersistedThemeId();
+    },
+  }),
+);

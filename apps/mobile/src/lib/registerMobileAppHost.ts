@@ -1,6 +1,9 @@
 import * as Linking from "expo-linking";
 import { createMMKV, type MMKV } from "react-native-mmkv";
-import { setAppHost, type AppHost } from "@shared/infrastructure/platform/appHost";
+import {
+  setAppHost,
+  type AppHost,
+} from "@shared/infrastructure/platform/appHost";
 
 /**
  * Imperative navigation delegate provided by the active navigator.

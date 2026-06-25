@@ -13,13 +13,18 @@ export function readCommunityDisplayOrder(userId: string): string[] | null {
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
-    return (parsed as unknown[]).filter((value): value is string => typeof value === "string");
+    return (parsed as unknown[]).filter(
+      (value): value is string => typeof value === "string",
+    );
   } catch {
     return null;
   }
 }
 
-export function writeCommunityDisplayOrder(userId: string, ids: string[]): void {
+export function writeCommunityDisplayOrder(
+  userId: string,
+  ids: string[],
+): void {
   try {
     getAppHost().browserRuntime?.storageSetItem(
       communityDisplayOrderStorageKey(userId),

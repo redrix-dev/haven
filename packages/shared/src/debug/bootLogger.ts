@@ -30,8 +30,8 @@ const MAX_EVENTS = 200;
 const events: BootEvent[] = [];
 
 function now(): number {
-  if (typeof performance !== 'undefined') return performance.now();
-  if (typeof Date !== 'undefined') return Date.now();
+  if (typeof performance !== "undefined") return performance.now();
+  if (typeof Date !== "undefined") return Date.now();
   return 0;
 }
 
@@ -45,7 +45,7 @@ const bootGlobal = globalThis as typeof globalThis & {
 };
 
 const _pageT0: number =
-  typeof bootGlobal.__havenBootT0 === 'number' ? bootGlobal.__havenBootT0 : 0;
+  typeof bootGlobal.__havenBootT0 === "number" ? bootGlobal.__havenBootT0 : 0;
 
 let t0: number = _pageT0;
 
@@ -65,17 +65,18 @@ function getEvents(): Readonly<BootEvent[]> {
 }
 
 function getReport(): string {
-  if (events.length === 0) return '(no boot events recorded)';
+  if (events.length === 0) return "(no boot events recorded)";
 
   const lines: string[] = [
     `Haven Boot Sequence — ${events.length} events`,
-    `${'Event'.padEnd(40)} ${'Elapsed'.padStart(10)} ${'Δ'.padStart(10)}`,
-    '─'.repeat(63),
+    `${"Event".padEnd(40)} ${"Elapsed".padStart(10)} ${"Δ".padStart(10)}`,
+    "─".repeat(63),
   ];
 
   for (const e of events) {
     const elapsed = `+${e.elapsed.toFixed(1)} ms`.padStart(10);
-    const delta = e.delta > 0 ? `+${e.delta.toFixed(1)} ms`.padStart(10) : ''.padStart(10);
+    const delta =
+      e.delta > 0 ? `+${e.delta.toFixed(1)} ms`.padStart(10) : "".padStart(10);
     lines.push(`${e.name.padEnd(40)} ${elapsed} ${delta}`);
     if (e.data) {
       for (const [k, v] of Object.entries(e.data)) {
@@ -84,11 +85,11 @@ function getReport(): string {
     }
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 function printReport(): void {
-  console.log('\n%c' + getReport(), 'font-family: monospace; white-space: pre');
+  console.log("\n%c" + getReport(), "font-family: monospace; white-space: pre");
 }
 
 /** Reset — only useful in tests. */

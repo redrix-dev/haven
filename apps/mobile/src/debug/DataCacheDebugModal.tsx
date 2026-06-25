@@ -33,10 +33,15 @@ type DataCacheDebugModalProps = {
   onClose: () => void;
 };
 
-export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalProps) {
+export function DataCacheDebugModal({
+  visible,
+  onClose,
+}: DataCacheDebugModalProps) {
   useDataCacheDebugRevision(visible);
   const [tab, setTab] = useState<TabId>("log");
-  const [category, setCategory] = useState<DataCacheDebugCategory | "all">("all");
+  const [category, setCategory] = useState<DataCacheDebugCategory | "all">(
+    "all",
+  );
   const [enabled, setEnabled] = useState(dataCacheDebug.isEnabled());
   const [exporting, setExporting] = useState(false);
   const [lastExportPath, setLastExportPath] = useState<string | null>(null);
@@ -88,7 +93,9 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-background pt-12">
         <View className="border-b border-border px-4 pb-3">
-          <Text className="text-xl font-bold text-foreground">Data Cache Debug</Text>
+          <Text className="text-xl font-bold text-foreground">
+            Data Cache Debug
+          </Text>
           <Text className="mt-1 text-xs text-muted-foreground">
             {entries.length} events · {snapshots.length} component snapshots
           </Text>
@@ -112,24 +119,41 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
                 // uniwind-theme-allow mobile-theme/no-raw-color-prop - ActivityIndicator requires raw color; resolves to --foreground
                 <ActivityIndicator size="small" color="#e6edf7" />
               ) : (
-                <Text className="text-xs font-semibold text-foreground">Export log</Text>
+                <Text className="text-xs font-semibold text-foreground">
+                  Export log
+                </Text>
               )}
             </Pressable>
-            <Pressable onPress={handleClear} className="rounded-lg bg-surface-panel px-3 py-2">
-              <Text className="text-xs font-semibold text-foreground">Clear</Text>
+            <Pressable
+              onPress={handleClear}
+              className="rounded-lg bg-surface-panel px-3 py-2"
+            >
+              <Text className="text-xs font-semibold text-foreground">
+                Clear
+              </Text>
             </Pressable>
             <Pressable
               onPress={handleResetSession}
               className="rounded-lg bg-surface-panel px-3 py-2"
             >
-              <Text className="text-xs font-semibold text-foreground">Reset session</Text>
+              <Text className="text-xs font-semibold text-foreground">
+                Reset session
+              </Text>
             </Pressable>
-            <Pressable onPress={onClose} className="rounded-lg bg-surface-panel px-3 py-2">
-              <Text className="text-xs font-semibold text-foreground">Close</Text>
+            <Pressable
+              onPress={onClose}
+              className="rounded-lg bg-surface-panel px-3 py-2"
+            >
+              <Text className="text-xs font-semibold text-foreground">
+                Close
+              </Text>
             </Pressable>
           </View>
           {lastExportPath ? (
-            <Text className="mt-2 text-[10px] text-muted-foreground" numberOfLines={2}>
+            <Text
+              className="mt-2 text-[10px] text-muted-foreground"
+              numberOfLines={2}
+            >
               Last export: {lastExportPath}
             </Text>
           ) : null}
@@ -165,7 +189,11 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
               horizontal
               showsHorizontalScrollIndicator={false}
               className="max-h-10 border-b border-border"
-              contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 8 }}
+              contentContainerStyle={{
+                gap: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+              }}
             >
               {CATEGORIES.map((cat) => (
                 <Pressable
@@ -177,7 +205,9 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
                 >
                   <Text
                     className={`text-[10px] font-medium ${
-                      category === cat ? "text-primary-foreground" : "text-muted-foreground"
+                      category === cat
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground"
                     }`}
                   >
                     {cat}
@@ -188,7 +218,8 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
             <ScrollView className="flex-1 px-3 py-2">
               {filteredEntries.length === 0 ? (
                 <Text className="py-6 text-center text-sm text-muted-foreground">
-                  No events yet. Navigate communities / channels to generate activity.
+                  No events yet. Navigate communities / channels to generate
+                  activity.
                 </Text>
               ) : (
                 filteredEntries.map((entry) => (
@@ -199,7 +230,9 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
                     <Text className="text-[10px] text-muted-foreground">
                       +{entry.elapsedMs}ms · {entry.category} · {entry.source}
                     </Text>
-                    <Text className="mt-0.5 text-xs text-foreground">{entry.message}</Text>
+                    <Text className="mt-0.5 text-xs text-foreground">
+                      {entry.message}
+                    </Text>
                     {entry.data ? (
                       <Text className="mt-1 font-mono text-[10px] text-muted-foreground">
                         {JSON.stringify(entry.data, null, 0)}
@@ -224,8 +257,12 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
                   key={`${snap.componentId}-${snap.ts}`}
                   className="mb-3 rounded-lg border border-border-panel bg-surface-embedded p-3"
                 >
-                  <Text className="text-sm font-semibold text-foreground">{snap.componentId}</Text>
-                  <Text className="text-[10px] text-muted-foreground">+{snap.elapsedMs}ms</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {snap.componentId}
+                  </Text>
+                  <Text className="text-[10px] text-muted-foreground">
+                    +{snap.elapsedMs}ms
+                  </Text>
                   <Text className="mt-2 font-mono text-[10px] text-muted-foreground">
                     {JSON.stringify(snap.values, null, 2)}
                   </Text>
@@ -241,8 +278,9 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
               Metro console receives every event when logging is ON.
             </Text>
             <Text className="mt-3 text-xs text-muted-foreground">
-              Export writes a chronological .txt file to the app documents directory and opens the
-              share sheet so you can AirDrop, save to Files, or paste into Notes.
+              Export writes a chronological .txt file to the app documents
+              directory and opens the share sheet so you can AirDrop, save to
+              Files, or paste into Notes.
             </Text>
             <Text className="mt-3 text-xs text-muted-foreground">
               From the JS debugger you can also call:
@@ -250,11 +288,13 @@ export function DataCacheDebugModal({ visible, onClose }: DataCacheDebugModalPro
             <Text className="mt-1 font-mono text-[10px] text-foreground">
               global.__havenDataCacheDebug.exportText()
             </Text>
-            <Text className="mt-4 text-xs font-semibold text-foreground">Instrumented stores</Text>
-            <Text className="text-xs text-muted-foreground">
-              authStore
+            <Text className="mt-4 text-xs font-semibold text-foreground">
+              Instrumented stores
             </Text>
-            <Text className="mt-4 text-xs font-semibold text-foreground">Instrumented hooks</Text>
+            <Text className="text-xs text-muted-foreground">authStore</Text>
+            <Text className="mt-4 text-xs font-semibold text-foreground">
+              Instrumented hooks
+            </Text>
             <Text className="text-xs text-muted-foreground">
               HavenCore prepareCommunityEntry, prefetchCommunityChannelMessages,
               servers realtime bootstrap, auth session cache clears

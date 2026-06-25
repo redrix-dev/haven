@@ -19,7 +19,9 @@ export const parseAuthConfirmUrl = (url: string): URL | null => {
     const parsed = new URL(url);
     const pathname = normalizePathname(parsed.pathname);
     if (parsed.protocol === "haven:") {
-      return parsed.hostname === "auth" && pathname === "/confirm" ? parsed : null;
+      return parsed.hostname === "auth" && pathname === "/confirm"
+        ? parsed
+        : null;
     }
     if (
       (parsed.protocol === "http:" || parsed.protocol === "https:") &&

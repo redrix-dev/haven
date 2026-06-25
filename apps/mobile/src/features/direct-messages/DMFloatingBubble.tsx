@@ -2,8 +2,21 @@
  * LOCKED: DMFloatingBubble — do not modify behavior without explicit product approval.
  * Extracted from haven-rev2 DMBubbleHost; ux-lab reference: dev/ux-lab/components/FloatingDMBubble.tsx
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View, type LayoutChangeEvent } from "react-native";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
@@ -29,7 +42,11 @@ import type {
 import { ThemedIonicons } from "@/theme-rn";
 import { useFloatingDmPlaceholderChannels } from "@/theme-rn/useFloatingDmPlaceholderChannels";
 import { useDmBubbleSheetChrome } from "@/theme-rn/useDmBubbleSheetChrome";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useCommunities,
+  usePermissionsByCommunityId,
+} from "@mobile-data/hooks";
 
 export type {
   FloatingDmBubbleIconName,
@@ -107,10 +124,14 @@ function resolveBubbleFace(channel: FloatingDmChannelConfig): {
   colorClassName: `accent-${string}`;
 } {
   return {
-    name: channel.bubbleIconName ?? (channel.id === "modmail" ? "shield-outline" : "mail-outline"),
+    name:
+      channel.bubbleIconName ??
+      (channel.id === "modmail" ? "shield-outline" : "mail-outline"),
     colorClassName:
       channel.bubbleIconColorClassName ??
-      (channel.id === "modmail" ? "accent-background" : "accent-primary-foreground"),
+      (channel.id === "modmail"
+        ? "accent-background"
+        : "accent-primary-foreground"),
   };
 }
 
@@ -135,8 +156,10 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
   const themedDefaults = useFloatingDmPlaceholderChannels();
   const sheetChrome = useDmBubbleSheetChrome();
   const core = useHavenCore();
-  const communities = core.communities.useCommunities();
-  const permissionsByCommunityId = core.permissions.usePermissionsByCommunityId();
+  const communities = useCommunities(core.communities);
+  const permissionsByCommunityId = usePermissionsByCommunityId(
+    core.permissions,
+  );
   const modmailManagedCommunityIds = useMemo(
     () =>
       communities
@@ -188,7 +211,16 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
     insetRight.value = insets.right;
     insetTop.value = insets.top;
     insetBottom.value = insets.bottom;
-  }, [insetBottom, insetLeft, insetRight, insetTop, insets.bottom, insets.left, insets.right, insets.top]);
+  }, [
+    insetBottom,
+    insetLeft,
+    insetRight,
+    insetTop,
+    insets.bottom,
+    insets.left,
+    insets.right,
+    insets.top,
+  ]);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -219,7 +251,9 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
     onOpenChange?.(expanded);
   }, [expanded, onOpenChange]);
 
-  const expandSheetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expandSheetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const layoutInitialized = useRef(false);
 
@@ -241,7 +275,17 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
       restY.value = ry;
       setRestPosition({ x: rx, y: ry });
     },
-    [insets.bottom, insets.right, insets.top, layoutH, layoutW, restX, restY, translateX, translateY],
+    [
+      insets.bottom,
+      insets.right,
+      insets.top,
+      layoutH,
+      layoutW,
+      restX,
+      restY,
+      translateX,
+      translateY,
+    ],
   );
 
   const clearExpandTimer = useCallback(() => {
@@ -350,7 +394,13 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
         scheduleOnRN(finishCollapse);
       }
     });
-  }, [clearExpandTimer, finishCollapse, secondaryDeltaX, secondaryOpacity, sheetOpacity]);
+  }, [
+    clearExpandTimer,
+    finishCollapse,
+    secondaryDeltaX,
+    secondaryOpacity,
+    sheetOpacity,
+  ]);
 
   const handleCollapsedTap = useCallback(() => {
     beginExpand();
@@ -510,10 +560,7 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
           } else if (softEnergeticThrow) {
             const rawPredX = fingerX + vx * THROW_PROJECTION_S;
             const rawPredY = fingerY + vy * THROW_PROJECTION_S;
-            const predX = Math.min(
-              rightSnap,
-              Math.max(leftSnap, rawPredX),
-            );
+            const predX = Math.min(rightSnap, Math.max(leftSnap, rawPredX));
             const predY = Math.min(maxY, Math.max(minY, rawPredY));
             translateX.value = withClamp(
               { min: leftSnap, max: rightSnap },
@@ -675,7 +722,12 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
             ]}
             pointerEvents="auto"
           >
-            <Text style={[styles.sheetTitle, { color: sheetChrome.sheetTitleColor }]}>
+            <Text
+              style={[
+                styles.sheetTitle,
+                { color: sheetChrome.sheetTitleColor },
+              ]}
+            >
               {activeChannel.sheetTitle}
             </Text>
             <View style={styles.channelRow}>
@@ -693,20 +745,36 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
                       selected && [
                         styles.channelPillSelected,
                         {
-                          backgroundColor: sheetChrome.channelPillSelectedBackground,
+                          backgroundColor:
+                            sheetChrome.channelPillSelectedBackground,
                           borderColor: sheetChrome.channelPillBorderColor,
                         },
                       ],
                     ]}
                   >
-                    <Text style={[styles.channelPillLabel, { color: sheetChrome.channelPillLabelColor }]}>
+                    <Text
+                      style={[
+                        styles.channelPillLabel,
+                        { color: sheetChrome.channelPillLabelColor },
+                      ]}
+                    >
                       {ch.label}
                     </Text>
                     {ch.unreadCount != null && ch.unreadCount > 0 ? (
                       <View
-                        style={[styles.unreadBadge, { backgroundColor: sheetChrome.unreadBadgeBackground }]}
+                        style={[
+                          styles.unreadBadge,
+                          {
+                            backgroundColor: sheetChrome.unreadBadgeBackground,
+                          },
+                        ]}
                       >
-                        <Text style={[styles.unreadBadgeText, { color: sheetChrome.unreadBadgeTextColor }]}>
+                        <Text
+                          style={[
+                            styles.unreadBadgeText,
+                            { color: sheetChrome.unreadBadgeTextColor },
+                          ]}
+                        >
                           {ch.unreadCount}
                         </Text>
                       </View>
@@ -720,12 +788,20 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
                 <DirectMessagesContainer />
               ) : modmailManagedCommunityIds.length > 0 ? (
                 <View style={styles.modmailPanelWrap}>
-                  <MobileModmailPanel managedCommunityIds={modmailManagedCommunityIds} />
+                  <MobileModmailPanel
+                    managedCommunityIds={modmailManagedCommunityIds}
+                  />
                 </View>
               ) : (
                 <View style={styles.modmailPlaceholder}>
-                  <Text style={[styles.sheetPlaceholder, { color: sheetChrome.sheetPlaceholderColor }]}>
-                    ModMail appears when you can manage reports in at least one community.
+                  <Text
+                    style={[
+                      styles.sheetPlaceholder,
+                      { color: sheetChrome.sheetPlaceholderColor },
+                    ]}
+                  >
+                    ModMail appears when you can manage reports in at least one
+                    community.
                   </Text>
                 </View>
               )}

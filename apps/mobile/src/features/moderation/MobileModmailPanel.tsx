@@ -9,7 +9,14 @@ import {
   Text,
   View,
 } from "react-native";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useDetail,
+  useIsLoadingDetail,
+  useIsLoadingReports,
+  useReports,
+  useSelectedReportId,
+} from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 type MobileModmailPanelProps = {
@@ -17,13 +24,15 @@ type MobileModmailPanelProps = {
   managedCommunityIds: string[];
 };
 
-export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelProps) {
+export function MobileModmailPanel({
+  managedCommunityIds,
+}: MobileModmailPanelProps) {
   const core = useHavenCore();
-  const reports = core.moderation.useReports();
-  const detail = core.moderation.useDetail();
-  const selectedReportId = core.moderation.useSelectedReportId();
-  const loading = core.moderation.useIsLoadingReports();
-  const loadingDetail = core.moderation.useIsLoadingDetail();
+  const reports = useReports(core.moderation);
+  const detail = useDetail(core.moderation);
+  const selectedReportId = useSelectedReportId(core.moderation);
+  const loading = useIsLoadingReports(core.moderation);
+  const loadingDetail = useIsLoadingDetail(core.moderation);
 
   useEffect(() => {
     if (managedCommunityIds.length === 0) return;
@@ -48,7 +57,9 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
         Alert.alert("Escalated", "Report escalated to Haven.");
         closeDetail();
       })
-      .catch((e) => Alert.alert("Error", getErrorMessage(e, "Escalate failed.")));
+      .catch((e) =>
+        Alert.alert("Error", getErrorMessage(e, "Escalate failed.")),
+      );
   };
 
   if (managedCommunityIds.length === 0) {
@@ -75,10 +86,17 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
           keyExtractor={(r) => r.reportId}
           renderItem={({ item }) => (
             // uniwind-theme-allow mobile-theme/no-raw-palette-class - ModMail amber brand palette
-            <Pressable className="mb-2 rounded-xl border border-amber-700/50 bg-amber-950/40 px-3 py-3 active:opacity-90" onPress={() => openDetail(item.reportId)}>
+            <Pressable
+              className="mb-2 rounded-xl border border-amber-700/50 bg-amber-950/40 px-3 py-3 active:opacity-90"
+              onPress={() => openDetail(item.reportId)}
+            >
               {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - ModMail amber brand text */}
-              <Text className="text-xs uppercase text-amber-200/80">{item.serverName}</Text>
-              <Text className="mt-1 font-medium text-foreground">{item.title}</Text>
+              <Text className="text-xs uppercase text-amber-200/80">
+                {item.serverName}
+              </Text>
+              <Text className="mt-1 font-medium text-foreground">
+                {item.title}
+              </Text>
               <Text className="mt-1 text-[11px] text-muted-foreground">
                 {item.status} · {new Date(item.createdAt).toLocaleString()}
               </Text>
@@ -87,15 +105,23 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
           refreshing={loading}
           onRefresh={() => void core.moderation.load(managedCommunityIds)}
           ListEmptyComponent={
-            <Text className="py-6 text-center text-sm text-muted-foreground">No open reports.</Text>
+            <Text className="py-6 text-center text-sm text-muted-foreground">
+              No open reports.
+            </Text>
           }
         />
       )}
 
-      <Modal visible={Boolean(selectedReportId)} animationType="slide" presentationStyle="pageSheet">
+      <Modal
+        visible={Boolean(selectedReportId)}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
         <View className="flex-1 bg-card px-4 pt-14">
           <View className="mb-4 flex-row items-center justify-between">
-            <Text className="text-lg font-semibold text-foreground">Report</Text>
+            <Text className="text-lg font-semibold text-foreground">
+              Report
+            </Text>
             <Pressable onPress={closeDetail}>
               <Text className="text-lg text-muted-foreground">Close</Text>
             </Pressable>
@@ -105,11 +131,19 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
             <ActivityIndicator color="#e6edf7" />
           ) : detail ? (
             <ScrollView keyboardShouldPersistTaps="handled">
-              <Text className="text-sm text-muted-foreground">{detail.serverName}</Text>
-              <Text className="mt-2 text-base font-semibold text-foreground">{detail.title}</Text>
-              <Text className="mt-2 text-xs text-muted-foreground">Status: {detail.status}</Text>
+              <Text className="text-sm text-muted-foreground">
+                {detail.serverName}
+              </Text>
+              <Text className="mt-2 text-base font-semibold text-foreground">
+                {detail.title}
+              </Text>
+              <Text className="mt-2 text-xs text-muted-foreground">
+                Status: {detail.status}
+              </Text>
               {detail.targetDisplayName ? (
-                <Text className="mt-2 text-sm text-foreground">Target: {detail.targetDisplayName}</Text>
+                <Text className="mt-2 text-sm text-foreground">
+                  Target: {detail.targetDisplayName}
+                </Text>
               ) : null}
               {detail.platformAction ? (
                 // uniwind-theme-allow mobile-theme/no-raw-palette-class - Haven platform action badge; intentional purple brand palette
@@ -119,36 +153,53 @@ export function MobileModmailPanel({ managedCommunityIds }: MobileModmailPanelPr
                     Haven Platform Moderation has acted on this report
                   </Text>
                   {detail.platformAction.user_banned === true && (
-                    <Text className="mt-1 text-sm text-foreground">✓ User platform banned</Text>
+                    <Text className="mt-1 text-sm text-foreground">
+                      ✓ User platform banned
+                    </Text>
                   )}
                   {detail.platformAction.content_removed === true && (
-                    <Text className="mt-1 text-sm text-foreground">✓ Content removed</Text>
+                    <Text className="mt-1 text-sm text-foreground">
+                      ✓ Content removed
+                    </Text>
                   )}
-                  {detail.status === 'resolved_by_platform' && (
+                  {detail.status === "resolved_by_platform" && (
                     // uniwind-theme-allow mobile-theme/no-raw-palette-class - acknowledge action green; intentional positive-action indicator
-                    <Pressable className="mt-3 rounded-xl bg-green-700 py-2" onPress={() => {
+                    <Pressable
+                      className="mt-3 rounded-xl bg-green-700 py-2"
+                      onPress={() => {
                         void core.moderation
                           .acknowledge(detail.reportId)
                           .then(() => {
                             Alert.alert("Acknowledged", "Report closed.");
                             closeDetail();
                           })
-                          .catch((e) => Alert.alert("Error", getErrorMessage(e, "Acknowledge failed.")));
+                          .catch((e) =>
+                            Alert.alert(
+                              "Error",
+                              getErrorMessage(e, "Acknowledge failed."),
+                            ),
+                          );
                       }}
                     >
-                      <Text className="text-center font-semibold text-primary-foreground">Acknowledge & Close</Text>
+                      <Text className="text-center font-semibold text-primary-foreground">
+                        Acknowledge & Close
+                      </Text>
                     </Pressable>
                   )}
                 </View>
               ) : null}
-              {detail.status !== 'escalated' && detail.destination === 'server_admins' && !detail.platformAction && (
-                <Pressable
-                  className="mt-6 rounded-xl bg-primary py-3"
-                  onPress={handleEscalate}
-                >
-                  <Text className="text-center font-semibold text-primary-foreground">Escalate to Haven</Text>
-                </Pressable>
-              )}
+              {detail.status !== "escalated" &&
+                detail.destination === "server_admins" &&
+                !detail.platformAction && (
+                  <Pressable
+                    className="mt-6 rounded-xl bg-primary py-3"
+                    onPress={handleEscalate}
+                  >
+                    <Text className="text-center font-semibold text-primary-foreground">
+                      Escalate to Haven
+                    </Text>
+                  </Pressable>
+                )}
             </ScrollView>
           ) : null}
         </View>

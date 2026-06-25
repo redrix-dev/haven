@@ -2,14 +2,22 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * CI guardrail: portable `packages/shared` must not reintroduce the old
- * import-time Supabase singleton or direct public Supabase env reads.
+ * CI guardrail: portable `packages/shared` must stay framework-free.
  *
- * Broader DOM/Radix eviction is tracked manually; this script enforces the
- * data-plane boundary that Metro/Vitest rely on.
+ * Enforces:
+ * - no deprecated Supabase singleton / direct env reads
+ * - no react / solid-js / react-flavored zustand anywhere in shared
+ * - no hook-shaped `use*` exports under shared/core (cache ports belong in mobile)
+ * - browser-global and web-only imports in portable logic paths
  */
 const sharedRoot = path.join("packages", "shared", "src");
-const bannedSingletonFile = path.join("packages", "shared", "src", "lib", "supabase.ts");
+const bannedSingletonFile = path.join(
+  "packages",
+  "shared",
+  "src",
+  "lib",
+  "supabase.ts",
+);
 
 const importSupabaseRe = /@shared\/lib\/supabase\b/;
 const envSupabaseRe =
@@ -20,15 +28,19 @@ const webOnlyImportRe =
   /\b(?:sonner|react-dom|react-markdown|@radix-ui\/|@tiptap\/|lucide-react|cmdk)\b/;
 
 const portablePathChecks = [
-  /^packages\/shared\/src\/contexts\/.+\.(?:ts|tsx)$/,
   /^packages\/shared\/src\/app\/hooks\/.+\.(?:ts|tsx)$/,
-  /^packages\/shared\/src\/features\/.+\/hooks\/.+\.(?:ts|tsx)$/,
   /^packages\/shared\/src\/lib\/deepLinks\.ts$/,
   /^packages\/shared\/src\/platform\/urls\.ts$/,
 ];
 const portablePathExclusions = [
   /^packages\/shared\/src\/app\/hooks\/useDesktopSettings\.ts$/,
 ];
+
+const frameworkImportRe =
+  /\bfrom\s+["'](?:react|react-dom|solid-js|zustand|zustand\/traditional|zustand\/react)["']/;
+
+const coreUseMemberRe =
+  /^\s*(?:export\s+)?(?:async\s+)?function\s+(use[A-Z][A-Za-z0-9]*)\s*\(/;
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -57,14 +69,29 @@ if (fs.existsSync(bannedSingletonFile)) {
 
 for (const file of walk(sharedRoot)) {
   const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
-  const shouldCheckPortablePath = portablePathChecks.some((pattern) =>
-    pattern.test(rel),
-  ) && !portablePathExclusions.some((pattern) => pattern.test(rel));
+  const shouldCheckPortablePath =
+    portablePathChecks.some((pattern) => pattern.test(rel)) &&
+    !portablePathExclusions.some((pattern) => pattern.test(rel));
   const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((rawLine, i) => {
     const line = stripComments(rawLine);
+    if (frameworkImportRe.test(line)) {
+      violations.push(
+        `${rel}:${i + 1}: framework import in packages/shared (reactivity belongs in platform data layers)`,
+      );
+    }
+    if (
+      /^packages\/shared\/src\/core\/.+\.(?:ts|tsx)$/.test(rel) &&
+      coreUseMemberRe.test(line)
+    ) {
+      violations.push(
+        `${rel}:${i + 1}: hook-shaped use* export in packages/shared/core (move to mobile data hooks)`,
+      );
+    }
     if (importSupabaseRe.test(line)) {
-      violations.push(`${rel}:${i + 1}: import of deprecated @shared/lib/supabase`);
+      violations.push(
+        `${rel}:${i + 1}: import of deprecated @shared/lib/supabase`,
+      );
     }
     if (envSupabaseRe.test(line)) {
       violations.push(

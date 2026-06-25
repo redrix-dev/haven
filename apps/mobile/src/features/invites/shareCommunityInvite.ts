@@ -1,5 +1,5 @@
 import { Share } from "react-native";
-import { getPlatformInviteBaseUrl } from "@shared/platform/urls";
+import { getPlatformInviteBaseUrl } from "@shared/infrastructure/platform/urls";
 
 export function buildCommunityInviteUrl(code: string): string {
   return `${getPlatformInviteBaseUrl()}${code}`;

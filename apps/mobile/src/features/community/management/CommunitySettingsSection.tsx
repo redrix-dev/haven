@@ -22,8 +22,9 @@ import type {
   ServerPermissions,
   ServerRoleItem,
 } from "@shared/lib/backend/types";
-import { useHavenCore } from "@shared/core";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useHavenCore } from "@mobile-data";
+import { useServerPanelState } from "@mobile-data/hooks";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 import {
@@ -50,11 +51,16 @@ type Props = {
   perms: ServerPermissions;
 };
 
-export function CommunitySettingsSection({ serverId, communityName, perms }: Props) {
+export function CommunitySettingsSection({
+  serverId,
+  communityName,
+  perms,
+}: Props) {
   const core = useHavenCore();
   const admin = core.admin;
   const themeTokens = useMobileThemeTokens();
-  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const foregroundColor =
+    resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const switchColors = useMemo(
     () => ({
       false: resolveColorProp(themeTokens, "border-panel") ?? "#3d4f6a",
@@ -63,7 +69,7 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
     }),
     [foregroundColor, themeTokens],
   );
-  const serverPanel = admin.useServerPanelState();
+  const serverPanel = useServerPanelState(admin);
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
 
@@ -73,7 +79,9 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
   const [draftPublicInvites, setDraftPublicInvites] = useState(false);
   const [draftReportReason, setDraftReportReason] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [customRolesOrder, setCustomRolesOrder] = useState<ServerRoleItem[]>([]);
+  const [customRolesOrder, setCustomRolesOrder] = useState<ServerRoleItem[]>(
+    [],
+  );
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [pendingRoleIds, setPendingRoleIds] = useState<string[]>([]);
   const [savingRoles, setSavingRoles] = useState(false);
@@ -109,16 +117,25 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
   );
 
   const isCurrentUserOwner = useMemo(
-    () => snapshots.members.some((m) => m.userId === currentUserId && m.isOwner),
+    () =>
+      snapshots.members.some((m) => m.userId === currentUserId && m.isOwner),
     [snapshots.members, currentUserId],
   );
 
   const loadErrors = useMemo(
     () => ({
-      ...(serverPanel.serverSettingsLoadError ? { settings: serverPanel.serverSettingsLoadError } : {}),
-      ...(serverPanel.serverRoleManagementError ? { roles: serverPanel.serverRoleManagementError } : {}),
-      ...(serverPanel.serverInvitesError ? { invites: serverPanel.serverInvitesError } : {}),
-      ...(serverPanel.communityBansError ? { bans: serverPanel.communityBansError } : {}),
+      ...(serverPanel.serverSettingsLoadError
+        ? { settings: serverPanel.serverSettingsLoadError }
+        : {}),
+      ...(serverPanel.serverRoleManagementError
+        ? { roles: serverPanel.serverRoleManagementError }
+        : {}),
+      ...(serverPanel.serverInvitesError
+        ? { invites: serverPanel.serverInvitesError }
+        : {}),
+      ...(serverPanel.communityBansError
+        ? { bans: serverPanel.communityBansError }
+        : {}),
     }),
     [
       serverPanel.communityBansError,
@@ -203,7 +220,10 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
       const merged = [...systemRoles, ...data];
       await admin.reorderServerRoles(merged, serverId);
     } catch (e) {
-      Alert.alert("Reorder failed", getErrorMessage(e, "Could not update role order."));
+      Alert.alert(
+        "Reorder failed",
+        getErrorMessage(e, "Could not update role order."),
+      );
       void reloadSnapshots();
     }
   };
@@ -220,12 +240,23 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
           }`}
         >
           <View className="flex-row items-center gap-2">
-            <View className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+            <View
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
             <Text className="text-base text-foreground">{item.name}</Text>
           </View>
           <View className="flex-row items-center gap-2">
-            <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
-            <ThemedIonicons name="reorder-three" size={22} colorClassName="accent-muted-foreground" />
+            <ThemedIonicons
+              name="chevron-forward"
+              size={16}
+              colorClassName="accent-muted-foreground"
+            />
+            <ThemedIonicons
+              name="reorder-three"
+              size={22}
+              colorClassName="accent-muted-foreground"
+            />
           </View>
         </Pressable>
       </ScaleDecorator>
@@ -246,7 +277,8 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
     [snapshots.roles, selectedRoleId],
   );
 
-  const mutedColor = resolveColorProp(themeTokens, "muted-foreground") ?? "#9aa0a6";
+  const mutedColor =
+    resolveColorProp(themeTokens, "muted-foreground") ?? "#9aa0a6";
 
   const handleCreateRole = useCallback(async () => {
     const trimmed = newRoleName.trim();
@@ -265,7 +297,10 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
       setNewRoleName("");
       setCreatingRole(false);
     } catch (e) {
-      Alert.alert("Create failed", getErrorMessage(e, "Could not create role."));
+      Alert.alert(
+        "Create failed",
+        getErrorMessage(e, "Could not create role."),
+      );
     } finally {
       setCreatingSaving(false);
     }
@@ -283,7 +318,9 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
 
   const togglePendingRole = useCallback((roleId: string) => {
     setPendingRoleIds((prev) =>
-      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId],
+      prev.includes(roleId)
+        ? prev.filter((id) => id !== roleId)
+        : [...prev, roleId],
     );
   }, []);
 
@@ -298,7 +335,10 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
         await admin.saveServerMemberRoles(memberId, pendingRoleIds);
         closeMemberEditor();
       } catch (e) {
-        Alert.alert("Save failed", getErrorMessage(e, "Could not update member roles."));
+        Alert.alert(
+          "Save failed",
+          getErrorMessage(e, "Could not update member roles."),
+        );
       } finally {
         setSavingRoles(false);
       }
@@ -309,8 +349,12 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
   const tabs: { key: TabKey; label: string }[] = [
     { key: "general", label: "Overview" },
     ...(canManageRoles ? [{ key: "roles" as const, label: "Roles" }] : []),
-    ...(canManageMembers ? [{ key: "members" as const, label: "Members" }] : []),
-    ...(canManageInvites ? [{ key: "invites" as const, label: "Invites" }] : []),
+    ...(canManageMembers
+      ? [{ key: "members" as const, label: "Members" }]
+      : []),
+    ...(canManageInvites
+      ? [{ key: "invites" as const, label: "Invites" }]
+      : []),
     ...(canManageBans ? [{ key: "bans" as const, label: "Bans" }] : []),
   ];
 
@@ -376,7 +420,11 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                 }
                 hitSlop={8}
               >
-                <ThemedIonicons name="information-circle-outline" size={20} colorClassName="accent-muted-foreground" />
+                <ThemedIonicons
+                  name="information-circle-outline"
+                  size={20}
+                  colorClassName="accent-muted-foreground"
+                />
               </Pressable>
               <Text className="flex-1 text-sm text-muted-foreground">
                 Tap a role to edit it. Long-press to reorder.
@@ -420,13 +468,19 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                 onPress={() => setCreatingRole(true)}
                 className="mb-3 flex-row items-center justify-center gap-1 rounded-xl border border-border-panel py-3"
               >
-                <ThemedIonicons name="add" size={18} colorClassName="accent-muted-foreground" />
+                <ThemedIonicons
+                  name="add"
+                  size={18}
+                  colorClassName="accent-muted-foreground"
+                />
                 <Text className="text-foreground">Add role</Text>
               </Pressable>
             )}
 
             {loadErrors.roles ? (
-              <Text className="mb-2 text-sm text-destructive">{loadErrors.roles}</Text>
+              <Text className="mb-2 text-sm text-destructive">
+                {loadErrors.roles}
+              </Text>
             ) : null}
             {systemRoles.length > 0 ? (
               <View className="mb-3">
@@ -439,9 +493,16 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                     onPress={() => setSelectedRoleId(r.id)}
                     className="mb-2 flex-row items-center gap-2 rounded-xl border border-border-panel bg-surface-embedded px-3 py-3"
                   >
-                    <View className="h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
+                    <View
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: r.color }}
+                    />
                     <Text className="flex-1 text-foreground">{r.name}</Text>
-                    <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
+                    <ThemedIonicons
+                      name="chevron-forward"
+                      size={16}
+                      colorClassName="accent-muted-foreground"
+                    />
                   </Pressable>
                 ))}
               </View>
@@ -468,16 +529,22 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
           {tab === "general" ? (
             <View className="gap-4 pb-24">
               {loadErrors.settings ? (
-                <Text className="text-sm text-destructive">{loadErrors.settings}</Text>
+                <Text className="text-sm text-destructive">
+                  {loadErrors.settings}
+                </Text>
               ) : null}
-              <Text className="text-xs uppercase text-muted-foreground">Community name</Text>
+              <Text className="text-xs uppercase text-muted-foreground">
+                Community name
+              </Text>
               <TextInput
                 value={draftName}
                 onChangeText={setDraftName}
                 editable={canManageServer}
                 className="rounded-xl border border-border-control bg-surface-panel px-3 py-3 text-foreground"
               />
-              <Text className="text-xs uppercase text-muted-foreground">Description</Text>
+              <Text className="text-xs uppercase text-muted-foreground">
+                Description
+              </Text>
               <TextInput
                 value={draftDesc}
                 onChangeText={setDraftDesc}
@@ -491,7 +558,10 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                   value={draftPublicInvites}
                   onValueChange={setDraftPublicInvites}
                   disabled={!canManageServer}
-                  trackColor={{ false: switchColors.false, true: switchColors.true }}
+                  trackColor={{
+                    false: switchColors.false,
+                    true: switchColors.true,
+                  }}
                   thumbColor={switchColors.thumb}
                 />
               </View>
@@ -501,7 +571,10 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                   value={draftReportReason}
                   onValueChange={setDraftReportReason}
                   disabled={!canManageServer}
-                  trackColor={{ false: switchColors.false, true: switchColors.true }}
+                  trackColor={{
+                    false: switchColors.false,
+                    true: switchColors.true,
+                  }}
                   thumbColor={switchColors.thumb}
                 />
               </View>
@@ -525,7 +598,9 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                   : "Manage Roles is required to change role assignments."}
               </Text>
               {loadErrors.roles ? (
-                <Text className="mb-2 text-sm text-destructive">{loadErrors.roles}</Text>
+                <Text className="mb-2 text-sm text-destructive">
+                  {loadErrors.roles}
+                </Text>
               ) : null}
               {snapshots.members.map((m) => {
                 const isEditing = editingMemberId === m.memberId;
@@ -545,10 +620,13 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                       className="flex-row items-center justify-between"
                     >
                       <View className="flex-1">
-                        <Text className="font-medium text-foreground">{m.displayName}</Text>
+                        <Text className="font-medium text-foreground">
+                          {m.displayName}
+                        </Text>
                         <Text className="text-xs text-muted-foreground">
                           {m.isOwner ? "Owner · " : ""}
-                          {m.roleIds.length} role{m.roleIds.length === 1 ? "" : "s"}
+                          {m.roleIds.length} role
+                          {m.roleIds.length === 1 ? "" : "s"}
                         </Text>
                       </View>
                       {canEdit ? (
@@ -564,8 +642,10 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                       <View className="mt-3 border-t border-border-panel pt-3">
                         {rolesForAssignment.map((role) => {
                           const locked =
-                            role.isDefault || (role.isSystem && !isCurrentUserOwner);
-                          const checked = pendingRoleIds.includes(role.id) || role.isDefault;
+                            role.isDefault ||
+                            (role.isSystem && !isCurrentUserOwner);
+                          const checked =
+                            pendingRoleIds.includes(role.id) || role.isDefault;
                           return (
                             <View
                               key={role.id}
@@ -576,7 +656,9 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                                   className="h-3 w-3 rounded-full"
                                   style={{ backgroundColor: role.color }}
                                 />
-                                <Text className="flex-1 text-foreground">{role.name}</Text>
+                                <Text className="flex-1 text-foreground">
+                                  {role.name}
+                                </Text>
                                 {locked ? (
                                   <Text className="text-xs text-muted-foreground">
                                     {role.isDefault ? "Default" : "System"}
@@ -587,7 +669,10 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                                 value={checked}
                                 onValueChange={() => togglePendingRole(role.id)}
                                 disabled={locked || savingRoles}
-                                trackColor={{ false: switchColors.false, true: switchColors.true }}
+                                trackColor={{
+                                  false: switchColors.false,
+                                  true: switchColors.true,
+                                }}
                                 thumbColor={switchColors.thumb}
                               />
                             </View>
@@ -613,7 +698,9 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
               serverId={serverId}
               invites={snapshots.invites}
               loadError={loadErrors.invites}
-              onCreateInvite={(input) => admin.createServerInvite(input, serverId)}
+              onCreateInvite={(input) =>
+                admin.createServerInvite(input, serverId)
+              }
               onRevoke={(id) => admin.revokeServerInvite(id, serverId)}
             />
           ) : tab === "bans" && canManageBans ? (
@@ -627,9 +714,15 @@ export function CommunitySettingsSection({ serverId, communityName, perms }: Pro
                     text: "Unban",
                     onPress: () =>
                       void admin
-                        .unbanUserFromCurrentServer({ targetUserId: bannedUserId }, serverId)
+                        .unbanUserFromCurrentServer(
+                          { targetUserId: bannedUserId },
+                          serverId,
+                        )
                         .catch((e) =>
-                          Alert.alert("Error", getErrorMessage(e, "Unban failed.")),
+                          Alert.alert(
+                            "Error",
+                            getErrorMessage(e, "Unban failed."),
+                          ),
                         ),
                   },
                 ])
@@ -654,7 +747,10 @@ function InvitesTab({
   serverId: string;
   invites: ServerInvite[];
   loadError?: string;
-  onCreateInvite: (input: { maxUses: number | null; expiresInHours: number | null }) => Promise<unknown>;
+  onCreateInvite: (input: {
+    maxUses: number | null;
+    expiresInHours: number | null;
+  }) => Promise<unknown>;
   onRevoke: (id: string) => Promise<void>;
 }) {
   const [creating, setCreating] = useState(false);
@@ -662,7 +758,10 @@ function InvitesTab({
   const handleCreate = async () => {
     setCreating(true);
     try {
-      const inv = (await onCreateInvite({ maxUses: null, expiresInHours: 24 })) as { code: string };
+      const inv = (await onCreateInvite({
+        maxUses: null,
+        expiresInHours: 24,
+      })) as { code: string };
       await shareCommunityInvite(inv.code);
     } catch (e) {
       Alert.alert("Error", getErrorMessage(e, "Could not create invite."));
@@ -673,7 +772,9 @@ function InvitesTab({
 
   return (
     <View className="pb-24">
-      {loadError ? <Text className="mb-2 text-sm text-destructive">{loadError}</Text> : null}
+      {loadError ? (
+        <Text className="mb-2 text-sm text-destructive">{loadError}</Text>
+      ) : null}
       <Pressable
         onPress={() => void handleCreate()}
         disabled={creating}
@@ -689,8 +790,13 @@ function InvitesTab({
           className="mb-2 flex-row items-center justify-between rounded-xl border border-border-panel px-3 py-2"
         >
           <View className="min-w-0 flex-1 pr-3">
-            <Text className="font-mono text-xs text-foreground">{inv.code}</Text>
-            <Text className="mt-1 text-[11px] text-muted-foreground" numberOfLines={1}>
+            <Text className="font-mono text-xs text-foreground">
+              {inv.code}
+            </Text>
+            <Text
+              className="mt-1 text-[11px] text-muted-foreground"
+              numberOfLines={1}
+            >
               {buildCommunityInviteUrl(inv.code)}
             </Text>
           </View>
@@ -719,18 +825,27 @@ function BansTab({
 }) {
   return (
     <View className="pb-24">
-      {loadError ? <Text className="mb-2 text-sm text-destructive">{loadError}</Text> : null}
+      {loadError ? (
+        <Text className="mb-2 text-sm text-destructive">{loadError}</Text>
+      ) : null}
       {bans.length === 0 ? (
-        <Text className="py-6 text-center text-sm text-muted-foreground">No bans.</Text>
+        <Text className="py-6 text-center text-sm text-muted-foreground">
+          No bans.
+        </Text>
       ) : null}
       {bans.map((b) => (
         <View
           key={b.id}
           className="mb-2 rounded-xl border border-border-panel bg-surface-panel px-3 py-3"
         >
-          <Text className="font-medium text-foreground">{b.username ?? b.bannedUserId}</Text>
+          <Text className="font-medium text-foreground">
+            {b.username ?? b.bannedUserId}
+          </Text>
           <Text className="text-xs text-muted-foreground">{b.reason}</Text>
-          <Pressable className="mt-2 self-start" onPress={() => onUnban(b.bannedUserId)}>
+          <Pressable
+            className="mt-2 self-start"
+            onPress={() => onUnban(b.bannedUserId)}
+          >
             <Text className="text-sm text-primary">Unban</Text>
           </Pressable>
         </View>

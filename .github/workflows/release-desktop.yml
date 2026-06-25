@@ -1,0 +1,112 @@
+# Desktop release — builds the Tauri app for each OS, signs the updater artifacts,
+# and publishes a GitHub Release (with `latest.json`) that the in-app updater reads.
+#
+# Trigger: push a tag like `desktop-v2.0.0` (see docs/RELEASE_CADENCE.md). The
+# release is created as a DRAFT — review it, then publish. The updater endpoint
+# (`releases/latest/download/latest.json`) only serves a published, non-prerelease
+# release, so auto-update activates the moment you publish the draft.
+#
+# Required repository secrets:
+#   TAURI_SIGNING_PRIVATE_KEY           — minisign private key (`tauri signer generate`)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  — its password ("" if none)
+# The matching PUBLIC key lives in src-tauri/tauri.conf.json (`plugins.updater.pubkey`).
+# The production keypair is wired; just ensure the two secrets above are set in the repo.
+#
+# Release notes: the body is read from docs/releases/<tag>.md when present (curate the
+# SANITIZED PUBLIC test-signoff summary there — see docs/RELEASE_CADENCE.md). Never paste
+# raw test-reports/ logs; they're internal. Falls back to a generic body if the file is absent.
+#
+# Not handled here (deliberate, tracked separately): OS code signing —
+#   macOS notarization (Apple cert) and Windows Authenticode. Without them users
+#   get a Gatekeeper/SmartScreen prompt on first install, and unsigned macOS
+#   builds can hit Gatekeeper "damaged" errors on update. Updater (minisign)
+#   signing above is independent of, and not a substitute for, OS code signing.
+
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+
+# tauri-action needs write access to create the release and upload assets.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./apps/tauri/src-tauri -> target"
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      # Release body = the curated SANITIZED PUBLIC signoff at docs/releases/<tag>.md,
+      # if present (see docs/RELEASE_CADENCE.md). Falls back to a generic body so a
+      # missing file degrades safely and never leaks internal logs.
+      - name: Resolve release notes
+        id: notes
+        shell: bash
+        run: |
+          NOTES_FILE="docs/releases/${GITHUB_REF_NAME}.md"
+          {
+            echo "body<<HAVEN_NOTES_EOF"
+            if [ -f "$NOTES_FILE" ]; then
+              cat "$NOTES_FILE"
+            else
+              echo "Download an installer below. Existing installs update automatically once this release is published."
+            fi
+            echo "HAVEN_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build, sign, and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: "Haven ${{ github.ref_name }}"
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}

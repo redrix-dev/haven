@@ -1,14 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   builtinThemes,
   resolveTheme,
   resolveThemeRegistry,
   validateAndSanitize,
-} from '@shared/themes/registry';
-import { createThemeProxy, resolveSemanticEntries, semanticToPrimitive } from '@shared/themes/semantics';
+} from "@shared/themes/registry";
+import {
+  createThemeProxy,
+  resolveSemanticEntries,
+  semanticToPrimitive,
+} from "@shared/themes/semantics";
 
-describe('theme semantics proxy', () => {
-  it('resolves semantic keys through the canonical map', () => {
+describe("theme semantics proxy", () => {
+  it("resolves semantic keys through the canonical map", () => {
     const tokens = builtinThemes.default.tokens;
     const proxy = createThemeProxy(tokens);
     for (const [semantic, primitive] of Object.entries(semanticToPrimitive)) {
@@ -18,7 +22,7 @@ describe('theme semantics proxy', () => {
     }
   });
 
-  it('creates semantic entries that match resolved proxy values', () => {
+  it("creates semantic entries that match resolved proxy values", () => {
     const tokens = builtinThemes.default.tokens;
     const proxy = createThemeProxy(tokens);
     const semanticEntries = resolveSemanticEntries(tokens);
@@ -28,39 +32,39 @@ describe('theme semantics proxy', () => {
   });
 });
 
-describe('theme registry resolution', () => {
-  it('keeps builtins and merges valid ota themes', () => {
+describe("theme registry resolution", () => {
+  it("keeps builtins and merges valid ota themes", () => {
     const merged = resolveThemeRegistry(builtinThemes, {
       ocean: {
-        id: 'ocean',
-        name: 'Ocean',
-        source: 'catalog',
-        entitlementKey: 'theme:ocean',
-        status: 'active',
+        id: "ocean",
+        name: "Ocean",
+        source: "catalog",
+        entitlementKey: "theme:ocean",
+        status: "active",
         tokens: {
           ...builtinThemes.default.tokens,
-          primary: '#1c8fc5',
+          primary: "#1c8fc5",
         },
       },
     });
 
     expect(merged.default).toBeDefined();
     expect(merged.ocean).toBeDefined();
-    expect(merged.ocean.tokens.primary).toBe('#1c8fc5');
+    expect(merged.ocean.tokens.primary).toBe("#1c8fc5");
   });
 
-  it('drops malformed ota themes during sanitize', () => {
+  it("drops malformed ota themes during sanitize", () => {
     const ota = validateAndSanitize({
       badTheme: {
-        id: 'badTheme',
-        name: 'Bad Theme',
+        id: "badTheme",
+        name: "Bad Theme",
         tokens: {},
       },
       goodTheme: {
-        id: 'goodTheme',
-        name: 'Good Theme',
+        id: "goodTheme",
+        name: "Good Theme",
         tokens: {
-          primary: '#123456',
+          primary: "#123456",
         },
       },
     });
@@ -69,33 +73,33 @@ describe('theme registry resolution', () => {
     expect(ota.goodTheme).toBeDefined();
   });
 
-  it('falls back when entitlement is missing', () => {
+  it("falls back when entitlement is missing", () => {
     const registry = resolveThemeRegistry(builtinThemes, {
       premium: {
-        id: 'premium',
-        name: 'Premium',
-        source: 'catalog',
-        entitlementKey: 'theme:premium',
-        status: 'active',
+        id: "premium",
+        name: "Premium",
+        source: "catalog",
+        entitlementKey: "theme:premium",
+        status: "active",
         tokens: {
           ...builtinThemes.default.tokens,
-          primary: '#8b5cf6',
+          primary: "#8b5cf6",
         },
       },
     });
 
     const denied = resolveTheme(registry, {
-      selectedThemeId: 'premium',
+      selectedThemeId: "premium",
       allowedEntitlements: [],
-      fallbackThemeId: 'default',
+      fallbackThemeId: "default",
     });
-    expect(denied.id).toBe('default');
+    expect(denied.id).toBe("default");
 
     const granted = resolveTheme(registry, {
-      selectedThemeId: 'premium',
-      allowedEntitlements: ['theme:premium'],
-      fallbackThemeId: 'default',
+      selectedThemeId: "premium",
+      allowedEntitlements: ["theme:premium"],
+      fallbackThemeId: "default",
     });
-    expect(granted.id).toBe('premium');
+    expect(granted.id).toBe("premium");
   });
 });

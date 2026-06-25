@@ -1,0 +1,17 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Haven",
+        "width": 1100,
+        "height": 740,
+        "minWidth": 800,
+        "minHeight": 560,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "backgroundColor": "#0d1626"
+      }
+    ]
+  }
+}

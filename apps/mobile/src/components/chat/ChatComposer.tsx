@@ -39,7 +39,8 @@ export function ChatComposer({
   strips,
   sendAccessibilityLabel = "Send message",
 }: ChatComposerProps) {
-  const { composerBackdropAnimatedStyle, composerChromeAnimatedStyle } = useChatSurfaceChrome();
+  const { composerBackdropAnimatedStyle, composerChromeAnimatedStyle } =
+    useChatSurfaceChrome();
 
   return (
     <>
@@ -76,12 +77,19 @@ export function ChatComposer({
               ]}
               className="rounded-full bg-background"
             />
-            <ThemedIonicons name="add" size={22} colorClassName="accent-primary-foreground" />
+            <ThemedIonicons
+              name="add"
+              size={22}
+              colorClassName="accent-primary-foreground"
+            />
           </Pressable>
         </Animated.View>
 
         <Animated.View
-          style={[{ flex: 1, flexDirection: "row", alignItems: "flex-end" }, composerChromeAnimatedStyle]}
+          style={[
+            { flex: 1, flexDirection: "row", alignItems: "flex-end" },
+            composerChromeAnimatedStyle,
+          ]}
         >
           <View className="relative flex-1 flex-row items-center overflow-hidden rounded-[20px] border border-foreground/10 bg-foreground/8 pr-1">
             <Animated.View
@@ -100,7 +108,6 @@ export function ChatComposer({
             />
             <EnrichedMarkdownTextInput
               ref={inputRef}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               {...({ nativeID: CHAT_COMPOSER_NATIVE_ID } as any)}
               multiline
               editable={!isSending}
@@ -115,7 +122,10 @@ export function ChatComposer({
                 strong: { color: colors.text },
                 em: { color: colors.text },
                 link: { color: colors.link, underline: true },
-                spoiler: { color: colors.spoiler, backgroundColor: "rgba(0,0,0,0.2)" },
+                spoiler: {
+                  color: colors.spoiler,
+                  backgroundColor: "rgba(0,0,0,0.2)",
+                },
               }}
               style={{
                 flex: 1,
@@ -134,7 +144,11 @@ export function ChatComposer({
               }}
               className="h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary"
             >
-              <ThemedIonicons name="arrow-up" size={20} colorClassName="accent-primary-foreground" />
+              <ThemedIonicons
+                name="arrow-up"
+                size={20}
+                colorClassName="accent-primary-foreground"
+              />
             </Pressable>
           </View>
         </Animated.View>

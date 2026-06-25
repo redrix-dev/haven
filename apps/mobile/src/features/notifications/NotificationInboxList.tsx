@@ -21,9 +21,17 @@ import {
   getNotificationSummary,
   getNotificationTitle,
 } from "@shared/features/notifications/notificationCopy";
-import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
 import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
-import { useHavenCore } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useNotifications,
+  useNotificationsLoading,
+  useProfilesRecord,
+} from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 
@@ -49,14 +57,15 @@ export function NotificationInboxList({
 }: NotificationInboxListProps) {
   const core = useHavenCore();
   const themeTokens = useMobileThemeTokens();
-  const foregroundColor = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
-  const notificationItems = core.notifications.useNotifications();
+  const foregroundColor =
+    resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
+  const notificationItems = useNotifications(core.notifications);
   const items = useMemo(
     () => filterNotificationsForInbox(notificationItems),
     [notificationItems],
   );
-  const liveProfiles = core.profiles.useProfilesRecord();
-  const loading = core.notifications.useIsLoading();
+  const liveProfiles = useProfilesRecord(core.profiles);
+  const loading = useNotificationsLoading(core.notifications);
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -82,14 +91,18 @@ export function NotificationInboxList({
 
   const dismiss = useCallback(
     (recipientId: string) => {
-      void withNotificationAction(() => core.notifications.dismiss([recipientId]));
+      void withNotificationAction(() =>
+        core.notifications.dismiss([recipientId]),
+      );
     },
     [core.notifications, withNotificationAction],
   );
 
   const markRead = useCallback(
     (recipientId: string) => {
-      void withNotificationAction(() => core.notifications.markRead([recipientId]));
+      void withNotificationAction(() =>
+        core.notifications.markRead([recipientId]),
+      );
     },
     [core.notifications, withNotificationAction],
   );
@@ -116,7 +129,9 @@ export function NotificationInboxList({
               className="w-24 items-center justify-center bg-primary"
               onPress={() => markRead(notification.recipientId)}
             >
-              <Text className="text-center text-sm font-semibold text-primary-foreground">Read</Text>
+              <Text className="text-center text-sm font-semibold text-primary-foreground">
+                Read
+              </Text>
             </Pressable>
           ) : null}
           <Pressable
@@ -124,7 +139,9 @@ export function NotificationInboxList({
             className="w-24 items-center justify-center bg-destructive/90"
             onPress={() => dismiss(notification.recipientId)}
           >
-            <Text className="text-center text-sm font-semibold text-primary-foreground">Dismiss</Text>
+            <Text className="text-center text-sm font-semibold text-primary-foreground">
+              Dismiss
+            </Text>
           </Pressable>
         </View>
       );
@@ -136,7 +153,11 @@ export function NotificationInboxList({
     ({ item }) => {
       const expanded = expandedIds.has(item.recipientId);
       const actorLabel =
-        resolveLiveUsername(liveProfiles, item.actorUserId, item.actorUsername)?.trim() ||
+        resolveLiveUsername(
+          liveProfiles,
+          item.actorUserId,
+          item.actorUsername,
+        )?.trim() ||
         item.actorUserId ||
         "System";
       const avatarUrl = resolveLiveAvatarUrl(
@@ -150,7 +171,10 @@ export function NotificationInboxList({
       const unread = item.readAt == null;
 
       return (
-        <Swipeable renderRightActions={() => renderRightActions(item)} overshootRight={false}>
+        <Swipeable
+          renderRightActions={() => renderRightActions(item)}
+          overshootRight={false}
+        >
           <View className="border-b border-border-panel bg-card py-3">
             <Pressable
               onPress={() => toggleExpanded(item.recipientId)}
@@ -167,7 +191,9 @@ export function NotificationInboxList({
                       accessibilityIgnoresInvertColors
                     />
                   ) : (
-                    <Text className="text-lg font-semibold text-foreground">{initial}</Text>
+                    <Text className="text-lg font-semibold text-foreground">
+                      {initial}
+                    </Text>
                   )}
                 </View>
                 <View className="min-w-0 flex-1">
@@ -178,9 +204,14 @@ export function NotificationInboxList({
                     >
                       {title}
                     </Text>
-                    <Text className="text-xs text-muted-foreground">{formatShortTime(item.createdAt)}</Text>
+                    <Text className="text-xs text-muted-foreground">
+                      {formatShortTime(item.createdAt)}
+                    </Text>
                   </View>
-                  <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                  <Text
+                    className="text-xs text-muted-foreground"
+                    numberOfLines={1}
+                  >
                     {actorLabel}
                   </Text>
                   <Text
@@ -198,7 +229,9 @@ export function NotificationInboxList({
                 className="mt-3 self-start rounded-lg bg-primary px-3 py-2 active:bg-primary-hover"
                 onPress={() => onNavigate(item)}
               >
-                <Text className="text-sm font-semibold text-primary-foreground">Navigate</Text>
+                <Text className="text-sm font-semibold text-primary-foreground">
+                  Navigate
+                </Text>
               </Pressable>
             ) : null}
           </View>
@@ -212,7 +245,9 @@ export function NotificationInboxList({
     return (
       <View className="items-center py-12">
         <ActivityIndicator color={foregroundColor} />
-        <Text className="mt-3 text-sm text-muted-foreground">Loading notifications…</Text>
+        <Text className="mt-3 text-sm text-muted-foreground">
+          Loading notifications…
+        </Text>
       </View>
     );
   }
@@ -236,9 +271,14 @@ export function NotificationInboxList({
       }
       ListEmptyComponent={
         <View className="items-center py-10">
-          <ThemedIonicons name="notifications-off-outline" size={40} colorClassName="accent-muted-foreground" />
+          <ThemedIonicons
+            name="notifications-off-outline"
+            size={40}
+            colorClassName="accent-muted-foreground"
+          />
           <Text className="mt-3 text-center text-sm text-muted-foreground">
-            No notifications here. Mentions and updates show up once you start chatting.
+            No notifications here. Mentions and updates show up once you start
+            chatting.
           </Text>
         </View>
       }

@@ -1,16 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, Platform, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  Platform,
+  Text,
+  View,
+} from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
 import { type EnrichedMarkdownTextInputInstance } from "react-native-enriched-markdown";
-import { useAuthStore } from "@shared/stores/authStore";
-import { useUserStatusStore } from "@shared/stores/userStatusStore";
+import { useAuthStore } from "@mobile-data/session/authStore";
+import { useUserStatusStore } from "@mobile-data/session/userStatusStore";
 import {
   deriveCommunitiesLoadStatus,
   toChannel,
   toServerSummaries,
-  useHavenCore,
 } from "@shared/core";
+import { useHavenCore } from "@mobile-data";
+import {
+  useActiveChannelId,
+  useActiveCommunityId,
+  useChannels,
+  useChannelsLoading,
+  useCommunities,
+  useCommunitiesLoadError,
+  useCommunitiesLoading,
+  useChannelMeta,
+  useHasInitialLoadCompleted,
+  useIsLoadingOlder,
+  usePlatformStaff,
+  useProfilesRecord,
+  useVisibleChannel,
+} from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   buildChatListItemsFromChatMessages,
@@ -41,7 +63,8 @@ import {
   loadPickedCommunityMediaForUpload,
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
-import { useDataCacheComponentProbe } from "@shared/debug";
+import { useDataCacheComponentProbe } from "@/debug/useDataCacheComponentProbe";
+import type { CommunityMessageCache } from "@mobile-data/messages/CommunityMessageCache";
 
 type CommunityChatScreenProps = {
   serverId: string;
@@ -62,14 +85,19 @@ export function CommunityChatScreen({
   const core = useHavenCore();
   const { setRainbowMode } = useUserStatusStore();
   const user = useAuthStore((state) => state.user);
-  const communityId = core.communities.useActiveId() ?? serverId;
-  const navigationChannelId = core.channels.useActiveChannelId();
-  const messageNexus = core.messages.for(communityId ?? "__none__");
+  const communityId = useActiveCommunityId(core.communities) ?? serverId;
+  const navigationChannelId = useActiveChannelId(core.channels);
+  const messageNexus = core.messages.for(
+    communityId ?? "__none__",
+  ) as CommunityMessageCache;
   const currentUserId = user?.id ?? null;
-  const currentUserPlatformStaff = core.profiles.usePlatformStaff(currentUserId);
-  const nexusCommunities = core.communities.useCommunities();
-  const serversLoading = core.communities.useIsLoading();
-  const serversError = core.communities.useLoadError();
+  const currentUserPlatformStaff = usePlatformStaff(
+    core.profiles,
+    currentUserId,
+  );
+  const nexusCommunities = useCommunities(core.communities);
+  const serversLoading = useCommunitiesLoading(core.communities);
+  const serversError = useCommunitiesLoadError(core.communities);
   const servers = useMemo(
     () => toServerSummaries(nexusCommunities),
     [nexusCommunities],
@@ -84,8 +112,11 @@ export function CommunityChatScreen({
     if (!currentUserId) return;
     await core.refreshCommunities(currentUserId);
   }, [core, currentUserId]);
-  const havenChannels = core.channels.useChannels(communityId ?? serverId);
-  const channelsLoading = core.channels.useIsLoading(communityId ?? serverId);
+  const havenChannels = useChannels(core.channels, communityId ?? serverId);
+  const channelsLoading = useChannelsLoading(
+    core.channels,
+    communityId ?? serverId,
+  );
   const channels = useMemo(() => havenChannels.map(toChannel), [havenChannels]);
   const currentChannel = useMemo(
     () =>
@@ -147,14 +178,17 @@ export function CommunityChatScreen({
     void core.prepareTextChannelMessages(communityId, activeChannelIdForLoad);
   }, [core, communityId, activeChannelIdForLoad]);
 
-  const channelMeta = messageNexus.useChannelMeta(
+  const channelMeta = useChannelMeta(
+    messageNexus,
     activeChannelId ?? "__none__",
   );
   const hasOlderMessages = channelMeta.hasMore;
-  const isLoadingOlderMessages = messageNexus.useIsLoadingOlder(
+  const isLoadingOlderMessages = useIsLoadingOlder(
+    messageNexus,
     activeChannelId ?? "__none__",
   );
-  const hasCompletedInitialLoad = messageNexus.useHasInitialLoadCompleted(
+  const hasCompletedInitialLoad = useHasInitialLoadCompleted(
+    messageNexus,
     activeChannelId ?? "__none__",
   );
 
@@ -202,7 +236,8 @@ export function CommunityChatScreen({
     ],
   );
 
-  const visibleMessages = messageNexus.useVisibleChannel(
+  const visibleMessages = useVisibleChannel(
+    messageNexus,
     activeChannelId ?? "__none__",
   );
 
@@ -222,7 +257,7 @@ export function CommunityChatScreen({
     channelsLoading,
     communityIdMatchesRoute: communityId === serverId,
   });
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const liveProfiles = useProfilesRecord(core.profiles);
 
   useEffect(() => {
     if (drawerGestureNonce <= 0) return;
@@ -244,7 +279,10 @@ export function CommunityChatScreen({
   const messages = useMemo<ChatMessage[]>(
     // toInvertedChatOrder reverses ascending nexus order to descending for
     // ChatInterface's inverted FlatList (newest at data[0] = visual bottom).
-    () => toInvertedChatOrder(mapBundlesToChatMessages(visibleMessages, liveProfiles)),
+    () =>
+      toInvertedChatOrder(
+        mapBundlesToChatMessages(visibleMessages, liveProfiles),
+      ),
     [liveProfiles, visibleMessages],
   );
 
@@ -407,7 +445,7 @@ export function CommunityChatScreen({
 
   const canReportMessageTarget = Boolean(
     messageActionsTarget?.authorUserId &&
-      messageActionsTarget.authorUserId !== currentUserId,
+    messageActionsTarget.authorUserId !== currentUserId,
   );
 
   const phase: "loading" | "ready" | "missing" | "error" =
@@ -524,7 +562,8 @@ export function CommunityChatScreen({
         canKick={false}
         canBan={false}
         onReply={() => {
-          if (messageActionsTarget) setPendingReplyToMessageId(messageActionsTarget.messageId);
+          if (messageActionsTarget)
+            setPendingReplyToMessageId(messageActionsTarget.messageId);
         }}
         onReport={() => {
           if (messageActionsTarget && canReportMessageTarget) {
@@ -539,7 +578,8 @@ export function CommunityChatScreen({
         onDismiss={() => setReportMessageTarget(null)}
         communityName={community?.name ?? "Community"}
         onSubmit={async (input) => {
-          if (!activeChannelId || !currentUserId || !reportMessageTarget) return;
+          if (!activeChannelId || !currentUserId || !reportMessageTarget)
+            return;
           await messageNexus.report({
             channelId: activeChannelId,
             messageId: reportMessageTarget.messageId,

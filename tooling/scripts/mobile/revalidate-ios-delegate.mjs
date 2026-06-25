@@ -34,8 +34,15 @@ for (const name of requiredTemplates) {
   }
 }
 
-const swiftTemplate = fs.readFileSync(path.join(templateDir, "AppDelegate.swift"), "utf8");
-for (const needle of ["ExpoReactNativeFactory", "startReactNative", "internal import Expo"]) {
+const swiftTemplate = fs.readFileSync(
+  path.join(templateDir, "AppDelegate.swift"),
+  "utf8",
+);
+for (const needle of [
+  "ExpoReactNativeFactory",
+  "startReactNative",
+  "internal import Expo",
+]) {
   if (!swiftTemplate.includes(needle)) {
     fail(`Template AppDelegate.swift must include "${needle}"`);
   }
@@ -44,7 +51,11 @@ for (const needle of ["ExpoReactNativeFactory", "startReactNative", "internal im
 const generated = path.join(iosAppDir, "AppDelegate.swift");
 if (fs.existsSync(generated)) {
   const body = fs.readFileSync(generated, "utf8");
-  for (const needle of ["ExpoReactNativeFactory", "startReactNative", "internal import Expo"]) {
+  for (const needle of [
+    "ExpoReactNativeFactory",
+    "startReactNative",
+    "internal import Expo",
+  ]) {
     if (!body.includes(needle)) {
       fail(
         `Generated ${path.relative(repoRoot, generated)} missing "${needle}" — re-run prebuild with withHavenIOSNative last in app.json plugins`,
@@ -59,7 +70,9 @@ if (fs.existsSync(generated)) {
 
 const workspace = path.join(mobileRoot, "ios/HavenMobile.xcworkspace");
 if (fs.existsSync(workspace) && process.env.SKIP_XCODEBUILD !== "1") {
-  console.log("[revalidate-ios-delegate] xcodebuild -workspace HavenMobile.xcworkspace -scheme HavenMobile -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO build");
+  console.log(
+    "[revalidate-ios-delegate] xcodebuild -workspace HavenMobile.xcworkspace -scheme HavenMobile -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO build",
+  );
   const r = spawnSync(
     "xcodebuild",
     [

@@ -3,6 +3,8 @@
  *
  * Implementations:
  *   - createMmkvPersistence — mobile (apps/mobile/src/lib/createMmkvPersistence.ts)
+ *   - createLocalStoragePersistence — web + Tauri webview fallback
+ *   - createTauriPersistence — Tauri desktop (plugin-store, localStorage fallback)
  *   - createMemoryPersistence — tests and any host without a disk adapter
  *
  * Hosts inject the appropriate implementation when constructing HavenCore.

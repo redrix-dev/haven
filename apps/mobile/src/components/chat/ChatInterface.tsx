@@ -55,7 +55,10 @@ export type ChatInterfaceProps<T> = Omit<
   /** When set, replaces the message list (e.g. loading spinner). Composer stays mounted. */
   listPlaceholder?: React.ReactNode;
   /** Passed through to the underlying keyboard-aware scroll view. */
-  keyboardScrollProps?: Pick<KeyboardChatScrollViewProps, "keyboardLiftBehavior">;
+  keyboardScrollProps?: Pick<
+    KeyboardChatScrollViewProps,
+    "keyboardLiftBehavior"
+  >;
   /** Android: set false on the composer wrapper to avoid sticky layout collapse. */
   composerCollapsable?: boolean;
 };
@@ -141,7 +144,9 @@ export function ChatInterface<T>({
                 bottom: CHAT_SURFACE_MARGIN,
               }}
             >
-              <View collapsable={composerCollapsable === false ? false : undefined}>
+              <View
+                collapsable={composerCollapsable === false ? false : undefined}
+              >
                 {composer}
               </View>
             </KeyboardStickyView>

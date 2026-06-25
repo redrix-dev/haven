@@ -20,7 +20,9 @@ export async function exportDataCacheDebugLog(): Promise<ExportDataCacheDebugRes
   const dir = FileSystem.documentDirectory;
 
   if (!dir) {
-    console.log("\n=== Haven Data Cache Debug Export (no documentDirectory) ===\n");
+    console.log(
+      "\n=== Haven Data Cache Debug Export (no documentDirectory) ===\n",
+    );
     console.log(text);
     throw new Error("documentDirectory is unavailable on this platform.");
   }

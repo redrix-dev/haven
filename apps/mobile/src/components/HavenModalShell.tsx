@@ -170,7 +170,11 @@ export function HavenModalShell({
       >
         {/* Scrim — fades independently */}
         {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal scrim overlay, invariant across all themes */}
-        <Animated.View className="absolute inset-0 bg-black/50" style={scrimStyle} pointerEvents="none" />
+        <Animated.View
+          className="absolute inset-0 bg-black/50"
+          style={scrimStyle}
+          pointerEvents="none"
+        />
 
         {/* Tap scrim to dismiss */}
         <Pressable className="absolute inset-0" onPress={handleScrimPress} />

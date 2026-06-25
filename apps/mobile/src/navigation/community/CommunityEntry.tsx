@@ -3,13 +3,20 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "@/navigation/types";
 import {
-  applyCommunityFocus,
   resolveCommunityEntrypointTarget,
   toServerSummaries,
+} from "@shared/core";
+import {
+  applyCommunityFocus,
   useBootstrapPhase,
   useHavenCore,
-} from "@shared/core";
-import { useAuthStore } from "@shared/stores/authStore";
+} from "@mobile-data";
+import {
+  useCommunitiesLoadError,
+  useCommunitiesLoading,
+  useOrderedCommunities,
+} from "@mobile-data/hooks";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { getLastCommunitySurface } from "@/storage/communitySurfacePrefs";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { resolveColorProp } from "@shared/themes";
@@ -20,9 +27,9 @@ export function CommunityEntry({ navigation }: Props) {
   const core = useHavenCore();
   const bootstrapPhase = useBootstrapPhase();
   const userId = useAuthStore((state) => state.user?.id ?? null);
-  const communities = core.communities.useOrderedCommunities();
-  const communitiesLoading = core.communities.useIsLoading();
-  const loadError = core.communities.useLoadError();
+  const communities = useOrderedCommunities(core.communities);
+  const communitiesLoading = useCommunitiesLoading(core.communities);
+  const loadError = useCommunitiesLoadError(core.communities);
   const themeTokens = useMobileThemeTokens();
   const spinnerFg = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const routedRef = useRef(false);
@@ -74,7 +81,14 @@ export function CommunityEntry({ navigation }: Props) {
     };
 
     void routeToCommunity();
-  }, [bootstrapPhase.phase, communities, communitiesLoading, core, navigation, userId]);
+  }, [
+    bootstrapPhase.phase,
+    communities,
+    communitiesLoading,
+    core,
+    navigation,
+    userId,
+  ]);
 
   if (bootstrapPhase.phase === "error" || loadError) {
     return (

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import {
   COMPOSER_BACKDROP_IMMERSIVE_OPACITY,
   COMPOSER_BACKDROP_REST_OPACITY,
@@ -12,10 +16,14 @@ import {
 
 export function useChatComposerChrome() {
   const composerChromeOpacity = useSharedValue(COMPOSER_CHROME_REST_OPACITY);
-  const composerBackdropOpacity = useSharedValue(COMPOSER_BACKDROP_REST_OPACITY);
+  const composerBackdropOpacity = useSharedValue(
+    COMPOSER_BACKDROP_REST_OPACITY,
+  );
   const listDragRef = useRef(false);
   const listMomentumRef = useRef(false);
-  const composerSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const composerSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const clearComposerSettleTimer = useCallback(() => {
     if (composerSettleTimerRef.current != null) {
@@ -26,13 +34,23 @@ export function useChatComposerChrome() {
 
   const goComposerChromeImmersive = useCallback(() => {
     clearComposerSettleTimer();
-    composerChromeOpacity.value = withTiming(COMPOSER_CHROME_IMMERSIVE_OPACITY, {
-      duration: COMPOSER_CHROME_IMMERSIVE_MS,
-    });
-    composerBackdropOpacity.value = withTiming(COMPOSER_BACKDROP_IMMERSIVE_OPACITY, {
-      duration: COMPOSER_CHROME_IMMERSIVE_MS,
-    });
-  }, [clearComposerSettleTimer, composerBackdropOpacity, composerChromeOpacity]);
+    composerChromeOpacity.value = withTiming(
+      COMPOSER_CHROME_IMMERSIVE_OPACITY,
+      {
+        duration: COMPOSER_CHROME_IMMERSIVE_MS,
+      },
+    );
+    composerBackdropOpacity.value = withTiming(
+      COMPOSER_BACKDROP_IMMERSIVE_OPACITY,
+      {
+        duration: COMPOSER_CHROME_IMMERSIVE_MS,
+      },
+    );
+  }, [
+    clearComposerSettleTimer,
+    composerBackdropOpacity,
+    composerChromeOpacity,
+  ]);
 
   const scheduleComposerChromeRest = useCallback(() => {
     clearComposerSettleTimer();
@@ -42,12 +60,19 @@ export function useChatComposerChrome() {
         composerChromeOpacity.value = withTiming(COMPOSER_CHROME_REST_OPACITY, {
           duration: COMPOSER_CHROME_REST_MS,
         });
-        composerBackdropOpacity.value = withTiming(COMPOSER_BACKDROP_REST_OPACITY, {
-          duration: COMPOSER_CHROME_REST_MS,
-        });
+        composerBackdropOpacity.value = withTiming(
+          COMPOSER_BACKDROP_REST_OPACITY,
+          {
+            duration: COMPOSER_CHROME_REST_MS,
+          },
+        );
       }
     }, COMPOSER_CHROME_SETTLE_MS);
-  }, [clearComposerSettleTimer, composerBackdropOpacity, composerChromeOpacity]);
+  }, [
+    clearComposerSettleTimer,
+    composerBackdropOpacity,
+    composerChromeOpacity,
+  ]);
 
   useEffect(() => () => clearComposerSettleTimer(), [clearComposerSettleTimer]);
 
@@ -78,5 +103,9 @@ export function useChatComposerChrome() {
     },
   } as const;
 
-  return { composerBackdropAnimatedStyle, composerChromeAnimatedStyle, listScrollHandlers };
+  return {
+    composerBackdropAnimatedStyle,
+    composerChromeAnimatedStyle,
+    listScrollHandlers,
+  };
 }

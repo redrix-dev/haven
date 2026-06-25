@@ -11,7 +11,7 @@ import type {
   UserFlairBadge,
   UserFlairGrant,
   UserProfileCard,
-} from './types';
+} from "./types";
 
 export type PlatformStaffInfo = {
   isActive: boolean;
@@ -71,11 +71,16 @@ export interface ControlPlaneBackend {
     expiresInHours: number | null;
   }): Promise<ServerInvite>;
   redeemCommunityInvite(code: string): Promise<RedeemedInvite>;
-  listBanEligibleServersForUser(targetUserId: string): Promise<BanEligibleServer[]>;
+  listBanEligibleServersForUser(
+    targetUserId: string,
+  ): Promise<BanEligibleServer[]>;
   listActiveCommunityInvites(communityId: string): Promise<ServerInvite[]>;
   revokeCommunityInvite(communityId: string, inviteId: string): Promise<void>;
   subscribeToPrivateUserChannel(
     userId: string,
-    onEvent: (event: { type: string; payload: Record<string, unknown> }) => void,
+    onEvent: (event: {
+      type: string;
+      payload: Record<string, unknown>;
+    }) => void,
   ): () => void;
 }

@@ -8,7 +8,10 @@ import {
   View,
 } from "react-native";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
-import type { MessageReportKind, MessageReportTarget } from "@shared/lib/backend/types";
+import type {
+  MessageReportKind,
+  MessageReportTarget,
+} from "@shared/lib/backend/types";
 import { resolveColorProp } from "@shared/themes";
 
 type CommunityReportMessageModalProps = {
@@ -72,17 +75,27 @@ export function CommunityReportMessageModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onDismiss}
+    >
       {/* uniwind-theme-allow mobile-theme/no-raw-palette-class - modal scrim overlay, invariant across themes */}
-      <Pressable className="flex-1 justify-center bg-black/60 px-4" onPress={onDismiss}>
+      <Pressable
+        className="flex-1 justify-center bg-black/60 px-4"
+        onPress={onDismiss}
+      >
         <Pressable
           className="max-h-[88%] rounded-2xl bg-card border border-border-panel p-4"
           onPress={(e) => e.stopPropagation()}
         >
-          <Text className="text-lg font-semibold text-foreground">Report message</Text>
+          <Text className="text-lg font-semibold text-foreground">
+            Report message
+          </Text>
           <Text className="mt-1 text-sm text-muted-foreground">
-            Route this report to {communityName} staff, Haven, or both. A snapshot of the message
-            context is included for reviewers.
+            Route this report to {communityName} staff, Haven, or both. A
+            snapshot of the message context is included for reviewers.
           </Text>
 
           <ScrollView className="mt-4" keyboardShouldPersistTaps="handled">
@@ -93,7 +106,9 @@ export function CommunityReportMessageModal({
               <Pressable
                 key={opt.value}
                 className={`mb-2 rounded-xl border px-3 py-3 ${
-                  target === opt.value ? "border-primary bg-surface-panel" : "border-border-control"
+                  target === opt.value
+                    ? "border-primary bg-surface-panel"
+                    : "border-border-control"
                 }`}
                 onPress={() => setTarget(opt.value)}
               >
@@ -108,7 +123,9 @@ export function CommunityReportMessageModal({
               <Pressable
                 key={opt.value}
                 className={`mb-2 rounded-xl border px-3 py-3 ${
-                  kind === opt.value ? "border-primary bg-surface-panel" : "border-border-control"
+                  kind === opt.value
+                    ? "border-primary bg-surface-panel"
+                    : "border-border-control"
                 }`}
                 onPress={() => setKind(opt.value)}
               >
@@ -128,11 +145,17 @@ export function CommunityReportMessageModal({
               maxLength={1000}
               className="min-h-22 rounded-xl border border-border-control bg-surface-panel px-3 py-2 text-sm text-foreground"
             />
-            {error ? <Text className="mt-2 text-sm text-destructive">{error}</Text> : null}
+            {error ? (
+              <Text className="mt-2 text-sm text-destructive">{error}</Text>
+            ) : null}
           </ScrollView>
 
           <View className="mt-4 flex-row justify-end gap-3">
-            <Pressable onPress={onDismiss} disabled={submitting} className="py-2">
+            <Pressable
+              onPress={onDismiss}
+              disabled={submitting}
+              className="py-2"
+            >
               <Text className="text-base text-muted-foreground">Cancel</Text>
             </Pressable>
             <Pressable

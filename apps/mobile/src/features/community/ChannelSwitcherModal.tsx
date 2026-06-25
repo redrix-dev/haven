@@ -36,7 +36,10 @@ export function ChannelSwitcherModal({
         <Pressable className="flex-1" onPress={onRequestClose} />
         <View className="max-h-[70%] rounded-t-2xl border-t border-border-panel bg-surface-modal px-4 pb-6 pt-3">
           <View className="mb-3 flex-row items-center justify-between">
-            <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
+            <Text
+              className="text-base font-semibold text-foreground"
+              numberOfLines={1}
+            >
               {communityName}
             </Text>
             <Pressable
@@ -44,7 +47,11 @@ export function ChannelSwitcherModal({
               className="h-9 w-9 items-center justify-center rounded-lg bg-surface-panel active:bg-surface-hover"
               onPress={onRequestClose}
             >
-              <ThemedIonicons name="close" size={18} colorClassName="accent-foreground" />
+              <ThemedIonicons
+                name="close"
+                size={18}
+                colorClassName="accent-foreground"
+              />
             </Pressable>
           </View>
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -77,15 +84,23 @@ export function ChannelSwitcherModal({
                         <ThemedIonicons
                           name="volume-medium-outline"
                           size={16}
-                          colorClassName={active ? "accent-foreground" : "accent-text-dim"}
+                          colorClassName={
+                            active ? "accent-foreground" : "accent-text-dim"
+                          }
                         />
                       ) : (
-                        <Text className={active ? "text-foreground" : "text-muted-foreground"}>
+                        <Text
+                          className={
+                            active ? "text-foreground" : "text-muted-foreground"
+                          }
+                        >
                           #
                         </Text>
                       )}
                       <Text
-                        className={active ? "text-foreground" : "text-muted-foreground"}
+                        className={
+                          active ? "text-foreground" : "text-muted-foreground"
+                        }
                         numberOfLines={1}
                       >
                         {channel.name}

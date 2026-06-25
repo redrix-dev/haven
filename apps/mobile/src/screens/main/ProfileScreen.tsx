@@ -3,9 +3,13 @@ import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHavenCore } from "@shared/core";
-import { resolveLiveAvatarUrl, resolveLiveUsername } from "@shared/lib/liveProfiles";
-import { useAuthStore } from "@shared/stores/authStore";
+import { useHavenCore } from "@mobile-data";
+import { useProfilesRecord, useViewerProfile } from "@mobile-data/hooks";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import UserAccountCard from "@/features/user-profile/UserAccountCard";
 import { ProfileDetailsSettingsCard } from "@/features/user-profile/ProfileDetailsSettingsCard";
@@ -29,17 +33,23 @@ export function ProfileScreen({ navigation }: Props) {
     void core.profiles.ensureViewerProfile(userId).catch(() => {});
   }, [core.profiles, userId]);
 
-  const viewerProfile = core.profiles.useViewerProfile(userId);
-  const liveProfiles = core.profiles.useProfilesRecord();
+  const viewerProfile = useViewerProfile(core.profiles, userId);
+  const liveProfiles = useProfilesRecord(core.profiles);
 
   const identity = useMemo(() => {
     const email = user?.email ?? null;
     const emailLocalPart = email?.split("@")[0]?.trim() ?? "";
-    const fallbackUsername = (viewerProfile?.username ?? emailLocalPart) || "User";
+    const fallbackUsername =
+      (viewerProfile?.username ?? emailLocalPart) || "User";
     const username =
-      resolveLiveUsername(liveProfiles, userId, fallbackUsername) ?? fallbackUsername;
+      resolveLiveUsername(liveProfiles, userId, fallbackUsername) ??
+      fallbackUsername;
     const avatarUrl =
-      resolveLiveAvatarUrl(liveProfiles, userId, viewerProfile?.avatarUrl ?? null) ??
+      resolveLiveAvatarUrl(
+        liveProfiles,
+        userId,
+        viewerProfile?.avatarUrl ?? null,
+      ) ??
       viewerProfile?.avatarUrl ??
       null;
     return { userId, email, username, avatarUrl };
@@ -47,7 +57,9 @@ export function ProfileScreen({ navigation }: Props) {
 
   const [draftUsername, setDraftUsername] = useState(identity.username);
   const [isUsernameDirty, setIsUsernameDirty] = useState(false);
-  const [pendingAvatarPreviewUri, setPendingAvatarPreviewUri] = useState<string | null>(null);
+  const [pendingAvatarPreviewUri, setPendingAvatarPreviewUri] = useState<
+    string | null
+  >(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSavingAccount, setIsSavingAccount] = useState(false);
 
@@ -67,13 +79,17 @@ export function ProfileScreen({ navigation }: Props) {
       }
       const username = identity.username.trim();
       if (!username) {
-        Alert.alert("Username missing", "Set a username before updating your photo.");
+        Alert.alert(
+          "Username missing",
+          "Set a username before updating your photo.",
+        );
         return;
       }
       setPendingAvatarPreviewUri(asset.uri);
       try {
         const { body, contentType } = await loadPickedAvatarForUpload(asset);
-        if (body.byteLength <= 0) throw new Error("Prepared image is empty; try another photo.");
+        if (body.byteLength <= 0)
+          throw new Error("Prepared image is empty; try another photo.");
         await core.updateUserProfile({
           userId: identity.userId,
           username,
@@ -94,7 +110,9 @@ export function ProfileScreen({ navigation }: Props) {
     [core, identity.avatarUrl, identity.userId, identity.username],
   );
 
-  const { pickAvatar, isPicking } = useProfileAvatarPicker({ onPicked: handleAvatarPicked });
+  const { pickAvatar, isPicking } = useProfileAvatarPicker({
+    onPicked: handleAvatarPicked,
+  });
 
   const handleSaveAccount = useCallback(async () => {
     const nextUsername = draftUsername.trim();
@@ -121,15 +139,27 @@ export function ProfileScreen({ navigation }: Props) {
       setIsUsernameDirty(false);
       setIsEditingName(false);
     } catch (error) {
-      Alert.alert("Save failed", getErrorMessage(error, "Could not save account settings."));
+      Alert.alert(
+        "Save failed",
+        getErrorMessage(error, "Could not save account settings."),
+      );
     } finally {
       setIsSavingAccount(false);
     }
-  }, [core, draftUsername, identity.avatarUrl, identity.userId, identity.username]);
+  }, [
+    core,
+    draftUsername,
+    identity.avatarUrl,
+    identity.userId,
+    identity.username,
+  ]);
 
   return (
     <View className="flex-1 bg-background">
-      <View style={{ paddingTop: insets.top }} className="border-b border-border-panel bg-surface-panel">
+      <View
+        style={{ paddingTop: insets.top }}
+        className="border-b border-border-panel bg-surface-panel"
+      >
         <View className="flex-row items-center gap-1 px-2 py-2">
           <Pressable
             onPress={navigation.goBack}
@@ -138,7 +168,11 @@ export function ProfileScreen({ navigation }: Props) {
             accessibilityLabel="Go back"
             className="rounded-xl p-2 active:bg-surface-hover"
           >
-            <ThemedIonicons name="chevron-back" size={24} colorClassName="accent-foreground" />
+            <ThemedIonicons
+              name="chevron-back"
+              size={24}
+              colorClassName="accent-foreground"
+            />
           </Pressable>
           <Text className="text-lg font-semibold text-foreground">Profile</Text>
         </View>
@@ -146,7 +180,11 @@ export function ProfileScreen({ navigation }: Props) {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 16 }}
+        contentContainerStyle={{
+          padding: 16,
+          gap: 12,
+          paddingBottom: insets.bottom + 16,
+        }}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
       >
@@ -166,7 +204,9 @@ export function ProfileScreen({ navigation }: Props) {
             setIsUsernameDirty(false);
             setIsEditingName(false);
           }}
-          onPressAvatar={() => { void pickAvatar(); }}
+          onPressAvatar={() => {
+            void pickAvatar();
+          }}
           onPressSave={handleSaveAccount}
           onChangeUsername={(next) => {
             setIsUsernameDirty(true);
@@ -188,10 +228,20 @@ export function ProfileScreen({ navigation }: Props) {
           className="flex-row items-center justify-between rounded-2xl bg-surface-card-deep px-4 py-4 active:bg-surface-hover"
         >
           <View className="flex-row items-center gap-3">
-            <ThemedIonicons name="settings-outline" size={20} colorClassName="accent-muted-foreground" />
-            <Text className="text-base font-medium text-foreground">Settings</Text>
+            <ThemedIonicons
+              name="settings-outline"
+              size={20}
+              colorClassName="accent-muted-foreground"
+            />
+            <Text className="text-base font-medium text-foreground">
+              Settings
+            </Text>
           </View>
-          <ThemedIonicons name="chevron-forward" size={16} colorClassName="accent-muted-foreground" />
+          <ThemedIonicons
+            name="chevron-forward"
+            size={16}
+            colorClassName="accent-muted-foreground"
+          />
         </Pressable>
       </ScrollView>
     </View>

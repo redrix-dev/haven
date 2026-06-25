@@ -37,14 +37,20 @@ function VoiceParticipantRow({
         ].join(" ")}
       >
         {participant.avatarUrl ? (
-          <Image source={{ uri: participant.avatarUrl }} className="h-full w-full rounded-full" />
+          <Image
+            source={{ uri: participant.avatarUrl }}
+            className="h-full w-full rounded-full"
+          />
         ) : (
           <Text className="text-xs font-bold text-foreground">
             {participantInitial(participant.displayName)}
           </Text>
         )}
       </View>
-      <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+      <Text
+        className="min-w-0 flex-1 text-xs text-muted-foreground"
+        numberOfLines={1}
+      >
         {participant.displayName}
       </Text>
       {participant.isSpeaking ? (
@@ -77,12 +83,17 @@ export function CommunityChannelDrawer({
           className="border-b border-border-panel px-4 pb-4"
           style={{ paddingTop: insets.top + 16 }}
         >
-          <Text className="text-base font-semibold text-foreground">Communities</Text>
+          <Text className="text-base font-semibold text-foreground">
+            Communities
+          </Text>
         </View>
         <View className="flex-1 justify-center px-5">
-          <Text className="text-xl font-bold text-foreground">Start with a community</Text>
+          <Text className="text-xl font-bold text-foreground">
+            Start with a community
+          </Text>
           <Text className="mt-2 text-sm leading-5 text-muted-foreground">
-            Create your own server or join one with an invite to see channels here.
+            Create your own server or join one with an invite to see channels
+            here.
           </Text>
           <View className="mt-5 gap-3">
             <Pressable
@@ -117,9 +128,14 @@ export function CommunityChannelDrawer({
       >
         <View className="flex-row items-center gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-2xl bg-surface-panel">
-            <Text className="text-base font-bold text-foreground">{initial}</Text>
+            <Text className="text-base font-bold text-foreground">
+              {initial}
+            </Text>
           </View>
-          <Text className="flex-1 text-base font-semibold text-foreground" numberOfLines={2}>
+          <Text
+            className="flex-1 text-base font-semibold text-foreground"
+            numberOfLines={2}
+          >
             {communityName}
           </Text>
         </View>
@@ -127,18 +143,26 @@ export function CommunityChannelDrawer({
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 24 }}
+        contentContainerStyle={{
+          paddingHorizontal: 12,
+          paddingTop: 8,
+          paddingBottom: 24,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {channels.length === 0 ? (
-          <Text className="py-4 text-sm text-muted-foreground">No channels yet.</Text>
+          <Text className="py-4 text-sm text-muted-foreground">
+            No channels yet.
+          </Text>
         ) : (
           channels.map((channel) => {
             const isVoice = channel.kind === "voice";
             const active = isVoice
               ? activeVoiceChannelId === channel.id
               : selectedChannelId === channel.id;
-            const participants = isVoice ? (voiceChannelParticipants[channel.id] ?? []) : [];
+            const participants = isVoice
+              ? (voiceChannelParticipants[channel.id] ?? [])
+              : [];
             const participantCount = participants.length;
             return (
               <View key={channel.id} className="mb-1">
@@ -162,7 +186,9 @@ export function CommunityChannelDrawer({
                   <ThemedIonicons
                     name={isVoice ? "volume-medium-outline" : "chatbox-outline"}
                     size={16}
-                    colorClassName={active ? "accent-foreground" : "accent-text-dim"}
+                    colorClassName={
+                      active ? "accent-foreground" : "accent-text-dim"
+                    }
                   />
                   <Text
                     className={`flex-1 text-sm font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}

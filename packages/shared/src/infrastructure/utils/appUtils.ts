@@ -1,9 +1,9 @@
-import type { NotificationItem } from '@shared/lib/backend/types';
-import type { VoiceSidebarParticipant } from '@shared/types/types';
+import type { NotificationItem } from "@shared/lib/backend/types";
+import type { VoiceSidebarParticipant } from "@shared/types/types";
 
 export const areVoiceParticipantListsEqual = (
   left: VoiceSidebarParticipant[],
-  right: VoiceSidebarParticipant[]
+  right: VoiceSidebarParticipant[],
 ) => {
   if (left === right) return true;
   if (left.length !== right.length) return false;
@@ -27,13 +27,13 @@ export const isEditableKeyboardTarget = (target: EventTarget | null) => {
   if (target.isContentEditable) return true;
 
   const tagName = target.tagName.toLowerCase();
-  return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+  return tagName === "input" || tagName === "textarea" || tagName === "select";
 };
 
 export const getNotificationPayloadString = (
   notification: NotificationItem,
-  key: string
+  key: string,
 ): string | null => {
   const value = notification.payload[key];
-  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
 };
