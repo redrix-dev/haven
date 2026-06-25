@@ -5,8 +5,8 @@ build-out to that first release lives in
 [SOLID_SHIP_READINESS.md](./SOLID_SHIP_READINESS.md); this doc is the steady state.
 
 Governing idea: **one repo, three release trains.** Desktop, web, and mobile ship
-on their own clocks against the same `main` and the same shared core. Nothing here
-forces a platform onto its own long-lived branch.
+on their own clocks against the same shared core. Integration happens on `staging`,
+promotion happens on `main`, and each train cuts its own artifact from there.
 
 ---
 
@@ -18,11 +18,11 @@ forces a platform onto its own long-lived branch.
 | **Web** (Vercel) | derived, continuous | _none_ | in-app build stamp `2.0.0+<shortSha>` + build time |
 | **Mobile** (iOS) | its own semver line | `mobile-v<semver>` | `apps/mobile/package.json` + native build/version codes |
 
-- The old unified `vX.Y.Z` tags (…`v1.9.0`) belong to the retired Electron line;
-  they are history. New tags are **platform-prefixed** so the three trains never
-  collide.
-- Desktop is the canonical `2.x` line (Electron was `1.x`; the rewrite is the next
-  generation). A version-sync check fails the release if the three desktop version
+- New tags are **platform-prefixed** (`desktop-v*`, `mobile-v*`) so the three
+  trains never collide. The old unified `vX.Y.Z` / `release/v1.*` tags belong to
+  the retired Electron line — they are history.
+- Desktop is the canonical `2.x` line (Electron was `1.x`). A version-sync check
+  (`npm run check:desktop-version`) fails the release if the three desktop version
   fields disagree.
 - Web has no version of its own — it _is_ whatever commit is live on `main`,
   labelled with the desktop baseline + SHA for traceability.
@@ -31,33 +31,70 @@ forces a platform onto its own long-lived branch.
 
 ## Branch workflow
 
-Trunk-based, short-lived branches. `main` is always releasable.
+Three persistent lines — `feature → staging → main` — plus short-lived
+`release/*` branches cut from `main`. Flow is always forward; nothing skips a
+stage.
 
 ```
-main ─────●────────●───────────●───────────●──────▶   (always green, auto-deploys web)
-           \        \           ▲           ▲
-   feat/x ●─●        \          │ squash    │
-                      \  fix/y ●─● merge     │
-                                             │
-        desktop-v2.0.0 (tag on main) ────────┘ → desktop release workflow
+feature/* ─▶ staging ──────▶ main ──────▶ release/v2.0.0   ← tag desktop-v2.0.0
+               ▲   (manual    │ (protected,    │             (+ mobile-v* if coordinated)
+               │   test       │  web prod)     │
+               │   signoff)   │                │
+               └──────────────┴────────────────┘   main ─▶ staging (merge-back)
 ```
 
-- **`main`** — trunk. Protected. Every merge must pass the CI floor
-  (`test:cleave` / `ci:verify`, per [ARCHITECTURE.md](./ARCHITECTURE.md) gates).
-  Always in a shippable state.
 - **Feature branches** — `feat/<short>`, `fix/<short>`, `chore/<short>`, branched
-  off `main`, short-lived, merged back by PR (squash). Delete on merge.
-- **Release** — not a branch. A **tag on `main`** drives a desktop or mobile
-  release. Web needs no tag at all.
-- **Hotfix branches** — only when `main` has already moved past a released tag and
-  you must patch the released version without shipping unrelated `main` work. See
-  per-platform hotfix sections.
-- **No `develop`, no per-platform long-lived branches, no `web-*` branch.** They
-  were considered and rejected: they fragment the trunk and force ceremony web
-  doesn't need.
+  off `staging`, short-lived, merged back into **`staging`** by PR. Delete on merge.
+- **`staging`** — the integration line. Everything lands here first. This is where
+  the **manual test suites + release signoff** run (see below) against an
+  integrated tree before anything reaches `main`. A Vercel **staging** deployment
+  tracks this branch so there's a stable staging URL.
+- **`main`** — the promotion line. Protected; only updated by PR **from `staging`**
+  once signoff is green. **Vercel production deploys from `main`** on every push.
+  Always in a shippable state.
+- **`release/v<semver>`** — cut from `main` for a coordinated cut. The platform
+  tags (`desktop-v*`, `mobile-v*`) are applied here, which is what actually drives
+  the build/publish workflows. Isolates a release so unrelated `main` work can keep
+  flowing. Web ignores release branches entirely (it's already live from `main`).
+- **Merge-back** — after a release branch is cut (and after any fix made on it),
+  merge `main` back into `staging` so `staging` never drifts behind what shipped.
 
 Mobile keeps its deliberate exception (PRINCIPLES §7): its data layer changes only
 on its own gated schedule, never as a side effect of desktop/web work.
+
+---
+
+## Test signoff & release notes
+
+The release signoff is a **manual gate run on `staging`** (it's how integrated
+work is proven before promotion to `main`). It also produces the artifact that
+becomes the public release notes.
+
+```
+npm run test:signoff:release -- --release-label v2.0.0-rc1 --environment staging
+```
+
+This runs the full release command set (lint · typecheck · unit · db · backend)
+and writes, under `test-reports/<runId>.local/` (**gitignored — never committed**):
+
+- `report.local.md` / the JSON + full markdown summary — **internal**: includes
+  raw command logs, local filesystem paths, and signer names.
+- per-step `*.stdout.log` / `*.stderr.log` / `*.combined.log` — **internal**: raw,
+  unsanitized output.
+- `public/signoff.local.md` — **the only sanitized, publishable artifact**. It
+  carries the status table, timing, tooling versions and signatures, and
+  explicitly omits raw logs and local paths ("This public signoff intentionally
+  omits raw command logs and local artifact paths").
+
+**Release-notes rule:** only the **public** summary is publishable. Copy it (edited
+as you like) into `docs/releases/<tag>.md` — e.g. `docs/releases/desktop-v2.0.0.md`
+— and commit it on the release branch. The desktop release workflow reads that
+file verbatim into the GitHub Release body. Raw logs, full markdown, and the
+`test-reports/` tree stay on your machine and never reach a public release.
+
+If `docs/releases/<tag>.md` is absent, the workflow falls back to a generic
+"installer below / auto-updates" body — so a missing notes file degrades safely
+rather than leaking anything.
 
 ---
 
@@ -65,25 +102,30 @@ on its own gated schedule, never as a side effect of desktop/web work.
 
 For a milestone you want live everywhere on the same code.
 
-1. Land everything on `main`; confirm CI green and `test:all` locally.
-2. Pick the release commit. **Web is already there** — merging to `main`
-   auto-deployed it; confirm the live build stamp matches the commit.
-3. Cut **desktop**: `git tag desktop-v<semver> <commit>` → push tag → desktop
-   release workflow builds the platform matrix, signs, and publishes the GitHub
-   Release + updater `latest.json`. Auto-update rolls out to existing installs.
-4. Cut **mobile** from the same commit: `mobile:release:check`, build, submit to
+1. Land everything on `staging`; run `npm run test:signoff:release` there and
+   confirm green. Curate the **public** summary into `docs/releases/<tag>.md`.
+2. **Promote** `staging → main` by PR. Merging publishes **web to production**
+   automatically — confirm the live build stamp matches the merge commit.
+3. Cut a release branch from `main`: `git switch -c release/v<semver> main`
+   (carries `docs/releases/<tag>.md`).
+4. Cut **desktop**: `git tag desktop-v<semver>` on the release branch → push the
+   tag → the desktop release workflow builds the platform matrix, signs, and
+   publishes a **draft** GitHub Release (notes from `docs/releases/`, plus
+   `latest.json`). Review, then publish — auto-update activates on publish.
+5. Cut **mobile** from the same commit: `mobile:release:check`, build, submit to
    TestFlight/App Store, publish OTA per the mobile pipeline. Tag `mobile-v<semver>`.
-5. Update CHANGELOG / release notes; archive any docs the release invalidated
-   (PRINCIPLES §11).
+6. Merge `main` back into `staging`. Update CHANGELOG; archive any docs the release
+   invalidated (PRINCIPLES §11).
 
 Exit gate: all three trains report the same release commit; desktop auto-update
 manifest is live; web build stamp matches; mobile build is in review/distribution.
 
 ### All-platforms hotfix
 
-Critical fix needed everywhere, fast: land the fix on `main` (or cherry-pick if
-`main` has diverged — see per-platform), then run each platform's hotfix path
-below from the same fix commit. Web is fixed the instant the fix hits `main`.
+Critical fix needed everywhere, fast: land the fix on `staging`, fast-track signoff,
+promote to `main`, then run each platform's hotfix path below. Web is fixed the
+instant the fix hits `main`. If `main` has already moved past the released tag, make
+the fix on the `release/*` branch instead and merge it back to `main` → `staging`.
 
 ---
 
@@ -91,67 +133,46 @@ below from the same fix commit. Web is fixed the instant the fix hits `main`.
 
 ### Standard release
 
-- Trigger: `desktop-v<semver>` tag on `main`.
-- The release workflow (`tauri-action`, platform matrix) builds, signs (Apple
-  notarization + Windows Authenticode), and publishes artifacts + the updater
-  `latest.json` manifest to a GitHub Release.
-- Existing installs pick up the update via `tauri-plugin-updater` against that
-  manifest endpoint.
+- Trigger: a `desktop-v<semver>` tag (applied on a `release/*` branch cut from
+  `main`).
+- The release workflow (`tauri-action`, platform matrix) builds, signs the updater
+  artifacts (minisign), and publishes a **draft** GitHub Release with the
+  `latest.json` manifest + notes from `docs/releases/<tag>.md`. Review, then publish.
+- Existing installs pick up the update via `tauri-plugin-updater` against the
+  published release's manifest endpoint.
 - Bump rule: patch for fixes, minor for features, major for breaking/again-
-  generational changes.
+  generational changes. Keep the three version fields in sync (`check:desktop-version`).
 
 ### Desktop hotfix
 
-1. If `main` is still at (or cleanly ahead by safe commits of) the released tag:
-   patch on `main`, tag `desktop-v<x.y.(z+1)>`, done.
-2. If `main` has diverged with unshippable work: branch
-   `hotfix/desktop-<x.y.(z+1)>` **from the released tag**, cherry-pick only the
-   fix, tag the hotfix branch, let the workflow publish, then merge the hotfix
-   branch back into `main` (no-ff) so the fix isn't lost.
+1. Branch `release/v<x.y.(z+1)>` **from the released tag**, cherry-pick only the
+   fix, tag `desktop-v<x.y.(z+1)>`, let the workflow publish.
+2. Merge the hotfix branch back into `main`, then `main → staging`, so the fix
+   isn't lost.
 3. Auto-update distributes it like any release — no user action.
 
 ---
 
 ## Web (Vercel)
 
-### First-time setup (one-time, dashboard)
-
-The build target ships in-repo (`apps/web/`, `vercel.json`, `build:web`). To turn
-it into a live deployment, connect Vercel once:
-
-1. **Create the project** — Vercel → Add New → Project → import `redrix-dev/haven`.
-   Leave Framework Preset as **Other**; `vercel.json` already pins the build:
-   `buildCommand: npm run build:web`, `outputDirectory: dist/web`, SPA rewrite.
-   (Root Directory stays the repo root — the build reads `apps/web/vite.config.ts`.)
-2. **Set env vars** (Project → Settings → Environment Variables, Production +
-   Preview): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and
-   `VITE_WEB_PUSH_VAPID_PUBLIC_KEY`. These must keep the `VITE_` prefix to reach
-   the client bundle. No secrets beyond the anon/public keys belong here.
-3. **Git integration** — enabled by default on import: production deploys from
-   `main`, every PR gets a preview URL. Confirm the Production Branch is `main`.
-4. **Verify** — trigger a deploy, open the URL, confirm it boots to the login
-   screen and the in-app build stamp (`document.documentElement.dataset.havenBuild`
-   / `window.__havenBuild`) shows `2.0.0+<shortSha>` matching the deployed commit.
-
-After this, web is continuous (below) and needs no further ceremony.
-
 ### Standard "release" — continuous
 
-There is no web release event. **Vercel's Git integration deploys `main` to
-production on every push**, and every PR gets a preview URL. Shipping web = merging
-to `main`. The in-app build stamp (`2.0.0+<shortSha>`) is how you know what's live.
+There is no web release event. **Vercel deploys `main` to production on every
+push**, and the `staging` branch deploys to a stable staging URL. Shipping web =
+promoting `staging → main`. The in-app build stamp (`2.0.0+<shortSha>`) tells you
+what's live. Web ignores `release/*` branches and tags entirely.
 
-- Keep the CI floor as the gate: Vercel only promotes commits that are on `main`,
-  and `main` only accepts green PRs.
-- Optional: protect with a manual "promote to production" step in Vercel if you
-  want a human in the loop; default is auto-promote.
+- Keep CI green as the gate; production only ever reflects `main`.
+- Env vars must exist in **both** Vercel environments (Production for `main`,
+  Preview/Staging for `staging`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
+  `VITE_WEB_PUSH_VAPID_PUBLIC_KEY`.
 
 ### Web hotfix
 
-- **Fix forward** (default): push the fix to `main`; it auto-deploys in minutes.
+- **Fix forward** (default): land on `staging`, promote to `main`; auto-deploys in
+  minutes.
 - **Instant rollback**: in the Vercel dashboard, promote the previous good
-  deployment — zero rebuild, immediate. Then fix forward on `main` at leisure.
-- No tag, no branch, no artifact signing — web's whole advantage.
+  production deployment — zero rebuild. Then fix forward at leisure.
 
 ---
 
@@ -172,16 +193,19 @@ a **custom Expo Updates-compatible OTA pipeline** (asset hashing → bundle/mani
 
 - **JS-only fix** (no native change): push an OTA update via the custom pipeline
   (`tooling/scripts/mobile/`) — clients pick it up at next launch. No store review.
-- **Native fix** (anything touching native modules / config): new build through
-  TestFlight/App Store review; OTA cannot ship native code.
+- **Native fix**: new build through TestFlight/App Store review; OTA cannot ship
+  native code.
 - Gate either path on `mobile:release:check` green.
 
 ---
 
 ## Release notes / changelog
 
-- Each desktop and mobile tag gets human-readable release notes on its GitHub
-  Release (desktop) / store notes (mobile).
+- Each desktop/mobile release gets human-readable notes — sourced from the
+  **public** signoff summary in `docs/releases/<tag>.md` (desktop workflow reads it
+  into the GitHub Release; mobile store notes drawn from the same file).
 - A top-level `CHANGELOG.md` (Keep a Changelog format, sectioned per train) is the
   durable record; web entries reference the deploy commit rather than a version.
 - Notes are written **as part of the release change**, not reconstructed after.
+- Never publish raw `test-reports/` logs or the internal/full signoff — public
+  notes come only from the sanitized public summary.
