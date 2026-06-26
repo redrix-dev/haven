@@ -22,4 +22,14 @@ async function boot(): Promise<void> {
   );
 }
 
-void boot();
+// Never let a boot rejection die silently — the splash removal lives at the end
+// of boot(), so an unhandled throw leaves the user staring at "Warming up the
+// perch…" forever. Surface the error in place instead.
+void boot().catch((error: unknown) => {
+  console.error("[boot] fatal", error);
+  const splash = document.querySelector(".boot-splash");
+  if (splash) {
+    const message = error instanceof Error ? error.message : String(error);
+    splash.innerHTML = `<strong>Haven failed to start</strong><span>${message}</span>`;
+  }
+});
