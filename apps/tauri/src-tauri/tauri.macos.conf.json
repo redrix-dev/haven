@@ -13,5 +13,11 @@
         "backgroundColor": "#0d1626"
       }
     ]
+  },
+  "bundle": {
+    "macOS": {
+      "entitlements": "./Entitlements.plist",
+      "minimumSystemVersion": "12.0"
+    }
   }
 }

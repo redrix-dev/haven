@@ -113,6 +113,19 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      # Write the App Store Connect API key (.p8) to the standard notarytool
+      # search path so tauri-action's notarization step finds it automatically.
+      # notarytool searches: ~/.appstoreconnect/private_keys/AuthKey_KEYID.p8
+      - name: Write App Store Connect API key
+        if: runner.os == 'macOS'
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$APPLE_API_KEY_CONTENT" | base64 --decode \
+            > ~/.appstoreconnect/private_keys/AuthKey_${APPLE_API_KEY}.p8
+
       # Upload to the single release created above (by id, never by tag) so all
       # platforms land in one draft with one combined latest.json.
       - name: Build, sign, and upload
@@ -125,6 +138,14 @@ jobs:
           # Without these the packaged app throws at boot and hangs on the splash.
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # macOS Developer ID signing + notarization via App Store Connect API key.
+          # Certificate import is handled by tauri-action when these three are set.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # notarytool picks up the .p8 written above from its standard search path.
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         with:
           projectPath: apps/tauri
           releaseId: ${{ needs.create-release.outputs.release_id }}
