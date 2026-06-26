@@ -326,6 +326,15 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       await room.connect(serverUrl, token, { autoSubscribe: true });
       if (generation !== joinGeneration) return;
 
+      // On macOS, WKWebView only exposes navigator.mediaDevices when the app is
+      // signed with the audio-input entitlement. Guard here so the catch block
+      // below surfaces a legible message instead of "undefined is not an object".
+      if (!navigator.mediaDevices) {
+        throw new Error(
+          "Microphone access is unavailable. On macOS, please check System Settings → Privacy & Security → Microphone and ensure Haven is allowed.",
+        );
+      }
+
       const profile = viewerProfile();
       void room.localParticipant
         .setMetadata(JSON.stringify({ avatarUrl: profile?.avatarUrl ?? null }))
