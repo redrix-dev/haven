@@ -1,6 +1,7 @@
 import { For, Show, createSignal } from "solid-js";
 import type { HavenTheme } from "@shared/themes/types";
 import { useTheme } from "@solid-client/contexts/ThemeProvider";
+import { useSession } from "@solid-client/contexts/SessionProvider";
 
 /**
  * The appearance settings surface: pick a theme, see it applied instantly,
@@ -8,6 +9,7 @@ import { useTheme } from "@solid-client/contexts/ThemeProvider";
  */
 export function AppearanceSettings() {
   const { themeId, selectableThemes, setThemeId } = useTheme();
+  const { signOut } = useSession();
   const [error, setError] = createSignal<string | null>(null);
 
   const select = async (theme: HavenTheme) => {
@@ -54,6 +56,17 @@ export function AppearanceSettings() {
           )}
         </For>
       </div>
+
+      <h2 class="mb-1 mt-10 text-lg font-bold text-foreground">Account</h2>
+      <p class="mb-4 text-sm text-muted-foreground">
+        Sign out of Haven on this device.
+      </p>
+      <button
+        onClick={() => void signOut()}
+        class="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-destructive transition-colors hover:border-destructive"
+      >
+        Sign out
+      </button>
     </div>
   );
 }
