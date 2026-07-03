@@ -110,9 +110,6 @@ begin
   where ndt.recipient_user_id in (select user_id from test_support.fixture_user_ids())
      or ndt.notification_recipient_id is null;
 
-  delete from public.web_push_subscriptions wps
-  where wps.user_id in (select user_id from test_support.fixture_user_ids());
-
   delete from public.expo_push_subscriptions eps
   where eps.user_id in (select user_id from test_support.fixture_user_ids());
 end;

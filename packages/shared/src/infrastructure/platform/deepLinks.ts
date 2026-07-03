@@ -124,75 +124,10 @@ const parseWebAppDeepLinkUrl = (url: string): WebAppDeepLinkTarget | null => {
   }
 };
 
-const parseWebPushClickPayloadTarget = (
-  payload: unknown,
-): WebAppDeepLinkTarget | null => {
-  const root = asRecord(payload);
-  if (!root) return null;
-
-  const nestedPayload = asRecord(root.payload);
-  const data = asRecord(root.data);
-  const notification = asRecord(root.notification);
-  const notificationData = asRecord(notification?.data);
-  const records = [root, nestedPayload, data, notificationData];
-
-  for (const record of records) {
-    const candidateUrl =
-      getRecordString(record, "url") ?? getRecordString(record, "path");
-    if (candidateUrl) {
-      const fromUrl = parseWebAppDeepLinkUrl(candidateUrl);
-      if (fromUrl) return fromUrl;
-    }
-  }
-
-  const kind =
-    records
-      .map(
-        (record) =>
-          getRecordString(record, "kind") ??
-          getRecordString(record, "notificationKind"),
-      )
-      .find(Boolean)
-      ?.toLowerCase() ?? null;
-
-  const conversationId =
-    records
-      .map((record) => getRecordString(record, "conversationId"))
-      .find(Boolean) ?? null;
-  const friendRequestId =
-    records
-      .map((record) => getRecordString(record, "friendRequestId"))
-      .find(Boolean) ?? null;
-  const communityId =
-    records
-      .map((record) => getRecordString(record, "communityId"))
-      .find(Boolean) ?? null;
-  const channelId =
-    records
-      .map((record) => getRecordString(record, "channelId"))
-      .find(Boolean) ?? null;
-
-  switch (kind) {
-    case "dm_message":
-      return conversationId ? { kind: "dm_message", conversationId } : null;
-    case "friend_request_received":
-      return { kind: "friend_request_received", friendRequestId };
-    case "friend_request_accepted":
-      return { kind: "friend_request_accepted" };
-    case "channel_mention":
-      return communityId && channelId
-        ? { kind: "channel_mention", communityId, channelId }
-        : null;
-    default:
-      return null;
-  }
-};
-
 export {
   WEB_DEEP_LINK_DEDUPE_WINDOW_MS,
   safeStableStringify,
   parseWebAppDeepLinkUrl,
-  parseWebPushClickPayloadTarget,
   WebAppDeepLinkTarget,
   normalizeDeepLinkPathname,
   getMergedUrlParams,

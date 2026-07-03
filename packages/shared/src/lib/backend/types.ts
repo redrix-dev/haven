@@ -473,35 +473,6 @@ export type NotificationPreferenceUpdate = {
   mentionPushEnabled: boolean;
 };
 
-export type WebPushSubscriptionRecord = {
-  id: string;
-  userId: string;
-  endpoint: string;
-  installationId: string | null;
-  p256dhKey: string;
-  authKey: string;
-  expirationTime: string | null;
-  userAgent: string | null;
-  clientPlatform: string | null;
-  appDisplayMode: string | null;
-  metadata: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
-  lastSeenAt: string;
-};
-
-export type WebPushSubscriptionUpsertInput = {
-  endpoint: string;
-  installationId?: string | null;
-  p256dhKey: string;
-  authKey: string;
-  expirationTime?: string | null;
-  userAgent?: string | null;
-  clientPlatform?: string | null;
-  appDisplayMode?: string | null;
-  metadata?: Record<string, unknown>;
-};
-
 export type ExpoPushSubscriptionRecord = {
   id: string;
   userId: string;
@@ -522,6 +493,8 @@ export type ExpoPushSubscriptionUpsertInput = {
 };
 
 export type NotificationDeliveryTransport =
+  // "web_push" is retired as an active transport but retained here because
+  // historical notification_delivery_traces rows still carry it.
   | "web_push"
   | "expo_push"
   | "in_app"
@@ -570,54 +543,6 @@ export type NotificationDeliveryTraceRecord = {
   reasonCode: NotificationDeliveryReasonCode | string;
   details: Record<string, unknown>;
   createdAt: string;
-};
-
-export type WebPushDispatchWakeupDiagnostics = {
-  enabled: boolean;
-  shadowMode: boolean;
-  minIntervalSeconds: number;
-  lastAttemptedAt: string | null;
-  lastRequestedAt: string | null;
-  lastRequestId: number | null;
-  lastMode: string | null;
-  lastReason: string | null;
-  lastSkipReason: string | null;
-  lastError: string | null;
-  totalAttempts: number;
-  totalScheduled: number;
-  totalDebounced: number;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type WebPushDispatchQueueHealthDiagnostics = {
-  asOf: string;
-  totalPending: number;
-  totalRetryableFailed: number;
-  totalProcessing: number;
-  totalDone: number;
-  totalDeadLetter: number;
-  totalSkipped: number;
-  claimableNowCount: number;
-  pendingDueNowCount: number;
-  retryableDueNowCount: number;
-  processingLeaseExpiredCount: number;
-  oldestClaimableAgeSeconds: number | null;
-  oldestPendingAgeSeconds: number | null;
-  oldestRetryableFailedAgeSeconds: number | null;
-  oldestProcessingAgeSeconds: number | null;
-  oldestProcessingLeaseOverdueSeconds: number | null;
-  maxAttemptsActive: number | null;
-  highRetryAttemptCount: number;
-  deadLetterLast60mCount: number;
-  retryableFailedLast10mCount: number;
-  doneLast10mCount: number;
-};
-
-export type WebPushDispatchWakeupConfigUpdate = {
-  enabled?: boolean | null;
-  shadowMode?: boolean | null;
-  minIntervalSeconds?: number | null;
 };
 
 export type FriendRequestStatus =
