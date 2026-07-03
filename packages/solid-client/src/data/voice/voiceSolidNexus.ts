@@ -1,5 +1,5 @@
 import { createMemo, type Accessor } from "solid-js";
-import { createStore, type SetStoreFunction } from "solid-js/store";
+import { createStore, reconcile, type SetStoreFunction } from "solid-js/store";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
 import type {
   VoiceChannelReference,
@@ -116,21 +116,31 @@ export class VoiceSolidNexus {
   ): Accessor<VoiceSidebarParticipant[]> {
     return createMemo(() => {
       const id = channelId();
-      const byChannel = this.state.participantsByChannelId[id];
-      if (byChannel) return byChannel;
-      if (this.state.activeChannel?.id === id || this.state.currentChannelId === id) {
+      if (
+        this.state.activeChannel?.id === id ||
+        this.state.currentChannelId === id
+      ) {
         return this.state.participants;
       }
+      const byChannel = this.state.participantsByChannelId[id];
+      if (byChannel) return byChannel;
       return NO_PARTICIPANTS;
     });
   }
 
   startConnect(channel: VoiceChannelReference): void {
+    // Seed the LiveKit-source roster from the presence roster we already have so
+    // the active-channel row doesn't blink empty during "connecting" (LiveKit is
+    // empty until the room connects). applyParticipants reconciles it to the real
+    // roster on connect.
+    const seed =
+      this.state.participantsByChannelId[channel.id] ?? this.state.participants;
     this.setState({
       phase: "connecting",
       activeChannel: channel,
       pendingChannel: null,
       currentChannelId: channel.id,
+      participants: seed,
       error: null,
     });
   }
@@ -205,8 +215,15 @@ export class VoiceSolidNexus {
   }
 
   setParticipants(participants: VoiceSidebarParticipant[]): void {
-    if (voiceParticipantListsEqual(this.state.participants, participants)) return;
-    this.setState("participants", participants);
+    if (voiceParticipantListsEqual(this.state.participants, participants))
+      return;
+    // reconcile by userId so still-present participants keep their object
+    // reference across updates — otherwise <For> tears down and rebuilds the
+    // row on every speaking-state flip, closing any open dropdown.
+    this.setState(
+      "participants",
+      reconcile(participants, { key: "userId" }),
+    );
   }
 
   setChannelParticipants(
@@ -215,7 +232,11 @@ export class VoiceSolidNexus {
   ): void {
     const previous = this.state.participantsByChannelId[channelId] ?? [];
     if (voiceParticipantListsEqual(previous, participants)) return;
-    this.setState("participantsByChannelId", channelId, participants);
+    this.setState(
+      "participantsByChannelId",
+      channelId,
+      reconcile(participants, { key: "userId" }),
+    );
   }
 
   retainChannelParticipants(channelIds: string[]): void {
@@ -338,6 +359,18 @@ export class VoiceSolidNexus {
     });
     if (sendStatus !== "ok") {
       throw new Error("Failed to remove member from the voice channel.");
+    }
+
+    // Keep the presence map honest so the kicked user can't reappear as a
+    // phantom when the memo falls back to presence (e.g. when the kicker later
+    // leaves and the channel un-excludes).
+    const roster = this.state.participantsByChannelId[channelId];
+    if (roster) {
+      this.setState(
+        "participantsByChannelId",
+        channelId,
+        roster.filter((p) => p.userId !== targetUserId),
+      );
     }
   }
 
@@ -479,13 +512,13 @@ export class VoiceSolidNexus {
   private getParticipantsForChannel(
     channelId: string,
   ): VoiceSidebarParticipant[] {
-    if (this.state.participantsByChannelId[channelId]) {
-      return this.state.participantsByChannelId[channelId];
-    }
     if (
       this.state.activeChannel?.id === channelId ||
       this.state.currentChannelId === channelId
     ) {
+      if (this.state.participantsByChannelId[channelId]) {
+        return this.state.participantsByChannelId[channelId];
+      }
       return this.state.participants;
     }
     return [];

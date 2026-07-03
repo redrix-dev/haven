@@ -1,4 +1,11 @@
-import { For, Show, createEffect, createMemo, onCleanup } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  onCleanup,
+  untrack,
+} from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import {
   Bell,
@@ -15,6 +22,7 @@ import { Avatar } from "@solid-client/components/ui";
 import type { HavenChannel } from "@shared/nexus/community/channelTypes";
 import { openCommunitySettings } from "./settings/CommunitySettingsPanel";
 import { canOpenCommunitySettingsPanel } from "./settings/communitySettingsAccess";
+import * as KDropdownMenu from "@kobalte/core/dropdown-menu";
 
 // ─── data wiring ─────────────────────────────────────────────────────────────
 //
@@ -298,9 +306,7 @@ function VoiceChannelRow(props: {
   const viewerProfile = core.profiles.viewerProfile(
     () => session()?.user.id ?? null,
   );
-  const occupants = core.voice.channelVoiceParticipants(
-    () => props.channel.id,
-  );
+  const occupants = core.voice.channelVoiceParticipants(() => props.channel.id);
   const isActive = () => voice.activeChannel?.channelId === props.channel.id;
   // Room participants are remotes only — the viewer appears via this row.
   const showSelf = () => isActive() && (voice.joined || voice.joining);
@@ -326,6 +332,10 @@ function VoiceChannelRow(props: {
               name={viewerProfile()?.username ?? "You"}
               avatarUrl={viewerProfile()?.avatarUrl ?? null}
               speaking={false}
+              isSelf={true}
+              userId={session()?.user.id ?? ""}
+              communityId={props.communityId}
+              channelId={props.channel.id}
             />
           </Show>
           <For each={occupants()}>
@@ -334,6 +344,10 @@ function VoiceChannelRow(props: {
                 name={participant.displayName}
                 avatarUrl={participant.avatarUrl ?? null}
                 speaking={participant.isSpeaking ?? false}
+                isSelf={false}
+                userId={participant.userId}
+                communityId={props.communityId}
+                channelId={props.channel.id}
               />
             )}
           </For>
@@ -347,11 +361,18 @@ function OccupantRow(props: {
   name: string;
   avatarUrl: string | null;
   speaking: boolean;
+  isSelf: boolean;
+  userId: string;
+  communityId: string;
+  channelId: string;
 }) {
-  return (
+  const core = requireHavenSolidCore();
+  const { voice, setMemberVolume } = useVoice();
+
+  const row = (
     <div class="flex items-center gap-1.5 px-1 py-0.5">
       <span
-        class="rounded-full"
+        class="inline-flex rounded-full"
         classList={{ "ring-2 ring-accent-success": props.speaking }}
       >
         <Avatar src={props.avatarUrl} name={props.name} size="sm" />
@@ -360,6 +381,61 @@ function OccupantRow(props: {
         {props.name}
       </span>
     </div>
+  );
+
+  // You don't get a menu on yourself.
+  if (props.isSelf) return row;
+
+  // The menu's actions only work in the channel you're connected to: kick needs
+  // the live kick-broadcast channel (which only exists while joined), and volume
+  // only matters for audio you're actually receiving. Gate via <Show> (reactive)
+  // — NOT an early return — so the menu appears the instant you join and
+  // collapses back to a plain row when you leave.
+  const inThisChannel = () =>
+    voice.joined && voice.activeChannel?.channelId === props.channelId;
+
+  const volume = () => voice.memberVolumes[props.userId] ?? 100;
+  const canKick = () =>
+    core.permissions.getPermissions(props.communityId).canManageMembers;
+
+  return (
+    <Show when={inThisChannel()} fallback={row}>
+      <KDropdownMenu.Root>
+      <KDropdownMenu.Trigger class="w-full text-left">
+        {row}
+      </KDropdownMenu.Trigger>
+      <KDropdownMenu.Portal>
+        <KDropdownMenu.Content class="z-50 min-w-52 rounded-lg border border-border-dialog bg-popover p-2 text-popover-foreground shadow-lg outline-none">
+          <div class="px-1 py-1.5" onPointerDown={(e) => e.stopPropagation()}>
+            <div class="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Volume</span>
+              <span>{volume()}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={volume()}
+              onInput={(e) =>
+                setMemberVolume(props.userId, Number(e.currentTarget.value))
+              }
+              class="w-full"
+            />
+          </div>
+          <Show when={canKick()}>
+            <KDropdownMenu.Item
+              class="mt-1 flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-sm text-destructive outline-none data-[highlighted]:bg-destructive data-[highlighted]:text-primary-foreground"
+              onSelect={() =>
+                void core.voice.kickParticipant(props.userId, props.channelId)
+              }
+            >
+              Disconnect from voice
+            </KDropdownMenu.Item>
+          </Show>
+        </KDropdownMenu.Content>
+      </KDropdownMenu.Portal>
+      </KDropdownMenu.Root>
+    </Show>
   );
 }
 
@@ -373,11 +449,22 @@ function VoicePresenceSubscriptions(props: {
   const { voice } = useVoice();
 
   createEffect(() => {
-    const dispose = core.voice.subscribePresenceChannels({
-      communityId: props.communityId,
-      channelIds: props.channelIds,
-      activeChannelId: voice.activeChannel?.channelId ?? null,
-    });
+    // Read the real inputs in the tracked scope so the effect only re-runs when
+    // THESE change...
+    const communityId = props.communityId;
+    const channelIds = props.channelIds;
+    const activeChannelId = voice.activeChannel?.channelId ?? null;
+    // ...then run the imperative subscribe untracked. subscribePresenceChannels
+    // reads participantsByChannelId (retainChannelParticipants) and its syncs
+    // WRITE it — without untrack, those writes become dependencies of this
+    // effect and every presence sync re-subscribes forever (infinite loop).
+    const dispose = untrack(() =>
+      core.voice.subscribePresenceChannels({
+        communityId,
+        channelIds,
+        activeChannelId,
+      }),
+    );
     onCleanup(dispose);
   });
 

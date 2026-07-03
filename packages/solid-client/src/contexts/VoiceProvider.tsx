@@ -56,6 +56,7 @@ export type VoiceUiState = {
   supportsOutputSelection: boolean;
   /** Browser blocked autoplay — a user gesture must call enableAudioPlayback. */
   audioPlaybackBlocked: boolean;
+  memberVolumes: Record<string, number>;
 };
 
 type VoiceContextValue = {
@@ -67,6 +68,7 @@ type VoiceContextValue = {
   switchInputDevice: (deviceId: string) => Promise<void>;
   setOutputDevice: (deviceId: string) => Promise<void>;
   enableAudioPlayback: () => Promise<void>;
+  setMemberVolume: (memberId: string, volume: number) => void;
 };
 
 const VoiceContext = createContext<VoiceContextValue>();
@@ -88,6 +90,7 @@ const initialState = (): VoiceUiState => ({
     typeof HTMLMediaElement !== "undefined" &&
     "setSinkId" in HTMLMediaElement.prototype,
   audioPlaybackBlocked: false,
+  memberVolumes: {},
 });
 
 function tryParseAvatarUrl(metadata: string | undefined): string | null {
@@ -166,6 +169,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       })
       .on(RoomEvent.ParticipantDisconnected, () => {
         playVoiceLeaveSound();
+        applyRemoteVolumes(voice.isDeafened);
         syncParticipants();
       })
       .on(RoomEvent.TrackMuted, syncParticipants)
@@ -213,7 +217,15 @@ export function VoiceProvider(props: { children: JSX.Element }) {
 
   const applyRemoteVolumes = (deafened: boolean) => {
     room?.remoteParticipants.forEach((participant) => {
-      participant.setVolume(deafened ? 0 : 1, Track.Source.Microphone);
+      participant.setVolume(
+        deafened
+          ? 0
+          : Math.min(
+              1,
+              (voice.memberVolumes[participant.identity] ?? 100) / 100,
+            ),
+        Track.Source.Microphone,
+      );
     });
   };
 
@@ -280,7 +292,9 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     // room.disconnect() tears down the connection but leaves the local mic
     // track running in the browser (readyState stays "live"), so the mic stays
     // engaged after leaving. Stop the local tracks explicitly to release it.
-    room?.localParticipant.trackPublications.forEach((pub) => pub.track?.stop());
+    room?.localParticipant.trackPublications.forEach((pub) =>
+      pub.track?.stop(),
+    );
     try {
       await room?.disconnect();
     } catch {
@@ -294,16 +308,18 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   const joinChannel = async (channel: VoiceControllerChannel) => {
     const uid = userId();
     if (!uid || voice.joining) return;
-    if (
-      voice.joined &&
-      voice.activeChannel?.channelId === channel.channelId
-    ) {
+    if (voice.joined && voice.activeChannel?.channelId === channel.channelId) {
       return;
     }
     // Switching: tear the current session down first, then join the target.
     if (voice.joined) await cleanup();
 
-    setVoice({ joining: true, error: null, notice: null, activeChannel: channel });
+    setVoice({
+      joining: true,
+      error: null,
+      notice: null,
+      activeChannel: channel,
+    });
     core.voice.startConnect({
       id: channel.channelId,
       name: channel.channelName,
@@ -410,7 +426,14 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     setVoice({ isDeafened: next, isMuted: next ? true : voice.isMuted });
     core.voice.setIsDeafened(next);
     applyRemoteVolumes(next);
-    if (next) void room?.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+    if (next)
+      void room?.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+  };
+
+  const setMemberVolume = (userId: string, volume: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(volume)));
+    setVoice("memberVolumes", userId, clamped);
+    applyRemoteVolumes(voice.isDeafened);
   };
 
   const switchInputDevice = async (deviceId: string) => {
@@ -528,8 +551,10 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     switchInputDevice,
     setOutputDevice,
     enableAudioPlayback,
+    setMemberVolume,
   };
-
+  if (import.meta.env.DEV)
+    (window as Window & { __voice?: unknown }).__voice = value;
   return (
     <VoiceContext.Provider value={value}>
       {props.children}
