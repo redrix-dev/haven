@@ -30,3 +30,4 @@ supabase/tests/sql/16_profile_card_visibility.sql
 supabase/tests/sql/17_profile_flair.sql
 supabase/tests/sql/18_community_flair_grant_rules.sql
 supabase/tests/sql/19_onboarding_campaigns.sql
+supabase/tests/sql/20_internal_function_acl.sql
