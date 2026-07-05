@@ -9,10 +9,16 @@ name: CI
 # integration either passed or was legitimately skipped.
 on:
   pull_request:
+  # `staging` is included because the normal flow merges feature branches into
+  # staging locally and pushes (no per-feature PR). Without it, incremental
+  # staging pushes would run no CI until the staging->main release PR — the
+  # lanes below would only ever see one big batch. Fix-forward on staging;
+  # main stays the hard gate via the required `gate` check + branch protection.
   push:
     branches:
       - main
       - master
+      - staging
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
