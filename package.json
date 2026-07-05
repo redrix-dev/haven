@@ -36,6 +36,10 @@
     "test:all": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run test:unit && npm run test:db && npm run test:backend",
     "test:ci": "npm run test:cleave && npm run test:db && npm run test:backend",
     "ci:verify": "npm run test:ci",
+    "ci:fast": "npm run lint && npm run check:shared-portable && npm run typecheck && npm run test:unit",
+    "ci:mobile": "npm run mobile:typecheck && npm run mobile:bundle",
+    "ci:integration": "npm run test:db && npm run test:backend",
+    "prepare": "husky",
     "dev:solid": "vite --config apps/tauri/vite.config.ts",
     "build:solid": "vite build --config apps/tauri/vite.config.ts",
     "dev:web": "vite --config apps/web/vite.config.ts",
@@ -67,6 +71,15 @@
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
+  "lint-staged": {
+    "{apps,packages,tooling}/**/*.{js,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml,css}": [
+      "prettier --write"
+    ]
+  },
   "keywords": [],
   "author": {
     "name": "redrix-dev",
@@ -86,7 +99,9 @@
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-boundaries": "^6.0.2",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "husky": "^9.1.7",
     "jsdom": "^28.1.0",
+    "lint-staged": "^17.0.8",
     "prettier": "^3.8.1",
     "supabase": "^2.105.0",
     "tailwindcss": "^4.3.0",

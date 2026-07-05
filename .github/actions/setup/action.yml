@@ -1,0 +1,32 @@
+# Composite setup shared by every CI lane: Node 24 + cached root & mobile deps.
+#
+# Each lane runs on its own runner, so each must install independently. To keep
+# that cheap we cache node_modules (root + apps/mobile) keyed on the two
+# lockfiles: on a hit we skip `npm ci` / `setup:mobile` entirely; on a miss we
+# install and the cache is populated for the next run. `npm ci` never mutates a
+# lockfile, so the caller's "Lockfile discipline" check stays valid either way.
+name: "Setup workspace"
+description: "Node 24 with cached root and mobile dependencies"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: npm
+
+    - name: Restore node_modules (root + mobile)
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          node_modules
+          apps/mobile/node_modules
+        key: nm-${{ runner.os }}-node24-${{ hashFiles('package-lock.json', 'apps/mobile/package-lock.json') }}
+
+    - name: Install dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        npm ci
+        npm run setup:mobile
