@@ -1,7 +1,62 @@
 /** Discord-style spoiler markers; aligned with mobile RNEM `||...||` parsing. */
 export const COMMUNITY_SPOILER_DELIMITER = "||";
-
 const TRAILING_SPACES_RE = /[^\S\n]+$/gm;
+type TextStyle =
+  | { kind: "delimited"; styleName: string; value: string }
+  | {
+      kind: "wrapped";
+      styleName: string;
+      styleWrapOpening: string;
+      styleWrapClosing: string;
+    };
+
+const StylesArray = [
+  {
+    styleName: "bold",
+    styleWrapOpening: "**",
+    styleWrapClosing: "**",
+    kind: "wrapped",
+  },
+  {
+    styleName: "italic",
+    styleWrapOpening: "*",
+    styleWrapClosing: "*",
+    kind: "wrapped",
+  },
+  {
+    styleName: "underline",
+    styleWrapOpening: "_",
+    styleWrapClosing: "_",
+    kind: "wrapped",
+  },
+  {
+    styleName: "strikethrough",
+    styleWrapOpening: "~~",
+    styleWrapClosing: "~~",
+    kind: "wrapped",
+  },
+  {
+    styleName: "inline-code",
+    styleWrapOpening: "`",
+    styleWrapClosing: "`",
+    kind: "wrapped",
+  },
+  {
+    styleName: "link",
+    styleWrapOpening: "[text]",
+    styleWrapClosing: "(url)",
+    kind: "wrapped",
+  },
+  {
+    styleName: "spoiler",
+    styleWrapOpening: COMMUNITY_SPOILER_DELIMITER,
+    styleWrapClosing: COMMUNITY_SPOILER_DELIMITER,
+    kind: "wrapped",
+  },
+  { styleName: "blockquote", value: ">", kind: "delimited" },
+  { styleName: "codeblock", syntax: "```", kind: "TODO" },
+] as const satisfies readonly TextStyle[];
+type StyleName = (typeof StylesArray)[number]["styleName"];
 
 /** Normalizes composer output so web/desktop/mobile agree on line endings and spoiler edges. */
 export function normalizeCommunityMarkdown(value: string): string {
