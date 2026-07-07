@@ -2,62 +2,96 @@
 export const COMMUNITY_SPOILER_DELIMITER = "||";
 const TRAILING_SPACES_RE = /[^\S\n]+$/gm;
 type TextStyle =
-  | { kind: "delimited"; styleName: string; value: string }
+  | { kind: "delimited"; value: string }
   | {
       kind: "wrapped";
-      styleName: string;
       styleWrapOpening: string;
       styleWrapClosing: string;
     };
 
-const StylesArray = [
-  {
-    styleName: "bold",
+export const StylesCatalog = {
+  bold: {
     styleWrapOpening: "**",
     styleWrapClosing: "**",
     kind: "wrapped",
   },
-  {
-    styleName: "italic",
+  italic: {
     styleWrapOpening: "*",
     styleWrapClosing: "*",
     kind: "wrapped",
   },
-  {
-    styleName: "underline",
+  underline: {
     styleWrapOpening: "_",
     styleWrapClosing: "_",
     kind: "wrapped",
   },
-  {
-    styleName: "strikethrough",
+  strikethrough: {
     styleWrapOpening: "~~",
     styleWrapClosing: "~~",
     kind: "wrapped",
   },
-  {
-    styleName: "inline-code",
+  code: {
     styleWrapOpening: "`",
     styleWrapClosing: "`",
     kind: "wrapped",
   },
-  {
-    styleName: "link",
-    styleWrapOpening: "[text]",
-    styleWrapClosing: "(url)",
+  link: {
+    styleWrapOpening: "[",
+    styleWrapClosing: "](url)",
     kind: "wrapped",
   },
-  {
-    styleName: "spoiler",
+  spoiler: {
     styleWrapOpening: COMMUNITY_SPOILER_DELIMITER,
     styleWrapClosing: COMMUNITY_SPOILER_DELIMITER,
     kind: "wrapped",
   },
-  { styleName: "blockquote", value: ">", kind: "delimited" },
-  { styleName: "codeblock", syntax: "```", kind: "TODO" },
-] as const satisfies readonly TextStyle[];
-type StyleName = (typeof StylesArray)[number]["styleName"];
+  blockquote: {
+    value: "> ",
+    kind: "delimited",
+  },
+  codeblock: {
+    styleWrapOpening: "```\n",
+    styleWrapClosing: "\n```",
+    kind: "wrapped",
+  },
+} as const satisfies Record<string, TextStyle>;
+export type StyleName = keyof typeof StylesCatalog;
+export function markdownWrapHelper(
+  text: string,
+  start: number,
+  end: number,
+  style: TextStyle,
+): string {
+  if (style.kind === "delimited") {
+    const delimiter = style.value;
+    const transformed = text
+      .slice(start, end)
+      .split("\n")
+      .map((line) => delimiter + line)
+      .join("\n");
+    return text.slice(0, start) + transformed + text.slice(end);
+  }
+  // style.kind = "wrapped"
+  const wrapOpening = style.styleWrapOpening;
+  const wrapClosing = style.styleWrapClosing;
 
+  return (
+    text.slice(0, start) +
+    wrapOpening +
+    text.slice(start, end) +
+    wrapClosing +
+    text.slice(end)
+  );
+}
+
+export function applyMarkdown(
+  styleName: StyleName,
+  text: string,
+  start: number,
+  end: number,
+): string {
+  return markdownWrapHelper(text, start, end, StylesCatalog[styleName]);
+}
 /** Normalizes composer output so web/desktop/mobile agree on line endings and spoiler edges. */
 export function normalizeCommunityMarkdown(value: string): string {
   const withLf = value.replace(/\r\n?/g, "\n");
