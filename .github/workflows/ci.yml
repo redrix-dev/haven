@@ -21,6 +21,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      # Honor the pinned npm from package.json's "packageManager" field so the
+      # runner's npm matches contributors' (prevents lockfile drift across npm versions).
+      - run: corepack enable
       - uses: supabase/setup-cli@v1
         with:
           version: latest
