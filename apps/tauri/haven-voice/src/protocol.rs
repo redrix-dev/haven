@@ -51,8 +51,9 @@ pub enum Event {
         inputs: Vec<DeviceInfo>,
         outputs: Vec<DeviceInfo>,
     },
-    // `Speaking { identities }` (speaking indicators) is added in its slice, so
-    // every intermediate build stays warning-clean.
+    /// Identities currently speaking (drives the Linux speaking indicators).
+    /// Identity == Haven user id, so it maps straight onto the roster.
+    Speaking { identities: Vec<String> },
 }
 
 /// One selectable audio device. `id` is the cpal device name — cpal exposes no

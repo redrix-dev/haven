@@ -180,36 +180,50 @@ async fn main() -> Result<()> {
         tokio::spawn(async move {
             let mut events = room.subscribe();
             while let Some(event) = events.recv().await {
-                // Only the audio-critical event; the participant roster is driven
-                // by the existing Supabase presence channel on the UI side.
-                if let RoomEvent::TrackSubscribed { track, participant, .. } = event {
-                    if let RemoteTrack::Audio(audio_track) = track {
-                        let mut stream =
-                            NativeAudioStream::new(audio_track.rtc_track(), SAMPLE_RATE as i32, 1);
-                        let mixer = mixer.clone();
-                        let member_gains = member_gains.clone();
-                        let identity = participant.identity().to_string();
-                        tokio::spawn(async move {
-                            while let Some(frame) = stream.next().await {
-                                let samples = frame.data.as_ref();
-                                let gain = member_gains
-                                    .lock()
-                                    .unwrap()
-                                    .get(&identity)
-                                    .copied()
-                                    .unwrap_or(1.0);
-                                if gain >= 0.999 {
-                                    mixer.add_audio_data(samples);
-                                } else {
-                                    let scaled: Vec<i16> = samples
-                                        .iter()
-                                        .map(|&s| (s as f32 * gain) as i16)
-                                        .collect();
-                                    mixer.add_audio_data(&scaled);
+                match event {
+                    // Remote audio → per-member gain → mixer. The roster itself
+                    // is driven by the Supabase presence channel on the UI side.
+                    RoomEvent::TrackSubscribed { track, participant, .. } => {
+                        if let RemoteTrack::Audio(audio_track) = track {
+                            let mut stream = NativeAudioStream::new(
+                                audio_track.rtc_track(),
+                                SAMPLE_RATE as i32,
+                                1,
+                            );
+                            let mixer = mixer.clone();
+                            let member_gains = member_gains.clone();
+                            let identity = participant.identity().to_string();
+                            tokio::spawn(async move {
+                                while let Some(frame) = stream.next().await {
+                                    let samples = frame.data.as_ref();
+                                    let gain = member_gains
+                                        .lock()
+                                        .unwrap()
+                                        .get(&identity)
+                                        .copied()
+                                        .unwrap_or(1.0);
+                                    if gain >= 0.999 {
+                                        mixer.add_audio_data(samples);
+                                    } else {
+                                        let scaled: Vec<i16> = samples
+                                            .iter()
+                                            .map(|&s| (s as f32 * gain) as i16)
+                                            .collect();
+                                        mixer.add_audio_data(&scaled);
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
+                    // Speaking indicators: forward the active-speaker set so the
+                    // presence-driven roster can light up who's talking (parity
+                    // with web/mac/win, which read LiveKit ActiveSpeakersChanged).
+                    RoomEvent::ActiveSpeakersChanged { speakers } => {
+                        let identities: Vec<String> =
+                            speakers.iter().map(|p| p.identity().to_string()).collect();
+                        emit(&Event::Speaking { identities });
+                    }
+                    _ => {}
                 }
             }
         });

@@ -393,6 +393,9 @@ export function VoiceProvider(props: { children: JSX.Element }) {
               "outputDevices",
               ev.outputs.map((d) => ({ deviceId: d.id, label: d.label })),
             );
+          } else if (ev.type === "speaking") {
+            // Overlay the sidecar's active speakers onto the presence roster.
+            core.voice.setSpeakingIds(ev.identities);
           }
         });
         await native.join(serverUrl, token);

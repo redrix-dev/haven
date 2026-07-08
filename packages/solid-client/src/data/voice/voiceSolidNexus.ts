@@ -99,6 +99,9 @@ export class VoiceSolidNexus {
   private kickConnectionSerial = 0;
   private presenceChannel: VoiceRealtimeChannel | null = null;
   private presenceConnectionSerial = 0;
+  // Live speaking set (native/Linux path). Presence carries the roster but not
+  // per-frame speaking, so the sidecar's ActiveSpeakersChanged is overlaid here.
+  private speakingIds = new Set<string>();
 
   constructor(
     viewerPolicyStore: ViewerMessagePolicyStore,
@@ -136,6 +139,8 @@ export class VoiceSolidNexus {
   }
 
   startConnect(channel: VoiceChannelReference): void {
+    // Fresh session — drop any speaking overlay from the previous channel.
+    this.speakingIds.clear();
     // Seed the LiveKit-source roster from the presence roster we already have so
     // the active-channel row doesn't blink empty during "connecting" (LiveKit is
     // empty until the room connects). applyParticipants reconciles it to the real
@@ -235,6 +240,28 @@ export class VoiceSolidNexus {
     this.setState(
       "participants",
       reconcile(participants, { key: "userId" }),
+    );
+  }
+
+  /**
+   * Overlay the live speaking set onto the active-channel roster (native/Linux
+   * path — the sidecar forwards LiveKit's active speakers). Re-applies over the
+   * current presence-driven roster; reconcile-by-userId keeps row identity so
+   * indicators flip without tearing down the row.
+   */
+  setSpeakingIds(identities: string[]): void {
+    const next = new Set(identities);
+    if (
+      next.size === this.speakingIds.size &&
+      [...next].every((id) => this.speakingIds.has(id))
+    )
+      return;
+    this.speakingIds = next;
+    this.setParticipants(
+      this.state.participants.map((participant) => ({
+        ...participant,
+        isSpeaking: next.has(participant.userId),
+      })),
     );
   }
 
@@ -407,9 +434,13 @@ export class VoiceSolidNexus {
       // arrays each time (setParticipants reconciles by userId) — never aliased.
       const syncRoster = () => {
         this.setParticipants(
-          normalizePresenceRows(channel.presenceState()).filter(
-            (participant) => participant.userId !== input.currentUserId,
-          ),
+          normalizePresenceRows(channel.presenceState())
+            .filter((participant) => participant.userId !== input.currentUserId)
+            // Preserve the live speaking overlay across presence syncs.
+            .map((participant) => ({
+              ...participant,
+              isSpeaking: this.speakingIds.has(participant.userId),
+            })),
         );
       };
       channel
