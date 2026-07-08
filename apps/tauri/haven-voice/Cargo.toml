@@ -1,0 +1,26 @@
+# haven-voice — native LiveKit voice sidecar for Haven on Linux.
+# The Tauri app spawns this binary; it does mic capture, remote playback, and
+# echo cancellation in native Rust (WebKitGTK has no WebRTC). Adapted from
+# LiveKit's `local_audio` example, which is proven working on this hardware.
+#
+# Standalone `[workspace]` so it isn't absorbed by any parent Cargo workspace.
+[workspace]
+
+[package]
+name = "haven-voice"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "haven-voice"
+path = "src/main.rs"
+
+[dependencies]
+livekit = { version = "0.7", features = ["rustls-tls-native-roots"] }
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+cpal = "0.15"
+anyhow = "1"
+log = "0.4"
+env_logger = "0.11"
