@@ -1,2 +1,4 @@
 /target
 /gen/schemas
+# Staged haven-voice sidecar (built by tooling/scripts/stage-haven-voice-sidecar.mjs).
+/binaries

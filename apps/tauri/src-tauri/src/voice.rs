@@ -26,13 +26,28 @@ struct VoiceProc {
     stdin: ChildStdin,
 }
 
-/// Resolve the haven-voice binary. `HAVEN_VOICE_BIN` overrides; otherwise look
-/// next to the app under apps/tauri/haven-voice/target/{debug,release}.
+/// Resolve the haven-voice binary, in priority order:
+///  1. `HAVEN_VOICE_BIN` env override (standalone / `cargo run` testing).
+///  2. Bundled sidecar next to the app exe — Tauri strips the target-triple
+///     suffix from the `externalBin` entry in packaged builds (see
+///     tauri.linux.conf.json), so it lands as plain `haven-voice`.
+///  3. Dev tree: the sidecar's own cargo target dir (a plain `cargo build` in
+///     apps/tauri/haven-voice, which is how we build it during development).
+///  4. Bare name, relying on PATH.
 fn voice_bin() -> std::path::PathBuf {
     if let Ok(p) = std::env::var("HAVEN_VOICE_BIN") {
         return std::path::PathBuf::from(p);
     }
+    let exe_name = if cfg!(windows) { "haven-voice.exe" } else { "haven-voice" };
     if let Ok(exe) = std::env::current_exe() {
+        // 2. Bundled sidecar: sits directly beside the app executable.
+        if let Some(dir) = exe.parent() {
+            let bundled = dir.join(exe_name);
+            if bundled.exists() {
+                return bundled;
+            }
+        }
+        // 3. Dev tree.
         // exe = .../apps/tauri/src-tauri/target/<profile>/haven-tauri
         // ancestors: [1]=<profile> [2]=target [3]=src-tauri [4]=apps/tauri
         if let Some(apps_tauri) = exe.ancestors().nth(4) {
@@ -41,7 +56,7 @@ fn voice_bin() -> std::path::PathBuf {
                     .join("haven-voice")
                     .join("target")
                     .join(profile)
-                    .join("haven-voice");
+                    .join(exe_name);
                 if candidate.exists() {
                     return candidate;
                 }

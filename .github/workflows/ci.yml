@@ -50,3 +50,20 @@ jobs:
       - name: Stop Supabase
         if: always()
         run: supabase stop
+
+  # Compile-check the native voice sidecar (its own Cargo workspace, pinned to
+  # an unreleased libwebrtc — see docs/architecture/NATIVE_VOICE.md). Runs in
+  # parallel with `verify`; --locked also proves haven-voice/Cargo.lock is sound.
+  sidecar:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./apps/tauri/haven-voice -> target"
+      - name: Install audio dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - name: Build native voice sidecar
+        run: cargo build --locked --manifest-path apps/tauri/haven-voice/Cargo.toml
