@@ -16,4 +16,6 @@ export type {
   UpdaterControls,
   Platform,
   VoiceBridge,
+  VoiceEvent,
+  VoiceDeviceInfo,
 } from "./contexts/BridgeProvider";

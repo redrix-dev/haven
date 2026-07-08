@@ -3,20 +3,24 @@
 //! Adapted from LiveKit's `local_audio` example (proven on this hardware).
 //! Joins a room with a SERVER-MINTED token (from Haven's `voice-token` function
 //! — never the API secret), captures the mic, plays remote participants, and
-//! runs libwebrtc echo cancellation. Driven by the Tauri app over stdio:
+//! runs libwebrtc echo cancellation. Driven by the Tauri app over stdio using a
+//! newline-delimited JSON protocol (one JSON object per line — see protocol.rs):
 //!
-//!   stdin  (one command per line):  mute | unmute | leave
-//!   stdout (one event per line):    connected | ready | disconnected | error <msg>
+//!   stdin  (commands):  {"type":"mute"} | {"type":"unmute"} | {"type":"leave"} | …
+//!   stdout (events):    {"type":"connected"} | {"type":"ready"} |
+//!                       {"type":"disconnected"} | {"type":"error","message":…}
 //!
 //! Config via env:  LIVEKIT_URL, LIVEKIT_TOKEN.
 //!
 //! Test standalone (no Tauri):
 //!   LIVEKIT_URL=wss://... LIVEKIT_TOKEN=<join jwt> cargo run
+//!   then type JSON commands on stdin, e.g. {"type":"mute"}
 
 mod audio_capture;
 mod audio_mixer;
 mod audio_playback;
 mod db_meter;
+mod protocol;
 
 use anyhow::{anyhow, Result};
 use audio_capture::AudioCapture;
@@ -37,6 +41,7 @@ use livekit::{
     },
     Room, RoomEvent, RoomOptions,
 };
+use protocol::{Command, Event};
 use std::io::Write;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -45,10 +50,15 @@ use tokio::sync::{mpsc, Mutex};
 const SAMPLE_RATE: u32 = 48_000;
 const SAMPLES_PER_10MS: usize = (SAMPLE_RATE / 100) as usize;
 
-/// Emit one event line to the parent (Tauri) and flush immediately.
-fn emit(line: &str) {
-    println!("{line}");
-    let _ = std::io::stdout().flush();
+/// Emit one event to the parent (Tauri) as a JSON line and flush immediately.
+fn emit(event: &Event) {
+    match serde_json::to_string(event) {
+        Ok(line) => {
+            println!("{line}");
+            let _ = std::io::stdout().flush();
+        }
+        Err(e) => eprintln!("haven-voice: failed to serialize event {event:?}: {e}"),
+    }
 }
 
 #[tokio::main]
@@ -63,11 +73,11 @@ async fn main() -> Result<()> {
     let room = match Room::connect(&url, &token, opts).await {
         Ok((room, _rx)) => Arc::new(room),
         Err(e) => {
-            emit(&format!("error connect_failed: {e}"));
+            emit(&Event::Error { message: format!("connect_failed: {e}") });
             return Err(e.into());
         }
     };
-    emit("connected");
+    emit(&Event::Connected);
 
     // ── shared echo-cancellation processor (APM) ───────────────────────────
     // args: echo_cancellation, auto_gain_control, high_pass_filter, noise_suppression
@@ -207,20 +217,29 @@ async fn main() -> Result<()> {
         });
     }
 
-    emit("ready");
+    emit(&Event::Ready);
 
-    // ── stdin control loop (mute / unmute / leave) ─────────────────────────
+    // ── stdin control loop (JSON commands, one per line) ───────────────────
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
     loop {
         tokio::select! {
             line = lines.next_line() => match line {
-                Ok(Some(cmd)) => match cmd.trim() {
-                    "mute" => track.mute(),
-                    "unmute" => track.unmute(),
-                    "leave" => break,
-                    "" => {}
-                    other => eprintln!("haven-voice: unknown command {other:?}"),
-                },
+                Ok(Some(cmd)) => {
+                    let trimmed = cmd.trim();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    match serde_json::from_str::<Command>(trimmed) {
+                        Ok(Command::Mute) => track.mute(),
+                        Ok(Command::Unmute) => track.unmute(),
+                        Ok(Command::Leave) => break,
+                        // Device/volume/enumeration commands land in later slices.
+                        Ok(other) => {
+                            log::warn!("haven-voice: command not yet implemented: {other:?}");
+                        }
+                        Err(e) => eprintln!("haven-voice: bad command {trimmed:?}: {e}"),
+                    }
+                }
                 // stdin closed → parent process gone → exit.
                 _ => break,
             },
@@ -229,6 +248,6 @@ async fn main() -> Result<()> {
     }
 
     let _ = room.close().await;
-    emit("disconnected");
+    emit(&Event::Disconnected);
     Ok(())
 }

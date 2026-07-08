@@ -8,6 +8,7 @@ import type {
   PopoutOptions,
   StagedUpdate,
   Platform,
+  VoiceEvent,
 } from "@solid-client/bridge";
 
 /**
@@ -63,20 +64,26 @@ export const tauriBridge: HavenBridge = {
   platform: detectPlatform(),
 
   // Native voice sidecar — only meaningful on Linux (WebKitGTK has no WebRTC),
-  // but harmless to expose everywhere; VoiceProvider gates on platform.
+  // but harmless to expose everywhere; VoiceProvider gates on platform. The
+  // sidecar speaks newline-delimited JSON, so commands are stringified and
+  // events are parsed here — the Solid UI only sees typed VoiceEvents.
   voice: {
     join: (serverUrl: string, token: string) =>
       invoke<void>("voice_join", { url: serverUrl, token }),
     setMuted: (muted: boolean) =>
       invoke<void>("voice_send_command", {
-        command: muted ? "mute" : "unmute",
+        command: JSON.stringify({ type: muted ? "mute" : "unmute" }),
       }),
     leave: () => invoke<void>("voice_leave"),
-    onEvent: async (handler: (event: string) => void) => {
+    onEvent: async (handler: (event: VoiceEvent) => void) => {
       const { listen } = await import("@tauri-apps/api/event");
-      return await listen<string>("voice://event", (event) =>
-        handler(event.payload),
-      );
+      return await listen<string>("voice://event", (event) => {
+        try {
+          handler(JSON.parse(event.payload) as VoiceEvent);
+        } catch {
+          // Ignore malformed lines rather than tearing down the listener.
+        }
+      });
     },
   },
 

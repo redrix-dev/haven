@@ -30,6 +30,26 @@ export type BridgeCapabilities = {
 
 export type Platform = "macos" | "windows" | "linux";
 
+/** One selectable audio device reported by the native sidecar. */
+export type VoiceDeviceInfo = {
+  /** cpal device name — stable enough to re-select within a session. */
+  id: string;
+  label: string;
+};
+
+/**
+ * A structured event from the native sidecar. The wire form is newline-
+ * delimited JSON (one object per line); this is the parsed shape, mirroring
+ * the sidecar's `protocol::Event`.
+ */
+export type VoiceEvent =
+  | { type: "connected" }
+  | { type: "ready" }
+  | { type: "disconnected" }
+  | { type: "error"; message: string }
+  | { type: "devices"; inputs: VoiceDeviceInfo[]; outputs: VoiceDeviceInfo[] }
+  | { type: "speaking"; identities: string[] };
+
 /**
  * Native voice, mediated by the shell. Present only where the webview can't do
  * WebRTC itself (Linux/WebKitGTK): the shell spawns a native LiveKit sidecar
@@ -44,10 +64,10 @@ export type VoiceBridge = {
   /** Leave the room and stop the sidecar. */
   leave(): Promise<void>;
   /**
-   * Subscribe to sidecar lifecycle lines: "connected" | "ready" |
-   * "disconnected" | "error <msg>". Resolves with an unsubscribe fn.
+   * Subscribe to structured sidecar events (parsed from the JSON protocol).
+   * Resolves with an unsubscribe fn.
    */
-  onEvent(handler: (event: string) => void): Promise<() => void>;
+  onEvent(handler: (event: VoiceEvent) => void): Promise<() => void>;
 };
 
 /** Native window controls, used to drive custom (frameless) chrome. */

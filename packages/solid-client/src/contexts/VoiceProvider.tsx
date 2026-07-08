@@ -365,19 +365,17 @@ export function VoiceProvider(props: { children: JSX.Element }) {
         // LiveKit participant events live in the sidecar, not the webview.
         nativeUnsub?.();
         nativeUnsub = await native.onEvent((ev) => {
-          if (ev === "connected" || ev === "ready") {
+          if (ev.type === "connected" || ev.type === "ready") {
             core.voice.setVoiceConnected(true);
             core.voice.markConnected();
-          } else if (ev === "disconnected") {
+          } else if (ev.type === "disconnected") {
             core.voice.setVoiceConnected(false);
             if (!intentionalDisconnect) {
               core.voice.setJoined(false);
               setVoice({ joined: false, notice: "Voice disconnected." });
             }
-          } else if (ev.startsWith("error")) {
-            setVoice({
-              error: ev.slice("error".length).trim() || "Failed to join voice.",
-            });
+          } else if (ev.type === "error") {
+            setVoice({ error: ev.message || "Failed to join voice." });
           }
         });
         await native.join(serverUrl, token);
