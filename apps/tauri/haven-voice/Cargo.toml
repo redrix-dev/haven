@@ -17,11 +17,11 @@ name = "haven-voice"
 path = "src/main.rs"
 
 [dependencies]
-livekit = { version = "=0.7.50", features = ["rustls-tls-native-roots"] }
-# libwebrtc + webrtc-sys must be a matched pair. Cargo floats to the broken
-# libwebrtc 0.3.38 (3-arg store_frame_metadata vs webrtc-sys 0.3.36's 4-arg),
-# so pin to 0.3.39 — the pair LiveKit's own SDK builds with.
-libwebrtc = "=0.3.39"
+# The crates.io release of livekit pulls the broken libwebrtc 0.3.38 (3-arg
+# store_frame_metadata vs webrtc-sys 0.3.36's 4-arg). The fix (libwebrtc 0.3.39)
+# lives only in LiveKit's git repo as a workspace crate, so we depend on the
+# repo directly, pinned to the exact rev that builds on this machine.
+livekit = { git = "https://github.com/livekit/rust-sdks", rev = "3dafb1d8e8fc49b907a7c4a74cf342dfcbb24c4f", features = ["rustls-tls-native-roots"] }
 tokio = { version = "1", features = ["full"] }
 futures-util = "0.3"
 cpal = "0.15"
