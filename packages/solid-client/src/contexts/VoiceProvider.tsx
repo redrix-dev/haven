@@ -427,6 +427,10 @@ export function VoiceProvider(props: { children: JSX.Element }) {
           currentUserId: uid,
           displayName: profile?.username ?? "Member",
           avatarUrl: profile?.avatarUrl ?? null,
+          // On Linux there's no in-webview Room to feed the roster, so let
+          // presence drive it (fresh, non-aliased) — this is what keeps the
+          // WebKitGTK <For> tree valid when a second person joins.
+          syncRoster: Boolean(native),
         })
         .catch((presenceError) => {
           console.warn("[voice] presence publish failed", presenceError);

@@ -38,6 +38,13 @@ type ConnectPresenceChannelInput = {
   currentUserId: string;
   displayName: string;
   avatarUrl?: string | null;
+  /**
+   * Also drive the active-channel roster (`participants`) from this channel's
+   * presence. Used on Linux, where there's no in-webview LiveKit Room to call
+   * setParticipants — the native sidecar owns the media, presence owns the
+   * roster. Web/mac/win leave this false (LiveKit drives the roster).
+   */
+  syncRoster?: boolean;
 };
 
 type SubscribePresenceChannelsInput = {
@@ -133,8 +140,13 @@ export class VoiceSolidNexus {
     // the active-channel row doesn't blink empty during "connecting" (LiveKit is
     // empty until the room connects). applyParticipants reconciles it to the real
     // roster on connect.
-    const seed =
-      this.state.participantsByChannelId[channel.id] ?? this.state.participants;
+    // Copy the objects — don't alias the participantsByChannelId store proxies
+    // into `participants`. Aliasing survives on the native path (nothing
+    // replaces the seed like LiveKit's applyParticipants does on web), and the
+    // stale shared proxies later corrupt the <For> DOM tree on WebKitGTK.
+    const seed = (
+      this.state.participantsByChannelId[channel.id] ?? this.state.participants
+    ).map((participant) => ({ ...participant }));
     this.setState({
       phase: "connecting",
       activeChannel: channel,
@@ -388,6 +400,23 @@ export class VoiceSolidNexus {
       `voice:presence:${input.communityId}:${input.channelId}`,
       { config: { presence: { key: input.currentUserId } } },
     );
+
+    if (input.syncRoster) {
+      // Native (Linux): keep the active-channel roster in sync from presence,
+      // excluding self to mirror LiveKit's remoteParticipants on web. Fresh
+      // arrays each time (setParticipants reconciles by userId) — never aliased.
+      const syncRoster = () => {
+        this.setParticipants(
+          normalizePresenceRows(channel.presenceState()).filter(
+            (participant) => participant.userId !== input.currentUserId,
+          ),
+        );
+      };
+      channel
+        .on("presence", { event: "sync" }, syncRoster)
+        .on("presence", { event: "join" }, syncRoster)
+        .on("presence", { event: "leave" }, syncRoster);
+    }
 
     await new Promise<void>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
