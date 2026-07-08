@@ -245,9 +245,15 @@ export class VoiceSolidNexus {
 
   /**
    * Overlay the live speaking set onto the active-channel roster (native/Linux
-   * path — the sidecar forwards LiveKit's active speakers). Re-applies over the
-   * current presence-driven roster; reconcile-by-userId keeps row identity so
-   * indicators flip without tearing down the row.
+   * path — the sidecar forwards LiveKit's active speakers).
+   *
+   * A speaking change is only ever a per-row boolean flip — never a membership
+   * add/remove/reorder — so it must NOT go through setParticipants/reconcile
+   * (the <For> structural path). Doing so raced with the presence-driven roster
+   * insert when joining a channel that already had members and reintroduced the
+   * WebKitGTK "incorrect node tree" crash. Patch isSpeaking in place instead:
+   * the array + row references never change, so <For> does zero structural work
+   * and only each row's isSpeaking signal updates.
    */
   setSpeakingIds(identities: string[]): void {
     const next = new Set(identities);
@@ -257,12 +263,12 @@ export class VoiceSolidNexus {
     )
       return;
     this.speakingIds = next;
-    this.setParticipants(
-      this.state.participants.map((participant) => ({
-        ...participant,
-        isSpeaking: next.has(participant.userId),
-      })),
-    );
+    this.state.participants.forEach((participant, index) => {
+      const speaking = next.has(participant.userId);
+      if (participant.isSpeaking !== speaking) {
+        this.setState("participants", index, "isSpeaking", speaking);
+      }
+    });
   }
 
   setChannelParticipants(
