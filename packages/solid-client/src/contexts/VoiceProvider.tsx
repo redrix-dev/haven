@@ -239,6 +239,13 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   };
 
   const refreshInputDevices = async () => {
+    const native = nativeVoice();
+    if (native) {
+      // Native path: the sidecar replies with a `devices` event, handled by the
+      // onEvent subscriber in joinChannel (which fills inputDevices/outputDevices).
+      await native.enumerateDevices().catch(() => {});
+      return;
+    }
     try {
       const devices = await Room.getLocalDevices("audioinput");
       setVoice(
@@ -365,24 +372,37 @@ export function VoiceProvider(props: { children: JSX.Element }) {
         // LiveKit participant events live in the sidecar, not the webview.
         nativeUnsub?.();
         nativeUnsub = await native.onEvent((ev) => {
-          if (ev === "connected" || ev === "ready") {
+          if (ev.type === "connected" || ev.type === "ready") {
             core.voice.setVoiceConnected(true);
             core.voice.markConnected();
-          } else if (ev === "disconnected") {
+          } else if (ev.type === "disconnected") {
             core.voice.setVoiceConnected(false);
             if (!intentionalDisconnect) {
               core.voice.setJoined(false);
               setVoice({ joined: false, notice: "Voice disconnected." });
             }
-          } else if (ev.startsWith("error")) {
-            setVoice({
-              error: ev.slice("error".length).trim() || "Failed to join voice.",
-            });
+          } else if (ev.type === "error") {
+            setVoice({ error: ev.message || "Failed to join voice." });
+          } else if (ev.type === "devices") {
+            // Sidecar device lists mirror the web path's {deviceId,label} shape.
+            setVoice(
+              "inputDevices",
+              ev.inputs.map((d) => ({ deviceId: d.id, label: d.label })),
+            );
+            setVoice(
+              "outputDevices",
+              ev.outputs.map((d) => ({ deviceId: d.id, label: d.label })),
+            );
+          } else if (ev.type === "speaking") {
+            // Overlay the sidecar's active speakers onto the presence roster.
+            core.voice.setSpeakingIds(ev.identities);
           }
         });
         await native.join(serverUrl, token);
         if (generation !== joinGeneration) return;
         await native.setMuted(voice.isMuted);
+        // Populate the device pickers (arrives async as a `devices` event).
+        void refreshInputDevices();
       } else {
         if (!room) room = createRoom();
         await room.connect(serverUrl, token, { autoSubscribe: true });
@@ -483,8 +503,9 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     core.voice.setIsDeafened(next);
     const native = nativeVoice();
     if (native) {
-      // The sidecar has no per-remote volume yet, so deafen at least mutes the
-      // mic; silencing others is a follow-up (needs a sidecar volume command).
+      // Deafen silences all incoming audio via the sidecar's master volume and
+      // (mirroring mobile) also mutes the mic; un-deafen restores playback.
+      void native.setMasterVolume(next ? 0 : 1).catch(() => {});
       if (next) void native.setMuted(true).catch(() => {});
     } else {
       applyRemoteVolumes(next);
@@ -496,17 +517,27 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   const setMemberVolume = (userId: string, volume: number) => {
     const clamped = Math.max(0, Math.min(100, Math.round(volume)));
     setVoice("memberVolumes", userId, clamped);
-    applyRemoteVolumes(voice.isDeafened);
+    const native = nativeVoice();
+    if (native) {
+      // Sidecar gain is 0..1, capped at 1 like the web path's setVolume.
+      void native.setMemberVolume(userId, Math.min(1, clamped / 100)).catch(() => {});
+    } else {
+      applyRemoteVolumes(voice.isDeafened);
+    }
   };
 
   const switchInputDevice = async (deviceId: string) => {
     setVoice({ selectedInputDeviceId: deviceId });
-    await room?.switchActiveDevice("audioinput", deviceId).catch(() => {});
+    const native = nativeVoice();
+    if (native) await native.setInputDevice(deviceId).catch(() => {});
+    else await room?.switchActiveDevice("audioinput", deviceId).catch(() => {});
   };
 
   const setOutputDevice = async (deviceId: string) => {
     setVoice({ selectedOutputDeviceId: deviceId });
-    await room?.switchActiveDevice("audiooutput", deviceId).catch(() => {});
+    const native = nativeVoice();
+    if (native) await native.setOutputDevice(deviceId).catch(() => {});
+    else await room?.switchActiveDevice("audiooutput", deviceId).catch(() => {});
   };
 
   const enableAudioPlayback = async () => {

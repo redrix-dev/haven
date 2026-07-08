@@ -98,7 +98,11 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./apps/tauri/src-tauri -> target"
+          # Two independent Cargo workspaces: the Tauri app and the standalone
+          # native voice sidecar (Linux).
+          workspaces: |
+            ./apps/tauri/src-tauri -> target
+            ./apps/tauri/haven-voice -> target
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -108,10 +112,18 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            libasound2-dev
 
       - name: Install JS dependencies
         run: npm ci
+
+      # Build + stage the native voice sidecar so tauri-action bundles it as an
+      # externalBin (declared Linux-only in tauri.linux.conf.json). Linux is the
+      # only platform that ships the sidecar today; mac/win keep in-webview voice.
+      - name: Build native voice sidecar (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: node tooling/scripts/stage-haven-voice-sidecar.mjs
 
       # Write the App Store Connect API key (.p8) to the standard notarytool
       # search path so tauri-action's notarization step finds it automatically.
