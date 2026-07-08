@@ -42,6 +42,7 @@ use livekit::{
     Room, RoomEvent, RoomOptions,
 };
 use protocol::{Command, DeviceInfo, Event};
+use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -164,23 +165,48 @@ async fn main() -> Result<()> {
         });
     }
 
+    // Per-participant playback gain (LiveKit identity → 0.0..=1.0), applied
+    // before the mixer. Absent == full volume. Shared with the stdin loop so
+    // slider moves take effect live. The identity equals the Haven user id (the
+    // token mints it that way), so it matches the UI's memberVolumes keys.
+    let member_gains: Arc<std::sync::Mutex<HashMap<String, f32>>> =
+        Arc::new(std::sync::Mutex::new(HashMap::new()));
+
     // ── remote audio tracks → mixer ────────────────────────────────────────
     {
         let room = room.clone();
         let mixer = mixer.clone();
+        let member_gains = member_gains.clone();
         tokio::spawn(async move {
             let mut events = room.subscribe();
             while let Some(event) = events.recv().await {
-                // Only the audio-critical event for now; participant roster is
-                // driven by the existing Supabase presence channel on the UI side.
-                if let RoomEvent::TrackSubscribed { track, .. } = event {
+                // Only the audio-critical event; the participant roster is driven
+                // by the existing Supabase presence channel on the UI side.
+                if let RoomEvent::TrackSubscribed { track, participant, .. } = event {
                     if let RemoteTrack::Audio(audio_track) = track {
                         let mut stream =
                             NativeAudioStream::new(audio_track.rtc_track(), SAMPLE_RATE as i32, 1);
                         let mixer = mixer.clone();
+                        let member_gains = member_gains.clone();
+                        let identity = participant.identity().to_string();
                         tokio::spawn(async move {
                             while let Some(frame) = stream.next().await {
-                                mixer.add_audio_data(frame.data.as_ref());
+                                let samples = frame.data.as_ref();
+                                let gain = member_gains
+                                    .lock()
+                                    .unwrap()
+                                    .get(&identity)
+                                    .copied()
+                                    .unwrap_or(1.0);
+                                if gain >= 0.999 {
+                                    mixer.add_audio_data(samples);
+                                } else {
+                                    let scaled: Vec<i16> = samples
+                                        .iter()
+                                        .map(|&s| (s as f32 * gain) as i16)
+                                        .collect();
+                                    mixer.add_audio_data(&scaled);
+                                }
                             }
                         });
                     }
@@ -244,9 +270,11 @@ async fn main() -> Result<()> {
                             }
                         }
                         Ok(Command::SetMasterVolume { value }) => mixer.set_volume(value),
-                        // Per-member volume lands in the next slice.
-                        Ok(other) => {
-                            log::warn!("haven-voice: command not yet implemented: {other:?}");
+                        Ok(Command::SetMemberVolume { identity, value }) => {
+                            member_gains
+                                .lock()
+                                .unwrap()
+                                .insert(identity, value.clamp(0.0, 1.0));
                         }
                         Err(e) => eprintln!("haven-voice: bad command {trimmed:?}: {e}"),
                     }

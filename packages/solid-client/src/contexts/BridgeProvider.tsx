@@ -78,6 +78,11 @@ export type VoiceBridge = {
    */
   setMasterVolume(value: number): Promise<void>;
   /**
+   * Set one participant's playback gain (0..1), keyed by identity (the Haven
+   * user id the voice token mints). Per-member volume sliders use this.
+   */
+  setMemberVolume(identity: string, value: number): Promise<void>;
+  /**
    * Subscribe to structured sidecar events (parsed from the JSON protocol).
    * Resolves with an unsubscribe fn.
    */

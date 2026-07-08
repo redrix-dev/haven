@@ -514,7 +514,13 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   const setMemberVolume = (userId: string, volume: number) => {
     const clamped = Math.max(0, Math.min(100, Math.round(volume)));
     setVoice("memberVolumes", userId, clamped);
-    applyRemoteVolumes(voice.isDeafened);
+    const native = nativeVoice();
+    if (native) {
+      // Sidecar gain is 0..1, capped at 1 like the web path's setVolume.
+      void native.setMemberVolume(userId, Math.min(1, clamped / 100)).catch(() => {});
+    } else {
+      applyRemoteVolumes(voice.isDeafened);
+    }
   };
 
   const switchInputDevice = async (deviceId: string) => {

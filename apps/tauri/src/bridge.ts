@@ -90,6 +90,10 @@ export const tauriBridge: HavenBridge = {
       invoke<void>("voice_send_command", {
         command: JSON.stringify({ type: "setMasterVolume", value }),
       }),
+    setMemberVolume: (identity: string, value: number) =>
+      invoke<void>("voice_send_command", {
+        command: JSON.stringify({ type: "setMemberVolume", identity, value }),
+      }),
     leave: () => invoke<void>("voice_leave"),
     onEvent: async (handler: (event: VoiceEvent) => void) => {
       const { listen } = await import("@tauri-apps/api/event");
