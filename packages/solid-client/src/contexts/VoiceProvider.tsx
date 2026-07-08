@@ -500,8 +500,9 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     core.voice.setIsDeafened(next);
     const native = nativeVoice();
     if (native) {
-      // The sidecar has no per-remote volume yet, so deafen at least mutes the
-      // mic; silencing others is a follow-up (needs a sidecar volume command).
+      // Deafen silences all incoming audio via the sidecar's master volume and
+      // (mirroring mobile) also mutes the mic; un-deafen restores playback.
+      void native.setMasterVolume(next ? 0 : 1).catch(() => {});
       if (next) void native.setMuted(true).catch(() => {});
     } else {
       applyRemoteVolumes(next);

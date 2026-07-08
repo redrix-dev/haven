@@ -1,4 +1,5 @@
 use crate::db_meter::calculate_db_level;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
@@ -7,11 +8,19 @@ pub struct AudioMixer {
     buffer: Arc<Mutex<std::collections::VecDeque<i16>>>,
     sample_rate: u32,
     channels: u32,
-    volume: f32,
+    // Master output gain, 0.0..=1.0, stored as f32 bits so it can be set at
+    // runtime (e.g. deafen → 0.0) and shared across clones without a lock in
+    // the per-sample path.
+    volume: Arc<AtomicU32>,
     max_buffer_size: usize,
     db_tx: Option<mpsc::UnboundedSender<f32>>,
     // Channel to send reference audio for echo cancellation
     reference_audio_tx: Option<mpsc::UnboundedSender<Vec<i16>>>,
+}
+
+/// Build the shared, clamped master-volume cell from an initial gain.
+fn volume_cell(volume: f32) -> Arc<AtomicU32> {
+    Arc::new(AtomicU32::new(volume.clamp(0.0, 1.0).to_bits()))
 }
 
 impl AudioMixer {
@@ -25,7 +34,7 @@ impl AudioMixer {
             ))),
             sample_rate,
             channels,
-            volume: volume.clamp(0.0, 1.0),
+            volume: volume_cell(volume),
             max_buffer_size,
             db_tx: None,
             reference_audio_tx: None,
@@ -47,7 +56,7 @@ impl AudioMixer {
             ))),
             sample_rate,
             channels,
-            volume: volume.clamp(0.0, 1.0),
+            volume: volume_cell(volume),
             max_buffer_size,
             db_tx: Some(db_tx),
             reference_audio_tx: None,
@@ -70,7 +79,7 @@ impl AudioMixer {
             ))),
             sample_rate,
             channels,
-            volume: volume.clamp(0.0, 1.0),
+            volume: volume_cell(volume),
             max_buffer_size,
             db_tx: Some(db_tx),
             reference_audio_tx: Some(reference_audio_tx),
@@ -78,11 +87,12 @@ impl AudioMixer {
     }
 
     pub fn add_audio_data(&self, data: &[i16]) {
+        let volume = self.volume();
         let mut buffer = self.buffer.lock().unwrap();
 
         // Apply volume scaling and add to buffer
         for &sample in data.iter() {
-            let scaled_sample = (sample as f32 * self.volume) as i16;
+            let scaled_sample = (sample as f32 * volume) as i16;
             buffer.push_back(scaled_sample);
 
             // Prevent buffer from growing too large
@@ -90,6 +100,18 @@ impl AudioMixer {
                 buffer.pop_front();
             }
         }
+    }
+
+    /// Current master output gain (0.0..=1.0).
+    pub fn volume(&self) -> f32 {
+        f32::from_bits(self.volume.load(Ordering::Relaxed))
+    }
+
+    /// Set the master output gain (0.0..=1.0). Deafen sets 0.0; the change is
+    /// shared across every clone of this mixer. Takes effect on the next frame.
+    pub fn set_volume(&self, volume: f32) {
+        self.volume
+            .store(volume.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
     }
 
     pub fn get_samples(&self, requested_samples: usize) -> Vec<i16> {

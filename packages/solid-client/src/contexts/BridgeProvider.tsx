@@ -73,6 +73,11 @@ export type VoiceBridge = {
   /** Switch the playback (speaker) device by id (cpal device name). */
   setOutputDevice(id: string): Promise<void>;
   /**
+   * Set the master playback gain (0..1) — silences all incoming audio at 0.
+   * Deafen uses this.
+   */
+  setMasterVolume(value: number): Promise<void>;
+  /**
    * Subscribe to structured sidecar events (parsed from the JSON protocol).
    * Resolves with an unsubscribe fn.
    */

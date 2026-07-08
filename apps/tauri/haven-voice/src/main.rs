@@ -243,7 +243,8 @@ async fn main() -> Result<()> {
                                 }),
                             }
                         }
-                        // Volume commands land in later slices.
+                        Ok(Command::SetMasterVolume { value }) => mixer.set_volume(value),
+                        // Per-member volume lands in the next slice.
                         Ok(other) => {
                             log::warn!("haven-voice: command not yet implemented: {other:?}");
                         }
