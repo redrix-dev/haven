@@ -21,6 +21,7 @@ import type {
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { requireHavenSolidCore } from "../core";
 import { useSession } from "./SessionProvider";
+import { useBridge } from "./BridgeProvider";
 import { openVoiceSyncChannel, type VoiceMirrorState } from "./voiceSync";
 import { playVoiceJoinSound, playVoiceLeaveSound } from "../audio/sounds";
 
@@ -116,6 +117,14 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   let room: Room | null = null;
   let joinGeneration = 0;
   let intentionalDisconnect = false;
+
+  // On Linux (WebKitGTK has no WebRTC) the shell exposes a native voice
+  // sidecar; we drive that instead of a livekit-client Room. Everywhere else
+  // this is undefined and the Room path below runs unchanged.
+  const bridge = useBridge();
+  const nativeVoice = () =>
+    bridge.platform === "linux" ? bridge.voice : undefined;
+  let nativeUnsub: (() => void) | null = null;
   // Remote audio tracks must be attached to DOM elements to be audible.
   const audioElements = new Map<string, HTMLMediaElement>();
   const audioContainer = document.createElement("div");
@@ -289,6 +298,16 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     } catch {
       // Best-effort cleanup.
     }
+    // Native sidecar teardown (Linux). No-op elsewhere.
+    if (nativeUnsub) {
+      nativeUnsub();
+      nativeUnsub = null;
+    }
+    try {
+      await nativeVoice()?.leave();
+    } catch {
+      // Best-effort; the sidecar also exits when its stdin closes.
+    }
     // room.disconnect() tears down the connection but leaves the local mic
     // track running in the browser (readyState stays "live"), so the mic stays
     // engaged after leaving. Stop the local tracks explicitly to release it.
@@ -335,27 +354,56 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       );
       void credentialsPromise.catch(() => {});
 
-      if (!room) room = createRoom();
       const { token, serverUrl } = await credentialsPromise;
       if (generation !== joinGeneration) return;
-
-      await room.connect(serverUrl, token, { autoSubscribe: true });
-      if (generation !== joinGeneration) return;
-
-      // On macOS, WKWebView only exposes navigator.mediaDevices when the app is
-      // signed with the audio-input entitlement. Guard here so the catch block
-      // below surfaces a legible message instead of "undefined is not an object".
-      if (!navigator.mediaDevices) {
-        throw new Error(
-          "Microphone access is unavailable. On macOS, please check System Settings → Privacy & Security → Microphone and ensure Haven is allowed.",
-        );
-      }
-
       const profile = viewerProfile();
-      void room.localParticipant
-        .setMetadata(JSON.stringify({ avatarUrl: profile?.avatarUrl ?? null }))
-        .catch(() => {});
-      await room.localParticipant.setMicrophoneEnabled(!voice.isMuted);
+
+      const native = nativeVoice();
+      if (native) {
+        // Linux: hand the join to the native sidecar. The participant roster
+        // (and speaking) is driven by the Supabase presence channel below —
+        // LiveKit participant events live in the sidecar, not the webview.
+        nativeUnsub?.();
+        nativeUnsub = await native.onEvent((ev) => {
+          if (ev === "connected" || ev === "ready") {
+            core.voice.setVoiceConnected(true);
+            core.voice.markConnected();
+          } else if (ev === "disconnected") {
+            core.voice.setVoiceConnected(false);
+            if (!intentionalDisconnect) {
+              core.voice.setJoined(false);
+              setVoice({ joined: false, notice: "Voice disconnected." });
+            }
+          } else if (ev.startsWith("error")) {
+            setVoice({
+              error: ev.slice("error".length).trim() || "Failed to join voice.",
+            });
+          }
+        });
+        await native.join(serverUrl, token);
+        if (generation !== joinGeneration) return;
+        await native.setMuted(voice.isMuted);
+      } else {
+        if (!room) room = createRoom();
+        await room.connect(serverUrl, token, { autoSubscribe: true });
+        if (generation !== joinGeneration) return;
+
+        // On macOS, WKWebView only exposes navigator.mediaDevices when the app
+        // is signed with the audio-input entitlement. Guard here so the catch
+        // block surfaces a legible message instead of "undefined is not object".
+        if (!navigator.mediaDevices) {
+          throw new Error(
+            "Microphone access is unavailable. On macOS, please check System Settings → Privacy & Security → Microphone and ensure Haven is allowed.",
+          );
+        }
+
+        void room.localParticipant
+          .setMetadata(
+            JSON.stringify({ avatarUrl: profile?.avatarUrl ?? null }),
+          )
+          .catch(() => {});
+        await room.localParticipant.setMicrophoneEnabled(!voice.isMuted);
+      }
 
       core.voice.setJoined(true);
       core.voice.markConnected();
@@ -366,9 +414,11 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       });
       setVoice({ joined: true });
       playVoiceJoinSound();
-      applyParticipants(room);
-      applyRemoteVolumes(voice.isDeafened);
-      void refreshInputDevices();
+      if (room && !native) {
+        applyParticipants(room);
+        applyRemoteVolumes(voice.isDeafened);
+        void refreshInputDevices();
+      }
 
       void core.voice
         .connectPresenceChannel({
@@ -417,7 +467,9 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     const next = !voice.isMuted;
     setVoice({ isMuted: next });
     core.voice.setIsMuted(next);
-    void room?.localParticipant.setMicrophoneEnabled(!next).catch(() => {});
+    const native = nativeVoice();
+    if (native) void native.setMuted(next).catch(() => {});
+    else void room?.localParticipant.setMicrophoneEnabled(!next).catch(() => {});
   };
 
   const toggleDeafen = () => {
@@ -425,9 +477,16 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     // Deafening also mutes (mirrors mobile's VoiceNexus.setDeafened).
     setVoice({ isDeafened: next, isMuted: next ? true : voice.isMuted });
     core.voice.setIsDeafened(next);
-    applyRemoteVolumes(next);
-    if (next)
-      void room?.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+    const native = nativeVoice();
+    if (native) {
+      // The sidecar has no per-remote volume yet, so deafen at least mutes the
+      // mic; silencing others is a follow-up (needs a sidecar volume command).
+      if (next) void native.setMuted(true).catch(() => {});
+    } else {
+      applyRemoteVolumes(next);
+      if (next)
+        void room?.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+    }
   };
 
   const setMemberVolume = (userId: string, volume: number) => {

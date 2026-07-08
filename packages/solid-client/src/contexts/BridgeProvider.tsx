@@ -30,6 +30,26 @@ export type BridgeCapabilities = {
 
 export type Platform = "macos" | "windows" | "linux";
 
+/**
+ * Native voice, mediated by the shell. Present only where the webview can't do
+ * WebRTC itself (Linux/WebKitGTK): the shell spawns a native LiveKit sidecar
+ * and the UI drives it through here instead of livekit-client. Absent
+ * everywhere else, so VoiceProvider falls back to the in-webview Room.
+ */
+export type VoiceBridge = {
+  /** Join the room named by `token` (from the voice-token edge function). */
+  join(serverUrl: string, token: string): Promise<void>;
+  /** Mute/unmute the local microphone. */
+  setMuted(muted: boolean): Promise<void>;
+  /** Leave the room and stop the sidecar. */
+  leave(): Promise<void>;
+  /**
+   * Subscribe to sidecar lifecycle lines: "connected" | "ready" |
+   * "disconnected" | "error <msg>". Resolves with an unsubscribe fn.
+   */
+  onEvent(handler: (event: string) => void): Promise<() => void>;
+};
+
 /** Native window controls, used to drive custom (frameless) chrome. */
 export type WindowControls = {
   minimize(): Promise<void>;
@@ -88,6 +108,11 @@ export interface HavenBridge {
   updater?: UpdaterControls;
   /** Host OS — lets chrome differ per platform (e.g. macOS traffic lights). */
   platform?: Platform;
+  /**
+   * Native voice sidecar. Present only where the webview lacks WebRTC
+   * (Linux/WebKitGTK); VoiceProvider uses it instead of livekit-client there.
+   */
+  voice?: VoiceBridge;
   /**
    * Subscribe to incoming deep links (`haven://…`); resolves with an
    * unsubscribe fn. Absent in a plain browser, which uses normal URLs.

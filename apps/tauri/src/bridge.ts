@@ -62,6 +62,24 @@ export const tauriBridge: HavenBridge = {
 
   platform: detectPlatform(),
 
+  // Native voice sidecar — only meaningful on Linux (WebKitGTK has no WebRTC),
+  // but harmless to expose everywhere; VoiceProvider gates on platform.
+  voice: {
+    join: (serverUrl: string, token: string) =>
+      invoke<void>("voice_join", { url: serverUrl, token }),
+    setMuted: (muted: boolean) =>
+      invoke<void>("voice_send_command", {
+        command: muted ? "mute" : "unmute",
+      }),
+    leave: () => invoke<void>("voice_leave"),
+    onEvent: async (handler: (event: string) => void) => {
+      const { listen } = await import("@tauri-apps/api/event");
+      return await listen<string>("voice://event", (event) =>
+        handler(event.payload),
+      );
+    },
+  },
+
   window: {
     minimize: () => getCurrentWindow().minimize(),
     toggleMaximize: () => getCurrentWindow().toggleMaximize(),
