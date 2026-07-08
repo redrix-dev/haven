@@ -64,6 +64,15 @@ export type VoiceBridge = {
   /** Leave the room and stop the sidecar. */
   leave(): Promise<void>;
   /**
+   * Ask the sidecar to enumerate audio devices. The result arrives
+   * asynchronously as a `devices` event on `onEvent`.
+   */
+  enumerateDevices(): Promise<void>;
+  /** Switch the capture (microphone) device by id (cpal device name). */
+  setInputDevice(id: string): Promise<void>;
+  /** Switch the playback (speaker) device by id (cpal device name). */
+  setOutputDevice(id: string): Promise<void>;
+  /**
    * Subscribe to structured sidecar events (parsed from the JSON protocol).
    * Resolves with an unsubscribe fn.
    */

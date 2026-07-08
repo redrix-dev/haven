@@ -74,6 +74,18 @@ export const tauriBridge: HavenBridge = {
       invoke<void>("voice_send_command", {
         command: JSON.stringify({ type: muted ? "mute" : "unmute" }),
       }),
+    enumerateDevices: () =>
+      invoke<void>("voice_send_command", {
+        command: JSON.stringify({ type: "enumerateDevices" }),
+      }),
+    setInputDevice: (id: string) =>
+      invoke<void>("voice_send_command", {
+        command: JSON.stringify({ type: "setInputDevice", id }),
+      }),
+    setOutputDevice: (id: string) =>
+      invoke<void>("voice_send_command", {
+        command: JSON.stringify({ type: "setOutputDevice", id }),
+      }),
     leave: () => invoke<void>("voice_leave"),
     onEvent: async (handler: (event: VoiceEvent) => void) => {
       const { listen } = await import("@tauri-apps/api/event");

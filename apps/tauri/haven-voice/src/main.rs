@@ -41,7 +41,7 @@ use livekit::{
     },
     Room, RoomEvent, RoomOptions,
 };
-use protocol::{Command, Event};
+use protocol::{Command, DeviceInfo, Event};
 use std::io::Write;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -107,28 +107,18 @@ async fn main() -> Result<()> {
 
     let host = cpal::default_host();
 
-    // mic capture → APM (forward stream) → livekit
-    let input_device = host
-        .default_input_device()
-        .ok_or_else(|| anyhow!("no default input device"))?;
-    let in_supported = input_device.default_input_config()?;
-    let in_channels = in_supported.channels() as u32;
-    let in_config = StreamConfig {
-        channels: in_supported.channels(),
-        sample_rate: SampleRate(SAMPLE_RATE),
-        buffer_size: cpal::BufferSize::Default,
-    };
+    // The mpsc channels and the mixer are STABLE for the whole session; only the
+    // cpal capture/playback streams below are torn down and rebuilt when the user
+    // picks a different device (see the SetInputDevice/SetOutputDevice handlers).
     let (mic_tx, mut mic_rx) = mpsc::unbounded_channel::<Vec<i16>>();
-    let _capture = AudioCapture::new(
-        input_device,
-        in_config,
-        in_supported.sample_format(),
-        mic_tx,
-        None,
-        0, // capture channel 0
-        in_channels,
-    )
-    .await?;
+    let (ref_tx, mut ref_rx) = mpsc::unbounded_channel::<Vec<i16>>();
+    let (db_tx, _db_rx) = mpsc::unbounded_channel::<f32>();
+    let mixer = AudioMixer::with_reference_audio(SAMPLE_RATE, 1, 1.0, db_tx, ref_tx);
+
+    // mic capture → APM (forward stream) → livekit. Held in an Option so a device
+    // switch can drop the old stream (freeing the device) before opening the new.
+    let input_device = resolve_input_device(&host, None)?;
+    let mut capture = Some(build_capture(input_device, mic_tx.clone()).await?);
 
     {
         let apm = apm.clone();
@@ -153,26 +143,8 @@ async fn main() -> Result<()> {
     }
 
     // ── playback: mixer (feeds reference audio to AEC) + output stream ──────
-    let (ref_tx, mut ref_rx) = mpsc::unbounded_channel::<Vec<i16>>();
-    let (db_tx, _db_rx) = mpsc::unbounded_channel::<f32>();
-    let mixer = AudioMixer::with_reference_audio(SAMPLE_RATE, 1, 1.0, db_tx, ref_tx);
-
-    let output_device = host
-        .default_output_device()
-        .ok_or_else(|| anyhow!("no default output device"))?;
-    let out_supported = output_device.default_output_config()?;
-    let out_config = StreamConfig {
-        channels: 1,
-        sample_rate: SampleRate(SAMPLE_RATE),
-        buffer_size: cpal::BufferSize::Default,
-    };
-    let _playback = AudioPlayback::new(
-        output_device,
-        out_config,
-        out_supported.sample_format(),
-        mixer.clone(),
-    )
-    .await?;
+    let output_device = resolve_output_device(&host, None)?;
+    let mut playback = Some(build_playback(output_device, mixer.clone()).await?);
 
     // reference audio (what we play) → APM (reverse stream) for echo cancellation
     {
@@ -233,7 +205,45 @@ async fn main() -> Result<()> {
                         Ok(Command::Mute) => track.mute(),
                         Ok(Command::Unmute) => track.unmute(),
                         Ok(Command::Leave) => break,
-                        // Device/volume/enumeration commands land in later slices.
+                        Ok(Command::EnumerateDevices) => {
+                            let (inputs, outputs) = enumerate_devices(&host);
+                            emit(&Event::Devices { inputs, outputs });
+                        }
+                        Ok(Command::SetInputDevice { id }) => {
+                            match resolve_input_device(&host, Some(id.as_str())) {
+                                Ok(device) => {
+                                    // Drop the old stream first so the device is
+                                    // free to reopen (some backends are exclusive).
+                                    drop(capture.take());
+                                    match build_capture(device, mic_tx.clone()).await {
+                                        Ok(c) => capture = Some(c),
+                                        Err(e) => emit(&Event::Error {
+                                            message: format!("input_device_failed: {e}"),
+                                        }),
+                                    }
+                                }
+                                Err(e) => emit(&Event::Error {
+                                    message: format!("input_device_error: {e}"),
+                                }),
+                            }
+                        }
+                        Ok(Command::SetOutputDevice { id }) => {
+                            match resolve_output_device(&host, Some(id.as_str())) {
+                                Ok(device) => {
+                                    drop(playback.take());
+                                    match build_playback(device, mixer.clone()).await {
+                                        Ok(p) => playback = Some(p),
+                                        Err(e) => emit(&Event::Error {
+                                            message: format!("output_device_failed: {e}"),
+                                        }),
+                                    }
+                                }
+                                Err(e) => emit(&Event::Error {
+                                    message: format!("output_device_error: {e}"),
+                                }),
+                            }
+                        }
+                        // Volume commands land in later slices.
                         Ok(other) => {
                             log::warn!("haven-voice: command not yet implemented: {other:?}");
                         }
@@ -250,4 +260,81 @@ async fn main() -> Result<()> {
     let _ = room.close().await;
     emit(&Event::Disconnected);
     Ok(())
+}
+
+/// Resolve an input device by cpal name, or the system default when `id` is None.
+fn resolve_input_device(host: &cpal::Host, id: Option<&str>) -> Result<cpal::Device> {
+    match id {
+        Some(name) => host
+            .input_devices()?
+            .find(|d| d.name().ok().as_deref() == Some(name))
+            .ok_or_else(|| anyhow!("input device {name:?} not found")),
+        None => host
+            .default_input_device()
+            .ok_or_else(|| anyhow!("no default input device")),
+    }
+}
+
+/// Resolve an output device by cpal name, or the system default when `id` is None.
+fn resolve_output_device(host: &cpal::Host, id: Option<&str>) -> Result<cpal::Device> {
+    match id {
+        Some(name) => host
+            .output_devices()?
+            .find(|d| d.name().ok().as_deref() == Some(name))
+            .ok_or_else(|| anyhow!("output device {name:?} not found")),
+        None => host
+            .default_output_device()
+            .ok_or_else(|| anyhow!("no default output device")),
+    }
+}
+
+/// List selectable input/output devices. `id` == cpal device name (see
+/// `DeviceInfo`); devices whose name can't be read are skipped.
+fn enumerate_devices(host: &cpal::Host) -> (Vec<DeviceInfo>, Vec<DeviceInfo>) {
+    fn to_infos<I: Iterator<Item = cpal::Device>>(devices: I) -> Vec<DeviceInfo> {
+        devices
+            .filter_map(|d| d.name().ok())
+            .map(|name| DeviceInfo { id: name.clone(), label: name })
+            .collect()
+    }
+    let inputs = host.input_devices().map(to_infos).unwrap_or_default();
+    let outputs = host.output_devices().map(to_infos).unwrap_or_default();
+    (inputs, outputs)
+}
+
+/// Build a mic-capture stream on `device`, downmixing to mono i16 into `mic_tx`.
+/// Rebuilt on device switch; the `mic_tx` end stays wired to the APM pipeline.
+async fn build_capture(
+    device: cpal::Device,
+    mic_tx: mpsc::UnboundedSender<Vec<i16>>,
+) -> Result<AudioCapture> {
+    let supported = device.default_input_config()?;
+    let channels = supported.channels() as u32;
+    let config = StreamConfig {
+        channels: supported.channels(),
+        sample_rate: SampleRate(SAMPLE_RATE),
+        buffer_size: cpal::BufferSize::Default,
+    };
+    AudioCapture::new(
+        device,
+        config,
+        supported.sample_format(),
+        mic_tx,
+        None,
+        0, // capture channel 0 (voice is mono — LiveKit downmixes anyway)
+        channels,
+    )
+    .await
+}
+
+/// Build a playback stream on `device`, pulling mixed mono i16 from `mixer`.
+/// Rebuilt on device switch; the `mixer` (and its AEC reference tap) is stable.
+async fn build_playback(device: cpal::Device, mixer: AudioMixer) -> Result<AudioPlayback> {
+    let supported = device.default_output_config()?;
+    let config = StreamConfig {
+        channels: 1,
+        sample_rate: SampleRate(SAMPLE_RATE),
+        buffer_size: cpal::BufferSize::Default,
+    };
+    AudioPlayback::new(device, config, supported.sample_format(), mixer).await
 }

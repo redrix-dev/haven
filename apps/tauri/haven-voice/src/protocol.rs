@@ -46,7 +46,19 @@ pub enum Event {
     Disconnected,
     /// A non-fatal or fatal error, carrying a human-readable message.
     Error { message: String },
-    // `Devices { inputs, outputs }` (device selection) and
-    // `Speaking { identities }` (speaking indicators) are added in their
-    // respective slices, so every intermediate build stays warning-clean.
+    /// Available capture/playback devices, in response to `EnumerateDevices`.
+    Devices {
+        inputs: Vec<DeviceInfo>,
+        outputs: Vec<DeviceInfo>,
+    },
+    // `Speaking { identities }` (speaking indicators) is added in its slice, so
+    // every intermediate build stays warning-clean.
+}
+
+/// One selectable audio device. `id` is the cpal device name — cpal exposes no
+/// stable hardware id, but the name is stable enough to re-select in-session.
+#[derive(Debug, Clone, Serialize)]
+pub struct DeviceInfo {
+    pub id: String,
+    pub label: String,
 }
