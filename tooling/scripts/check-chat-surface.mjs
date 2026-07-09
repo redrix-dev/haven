@@ -115,7 +115,7 @@ if (violations.length) {
   console.error(
     "check:chat-surface failed — mobile chat surface violations:\n\n" +
       violations.join("\n") +
-      "\n\nSee .cursor/skills/haven-mobile-chat-surface/SKILL.md\n",
+      "\n\nSee docs/agent-skills/haven-mobile-chat-surface/SKILL.md\n",
   );
   process.exit(1);
 }

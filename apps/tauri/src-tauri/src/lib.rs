@@ -1,5 +1,7 @@
 use tauri::{Emitter, Manager};
 
+mod voice;
+
 /// Placeholder command demonstrating the JS `invoke("ping")` round-trip.
 /// This is where real backend-access commands will live later.
 #[tauri::command]
@@ -27,6 +29,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .manage(voice::VoiceState::default())
         .setup(|app| {
             // Register the haven:// scheme at runtime so deep links work in dev
             // (production registers it via the installer). Best-effort.
@@ -37,7 +40,12 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ping])
+        .invoke_handler(tauri::generate_handler![
+            ping,
+            voice::voice_join,
+            voice::voice_send_command,
+            voice::voice_leave
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

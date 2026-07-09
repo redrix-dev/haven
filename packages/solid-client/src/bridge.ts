@@ -15,4 +15,7 @@ export type {
   StagedUpdate,
   UpdaterControls,
   Platform,
+  VoiceBridge,
+  VoiceEvent,
+  VoiceDeviceInfo,
 } from "./contexts/BridgeProvider";

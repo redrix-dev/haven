@@ -127,11 +127,13 @@ across windows.
    remote control**: it renders state broadcast by the owning window and sends
    commands (mute/deafen/leave) back. It never opens its own LiveKit
    connection — two connections would mean double audio and double presence.
-2. **Transport is `BroadcastChannel`** (`contexts/voiceSync.ts`). It works
-   identically across browser tabs and same-origin Tauri webviews, so the
-   protocol needs no bridge capability and no shell-specific code. The popout
-   route renders "Not connected" if no owner ever broadcasts.
-3. **Scope:** this is the pattern for *session-owning* surfaces (voice now,
+2. **Transport is currently `BroadcastChannel`** (`contexts/voiceSync.ts`) for
+   browser windows. It does **not** reliably cross Tauri `WebviewWindow`s in
+   the desktop shell, so the desktop voice pop-out launcher is intentionally
+   hidden. Do not re-enable it until sync moves to a Tauri-safe event-backed
+   protocol. The popout route renders "Not connected" if no owner ever
+   broadcasts.
+3. **Scope:** this is the pattern for _session-owning_ surfaces (voice now,
    maybe screen-share later). Read-only data surfaces that popout in the
    future may instead boot their own core and fetch their own data — decide
    per popout, against this record.
@@ -145,7 +147,7 @@ across windows.
    `/popout` branch mounts the lightest shell its surfaces need: a mirror
    surface (voice) gets `PopoutLiteShell` — theme from localStorage and
    nothing else, so a popout window never boots a second session or opens a
-   second realtime subscription. A future *data-backed* popout (e.g. watching
+   second realtime subscription. A future _data-backed_ popout (e.g. watching
    a channel's messages in its own window) registers under `/popout` with its
    own session-equipped shell — the seam is always "add a shell component +
    a child route," never special window code.

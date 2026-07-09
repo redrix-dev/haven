@@ -30,6 +30,65 @@ export type BridgeCapabilities = {
 
 export type Platform = "macos" | "windows" | "linux";
 
+/** One selectable audio device reported by the native sidecar. */
+export type VoiceDeviceInfo = {
+  /** cpal device name — stable enough to re-select within a session. */
+  id: string;
+  label: string;
+};
+
+/**
+ * A structured event from the native sidecar. The wire form is newline-
+ * delimited JSON (one object per line); this is the parsed shape, mirroring
+ * the sidecar's `protocol::Event`.
+ */
+export type VoiceEvent =
+  | { type: "connected" }
+  | { type: "ready" }
+  | { type: "disconnected" }
+  | { type: "error"; message: string }
+  | { type: "devices"; inputs: VoiceDeviceInfo[]; outputs: VoiceDeviceInfo[] }
+  | { type: "speaking"; identities: string[] };
+
+/**
+ * Native voice, mediated by the shell. Present only where the webview can't do
+ * WebRTC itself (Linux/WebKitGTK): the shell spawns a native LiveKit sidecar
+ * and the UI drives it through here instead of livekit-client. Absent
+ * everywhere else, so VoiceProvider falls back to the in-webview Room.
+ */
+export type VoiceBridge = {
+  /** Join the room named by `token` (from the voice-token edge function). */
+  join(serverUrl: string, token: string): Promise<void>;
+  /** Mute/unmute the local microphone. */
+  setMuted(muted: boolean): Promise<void>;
+  /** Leave the room and stop the sidecar. */
+  leave(): Promise<void>;
+  /**
+   * Ask the sidecar to enumerate audio devices. The result arrives
+   * asynchronously as a `devices` event on `onEvent`.
+   */
+  enumerateDevices(): Promise<void>;
+  /** Switch the capture (microphone) device by id (cpal device name). */
+  setInputDevice(id: string): Promise<void>;
+  /** Switch the playback (speaker) device by id (cpal device name). */
+  setOutputDevice(id: string): Promise<void>;
+  /**
+   * Set the master playback gain (0..1) — silences all incoming audio at 0.
+   * Deafen uses this.
+   */
+  setMasterVolume(value: number): Promise<void>;
+  /**
+   * Set one participant's playback gain (0..1), keyed by identity (the Haven
+   * user id the voice token mints). Per-member volume sliders use this.
+   */
+  setMemberVolume(identity: string, value: number): Promise<void>;
+  /**
+   * Subscribe to structured sidecar events (parsed from the JSON protocol).
+   * Resolves with an unsubscribe fn.
+   */
+  onEvent(handler: (event: VoiceEvent) => void): Promise<() => void>;
+};
+
 /** Native window controls, used to drive custom (frameless) chrome. */
 export type WindowControls = {
   minimize(): Promise<void>;
@@ -88,6 +147,11 @@ export interface HavenBridge {
   updater?: UpdaterControls;
   /** Host OS — lets chrome differ per platform (e.g. macOS traffic lights). */
   platform?: Platform;
+  /**
+   * Native voice sidecar. Present only where the webview lacks WebRTC
+   * (Linux/WebKitGTK); VoiceProvider uses it instead of livekit-client there.
+   */
+  voice?: VoiceBridge;
   /**
    * Subscribe to incoming deep links (`haven://…`); resolves with an
    * unsubscribe fn. Absent in a plain browser, which uses normal URLs.
