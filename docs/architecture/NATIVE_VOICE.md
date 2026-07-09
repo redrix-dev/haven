@@ -67,6 +67,10 @@ sidecar identities map straight onto the UI's `memberVolumes` / roster.
   gain before the mixer, and uses the mixer's master gain for deafen.
 - **Audio is mono.** Voice is mono; LiveKit downmixes received audio to mono and
   DTX is mono-only. Do not "upgrade" the sidecar to stereo for voice.
+- **Desktop popout is not live yet.** The route/window seam exists, but the
+  launcher is hidden because the current BroadcastChannel mirror does not
+  reliably cross Tauri `WebviewWindow`s. Keep it hidden until voice sync moves
+  to a Tauri-safe event-backed protocol.
 
 ### Known duplication (do not merge yet, just know)
 

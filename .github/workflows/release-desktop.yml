@@ -23,10 +23,10 @@
 # SANITIZED PUBLIC test-signoff summary there — see docs/RELEASE_CADENCE.md). Never paste
 # raw test-reports/ logs; they're internal. Falls back to a generic body if the file is absent.
 #
-# Not handled here (deliberate, tracked separately): OS code signing —
-#   macOS notarization (Apple cert) and Windows Authenticode. Without them users
-#   get a Gatekeeper/SmartScreen prompt on first install, and unsigned macOS
-#   builds can hit Gatekeeper "damaged" errors on update. Updater (minisign)
+# OS signing status:
+#   macOS Developer ID signing + notarization is wired below through the Apple
+#   certificate and App Store Connect secrets. Windows Authenticode is not wired
+#   yet, so Windows users can still see SmartScreen prompts. Updater (minisign)
 #   signing above is independent of, and not a substitute for, OS code signing.
 
 name: Release Desktop
