@@ -15,6 +15,16 @@ runs:
         node-version: 24
         cache: npm
 
+    # Honor the npm pinned in package.json's "packageManager" so every lane
+    # runs the same npm contributors use (prevents lockfile-drift false reds —
+    # carried from the pre-lanes workflow, PR #64). NOTE: bare `corepack
+    # enable` skips npm by design; the explicit `npm` argument is required.
+    - name: Pin npm via corepack
+      shell: bash
+      env:
+        COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      run: corepack enable npm
+
     - name: Restore node_modules (root + mobile)
       id: cache
       uses: actions/cache@v4

@@ -1,0 +1,33 @@
+# haven-voice — native LiveKit voice sidecar for Haven on Linux.
+# The Tauri app spawns this binary; it does mic capture, remote playback, and
+# echo cancellation in native Rust (WebKitGTK has no WebRTC). Adapted from
+# LiveKit's `local_audio` example, which is proven working on this hardware.
+#
+# Standalone `[workspace]` so it isn't absorbed by any parent Cargo workspace.
+[workspace]
+
+[package]
+name = "haven-voice"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "haven-voice"
+path = "src/main.rs"
+
+[dependencies]
+# The crates.io release of livekit pulls the broken libwebrtc 0.3.38 (3-arg
+# store_frame_metadata vs webrtc-sys 0.3.36's 4-arg). The fix (libwebrtc 0.3.39)
+# lives only in LiveKit's git repo as a workspace crate, so we depend on the
+# repo directly, pinned to the exact rev that builds on this machine.
+livekit = { git = "https://github.com/livekit/rust-sdks", rev = "3dafb1d8e8fc49b907a7c4a74cf342dfcbb24c4f", features = ["rustls-tls-native-roots"] }
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+cpal = "0.15"
+anyhow = "1"
+log = "0.4"
+env_logger = "0.11"
+# Newline-delimited JSON control/event protocol with the Tauri shell.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

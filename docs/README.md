@@ -17,6 +17,7 @@ Small on purpose — a handful of living documents plus one detailed-contract fo
 - [HAVEN_CORE.md](./architecture/HAVEN_CORE.md) — the data-layer contract: core, caches/nexuses, host boundaries, enforcement. The Solid core mirrors it.
 - [SOLID_CLIENT_SHAPE.md](./architecture/SOLID_CLIENT_SHAPE.md) — the desktop/web client's shape law: feature slices, routes, layering boundaries.
 - [REALTIME.md](./architecture/REALTIME.md) — the realtime event contract and coverage matrix.
+- [NATIVE_VOICE.md](./architecture/NATIVE_VOICE.md) — the Linux native voice sidecar: its seam, the stdio protocol, and the unreleased libwebrtc pin (with the watch/upgrade procedure).
 - [nexus-framework.html](./architecture/nexus-framework.html) — standalone visual walkthrough of the Nexus architecture (open in a browser).
 
 ## Rules for these docs

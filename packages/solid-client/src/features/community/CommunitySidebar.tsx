@@ -369,7 +369,15 @@ function OccupantRow(props: {
   const core = requireHavenSolidCore();
   const { voice, setMemberVolume } = useVoice();
 
-  const row = (
+  // Must be a FUNCTION, not a shared JSX node. In Solid, `const row = <div/>`
+  // is one physical DOM element; reusing that same node in both the <Show>
+  // fallback AND inside the dropdown Trigger means the node lives in two places
+  // at once. When `inThisChannel()` flips (join/leave/switch), <Show> tears down
+  // one branch and mounts the other, and the occupants <For>'s reconcileArrays
+  // then tries to insertBefore a node that's still parented in the other branch
+  // — WebKitGTK rejects it as HierarchyRequestError ("incorrect node tree").
+  // Calling row() per use gives each branch its own independent element.
+  const row = () => (
     <div class="flex items-center gap-1.5 px-1 py-0.5">
       <span
         class="inline-flex rounded-full"
@@ -384,7 +392,7 @@ function OccupantRow(props: {
   );
 
   // You don't get a menu on yourself.
-  if (props.isSelf) return row;
+  if (props.isSelf) return row();
 
   // The menu's actions only work in the channel you're connected to: kick needs
   // the live kick-broadcast channel (which only exists while joined), and volume
@@ -399,10 +407,10 @@ function OccupantRow(props: {
     core.permissions.getPermissions(props.communityId).canManageMembers;
 
   return (
-    <Show when={inThisChannel()} fallback={row}>
+    <Show when={inThisChannel()} fallback={row()}>
       <KDropdownMenu.Root>
       <KDropdownMenu.Trigger class="w-full text-left">
-        {row}
+        {row()}
       </KDropdownMenu.Trigger>
       <KDropdownMenu.Portal>
         <KDropdownMenu.Content class="z-50 min-w-52 rounded-lg border border-border-dialog bg-popover p-2 text-popover-foreground shadow-lg outline-none">

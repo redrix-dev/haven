@@ -4,9 +4,11 @@ name: CI
 # (bundle smoke) run on every push/PR and give a red X in ~2-3 min for the
 # common mistakes. The expensive `integration` lane (Supabase boot + reset +
 # RLS/backend suites) only runs when the DB-layer input surface actually
-# changed — see `detect-changes` below. `gate` is the single job to mark as the
-# required status check: it passes only when fast+mobile are green and
-# integration either passed or was legitimately skipped.
+# changed — see `detect-changes` below. The `sidecar` lane (native voice
+# Rust build) likewise only runs when its own workspace changed. `gate` is the
+# single job to mark as the required status check: it passes only when
+# fast+mobile are green and integration/sidecar either passed or were
+# legitimately skipped.
 on:
   pull_request:
   # `staging` is included because the normal flow merges feature branches into
@@ -39,10 +41,15 @@ jobs:
   #   package-lock.json      a dependency bump can change behavior.
   # Filtering narrower than this (e.g. supabase/migrations only) would let a
   # helper/fixture/shared edit skip the very tests that cover it — a false green.
+  #
+  # `sidecar` is the native voice binary's own Cargo workspace — nothing else
+  # in the repo feeds its build, so apps/tauri/haven-voice/** is its full
+  # input surface.
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
       integration: ${{ steps.filter.outputs.integration }}
+      sidecar: ${{ steps.filter.outputs.sidecar }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -56,6 +63,8 @@ jobs:
               - 'tooling/test-support/**'
               - 'vitest.config.ts'
               - 'package-lock.json'
+            sidecar:
+              - 'apps/tauri/haven-voice/**'
 
   fast:
     needs: detect-changes
@@ -101,18 +110,49 @@ jobs:
         if: always()
         run: supabase stop
 
+  # Compile-check the native voice sidecar (its own Cargo workspace, pinned to
+  # an unreleased libwebrtc — see docs/architecture/NATIVE_VOICE.md). Only runs
+  # when the sidecar workspace changed; --locked also proves
+  # haven-voice/Cargo.lock is sound.
+  sidecar:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sidecar == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./apps/tauri/haven-voice -> target"
+      # cpal needs ALSA; webrtc-sys's prebuilt libwebrtc links the GTK/glib
+      # desktop stack (glib-2.0, gio) at build time — same set the release
+      # workflow installs before building the sidecar.
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libglib2.0-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev
+      - name: Build native voice sidecar
+        run: cargo build --locked --manifest-path apps/tauri/haven-voice/Cargo.toml
+
   # The required status check. Aggregates the lanes so a legitimately-skipped
-  # integration lane doesn't leave the required check pending forever.
+  # integration/sidecar lane doesn't leave the required check pending forever.
   gate:
-    needs: [detect-changes, fast, mobile, integration]
+    needs: [detect-changes, fast, mobile, integration, sidecar]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Require lanes (integration may skip when no DB-layer change)
+      - name: Require lanes (integration/sidecar may skip when unchanged)
         run: |
           echo "fast=${{ needs.fast.result }}"
           echo "mobile=${{ needs.mobile.result }}"
           echo "integration=${{ needs.integration.result }} (db-layer changed=${{ needs.detect-changes.outputs.integration }})"
+          echo "sidecar=${{ needs.sidecar.result }} (sidecar changed=${{ needs.detect-changes.outputs.sidecar }})"
           fail=0
           [ "${{ needs.fast.result }}" = "success" ] || { echo "::error::fast lane failed"; fail=1; }
           [ "${{ needs.mobile.result }}" = "success" ] || { echo "::error::mobile lane failed"; fail=1; }
@@ -120,5 +160,9 @@ jobs:
             success|skipped) ;;
             *) echo "::error::integration lane failed (${{ needs.integration.result }})"; fail=1 ;;
           esac
+          case "${{ needs.sidecar.result }}" in
+            success|skipped) ;;
+            *) echo "::error::sidecar lane failed (${{ needs.sidecar.result }})"; fail=1 ;;
+          esac
           if [ "$fail" = "1" ]; then exit 1; fi
-          echo "All required lanes green (integration: ${{ needs.integration.result }})."
+          echo "All required lanes green (integration: ${{ needs.integration.result }}, sidecar: ${{ needs.sidecar.result }})."
