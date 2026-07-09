@@ -2,12 +2,16 @@
 //!
 //! WebKitGTK ships without WebRTC, so `livekit-client` can't run in the Linux
 //! webview. Instead we spawn the `haven-voice` sidecar (native LiveKit + cpal
-//! + echo cancellation) as a child process and talk to it over stdio:
+//! + echo cancellation) as a child process and talk to it over stdio using a
+//! newline-delimited JSON protocol (one object per line — the sidecar's
+//! protocol.rs is the wire contract; the TS mirror is `VoiceEvent` in
+//! BridgeProvider):
 //!
-//!   we write  : mute | unmute | leave   (to its stdin)
-//!   it writes : connected | ready | disconnected | error <msg>  (its stdout)
+//!   we write  : {"type":"mute"} | {"type":"setMemberVolume",…} | … (stdin)
+//!   it writes : {"type":"connected"} | {"type":"devices",…} | …   (stdout)
 //!
-//! Each stdout line is forwarded to the frontend as a `voice://event` event.
+//! Each stdout line is forwarded verbatim to the frontend as a `voice://event`
+//! event; the bridge parses it there.
 //! The token is minted server-side (voice-token edge function) and passed in —
 //! the API secret never touches the client.
 
@@ -101,7 +105,10 @@ pub async fn voice_join(
         while let Ok(Some(line)) = lines.next_line().await {
             let _ = emit_app.emit("voice://event", line);
         }
-        let _ = emit_app.emit("voice://event", "disconnected".to_string());
+        // Must be the JSON wire shape — the bridge JSON.parses every event and
+        // silently drops malformed lines, so a bare string here would make a
+        // sidecar crash invisible to the UI.
+        let _ = emit_app.emit("voice://event", r#"{"type":"disconnected"}"#.to_string());
     });
 
     *guard = Some(VoiceProc { child, stdin });
