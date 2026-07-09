@@ -9,6 +9,7 @@
   },
   "scripts": {
     "lint": "eslint \"{apps,packages,tooling}/**/*.{js,ts,tsx}\"",
+    "check:agent-skills": "node tooling/scripts/validate-agent-skills.mjs",
     "check:desktop-version": "node tooling/scripts/check-desktop-version-sync.mjs",
     "check:shared-hex": "node tooling/scripts/check-shared-hex-literals.mjs",
     "check:shared-portable": "node tooling/scripts/check-shared-portable.mjs",

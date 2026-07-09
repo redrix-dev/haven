@@ -20,6 +20,11 @@ Small on purpose — a handful of living documents plus one detailed-contract fo
 - [NATIVE_VOICE.md](./architecture/NATIVE_VOICE.md) — the Linux native voice sidecar: its seam, the stdio protocol, and the unreleased libwebrtc pin (with the watch/upgrade procedure).
 - [nexus-framework.html](./architecture/nexus-framework.html) — standalone visual walkthrough of the Nexus architecture (open in a browser).
 
+## Agent handoff
+
+- [../AGENTS.md](../AGENTS.md) — quick index for future maintainers and coding agents.
+- [agent-skills/](./agent-skills/) — narrow, task-specific SKILL.md files for branch discipline, shared boundaries, Solid, Tauri desktop, mobile, Supabase, and native voice work.
+
 ## Rules for these docs
 
 - **A living doc is updated in the same change that invalidates it.** A doc that
