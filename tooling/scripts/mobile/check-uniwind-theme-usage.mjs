@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { isThemeRuleAllowed as isAllowed } from "./uniwind-theme-allow.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,7 +97,8 @@ Flags mobile UI patterns that bypass Haven's UniWind theme tokens:
 Prefer semantic className tokens, ThemedIonicons, Icon, useCSSVariable,
 useResolveClassNames, or useMobileThemeTokens.
 
-Intentional exceptions can be marked on the same or previous line:
+Intentional exceptions can be marked on the same line or immediately above the
+relevant JSX element (including a Prettier-expanded opening tag):
   // uniwind-theme-allow ${RULES.rawPaletteClass} - modal scrim
   // uniwind-theme-allow all - generated fallback
 `.trim();
@@ -222,23 +224,6 @@ function isRawColorPathAllowed(normalizedPath) {
     allowed.endsWith("/")
       ? normalizedPath.startsWith(allowed)
       : normalizedPath === allowed,
-  );
-}
-
-function allowCommentMatches(text, rule) {
-  const markerIndex = text.indexOf("uniwind-theme-allow");
-  if (markerIndex === -1) return false;
-
-  const tail = text.slice(markerIndex + "uniwind-theme-allow".length).trim();
-  if (!tail) return true;
-  if (/\ball\b/.test(tail)) return true;
-  return tail.includes(rule);
-}
-
-function isAllowed(rawLines, lineIndex, rule) {
-  return (
-    allowCommentMatches(rawLines[lineIndex] ?? "", rule) ||
-    allowCommentMatches(rawLines[lineIndex - 1] ?? "", rule)
   );
 }
 
