@@ -1,11 +1,11 @@
 import { Show, createSignal, onCleanup } from "solid-js";
 import { ImagePlus, SendHorizontal, X } from "lucide-solid";
-import { Button } from "@solid-client/components/ui";
+import { Button, MarkdownToolbar } from "@solid-client/components/ui";
 import {
-  applyMarkdown,
+  matchCommunityMarkdownShortcut,
   normalizeCommunityMarkdown,
-  StylesCatalog,
-  type StyleName,
+  toggleCommunityMarkdown,
+  type CommunityMarkdownFormat,
 } from "@shared/features/messaging/utils/communityMarkdownParity";
 
 export function Composer(props: {
@@ -32,44 +32,38 @@ export function Composer(props: {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
   };
 
-  const applyStyle = (styleName: StyleName) => {
+  const applyStyle = (format: CommunityMarkdownFormat) => {
     if (!textarea) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const next = applyMarkdown(styleName, draft(), start, end);
-
-    setDraft(next);
+    const edit = toggleCommunityMarkdown(
+      format,
+      draft(),
+      textarea.selectionStart,
+      textarea.selectionEnd,
+    );
+    setDraft(edit.value);
 
     queueMicrotask(() => {
       if (!textarea) return;
-
-      const style = StylesCatalog[styleName];
-
       textarea.focus();
-
-      if (style.kind === "wrapped") {
-        const offset = style.styleWrapOpening.length;
-        textarea.setSelectionRange(start + offset, end + offset);
-      }
+      textarea.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+      autogrow();
     });
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
-    const modifier = event.metaKey || event.ctrlKey;
-
-    if (modifier) {
-      switch (event.key.toLowerCase()) {
-        case "b":
-          event.preventDefault();
-          applyStyle("bold");
-          return;
-
-        case "i":
-          event.preventDefault();
-          applyStyle("italic");
-          return;
-      }
+    const format = event.isComposing
+      ? null
+      : matchCommunityMarkdownShortcut({
+          key: event.key,
+          primaryModifier: event.metaKey || event.ctrlKey,
+          shiftKey: event.shiftKey,
+          altKey: event.altKey,
+        });
+    if (format) {
+      event.preventDefault();
+      applyStyle(format);
+      return;
     }
 
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
@@ -161,49 +155,52 @@ export function Composer(props: {
         )}
       </Show>
 
-      <div class="flex items-end gap-2 rounded-xl bg-surface-input px-3 py-2">
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/*"
-          class="hidden"
-          onChange={(e) => setPickedImage(e.currentTarget.files?.[0])}
-        />
+      <div class="rounded-xl bg-surface-input">
+        <MarkdownToolbar disabled={sending()} onFormat={applyStyle} />
+        <div class="flex items-end gap-2 px-3 py-2">
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/*"
+            class="hidden"
+            onChange={(e) => setPickedImage(e.currentTarget.files?.[0])}
+          />
 
-        <Button
-          size="icon"
-          variant="ghost"
-          aria-label="Attach image"
-          disabled={sending()}
-          onClick={pickImage}
-          class="h-8 w-8"
-        >
-          <ImagePlus size={18} />
-        </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Attach image"
+            disabled={sending()}
+            onClick={pickImage}
+            class="h-8 w-8"
+          >
+            <ImagePlus size={18} />
+          </Button>
 
-        <textarea
-          ref={textarea}
-          rows={1}
-          value={draft()}
-          placeholder={`Message #${props.channelName}`}
-          onInput={(e) => {
-            setDraft(e.currentTarget.value);
-            autogrow();
-          }}
-          onKeyDown={handleKeyDown}
-          class="max-h-50 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-hidden"
-        />
+          <textarea
+            ref={textarea}
+            rows={1}
+            value={draft()}
+            placeholder={`Message #${props.channelName}`}
+            onInput={(e) => {
+              setDraft(e.currentTarget.value);
+              autogrow();
+            }}
+            onKeyDown={handleKeyDown}
+            class="max-h-50 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-hidden"
+          />
 
-        <Button
-          size="icon"
-          variant="ghost"
-          aria-label="Send message"
-          disabled={sending() || (!draft().trim() && !pendingImage())}
-          onClick={() => void submit()}
-          class="h-8 w-8"
-        >
-          <SendHorizontal size={18} />
-        </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Send message"
+            disabled={sending() || (!draft().trim() && !pendingImage())}
+            onClick={() => void submit()}
+            class="h-8 w-8"
+          >
+            <SendHorizontal size={18} />
+          </Button>
+        </div>
       </div>
     </div>
   );

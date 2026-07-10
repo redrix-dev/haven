@@ -9,6 +9,7 @@ import {
   type GestureResponderEvent,
 } from "react-native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
+import { COMMUNITY_MARKDOWN_MD4C_FLAGS } from "@shared/features/messaging/utils/communityMarkdownParity";
 import type {
   MessageAttachment,
   MessageLinkPreview,
@@ -214,7 +215,7 @@ export function CommunityMessageBubble({
         <EnrichedMarkdownText
           markdown={text}
           flavor="github"
-          md4cFlags={{ underline: true }}
+          md4cFlags={COMMUNITY_MARKDOWN_MD4C_FLAGS}
           markdownStyle={{
             ...markdownStyle,
             code: {
