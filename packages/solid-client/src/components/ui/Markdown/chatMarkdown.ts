@@ -1,5 +1,8 @@
 import { Marked, type Token, type TokenizerAndRendererExtension } from "marked";
-import { COMMUNITY_SPOILER_DELIMITER } from "@shared/features/messaging/utils/communityMarkdownParity";
+import {
+  COMMUNITY_MARKDOWN_FORMATS,
+  COMMUNITY_SPOILER_DELIMITER,
+} from "@shared/features/messaging/utils/communityMarkdownParity";
 
 /**
  * The chat markdown lexer — the web half of the cross-platform render contract.
@@ -12,13 +15,20 @@ import { COMMUNITY_SPOILER_DELIMITER } from "@shared/features/messaging/utils/co
  * mirrors that grammar as a marked inline extension so spoilers keep their
  * inline flow inside paragraphs instead of being split into blocks.
  *
- * Known divergence from mobile (md4c underline flag): `__text__` renders bold
- * here, underline there. Cosmetic; revisit with a tokenizer extension if it
- * starts to matter.
+ * Haven intentionally follows mobile's opinionated underscore grammar:
+ * `_text_` and legacy `__text__` are underline, `*text*` is italic, and
+ * `**text**` is bold. The underline extension runs before marked's built-in
+ * emphasis tokenizer so those wire forms mean the same thing everywhere.
  */
 
 export type SpoilerToken = {
   type: "spoiler";
+  raw: string;
+  tokens: Token[];
+};
+
+export type UnderlineToken = {
+  type: "underline";
   raw: string;
   tokens: Token[];
 };
@@ -43,8 +53,27 @@ const spoilerExtension: TokenizerAndRendererExtension = {
   },
 };
 
+const underlineExtension: TokenizerAndRendererExtension = {
+  name: "underline",
+  level: "inline",
+  start(src: string) {
+    const index = src.indexOf(COMMUNITY_MARKDOWN_FORMATS.underline.opening);
+    return index < 0 ? undefined : index;
+  },
+  tokenizer(src: string) {
+    const match = /^(_{1,2})(?=\S)([\s\S]*?\S)\1(?!_)/.exec(src);
+    if (!match) return undefined;
+    const token: UnderlineToken = {
+      type: "underline",
+      raw: match[0],
+      tokens: this.lexer.inlineTokens(match[2] ?? ""),
+    };
+    return token;
+  },
+};
+
 const chatMarked = new Marked({ gfm: true, breaks: true });
-chatMarked.use({ extensions: [spoilerExtension] });
+chatMarked.use({ extensions: [spoilerExtension, underlineExtension] });
 
 export function lexChatMarkdown(content: string): Token[] {
   return chatMarked.lexer(content);

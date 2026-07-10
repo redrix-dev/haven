@@ -8,3 +8,4 @@ export { ReportDialog, type ReportDialogResult } from "./ReportDialog";
 export { SidePanel, type SidePanelProps } from "./SidePanel";
 export { Tooltip, type TooltipProps } from "./Tooltip";
 export { Markdown } from "./Markdown/Markdown";
+export { MarkdownToolbar } from "./Markdown/MarkdownToolbar";

@@ -16,6 +16,7 @@ import {
   EnrichedMarkdownText,
   type EnrichedMarkdownTextInputInstance,
 } from "react-native-enriched-markdown";
+import { COMMUNITY_MARKDOWN_MD4C_FLAGS } from "@shared/features/messaging/utils/communityMarkdownParity";
 import { ThemedIonicons } from "@/theme-rn";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatInterface } from "@/components/chat/ChatInterface";
@@ -368,7 +369,7 @@ export function DmChatSurface() {
             <EnrichedMarkdownText
               markdown={item.content}
               flavor="github"
-              md4cFlags={{ underline: true }}
+              md4cFlags={COMMUNITY_MARKDOWN_MD4C_FLAGS}
               markdownStyle={{
                 ...markdownStyle,
                 code: {

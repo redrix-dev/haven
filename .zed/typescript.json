@@ -1,0 +1,43 @@
+{
+  "Derive a type FROM a value (indexed access)": {
+    "prefix": "tsderive",
+    "body": [
+      "// Derive a type FROM a value so the two can NEVER drift apart.",
+      "//   typeof X   -> the value's type",
+      "//   [number]   -> union of an array's element types",
+      "//   [\"field\"]  -> pulls one property's type out of every element",
+      "// Reach for this when a `const` array/object is your source of truth and you want its shape as a type.",
+      "// Gotcha: the source needs `as const`, or you get widened `string` instead of the literal values.",
+      "type ${1:Name} = (typeof ${2:sourceArray})[number][\"${3:field}\"];$0"
+    ],
+    "description": "Derive a type from a value via indexed access, so type and data can't drift. Needs `as const` on the source."
+  },
+  "Discriminated union (literal kind tag)": {
+    "prefix": "tsdunion",
+    "body": [
+      "// Discriminated union: every variant carries a literal `kind` tag.",
+      "// TS reads that tag to know WHICH variant you have -> each variant can hold different fields.",
+      "// Reach for this when one value is one-of-several shapes, not just different data.",
+      "// Gotcha: a tag is a literal TYPE. kind: \"wrapped\" (quotes = this EXACT value).",
+      "//         In type space, no quotes -> `string` means ANY string; \"string\" means the literal word.",
+      "type ${1:Name} =",
+      "  | { kind: \"${2:variantA}\"; ${3:fieldA}: ${4:string} }",
+      "  | { kind: \"${5:variantB}\"; ${6:fieldB}: ${7:string} };$0"
+    ],
+    "description": "One-of-several shapes tagged by a literal `kind` so TS narrows to the right variant."
+  },
+  "as const satisfies (lock + check, no widening)": {
+    "prefix": "tsconstsat",
+    "body": [
+      "// `as const`    -> freeze values to their literal types (keeps \"**\", not widened to string)",
+      "// `satisfies T` -> a checkpoint: errors if any entry doesn't fit T, WITHOUT changing the value's type",
+      "// Reach for both when this value is your source of truth AND must obey a contract type.",
+      "// Gotcha: if you also derive a type FROM this value, keep that field loose in T (e.g. name: string),",
+      "//         or T -> derived type -> T becomes a circular reference and the whole thing breaks.",
+      "const ${1:catalog} = [",
+      "  ${2:/* entries */}",
+      "] as const satisfies readonly ${3:ContractType}[];$0"
+    ],
+    "description": "Validate a literal against a contract while keeping its narrow literal types (no widening)."
+  }
+}

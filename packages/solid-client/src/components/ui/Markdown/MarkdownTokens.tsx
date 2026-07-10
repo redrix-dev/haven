@@ -1,7 +1,7 @@
 import { For, type JSX } from "solid-js";
 import type { Token, Tokens } from "marked";
 import { Spoiler } from "./Spoiler";
-import type { SpoilerToken } from "./chatMarkdown";
+import type { SpoilerToken, UnderlineToken } from "./chatMarkdown";
 
 /**
  * Renders a marked token tree as Solid JSX. Security model: every piece of
@@ -48,6 +48,14 @@ function renderToken(token: Token): JSX.Element {
         <del>
           <MarkdownTokens tokens={(token as Tokens.Del).tokens} />
         </del>
+      );
+    case "underline":
+      return (
+        <u>
+          <MarkdownTokens
+            tokens={(token as unknown as UnderlineToken).tokens}
+          />
+        </u>
       );
     case "codespan":
       return (

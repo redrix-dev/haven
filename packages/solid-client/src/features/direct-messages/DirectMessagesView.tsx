@@ -16,7 +16,12 @@ import {
   SendHorizontal,
   X,
 } from "lucide-solid";
-import { normalizeCommunityMarkdown } from "@shared/features/messaging/utils/communityMarkdownParity";
+import {
+  matchCommunityMarkdownShortcut,
+  normalizeCommunityMarkdown,
+  toggleCommunityMarkdown,
+  type CommunityMarkdownFormat,
+} from "@shared/features/messaging/utils/communityMarkdownParity";
 import {
   resolveLiveAvatarUrl,
   resolveLiveUsername,
@@ -34,6 +39,7 @@ import {
   Avatar,
   Button,
   Markdown,
+  MarkdownToolbar,
   ReportDialog,
   type ActionMenuItem,
   type ReportDialogResult,
@@ -604,6 +610,46 @@ function DmComposer(props: {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
   };
 
+  const applyStyle = (format: CommunityMarkdownFormat) => {
+    if (!textarea) return;
+
+    const edit = toggleCommunityMarkdown(
+      format,
+      draft(),
+      textarea.selectionStart,
+      textarea.selectionEnd,
+    );
+    setDraft(edit.value);
+
+    queueMicrotask(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+      autogrow();
+    });
+  };
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    const format = event.isComposing
+      ? null
+      : matchCommunityMarkdownShortcut({
+          key: event.key,
+          primaryModifier: event.metaKey || event.ctrlKey,
+          shiftKey: event.shiftKey,
+          altKey: event.altKey,
+        });
+    if (format) {
+      event.preventDefault();
+      applyStyle(format);
+      return;
+    }
+
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      void submit();
+    }
+  };
+
   const clearPendingImage = (options?: { retainPreview?: boolean }) => {
     const current = pendingImage();
     if (current) {
@@ -696,57 +742,51 @@ function DmComposer(props: {
           </div>
         )}
       </Show>
-      <div class="flex items-end gap-2 rounded-xl bg-surface-input px-3 py-2">
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/*"
-          class="hidden"
-          onChange={(event) => {
-            setPickedImage(event.currentTarget.files?.[0]);
-          }}
-        />
-        <Button
-          size="icon"
-          variant="ghost"
-          aria-label="Attach image"
-          disabled={sending()}
-          onClick={pickImage}
-          class="h-8 w-8"
-        >
-          <ImagePlus size={18} />
-        </Button>
-        <textarea
-          ref={textarea}
-          rows={1}
-          value={draft()}
-          placeholder={`Message ${props.recipientName}`}
-          onInput={(event) => {
-            setDraft(event.currentTarget.value);
-            autogrow();
-          }}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.isComposing
-            ) {
-              event.preventDefault();
-              void submit();
-            }
-          }}
-          class="max-h-[200px] flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
-        />
-        <Button
-          size="icon"
-          variant="ghost"
-          aria-label="Send direct message"
-          disabled={sending() || (!draft().trim() && !pendingImage())}
-          onClick={() => void submit()}
-          class="h-8 w-8"
-        >
-          <SendHorizontal size={18} />
-        </Button>
+      <div class="rounded-xl bg-surface-input">
+        <MarkdownToolbar disabled={sending()} onFormat={applyStyle} />
+        <div class="flex items-end gap-2 px-3 py-2">
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/*"
+            class="hidden"
+            onChange={(event) => {
+              setPickedImage(event.currentTarget.files?.[0]);
+            }}
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Attach image"
+            disabled={sending()}
+            onClick={pickImage}
+            class="h-8 w-8"
+          >
+            <ImagePlus size={18} />
+          </Button>
+          <textarea
+            ref={textarea}
+            rows={1}
+            value={draft()}
+            placeholder={`Message ${props.recipientName}`}
+            onInput={(event) => {
+              setDraft(event.currentTarget.value);
+              autogrow();
+            }}
+            onKeyDown={handleKeyDown}
+            class="max-h-50 flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Send direct message"
+            disabled={sending() || (!draft().trim() && !pendingImage())}
+            onClick={() => void submit()}
+            class="h-8 w-8"
+          >
+            <SendHorizontal size={18} />
+          </Button>
+        </div>
       </div>
     </div>
   );

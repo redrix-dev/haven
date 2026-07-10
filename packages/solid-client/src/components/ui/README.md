@@ -11,9 +11,10 @@ a primitive — it belongs inside the feature that needs it.
 
 Current inventory: `cn` (class merge), `Button`, `TextField`, `Avatar`,
 `Tooltip` (Kobalte wraps styled with the semantic theme tokens), and
-`Markdown/` — the chat markdown renderer (marked lexer + Solid token renderer +
-`||spoiler||` support, contractually aligned with mobile via
-`@shared/features/messaging/utils/communityMarkdownParity.ts`).
+`Markdown/` — the chat markdown renderer and data-free composer toolbar. Its
+underscore/italic/bold grammar, formatting actions, shortcuts, and
+`||spoiler||` support are contractually aligned with mobile via
+`@shared/features/messaging/utils/communityMarkdownParity.ts`.
 
 Styling rule: use **semantic** Tailwind utilities only (`bg-card`,
 `text-foreground`, `bg-surface-panel`, …). The generated theme bridge
