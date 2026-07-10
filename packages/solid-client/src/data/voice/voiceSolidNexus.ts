@@ -38,6 +38,13 @@ type ConnectPresenceChannelInput = {
   currentUserId: string;
   displayName: string;
   avatarUrl?: string | null;
+  /**
+   * Also drive the active-channel roster (`participants`) from this channel's
+   * presence. Used on Linux, where there's no in-webview LiveKit Room to call
+   * setParticipants — the native sidecar owns the media, presence owns the
+   * roster. Web/mac/win leave this false (LiveKit drives the roster).
+   */
+  syncRoster?: boolean;
 };
 
 type SubscribePresenceChannelsInput = {
@@ -92,6 +99,9 @@ export class VoiceSolidNexus {
   private kickConnectionSerial = 0;
   private presenceChannel: VoiceRealtimeChannel | null = null;
   private presenceConnectionSerial = 0;
+  // Live speaking set (native/Linux path). Presence carries the roster but not
+  // per-frame speaking, so the sidecar's ActiveSpeakersChanged is overlaid here.
+  private speakingIds = new Set<string>();
 
   constructor(
     viewerPolicyStore: ViewerMessagePolicyStore,
@@ -129,12 +139,19 @@ export class VoiceSolidNexus {
   }
 
   startConnect(channel: VoiceChannelReference): void {
+    // Fresh session — drop any speaking overlay from the previous channel.
+    this.speakingIds.clear();
     // Seed the LiveKit-source roster from the presence roster we already have so
     // the active-channel row doesn't blink empty during "connecting" (LiveKit is
     // empty until the room connects). applyParticipants reconciles it to the real
     // roster on connect.
-    const seed =
-      this.state.participantsByChannelId[channel.id] ?? this.state.participants;
+    // Copy the objects — don't alias the participantsByChannelId store proxies
+    // into `participants`. Aliasing survives on the native path (nothing
+    // replaces the seed like LiveKit's applyParticipants does on web), and the
+    // stale shared proxies later corrupt the <For> DOM tree on WebKitGTK.
+    const seed = (
+      this.state.participantsByChannelId[channel.id] ?? this.state.participants
+    ).map((participant) => ({ ...participant }));
     this.setState({
       phase: "connecting",
       activeChannel: channel,
@@ -220,10 +237,35 @@ export class VoiceSolidNexus {
     // reconcile by userId so still-present participants keep their object
     // reference across updates — otherwise <For> tears down and rebuilds the
     // row on every speaking-state flip, closing any open dropdown.
-    this.setState(
-      "participants",
-      reconcile(participants, { key: "userId" }),
-    );
+    this.setState("participants", reconcile(participants, { key: "userId" }));
+  }
+
+  /**
+   * Overlay the live speaking set onto the active-channel roster (native/Linux
+   * path — the sidecar forwards LiveKit's active speakers).
+   *
+   * A speaking change is only ever a per-row boolean flip — never a membership
+   * add/remove/reorder — so it must NOT go through setParticipants/reconcile
+   * (the <For> structural path). Doing so raced with the presence-driven roster
+   * insert when joining a channel that already had members and reintroduced the
+   * WebKitGTK "incorrect node tree" crash. Patch isSpeaking in place instead:
+   * the array + row references never change, so <For> does zero structural work
+   * and only each row's isSpeaking signal updates.
+   */
+  setSpeakingIds(identities: string[]): void {
+    const next = new Set(identities);
+    if (
+      next.size === this.speakingIds.size &&
+      [...next].every((id) => this.speakingIds.has(id))
+    )
+      return;
+    this.speakingIds = next;
+    this.state.participants.forEach((participant, index) => {
+      const speaking = next.has(participant.userId);
+      if (participant.isSpeaking !== speaking) {
+        this.setState("participants", index, "isSpeaking", speaking);
+      }
+    });
   }
 
   setChannelParticipants(
@@ -388,6 +430,27 @@ export class VoiceSolidNexus {
       `voice:presence:${input.communityId}:${input.channelId}`,
       { config: { presence: { key: input.currentUserId } } },
     );
+
+    if (input.syncRoster) {
+      // Native (Linux): keep the active-channel roster in sync from presence,
+      // excluding self to mirror LiveKit's remoteParticipants on web. Fresh
+      // arrays each time (setParticipants reconciles by userId) — never aliased.
+      const syncRoster = () => {
+        this.setParticipants(
+          normalizePresenceRows(channel.presenceState())
+            .filter((participant) => participant.userId !== input.currentUserId)
+            // Preserve the live speaking overlay across presence syncs.
+            .map((participant) => ({
+              ...participant,
+              isSpeaking: this.speakingIds.has(participant.userId),
+            })),
+        );
+      };
+      channel
+        .on("presence", { event: "sync" }, syncRoster)
+        .on("presence", { event: "join" }, syncRoster)
+        .on("presence", { event: "leave" }, syncRoster);
+    }
 
     await new Promise<void>((resolve, reject) => {
       const timeoutId = setTimeout(() => {

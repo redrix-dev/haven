@@ -258,6 +258,31 @@ function safeCapture(command, args) {
   return { ok: result.status === 0, text: text || "" };
 }
 
+// Provenance for the DB/backend layer: the single commit that last touched the
+// schema/tests (supabase/**) or the backend code under test. Lets a signoff
+// truthfully state "DB/backend layer unchanged since <sha>" — the same fact CI
+// uses to skip the integration lane when nothing here changed.
+function captureDbLayerProvenance() {
+  const paths = ["supabase", "packages/shared/src/lib/backend"];
+  const res = safeCapture("git", [
+    "log",
+    "-1",
+    "--format=%h%x1f%cs%x1f%s",
+    "--",
+    ...paths,
+  ]);
+  if (!res.ok || !res.text) {
+    return { paths, commit: null, date: null, subject: null };
+  }
+  const [commit, date, subject] = res.text.split("");
+  return {
+    paths,
+    commit: commit?.trim() || null,
+    date: date?.trim() || null,
+    subject: subject?.trim() || null,
+  };
+}
+
 function runCapture(command, args, options = {}) {
   const invocation = resolveCommandInvocation(command, args);
   const startedAt = new Date();
@@ -340,6 +365,8 @@ function buildMarkdownSignoff(data) {
   lines.push(`- Commit: \`${data.git.commit || "unknown"}\``);
   lines.push("");
 
+  pushDbLayerSection(lines, data.dbLayer);
+
   lines.push("## Tooling Snapshot");
   lines.push("");
   lines.push(`- Node: \`${data.system.node || "unknown"}\``);
@@ -405,6 +432,29 @@ function firstLine(value) {
   return String(value).split(/\r?\n/)[0]?.trim() || "unknown";
 }
 
+function pushDbLayerSection(lines, dbLayer) {
+  lines.push("## DB / Backend Layer Provenance");
+  lines.push("");
+  if (!dbLayer || !dbLayer.commit) {
+    lines.push(
+      "- Provenance unavailable (no git history found for the tracked paths).",
+    );
+  } else {
+    const when = dbLayer.date ? ` (${dbLayer.date})` : "";
+    lines.push(`- Last changed at: \`${dbLayer.commit}\`${when}`);
+    if (dbLayer.subject) {
+      lines.push(`- Commit subject: ${dbLayer.subject}`);
+    }
+    lines.push(
+      `- Tracked paths: ${dbLayer.paths.map((p) => `\`${p}\``).join(", ")}`,
+    );
+    lines.push(
+      "- If this signoff did not run the DB/backend suites, they remain valid as of this commit (inputs unchanged since).",
+    );
+  }
+  lines.push("");
+}
+
 function buildPublicMarkdownSignoff(data) {
   const lines = [];
   lines.push(`# Test Signoff (${data.status})`);
@@ -446,6 +496,8 @@ function buildPublicMarkdownSignoff(data) {
     );
   }
   lines.push("");
+
+  pushDbLayerSection(lines, data.dbLayer);
 
   lines.push("## Signature");
   lines.push("");
@@ -533,6 +585,7 @@ async function main() {
   const npmVersion = safeCapture("npm", ["-v"]);
   const supabaseVersion = safeCapture("npx", ["supabase", "--version"]);
   const psqlVersion = safeCapture("psql", ["--version"]);
+  const dbLayer = captureDbLayerProvenance();
 
   const results = [];
   let failed = false;
@@ -598,6 +651,7 @@ async function main() {
       branch: gitBranch.ok ? gitBranch.text : null,
       commit: gitCommit.ok ? gitCommit.text : null,
     },
+    dbLayer,
     system: {
       node: nodeVersion.ok ? nodeVersion.text : null,
       npm: npmVersion.ok ? npmVersion.text : null,
