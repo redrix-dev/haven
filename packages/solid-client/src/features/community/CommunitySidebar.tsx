@@ -409,39 +409,39 @@ function OccupantRow(props: {
   return (
     <Show when={inThisChannel()} fallback={row()}>
       <KDropdownMenu.Root>
-      <KDropdownMenu.Trigger class="w-full text-left">
-        {row()}
-      </KDropdownMenu.Trigger>
-      <KDropdownMenu.Portal>
-        <KDropdownMenu.Content class="z-50 min-w-52 rounded-lg border border-border-dialog bg-popover p-2 text-popover-foreground shadow-lg outline-none">
-          <div class="px-1 py-1.5" onPointerDown={(e) => e.stopPropagation()}>
-            <div class="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-              <span>Volume</span>
-              <span>{volume()}%</span>
+        <KDropdownMenu.Trigger class="w-full text-left">
+          {row()}
+        </KDropdownMenu.Trigger>
+        <KDropdownMenu.Portal>
+          <KDropdownMenu.Content class="z-50 min-w-52 rounded-lg border border-border-dialog bg-popover p-2 text-popover-foreground shadow-lg outline-none">
+            <div class="px-1 py-1.5" onPointerDown={(e) => e.stopPropagation()}>
+              <div class="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                <span>Volume</span>
+                <span>{volume()}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={volume()}
+                onInput={(e) =>
+                  setMemberVolume(props.userId, Number(e.currentTarget.value))
+                }
+                class="w-full"
+              />
             </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={volume()}
-              onInput={(e) =>
-                setMemberVolume(props.userId, Number(e.currentTarget.value))
-              }
-              class="w-full"
-            />
-          </div>
-          <Show when={canKick()}>
-            <KDropdownMenu.Item
-              class="mt-1 flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-sm text-destructive outline-none data-[highlighted]:bg-destructive data-[highlighted]:text-primary-foreground"
-              onSelect={() =>
-                void core.voice.kickParticipant(props.userId, props.channelId)
-              }
-            >
-              Disconnect from voice
-            </KDropdownMenu.Item>
-          </Show>
-        </KDropdownMenu.Content>
-      </KDropdownMenu.Portal>
+            <Show when={canKick()}>
+              <KDropdownMenu.Item
+                class="mt-1 flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-sm text-destructive outline-none data-[highlighted]:bg-destructive data-[highlighted]:text-primary-foreground"
+                onSelect={() =>
+                  void core.voice.kickParticipant(props.userId, props.channelId)
+                }
+              >
+                Disconnect from voice
+              </KDropdownMenu.Item>
+            </Show>
+          </KDropdownMenu.Content>
+        </KDropdownMenu.Portal>
       </KDropdownMenu.Root>
     </Show>
   );

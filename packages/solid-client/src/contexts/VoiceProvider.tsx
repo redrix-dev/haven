@@ -493,7 +493,8 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     core.voice.setIsMuted(next);
     const native = nativeVoice();
     if (native) void native.setMuted(next).catch(() => {});
-    else void room?.localParticipant.setMicrophoneEnabled(!next).catch(() => {});
+    else
+      void room?.localParticipant.setMicrophoneEnabled(!next).catch(() => {});
   };
 
   const toggleDeafen = () => {
@@ -520,7 +521,9 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     const native = nativeVoice();
     if (native) {
       // Sidecar gain is 0..1, capped at 1 like the web path's setVolume.
-      void native.setMemberVolume(userId, Math.min(1, clamped / 100)).catch(() => {});
+      void native
+        .setMemberVolume(userId, Math.min(1, clamped / 100))
+        .catch(() => {});
     } else {
       applyRemoteVolumes(voice.isDeafened);
     }
@@ -537,7 +540,8 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     setVoice({ selectedOutputDeviceId: deviceId });
     const native = nativeVoice();
     if (native) await native.setOutputDevice(deviceId).catch(() => {});
-    else await room?.switchActiveDevice("audiooutput", deviceId).catch(() => {});
+    else
+      await room?.switchActiveDevice("audiooutput", deviceId).catch(() => {});
   };
 
   const enableAudioPlayback = async () => {

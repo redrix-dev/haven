@@ -150,9 +150,8 @@ export const tauriBridge: HavenBridge = {
     const unsubscribers: Array<() => void> = [];
 
     // macOS (running app) + the plugin's native delivery.
-    const { onOpenUrl, getCurrent } = await import(
-      "@tauri-apps/plugin-deep-link"
-    );
+    const { onOpenUrl, getCurrent } =
+      await import("@tauri-apps/plugin-deep-link");
     unsubscribers.push(
       await onOpenUrl((urls) => urls.forEach((url) => handler(url))),
     );
