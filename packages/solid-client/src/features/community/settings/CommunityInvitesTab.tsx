@@ -35,8 +35,7 @@ const MAX_USES_OPTIONS: { label: string; value: number | null }[] = [
  * registers a browserRuntime, this can move to getPlatformInviteBaseUrl().
  */
 function inviteReference(code: string): string {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   return origin.startsWith("http") ? `${origin}/invite/${code}` : code;
 }
 
@@ -220,9 +219,7 @@ export function CommunityInvitesTab(props: { communityId: string }) {
 
             <Show
               when={!loading() || invites().length > 0}
-              fallback={
-                <p class="text-sm text-muted-foreground">Loading…</p>
-              }
+              fallback={<p class="text-sm text-muted-foreground">Loading…</p>}
             >
               <Show
                 when={invites().length > 0}

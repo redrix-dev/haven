@@ -263,8 +263,7 @@ export class CommunityMessageSolidNexus {
           byChannel: snapshot.channelState?.byChannel ?? {},
           cursors: snapshot.channelState?.cursors ?? {},
           hasMore: snapshot.channelState?.hasMore ?? {},
-          initialLoadComplete:
-            snapshot.channelState?.initialLoadComplete ?? {},
+          initialLoadComplete: snapshot.channelState?.initialLoadComplete ?? {},
         });
       } else {
         this.setState({
@@ -392,7 +391,10 @@ export class CommunityMessageSolidNexus {
         byChannel: { ...state.byChannel, [channelId]: [] },
         cursors: { ...state.cursors, [channelId]: null },
         hasMore: { ...state.hasMore, [channelId]: false },
-        initialLoadComplete: { ...state.initialLoadComplete, [channelId]: false },
+        initialLoadComplete: {
+          ...state.initialLoadComplete,
+          [channelId]: false,
+        },
         loadingInitial: { ...state.loadingInitial, [channelId]: false },
         loadingOlder: { ...state.loadingOlder, [channelId]: false },
         lastInitialLoadedAt: { ...state.lastInitialLoadedAt, [channelId]: 0 },

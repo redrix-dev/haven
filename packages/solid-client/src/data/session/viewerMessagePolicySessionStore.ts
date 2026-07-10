@@ -16,7 +16,9 @@ import {
  * side never calls it (no notify, no manual pub/sub).
  */
 export function createSolidViewerMessagePolicyStore(): ViewerMessagePolicyStore {
-  const [state, setState] = createStore(createDefaultViewerMessagePolicyState());
+  const [state, setState] = createStore(
+    createDefaultViewerMessagePolicyState(),
+  );
 
   return {
     getState: () => state,

@@ -5,7 +5,7 @@ a single cohesive nexus. Use `channels/channelSolidNexus.ts` as the worked
 example — it's the template every step below points back to.
 
 **You are not writing from scratch.** The old `XSolidCache.ts` already contains
-the state shape, the raw→clean mapper, and the load logic. You're *transforming*
+the state shape, the raw→clean mapper, and the load logic. You're _transforming_
 it: re-housing into the nexus shape, stripping the adapter, folding the accessors
 back in as methods.
 
@@ -45,7 +45,7 @@ pass learned it the hard way.)
    needed `getActiveId()`, `getCommunityIds()`, `loadDisplayOrder()`. These won't
    show up in a feature-component grep.
 3. **The typed contract** — `@shared/core/realtimeMutationTarget.ts`. `HavenSolidCore
-   implements RealtimeMutationTarget`, whose `<domain>` property is a typed
+implements RealtimeMutationTarget`, whose `<domain>` property is a typed
    `Realtime<Domain>Cache` interface your nexus **must** implement. It also **dictates
    method names** — communities had to expose `load(userId)`, NOT `loadCommunities`.
    The interface is the source of truth for the name; don't rename it.

@@ -25,8 +25,17 @@ const payload = {
   name: identity,
   nbf: now,
   exp: now + 3600,
-  video: { room, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true },
+  video: {
+    room,
+    roomJoin: true,
+    canPublish: true,
+    canSubscribe: true,
+    canPublishData: true,
+  },
 };
 const signingInput = `${b64({ alg: "HS256", typ: "JWT" })}.${b64(payload)}`;
-const signature = crypto.createHmac("sha256", secret).update(signingInput).digest("base64url");
+const signature = crypto
+  .createHmac("sha256", secret)
+  .update(signingInput)
+  .digest("base64url");
 process.stdout.write(`${signingInput}.${signature}\n`);

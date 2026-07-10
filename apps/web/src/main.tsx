@@ -7,9 +7,7 @@ function boot(): void {
   // Surface the web build identity (SHA + build time) — the web analog of the
   // desktop updater version. Inspectable in-app via the DOM + console.
   document.documentElement.dataset.havenBuild = buildInfo.stamp;
-  console.info(
-    `[Haven web] ${buildInfo.stamp} · built ${buildInfo.buildTime}`,
-  );
+  console.info(`[Haven web] ${buildInfo.stamp} · built ${buildInfo.buildTime}`);
 
   // Build + register the core BEFORE App evaluates anything that needs it.
   const core = createWebHavenCore();

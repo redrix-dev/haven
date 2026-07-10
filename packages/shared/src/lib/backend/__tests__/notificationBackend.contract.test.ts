@@ -200,5 +200,4 @@ describe.sequential("NotificationBackend (contract)", () => {
     expect(target?.stage).toBe("client_route");
     expect(target?.reasonCode).toBe("sw_focused_window_suppressed");
   });
-
 });

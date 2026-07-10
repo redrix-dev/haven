@@ -1,10 +1,4 @@
-import {
-  For,
-  Show,
-  createEffect,
-  createMemo,
-  createSignal,
-} from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { SidePanel } from "@solid-client/components/ui/SidePanel";
 import type { CommunitySettingsTab } from "@shared/core/sessionStorePorts";
@@ -58,9 +52,7 @@ export function CommunitySettingsPanel() {
   );
 
   const perms = createMemo(() =>
-    communityId()
-      ? core.permissions.getPermissions(communityId())
-      : null,
+    communityId() ? core.permissions.getPermissions(communityId()) : null,
   );
 
   const tabs = createMemo(() => {

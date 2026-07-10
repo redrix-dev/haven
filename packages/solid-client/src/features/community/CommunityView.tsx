@@ -3,7 +3,10 @@ import { Navigate, useParams } from "@solidjs/router";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useToast } from "@solid-client/contexts/ToastProvider";
-import { ReportDialog, type ReportDialogResult } from "@solid-client/components/ui";
+import {
+  ReportDialog,
+  type ReportDialogResult,
+} from "@solid-client/components/ui";
 import { createCommunityRouteSync } from "./CommunityRouteSync";
 import { buildMessageViewItems } from "./messageList/messageViewModel";
 import { MessageList } from "./messageList/MessageList";

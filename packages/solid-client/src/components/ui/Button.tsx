@@ -20,13 +20,15 @@ const sizeClasses: Record<ButtonSize, string> = {
   icon: "h-9 w-9",
 };
 
-export type ButtonProps<T extends ValidComponent = "button"> =
-  PolymorphicProps<T, KButton.ButtonRootProps<T>> & {
-    variant?: ButtonVariant;
-    size?: ButtonSize;
-    class?: string;
-    children?: JSX.Element;
-  };
+export type ButtonProps<T extends ValidComponent = "button"> = PolymorphicProps<
+  T,
+  KButton.ButtonRootProps<T>
+> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  class?: string;
+  children?: JSX.Element;
+};
 
 export function Button<T extends ValidComponent = "button">(
   props: ButtonProps<T>,

@@ -103,9 +103,7 @@ export function ModmailView() {
         <div class="flex w-80 shrink-0 flex-col border-r border-border">
           <Show
             when={!loading() || reports().length > 0}
-            fallback={
-              <p class="p-4 text-sm text-muted-foreground">Loading…</p>
-            }
+            fallback={<p class="p-4 text-sm text-muted-foreground">Loading…</p>}
           >
             <Show
               when={visible().length > 0}
@@ -289,9 +287,7 @@ function ReportDetailPane(props: { detail: ServerReportDetail }) {
         </p>
         <Show
           when={props.detail.internalNotes.length > 0}
-          fallback={
-            <p class="text-sm text-muted-foreground">No notes yet.</p>
-          }
+          fallback={<p class="text-sm text-muted-foreground">No notes yet.</p>}
         >
           <ul class="space-y-2">
             <For each={props.detail.internalNotes}>
@@ -337,7 +333,9 @@ function ReportDetailPane(props: { detail: ServerReportDetail }) {
           </span>
           <select
             value={props.detail.status}
-            disabled={busy() || !SETTABLE_STATUSES.includes(props.detail.status)}
+            disabled={
+              busy() || !SETTABLE_STATUSES.includes(props.detail.status)
+            }
             onChange={(e) =>
               setStatus(e.currentTarget.value as SupportReportStatus)
             }

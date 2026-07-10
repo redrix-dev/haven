@@ -202,7 +202,10 @@ export class CommunityModerationSolidNexus {
       if (this.state.reports.some((r) => r.reportId === reportId)) return;
       this.setState("reports", (reports) => [detail, ...reports]);
     } catch (err) {
-      console.warn("[CommunityModerationSolidNexus] handleReportCreated failed", err);
+      console.warn(
+        "[CommunityModerationSolidNexus] handleReportCreated failed",
+        err,
+      );
     }
   }
 

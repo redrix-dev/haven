@@ -23,7 +23,9 @@ export type MessageRowActions = {
   onReportUser?: (userId: string, name: string) => void;
 };
 
-export function MessageRow(props: { item: MessageRowItem } & MessageRowActions) {
+export function MessageRow(
+  props: { item: MessageRowItem } & MessageRowActions,
+) {
   const m = () => props.item.message;
 
   const items = (): ActionMenuItem[] => {
@@ -57,54 +59,54 @@ export function MessageRow(props: { item: MessageRowItem } & MessageRowActions) 
 
   return (
     <ActionsMenu items={items()} label="Message actions">
-    <div
-      class="px-4 py-0.5 hover:bg-surface-message-row-hover"
-      classList={{ "mt-2": props.item.showHeader }}
-    >
-      <Show when={props.item.replyContext}>
-        {(reply) => (
-          <div class="mb-0.5 flex items-center gap-1.5 pl-[52px] text-xs text-muted-foreground">
-            <CornerUpLeft size={12} />
-            <span class="font-semibold">{reply().displayName}</span>
-            <span class="truncate">{reply().preview}</span>
-          </div>
-        )}
-      </Show>
-
-      <Show
-        when={props.item.showHeader}
-        fallback={
-          <div class="pl-[52px]">
-            <MessageContent item={props.item} />
-          </div>
-        }
+      <div
+        class="px-4 py-0.5 hover:bg-surface-message-row-hover"
+        classList={{ "mt-2": props.item.showHeader }}
       >
-        <div class="flex gap-3">
-          <Avatar
-            src={props.item.avatarUrl}
-            name={props.item.authorName}
-            size="lg"
-            class="mt-0.5"
-          />
-          <div class="min-w-0 flex-1">
-            <div class="flex items-baseline gap-2">
-              <span class="font-semibold text-foreground">
-                {props.item.authorName}
-              </span>
-              <Show when={m().isPlatformStaff}>
-                <span class="rounded bg-primary/20 px-1 text-[10px] font-semibold uppercase text-primary">
-                  staff
-                </span>
-              </Show>
-              <span class="text-xs text-muted-foreground">
-                {timeLabel(m().createdAt)}
-              </span>
+        <Show when={props.item.replyContext}>
+          {(reply) => (
+            <div class="mb-0.5 flex items-center gap-1.5 pl-[52px] text-xs text-muted-foreground">
+              <CornerUpLeft size={12} />
+              <span class="font-semibold">{reply().displayName}</span>
+              <span class="truncate">{reply().preview}</span>
             </div>
-            <MessageContent item={props.item} />
+          )}
+        </Show>
+
+        <Show
+          when={props.item.showHeader}
+          fallback={
+            <div class="pl-[52px]">
+              <MessageContent item={props.item} />
+            </div>
+          }
+        >
+          <div class="flex gap-3">
+            <Avatar
+              src={props.item.avatarUrl}
+              name={props.item.authorName}
+              size="lg"
+              class="mt-0.5"
+            />
+            <div class="min-w-0 flex-1">
+              <div class="flex items-baseline gap-2">
+                <span class="font-semibold text-foreground">
+                  {props.item.authorName}
+                </span>
+                <Show when={m().isPlatformStaff}>
+                  <span class="rounded bg-primary/20 px-1 text-[10px] font-semibold uppercase text-primary">
+                    staff
+                  </span>
+                </Show>
+                <span class="text-xs text-muted-foreground">
+                  {timeLabel(m().createdAt)}
+                </span>
+              </div>
+              <MessageContent item={props.item} />
+            </div>
           </div>
-        </div>
-      </Show>
-    </div>
+        </Show>
+      </div>
     </ActionsMenu>
   );
 }

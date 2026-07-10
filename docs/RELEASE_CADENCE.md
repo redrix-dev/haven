@@ -11,11 +11,11 @@ promotion happens on `main`, and each train cuts its own artifact from there.
 
 ## Version semantics (one source of truth per train)
 
-| Train | Versioning | Tag | Where it lives |
-| --- | --- | --- | --- |
+| Train               | Versioning             | Tag                 | Where it lives                                                       |
+| ------------------- | ---------------------- | ------------------- | -------------------------------------------------------------------- |
 | **Desktop** (Tauri) | semver, starts `2.0.0` | `desktop-v<semver>` | `tauri.conf.json` + `Cargo.toml` + root `package.json`, kept in sync |
-| **Web** (Vercel) | derived, continuous | _none_ | in-app build stamp `2.0.0+<shortSha>` + build time |
-| **Mobile** (iOS) | its own semver line | `mobile-v<semver>` | `apps/mobile/package.json` + native build/version codes |
+| **Web** (Vercel)    | derived, continuous    | _none_              | in-app build stamp `2.0.0+<shortSha>` + build time                   |
+| **Mobile** (iOS)    | its own semver line    | `mobile-v<semver>`  | `apps/mobile/package.json` + native build/version codes              |
 
 - New tags are **platform-prefixed** (`desktop-v*`, `mobile-v*`) so the three
   trains never collide. The old unified `vX.Y.Z` / `release/v1.*` tags belong to

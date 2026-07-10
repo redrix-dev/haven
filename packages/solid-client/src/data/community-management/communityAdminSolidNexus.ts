@@ -12,7 +12,9 @@ import type {
 /** The control-plane slice this nexus needs (invites live here, not communityData). */
 type InviteControlPlane = Pick<
   ControlPlaneBackend,
-  "listActiveCommunityInvites" | "createCommunityInvite" | "revokeCommunityInvite"
+  | "listActiveCommunityInvites"
+  | "createCommunityInvite"
+  | "revokeCommunityInvite"
 >;
 
 const NO_MEMBERS: CommunityMemberListItem[] = [];
@@ -72,9 +74,7 @@ export class CommunityAdminSolidNexus {
   }
 
   membersLoading(communityId: Accessor<string>): Accessor<boolean> {
-    return createMemo(
-      () => this.state.membersLoading[communityId()] ?? false,
-    );
+    return createMemo(() => this.state.membersLoading[communityId()] ?? false);
   }
 
   bans(communityId: Accessor<string>): Accessor<CommunityBanItem[]> {
@@ -107,12 +107,15 @@ export class CommunityAdminSolidNexus {
     this.setState("membersLoading", communityId, true);
     this.setState("membersError", communityId, null);
     try {
-      const members = await this.communityData.listCommunityMembers(
-        communityId,
-      );
+      const members =
+        await this.communityData.listCommunityMembers(communityId);
       this.setState("membersByCommunity", communityId, members);
     } catch (error) {
-      this.setState("membersError", communityId, error instanceof Error ? error.message : "Failed to load members");
+      this.setState(
+        "membersError",
+        communityId,
+        error instanceof Error ? error.message : "Failed to load members",
+      );
     } finally {
       this.setState("membersLoading", communityId, false);
     }

@@ -359,7 +359,9 @@ function DmConversation(props: {
   const { session } = useSession();
   const liveProfiles = core.profiles.liveProfiles();
   const messages = core.directMessages.messages(() => props.conversationId);
-  const loading = core.directMessages.messagesLoading(() => props.conversationId);
+  const loading = core.directMessages.messagesLoading(
+    () => props.conversationId,
+  );
   const [reportTarget, setReportTarget] = createSignal<DmReportTarget | null>(
     null,
   );
@@ -514,58 +516,65 @@ function DmMessageRow(props: {
 
   return (
     <ActionsMenu items={items()} label="Message actions">
-    <div
-      class="group flex gap-2 rounded px-1 py-1.5 hover:bg-surface-message-row-hover"
-      classList={{ "flex-row-reverse": props.self }}
-    >
-      <Avatar src={props.avatarUrl} name={props.authorName} size="md" />
-      <div class="min-w-0 max-w-[72%]" classList={{ "text-right": props.self }}>
+      <div
+        class="group flex gap-2 rounded px-1 py-1.5 hover:bg-surface-message-row-hover"
+        classList={{ "flex-row-reverse": props.self }}
+      >
+        <Avatar src={props.avatarUrl} name={props.authorName} size="md" />
         <div
-          class="mb-0.5 flex items-baseline gap-2"
-          classList={{ "justify-end": props.self }}
+          class="min-w-0 max-w-[72%]"
+          classList={{ "text-right": props.self }}
         >
-          <span class="text-sm font-semibold text-foreground">
-            {props.self ? "You" : props.authorName}
-          </span>
-          <span class="text-xs text-muted-foreground">
-            {timeLabel(props.message.createdAt)}
-          </span>
-        </div>
-        <Show
-          when={props.message.deletedAt === null}
-          fallback={
-            <p class="text-sm italic text-muted-foreground">Message deleted</p>
-          }
-        >
-          <Markdown content={props.message.content} class="text-foreground" />
-          <Show when={props.message.attachments.length > 0}>
-            <div class="mt-1 flex flex-wrap gap-2">
-              <For each={props.message.attachments}>
-                {(attachment) => (
-                  <Show
-                    when={attachment.signedUrl}
-                    fallback={
-                      <span class="inline-flex items-center gap-1 rounded bg-surface-embed-chip px-2 py-1 text-xs text-attachment-label">
-                        <ImageIcon size={12} />
-                        {attachment.originalFilename ?? "Image"}
-                      </span>
-                    }
-                  >
-                    {(src) => (
-                      <img
-                        src={src()}
-                        alt={attachment.originalFilename ?? "Image attachment"}
-                        class="max-h-60 max-w-full rounded border border-border object-contain"
-                      />
-                    )}
-                  </Show>
-                )}
-              </For>
-            </div>
+          <div
+            class="mb-0.5 flex items-baseline gap-2"
+            classList={{ "justify-end": props.self }}
+          >
+            <span class="text-sm font-semibold text-foreground">
+              {props.self ? "You" : props.authorName}
+            </span>
+            <span class="text-xs text-muted-foreground">
+              {timeLabel(props.message.createdAt)}
+            </span>
+          </div>
+          <Show
+            when={props.message.deletedAt === null}
+            fallback={
+              <p class="text-sm italic text-muted-foreground">
+                Message deleted
+              </p>
+            }
+          >
+            <Markdown content={props.message.content} class="text-foreground" />
+            <Show when={props.message.attachments.length > 0}>
+              <div class="mt-1 flex flex-wrap gap-2">
+                <For each={props.message.attachments}>
+                  {(attachment) => (
+                    <Show
+                      when={attachment.signedUrl}
+                      fallback={
+                        <span class="inline-flex items-center gap-1 rounded bg-surface-embed-chip px-2 py-1 text-xs text-attachment-label">
+                          <ImageIcon size={12} />
+                          {attachment.originalFilename ?? "Image"}
+                        </span>
+                      }
+                    >
+                      {(src) => (
+                        <img
+                          src={src()}
+                          alt={
+                            attachment.originalFilename ?? "Image attachment"
+                          }
+                          class="max-h-60 max-w-full rounded border border-border object-contain"
+                        />
+                      )}
+                    </Show>
+                  )}
+                </For>
+              </div>
+            </Show>
           </Show>
-        </Show>
+        </div>
       </div>
-    </div>
     </ActionsMenu>
   );
 }

@@ -82,7 +82,10 @@ export class OnboardingSolidNexus {
     campaignKey: string,
     context: OnboardingClientContext,
   ): Promise<OnboardingCompletionResult> {
-    this.setState({ completingCampaignKey: campaignKey, completionError: null });
+    this.setState({
+      completingCampaignKey: campaignKey,
+      completionError: null,
+    });
     try {
       const result = await this.controlPlane.completeOnboardingCampaign(
         campaignKey,

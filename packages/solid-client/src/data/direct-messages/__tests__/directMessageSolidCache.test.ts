@@ -117,7 +117,10 @@ describe("DirectMessageSolidNexus", () => {
         .mockResolvedValueOnce(newer)
         .mockResolvedValueOnce(older),
     });
-    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
+    const cache = new DirectMessageSolidNexus(
+      createMemoryPersistence(),
+      backend,
+    );
     cache.setConversations([
       conversation({ conversationId: "conversation-1" }),
     ]);
@@ -146,7 +149,10 @@ describe("DirectMessageSolidNexus", () => {
     const backend = createBackend({
       getMessage: vi.fn().mockResolvedValue(incoming),
     });
-    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
+    const cache = new DirectMessageSolidNexus(
+      createMemoryPersistence(),
+      backend,
+    );
     cache.setConversations([
       conversation({ conversationId: "conversation-1", otherUserId: "peer-1" }),
     ]);
@@ -178,7 +184,10 @@ describe("DirectMessageSolidNexus", () => {
           }),
       ),
     });
-    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
+    const cache = new DirectMessageSolidNexus(
+      createMemoryPersistence(),
+      backend,
+    );
     cache.setConversations([staleSummary]);
 
     const load = cache.loadConversations();
@@ -228,7 +237,10 @@ describe("DirectMessageSolidNexus", () => {
     });
     const sendMessage = vi.fn().mockResolvedValue(sent);
     const backend = createBackend({ sendMessage });
-    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
+    const cache = new DirectMessageSolidNexus(
+      createMemoryPersistence(),
+      backend,
+    );
     cache.setConversations([
       conversation({ conversationId: "conversation-1" }),
     ]);
@@ -257,7 +269,10 @@ describe("DirectMessageSolidNexus", () => {
   it("forwards direct message reports to the backend", async () => {
     const reportMessage = vi.fn().mockResolvedValue("report-1");
     const backend = createBackend({ reportMessage });
-    const cache = new DirectMessageSolidNexus(createMemoryPersistence(), backend);
+    const cache = new DirectMessageSolidNexus(
+      createMemoryPersistence(),
+      backend,
+    );
 
     const reportId = await cache.reportMessage({
       messageId: "message-1",

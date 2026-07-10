@@ -73,10 +73,12 @@ export function createSolidUiSessionStore() {
       setState("showChannelSettingsModal", open),
     setChannelSettingsTargetId: (id) => setState("channelSettingsTargetId", id),
     setShowCreateModal: (open) => setState("showCreateModal", open),
-    setShowCreateChannelModal: (open) => setState("showCreateChannelModal", open),
+    setShowCreateChannelModal: (open) =>
+      setState("showCreateChannelModal", open),
     setShowJoinServerModal: (open) => setState("showJoinServerModal", open),
     setShowAccountModal: (open) => setState("showAccountModal", open),
-    setShowVoiceSettingsModal: (open) => setState("showVoiceSettingsModal", open),
+    setShowVoiceSettingsModal: (open) =>
+      setState("showVoiceSettingsModal", open),
     setUserVoiceHardwareTestOpen: (open) =>
       setState("userVoiceHardwareTestOpen", open),
     setServerModmailOpen: (open) => setState("serverModmailOpen", open),

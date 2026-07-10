@@ -157,7 +157,9 @@ function RoleEditor(props: {
   const core = requireHavenSolidCore();
   const [name, setName] = createSignal(props.role.name);
   const [color, setColor] = createSignal(props.role.color);
-  const [keys, setKeys] = createSignal<string[]>([...props.role.permissionKeys]);
+  const [keys, setKeys] = createSignal<string[]>([
+    ...props.role.permissionKeys,
+  ]);
   const [saving, setSaving] = createSignal(false);
   const [deleting, setDeleting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);

@@ -27,5 +27,9 @@ export function FeatureGate(props: {
   fallback?: JSX.Element;
 }) {
   const enabled = useFeatureFlag(props.flag);
-  return <Show when={enabled()} fallback={props.fallback}>{props.children}</Show>;
+  return (
+    <Show when={enabled()} fallback={props.fallback}>
+      {props.children}
+    </Show>
+  );
 }

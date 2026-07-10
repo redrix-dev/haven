@@ -36,7 +36,9 @@ export function ForgotPasswordScreen() {
           when={!sent()}
           fallback={
             <div class="space-y-4">
-              <h1 class="text-xl font-bold text-foreground">Check your email</h1>
+              <h1 class="text-xl font-bold text-foreground">
+                Check your email
+              </h1>
               <p class="text-sm text-muted-foreground">
                 If an account exists for{" "}
                 <span class="text-foreground">{email()}</span>, a password-reset

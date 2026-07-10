@@ -71,7 +71,8 @@ export class PermissionsSolidNexus {
     channelId: string,
     revokedUserId: string,
   ): void {
-    const byCommunity = this.state.revokedAuthorIdsByCommunity[communityId] ?? {};
+    const byCommunity =
+      this.state.revokedAuthorIdsByCommunity[communityId] ?? {};
     const existing = byCommunity[channelId] ?? [];
     if (existing.includes(revokedUserId)) return;
     this.setState("revokedAuthorIdsByCommunity", communityId, {
@@ -135,10 +136,14 @@ export class PermissionsSolidNexus {
       communityId,
       channelId,
     });
-    this.setState("revokedAuthorIdsByCommunity", communityId, (byCommunity = {}) => ({
-      ...byCommunity,
-      [channelId]: ids,
-    }));
+    this.setState(
+      "revokedAuthorIdsByCommunity",
+      communityId,
+      (byCommunity = {}) => ({
+        ...byCommunity,
+        [channelId]: ids,
+      }),
+    );
     this.policySync?.(communityId);
   }
 

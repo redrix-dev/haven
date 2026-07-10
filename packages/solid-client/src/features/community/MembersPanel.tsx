@@ -130,7 +130,9 @@ export function MembersPanel(props: { communityId: string }) {
         <Show when={view() === "members"}>
           <Show
             when={!loading() || members().length > 0}
-            fallback={<p class="px-1 text-sm text-muted-foreground">Loading…</p>}
+            fallback={
+              <p class="px-1 text-sm text-muted-foreground">Loading…</p>
+            }
           >
             <For each={members()}>
               {(member) => (
@@ -139,35 +141,35 @@ export function MembersPanel(props: { communityId: string }) {
                   label="Member actions"
                   hoverButton={false}
                 >
-                <div class="group flex items-center gap-2 rounded px-1 py-1 hover:bg-surface-list-hover">
-                  <Avatar src={member.avatarUrl} name={member.displayName} />
-                  <span class="min-w-0 flex-1 truncate text-sm text-body-soft">
-                    {member.displayName}
-                  </span>
-                  <Show when={member.isOwner}>
-                    <Crown size={14} class="shrink-0 text-accent-amber" />
-                  </Show>
-                  <Show when={canModerate(member)}>
-                    <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
-                      <button
-                        type="button"
-                        title="Kick"
-                        onClick={() => setPending({ kind: "kick", member })}
-                        class="rounded p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-                      >
-                        <UserMinus size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        title="Ban"
-                        onClick={() => setPending({ kind: "ban", member })}
-                        class="rounded p-1 text-muted-foreground hover:bg-destructive hover:text-primary-foreground"
-                      >
-                        <Ban size={14} />
-                      </button>
-                    </div>
-                  </Show>
-                </div>
+                  <div class="group flex items-center gap-2 rounded px-1 py-1 hover:bg-surface-list-hover">
+                    <Avatar src={member.avatarUrl} name={member.displayName} />
+                    <span class="min-w-0 flex-1 truncate text-sm text-body-soft">
+                      {member.displayName}
+                    </span>
+                    <Show when={member.isOwner}>
+                      <Crown size={14} class="shrink-0 text-accent-amber" />
+                    </Show>
+                    <Show when={canModerate(member)}>
+                      <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+                        <button
+                          type="button"
+                          title="Kick"
+                          onClick={() => setPending({ kind: "kick", member })}
+                          class="rounded p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                        >
+                          <UserMinus size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          title="Ban"
+                          onClick={() => setPending({ kind: "ban", member })}
+                          class="rounded p-1 text-muted-foreground hover:bg-destructive hover:text-primary-foreground"
+                        >
+                          <Ban size={14} />
+                        </button>
+                      </div>
+                    </Show>
+                  </div>
                 </ActionsMenu>
               )}
             </For>
@@ -178,7 +180,9 @@ export function MembersPanel(props: { communityId: string }) {
           <Show
             when={bans().length > 0}
             fallback={
-              <p class="px-1 text-sm text-muted-foreground">No banned members.</p>
+              <p class="px-1 text-sm text-muted-foreground">
+                No banned members.
+              </p>
             }
           >
             <For each={bans()}>
@@ -186,7 +190,9 @@ export function MembersPanel(props: { communityId: string }) {
                 <div class="group flex items-center gap-2 rounded px-1 py-1 hover:bg-surface-list-hover">
                   <Avatar src={ban.avatarUrl} name={ban.username} />
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm text-body-soft">{ban.username}</p>
+                    <p class="truncate text-sm text-body-soft">
+                      {ban.username}
+                    </p>
                     <Show when={ban.reason}>
                       <p class="truncate text-xs text-muted-foreground">
                         {ban.reason}

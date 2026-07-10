@@ -35,7 +35,9 @@ execFileSync("cargo", cargoArgs, { cwd: sidecarDir, stdio: "inherit" });
 const rustcInfo = execFileSync("rustc", ["-vV"], { encoding: "utf8" });
 const tripleMatch = rustcInfo.match(/^host:\s*(.+)$/m);
 if (!tripleMatch) {
-  throw new Error("[stage-sidecar] could not determine host target triple from `rustc -vV`");
+  throw new Error(
+    "[stage-sidecar] could not determine host target triple from `rustc -vV`",
+  );
 }
 const triple = tripleMatch[1].trim();
 

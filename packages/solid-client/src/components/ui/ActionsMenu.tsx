@@ -63,28 +63,28 @@ export function ActionsMenu(props: {
         <KContextMenu.Trigger as="div" class="group relative">
           {props.children}
           <Show when={props.hoverButton !== false}>
-          <KDropdownMenu.Root>
-            <KDropdownMenu.Trigger
-              aria-label={props.label ?? "Actions"}
-              class="absolute right-2 top-1 flex h-6 w-6 items-center justify-center rounded bg-surface-panel text-muted-foreground opacity-0 shadow transition-opacity hover:bg-surface-hover hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 data-[expanded]:opacity-100"
-            >
-              <MoreHorizontal size={16} />
-            </KDropdownMenu.Trigger>
-            <KDropdownMenu.Portal>
-              <KDropdownMenu.Content class={CONTENT_CLASS}>
-                <For each={props.items}>
-                  {(item) => (
-                    <KDropdownMenu.Item
-                      class={itemClass(item.danger)}
-                      onSelect={() => item.onSelect()}
-                    >
-                      {itemBody(item)}
-                    </KDropdownMenu.Item>
-                  )}
-                </For>
-              </KDropdownMenu.Content>
-            </KDropdownMenu.Portal>
-          </KDropdownMenu.Root>
+            <KDropdownMenu.Root>
+              <KDropdownMenu.Trigger
+                aria-label={props.label ?? "Actions"}
+                class="absolute right-2 top-1 flex h-6 w-6 items-center justify-center rounded bg-surface-panel text-muted-foreground opacity-0 shadow transition-opacity hover:bg-surface-hover hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 data-[expanded]:opacity-100"
+              >
+                <MoreHorizontal size={16} />
+              </KDropdownMenu.Trigger>
+              <KDropdownMenu.Portal>
+                <KDropdownMenu.Content class={CONTENT_CLASS}>
+                  <For each={props.items}>
+                    {(item) => (
+                      <KDropdownMenu.Item
+                        class={itemClass(item.danger)}
+                        onSelect={() => item.onSelect()}
+                      >
+                        {itemBody(item)}
+                      </KDropdownMenu.Item>
+                    )}
+                  </For>
+                </KDropdownMenu.Content>
+              </KDropdownMenu.Portal>
+            </KDropdownMenu.Root>
           </Show>
         </KContextMenu.Trigger>
         <KContextMenu.Portal>

@@ -173,7 +173,9 @@ export class DirectMessageSolidNexus {
   }
 
   messagesLoading(conversationId: Accessor<string>): Accessor<boolean> {
-    return createMemo(() => selectIsLoadingMessages(this.state, conversationId()));
+    return createMemo(() =>
+      selectIsLoadingMessages(this.state, conversationId()),
+    );
   }
 
   activeConversationId(): Accessor<string | null> {

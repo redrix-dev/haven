@@ -495,11 +495,7 @@ export type ExpoPushSubscriptionUpsertInput = {
 export type NotificationDeliveryTransport =
   // "web_push" is retired as an active transport but retained here because
   // historical notification_delivery_traces rows still carry it.
-  | "web_push"
-  | "expo_push"
-  | "in_app"
-  | "simulated_push"
-  | "route_policy";
+  "web_push" | "expo_push" | "in_app" | "simulated_push" | "route_policy";
 
 export type NotificationDeliveryDecisionStage =
   | "enqueue"

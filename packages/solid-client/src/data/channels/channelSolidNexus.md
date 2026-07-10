@@ -374,21 +374,21 @@ You almost never construct this yourself — you get it from the bootstrapped co
 
 **To read (in a component or memo):**
 
-| Call                                            | Gives you                  | Notes                                                          |
-| ----------------------------------------------- | -------------------------- | ------------------------------------------------------------- |
-| `core.channels.channels(() => communityId)`     | `Accessor<HavenChannel[]>` | Pass a _getter_. Store the result, read it as `list()`. Auto-updates. |
-| `core.channels.activeChannelId()`               | `string \| null`           | Call inside a reactive scope to subscribe.                    |
+| Call                                        | Gives you                  | Notes                                                                 |
+| ------------------------------------------- | -------------------------- | --------------------------------------------------------------------- |
+| `core.channels.channels(() => communityId)` | `Accessor<HavenChannel[]>` | Pass a _getter_. Store the result, read it as `list()`. Auto-updates. |
+| `core.channels.activeChannelId()`           | `string \| null`           | Call inside a reactive scope to subscribe.                            |
 
 **To change:**
 
-| Call                                            | When                                              |
-| ----------------------------------------------- | ------------------------------------------------- |
-| `core.channels.ensureLoaded(communityId)`       | On navigation — fetches once, cheap to repeat.    |
-| `core.channels.loadForCommunity(communityId)`   | Force a (de-duped) fetch.                         |
-| `core.channels.upsertChannel(raw)`              | From a realtime "channel changed" event.          |
-| `core.channels.removeChannel(id, communityId)`  | From a realtime "channel deleted" event.          |
-| `core.channels.setActiveChannelId(id)`          | From route sync only — the URL drives this.       |
-| `core.channels.clear()`                         | On logout/teardown.                               |
+| Call                                           | When                                           |
+| ---------------------------------------------- | ---------------------------------------------- |
+| `core.channels.ensureLoaded(communityId)`      | On navigation — fetches once, cheap to repeat. |
+| `core.channels.loadForCommunity(communityId)`  | Force a (de-duped) fetch.                      |
+| `core.channels.upsertChannel(raw)`             | From a realtime "channel changed" event.       |
+| `core.channels.removeChannel(id, communityId)` | From a realtime "channel deleted" event.       |
+| `core.channels.setActiveChannelId(id)`         | From route sync only — the URL drives this.    |
+| `core.channels.clear()`                        | On logout/teardown.                            |
 
 **The one rule:** read through the accessors, write through the methods. Never
 reach into `core.channels.state` to mutate — it's exposed for reading, and

@@ -57,7 +57,10 @@ export function VoiceDock() {
           </Show>
 
           <div class="flex items-center gap-1">
-            <Tooltip content={voice.isMuted ? "Unmute" : "Mute"} placement="top">
+            <Tooltip
+              content={voice.isMuted ? "Unmute" : "Mute"}
+              placement="top"
+            >
               <Button
                 size="icon"
                 variant="ghost"

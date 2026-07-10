@@ -235,8 +235,10 @@ export class ChannelSolidNexus {
     this.setState("byCommunity", communityId, orderedIds);
     this.setState("groups", communityId, groupState.groups);
     this.setState("ungrouped", communityId, groupState.ungroupedChannelIds);
-    this.setState("collapsed", communityId, (existing) =>
-      existing ?? groupState.collapsedGroupIds,
+    this.setState(
+      "collapsed",
+      communityId,
+      (existing) => existing ?? groupState.collapsedGroupIds,
     );
     this.setState("loadingByCommunity", communityId, false);
     this.persist();

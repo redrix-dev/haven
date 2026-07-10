@@ -45,7 +45,8 @@ export function ReportDialog(props: {
   onSubmit: (result: ReportDialogResult) => Promise<void>;
 }) {
   const [kind, setKind] = createSignal<MessageReportKind>("content_abuse");
-  const [target, setTarget] = createSignal<MessageReportTarget>("server_admins");
+  const [target, setTarget] =
+    createSignal<MessageReportTarget>("server_admins");
   const [comment, setComment] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -194,7 +195,11 @@ export function ReportDialog(props: {
           </div>
 
           <div class="mt-4 flex justify-end gap-2">
-            <Button variant="ghost" disabled={submitting()} onClick={props.onClose}>
+            <Button
+              variant="ghost"
+              disabled={submitting()}
+              onClick={props.onClose}
+            >
               Cancel
             </Button>
             <Button disabled={submitting()} onClick={() => void submit()}>
