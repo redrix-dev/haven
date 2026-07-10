@@ -36,7 +36,7 @@ export function CommunityChannelBar({
       >
         <Text className="mr-1 text-sm text-muted-foreground">#</Text>
         <Text
-          className="min-w-0 flex-shrink text-sm font-semibold leading-5 text-foreground"
+          className="min-w-0 shrink text-sm font-semibold leading-5 text-foreground"
           numberOfLines={2}
         >
           {selectedChannelName}

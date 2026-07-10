@@ -735,7 +735,7 @@ function DmComposer(props: {
               void submit();
             }
           }}
-          class="max-h-[200px] flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          class="max-h-[200px] flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
         />
         <Button
           size="icon"

@@ -312,7 +312,7 @@ function ReportDetailPane(props: { detail: ServerReportDetail }) {
             placeholder="Add an internal note…"
             onInput={(e) => setNote(e.currentTarget.value)}
             onKeyDown={(e) => e.key === "Enter" && addNote()}
-            class="flex-1 rounded border border-input bg-surface-input px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            class="flex-1 rounded border border-input bg-surface-input px-3 py-2 text-sm text-foreground outline-hidden focus:border-primary"
           />
           <button
             type="button"
@@ -339,7 +339,7 @@ function ReportDetailPane(props: { detail: ServerReportDetail }) {
             onChange={(e) =>
               setStatus(e.currentTarget.value as SupportReportStatus)
             }
-            class="rounded border border-input bg-surface-input px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary disabled:opacity-60"
+            class="rounded border border-input bg-surface-input px-2 py-1.5 text-sm text-foreground outline-hidden focus:border-primary disabled:opacity-60"
           >
             <For each={SETTABLE_STATUSES}>
               {(s) => <option value={s}>{STATUS_LABELS[s]}</option>}

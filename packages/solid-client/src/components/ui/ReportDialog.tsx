@@ -186,7 +186,7 @@ export function ReportDialog(props: {
               rows={3}
               placeholder="Briefly describe the problem…"
               onInput={(e) => setComment(e.currentTarget.value)}
-              class="w-full resize-none rounded border border-border-control bg-surface-input px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              class="w-full resize-none rounded border border-border-control bg-surface-input px-3 py-2 text-sm text-foreground outline-hidden focus:border-primary"
             />
 
             <Show when={error()}>

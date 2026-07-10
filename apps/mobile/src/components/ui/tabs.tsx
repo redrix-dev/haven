@@ -66,7 +66,10 @@ function TabsContent({
 }: React.ComponentProps<typeof TabsPrimitive.Content>) {
   return (
     <TabsPrimitive.Content
-      className={cn(Platform.select({ web: "flex-1 outline-none" }), className)}
+      className={cn(
+        Platform.select({ web: "flex-1 outline-hidden" }),
+        className,
+      )}
       {...props}
     />
   );

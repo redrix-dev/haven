@@ -166,7 +166,7 @@ export function CommunityInvitesTab(props: { communityId: string }) {
                     const v = e.currentTarget.value;
                     setExpiresInHours(v === "null" ? null : Number(v));
                   }}
-                  class="w-full rounded border border-input bg-surface-input px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  class="w-full rounded border border-input bg-surface-input px-2 py-2 text-sm text-foreground outline-hidden focus:border-primary"
                 >
                   <For each={EXPIRY_OPTIONS}>
                     {(opt) => (
@@ -186,7 +186,7 @@ export function CommunityInvitesTab(props: { communityId: string }) {
                     const v = e.currentTarget.value;
                     setMaxUses(v === "null" ? null : Number(v));
                   }}
-                  class="w-full rounded border border-input bg-surface-input px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  class="w-full rounded border border-input bg-surface-input px-2 py-2 text-sm text-foreground outline-hidden focus:border-primary"
                 >
                   <For each={MAX_USES_OPTIONS}>
                     {(opt) => (

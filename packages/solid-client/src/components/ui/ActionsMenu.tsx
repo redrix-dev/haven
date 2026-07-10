@@ -22,11 +22,11 @@ export type ActionMenuItem = {
  * components/ui so any feature can use it without crossing feature boundaries.
  */
 const CONTENT_CLASS =
-  "z-50 min-w-44 overflow-hidden rounded-lg border border-border-dialog bg-popover p-1 text-popover-foreground shadow-lg outline-none";
+  "z-50 min-w-44 overflow-hidden rounded-lg border border-border-dialog bg-popover p-1 text-popover-foreground shadow-lg outline-hidden";
 
 function itemClass(danger?: boolean): string {
   return cn(
-    "flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-sm outline-none transition-colors",
+    "flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-sm outline-hidden transition-colors",
     danger
       ? "text-destructive data-[highlighted]:bg-destructive data-[highlighted]:text-primary-foreground"
       : "text-foreground data-[highlighted]:bg-surface-hover",

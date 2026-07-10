@@ -23,7 +23,7 @@ function renderToken(token: Token): JSX.Element {
   switch (token.type) {
     case "paragraph":
       return (
-        <p class="whitespace-pre-wrap [&:not(:first-child)]:mt-1">
+        <p class="whitespace-pre-wrap not-first:mt-1">
           <MarkdownTokens tokens={(token as Tokens.Paragraph).tokens} />
         </p>
       );

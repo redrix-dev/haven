@@ -10,7 +10,7 @@ import { MarkdownTokens } from "./MarkdownTokens";
 export function Markdown(props: { content: string; class?: string }) {
   const tokens = createMemo(() => lexChatMarkdown(props.content));
   return (
-    <div class={cn("break-words text-sm leading-relaxed", props.class)}>
+    <div class={cn("wrap-break-word text-sm leading-relaxed", props.class)}>
       <MarkdownTokens tokens={tokens()} />
     </div>
   );

@@ -254,7 +254,7 @@ function RoleEditor(props: {
               value={name()}
               disabled={saving()}
               onInput={(event) => setName(event.currentTarget.value)}
-              class="w-full rounded border border-input bg-surface-input px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              class="w-full rounded border border-input bg-surface-input px-3 py-2 text-sm text-foreground outline-hidden focus:border-primary"
             />
           </div>
           <div>

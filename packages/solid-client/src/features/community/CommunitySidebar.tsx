@@ -413,7 +413,7 @@ function OccupantRow(props: {
           {row()}
         </KDropdownMenu.Trigger>
         <KDropdownMenu.Portal>
-          <KDropdownMenu.Content class="z-50 min-w-52 rounded-lg border border-border-dialog bg-popover p-2 text-popover-foreground shadow-lg outline-none">
+          <KDropdownMenu.Content class="z-50 min-w-52 rounded-lg border border-border-dialog bg-popover p-2 text-popover-foreground shadow-lg outline-hidden">
             <div class="px-1 py-1.5" onPointerDown={(e) => e.stopPropagation()}>
               <div class="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                 <span>Volume</span>
@@ -432,7 +432,7 @@ function OccupantRow(props: {
             </div>
             <Show when={canKick()}>
               <KDropdownMenu.Item
-                class="mt-1 flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-sm text-destructive outline-none data-[highlighted]:bg-destructive data-[highlighted]:text-primary-foreground"
+                class="mt-1 flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-sm text-destructive outline-hidden data-highlighted:bg-destructive data-highlighted:text-primary-foreground"
                 onSelect={() =>
                   void core.voice.kickParticipant(props.userId, props.channelId)
                 }

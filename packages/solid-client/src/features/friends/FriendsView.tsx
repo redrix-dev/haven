@@ -391,7 +391,7 @@ function AddFriendPanel(props: {
           autocomplete="off"
           spellcheck={false}
           onInput={(event) => props.onQueryChange(event.currentTarget.value)}
-          class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
         />
       </div>
       <Show when={props.error}>

@@ -39,7 +39,7 @@ export function TextField(props: TextFieldProps) {
         class={cn(
           "rounded-lg border border-input bg-surface-input px-3 py-2 text-sm text-foreground",
           "placeholder:text-muted-foreground",
-          "focus:border-primary focus:outline-none",
+          "focus:border-primary focus:outline-hidden",
           "disabled:cursor-not-allowed disabled:opacity-50",
         )}
       />

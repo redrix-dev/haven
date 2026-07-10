@@ -56,7 +56,7 @@ function DialogBody(props: ConfirmDialogProps) {
                 value={reason()}
                 placeholder={cfg.placeholder}
                 onInput={(event) => setReason(event.currentTarget.value)}
-                class="w-full resize-none rounded border border-input bg-surface-input px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                class="w-full resize-none rounded border border-input bg-surface-input px-2 py-1.5 text-sm text-foreground outline-hidden focus:border-primary"
               />
             </div>
           )}
