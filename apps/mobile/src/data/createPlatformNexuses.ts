@@ -40,7 +40,11 @@ export function createPlatformNexusBundle(
     ctx;
 
   return {
-    admin: new CommunityAdminNexus(persistence, backends.controlPlane),
+    admin: new CommunityAdminNexus(
+      persistence,
+      backends.controlPlane,
+      backends.communityData,
+    ),
     moderation: new CommunityModerationNexus(
       persistence,
       backends.serverModmail,

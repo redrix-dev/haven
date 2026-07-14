@@ -2,8 +2,10 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { createMemoryPersistence, type HavenBackends } from "@shared/core";
 import {
   registerSessionBackends,
+  requireSessionBackends,
   resetSessionBackends,
 } from "@shared/lib/backend";
+import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import { registerHavenCore, resetHavenCore } from "@mobile-data";
 import type { HavenReactCore } from "@mobile-data/core/HavenReactCore";
 import { ChannelNexus } from "@mobile-data/channels/ChannelNexus";
@@ -39,9 +41,26 @@ describe("CommunityAdminNexus", () => {
   let channels: ChannelNexus;
   let communities: CommunityNexus;
 
+  // CommunityAdminNexus now holds an injected communityData ref. Feed it a live
+  // view of the session-registered mock so each test can still swap backends
+  // through registerTestCore().
+  const communityDataForTest = new Proxy({} as CommunityDataBackend, {
+    get: (_target, prop) =>
+      (
+        requireSessionBackends().communityData as Record<
+          string | symbol,
+          unknown
+        >
+      )?.[prop],
+  });
+
   beforeEach(() => {
     const persistence = createMemoryPersistence();
-    admin = new CommunityAdminNexus(persistence, {} as never);
+    admin = new CommunityAdminNexus(
+      persistence,
+      {} as never,
+      communityDataForTest,
+    );
     channels = new ChannelNexus(persistence, {} as never);
     communities = new CommunityNexus(persistence, {} as never);
 

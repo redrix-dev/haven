@@ -131,15 +131,9 @@ export class CommunityAdminSolidNexus {
   }): Promise<void> {
     this.removeMemberLocal(input.communityId, input.targetUserId);
     try {
-      const result = await this.communityData.banCommunityMember(input);
-      try {
-        await this.communityData.broadcastMemberBanned(result);
-      } catch (err) {
-        console.warn(
-          "[CommunityAdminSolidNexus] broadcastMemberBanned failed",
-          err,
-        );
-      }
+      // Ban RPC emits member_banned on the target's private_user channel;
+      // no client-side broadcast needed.
+      await this.communityData.banCommunityMember(input);
     } catch (error) {
       console.warn("[CommunityAdminSolidNexus] banMember failed", error);
       await this.loadMembers(input.communityId);

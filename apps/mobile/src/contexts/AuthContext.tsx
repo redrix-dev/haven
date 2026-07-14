@@ -14,6 +14,7 @@ import { bootLogger } from "@shared/debug/bootLogger";
 import { getAppHost } from "@shared/infrastructure/platform/appHost";
 import { getPlatformAuthConfirmRedirectUrl } from "@shared/infrastructure/platform/urls";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { deleteOwnAccount } from "@/auth/mobileAuthService";
 import {
   buildSignUpMetadata,
   parseAuthConfirmParams,
@@ -400,15 +401,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteAccount = async () => {
-    const { error: deleteError } = await havenAuthClient().rpc(
-      "delete_own_account" as never,
-    );
-    if (deleteError) throw deleteError;
-
-    const { error: signOutError } = await havenAuthClient().auth.signOut();
-    if (signOutError) {
-      console.warn("Failed to sign out after account deletion:", signOutError);
-    }
+    // Single delete-account implementation lives in mobileAuthService
+    // (RPC + sign out). AuthContext only layers on local session-state reset.
+    await deleteOwnAccount();
 
     const { setSession, setUser, setIsLoading } = authStore().getState();
     setSession(null);

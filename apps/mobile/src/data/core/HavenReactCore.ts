@@ -8,7 +8,6 @@ import type {
   UiStorePort,
   UserStatusStorePort,
 } from "@shared/core/sessionStorePorts";
-import { getCommunityDataBackend } from "@shared/lib/backend";
 import type {
   BanEligibleServer,
   DirectMessage,
@@ -576,7 +575,7 @@ export class HavenReactCore implements RealtimeMutationTarget {
       await this.permissions.loadRevokedAuthorIdsForChannel(
         communityId,
         channelId,
-        getCommunityDataBackend(communityId),
+        this.backends.communityData,
       );
       this.syncViewerMessagePolicy(communityId);
     } catch (err) {
@@ -606,9 +605,11 @@ export class HavenReactCore implements RealtimeMutationTarget {
         .filter((id) => this.profiles.getProfile(id) === undefined);
       if (authorIds.length === 0) return;
 
-      const profiles = await getCommunityDataBackend(
-        communityId,
-      ).fetchMessageAuthorProfiles({ communityId, authorUserIds: authorIds });
+      const profiles =
+        await this.backends.communityData.fetchMessageAuthorProfiles({
+          communityId,
+          authorUserIds: authorIds,
+        });
       this.profiles.upsertProfiles(profiles);
     } catch (error) {
       console.warn("[HavenReactCore] primeMessageAuthorProfiles failed", error);

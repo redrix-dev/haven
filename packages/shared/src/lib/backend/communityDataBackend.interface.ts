@@ -1,7 +1,6 @@
 import type { Database } from "@shared/types/database";
 import type {
   BanCommunityMemberResult,
-  BanEligibleServer,
   Channel,
   ChannelCreateInput,
   ChannelGroup,
@@ -19,7 +18,6 @@ import type {
   MessageReaction,
   MessageReportKind,
   MessageReportTarget,
-  MemberBannedBroadcastPayload,
   MemberChannelAccessRevokedBroadcastPayload,
   ReportStatusUpdatedBroadcastPayload,
   ServerPermissions,
@@ -71,16 +69,12 @@ export interface CommunityDataBackend {
     targetUserId: string;
     reason?: string | null;
   }): Promise<void>;
-  listBanEligibleServersForUser(
-    targetUserId: string,
-  ): Promise<BanEligibleServer[]>;
   listChannels(communityId: string): Promise<Channel[]>;
   /** Resolves the signed-in user's `community_members` row id and assigned `role_id`s in this community. */
   fetchMyMemberRoleAssignmentForRealtime(
     communityId: string,
     userId: string,
   ): Promise<{ memberId: string; roleIds: string[] } | null>;
-  broadcastMemberBanned(input: MemberBannedBroadcastPayload): Promise<void>;
   broadcastMemberChannelAccessRevoked(
     input: MemberChannelAccessRevokedBroadcastPayload,
   ): Promise<void>;
