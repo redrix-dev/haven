@@ -16,6 +16,7 @@ import {
   oldestMessageCursor,
   removeMessageIdFromChannelIndex,
   shouldSkipInitialReload,
+  upsertMessageIntoChannelIndex,
   validateMediaSendOptions,
   type ChannelMeta,
   type SendCommunityMessageMediaOptions,
@@ -303,20 +304,29 @@ export class CommunityMessageSolidNexus {
   }
 
   upsertMessage(message: MessageBundle): void {
-    this.setState((state) => ({
-      entities: {
+    this.setState((state) => {
+      const nextEntities = {
         ...state.entities,
-        [message.id]: { data: message, partial: false, cachedAt: Date.now() },
-      },
-      byChannel: {
-        ...state.byChannel,
-        [message.channelId]: insertMessageIntoChannelIndex(
-          state.byChannel[message.channelId] ?? [],
-          message,
-          (id) => state.entities[id]?.data.createdAt,
-        ),
-      },
-    }));
+        [message.id]: {
+          data: message,
+          partial: false,
+          cachedAt: Date.now(),
+        },
+      };
+      return {
+        entities: nextEntities,
+        byChannel: {
+          ...state.byChannel,
+          // Reposition (not freeze): the authoritative server createdAt must be
+          // allowed to move an optimistically-placed message to its true slot.
+          [message.channelId]: upsertMessageIntoChannelIndex(
+            state.byChannel[message.channelId] ?? [],
+            message,
+            (id) => nextEntities[id]?.data.createdAt,
+          ),
+        },
+      };
+    });
     this.persist();
   }
 
@@ -427,9 +437,26 @@ export class CommunityMessageSolidNexus {
         replyToMessageId: options?.replyToMessageId,
         senderUserId: options?.senderUserId,
         senderIsPlatformStaff: options?.senderIsPlatformStaff,
+        createdAt: this.optimisticCreatedAt(channelId),
       }),
     );
     return result;
+  }
+
+  /**
+   * Timestamp for an optimistic send, clamped to be no earlier than the newest
+   * message already in the channel. A lagging local clock would otherwise stamp
+   * the just-sent message in the past and sort it above older messages; the
+   * real server createdAt reconciles the position shortly after via upsert.
+   */
+  private optimisticCreatedAt(channelId: string): string {
+    const now = new Date().toISOString();
+    const lastId = this.getLastMessageId(channelId);
+    const lastCreatedAt = lastId
+      ? this.state.entities[lastId]?.data.createdAt
+      : undefined;
+    if (!lastCreatedAt) return now;
+    return Date.parse(lastCreatedAt) > Date.parse(now) ? lastCreatedAt : now;
   }
 
   async sendWithMedia(

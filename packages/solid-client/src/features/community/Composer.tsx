@@ -2,6 +2,7 @@ import { Show, createSignal, onCleanup } from "solid-js";
 import { ImagePlus, SendHorizontal, X } from "lucide-solid";
 import { Button, MarkdownToolbar } from "@solid-client/components/ui";
 import {
+  insertCommunityLink,
   matchCommunityMarkdownShortcut,
   normalizeCommunityMarkdown,
   toggleCommunityMarkdown,
@@ -21,6 +22,15 @@ export function Composer(props: {
   const [pendingImage, setPendingImage] = createSignal<{
     file: File;
     previewUrl: string;
+  } | null>(null);
+  // Open link dialog carries the selection range captured when it was opened,
+  // since focus moves to the dialog inputs and the textarea selection is lost.
+  const [linkModal, setLinkModal] = createSignal<{
+    text: string;
+    url: string;
+    start: number;
+    end: number;
+    focusUrl: boolean;
   } | null>(null);
 
   let textarea: HTMLTextAreaElement | undefined;
@@ -51,6 +61,64 @@ export function Composer(props: {
     });
   };
 
+  // Links need a text + URL, so route them to a dialog instead of dumping a
+  // bare `[](url)` placeholder into the draft. Everything else toggles inline.
+  const requestFormat = (format: CommunityMarkdownFormat) => {
+    if (format === "link") {
+      openLinkModal();
+      return;
+    }
+    applyStyle(format);
+  };
+
+  const openLinkModal = () => {
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = draft().slice(Math.min(start, end), Math.max(start, end));
+    setLinkModal({
+      text: selected,
+      url: "",
+      start,
+      end,
+      focusUrl: selected.trim().length > 0,
+    });
+  };
+
+  const closeLinkModal = () => {
+    setLinkModal(null);
+    queueMicrotask(() => textarea?.focus());
+  };
+
+  const confirmLinkModal = () => {
+    const modal = linkModal();
+    if (!modal || !modal.url.trim()) return;
+
+    const edit = insertCommunityLink(draft(), modal.start, modal.end, {
+      text: modal.text,
+      url: modal.url,
+    });
+    setDraft(edit.value);
+    setLinkModal(null);
+
+    queueMicrotask(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+      autogrow();
+    });
+  };
+
+  const handleLinkModalKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      confirmLinkModal();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeLinkModal();
+    }
+  };
+
   const handleKeyDown = (event: KeyboardEvent) => {
     const format = event.isComposing
       ? null
@@ -62,7 +130,7 @@ export function Composer(props: {
         });
     if (format) {
       event.preventDefault();
-      applyStyle(format);
+      requestFormat(format);
       return;
     }
 
@@ -155,8 +223,58 @@ export function Composer(props: {
         )}
       </Show>
 
+      <Show when={linkModal()}>
+        {(modal) => (
+          <div class="mb-2 rounded-lg border border-border bg-surface-input p-3 shadow-lg">
+            <div class="flex flex-col gap-2">
+              <input
+                ref={(el) => {
+                  if (!modal().focusUrl) queueMicrotask(() => el.focus());
+                }}
+                value={modal().text}
+                placeholder="Link text"
+                aria-label="Link text"
+                onInput={(e) =>
+                  setLinkModal({ ...modal(), text: e.currentTarget.value })
+                }
+                onKeyDown={handleLinkModalKeyDown}
+                class="rounded border border-border bg-surface-embed-chip px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
+              />
+              <input
+                ref={(el) => {
+                  if (modal().focusUrl) queueMicrotask(() => el.focus());
+                }}
+                value={modal().url}
+                placeholder="https://…"
+                aria-label="Link URL"
+                type="url"
+                inputmode="url"
+                onInput={(e) =>
+                  setLinkModal({ ...modal(), url: e.currentTarget.value })
+                }
+                onKeyDown={handleLinkModalKeyDown}
+                class="rounded border border-border bg-surface-embed-chip px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
+              />
+              <div class="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={closeLinkModal}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={!modal().url.trim()}
+                  onClick={confirmLinkModal}
+                >
+                  Add link
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Show>
+
       <div class="rounded-xl bg-surface-input">
-        <MarkdownToolbar disabled={sending()} onFormat={applyStyle} />
+        <MarkdownToolbar disabled={sending()} onFormat={requestFormat} />
         <div class="flex items-end gap-2 px-3 py-2">
           <input
             ref={fileInput}

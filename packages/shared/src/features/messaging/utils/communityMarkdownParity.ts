@@ -261,6 +261,57 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+/**
+ * Normalize a user-entered link target so it can't become a relative path.
+ *
+ * A bare `example.com` typed into the link dialog would otherwise render as a
+ * link to a same-origin relative path. Schemes (`https:`, `mailto:`, …) and
+ * absolute/protocol-relative paths are left untouched; everything else gets an
+ * `https://` prefix.
+ */
+export function normalizeCommunityLinkUrl(raw: string): string {
+  const url = raw.trim();
+  if (!url) return url;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(url);
+  if (hasScheme || url.startsWith("//") || url.startsWith("/")) return url;
+  return `https://${url}`;
+}
+
+/** Build a canonical Markdown link; falls back to the URL as the visible text. */
+export function buildCommunityLinkMarkdown(input: {
+  text: string;
+  url: string;
+}): string {
+  const url = normalizeCommunityLinkUrl(input.url);
+  const text = input.text.trim() || url;
+  return `[${text}](${url})`;
+}
+
+/**
+ * Replace the current selection with a finished `[text](url)` link and return
+ * the caret position (collapsed) just after the inserted link.
+ */
+export function insertCommunityLink(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  input: { text: string; url: string },
+): CommunityMarkdownEdit {
+  const start = clamp(Math.min(selectionStart, selectionEnd), 0, value.length);
+  const end = clamp(
+    Math.max(selectionStart, selectionEnd),
+    start,
+    value.length,
+  );
+  const snippet = buildCommunityLinkMarkdown(input);
+  const caret = start + snippet.length;
+  return {
+    value: value.slice(0, start) + snippet + value.slice(end),
+    selectionStart: caret,
+    selectionEnd: caret,
+  };
+}
+
 /** Normalizes composer output so web/desktop/mobile agree on line endings and spoiler edges. */
 export function normalizeCommunityMarkdown(value: string): string {
   const withLf = value.replace(/\r\n?/g, "\n");
