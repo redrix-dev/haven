@@ -1,0 +1,12 @@
+[
+  {
+    "label": "Haven Web · Chrome (dev:web :5175)",
+    "adapter": "JavaScript",
+    "type": "chrome",
+    "request": "launch",
+    "url": "http://localhost:5175",
+    "webRoot": "$ZED_WORKTREE_ROOT",
+    "userDataDir": "$ZED_WORKTREE_ROOT/.zed/.chrome-debug-profile",
+    "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+  }
+]
