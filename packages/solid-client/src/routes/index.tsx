@@ -32,7 +32,11 @@ import {
   ResetPasswordScreen,
   AuthConfirmScreen,
 } from "../features/auth";
-import { AppearanceSettings, NotificationSettings } from "../features/settings";
+import {
+  AppearanceSettings,
+  NotificationSettings,
+  ProfileSettings,
+} from "../features/settings";
 import { DirectMessagesView } from "../features/direct-messages";
 import { FriendsView } from "../features/friends";
 import { NotificationsView } from "../features/notifications";
@@ -368,6 +372,7 @@ export const routes: RouteDefinition[] = [
             component: RoleManagementView,
           },
           { path: "/settings/appearance", component: AppearanceSettings },
+          { path: "/settings/profile", component: ProfileSettings },
           {
             path: "/settings/notifications",
             component: NotificationSettings,

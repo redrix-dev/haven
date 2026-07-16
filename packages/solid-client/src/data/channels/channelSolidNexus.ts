@@ -469,16 +469,25 @@ export class ChannelSolidNexus {
     permissions: ChannelPermissionState;
   }): Promise<ChannelAccessRevokedResult | null> {
     const result = await this.communityData.saveMemberChannelPermissions(input);
+    const memberOption = this.state.permissionsByChannel[
+      input.channelId
+    ]?.memberOptions.find((candidate) => candidate.memberId === input.memberId);
     this.setState(
       "permissionsByChannel",
       input.channelId,
       "memberPermissions",
-      (rows = []) =>
-        rows.map((candidate) =>
-          candidate.memberId === input.memberId
-            ? { ...candidate, ...input.permissions }
-            : candidate,
-        ),
+      (rows = []) => {
+        if (rows.some((candidate) => candidate.memberId === input.memberId)) {
+          return rows.map((candidate) =>
+            candidate.memberId === input.memberId
+              ? { ...candidate, ...input.permissions }
+              : candidate,
+          );
+        }
+        return memberOption
+          ? [...rows, { ...memberOption, ...input.permissions }]
+          : rows;
+      },
     );
     return result;
   }

@@ -1,6 +1,6 @@
 import { For, Show, createSignal } from "solid-js";
 import { A } from "@solidjs/router";
-import { Bell } from "lucide-solid";
+import { Bell, UserRound } from "lucide-solid";
 import type { HavenTheme } from "@shared/themes/types";
 import { useTheme } from "@solid-client/contexts/ThemeProvider";
 import { useSession } from "@solid-client/contexts/SessionProvider";
@@ -74,6 +74,16 @@ export function AppearanceSettings() {
       </A>
 
       <h2 class="mb-1 mt-10 text-lg font-bold text-foreground">Account</h2>
+      <p class="mb-4 text-sm text-muted-foreground">
+        Preview your public profile and choose an active flair.
+      </p>
+      <A
+        href="/settings/profile"
+        class="mb-6 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:border-primary"
+      >
+        <UserRound size={15} />
+        Profile and flair
+      </A>
       <p class="mb-4 text-sm text-muted-foreground">
         Sign out of Haven on this device.
       </p>

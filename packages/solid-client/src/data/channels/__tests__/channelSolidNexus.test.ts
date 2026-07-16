@@ -296,17 +296,14 @@ describe("ChannelSolidNexus channel management", () => {
           canManage: null,
         },
       ],
-      memberPermissions: [
+      memberPermissions: [],
+      memberOptions: [
         {
           memberId: "member-1",
           displayName: "Ada",
           isOwner: false,
-          canView: null,
-          canSend: null,
-          canManage: null,
         },
       ],
-      memberOptions: [],
     };
     const fetchChannelPermissions = vi.fn().mockResolvedValue(snapshot);
     const saveRoleChannelPermissions = vi.fn().mockResolvedValue(undefined);
