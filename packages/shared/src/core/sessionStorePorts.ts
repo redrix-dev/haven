@@ -1,7 +1,11 @@
 import type { PendingUiConfirmation } from "@shared/types/types";
 import type { Session, User } from "@supabase/supabase-js";
 
-export type CommunitySettingsTab = "overview" | "roles" | "invites";
+export type CommunitySettingsTab =
+  | "overview"
+  | "channels"
+  | "roles"
+  | "invites";
 
 export type AuthStoreState = {
   user: User | null;

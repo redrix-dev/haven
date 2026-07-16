@@ -94,6 +94,7 @@ out/
 # Editor/IDE
 .vscode/
 .idea/
+.zed/.chrome-debug-profile/
 *.suo
 *.ntvs*
 *.njsproj
@@ -135,6 +136,10 @@ release/
 # Vercel CLI (project link + pulled env)
 .vercel/
 
+# Private notes repo (haven-private) lives here — its own git repo, nested but
+# invisible to this one because this path is ignored. Never tracked publicly.
+/private/
+
 # Internal / personal docs — kept locally, deliberately out of the public tree
 docs/learning/
 docs/_archive/
@@ -144,7 +149,7 @@ docs/SOLID_SHIP_READINESS.md
 docs/SOLID_UNDERSTANDABILITY_AUDIT.md
 docs/BACKLOG.md
 apps/mobile/docs/mobile-todo.md
-
+.canvas
 # Misc build caches
 .turbo/
 

@@ -5,7 +5,6 @@ import type { MediaAttachmentHelpers } from "./mediaAttachmentUtils";
 import { createPortableUuid } from "../runtime/uuid";
 import type {
   BanCommunityMemberResult,
-  BanEligibleServer,
   Channel,
   ChannelCreateInput,
   ChannelGroup,
@@ -1314,23 +1313,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
-  async listBanEligibleServersForUser(targetUserId) {
-    if (!targetUserId) return [];
-
-    const { data, error } = await havenCommunitySb().rpc(
-      "list_bannable_shared_communities",
-      {
-        p_target_user_id: targetUserId,
-      },
-    );
-    if (error) throw error;
-
-    return (data ?? []).map((row) => ({
-      communityId: row.community_id,
-      communityName: row.community_name,
-    }));
-  },
-
   async listChannels(communityId) {
     const { data, error } = await havenCommunitySb()
       .from("channels")
@@ -1530,10 +1512,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
 
     const roleIds = [...new Set((roleRows ?? []).map((r) => r.role_id))];
     return { memberId: memberRow.id, roleIds };
-  },
-
-  async broadcastMemberBanned(_input) {
-    // Ban RPC emits member_banned on the banned user's private_user channel.
   },
 
   async broadcastMemberChannelAccessRevoked({

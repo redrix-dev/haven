@@ -16,6 +16,8 @@ import type { NotificationBackend } from "@shared/lib/backend/notificationBacken
 import type {
   NotificationCounts,
   NotificationItem,
+  NotificationPreferences,
+  NotificationPreferenceUpdate,
 } from "@shared/lib/backend/types";
 
 /**
@@ -57,6 +59,7 @@ export class NotificationSolidNexus {
   readonly state: NotificationNexusState;
   private readonly setState: SetStoreFunction<NotificationNexusState>;
   private listInflight: Promise<void> | null = null;
+  private preferencesInflight: Promise<NotificationPreferences> | null = null;
   private readonly incomingSignal: Accessor<IncomingNotification | null>;
   private readonly setIncoming: (value: IncomingNotification | null) => void;
 
@@ -101,6 +104,10 @@ export class NotificationSolidNexus {
   /** Latest realtime arrival, for the toast layer to watch. */
   incoming(): Accessor<IncomingNotification | null> {
     return this.incomingSignal;
+  }
+
+  preferences(): Accessor<NotificationPreferences | null> {
+    return createMemo(() => this.state.preferences);
   }
 
   // ─── lifecycle ─────────────────────────────────────────────────────────────
@@ -148,6 +155,56 @@ export class NotificationSolidNexus {
     }
   }
 
+  async loadPreferences(): Promise<NotificationPreferences> {
+    if (this.preferencesInflight) return this.preferencesInflight;
+
+    this.preferencesInflight = (async () => {
+      this.setState("preferencesLoading", true);
+      try {
+        const preferences = await this.backend.getNotificationPreferences();
+        this.setState("preferences", preferences);
+        this.setState("preferencesLastLoadedAt", Date.now());
+        return preferences;
+      } finally {
+        this.setState("preferencesLoading", false);
+      }
+    })().finally(() => {
+      this.preferencesInflight = null;
+    });
+
+    return this.preferencesInflight;
+  }
+
+  async ensurePreferences(options?: {
+    freshnessMs?: number;
+  }): Promise<NotificationPreferences | null> {
+    const freshnessMs = options?.freshnessMs ?? 60_000;
+    if (
+      this.state.preferences &&
+      this.state.preferencesLastLoadedAt > 0 &&
+      Date.now() - this.state.preferencesLastLoadedAt < freshnessMs
+    ) {
+      return this.state.preferences;
+    }
+    return this.loadPreferences();
+  }
+
+  async savePreferences(
+    values: NotificationPreferenceUpdate,
+  ): Promise<NotificationPreferences> {
+    this.setState("preferencesSaving", true);
+    try {
+      const preferences =
+        await this.backend.updateNotificationPreferences(values);
+      this.setState("preferences", preferences);
+      this.setState("preferencesLastLoadedAt", Date.now());
+      await this.loadInbox();
+      return preferences;
+    } finally {
+      this.setState("preferencesSaving", false);
+    }
+  }
+
   // ─── actions (optimistic, then reconcile) ──────────────────────────────────
 
   /** Mark notifications read. Optimistic, with a reload on failure. */
@@ -184,6 +241,12 @@ export class NotificationSolidNexus {
     } catch (err) {
       console.warn("[NotificationSolidNexus] markAllSeen failed", err);
     }
+  }
+
+  async markSeen(recipientIds: string[]): Promise<void> {
+    if (recipientIds.length === 0) return;
+    await this.backend.markNotificationsSeen(recipientIds);
+    await this.refreshCounts();
   }
 
   /** Dismiss notifications (removes them from the inbox). Optimistic. */
@@ -261,6 +324,8 @@ export class NotificationSolidNexus {
   }
 
   clear(): void {
+    this.listInflight = null;
+    this.preferencesInflight = null;
     this.setState(initialState());
     this.setIncoming(null);
     this.persistence.remove(NEXUS_STORAGE_KEYS.notifications);

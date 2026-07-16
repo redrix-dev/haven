@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { ReadableStore } from "@shared/nexus/storeTypes";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import { requireHavenCore } from "@mobile-data/core/havenCoreRegistry";
-import { getCommunityDataBackend } from "@shared/lib/backend";
+import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend.interface";
 import type {
   ChannelAccessRevokedResult,
@@ -70,13 +70,16 @@ const createInitialState = (): CommunityAdminNexusState => ({
 export class CommunityAdminNexus {
   private readonly store: UseBoundStore<StoreApi<CommunityAdminNexusState>>;
   private readonly controlPlane: ControlPlaneBackend;
+  private readonly communityData: CommunityDataBackend;
 
   constructor(
     _persistence: NexusPersistence,
     controlPlane: ControlPlaneBackend,
+    communityData: CommunityDataBackend,
   ) {
     void _persistence;
     this.controlPlane = controlPlane;
+    this.communityData = communityData;
     this.store = create<CommunityAdminNexusState>()(() => createInitialState());
   }
 
@@ -236,7 +239,7 @@ export class CommunityAdminNexus {
   };
 
   refreshMembersModalMembers = async (communityId: string): Promise<void> => {
-    const communityBackend = getCommunityDataBackend(communityId);
+    const communityBackend = this.communityData;
     const members = await communityBackend.listCommunityMembers(communityId);
     this.patch({ membersModalMembers: members });
   };
@@ -276,7 +279,7 @@ export class CommunityAdminNexus {
     });
 
     try {
-      const communityBackend = getCommunityDataBackend(communityId);
+      const communityBackend = this.communityData;
       const [members, permissions] = await Promise.all([
         communityBackend.listCommunityMembers(communityId),
         communityBackend.getMyPermissions(communityId),
@@ -308,7 +311,7 @@ export class CommunityAdminNexus {
 
     this.patch({ communityBansLoading: true, communityBansError: null });
     try {
-      const communityBackend = getCommunityDataBackend(resolvedId);
+      const communityBackend = this.communityData;
       const bans = await communityBackend.listCommunityBans(resolvedId);
       this.patch({ communityBans: bans });
     } catch (error: unknown) {
@@ -373,7 +376,7 @@ export class CommunityAdminNexus {
     });
 
     try {
-      const communityBackend = getCommunityDataBackend(resolvedId);
+      const communityBackend = this.communityData;
       const snapshot =
         await communityBackend.fetchServerRoleManagement(resolvedId);
       this.patch({
@@ -407,7 +410,7 @@ export class CommunityAdminNexus {
     this.patch({ serverSettingsLoadError: null, serverSettingsLoading: true });
 
     try {
-      const communityBackend = getCommunityDataBackend(resolvedId);
+      const communityBackend = this.communityData;
       const snapshot = await communityBackend.fetchServerSettings(resolvedId);
       this.patch({
         serverSettingsInitialValues: {
@@ -471,7 +474,7 @@ export class CommunityAdminNexus {
       throw new Error("Community name is required.");
     }
 
-    const communityBackend = getCommunityDataBackend(communityId);
+    const communityBackend = this.communityData;
     await communityBackend.updateServerSettings({
       communityId,
       values: {
@@ -573,7 +576,7 @@ export class CommunityAdminNexus {
     communityIdOverride?: string | null,
   ): Promise<void> => {
     const communityId = this.requireCommunityId(communityIdOverride);
-    const communityBackend = getCommunityDataBackend(communityId);
+    const communityBackend = this.communityData;
     await communityBackend.unbanCommunityMember({
       communityId,
       targetUserId: input.targetUserId,
@@ -590,7 +593,7 @@ export class CommunityAdminNexus {
     position: number;
   }): Promise<void> => {
     const communityId = this.requireCommunityId();
-    const communityBackend = getCommunityDataBackend(communityId);
+    const communityBackend = this.communityData;
     await communityBackend.createServerRole({
       communityId,
       name: input.name,
@@ -608,7 +611,7 @@ export class CommunityAdminNexus {
     position: number;
   }): Promise<void> => {
     const communityId = this.requireCommunityId();
-    const communityBackend = getCommunityDataBackend(communityId);
+    const communityBackend = this.communityData;
     await communityBackend.updateServerRole({
       communityId,
       roleId: input.roleId,
@@ -625,7 +628,7 @@ export class CommunityAdminNexus {
     communityId?: string | null,
   ): Promise<void> => {
     const resolvedId = this.requireCommunityId(communityId);
-    const communityBackend = getCommunityDataBackend(resolvedId);
+    const communityBackend = this.communityData;
     const n = orderedRoles.length;
 
     for (let i = 0; i < n; i++) {
@@ -646,7 +649,7 @@ export class CommunityAdminNexus {
 
   deleteServerRole = async (roleId: string): Promise<void> => {
     const communityId = this.requireCommunityId();
-    const communityBackend = getCommunityDataBackend(communityId);
+    const communityBackend = this.communityData;
     await communityBackend.deleteServerRole({
       communityId,
       roleId,
@@ -660,7 +663,7 @@ export class CommunityAdminNexus {
     permissionKeys: string[],
   ): Promise<void> => {
     const communityId = this.requireCommunityId();
-    const communityBackend = getCommunityDataBackend(communityId);
+    const communityBackend = this.communityData;
     await communityBackend.saveServerRolePermissions({
       roleId,
       permissionKeys,
@@ -677,7 +680,7 @@ export class CommunityAdminNexus {
     const userId = requireHavenCore().authStore.getState().user?.id;
     if (!userId) throw new Error("Not authenticated");
 
-    const communityBackend = getCommunityDataBackend(communityId);
+    const communityBackend = this.communityData;
     await communityBackend.saveServerMemberRoles({
       communityId,
       memberId,
@@ -693,17 +696,14 @@ export class CommunityAdminNexus {
     targetUserId: string;
     reason: string;
   }): Promise<void> => {
-    const communityBackend = getCommunityDataBackend(input.communityId);
-    const banResult = await communityBackend.banCommunityMember({
+    const communityBackend = this.communityData;
+    // Ban RPC emits member_banned on the target's private_user channel;
+    // no client-side broadcast needed.
+    await communityBackend.banCommunityMember({
       communityId: input.communityId,
       targetUserId: input.targetUserId,
       reason: input.reason,
     });
-    try {
-      await communityBackend.broadcastMemberBanned(banResult);
-    } catch (err) {
-      console.error("[CommunityAdminNexus] broadcastMemberBanned failed", err);
-    }
     await this.refreshMembersModalMembersIfOpen(input.communityId);
   };
 
@@ -711,7 +711,7 @@ export class CommunityAdminNexus {
     communityId: string;
     targetUserId: string;
   }): Promise<void> => {
-    const communityBackend = getCommunityDataBackend(input.communityId);
+    const communityBackend = this.communityData;
     await communityBackend.kickCommunityMember({
       communityId: input.communityId,
       targetUserId: input.targetUserId,
@@ -725,7 +725,7 @@ export class CommunityAdminNexus {
     reporterUserId: string;
     reason: string;
   }): Promise<void> => {
-    const communityBackend = getCommunityDataBackend(input.communityId);
+    const communityBackend = this.communityData;
     await communityBackend.reportUserProfile({
       communityId: input.communityId,
       targetUserId: input.targetUserId,
@@ -787,7 +787,7 @@ export class CommunityAdminNexus {
         ? 0
         : Math.max(...channels.map((channel) => channel.position)) + 1;
 
-    const communityBackend = getCommunityDataBackend(resolvedId);
+    const communityBackend = this.communityData;
     const channel = await communityBackend.createChannel({
       communityId: resolvedId,
       name: values.name,
@@ -809,7 +809,7 @@ export class CommunityAdminNexus {
     const channelIdToUpdate = this.resolveTargetChannelId(channelId);
     if (!channelIdToUpdate) throw new Error("No channel selected.");
 
-    const communityBackend = getCommunityDataBackend(resolvedId);
+    const communityBackend = this.communityData;
     await communityBackend.updateChannel({
       communityId: resolvedId,
       channelId: channelIdToUpdate,
@@ -837,7 +837,7 @@ export class CommunityAdminNexus {
       throw new Error("Channel name is required.");
     }
 
-    const communityBackend = getCommunityDataBackend(resolvedId);
+    const communityBackend = this.communityData;
     await communityBackend.updateChannel({
       communityId: resolvedId,
       channelId,
@@ -861,7 +861,7 @@ export class CommunityAdminNexus {
       throw new Error("At least one channel must exist in a server.");
     }
 
-    const communityBackend = getCommunityDataBackend(resolvedId);
+    const communityBackend = this.communityData;
     await communityBackend.deleteChannel({
       communityId: resolvedId,
       channelId,
@@ -914,7 +914,7 @@ export class CommunityAdminNexus {
       channelPermissionsLoading: true,
     });
     try {
-      const communityBackend = getCommunityDataBackend(resolvedId);
+      const communityBackend = this.communityData;
       const snapshot = await communityBackend.fetchChannelPermissions({
         communityId: resolvedId,
         channelId: resolvedChannelId,
@@ -983,7 +983,7 @@ export class CommunityAdminNexus {
       );
     }
 
-    const communityBackend = getCommunityDataBackend(resolvedId);
+    const communityBackend = this.communityData;
     await communityBackend.saveRoleChannelPermissions({
       communityId: resolvedId,
       channelId: targetChannelId,
@@ -1017,7 +1017,7 @@ export class CommunityAdminNexus {
     const targetChannelId = this.resolveTargetChannelId(channelId);
     if (!targetChannelId) throw new Error("No channel selected.");
 
-    const communityBackend = getCommunityDataBackend(resolvedId);
+    const communityBackend = this.communityData;
     const accessRevokedResult =
       await communityBackend.saveMemberChannelPermissions({
         communityId: resolvedId,

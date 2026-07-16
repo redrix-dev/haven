@@ -1,6 +1,7 @@
 import { Show } from "solid-js";
 import { Navigate } from "@solidjs/router";
 import { requireHavenSolidCore } from "@solid-client/core";
+import { CommunityAccessView } from "./CommunityAccessView";
 
 /**
  * The "/" landing surface: bounce to the first community once the bootstrap
@@ -12,14 +13,7 @@ export function CommunityHome() {
   const communities = core.communities.orderedCommunities();
 
   return (
-    <Show
-      when={communities()[0]}
-      fallback={
-        <div class="flex h-full items-center justify-center text-muted-foreground">
-          Join a community to get started.
-        </div>
-      }
-    >
+    <Show when={communities()[0]} fallback={<CommunityAccessView />}>
       {(first) => <Navigate href={`/community/${first().id}`} />}
     </Show>
   );

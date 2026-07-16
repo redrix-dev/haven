@@ -155,6 +155,15 @@ export class CommunitySolidNexus {
     this.persist();
   }
 
+  removeCommunity(id: string): void {
+    this.setState("entities", id, undefined!);
+    this.setState("orderedIds", (ids) =>
+      ids.filter((communityId) => communityId !== id),
+    );
+    if (this.state.activeId === id) this.setState("activeId", null);
+    this.persist();
+  }
+
   setCommunities(communities: ServerSummary[]): void {
     const orderedIds: string[] = [];
     for (const raw of communities) {
@@ -165,6 +174,12 @@ export class CommunitySolidNexus {
         cachedAt: Date.now(),
       });
       orderedIds.push(raw.id);
+    }
+    const retainedIds = new Set(orderedIds);
+    for (const existingId of Object.keys(this.state.entities)) {
+      if (!retainedIds.has(existingId)) {
+        this.setState("entities", existingId, undefined!);
+      }
     }
     this.setState("orderedIds", orderedIds);
     this.persist();

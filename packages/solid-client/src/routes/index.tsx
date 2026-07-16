@@ -21,6 +21,7 @@ import {
   CommunitySidebar,
   CommunityView,
   CommunityHome,
+  CommunityAccessView,
   RoleManagementView,
   CommunitySettingsPanel,
 } from "../features/community";
@@ -31,7 +32,11 @@ import {
   ResetPasswordScreen,
   AuthConfirmScreen,
 } from "../features/auth";
-import { AppearanceSettings } from "../features/settings";
+import {
+  AppearanceSettings,
+  NotificationSettings,
+  ProfileSettings,
+} from "../features/settings";
 import { DirectMessagesView } from "../features/direct-messages";
 import { FriendsView } from "../features/friends";
 import { NotificationsView } from "../features/notifications";
@@ -347,6 +352,8 @@ export const routes: RouteDefinition[] = [
         component: AppLayout,
         children: [
           { path: "/", component: CommunityHome },
+          { path: "/communities", component: CommunityAccessView },
+          { path: "/invite/:inviteCode", component: CommunityAccessView },
           { path: "/friends", component: FriendsView },
           { path: "/notifications", component: NotificationsView },
           { path: "/modmail", component: ModmailView },
@@ -365,6 +372,11 @@ export const routes: RouteDefinition[] = [
             component: RoleManagementView,
           },
           { path: "/settings/appearance", component: AppearanceSettings },
+          { path: "/settings/profile", component: ProfileSettings },
+          {
+            path: "/settings/notifications",
+            component: NotificationSettings,
+          },
         ],
       },
     ],

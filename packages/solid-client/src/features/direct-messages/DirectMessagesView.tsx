@@ -1,11 +1,31 @@
 import {
-  For,
-  Show,
-  createEffect,
-  createMemo,
-  createSignal,
-  onCleanup,
-} from "solid-js";
+  matchCommunityMarkdownShortcut,
+  normalizeCommunityMarkdown,
+  toggleCommunityMarkdown,
+  type CommunityMarkdownFormat,
+} from "@shared/features/messaging/utils/communityMarkdownParity";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import type {
+  DirectMessage,
+  DirectMessageConversationSummary,
+  FriendSummary,
+} from "@shared/lib/backend/types";
+import {
+  resolveLiveAvatarUrl,
+  resolveLiveUsername,
+} from "@shared/lib/liveProfiles";
+import {
+  ActionsMenu,
+  Avatar,
+  Button,
+  Markdown,
+  MarkdownToolbar,
+  ReportDialog,
+  type ActionMenuItem,
+  type ReportDialogResult,
+} from "@solid-client/components/ui";
+import { useSession } from "@solid-client/contexts/SessionProvider";
+import { requireHavenSolidCore } from "@solid-client/core";
 import { useNavigate, useParams } from "@solidjs/router";
 import {
   BellOff,
@@ -17,33 +37,14 @@ import {
   X,
 } from "lucide-solid";
 import {
-  matchCommunityMarkdownShortcut,
-  normalizeCommunityMarkdown,
-  toggleCommunityMarkdown,
-  type CommunityMarkdownFormat,
-} from "@shared/features/messaging/utils/communityMarkdownParity";
-import {
-  resolveLiveAvatarUrl,
-  resolveLiveUsername,
-} from "@shared/lib/liveProfiles";
-import type {
-  DirectMessage,
-  DirectMessageConversationSummary,
-  FriendSummary,
-} from "@shared/lib/backend/types";
-import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import { requireHavenSolidCore } from "@solid-client/core";
-import { useSession } from "@solid-client/contexts/SessionProvider";
-import {
-  ActionsMenu,
-  Avatar,
-  Button,
-  Markdown,
-  MarkdownToolbar,
-  ReportDialog,
-  type ActionMenuItem,
-  type ReportDialogResult,
-} from "@solid-client/components/ui";
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  untrack,
+} from "solid-js";
 
 type DmSendOptions = {
   imageUpload?: {
@@ -88,11 +89,11 @@ export function DirectMessagesView() {
       core.directMessages.clearFocusedConversation();
       return;
     }
-    void core.directMessages
-      .openConversation(id, { markRead: true })
-      .catch((error) => {
-        setOpenError(getErrorMessage(error, "Failed to open conversation."));
-      });
+    void untrack(() =>
+      core.directMessages.openConversation(id, { markRead: true }),
+    ).catch((error) => {
+      setOpenError(getErrorMessage(error, "Failed to open conversation."));
+    });
   });
 
   createEffect(() => {
