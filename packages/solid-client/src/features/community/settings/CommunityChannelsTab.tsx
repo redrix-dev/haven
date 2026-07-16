@@ -6,6 +6,7 @@ import {
   FolderPlus,
   Pencil,
   Plus,
+  ShieldCheck,
   Trash2,
 } from "lucide-solid";
 import type { HavenChannel } from "@shared/nexus/community/channelTypes";
@@ -13,6 +14,7 @@ import type { ChannelGroup, ChannelKind } from "@shared/lib/backend/types";
 import { Button, ConfirmDialog, TextField } from "@solid-client/components/ui";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
+import { ChannelPermissionsDialog } from "./ChannelPermissionsDialog";
 
 type ChannelEditorTarget =
   | { mode: "create"; kind: ChannelKind }
@@ -41,6 +43,8 @@ export function CommunityChannelsTab(props: { communityId: string }) {
   const [deleteTarget, setDeleteTarget] = createSignal<HavenChannel | null>(
     null,
   );
+  const [permissionsTarget, setPermissionsTarget] =
+    createSignal<HavenChannel | null>(null);
   const [deleting, setDeleting] = createSignal(false);
   const [groupDeleting, setGroupDeleting] = createSignal(false);
   const [structurePending, setStructurePending] = createSignal<string | null>(
@@ -290,12 +294,16 @@ export function CommunityChannelsTab(props: { communityId: string }) {
                                 canManage={
                                   permissions().canManageChannelStructure
                                 }
+                                canManagePermissions={
+                                  permissions().canManageChannelPermissions
+                                }
                                 pending={structurePending() === channel.id}
                                 onGroupChange={updateChannelGroup}
                                 onEdit={(target) =>
                                   setEditor({ mode: "edit", channel: target })
                                 }
                                 onDelete={setDeleteTarget}
+                                onPermissions={setPermissionsTarget}
                               />
                             )}
                           </For>
@@ -327,12 +335,16 @@ export function CommunityChannelsTab(props: { communityId: string }) {
                           groupId=""
                           groups={groupState().groups}
                           canManage={permissions().canManageChannelStructure}
+                          canManagePermissions={
+                            permissions().canManageChannelPermissions
+                          }
                           pending={structurePending() === channel.id}
                           onGroupChange={updateChannelGroup}
                           onEdit={(target) =>
                             setEditor({ mode: "edit", channel: target })
                           }
                           onDelete={setDeleteTarget}
+                          onPermissions={setPermissionsTarget}
                         />
                       )}
                     </For>
@@ -355,6 +367,11 @@ export function CommunityChannelsTab(props: { communityId: string }) {
         userId={session()?.user.id ?? null}
         target={groupEditor()}
         onClose={() => setGroupEditor(null)}
+      />
+      <ChannelPermissionsDialog
+        communityId={props.communityId}
+        channel={permissionsTarget()}
+        onClose={() => setPermissionsTarget(null)}
       />
       <ConfirmDialog
         open={deleteTarget() !== null}
@@ -385,10 +402,12 @@ function ChannelRow(props: {
   groupId: string;
   groups: ChannelGroup[];
   canManage: boolean;
+  canManagePermissions: boolean;
   pending: boolean;
   onGroupChange: (channelId: string, groupId: string) => Promise<void>;
   onEdit: (channel: HavenChannel) => void;
   onDelete: (channel: HavenChannel) => void;
+  onPermissions: (channel: HavenChannel) => void;
 }) {
   return (
     <div class="flex items-center gap-3 px-4 py-3">
@@ -438,6 +457,16 @@ function ChannelRow(props: {
           class="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
         >
           <Trash2 size={15} />
+        </button>
+      </Show>
+      <Show when={props.canManagePermissions}>
+        <button
+          type="button"
+          title={`Permissions for ${props.channel.name}`}
+          onClick={() => props.onPermissions(props.channel)}
+          class="rounded p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+        >
+          <ShieldCheck size={15} />
         </button>
       </Show>
     </div>

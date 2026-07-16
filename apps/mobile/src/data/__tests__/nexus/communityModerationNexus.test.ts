@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryPersistence } from "@shared/core";
+import {
+  createMemoryPersistence,
+  routeRealtimeEvent,
+  type RealtimeMutationTarget,
+} from "@shared/core";
 import type { ServerModmailBackend } from "@shared/lib/backend/serverModmailBackend";
 import type {
   ServerReportDetail,
@@ -83,5 +87,34 @@ describe("CommunityModerationNexus", () => {
     });
 
     expect(getServerReport).not.toHaveBeenCalled();
+  });
+
+  it("routes a report_created broadcast into the rendered report list", async () => {
+    const backend = {
+      listServerReports: vi.fn().mockResolvedValue([report("report-existing")]),
+      getServerReport: vi.fn().mockResolvedValue(detail("report-live")),
+    } as unknown as ServerModmailBackend;
+    const nexus = new CommunityModerationNexus(
+      createMemoryPersistence(),
+      backend,
+    );
+    await nexus.load(["community-1"]);
+
+    routeRealtimeEvent(
+      { moderation: nexus } as unknown as RealtimeMutationTarget,
+      {
+        type: "report_created",
+        payload: {
+          community_id: "community-1",
+          report_id: "report-live",
+        },
+      },
+    );
+
+    await vi.waitFor(() => {
+      expect(
+        nexus.reactiveStore.getState().reports.map((item) => item.reportId),
+      ).toEqual(["report-live", "report-existing"]);
+    });
   });
 });

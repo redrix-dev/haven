@@ -1,10 +1,11 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
-import { Ban, Crown, Flag, Undo2, UserMinus } from "lucide-solid";
+import { Ban, Crown, Flag, Undo2, UserMinus, X } from "lucide-solid";
 import { requireHavenSolidCore } from "@solid-client/core";
 import {
   ActionsMenu,
   Avatar,
   ConfirmDialog,
+  ProfileCard,
   ReportDialog,
   type ActionMenuItem,
   type ReportDialogResult,
@@ -37,6 +38,13 @@ export function MembersPanel(props: { communityId: string }) {
     userId: string;
     name: string;
   } | null>(null);
+  const [profileTarget, setProfileTarget] =
+    createSignal<CommunityMemberListItem | null>(null);
+  const profileTargetId = () => profileTarget()?.userId ?? null;
+  const profileCard = core.profiles.profileCard(profileTargetId);
+  const profileLoading = core.profiles.profileCardLoading(profileTargetId);
+  const profileError = core.profiles.profileCardError(profileTargetId);
+  const profileStaff = core.profiles.platformStaffInfo(profileTargetId);
 
   const memberActions = (member: CommunityMemberListItem): ActionMenuItem[] => {
     if (!canReport() || member.userId === myUserId) return [];
@@ -72,6 +80,16 @@ export function MembersPanel(props: { communityId: string }) {
   });
   createEffect(() => {
     if (view() === "bans") void core.admin.loadBans(props.communityId);
+  });
+  createEffect(() => {
+    const target = profileTarget();
+    if (!target) return;
+    void Promise.all([
+      core.profiles.loadProfileCard(target.userId),
+      core.profiles.ensurePlatformStaff(target.userId),
+    ]).catch(() => {
+      // The profile nexus exposes loading/error state in the dialog.
+    });
   });
 
   const canModerate = (member: CommunityMemberListItem) =>
@@ -142,13 +160,22 @@ export function MembersPanel(props: { communityId: string }) {
                   hoverButton={false}
                 >
                   <div class="group flex items-center gap-2 rounded px-1 py-1 hover:bg-surface-list-hover">
-                    <Avatar src={member.avatarUrl} name={member.displayName} />
-                    <span class="min-w-0 flex-1 truncate text-sm text-body-soft">
-                      {member.displayName}
-                    </span>
-                    <Show when={member.isOwner}>
-                      <Crown size={14} class="shrink-0 text-accent-amber" />
-                    </Show>
+                    <button
+                      type="button"
+                      onClick={() => setProfileTarget(member)}
+                      class="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Avatar
+                        src={member.avatarUrl}
+                        name={member.displayName}
+                      />
+                      <span class="min-w-0 flex-1 truncate text-sm text-body-soft">
+                        {member.displayName}
+                      </span>
+                      <Show when={member.isOwner}>
+                        <Crown size={14} class="shrink-0 text-accent-amber" />
+                      </Show>
+                    </button>
                     <Show when={canModerate(member)}>
                       <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
                         <button
@@ -250,6 +277,46 @@ export function MembersPanel(props: { communityId: string }) {
         onClose={() => setReportTarget(null)}
         onSubmit={submitReport}
       />
+
+      <Show when={profileTarget()}>
+        {(target) => (
+          <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
+            onClick={() => setProfileTarget(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${target().displayName} profile`}
+              class="w-full max-w-sm"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div class="mb-2 flex justify-end">
+                <button
+                  type="button"
+                  title="Close profile"
+                  onClick={() => setProfileTarget(null)}
+                  class="rounded-full bg-card p-2 text-muted-foreground shadow hover:text-foreground"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <Show
+                when={profileCard()}
+                fallback={
+                  <div class="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+                    {profileLoading()
+                      ? "Loading profile…"
+                      : profileError() || "This profile isn't available."}
+                  </div>
+                }
+              >
+                {(card) => <ProfileCard card={card()} staff={profileStaff()} />}
+              </Show>
+            </div>
+          </div>
+        )}
+      </Show>
     </aside>
   );
 }
