@@ -7,8 +7,8 @@ description: Use when changing the Haven Tauri desktop shell, apps/tauri bootstr
 
 ## Read Before Editing
 
-- [docs/architecture/SOLID_CLIENT_SHAPE.md](../../architecture/SOLID_CLIENT_SHAPE.md)
-- [docs/architecture/NATIVE_VOICE.md](../../architecture/NATIVE_VOICE.md) for
+- [docs/architecture/SOLID_CLIENT_SHAPE.md](../../../docs/architecture/SOLID_CLIENT_SHAPE.md)
+- [docs/architecture/NATIVE_VOICE.md](../../../docs/architecture/NATIVE_VOICE.md) for
   voice or popout work
 - [apps/tauri/src/bridge.ts](../../../apps/tauri/src/bridge.ts)
 - [packages/solid-client/src/contexts/BridgeProvider.tsx](../../../packages/solid-client/src/contexts/BridgeProvider.tsx)

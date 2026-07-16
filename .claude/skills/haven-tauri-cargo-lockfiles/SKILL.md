@@ -9,7 +9,7 @@ description: Use when changing Tauri Rust dependencies, Cargo.toml/Cargo.lock fi
 
 - [apps/tauri/src-tauri/Cargo.toml](../../../apps/tauri/src-tauri/Cargo.toml)
 - [apps/tauri/haven-voice/Cargo.toml](../../../apps/tauri/haven-voice/Cargo.toml)
-- [docs/architecture/NATIVE_VOICE.md](../../architecture/NATIVE_VOICE.md)
+- [docs/architecture/NATIVE_VOICE.md](../../../docs/architecture/NATIVE_VOICE.md)
 - [tooling/scripts/stage-haven-voice-sidecar.mjs](../../../tooling/scripts/stage-haven-voice-sidecar.mjs)
 - [.github/workflows/ci.yml](../../../.github/workflows/ci.yml)
 - [.github/workflows/release-desktop.yml](../../../.github/workflows/release-desktop.yml)

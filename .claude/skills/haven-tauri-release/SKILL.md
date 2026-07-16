@@ -7,8 +7,8 @@ description: Use when changing Haven desktop release workflow, desktop versionin
 
 ## Read Before Editing
 
-- [docs/RELEASE_CADENCE.md](../../RELEASE_CADENCE.md)
-- [docs/releases/README.md](../../releases/README.md)
+- [docs/RELEASE_CADENCE.md](../../../docs/RELEASE_CADENCE.md)
+- [docs/releases/README.md](../../../docs/releases/README.md)
 - [.github/workflows/release-desktop.yml](../../../.github/workflows/release-desktop.yml)
 - [tooling/scripts/check-desktop-version-sync.mjs](../../../tooling/scripts/check-desktop-version-sync.mjs)
 - [apps/tauri/src-tauri/tauri.conf.json](../../../apps/tauri/src-tauri/tauri.conf.json)

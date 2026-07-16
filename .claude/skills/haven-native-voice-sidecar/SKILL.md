@@ -7,7 +7,7 @@ description: Use when changing Linux native voice sidecar code, apps/tauri/haven
 
 ## Read Before Editing
 
-- [docs/architecture/NATIVE_VOICE.md](../../architecture/NATIVE_VOICE.md)
+- [docs/architecture/NATIVE_VOICE.md](../../../docs/architecture/NATIVE_VOICE.md)
 - [packages/solid-client/src/contexts/BridgeProvider.tsx](../../../packages/solid-client/src/contexts/BridgeProvider.tsx)
 - [packages/solid-client/src/contexts/VoiceProvider.tsx](../../../packages/solid-client/src/contexts/VoiceProvider.tsx)
 - [apps/tauri/src/bridge.ts](../../../apps/tauri/src/bridge.ts)

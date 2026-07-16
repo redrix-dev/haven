@@ -7,10 +7,10 @@ description: Use when changing packages/shared, backend clients, shared domain l
 
 ## Read Before Editing
 
-- [docs/PRINCIPLES.md](../../PRINCIPLES.md)
-- [docs/ARCHITECTURE.md](../../ARCHITECTURE.md)
-- [docs/architecture/HAVEN_CORE.md](../../architecture/HAVEN_CORE.md)
-- [docs/architecture/REALTIME.md](../../architecture/REALTIME.md) when routing,
+- [docs/PRINCIPLES.md](../../../docs/PRINCIPLES.md)
+- [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md)
+- [docs/architecture/HAVEN_CORE.md](../../../docs/architecture/HAVEN_CORE.md)
+- [docs/architecture/REALTIME.md](../../../docs/architecture/REALTIME.md) when routing,
   subscriptions, notifications, messages, DMs, social, moderation, or profile
   events change.
 

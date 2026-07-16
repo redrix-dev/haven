@@ -7,11 +7,11 @@ description: Use when changing Supabase migrations, Postgres RLS policies, secur
 
 ## Read Before Editing
 
-- [docs/PRINCIPLES.md](../../PRINCIPLES.md), especially "Security lives in the
+- [docs/PRINCIPLES.md](../../../docs/PRINCIPLES.md), especially "Security lives in the
   database"
-- [docs/ARCHITECTURE.md](../../ARCHITECTURE.md)
+- [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md)
 - [supabase/tests/README.md](../../../supabase/tests/README.md)
-- [docs/architecture/REALTIME.md](../../architecture/REALTIME.md) when changing
+- [docs/architecture/REALTIME.md](../../../docs/architecture/REALTIME.md) when changing
   private-user broadcasts or realtime-visible rows
 
 ## Security Rule
@@ -66,7 +66,7 @@ The SQL suite runs against local Supabase via `psql`.
 2. Route the event in `packages/shared/src/core/routeRealtimeEvent.ts`.
 3. Extend `RealtimeMutationTarget` only when a new platform-core mutation surface
    is necessary.
-4. Update [docs/architecture/REALTIME.md](../../architecture/REALTIME.md).
+4. Update [docs/architecture/REALTIME.md](../../../docs/architecture/REALTIME.md).
 5. Cover the SQL behavior and the TypeScript routing behavior.
 
 ## Footguns

@@ -8,7 +8,7 @@ description: Use when changing apps/mobile React Native or Expo code, mobile dat
 ## Read Before Editing
 
 - [apps/mobile/README.md](../../../apps/mobile/README.md)
-- [docs/architecture/HAVEN_CORE.md](../../architecture/HAVEN_CORE.md)
+- [docs/architecture/HAVEN_CORE.md](../../../docs/architecture/HAVEN_CORE.md)
 - [apps/mobile/docs/uniwind-mobile.md](../../../apps/mobile/docs/uniwind-mobile.md)
 - Load [haven-mobile-chat-surface](../haven-mobile-chat-surface/SKILL.md) when
   touching chat list/composer/keyboard layout.

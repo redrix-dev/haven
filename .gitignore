@@ -174,7 +174,12 @@ local_archives/
 # Local test run reports (generated)
 test-reports/
 
-.claude/
+# Agent/editor local config stays local, but .claude/skills/ is tracked source:
+# coding agents only load skills from .claude/skills/, so an ignored skill is an
+# invisible one. Ignore the contents of .claude/, not .claude/ itself — git
+# cannot re-include a path whose parent directory is excluded.
+.claude/*
+!.claude/skills/
 Haven-Obsidian-Vault/
 .cursor/
 .stfolder/
