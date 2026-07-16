@@ -11,6 +11,7 @@ import {
   Bell,
   ChevronDown,
   MessageCircle,
+  Plus,
   Settings,
   ShieldAlert,
   Users,
@@ -110,6 +111,14 @@ export function CommunitySidebar() {
             </button>
           )}
         </For>
+
+        <button
+          title="Create or join a community"
+          onClick={() => navigate("/communities")}
+          class="flex h-12 w-12 items-center justify-center rounded-2xl border border-dashed border-border text-body-soft transition-all hover:rounded-xl hover:border-primary hover:bg-sidebar-accent hover:text-foreground"
+        >
+          <Plus size={20} />
+        </button>
 
         <div class="mt-auto">
           <button

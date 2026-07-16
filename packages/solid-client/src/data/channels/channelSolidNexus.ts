@@ -12,7 +12,11 @@ import type {
   HavenChannel,
 } from "@shared/nexus/community/channelTypes";
 import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
-import type { Channel, ChannelGroupState } from "@shared/lib/backend/types";
+import type {
+  Channel,
+  ChannelGroupState,
+  ChannelKind,
+} from "@shared/lib/backend/types";
 
 /**
  * ChannelSolidNexus — one cohesive owner for the channel domain.
@@ -181,6 +185,57 @@ export class ChannelSolidNexus {
 
   // ─── realtime + writes ───────────────────────────────────────────────────
 
+  async createChannel(input: {
+    communityId: string;
+    name: string;
+    topic: string | null;
+    kind: ChannelKind;
+  }): Promise<HavenChannel> {
+    const channels = projectChannels(this.state, input.communityId);
+    const nextPosition =
+      channels.length === 0
+        ? 0
+        : Math.max(...channels.map((channel) => channel.position)) + 1;
+    const raw = await this.communityData.createChannel({
+      ...input,
+      position: nextPosition,
+    });
+    this.upsertChannel(raw);
+    this.setActiveChannelId(raw.id);
+    return this.state.entities[raw.id]!.data;
+  }
+
+  async updateChannel(input: {
+    communityId: string;
+    channelId: string;
+    name: string;
+    topic: string | null;
+  }): Promise<void> {
+    await this.communityData.updateChannel(input);
+    if (this.state.entities[input.channelId]) {
+      this.setState("entities", input.channelId, "data", "name", input.name);
+      this.setState("entities", input.channelId, "data", "topic", input.topic);
+      this.persist();
+    }
+  }
+
+  async deleteChannel(input: {
+    communityId: string;
+    channelId: string;
+  }): Promise<void> {
+    const channelIds = this.state.byCommunity[input.communityId] ?? [];
+    if (channelIds.length <= 1) {
+      throw new Error("At least one channel must exist in a community.");
+    }
+    await this.communityData.deleteChannel(input);
+    this.removeChannel(input.channelId, input.communityId);
+    if (this.state.activeChannelId === input.channelId) {
+      const nextId =
+        (this.state.byCommunity[input.communityId] ?? [])[0] ?? null;
+      this.setActiveChannelId(nextId);
+    }
+  }
+
   /** Insert / update a single channel from a realtime event. */
   upsertChannel(raw: Channel | unknown): void {
     const channel = toHavenChannel(raw as Channel);
@@ -193,6 +248,16 @@ export class ChannelSolidNexus {
     if (!communityIds.includes(channel.id)) {
       this.setState("byCommunity", channel.communityId, [
         ...communityIds,
+        channel.id,
+      ]);
+    }
+    const belongsToGroup = (this.state.groups[channel.communityId] ?? []).some(
+      (group) => group.channelIds.includes(channel.id),
+    );
+    const ungroupedIds = this.state.ungrouped[channel.communityId] ?? [];
+    if (!belongsToGroup && !ungroupedIds.includes(channel.id)) {
+      this.setState("ungrouped", channel.communityId, [
+        ...ungroupedIds,
         channel.id,
       ]);
     }

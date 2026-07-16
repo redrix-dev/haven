@@ -20,8 +20,18 @@ export function NotificationsView() {
   const unreadCount = core.notifications.inboxUnreadCount();
 
   onMount(() => {
-    void core.notifications.ensureInbox();
-    void core.notifications.markAllSeen();
+    void core.notifications
+      .ensureInbox()
+      .then(() =>
+        core.notifications.markSeen(
+          notifications()
+            .filter((item) => item.seenAt == null)
+            .map((item) => item.recipientId),
+        ),
+      )
+      .catch((error) => {
+        console.warn("[NotificationsView] inbox load failed", error);
+      });
   });
 
   return (
