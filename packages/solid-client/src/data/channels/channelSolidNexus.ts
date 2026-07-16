@@ -15,9 +15,18 @@ import type {
 import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type {
   Channel,
+  ChannelAccessRevokedResult,
   ChannelGroupState,
   ChannelKind,
+  ChannelPermissionState,
+  ChannelPermissionsSnapshot,
 } from "@shared/lib/backend/types";
+
+export type ChannelSolidState = ChannelNexusState & {
+  permissionsByChannel: Record<string, ChannelPermissionsSnapshot | undefined>;
+  permissionsLoadingByChannel: Record<string, boolean>;
+  permissionsErrorsByChannel: Record<string, string | null>;
+};
 
 /**
  * ChannelSolidNexus — one cohesive owner for the channel domain.
@@ -34,7 +43,7 @@ import type {
  * concept. This class only adds the Solid-native wiring around them.
  */
 
-const initialState = (): ChannelNexusState => ({
+const initialState = (): ChannelSolidState => ({
   entities: {},
   byCommunity: {},
   groups: {},
@@ -43,6 +52,9 @@ const initialState = (): ChannelNexusState => ({
   activeChannelId: null,
   loadingByCommunity: {},
   lastChannelByCommunity: {},
+  permissionsByChannel: {},
+  permissionsLoadingByChannel: {},
+  permissionsErrorsByChannel: {},
   revision: 0,
 });
 
@@ -58,9 +70,13 @@ const toHavenChannel = (raw: Channel): HavenChannel => ({
 
 export class ChannelSolidNexus {
   /** The live store proxy. Read-only to the outside; writes go through methods. */
-  readonly state: ChannelNexusState;
-  private readonly setState: SetStoreFunction<ChannelNexusState>;
+  readonly state: ChannelSolidState;
+  private readonly setState: SetStoreFunction<ChannelSolidState>;
   private readonly inflight = new Map<string, Promise<void>>();
+  private readonly permissionsInflight = new Map<
+    string,
+    Promise<ChannelPermissionsSnapshot>
+  >();
 
   constructor(
     private readonly persistence: NexusPersistence,
@@ -97,6 +113,33 @@ export class ChannelSolidNexus {
   /** Group layout for the community, including ungrouped and collapsed ids. */
   channelGroups(communityId: Accessor<string>): Accessor<ChannelGroupState> {
     return createMemo(() => projectChannelGroups(this.state, communityId()));
+  }
+
+  channelPermissions(
+    channelId: Accessor<string | null>,
+  ): Accessor<ChannelPermissionsSnapshot | null> {
+    return createMemo(() => {
+      const id = channelId();
+      return id ? (this.state.permissionsByChannel[id] ?? null) : null;
+    });
+  }
+
+  channelPermissionsLoading(
+    channelId: Accessor<string | null>,
+  ): Accessor<boolean> {
+    return createMemo(() => {
+      const id = channelId();
+      return id ? (this.state.permissionsLoadingByChannel[id] ?? false) : false;
+    });
+  }
+
+  channelPermissionsError(
+    channelId: Accessor<string | null>,
+  ): Accessor<string | null> {
+    return createMemo(() => {
+      const id = channelId();
+      return id ? (this.state.permissionsErrorsByChannel[id] ?? null) : null;
+    });
   }
 
   // ─── lifecycle ─────────────────────────────────────────────────────────────
@@ -169,6 +212,7 @@ export class ChannelSolidNexus {
   }
 
   clear(): void {
+    this.permissionsInflight.clear();
     this.setState(initialState());
     this.persistence.remove(NEXUS_STORAGE_KEYS.channels);
   }
@@ -354,6 +398,91 @@ export class ChannelSolidNexus {
     this.setGroupCollapsed(communityId, groupId, isCollapsed);
   }
 
+  async loadChannelPermissions(input: {
+    communityId: string;
+    channelId: string;
+    userId: string;
+  }): Promise<ChannelPermissionsSnapshot> {
+    const existing = this.permissionsInflight.get(input.channelId);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      this.setState("permissionsLoadingByChannel", input.channelId, true);
+      this.setState("permissionsErrorsByChannel", input.channelId, null);
+      try {
+        const snapshot =
+          await this.communityData.fetchChannelPermissions(input);
+        this.setState("permissionsByChannel", input.channelId, snapshot);
+        return snapshot;
+      } catch (error) {
+        this.setState(
+          "permissionsErrorsByChannel",
+          input.channelId,
+          error instanceof Error && error.message.trim()
+            ? error.message
+            : "Failed to load channel permissions.",
+        );
+        this.setState("permissionsByChannel", input.channelId, undefined);
+        throw error;
+      } finally {
+        this.setState("permissionsLoadingByChannel", input.channelId, false);
+        this.permissionsInflight.delete(input.channelId);
+      }
+    })();
+
+    this.permissionsInflight.set(input.channelId, promise);
+    return promise;
+  }
+
+  async saveRoleChannelPermissions(input: {
+    communityId: string;
+    channelId: string;
+    roleId: string;
+    permissions: ChannelPermissionState;
+  }): Promise<void> {
+    const row = this.state.permissionsByChannel[
+      input.channelId
+    ]?.rolePermissions.find((candidate) => candidate.roleId === input.roleId);
+    if (row && !row.editable) {
+      throw new Error(
+        "You can only edit overwrites for roles below your highest role.",
+      );
+    }
+    await this.communityData.saveRoleChannelPermissions(input);
+    this.setState(
+      "permissionsByChannel",
+      input.channelId,
+      "rolePermissions",
+      (rows = []) =>
+        rows.map((candidate) =>
+          candidate.roleId === input.roleId
+            ? { ...candidate, ...input.permissions }
+            : candidate,
+        ),
+    );
+  }
+
+  async saveMemberChannelPermissions(input: {
+    communityId: string;
+    channelId: string;
+    memberId: string;
+    permissions: ChannelPermissionState;
+  }): Promise<ChannelAccessRevokedResult | null> {
+    const result = await this.communityData.saveMemberChannelPermissions(input);
+    this.setState(
+      "permissionsByChannel",
+      input.channelId,
+      "memberPermissions",
+      (rows = []) =>
+        rows.map((candidate) =>
+          candidate.memberId === input.memberId
+            ? { ...candidate, ...input.permissions }
+            : candidate,
+        ),
+    );
+    return result;
+  }
+
   setGroupCollapsed(
     communityId: string,
     groupId: string,
@@ -414,12 +543,18 @@ export class ChannelSolidNexus {
         channelIds: group.channelIds.filter((channelId) => channelId !== id),
       })),
     );
+    this.setState("permissionsByChannel", id, undefined!);
+    this.setState("permissionsLoadingByChannel", id, undefined!);
+    this.setState("permissionsErrorsByChannel", id, undefined!);
     this.persist();
   }
 
   removeCommunity(communityId: string): void {
     for (const channelId of this.state.byCommunity[communityId] ?? []) {
       this.setState("entities", channelId, undefined!);
+      this.setState("permissionsByChannel", channelId, undefined!);
+      this.setState("permissionsLoadingByChannel", channelId, undefined!);
+      this.setState("permissionsErrorsByChannel", channelId, undefined!);
     }
     this.setState("byCommunity", communityId, undefined!);
     this.setState("groups", communityId, undefined!);

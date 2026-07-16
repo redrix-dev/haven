@@ -278,4 +278,89 @@ describe("ChannelSolidNexus channel management", () => {
     });
     expect(nexus.state.collapsed["community-1"]).not.toContain("group-1");
   });
+
+  it("loads and updates channel permission overwrites", async () => {
+    const snapshot = {
+      rolePermissions: [
+        {
+          roleId: "role-1",
+          name: "Members",
+          color: "#fff",
+          isDefault: true,
+          editable: true,
+          defaultCanView: true,
+          defaultCanSend: true,
+          defaultCanManage: false,
+          canView: null,
+          canSend: null,
+          canManage: null,
+        },
+      ],
+      memberPermissions: [
+        {
+          memberId: "member-1",
+          displayName: "Ada",
+          isOwner: false,
+          canView: null,
+          canSend: null,
+          canManage: null,
+        },
+      ],
+      memberOptions: [],
+    };
+    const fetchChannelPermissions = vi.fn().mockResolvedValue(snapshot);
+    const saveRoleChannelPermissions = vi.fn().mockResolvedValue(undefined);
+    const revoked = {
+      revokedUserId: "user-1",
+      channelId: "channel-1",
+      communityId: "community-1",
+    };
+    const saveMemberChannelPermissions = vi.fn().mockResolvedValue(revoked);
+    const nexus = new ChannelSolidNexus(createMemoryPersistence(), {
+      fetchChannelPermissions,
+      saveRoleChannelPermissions,
+      saveMemberChannelPermissions,
+    } as unknown as CommunityDataBackend);
+
+    await nexus.loadChannelPermissions({
+      communityId: "community-1",
+      channelId: "channel-1",
+      userId: "user-1",
+    });
+    await nexus.saveRoleChannelPermissions({
+      communityId: "community-1",
+      channelId: "channel-1",
+      roleId: "role-1",
+      permissions: { canView: true, canSend: false, canManage: null },
+    });
+    const result = await nexus.saveMemberChannelPermissions({
+      communityId: "community-1",
+      channelId: "channel-1",
+      memberId: "member-1",
+      permissions: { canView: false, canSend: null, canManage: null },
+    });
+
+    expect(nexus.state.permissionsByChannel["channel-1"]).toMatchObject({
+      rolePermissions: [{ canView: true, canSend: false }],
+      memberPermissions: [{ canView: false }],
+    });
+    expect(result).toEqual(revoked);
+  });
+
+  it("reports channel permission load failures", async () => {
+    const nexus = new ChannelSolidNexus(createMemoryPersistence(), {
+      fetchChannelPermissions: vi.fn().mockRejectedValue(new Error("Denied")),
+    } as unknown as CommunityDataBackend);
+
+    await expect(
+      nexus.loadChannelPermissions({
+        communityId: "community-1",
+        channelId: "channel-1",
+        userId: "user-1",
+      }),
+    ).rejects.toThrow("Denied");
+
+    expect(nexus.state.permissionsErrorsByChannel["channel-1"]).toBe("Denied");
+    expect(nexus.state.permissionsLoadingByChannel["channel-1"]).toBe(false);
+  });
 });
