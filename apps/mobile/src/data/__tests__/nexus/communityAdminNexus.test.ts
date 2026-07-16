@@ -47,7 +47,7 @@ describe("CommunityAdminNexus", () => {
   const communityDataForTest = new Proxy({} as CommunityDataBackend, {
     get: (_target, prop) =>
       (
-        requireSessionBackends().communityData as Record<
+        requireSessionBackends().communityData as unknown as Record<
           string | symbol,
           unknown
         >

@@ -452,6 +452,26 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     return result;
   }
 
+  async createCommunity(name: string): Promise<{ id: string }> {
+    const userId = this.sessionUserId;
+    if (!userId) throw new Error("Not authenticated");
+    const community = await this.admin.createCommunity(name);
+    await this.communities.load(userId);
+    this.communities.setActiveId(community.id);
+    return community;
+  }
+
+  async joinCommunityByInvite(
+    code: string,
+  ): Promise<{ communityId: string; communityName: string; joined: boolean }> {
+    const userId = this.sessionUserId;
+    if (!userId) throw new Error("Not authenticated");
+    const result = await this.admin.redeemCommunityInvite(code);
+    await this.communities.load(userId);
+    this.communities.setActiveId(result.communityId);
+    return result;
+  }
+
   /**
    * File a user-account report. Mirrors mobile's core method, extended for the
    * target choice: `server_admins` → community mods, `haven_staff` → platform,

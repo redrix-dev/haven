@@ -5,6 +5,7 @@ import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBacken
 import type {
   CommunityBanItem,
   CommunityMemberListItem,
+  RedeemedInvite,
   ServerInvite,
   ServerRoleManagementSnapshot,
 } from "@shared/lib/backend/types";
@@ -13,7 +14,9 @@ import type {
 type InviteControlPlane = Pick<
   ControlPlaneBackend,
   | "listActiveCommunityInvites"
+  | "createCommunity"
   | "createCommunityInvite"
+  | "redeemCommunityInvite"
   | "revokeCommunityInvite"
 >;
 
@@ -276,6 +279,14 @@ export class CommunityAdminSolidNexus {
   }
 
   // ─── invites (parity with mobile CommunityAdminNexus; controlPlane-backed) ──
+
+  async createCommunity(name: string): Promise<{ id: string }> {
+    return this.controlPlane.createCommunity(name);
+  }
+
+  async redeemCommunityInvite(code: string): Promise<RedeemedInvite> {
+    return this.controlPlane.redeemCommunityInvite(code);
+  }
 
   invites(communityId: Accessor<string>): Accessor<ServerInvite[]> {
     return createMemo(

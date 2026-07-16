@@ -4,6 +4,7 @@ import type { StoreApi, UseBoundStore } from "zustand";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ServerModmailBackend } from "@shared/lib/backend/serverModmailBackend";
 import type {
+  ReportCreatedBroadcastPayload,
   ReportStatusUpdatedBroadcastPayload,
   ServerReportDetail,
   ServerReportSummary,
@@ -172,6 +173,38 @@ export class CommunityModerationNexus {
   }
 
   // ─── Realtime handlers ────────────────────────────────────────────────────────
+
+  /**
+   * Fetch and prepend a newly-created report when its community inbox is
+   * already loaded. Re-check after the request so a concurrent load cannot
+   * introduce a duplicate.
+   */
+  async handleReportCreated(
+    payload: ReportCreatedBroadcastPayload,
+  ): Promise<void> {
+    const { reportId, communityId } = payload;
+    const state = this.store.getState();
+    if (!state.loadedCommunityIds.includes(communityId)) return;
+    if (state.reports.some((report) => report.reportId === reportId)) return;
+
+    try {
+      const detail = await this.backend.getServerReport(reportId);
+      if (!detail) return;
+      const current = this.store.getState();
+      if (!current.loadedCommunityIds.includes(communityId)) return;
+      if (current.reports.some((report) => report.reportId === reportId))
+        return;
+      this.store.setState((latest) => ({
+        reports: [detail, ...latest.reports],
+      }));
+      this.bumpRevision();
+    } catch (err) {
+      console.warn(
+        "[CommunityModerationNexus] handleReportCreated failed",
+        err,
+      );
+    }
+  }
 
   /**
    * Called by routeRealtimeEvent when report_status_updated fires.
