@@ -4,6 +4,7 @@ import type { NexusEntry } from "@shared/core/cache/entityTypes";
 import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import {
+  projectChannelGroups,
   projectChannels,
   selectActiveChannelId,
 } from "@shared/nexus/community/channelSelectors";
@@ -91,6 +92,11 @@ export class ChannelSolidNexus {
     return createMemo(
       () => this.state.loadingByCommunity[communityId()] ?? false,
     );
+  }
+
+  /** Group layout for the community, including ungrouped and collapsed ids. */
+  channelGroups(communityId: Accessor<string>): Accessor<ChannelGroupState> {
+    return createMemo(() => projectChannelGroups(this.state, communityId()));
   }
 
   // ─── lifecycle ─────────────────────────────────────────────────────────────
@@ -243,6 +249,129 @@ export class ChannelSolidNexus {
     }
   }
 
+  async createChannelGroup(
+    communityId: string,
+    name: string,
+    createdByUserId: string,
+    channelIdToAssign?: string | null,
+  ): Promise<void> {
+    const normalizedName = name.trim();
+    if (!normalizedName) throw new Error("Group name is required.");
+
+    const groups = projectChannelGroups(this.state, communityId).groups;
+    const nextPosition =
+      groups.length === 0
+        ? 0
+        : Math.max(...groups.map((group) => group.position)) + 1;
+    const createdGroup = await this.communityData.createChannelGroup({
+      communityId,
+      name: normalizedName,
+      position: nextPosition,
+      createdByUserId,
+    });
+
+    if (channelIdToAssign) {
+      await this.communityData.setChannelGroupForChannel({
+        communityId,
+        channelId: channelIdToAssign,
+        groupId: createdGroup.id,
+        position: 0,
+      });
+    }
+    await this.loadForCommunity(communityId);
+  }
+
+  async renameChannelGroup(
+    communityId: string,
+    groupId: string,
+    name: string,
+  ): Promise<void> {
+    const normalizedName = name.trim();
+    if (!normalizedName) throw new Error("Group name is required.");
+    await this.communityData.renameChannelGroup({
+      communityId,
+      groupId,
+      name: normalizedName,
+    });
+    this.setState("groups", communityId, (groups = []) =>
+      groups.map((group) =>
+        group.id === groupId ? { ...group, name: normalizedName } : group,
+      ),
+    );
+    this.persist();
+  }
+
+  async deleteChannelGroup(
+    communityId: string,
+    groupId: string,
+  ): Promise<void> {
+    await this.communityData.deleteChannelGroup({ communityId, groupId });
+    this.setGroupCollapsed(communityId, groupId, false);
+    await this.loadForCommunity(communityId);
+  }
+
+  async assignChannelToGroup(
+    communityId: string,
+    channelId: string,
+    groupId: string,
+  ): Promise<void> {
+    const group = projectChannelGroups(this.state, communityId).groups.find(
+      (candidate) => candidate.id === groupId,
+    );
+    if (!group) throw new Error("Channel group not found.");
+    await this.communityData.setChannelGroupForChannel({
+      communityId,
+      channelId,
+      groupId,
+      position: group.channelIds.length,
+    });
+    await this.loadForCommunity(communityId);
+  }
+
+  async removeChannelFromGroup(
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    await this.communityData.setChannelGroupForChannel({
+      communityId,
+      channelId,
+      groupId: null,
+      position: 0,
+    });
+    await this.loadForCommunity(communityId);
+  }
+
+  async setChannelGroupCollapsed(
+    communityId: string,
+    groupId: string,
+    isCollapsed: boolean,
+  ): Promise<void> {
+    await this.communityData.setChannelGroupCollapsed({
+      communityId,
+      groupId,
+      isCollapsed,
+    });
+    this.setGroupCollapsed(communityId, groupId, isCollapsed);
+  }
+
+  setGroupCollapsed(
+    communityId: string,
+    groupId: string,
+    collapsed: boolean,
+  ): void {
+    const current = this.state.collapsed[communityId] ?? [];
+    const has = current.includes(groupId);
+    if (collapsed === has) return;
+    this.setState(
+      "collapsed",
+      communityId,
+      collapsed
+        ? [...current, groupId]
+        : current.filter((id) => id !== groupId),
+    );
+    this.persist();
+  }
+
   /** Insert / update a single channel from a realtime event. */
   upsertChannel(raw: Channel | unknown): void {
     const channel = toHavenChannel(raw as Channel);
@@ -285,6 +414,19 @@ export class ChannelSolidNexus {
         channelIds: group.channelIds.filter((channelId) => channelId !== id),
       })),
     );
+    this.persist();
+  }
+
+  removeCommunity(communityId: string): void {
+    for (const channelId of this.state.byCommunity[communityId] ?? []) {
+      this.setState("entities", channelId, undefined!);
+    }
+    this.setState("byCommunity", communityId, undefined!);
+    this.setState("groups", communityId, undefined!);
+    this.setState("ungrouped", communityId, undefined!);
+    this.setState("collapsed", communityId, undefined!);
+    this.setState("loadingByCommunity", communityId, undefined!);
+    this.setState("lastChannelByCommunity", communityId, undefined!);
     this.persist();
   }
 

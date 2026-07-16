@@ -24,8 +24,7 @@ export function canOpenCommunitySettingsPanel(
 export function visibleCommunitySettingsTabs(
   perms: ServerPermissions,
 ): CommunitySettingsTab[] {
-  const tabs: CommunitySettingsTab[] = [];
-  if (perms.canManageServer) tabs.push("overview");
+  const tabs: CommunitySettingsTab[] = ["overview"];
   if (perms.canCreateChannels || perms.canManageChannelStructure) {
     tabs.push("channels");
   }

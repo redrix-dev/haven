@@ -5,37 +5,13 @@ import type { CommunitySettingsTab } from "@shared/core/sessionStorePorts";
 import { CommunityRoleEditor } from "./CommunityRoleEditor";
 import { CommunityInvitesTab } from "./CommunityInvitesTab";
 import { CommunityChannelsTab } from "./CommunityChannelsTab";
+import { CommunityOverviewTab } from "./CommunityOverviewTab";
 import {
   COMMUNITY_SETTINGS_TAB_LABELS,
   canOpenCommunitySettingsPanel,
   defaultCommunitySettingsTab,
   visibleCommunitySettingsTabs,
 } from "./communitySettingsAccess";
-
-function CommunityOverviewTab(props: {
-  communityId: string;
-  communityName: string;
-}) {
-  return (
-    <div class="overflow-y-auto p-6">
-      <div class="mx-auto max-w-lg space-y-4">
-        <div>
-          <p class="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Community name
-          </p>
-          <p class="text-base font-medium text-foreground">
-            {props.communityName}
-          </p>
-        </div>
-        <p class="text-sm text-muted-foreground">
-          General community settings (description, invite policy, and related
-          options) will land here in the next pass. Role and invite management
-          use the tabs above.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Slide-over community settings panel. Opened from the sidebar community
@@ -55,6 +31,12 @@ export function CommunitySettingsPanel() {
   const perms = createMemo(() =>
     communityId() ? core.permissions.getPermissions(communityId()) : null,
   );
+  const permissionsReady = createMemo(() => {
+    const id = communityId();
+    return Boolean(
+      id && core.permissions.getPermissionsByCommunityId()[id] !== undefined,
+    );
+  });
 
   const tabs = createMemo(() => {
     const current = perms();
@@ -69,7 +51,10 @@ export function CommunitySettingsPanel() {
   const canOpen = () => {
     const current = perms();
     return Boolean(
-      communityId() && current && canOpenCommunitySettingsPanel(current),
+      communityId() &&
+      permissionsReady() &&
+      current &&
+      canOpenCommunitySettingsPanel(current),
     );
   };
 
@@ -139,7 +124,8 @@ export function CommunitySettingsPanel() {
         <Show when={activeTab() === "overview"}>
           <CommunityOverviewTab
             communityId={communityId()}
-            communityName={communityName()}
+            canManageServer={perms()?.canManageServer ?? false}
+            isOwner={perms()?.isOwner ?? false}
           />
         </Show>
         <Show when={activeTab() === "roles"}>

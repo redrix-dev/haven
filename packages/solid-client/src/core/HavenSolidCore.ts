@@ -25,6 +25,7 @@ import type {
   MessageReportTarget,
   OnboardingClientContext,
   OnboardingCompletionResult,
+  ServerSettingsUpdate,
 } from "@shared/lib/backend/types";
 import {
   CommunitySolidNexus,
@@ -470,6 +471,59 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     await this.communities.load(userId);
     this.communities.setActiveId(result.communityId);
     return result;
+  }
+
+  async saveCommunitySettings(input: {
+    communityId: string;
+    values: ServerSettingsUpdate;
+  }): Promise<void> {
+    const userId = this.sessionUserId;
+    if (!userId) throw new Error("Not authenticated");
+    await this.admin.saveServerSettings(input);
+    await this.communities.load(userId);
+  }
+
+  async renameCommunity(communityId: string, name: string): Promise<void> {
+    const userId = this.sessionUserId;
+    if (!userId) throw new Error("Not authenticated");
+    await this.admin.renameCommunity(communityId, name);
+    await Promise.all([
+      this.communities.load(userId),
+      this.admin.loadServerSettings(communityId),
+    ]);
+  }
+
+  async leaveCommunity(communityId: string): Promise<void> {
+    const userId = this.sessionUserId;
+    if (!userId) throw new Error("Not authenticated");
+    await this.admin.leaveCommunity(communityId);
+    await this.removeCommunityFromSession(communityId, userId);
+  }
+
+  async deleteCommunity(communityId: string): Promise<void> {
+    const userId = this.sessionUserId;
+    if (!userId) throw new Error("Not authenticated");
+    await this.admin.deleteCommunity(communityId);
+    await this.removeCommunityFromSession(communityId, userId);
+  }
+
+  private async removeCommunityFromSession(
+    communityId: string,
+    userId: string,
+  ): Promise<void> {
+    const wasActive = this.communities.getActiveId() === communityId;
+    this.admin.clearCommunity(communityId);
+    this.channels.removeCommunity(communityId);
+    this.messages.clearCommunity(communityId);
+    this.permissions.invalidate(communityId);
+    this.communities.removeCommunity(communityId);
+    await this.communities.load(userId);
+    if (wasActive) {
+      this.communities.setActiveId(
+        this.communities.getCommunityIds()[0] ?? null,
+      );
+    }
+    this.syncViewerMessagePolicy(this.communities.getActiveId());
   }
 
   /**

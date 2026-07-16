@@ -361,6 +361,23 @@ export class CommunityAdminSolidNexus {
     });
   }
 
+  clearCommunity(communityId: string): void {
+    this.setState("membersByCommunity", communityId, undefined!);
+    this.setState("membersLoading", communityId, undefined!);
+    this.setState("membersError", communityId, undefined!);
+    this.setState("bansByCommunity", communityId, undefined!);
+    this.setState("bansLoading", communityId, undefined!);
+    this.setState("roleSnapshotByCommunity", communityId, undefined!);
+    this.setState("roleLoadingByCommunity", communityId, undefined!);
+    this.setState("roleErrorByCommunity", communityId, undefined!);
+    this.setState("settingsByCommunity", communityId, undefined!);
+    this.setState("settingsLoadingByCommunity", communityId, undefined!);
+    this.setState("settingsErrorByCommunity", communityId, undefined!);
+    this.setState("invitesByCommunity", communityId, undefined!);
+    this.setState("invitesLoadingByCommunity", communityId, undefined!);
+    this.setState("invitesErrorByCommunity", communityId, undefined!);
+  }
+
   // ─── invites (parity with mobile CommunityAdminNexus; controlPlane-backed) ──
 
   async createCommunity(name: string): Promise<{ id: string }> {
