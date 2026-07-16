@@ -8,6 +8,7 @@ export const COMMUNITY_SETTINGS_TAB_LABELS: Record<
   string
 > = {
   overview: "Overview",
+  channels: "Channels",
   roles: "Roles",
   invites: "Invites",
 };
@@ -25,6 +26,9 @@ export function visibleCommunitySettingsTabs(
 ): CommunitySettingsTab[] {
   const tabs: CommunitySettingsTab[] = [];
   if (perms.canManageServer) tabs.push("overview");
+  if (perms.canCreateChannels || perms.canManageChannelStructure) {
+    tabs.push("channels");
+  }
   if (perms.canManageRoles) tabs.push("roles");
   if (perms.canManageInvites) tabs.push("invites");
   return tabs;

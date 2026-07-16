@@ -86,6 +86,13 @@ export class ChannelSolidNexus {
     return selectActiveChannelId(this.state);
   }
 
+  /** Whether the community's channel list is currently being refreshed. */
+  loading(communityId: Accessor<string>): Accessor<boolean> {
+    return createMemo(
+      () => this.state.loadingByCommunity[communityId()] ?? false,
+    );
+  }
+
   // ─── lifecycle ─────────────────────────────────────────────────────────────
 
   async loadForCommunity(communityId: string): Promise<void> {

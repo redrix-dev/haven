@@ -4,6 +4,7 @@ import { SidePanel } from "@solid-client/components/ui/SidePanel";
 import type { CommunitySettingsTab } from "@shared/core/sessionStorePorts";
 import { CommunityRoleEditor } from "./CommunityRoleEditor";
 import { CommunityInvitesTab } from "./CommunityInvitesTab";
+import { CommunityChannelsTab } from "./CommunityChannelsTab";
 import {
   COMMUNITY_SETTINGS_TAB_LABELS,
   canOpenCommunitySettingsPanel,
@@ -143,6 +144,9 @@ export function CommunitySettingsPanel() {
         </Show>
         <Show when={activeTab() === "roles"}>
           <CommunityRoleEditor communityId={communityId()} />
+        </Show>
+        <Show when={activeTab() === "channels"}>
+          <CommunityChannelsTab communityId={communityId()} />
         </Show>
         <Show when={activeTab() === "invites"}>
           <CommunityInvitesTab communityId={communityId()} />

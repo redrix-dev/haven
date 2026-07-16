@@ -8,14 +8,19 @@ import type {
   RedeemedInvite,
   ServerInvite,
   ServerRoleManagementSnapshot,
+  ServerSettingsSnapshot,
+  ServerSettingsUpdate,
 } from "@shared/lib/backend/types";
 
-/** The control-plane slice this nexus needs (invites live here, not communityData). */
-type InviteControlPlane = Pick<
+/** The control-plane slice this governance nexus owns. */
+type AdminControlPlane = Pick<
   ControlPlaneBackend,
   | "listActiveCommunityInvites"
   | "createCommunity"
   | "createCommunityInvite"
+  | "deleteCommunity"
+  | "leaveCommunity"
+  | "renameCommunity"
   | "redeemCommunityInvite"
   | "revokeCommunityInvite"
 >;
@@ -33,6 +38,9 @@ export type CommunityAdminSolidState = {
   roleSnapshotByCommunity: Record<string, ServerRoleManagementSnapshot>;
   roleLoadingByCommunity: Record<string, boolean>;
   roleErrorByCommunity: Record<string, string | null>;
+  settingsByCommunity: Record<string, ServerSettingsSnapshot>;
+  settingsLoadingByCommunity: Record<string, boolean>;
+  settingsErrorByCommunity: Record<string, string | null>;
   invitesByCommunity: Record<string, ServerInvite[]>;
   invitesLoadingByCommunity: Record<string, boolean>;
   invitesErrorByCommunity: Record<string, string | null>;
@@ -47,6 +55,9 @@ const initialState = (): CommunityAdminSolidState => ({
   roleSnapshotByCommunity: {},
   roleLoadingByCommunity: {},
   roleErrorByCommunity: {},
+  settingsByCommunity: {},
+  settingsLoadingByCommunity: {},
+  settingsErrorByCommunity: {},
   invitesByCommunity: {},
   invitesLoadingByCommunity: {},
   invitesErrorByCommunity: {},
@@ -63,7 +74,7 @@ export class CommunityAdminSolidNexus {
 
   constructor(
     private readonly communityData: CommunityDataBackend,
-    private readonly controlPlane: InviteControlPlane,
+    private readonly controlPlane: AdminControlPlane,
   ) {
     const [state, setState] = createStore(initialState());
     this.state = state;
@@ -97,6 +108,26 @@ export class CommunityAdminSolidNexus {
   roleManagementLoading(communityId: Accessor<string>): Accessor<boolean> {
     return createMemo(
       () => this.state.roleLoadingByCommunity[communityId()] ?? false,
+    );
+  }
+
+  serverSettings(
+    communityId: Accessor<string>,
+  ): Accessor<ServerSettingsSnapshot | null> {
+    return createMemo(
+      () => this.state.settingsByCommunity[communityId()] ?? null,
+    );
+  }
+
+  serverSettingsLoading(communityId: Accessor<string>): Accessor<boolean> {
+    return createMemo(
+      () => this.state.settingsLoadingByCommunity[communityId()] ?? false,
+    );
+  }
+
+  serverSettingsError(communityId: Accessor<string>): Accessor<string | null> {
+    return createMemo(
+      () => this.state.settingsErrorByCommunity[communityId()] ?? null,
     );
   }
 
@@ -278,6 +309,58 @@ export class CommunityAdminSolidNexus {
     await this.loadRoleManagement(input.communityId);
   }
 
+  // ─── community settings + lifecycle ─────────────────────────────────────
+
+  async loadServerSettings(communityId: string): Promise<void> {
+    if (this.state.settingsLoadingByCommunity[communityId]) return;
+    this.setState("settingsLoadingByCommunity", communityId, true);
+    this.setState("settingsErrorByCommunity", communityId, null);
+    try {
+      const settings =
+        await this.communityData.fetchServerSettings(communityId);
+      this.setState("settingsByCommunity", communityId, settings);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load community settings";
+      this.setState("settingsErrorByCommunity", communityId, message);
+      throw error;
+    } finally {
+      this.setState("settingsLoadingByCommunity", communityId, false);
+    }
+  }
+
+  async saveServerSettings(input: {
+    communityId: string;
+    values: ServerSettingsUpdate;
+  }): Promise<void> {
+    const name = input.values.name.trim();
+    if (!name) throw new Error("Community name is required.");
+    await this.communityData.updateServerSettings({
+      communityId: input.communityId,
+      values: { ...input.values, name },
+    });
+    await this.loadServerSettings(input.communityId);
+  }
+
+  async leaveCommunity(communityId: string): Promise<void> {
+    await this.controlPlane.leaveCommunity(communityId);
+  }
+
+  async deleteCommunity(communityId: string): Promise<void> {
+    await this.controlPlane.deleteCommunity(communityId);
+  }
+
+  async renameCommunity(communityId: string, name: string): Promise<void> {
+    const trimmedName = name.trim();
+    if (!trimmedName) throw new Error("Community name is required.");
+    await this.controlPlane.renameCommunity({
+      communityId,
+      name: trimmedName,
+    });
+  }
+
   // ─── invites (parity with mobile CommunityAdminNexus; controlPlane-backed) ──
 
   async createCommunity(name: string): Promise<{ id: string }> {
@@ -354,7 +437,7 @@ export class CommunityAdminSolidNexus {
 
 export function createCommunityAdminSolidNexus(
   communityData: CommunityDataBackend,
-  controlPlane: InviteControlPlane,
+  controlPlane: AdminControlPlane,
 ): CommunityAdminSolidNexus {
   return new CommunityAdminSolidNexus(communityData, controlPlane);
 }
