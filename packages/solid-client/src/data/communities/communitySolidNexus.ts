@@ -72,6 +72,12 @@ export class CommunitySolidNexus {
     return this.state.orderedIds;
   }
 
+  /** True while the initial community list is loading — lets route guards tell
+   * "not loaded yet" apart from "you're not a member / it's gone". */
+  isLoading(): Accessor<boolean> {
+    return createMemo(() => this.state.isLoading);
+  }
+
   async load(userId: string): Promise<void> {
     if (this.loadPromise) return this.loadPromise; // already loading? reuse it
     this.loadPromise = (async () => {
