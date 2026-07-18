@@ -1,0 +1,412 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "e4062969-5958-4d04-9058-39c0b4bea4f1",
+    "name": "haven"
+  },
+  "packages": [
+    {
+      "id": "root",
+      "path": ".",
+      "manager": "npm"
+    }
+  ],
+  "testRoots": [
+    "apps/mobile/src/data/__tests__",
+    "apps/mobile/src/features/notifications/utils/__tests__",
+    "packages/shared/src/core/__tests__",
+    "packages/shared/src/features/auth/domain/__tests__",
+    "packages/shared/src/features/messaging/lib/__tests__",
+    "packages/shared/src/features/messaging/utils/__tests__",
+    "packages/shared/src/features/notifications/__tests__",
+    "packages/shared/src/features/notifications/utils/__tests__",
+    "packages/shared/src/infrastructure/platform/__tests__",
+    "packages/shared/src/lib/backend/__tests__",
+    "packages/shared/src/themes/__tests__",
+    "packages/solid-client/src/components/ui/Markdown/__tests__",
+    "packages/solid-client/src/data/channels/__tests__",
+    "packages/solid-client/src/data/communities/__tests__",
+    "packages/solid-client/src/data/community-management/__tests__",
+    "packages/solid-client/src/data/direct-messages/__tests__",
+    "packages/solid-client/src/data/notifications/__tests__",
+    "packages/solid-client/src/data/profile/__tests__",
+    "packages/solid-client/src/data/social/__tests__",
+    "packages/solid-client/src/data/voice/__tests__",
+    "packages/solid-client/src/features/community/settings/__tests__",
+    "packages/solid-client/src/features/voice/__tests__",
+    "packages/solid-client/src/test-support/__tests__",
+    "supabase/tests",
+    "tooling/scripts/mobile/__tests__",
+    "tooling/scripts/test"
+  ],
+  "tasks": [
+    {
+      "id": "root:lint",
+      "label": "lint",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "lint"
+    },
+    {
+      "id": "root:check:agent-skills",
+      "label": "check:agent-skills",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "check:agent-skills"
+    },
+    {
+      "id": "root:check:desktop-version",
+      "label": "check:desktop-version",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "check:desktop-version"
+    },
+    {
+      "id": "root:check:shared-hex",
+      "label": "check:shared-hex",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "check:shared-hex"
+    },
+    {
+      "id": "root:check:shared-portable",
+      "label": "check:shared-portable",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "check:shared-portable"
+    },
+    {
+      "id": "root:check:themes",
+      "label": "check:themes",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "check:themes"
+    },
+    {
+      "id": "root:check:chat-surface",
+      "label": "check:chat-surface",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "check:chat-surface"
+    },
+    {
+      "id": "root:check:mobile-typography",
+      "label": "check:mobile-typography",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "check:mobile-typography"
+    },
+    {
+      "id": "root:test:unit",
+      "label": "test:unit",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:unit"
+    },
+    {
+      "id": "root:test:cleave",
+      "label": "test:cleave",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:cleave"
+    },
+    {
+      "id": "root:test:backend",
+      "label": "test:backend",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:backend"
+    },
+    {
+      "id": "root:test:db:users",
+      "label": "test:db:users",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:db:users"
+    },
+    {
+      "id": "root:test:db:fixtures",
+      "label": "test:db:fixtures",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:db:fixtures"
+    },
+    {
+      "id": "root:test:db:rls",
+      "label": "test:db:rls",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:db:rls"
+    },
+    {
+      "id": "root:test:db:quick",
+      "label": "test:db:quick",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:db:quick"
+    },
+    {
+      "id": "root:test:db",
+      "label": "test:db",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:db"
+    },
+    {
+      "id": "root:test:notifications:smoke",
+      "label": "test:notifications:smoke",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:notifications:smoke"
+    },
+    {
+      "id": "root:test:signoff",
+      "label": "test:signoff",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:signoff"
+    },
+    {
+      "id": "root:test:signoff:release",
+      "label": "test:signoff:release",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:signoff:release"
+    },
+    {
+      "id": "root:test:report",
+      "label": "test:report",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:report"
+    },
+    {
+      "id": "root:checkin",
+      "label": "checkin",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "checkin"
+    },
+    {
+      "id": "root:typecheck",
+      "label": "typecheck",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "typecheck"
+    },
+    {
+      "id": "root:typecheck:solid",
+      "label": "typecheck:solid",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "typecheck:solid"
+    },
+    {
+      "id": "root:test:all",
+      "label": "test:all",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:all"
+    },
+    {
+      "id": "root:test:ci",
+      "label": "test:ci",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "test:ci"
+    },
+    {
+      "id": "root:ci:verify",
+      "label": "ci:verify",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "ci:verify"
+    },
+    {
+      "id": "root:ci:fast",
+      "label": "ci:fast",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "ci:fast"
+    },
+    {
+      "id": "root:ci:mobile",
+      "label": "ci:mobile",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "ci:mobile"
+    },
+    {
+      "id": "root:ci:integration",
+      "label": "ci:integration",
+      "category": "test",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "ci:integration"
+    },
+    {
+      "id": "root:dev:solid",
+      "label": "dev:solid",
+      "category": "dev",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "dev:solid"
+    },
+    {
+      "id": "root:build:solid",
+      "label": "build:solid",
+      "category": "build",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "build:solid"
+    },
+    {
+      "id": "root:dev:web",
+      "label": "dev:web",
+      "category": "dev",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "dev:web"
+    },
+    {
+      "id": "root:build:web",
+      "label": "build:web",
+      "category": "build",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "build:web"
+    },
+    {
+      "id": "root:typecheck:web",
+      "label": "typecheck:web",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "typecheck:web"
+    },
+    {
+      "id": "root:tauri:dev",
+      "label": "tauri:dev",
+      "category": "dev",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "tauri:dev"
+    },
+    {
+      "id": "root:tauri:build",
+      "label": "tauri:build",
+      "category": "build",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "tauri:build"
+    },
+    {
+      "id": "root:mobile:ownership",
+      "label": "mobile:ownership",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:ownership"
+    },
+    {
+      "id": "root:mobile:dev:metro",
+      "label": "mobile:dev:metro",
+      "category": "dev",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:dev:metro"
+    },
+    {
+      "id": "root:mobile:dev:metro:clear",
+      "label": "mobile:dev:metro:clear",
+      "category": "dev",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:dev:metro:clear"
+    },
+    {
+      "id": "root:mobile:fastlane:build",
+      "label": "mobile:fastlane:build",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:fastlane:build"
+    },
+    {
+      "id": "root:mobile:run:ios:device",
+      "label": "mobile:run:ios:device",
+      "category": "dev",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:run:ios:device"
+    },
+    {
+      "id": "root:mobile:native:prebuild",
+      "label": "mobile:native:prebuild",
+      "category": "build",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:native:prebuild"
+    },
+    {
+      "id": "root:mobile:eas:build",
+      "label": "mobile:eas:build",
+      "category": "build",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:eas:build"
+    },
+    {
+      "id": "root:mobile:typecheck",
+      "label": "mobile:typecheck",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:typecheck"
+    },
+    {
+      "id": "root:mobile:bundle",
+      "label": "mobile:bundle",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:bundle"
+    },
+    {
+      "id": "root:mobile:release:check",
+      "label": "mobile:release:check",
+      "category": "check",
+      "type": "package-script",
+      "packageId": "root",
+      "script": "mobile:release:check"
+    }
+  ]
+}
