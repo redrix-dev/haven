@@ -10,7 +10,7 @@ description: Use when adding, converting, or changing Solid data nexuses/caches 
 - [packages/solid-client/src/data/README.md](../../../packages/solid-client/src/data/README.md)
 - [packages/solid-client/src/data/NEXUS_RECIPE.md](../../../packages/solid-client/src/data/NEXUS_RECIPE.md)
 - [packages/solid-client/src/data/channels/channelSolidNexus.ts](../../../packages/solid-client/src/data/channels/channelSolidNexus.ts)
-- [docs/architecture/HAVEN_CORE.md](../../architecture/HAVEN_CORE.md)
+- [docs/architecture/HAVEN_CORE.md](../../../docs/architecture/HAVEN_CORE.md)
 
 ## Shape
 

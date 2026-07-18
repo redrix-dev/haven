@@ -5,7 +5,7 @@ private by construction, and easy for a tired maintainer to understand cold.
 When two correct options exist, choose the one you can explain plainly.
 
 This file is the quick index. Load the relevant project skill under
-`docs/agent-skills/` before changing code in that area.
+`.claude/skills/` before changing code in that area.
 
 ## First Moves
 
@@ -23,19 +23,20 @@ This file is the quick index. Load the relevant project skill under
 
 ## Skill Index
 
-| Task                                                                                                               | Load this skill                                                                       |
-| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Starting, scoping, testing, or handing off any change                                                              | [haven-branch-ci-gates](docs/agent-skills/haven-branch-ci-gates/SKILL.md)             |
-| Changing `packages/shared`, backend clients, HavenCore contracts, realtime routing, or platform ports              | [haven-shared-core-boundary](docs/agent-skills/haven-shared-core-boundary/SKILL.md)   |
-| Adding or changing a desktop/web Solid feature, route, UI primitive, or popout                                     | [haven-solid-feature-slice](docs/agent-skills/haven-solid-feature-slice/SKILL.md)     |
-| Adding or changing a Solid data nexus/cache in `packages/solid-client/src/data`                                    | [haven-solid-nexus](docs/agent-skills/haven-solid-nexus/SKILL.md)                     |
-| Changing the Tauri desktop shell, bridge, capabilities, deep links, updater bridge, persistence, or popout windows | [haven-tauri-desktop-shell](docs/agent-skills/haven-tauri-desktop-shell/SKILL.md)     |
-| Changing desktop release workflow, updater signing, version sync, release notes, or packaged build behavior        | [haven-tauri-release](docs/agent-skills/haven-tauri-release/SKILL.md)                 |
-| Changing Tauri/sidecar Rust dependencies, Cargo locks, sidecar staging, or platform-specific lockfile churn        | [haven-tauri-cargo-lockfiles](docs/agent-skills/haven-tauri-cargo-lockfiles/SKILL.md) |
-| Changing the live Expo mobile app outside the chat keyboard shell                                                  | [haven-mobile-live-app](docs/agent-skills/haven-mobile-live-app/SKILL.md)             |
-| Changing mobile community/DM chat layout, composer clearance, or RNKC keyboard behavior                            | [haven-mobile-chat-surface](docs/agent-skills/haven-mobile-chat-surface/SKILL.md)     |
-| Changing Supabase migrations, RLS, RPCs, Edge Functions, fixtures, SQL tests, or backend contract tests            | [haven-supabase-rls](docs/agent-skills/haven-supabase-rls/SKILL.md)                   |
-| Changing Linux native voice, the Tauri voice process host, or the `VoiceBridge` protocol                           | [haven-native-voice-sidecar](docs/agent-skills/haven-native-voice-sidecar/SKILL.md)   |
+| Task                                                                                                               | Load this skill                                                                    |
+| ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Starting, scoping, testing, or handing off any change                                                              | [haven-branch-ci-gates](.claude/skills/haven-branch-ci-gates/SKILL.md)             |
+| Changing `packages/shared`, backend clients, HavenCore contracts, realtime routing, or platform ports              | [haven-shared-core-boundary](.claude/skills/haven-shared-core-boundary/SKILL.md)   |
+| Adding or changing a desktop/web Solid feature, route, UI primitive, or popout                                     | [haven-solid-feature-slice](.claude/skills/haven-solid-feature-slice/SKILL.md)     |
+| Adding or changing a Solid data nexus/cache in `packages/solid-client/src/data`                                    | [haven-solid-nexus](.claude/skills/haven-solid-nexus/SKILL.md)                     |
+| Writing or changing any Solid `createEffect`, store subscription, or realtime handler                              | [haven-solid-reactivity](.claude/skills/haven-solid-reactivity/SKILL.md)           |
+| Changing the Tauri desktop shell, bridge, capabilities, deep links, updater bridge, persistence, or popout windows | [haven-tauri-desktop-shell](.claude/skills/haven-tauri-desktop-shell/SKILL.md)     |
+| Changing desktop release workflow, updater signing, version sync, release notes, or packaged build behavior        | [haven-tauri-release](.claude/skills/haven-tauri-release/SKILL.md)                 |
+| Changing Tauri/sidecar Rust dependencies, Cargo locks, sidecar staging, or platform-specific lockfile churn        | [haven-tauri-cargo-lockfiles](.claude/skills/haven-tauri-cargo-lockfiles/SKILL.md) |
+| Changing the live Expo mobile app outside the chat keyboard shell                                                  | [haven-mobile-live-app](.claude/skills/haven-mobile-live-app/SKILL.md)             |
+| Changing mobile community/DM chat layout, composer clearance, or RNKC keyboard behavior                            | [haven-mobile-chat-surface](.claude/skills/haven-mobile-chat-surface/SKILL.md)     |
+| Changing Supabase migrations, RLS, RPCs, Edge Functions, fixtures, SQL tests, or backend contract tests            | [haven-supabase-rls](.claude/skills/haven-supabase-rls/SKILL.md)                   |
+| Changing Linux native voice, the Tauri voice process host, or the `VoiceBridge` protocol                           | [haven-native-voice-sidecar](.claude/skills/haven-native-voice-sidecar/SKILL.md)   |
 
 ## Repo Map
 

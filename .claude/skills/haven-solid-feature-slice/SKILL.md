@@ -7,7 +7,7 @@ description: Use when adding or changing desktop/web Solid features, routes, pop
 
 ## Read Before Editing
 
-- [docs/architecture/SOLID_CLIENT_SHAPE.md](../../architecture/SOLID_CLIENT_SHAPE.md)
+- [docs/architecture/SOLID_CLIENT_SHAPE.md](../../../docs/architecture/SOLID_CLIENT_SHAPE.md)
 - [packages/solid-client/src/features/README.md](../../../packages/solid-client/src/features/README.md)
 - [packages/solid-client/src/routes/README.md](../../../packages/solid-client/src/routes/README.md)
 - [packages/solid-client/src/components/ui/README.md](../../../packages/solid-client/src/components/ui/README.md)

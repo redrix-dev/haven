@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "../..");
-const skillsRoot = path.join(repoRoot, "docs", "agent-skills");
+const skillsRoot = path.join(repoRoot, ".claude", "skills");
 
 const allowedFrontmatterKeys = new Set(["name", "description"]);
 const skillNameRe = /^[a-z0-9-]{1,63}$/;

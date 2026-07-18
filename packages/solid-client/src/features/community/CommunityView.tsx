@@ -28,7 +28,10 @@ export function CommunityView() {
   const params = useParams();
   const core = requireHavenSolidCore();
 
+  const communities = core.communities.communities();
+  const communitiesLoading = core.communities.isLoading();
   const channels = core.channels.channels(() => params.communityId ?? "");
+  const channelsLoading = core.channels.loading(() => params.communityId ?? "");
   const activeChannel = createMemo(() =>
     channels().find((c) => c.id === params.channelId),
   );
@@ -36,48 +39,81 @@ export function CommunityView() {
     channels().find((c) => c.kind === "text"),
   );
 
+  // Reconcile the URL against live data. The URL is the source of truth for the
+  // active community/channel, but nothing else makes it react when that entity
+  // is deleted or you lose access — so a stale route would otherwise render a
+  // nameless `#` with a live (failing) composer. Redirect instead. Each check
+  // is gated on its loading flag so we never redirect mid-hydration.
+  const communityKnown = createMemo(
+    () =>
+      !!params.communityId &&
+      communities().some((c) => c.id === params.communityId),
+  );
+  const channelKnown = createMemo(() => !params.channelId || !!activeChannel());
+
   return (
     <Show
-      when={params.channelId}
-      fallback={
-        <Show
-          when={firstTextChannel()}
-          fallback={
-            <div class="flex h-full items-center justify-center text-muted-foreground">
-              No text channels yet.
-            </div>
-          }
-        >
-          {(channel) => (
-            <Navigate
-              href={`/community/${params.communityId}/channel/${channel().id}`}
-            />
-          )}
-        </Show>
-      }
+      when={communitiesLoading() || communityKnown()}
+      fallback={<Navigate href="/" />}
     >
-      <div class="flex h-full min-w-0 flex-1 flex-col">
-        <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
-          <span class="text-muted-foreground">#</span>
-          <span class="font-semibold text-foreground">
-            {activeChannel()?.name ?? ""}
-          </span>
-        </header>
-
-        <div class="flex min-h-0 flex-1">
-          {/* keyed: a channel switch remounts the chat (fresh scroll state). */}
-          <Show when={params.channelId} keyed>
-            {(channelId) => (
-              <ChannelChat
-                communityId={params.communityId ?? ""}
-                channelId={channelId}
-                channelName={activeChannel()?.name ?? ""}
+      <Show
+        when={channelsLoading() || channelKnown()}
+        fallback={
+          <Show
+            when={firstTextChannel()}
+            fallback={<Navigate href={`/community/${params.communityId}`} />}
+          >
+            {(channel) => (
+              <Navigate
+                href={`/community/${params.communityId}/channel/${channel().id}`}
               />
             )}
           </Show>
-          <MembersPanel communityId={params.communityId ?? ""} />
-        </div>
-      </div>
+        }
+      >
+        <Show
+          when={params.channelId}
+          fallback={
+            <Show
+              when={firstTextChannel()}
+              fallback={
+                <div class="flex h-full items-center justify-center text-muted-foreground">
+                  No text channels yet.
+                </div>
+              }
+            >
+              {(channel) => (
+                <Navigate
+                  href={`/community/${params.communityId}/channel/${channel().id}`}
+                />
+              )}
+            </Show>
+          }
+        >
+          <div class="flex h-full min-w-0 flex-1 flex-col">
+            <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+              <span class="text-muted-foreground">#</span>
+              <span class="font-semibold text-foreground">
+                {activeChannel()?.name ?? ""}
+              </span>
+            </header>
+
+            <div class="flex min-h-0 flex-1">
+              {/* keyed: a channel switch remounts the chat (fresh scroll state). */}
+              <Show when={params.channelId} keyed>
+                {(channelId) => (
+                  <ChannelChat
+                    communityId={params.communityId ?? ""}
+                    channelId={channelId}
+                    channelName={activeChannel()?.name ?? ""}
+                  />
+                )}
+              </Show>
+              <MembersPanel communityId={params.communityId ?? ""} />
+            </div>
+          </div>
+        </Show>
+      </Show>
     </Show>
   );
 }

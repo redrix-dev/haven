@@ -23,7 +23,7 @@ Small on purpose — a handful of living documents plus one detailed-contract fo
 ## Agent handoff
 
 - [../AGENTS.md](../AGENTS.md) — quick index for future maintainers and coding agents.
-- [agent-skills/](./agent-skills/) — narrow, task-specific SKILL.md files for branch discipline, shared boundaries, Solid, Tauri desktop, mobile, Supabase, and native voice work.
+- [.claude/skills/](../.claude/skills/) — narrow, task-specific SKILL.md files for branch discipline, shared boundaries, Solid reactivity, Solid slices/nexuses, Tauri desktop, mobile, Supabase, and native voice work. They live under `.claude/` so coding agents load them automatically; they are still hand-maintained docs and `npm run check:agent-skills` gates their shape.
 
 ## Rules for these docs
 
