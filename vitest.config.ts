@@ -118,7 +118,13 @@ export default defineConfig({
       "packages/**/*.test.ts",
       "packages/**/*.test.tsx",
     ],
-    exclude: ["node_modules/**", "**/node_modules/**"],
+    exclude: [
+      "node_modules/**",
+      "**/node_modules/**",
+      // Tier-2 component-render tests need Solid's client build + jsdom; they run
+      // only under vitest.tier2.config.ts (`npm run test:tier2`), never the node suite.
+      "**/*.tier2.test.{ts,tsx}",
+    ],
     ...(conditionalReporters ? { reporters: conditionalReporters } : {}),
   },
 });
