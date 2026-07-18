@@ -101,6 +101,24 @@ proof.
 - Counting backend calls per tick is a useful second assertion — it catches the
   case where the effect settles but a downstream subscriber does not.
 
+### Two harnesses — pick by loop timing (both in `packages/solid-client/src/test-support/`)
+
+- **`expectEffectSettles`** (Tier 1, node, in `test:unit`) — for **synchronous**
+  loops: a signal self-write, or a settle that rides only on a guard. Runs the
+  effect in `createRoot`, counts, throws past a cap.
+- **`expectRenderSettles`** (Tier 2, jsdom, `npm run test:tier2`) — for the
+  **async store-loop class**, the real strobe: a store read leaked in, then an
+  **async** write (after an RPC/load) retriggered it. Proven finding: this class
+  does **not** reproduce in a bare reactive graph — it only loops under Solid's
+  real render scheduler, so the test must render (`@solidjs/testing-library`).
+  Drive the **real nexus method** (e.g. `openConversation`), not a synthetic
+  mimic — a hand-built store synthetic won't capture the exact subscription that
+  leaks. See `directMessagesLoop.tier2.test.ts`.
+
+**Rule of thumb:** if the retriggering write happens **after an `await`** (RPC,
+load, mark-read), it's the async class → Tier 2. If the effect blows the stack
+synchronously, it's Tier 1. When unsure, Tier 2 — it catches both.
+
 Nexus-side store writes belong to `haven-solid-nexus`; component structure and
 layer law belong to `haven-solid-feature-slice`. This skill owns the reactive
 graph between them.
@@ -109,5 +127,6 @@ graph between them.
 
 - `npm run typecheck:solid`
 - `npm run lint`
-- `npm run test:unit` — includes the settle tests
+- `npm run test:unit` — includes the Tier-1 (sync) settle tests
+- `npm run test:tier2` — the Tier-2 (async, render-level) settle tests
 - `npm run check:agent-skills` when editing this skill
