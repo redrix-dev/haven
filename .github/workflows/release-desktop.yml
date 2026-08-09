@@ -90,6 +90,11 @@ jobs:
         with:
           node-version: 24
 
+      - name: Pin npm via corepack
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: corepack enable npm
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:

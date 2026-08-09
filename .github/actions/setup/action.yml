@@ -13,7 +13,6 @@ runs:
     - uses: actions/setup-node@v4
       with:
         node-version: 24
-        cache: npm
 
     # Honor the npm pinned in package.json's "packageManager" so every lane
     # runs the same npm contributors use (prevents lockfile-drift false reds —

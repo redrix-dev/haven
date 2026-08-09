@@ -23,7 +23,14 @@ description: Use when starting, scoping, testing, finishing, or handing off any 
 
 - Use Node 24. The repo pins this with `.nvmrc`, `.node-version`, CI, and
   package engines.
-- Use npm, not pnpm or yarn. The root `packageManager` pins npm.
+- Use npm, not pnpm or yarn. The root `packageManager` pins the resolver and
+  `devEngines.packageManager` rejects the wrong npm version. Run
+  `corepack enable npm` after installing Node if `npm --version` does not match.
+- The root and mobile `.npmrc` files hard-fail installs when a dependency
+  lifecycle script is not covered by `allowScripts`. Approvals use exact
+  versions; reviewed denials use a package name with `false`. Review new script
+  notices; do not bypass them with
+  `--dangerously-allow-all-scripts`.
 - Use `npm ci` when lockfile correctness matters. Use `npm run setup:mobile` to
   install the mobile tree.
 - If dependencies change, commit the matching lockfile:
