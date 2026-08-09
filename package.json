@@ -91,7 +91,14 @@
   "engines": {
     "node": ">=24 <25"
   },
-  "packageManager": "npm@11.16.0",
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": "11.18.0",
+      "onFail": "error"
+    }
+  },
+  "packageManager": "npm@11.18.0",
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.10",
     "@tailwindcss/vite": "^4.3.0",
