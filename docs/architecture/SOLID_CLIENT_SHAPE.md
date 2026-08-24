@@ -177,3 +177,45 @@ only when providers or window chrome change.
    contained fix: flip the Tauri shell to hash routing (desktop has no URL
    aesthetics — nobody sees the address bar) or configure the protocol
    fallback. Either way, zero route definitions change.
+
+## The reactivity law
+
+The dependency law above governs which layer may import which. This one governs
+what an effect is allowed to depend on, and it is the only rule here whose
+violation produces no error of any kind.
+
+**Never call a store-writing function synchronously inside an effect without
+`untrack`.** An effect depends on _navigation and identity_ — a route param, an
+id, a permission flag — never on the store its own body mutates.
+
+```ts
+// WRONG — the call's synchronous reads join the effect's deps
+createEffect(() => {
+  const id = props.communityId;
+  if (!id) return;
+  void core.channels.ensureLoaded(id);
+});
+
+// RIGHT — read tracked values first, then untrack the work
+createEffect(() => {
+  const id = props.communityId;
+  if (!id) return;
+  untrack(() => void core.channels.ensureLoaded(id));
+});
+```
+
+**`async` and `void` do not defer.** An async body runs synchronously up to its
+first `await`, so every reactive read before that `await` happens in the
+caller's tracking scope. `void someAsyncThing()` inside an effect still
+subscribes to whatever that function reads on its way to the first `await`.
+This is what makes the class near-invisible in review.
+
+**A settling effect is not a defended one.** Measured under RED-50: every naked
+effect on the settings surfaces already settled, because `inflight` maps in the
+nexus swallowed the retrigger. The defense was an implementation detail one
+dedupe away from vanishing. Judge an effect by whether it reads a store it
+writes — not by whether you can watch it misbehave.
+
+Canonical instance and the full self-check: the `haven-solid-reactivity` skill.
+Effects ship with their settle test in the same change; the test asserts the
+**run count**, so removing the `untrack` fails it.
