@@ -1,4 +1,11 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  untrack,
+} from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import {
   ChevronDown,
@@ -55,13 +62,18 @@ export function CommunityChannelsTab(props: { communityId: string }) {
     () => new Map(channels().map((channel) => [channel.id, channel])),
   );
 
+  // ensureLoaded reads state.byCommunity synchronously before its first await,
+  // so calling it bare leaks that read into this effect's deps and the load's
+  // own write retriggers it. Track communityId only. See haven-solid-reactivity.
   createEffect(() => {
     const communityId = props.communityId;
     if (!communityId) return;
-    void core.channels.ensureLoaded(communityId).catch((cause) => {
-      setError(
-        cause instanceof Error ? cause.message : "Couldn't load channels.",
-      );
+    untrack(() => {
+      void core.channels.ensureLoaded(communityId).catch((cause) => {
+        setError(
+          cause instanceof Error ? cause.message : "Couldn't load channels.",
+        );
+      });
     });
   });
 

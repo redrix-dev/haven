@@ -1,4 +1,11 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  untrack,
+} from "solid-js";
 import { ShieldCheck, X } from "lucide-solid";
 import type { HavenChannel } from "@shared/nexus/community/channelTypes";
 import type {
@@ -37,20 +44,26 @@ export function ChannelPermissionsDialog(props: {
   const [actionError, setActionError] = createSignal<string | null>(null);
   const [pendingRow, setPendingRow] = createSignal<string | null>(null);
 
+  // loadChannelPermissions happens not to read a store before its first await,
+  // so this does not leak today — but that is the nexus's current shape, not a
+  // guarantee. Track channel/user identity only. See haven-solid-reactivity.
   createEffect(() => {
     const channel = props.channel;
     const userId = session()?.user.id;
+    const communityId = props.communityId;
     if (!channel || !userId) return;
-    setActionError(null);
-    void core.channels
-      .loadChannelPermissions({
-        communityId: props.communityId,
-        channelId: channel.id,
-        userId,
-      })
-      .catch(() => {
-        // The nexus exposes the load error in the dialog.
-      });
+    untrack(() => {
+      setActionError(null);
+      void core.channels
+        .loadChannelPermissions({
+          communityId,
+          channelId: channel.id,
+          userId,
+        })
+        .catch(() => {
+          // The nexus exposes the load error in the dialog.
+        });
+    });
   });
 
   const memberRows = createMemo(() => {

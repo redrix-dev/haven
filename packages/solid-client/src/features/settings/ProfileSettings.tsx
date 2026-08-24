@@ -1,5 +1,12 @@
 import { A } from "@solidjs/router";
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  untrack,
+} from "solid-js";
 import { ArrowLeft, Check, UserRound } from "lucide-solid";
 import type { UserFlairGrant } from "@shared/lib/backend/types";
 import { ProfileCard, ProfileFlair } from "@solid-client/components/ui";
@@ -39,9 +46,14 @@ export function ProfileSettings() {
     }
   };
 
+  // `load` is async, so its body runs synchronously up to the first await —
+  // three of the four ensure* calls read their store (and freshness stamps)
+  // before awaiting, then write them. Bare, those reads join this effect's
+  // deps. Track the id only. See haven-solid-reactivity.
   createEffect(() => {
     const id = userId();
-    if (id) void load(id);
+    if (!id) return;
+    untrack(() => void load(id));
   });
 
   const chooseFlair = async (grant: UserFlairGrant | null) => {

@@ -1,5 +1,12 @@
 import { A } from "@solidjs/router";
-import { For, Show, createEffect, createSignal, onMount } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createSignal,
+  onMount,
+  untrack,
+} from "solid-js";
 import { ArrowLeft, Bell } from "lucide-solid";
 import type {
   NotificationPreferences,
@@ -63,9 +70,15 @@ export function NotificationSettings() {
   const [error, setError] = createSignal<string | null>(null);
   const [saved, setSaved] = createSignal(false);
 
+  // Seeds the draft once from server preferences. Reading draft() bare would
+  // subscribe this effect to the signal it writes; the `== null` guard is the
+  // only thing that stopped it looping. Track preferences() only.
   createEffect(() => {
     const current = preferences();
-    if (current && draft() == null) setDraft(editablePreferences(current));
+    if (!current) return;
+    untrack(() => {
+      if (draft() == null) setDraft(editablePreferences(current));
+    });
   });
 
   onMount(() => {

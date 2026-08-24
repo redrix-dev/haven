@@ -81,11 +81,25 @@ Defended, copy these:
 
 - [DirectMessagesView.tsx](../../../packages/solid-client/src/features/direct-messages/DirectMessagesView.tsx) — the `86a20e0` fix
 - [CommunityOverviewTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityOverviewTab.tsx) — reads props, then `untrack(() => load(id))`
+- [CommunityChannelsTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityChannelsTab.tsx) — was known-naked; defended + locked under RED-50
+- [ProfileSettings.tsx](../../../packages/solid-client/src/features/settings/ProfileSettings.tsx) — `untrack(() => void load(id))` around four `ensure*` calls
 
-Known-naked, do not copy, fix if you touch it:
+### A settling effect is not a defended one
 
-- [CommunityChannelsTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityChannelsTab.tsx) — calls `ensureLoaded` bare; settles only on the early-return guard in
-  [channelSolidNexus.ts](../../../packages/solid-client/src/data/channels/channelSolidNexus.ts)
+Measured under RED-50: every naked effect on the settings surfaces **already
+settled**, because `inflight` maps in the nexus swallowed the retrigger. They
+cost one extra effect run and one extra render, not a runaway loop.
+
+So "it doesn't strobe" proves nothing. The defense was an implementation detail
+of the nexus, one dedupe away from vanishing — exactly the coincidence §5 warns
+about. Judge an effect by whether it reads a store it writes, not by whether you
+can see it misbehave.
+
+The corollary for tests: a settle test on an effect that settles either way
+asserts nothing. Assert the **run count** (naked costs 2, `untrack` costs 1) so
+removing the guard actually fails, and skip the test where no such difference
+exists — `ChannelPermissionsDialog` and `NotificationSettings` measure 1 run in
+every variant, so they carry the `untrack` fix without a settle test.
 
 ## Ship The Test With The Effect
 
