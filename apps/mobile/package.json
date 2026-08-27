@@ -136,7 +136,8 @@
     "typescript": "~5.9.2"
   },
   "allowScripts": {
-    "@supersami/rn-foreground-service": false
+    "@supersami/rn-foreground-service": false,
+    "fsevents@2.3.3": true
   },
   "expo": {
     "install": {
