@@ -16,6 +16,7 @@
     "apps/mobile/src/features/notifications/utils/__tests__",
     "packages/shared/src/core/__tests__",
     "packages/shared/src/features/auth/domain/__tests__",
+    "packages/shared/src/features/links/__tests__",
     "packages/shared/src/features/messaging/lib/__tests__",
     "packages/shared/src/features/messaging/utils/__tests__",
     "packages/shared/src/features/notifications/__tests__",
