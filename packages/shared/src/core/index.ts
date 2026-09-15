@@ -19,6 +19,16 @@ export { createMemoryPersistence } from "./persistence/createMemoryPersistence";
 export { createLocalStoragePersistence } from "./persistence/createLocalStoragePersistence";
 export { NEXUS_STORAGE_KEYS } from "./persistence/nexusStorageKeys";
 export {
+  createLinkPipeline,
+  LINK_DEDUPE_WINDOW_MS,
+  PENDING_LINK_TTL_MS,
+  type LinkAction,
+  type LinkPipeline,
+  type LinkPipelineOptions,
+  type LinkSource,
+  type SessionLinkIntent,
+} from "./linkPipeline";
+export {
   toChannel,
   getCachedChannelsForServer,
   resolvePreferredChannelIdForServer,
