@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["9H229274JB.com.redrix.haven.mobile"],
+        "components": [
+          { "/": "/invite/*", "comment": "Community invite links" },
+          {
+            "/": "/auth/confirm/ios",
+            "comment": "Auth email links the iOS app asked for"
+          },
+          { "/": "/community/*", "comment": "Communities and channels" },
+          { "/": "/direct-messages/*", "comment": "Direct messages" },
+          { "/": "/friends", "comment": "Friends list and requests" },
+          { "/": "/notifications", "comment": "Notification inbox" }
+        ]
+      }
+    ]
+  }
+}

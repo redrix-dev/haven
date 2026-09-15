@@ -4,6 +4,7 @@ export { TextField, type TextFieldProps } from "./TextField";
 export { Avatar, type AvatarProps } from "./Avatar";
 export { ProfileCard, ProfileFlair } from "./ProfileCard";
 export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
+export { OpenInAppBanner } from "./OpenInAppBanner";
 export { ActionsMenu, type ActionMenuItem } from "./ActionsMenu";
 export { ReportDialog, type ReportDialogResult } from "./ReportDialog";
 export { SidePanel, type SidePanelProps } from "./SidePanel";

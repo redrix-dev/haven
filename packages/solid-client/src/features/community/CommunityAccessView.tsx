@@ -3,14 +3,29 @@ import { useNavigate, useParams } from "@solidjs/router";
 import { LogIn, Plus } from "lucide-solid";
 import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode";
 import { describeInviteRedeemError } from "@shared/features/community/utils/inviteRedeemError";
-import { Button, TextField } from "@solid-client/components/ui";
+import { buildHavenSchemeLink } from "@shared/features/links";
+import {
+  Button,
+  OpenInAppBanner,
+  TextField,
+} from "@solid-client/components/ui";
+import { useBridge } from "@solid-client/contexts/BridgeProvider";
 import { requireHavenSolidCore } from "@solid-client/core";
 
 /** Create or join a community from one shell-agnostic Solid surface. */
 export function CommunityAccessView() {
   const core = requireHavenSolidCore();
+  const bridge = useBridge();
   const navigate = useNavigate();
   const params = useParams<{ inviteCode?: string }>();
+
+  // In a browser, an invite can also be opened in the installed app. The
+  // desktop shell is already the app, so it never offers this.
+  const inviteInApp = () => {
+    if (bridge.onDeepLink) return null;
+    const code = normalizeInviteCode(params.inviteCode ?? "");
+    return code ? buildHavenSchemeLink({ kind: "invite", code }) : null;
+  };
   const [name, setName] = createSignal("");
   const [invite, setInvite] = createSignal(params.inviteCode ?? "");
   const [creating, setCreating] = createSignal(false);
@@ -65,6 +80,15 @@ export function CommunityAccessView() {
         <p class="mt-2 text-sm text-muted-foreground">
           Start a new community or redeem an invite from someone you trust.
         </p>
+
+        <Show when={inviteInApp()}>
+          {(href) => (
+            <OpenInAppBanner
+              href={href()}
+              label="Already have Haven installed? Open this invite there."
+            />
+          )}
+        </Show>
 
         <div class="mt-8 grid gap-5 md:grid-cols-2">
           <section class="rounded-xl border border-border bg-card p-5">

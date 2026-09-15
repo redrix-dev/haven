@@ -30,7 +30,10 @@ export default defineConfig({
   },
   root: __dirname,
   base: "/",
-  publicDir: false,
+  // Serves `public/` verbatim at the site root. It exists for one file:
+  // `.well-known/apple-app-site-association`, which iOS fetches to decide that
+  // haven.redrixx.com links belong to the app (Universal Links).
+  publicDir: path.resolve(__dirname, "public"),
   envDir: path.resolve(__dirname, "../.."),
   define: {
     __HAVEN_VERSION__: JSON.stringify(pkg.version),

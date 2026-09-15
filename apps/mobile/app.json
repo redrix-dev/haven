@@ -56,6 +56,7 @@
     "ios": {
       "icon": "./assets/haven-app-icon.png",
       "bundleIdentifier": "com.redrix.haven.mobile",
+      "associatedDomains": ["applinks:haven.redrixx.com"],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Allow Haven to access your camera for media sharing and call features.",
