@@ -1,9 +1,11 @@
 import { createSignal, Show } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
+import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { Button, TextField } from "@solid-client/components/ui";
 
 export function SignInScreen() {
+  const core = requireHavenSolidCore();
   const { signIn } = useSession();
   // useNavigate() gives us a function to push a new route programmatically.
   // We call navigate("/") after a successful sign-in so the auth guard in
@@ -29,9 +31,10 @@ export function SignInScreen() {
       setBusy(false);
     } else {
       // Don't clear busy — we stay in the "loading" state while the router
-      // transitions to "/". The guard will show a spinner; this component
-      // unmounts before the user sees the button again.
-      navigate("/");
+      // transitions. Supabase reports the sign-in before signIn() resolves, so
+      // the link pipeline may already have opened a link remembered from before
+      // (e.g. an invite). Navigation is last-call-wins: only go home if not.
+      if (!core.links.openedLinkOnSignIn()) navigate("/");
     }
   };
 

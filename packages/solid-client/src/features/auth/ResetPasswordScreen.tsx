@@ -1,5 +1,6 @@
 import { Show, createSignal } from "solid-js";
 import { useNavigate } from "@solidjs/router";
+import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { Button, TextField } from "@solid-client/components/ui";
 import { validateRecoveryPassword } from "@shared/features/auth/domain/policies";
@@ -10,6 +11,7 @@ import { validateRecoveryPassword } from "@shared/features/auth/domain/policies"
  * short-lived session). On success the gate clears and the app renders.
  */
 export function ResetPasswordScreen() {
+  const core = requireHavenSolidCore();
   const { updateRecoveryPassword, signOut } = useSession();
   const navigate = useNavigate();
 
@@ -39,7 +41,10 @@ export function ResetPasswordScreen() {
       );
       return;
     }
-    navigate("/", { replace: true });
+    // The recovery link signed in before this screen appeared, and may have
+    // opened a remembered link underneath it (the gate covers any route).
+    // Navigation is last-call-wins, so only go home if nothing opened.
+    if (!core.links.openedLinkOnSignIn()) navigate("/", { replace: true });
   };
 
   return (

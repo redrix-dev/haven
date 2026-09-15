@@ -79,6 +79,13 @@ export interface LinkPipeline {
   setSession(userId: string | null): void;
   /** Attach the platform's handler. Actions produced before it attaches are delivered on attach, in order. */
   setHandler(handler: ((action: LinkAction) => void) | null): void;
+  /**
+   * Whether the most recent sign-in opened a link — one remembered from before
+   * it, or one that arrived while the session loaded. Screens that send
+   * someone home after signing in check this first: navigation is
+   * last-call-wins, and their `navigate("/")` would replace the link.
+   */
+  openedLinkOnSignIn(): boolean;
 }
 
 type SessionState =
@@ -111,6 +118,7 @@ export function createLinkPipeline(options: LinkPipelineOptions): LinkPipeline {
 
   let session: SessionState = { status: "unknown" };
   let handler: ((action: LinkAction) => void) | null = null;
+  let openedOnSignIn = false;
   const outbox: LinkAction[] = [];
   const heldUntilSessionKnown: string[] = [];
   const handledAt = new Map<string, number>();
@@ -146,34 +154,34 @@ export function createLinkPipeline(options: LinkPipelineOptions): LinkPipeline {
     }
   };
 
-  const route = (input: string) => {
+  const decide = (input: string): LinkAction => {
     const intent = parseHavenLink(input, parse);
     switch (intent.kind) {
       case "unsupported":
-        emit({ type: "unsupported", input: intent.input });
-        return;
+        return { type: "unsupported", input: intent.input };
       case "home":
-        emit({ type: "open", intent });
-        return;
+        return { type: "open", intent };
       case "auth_confirm":
-        emit(
-          session.status === "signed_in"
-            ? {
-                type: "confirm_auth_while_signed_in",
-                intent,
-                signedInUserId: session.userId,
-              }
-            : { type: "confirm_auth", intent },
-        );
-        return;
+        return session.status === "signed_in"
+          ? {
+              type: "confirm_auth_while_signed_in",
+              intent,
+              signedInUserId: session.userId,
+            }
+          : { type: "confirm_auth", intent };
       default:
-        if (session.status === "signed_in") {
-          emit({ type: "open", intent });
-          return;
-        }
-        remember(input);
-        emit({ type: "deferred", intent });
+        return session.status === "signed_in"
+          ? { type: "open", intent }
+          : { type: "deferred", intent };
     }
+  };
+
+  /** Decide, remember a deferred destination, emit. Returns what was emitted. */
+  const route = (input: string): LinkAction["type"] => {
+    const action = decide(input);
+    if (action.type === "deferred") remember(input);
+    emit(action);
+    return action.type;
   };
 
   return {
@@ -194,14 +202,18 @@ export function createLinkPipeline(options: LinkPipelineOptions): LinkPipeline {
       session = userId
         ? { status: "signed_in", userId }
         : { status: "signed_out" };
+      const isNewSignIn = userId !== null && userId !== previousUserId;
+      if (isNewSignIn) openedOnSignIn = false;
 
       // A link remembered earlier opens before any that arrived during boot,
       // so the newest link is where the person ends up.
-      if (userId && userId !== previousUserId) {
+      if (isNewSignIn) {
         const pending = takePending();
-        if (pending) route(pending);
+        if (pending && route(pending) === "open") openedOnSignIn = true;
       }
-      for (const key of heldUntilSessionKnown.splice(0)) route(key);
+      for (const key of heldUntilSessionKnown.splice(0)) {
+        if (route(key) === "open" && isNewSignIn) openedOnSignIn = true;
+      }
     },
 
     setHandler(next) {
@@ -210,6 +222,10 @@ export function createLinkPipeline(options: LinkPipelineOptions): LinkPipeline {
         const action = outbox.shift();
         if (action) handler(action);
       }
+    },
+
+    openedLinkOnSignIn() {
+      return openedOnSignIn;
     },
   };
 }

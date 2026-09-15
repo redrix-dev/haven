@@ -93,6 +93,8 @@ function MainShell(props: RouteSectionProps) {
               <WindowChrome>{props.children}</WindowChrome>
               {/* Incoming links, desktop and web: see features/links. */}
               <LinkActionHost />
+              {/* One toast stack for the whole app, signed in or out. */}
+              <AppToaster />
             </VoiceProvider>
           </ToastProvider>
         </UpdaterProvider>
@@ -169,8 +171,8 @@ function PopoutLiteShell(props: RouteSectionProps) {
 
 /**
  * Watches the notification nexus for realtime arrivals and surfaces each as a
- * toast, plus renders the toast stack. Mounted in the authed layout, so `core`
- * is bootstrapped and the ToastProvider sits above it.
+ * toast. Mounted in the authed layout, so `core` is bootstrapped and the
+ * ToastProvider sits above it. The stack itself is AppToaster, in MainShell.
  */
 function NotificationToastLayer() {
   const toast = useToast();
@@ -187,6 +189,16 @@ function NotificationToastLayer() {
     });
   });
 
+  return null;
+}
+
+/**
+ * The toast stack, mounted in MainShell rather than the authed layout so
+ * signed-out screens get toasts too — e.g. the link pipeline's "sign in to use
+ * this invite", which fires before anyone reaches the authed layout.
+ */
+function AppToaster() {
+  const toast = useToast();
   return <Toaster toasts={toast.toasts()} onDismiss={toast.dismiss} />;
 }
 

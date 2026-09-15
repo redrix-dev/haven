@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LinkAction } from "@shared/core/linkPipeline";
-import { createLinkActionHandler } from "../linkActions";
+import {
+  createLinkActionHandler,
+  isConsumedBySupabaseOnWeb,
+  linkFromPageUrl,
+  type AuthConfirmLinkIntent,
+} from "../linkActions";
 
 const INVITE = { kind: "invite", code: "ABCDEF0123" } as const;
 const AUTH = {
@@ -9,12 +14,27 @@ const AUTH = {
   params: { token_hash: "th", type: "signup" },
 } as const;
 
-function setup() {
+const authLink = (params: Record<string, string>): AuthConfirmLinkIntent => ({
+  kind: "auth_confirm",
+  client: null,
+  params,
+});
+const IMPLICIT = authLink({
+  access_token: "at",
+  refresh_token: "rt",
+  type: "signup",
+});
+const PKCE = authLink({ code: "pkce-code" });
+const TOKEN_HASH = authLink({ token_hash: "th", type: "signup" });
+const URL_ERROR = authLink({ error_description: "Email link is invalid" });
+
+function setup(options: { web?: boolean } = {}) {
   const deps = {
     navigate: vi.fn(),
     notify: vi.fn(),
     confirmAuth: vi.fn(),
     askToSwitchAccount: vi.fn(),
+    ignoreAuthLink: options.web ? isConsumedBySupabaseOnWeb : undefined,
   };
   return { deps, handle: createLinkActionHandler(deps) };
 }
@@ -109,5 +129,92 @@ describe("createLinkActionHandler", () => {
     expect(deps.notify).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Haven can't open that link" }),
     );
+  });
+});
+
+describe("isConsumedBySupabaseOnWeb", () => {
+  it("is true for Supabase's own URL flows", () => {
+    expect(isConsumedBySupabaseOnWeb(IMPLICIT)).toBe(true);
+    expect(isConsumedBySupabaseOnWeb(PKCE)).toBe(true);
+  });
+
+  it("is false for what Supabase leaves to the app", () => {
+    expect(isConsumedBySupabaseOnWeb(TOKEN_HASH)).toBe(false);
+    expect(isConsumedBySupabaseOnWeb(URL_ERROR)).toBe(false);
+  });
+});
+
+describe("web shell: auth links Supabase already consumed", () => {
+  it("never re-exchanges an implicit or PKCE link", () => {
+    for (const intent of [IMPLICIT, PKCE]) {
+      const { deps, handle } = setup({ web: true });
+      handle({ type: "confirm_auth", intent });
+      expect(deps.confirmAuth).not.toHaveBeenCalled();
+      expect(deps.navigate).not.toHaveBeenCalled();
+    }
+  });
+
+  it("doesn't ask about switching accounts Supabase has already switched", () => {
+    const { deps, handle } = setup({ web: true });
+    handle({
+      type: "confirm_auth_while_signed_in",
+      intent: IMPLICIT,
+      signedInUserId: "u1",
+    });
+    expect(deps.askToSwitchAccount).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a token_hash link", TOKEN_HASH],
+    ["a link carrying an error", URL_ERROR],
+  ])("still handles %s, which Supabase leaves alone", (_label, intent) => {
+    const { deps, handle } = setup({ web: true });
+    handle({ type: "confirm_auth", intent });
+    expect(deps.navigate).toHaveBeenCalledWith("/auth/confirm");
+    expect(deps.confirmAuth).toHaveBeenCalledWith(intent);
+  });
+});
+
+describe("linkFromPageUrl", () => {
+  const origin = "https://haven.redrixx.com";
+
+  it.each([
+    "/invite/ABCDEF0123",
+    "/community/c1",
+    "/community/c1/channel/ch1",
+    "/direct-messages/d1",
+    "/friends",
+    "/notifications",
+    "/auth/confirm#access_token=at&refresh_token=rt&type=signup",
+    "/auth/confirm?token_hash=th&type=signup",
+    "/auth/confirm#error_description=Email+link+is+invalid",
+  ])("treats %s as a link", (path) => {
+    const href = `${origin}${path}`;
+    expect(linkFromPageUrl(href, origin)).toBe(href);
+  });
+
+  it.each([
+    "/",
+    "/sign-in",
+    "/sign-up",
+    "/forgot-password",
+    "/settings/profile",
+    "/communities",
+    "/community/c1/roles",
+    "/auth/confirm",
+  ])("treats %s as an ordinary page", (path) => {
+    expect(linkFromPageUrl(`${origin}${path}`, origin)).toBeNull();
+  });
+
+  it("counts the page's own preview origin", () => {
+    const preview = "https://haven-abc123-cody-magnusons-projects.vercel.app";
+    const href = `${preview}/invite/ABCDEF0123`;
+    expect(linkFromPageUrl(href, preview)).toBe(href);
+  });
+
+  it("ignores a link to another site", () => {
+    expect(
+      linkFromPageUrl("https://evil.example/invite/ABCDEF0123", origin),
+    ).toBeNull();
   });
 });
