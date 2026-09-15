@@ -7,6 +7,8 @@ export type MainStackParamList = {
     serverId?: string | null;
     openDrawer?: boolean;
     pendingDmConversationId?: string;
+    /** From an invite link: open the join sheet pre-filled with this code. */
+    pendingInviteCode?: string;
   };
   Friends:
     | { initialTab?: FriendsPanelTab; highlightedRequestId?: string | null }

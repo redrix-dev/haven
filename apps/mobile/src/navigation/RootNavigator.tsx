@@ -9,14 +9,12 @@ import { PasswordRecoveryGateProvider } from "./PasswordRecoveryGateContext";
 import { MobileLogin } from "@/screens/entry/MobileLogin";
 import { PasswordRecoveryScreen } from "@/screens/onboarding/PasswordRecoveryScreen";
 import { SignUpScreen } from "@/screens/onboarding/SignUpScreen";
-import * as Linking from "expo-linking";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
-import { consumeAuthConfirmUrl } from "@/auth/mobileAuthService";
 import { MainNavigator } from "@/navigation/MainNavigator";
 import { MobileOnboardingGate } from "@/navigation/MobileOnboardingGate";
 import { NAV_THEME } from "@/lib/theme";
-import { savePendingInviteFromUrl } from "@/features/invites/mobilePendingInvite";
+import { useMobileLinkIntake } from "@/features/links/useMobileLinkIntake";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -34,57 +32,10 @@ export function RootNavigator() {
   useMobileVoipFoundation(session);
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
     useState(false);
-  const url = Linking.useURL();
-  const processedAuthConfirmUrlsRef = useRef<Set<string>>(new Set());
+  // Invite, destination, and auth email links: see features/links.
+  useMobileLinkIntake(setPasswordRecoveryRequired);
 
   useEffect(() => {
-    const consumeAuthUrl = async (candidateUrl: string | null | undefined) => {
-      if (!candidateUrl) return;
-      if (processedAuthConfirmUrlsRef.current.has(candidateUrl)) return;
-      try {
-        const result = await consumeAuthConfirmUrl(candidateUrl);
-        if (result.didProcess) {
-          processedAuthConfirmUrlsRef.current.add(candidateUrl);
-          setPasswordRecoveryRequired(result.requiresPasswordRecovery);
-          return;
-        }
-        if (savePendingInviteFromUrl(candidateUrl)) {
-          processedAuthConfirmUrlsRef.current.add(candidateUrl);
-        }
-      } catch (error) {
-        console.error("Failed to process mobile auth confirmation URL.", error);
-      }
-    };
-
-    void consumeAuthUrl(url);
-  }, [url]);
-
-  useEffect(() => {
-    let disposed = false;
-
-    const processInitialUrl = async () => {
-      try {
-        const initialUrl = await Linking.getInitialURL();
-        if (disposed) return;
-        if (!initialUrl) return;
-        if (processedAuthConfirmUrlsRef.current.has(initialUrl)) return;
-
-        const result = await consumeAuthConfirmUrl(initialUrl);
-        if (result.didProcess) {
-          processedAuthConfirmUrlsRef.current.add(initialUrl);
-          setPasswordRecoveryRequired(result.requiresPasswordRecovery);
-          return;
-        }
-        if (savePendingInviteFromUrl(initialUrl)) {
-          processedAuthConfirmUrlsRef.current.add(initialUrl);
-        }
-      } catch (error) {
-        console.error("Failed to process initial mobile auth URL.", error);
-      }
-    };
-
-    void processInitialUrl();
-
     const {
       data: { subscription },
     } = getMobileSupabase().auth.onAuthStateChange((event) => {
@@ -96,7 +47,6 @@ export function RootNavigator() {
     });
 
     return () => {
-      disposed = true;
       subscription.unsubscribe();
     };
   }, []);

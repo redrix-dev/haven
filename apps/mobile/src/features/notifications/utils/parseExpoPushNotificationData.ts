@@ -1,4 +1,5 @@
 import type { NotificationKind } from "@shared/lib/backend/types";
+import { parseHavenLink } from "@shared/features/links";
 
 const KNOWN_KINDS = new Set<NotificationKind>([
   "friend_request_received",
@@ -19,43 +20,44 @@ export type ParsedExpoPushPayload =
     }
   | { kind: "system" };
 
-function parseQueryString(search: string): Record<string, string> {
-  const trimmed = search.startsWith("?") ? search.slice(1) : search;
-  const out: Record<string, string> = {};
-  for (const part of trimmed.split("&")) {
-    if (!part) continue;
-    const eq = part.indexOf("=");
-    const key =
-      eq >= 0
-        ? decodeURIComponent(part.slice(0, eq))
-        : decodeURIComponent(part);
-    const val = eq >= 0 ? decodeURIComponent(part.slice(eq + 1)) : "";
-    if (key) out[key] = val;
-  }
-  return out;
-}
-
-/** Parses `data.url` from expo-push-worker (`/?kind=...&conversationId=...`). */
-export function parseExpoPushUrl(url: string): Partial<{
-  kind: string;
+type PushUrlFields = Partial<{
+  kind: NotificationKind;
   conversationId: string;
   friendRequestId: string;
   communityId: string;
   channelId: string;
-}> {
-  try {
-    const qIndex = url.indexOf("?");
-    const query = qIndex >= 0 ? url.slice(qIndex) : "";
-    const params = parseQueryString(query);
-    return {
-      kind: params.kind,
-      conversationId: params.conversationId,
-      friendRequestId: params.friendRequestId,
-      communityId: params.communityId,
-      channelId: params.channelId,
-    };
-  } catch {
-    return {};
+}>;
+
+/**
+ * Reads `data.url` from expo-push-worker (`/?kind=...&conversationId=...`)
+ * through the shared link model. A DM or mention link missing its ids reads
+ * as the notifications list there.
+ */
+function fieldsFromPushUrl(url: string): PushUrlFields {
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(url);
+  const intent = parseHavenLink(
+    hasScheme || url.startsWith("/") ? url : `/${url}`,
+  );
+  switch (intent.kind) {
+    case "dm":
+      return { kind: "dm_message", conversationId: intent.conversationId };
+    case "friends":
+      return intent.tab === "requests"
+        ? {
+            kind: "friend_request_received",
+            friendRequestId: intent.requestId ?? undefined,
+          }
+        : { kind: "friend_request_accepted" };
+    case "channel":
+      return {
+        kind: "channel_mention",
+        communityId: intent.communityId,
+        channelId: intent.channelId,
+      };
+    case "notifications":
+      return { kind: "system" };
+    default:
+      return {};
   }
 }
 
@@ -82,9 +84,7 @@ export function parseExpoPushNotificationData(
 
   const urlRaw = asTrimmedString(data.url);
   if (urlRaw) {
-    const fromUrl = parseExpoPushUrl(
-      urlRaw.startsWith("/") ? urlRaw : `/${urlRaw}`,
-    );
+    const fromUrl = fieldsFromPushUrl(urlRaw);
     kindRaw = kindRaw ?? fromUrl.kind ?? null;
     conversationId = conversationId ?? fromUrl.conversationId ?? null;
     friendRequestId = friendRequestId ?? fromUrl.friendRequestId ?? null;

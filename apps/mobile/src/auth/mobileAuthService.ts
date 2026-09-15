@@ -2,41 +2,13 @@ import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { getPlatformAuthConfirmRedirectUrl } from "@shared/infrastructure/platform/urls";
 import {
   buildSignUpMetadata,
-  parseAuthConfirmParams,
-  parseAuthConfirmUrl,
+  confirmAuthFromParams,
   validateLegalAcceptance,
   validatePasswordConfirmation,
   validateRecoveryPassword,
 } from "@shared/features/auth/domain";
 
 export type MobileAuthResult = { error: unknown | null };
-
-type MobileVerifyOtpParams = Parameters<
-  ReturnType<typeof getMobileSupabase>["auth"]["verifyOtp"]
->[0];
-type MobileEmailOtpType = Extract<
-  MobileVerifyOtpParams,
-  { token_hash: string }
->["type"];
-
-const SUPPORTED_MOBILE_EMAIL_OTP_TYPES = new Set<MobileEmailOtpType>([
-  "signup",
-  "invite",
-  "magiclink",
-  "recovery",
-  "email_change",
-  "email",
-]);
-
-function parseMobileEmailOtpType(
-  value: string | undefined,
-): MobileEmailOtpType | null {
-  const normalized = value?.trim().toLowerCase();
-  if (!normalized) return null;
-  return SUPPORTED_MOBILE_EMAIL_OTP_TYPES.has(normalized as MobileEmailOtpType)
-    ? (normalized as MobileEmailOtpType)
-    : null;
-}
 
 export const signInWithPassword = async (
   email: string,
@@ -171,43 +143,12 @@ export const deleteOwnAccount = async (): Promise<void> => {
   }
 };
 
-export const consumeAuthConfirmUrl = async (
-  candidateUrl: string | null | undefined,
-): Promise<{ didProcess: boolean; requiresPasswordRecovery: boolean }> => {
-  if (!candidateUrl) {
-    return { didProcess: false, requiresPasswordRecovery: false };
-  }
-
-  const parsedAuthConfirmUrl = parseAuthConfirmUrl(candidateUrl);
-  if (!parsedAuthConfirmUrl) {
-    return { didProcess: false, requiresPasswordRecovery: false };
-  }
-
-  const params = parseAuthConfirmParams(parsedAuthConfirmUrl);
-  const accessToken = params.access_token?.trim();
-  const refreshToken = params.refresh_token?.trim();
-  const tokenHash = params.token_hash?.trim();
-  const otpType = parseMobileEmailOtpType(params.type);
-  const isRecovery = otpType === "recovery";
-
-  if (accessToken && refreshToken) {
-    const { error: setSessionError } =
-      await getMobileSupabase().auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-    if (setSessionError) throw setSessionError;
-    return { didProcess: true, requiresPasswordRecovery: isRecovery };
-  }
-
-  if (tokenHash && otpType) {
-    const { error: verifyError } = await getMobileSupabase().auth.verifyOtp({
-      token_hash: tokenHash,
-      type: otpType,
-    });
-    if (verifyError) throw verifyError;
-    return { didProcess: true, requiresPasswordRecovery: isRecovery };
-  }
-
-  return { didProcess: false, requiresPasswordRecovery: false };
-};
+/**
+ * Exchange an auth email link's params for a session — the link pipeline's
+ * `confirm_auth`. Same logic as desktop: implicit tokens, PKCE `code`, and
+ * `token_hash`; Supabase's `error_description` comes back as the error.
+ */
+export const confirmAuthLink = (
+  params: Readonly<Record<string, string | undefined>>,
+): Promise<MobileAuthResult> =>
+  confirmAuthFromParams(params, getMobileSupabase().auth);

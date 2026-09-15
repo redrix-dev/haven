@@ -221,9 +221,10 @@ is not "no injection" — it is "no domain behavior hidden inside platform bridg
 2. **AppHost is OS and shell only.** Allowed: external URLs, file save, settings bridges,
    window chrome, imperative shell navigation for push taps / deep links / access-revoked
    redirects. Not allowed: any domain entity, backend RPC wrapper, or cache.
-3. **Auth is a bounded exception.** `AuthContext` may touch Supabase because it creates the
-   session Core depends on (Supabase → `bootstrapSession` / `clearSession`). Boundary only —
-   not a pattern for domain screens.
+3. **Auth is a bounded exception.** The auth boundary (`useAuthSession`,
+   `auth/mobileAuthService`) may touch Supabase because it creates the session Core depends on
+   (Supabase → `bootstrapSession` / `clearSession`). Boundary only — not a pattern for domain
+   screens.
 4. **`core.backends` is private-in-practice.** Core internals and cache construction may use
    backends; UI/feature code adds a Core/cache command instead.
 
@@ -260,7 +261,6 @@ packages/shared/src/
   infrastructure/platform/appHost.ts
 
 apps/mobile/src/
-  contexts/AuthContext.tsx
   data/
     Nexus.ts                    # entity cache base class
     core/

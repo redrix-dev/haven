@@ -36,7 +36,11 @@ production-sensitive, even when the user asks for a small UI tweak.
 - Feature code must not import backend factories, create Supabase clients, call
   RPC/table/channel APIs directly, import persistence adapters, or open domain
   realtime subscriptions.
-- `AuthContext` is the bounded auth/session exception, not a domain-data pattern.
+- The auth boundary (`useAuthSession`, `auth/mobileAuthService`) is the bounded
+  auth/session exception, not a domain-data pattern.
+- Incoming links (invites, destinations, auth emails) go through `core.links`,
+  fed by `features/links/useMobileLinkIntake`. Never join a community from a
+  link automatically; open the pre-filled join sheet.
 
 ## Styling And Theme
 

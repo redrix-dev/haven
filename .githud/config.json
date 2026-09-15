@@ -13,6 +13,7 @@
   ],
   "testRoots": [
     "apps/mobile/src/data/__tests__",
+    "apps/mobile/src/features/links/__tests__",
     "apps/mobile/src/features/notifications/utils/__tests__",
     "packages/shared/src/core/__tests__",
     "packages/shared/src/features/auth/domain/__tests__",
@@ -25,7 +26,6 @@
     "packages/shared/src/infrastructure/platform/__tests__",
     "packages/shared/src/lib/backend/__tests__",
     "packages/shared/src/themes/__tests__",
-    "packages/solid-client/src/auth/__tests__",
     "packages/solid-client/src/components/ui/Markdown/__tests__",
     "packages/solid-client/src/data/channels/__tests__",
     "packages/solid-client/src/data/communities/__tests__",

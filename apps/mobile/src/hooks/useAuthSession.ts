@@ -6,13 +6,15 @@ import { getMobileSupabase } from "../supabase/getMobileSupabase";
 import { clearAllChannelScrollExits } from "../storage/communityTimelinePrefs";
 import { useAuthStore } from "@mobile-data/session/authStore";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
+import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
 
 /**
  * `undefined` while hydrating from AsyncStorage; `null` when signed out.
  *
  * Session lifecycle (bootstrap/clear of nexuses, realtime subscription) is
  * delegated to `HavenCore.bootstrapSession` / `clearSession`. This hook only
- * tracks Supabase session state and notifies the core when the user changes.
+ * tracks Supabase session state and notifies the core when the user changes —
+ * including the link pipeline, which holds incoming links until it knows.
  */
 export function useAuthSession(): Session | null | undefined {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -26,13 +28,17 @@ export function useAuthSession(): Session | null | undefined {
       dataCacheDebug.lifecycle("useAuthSession", "signed out — clear caches");
       clearAllChannelScrollExits();
       useMobileThemePreferenceStore.getState().resetToDefault();
+      // A link opened for the previous account must not open for the next one.
+      useMobilePushNavigationStore.getState().setPendingLinkIntent(null);
       activeUserIdRef.current = null;
+      core.links.setSession(null);
       void core.clearSession();
     };
 
     const applySignIn = (userId: string) => {
       if (activeUserIdRef.current === userId) return;
       activeUserIdRef.current = userId;
+      core.links.setSession(userId);
       void core.bootstrapSession(userId).catch((err) => {
         console.warn("[useAuthSession] bootstrapSession failed", err);
       });
@@ -83,6 +89,7 @@ export function useAuthSession(): Session | null | undefined {
       });
       subscription = sub;
     } catch {
+      core.links.setSession(null);
       setSession(null);
       useAuthStore.getState().setSession(null);
       useAuthStore.getState().setUser(null);

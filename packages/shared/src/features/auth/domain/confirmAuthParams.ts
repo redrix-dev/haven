@@ -1,5 +1,5 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
-import { SUPPORTED_EMAIL_OTP_TYPES } from "@shared/features/auth/domain/authConfirm";
+import { SUPPORTED_EMAIL_OTP_TYPES } from "./authConfirm";
 
 export type AuthConfirmResult = { error: unknown | null };
 
@@ -17,12 +17,13 @@ export type AuthLinkExchanger = {
 };
 
 /**
- * Turn an auth email link's params into a session.
+ * Turn an auth email link's params into a session. Desktop and mobile both use
+ * it for the link pipeline's `confirm_auth`.
  *
- * Desktop needs this for every link shape: `detectSessionInUrl` is off there,
- * so nothing else reads the tokens. Supabase currently sends implicit-flow
- * links (`#access_token` + `refresh_token`). `code` (PKCE) and `token_hash`
- * (custom templates) are handled for when the templates move.
+ * Nothing else reads the tokens on those clients: `detectSessionInUrl` is off
+ * on desktop, and a native app has no page URL. Supabase currently sends
+ * implicit-flow links (`#access_token` + `refresh_token`). `code` (PKCE) and
+ * `token_hash` (custom templates) are handled for when the templates move.
  *
  * A link with none of those is an error, not a silent success.
  */

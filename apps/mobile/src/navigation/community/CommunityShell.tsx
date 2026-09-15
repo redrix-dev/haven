@@ -264,6 +264,25 @@ export function CommunityShell({
     setJoinOpen(true);
   }, []);
 
+  // An invite link opens the join sheet pre-filled; joining stays a tap.
+  // `seq` re-fills the sheet when the same invite is opened again.
+  const pendingInviteCode = route.params?.pendingInviteCode;
+  const [joinPrefill, setJoinPrefill] = useState<{
+    code: string;
+    seq: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!pendingInviteCode) return;
+    setJoinPrefill((prev) => ({
+      code: pendingInviteCode,
+      seq: (prev?.seq ?? 0) + 1,
+    }));
+    setCommunityActionsOpen(false);
+    setCreateOpen(false);
+    setJoinOpen(true);
+    navigation.setParams({ pendingInviteCode: undefined });
+  }, [navigation, pendingInviteCode]);
+
   const handleCommunityReady = useCallback(
     (communityId: string) => {
       navigation.setParams({ serverId: communityId, openDrawer: true });
@@ -401,6 +420,7 @@ export function CommunityShell({
         actionsOpen={communityActionsOpen}
         createOpen={createOpen}
         joinOpen={joinOpen}
+        joinPrefill={joinPrefill}
         userId={userId}
         onCloseActions={closeCommunityActions}
         onChooseCreate={chooseCreateCommunity}

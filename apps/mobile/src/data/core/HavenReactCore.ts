@@ -34,6 +34,10 @@ import {
 } from "@shared/core/communityChannelUtils";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import {
+  createLinkPipeline,
+  type LinkPipeline,
+} from "@shared/core/linkPipeline";
+import {
   routeRealtimeEvent,
   type RealtimeEvent,
 } from "@shared/core/routeRealtimeEvent";
@@ -154,6 +158,11 @@ export class HavenReactCore implements RealtimeMutationTarget {
   readonly featureFlags: FeatureFlagNexus;
   readonly onboarding: OnboardingNexus;
   readonly voice: VoiceNexus;
+  /**
+   * Every incoming link (`@shared/core/linkPipeline`). Outlives sessions: it
+   * remembers a link clicked while signed out and opens it after sign-in.
+   */
+  readonly links: LinkPipeline;
 
   readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
   readonly authStore: AuthStorePort;
@@ -173,6 +182,7 @@ export class HavenReactCore implements RealtimeMutationTarget {
     });
 
     this.persistence = options.persistence;
+    this.links = createLinkPipeline({ persistence: options.persistence });
     this.backends = createHavenBackends(options.client, options.publicConfig);
     registerSessionBackends(this.backends);
     this.authStore = useAuthStore;

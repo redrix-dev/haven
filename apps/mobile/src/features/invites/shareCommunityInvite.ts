@@ -1,8 +1,9 @@
 import { Share } from "react-native";
-import { getPlatformInviteBaseUrl } from "@shared/infrastructure/platform/urls";
+import { buildHavenLink } from "@shared/features/links";
 
+/** The canonical https invite link — the same one desktop and web share. */
 export function buildCommunityInviteUrl(code: string): string {
-  return `${getPlatformInviteBaseUrl()}${code}`;
+  return buildHavenLink({ kind: "invite", code });
 }
 
 export async function shareCommunityInvite(code: string): Promise<void> {

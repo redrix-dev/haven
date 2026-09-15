@@ -1,4 +1,4 @@
-import { confirmAuthFromParams } from "./confirmAuthParams";
+import { confirmAuthFromParams } from "@shared/features/auth/domain/confirmAuthParams";
 import {
   buildSignUpMetadata,
   validateLegalAcceptance,
@@ -76,8 +76,8 @@ export const updateRecoveryPassword = async (
 
 /**
  * Exchange an auth email link's params (from the link pipeline) for a session.
- * Desktop needs this for every link — `detectSessionInUrl` is off there — and
- * the logic lives in confirmAuthParams so it can be tested without a core.
+ * Desktop needs this for every link — `detectSessionInUrl` is off there. The
+ * logic is shared with mobile: `@shared/features/auth/domain/confirmAuthParams`.
  */
 export const confirmAuthLink = (
   params: Readonly<Record<string, string | undefined>>,

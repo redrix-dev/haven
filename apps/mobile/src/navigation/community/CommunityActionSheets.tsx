@@ -1,12 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { HavenFormSheet } from "@/components/HavenFormSheet";
 import { HavenListSheet } from "@/components/HavenListSheet";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import { getPlatformInviteInputPlaceholder } from "@shared/infrastructure/platform/urls";
 import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode";
+import { describeInviteRedeemError } from "@shared/features/community/utils/inviteRedeemError";
 import { resolveColorProp } from "@shared/themes";
 import { useHavenCore } from "@mobile-data";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
@@ -15,6 +15,8 @@ type CommunityActionSheetsProps = {
   actionsOpen: boolean;
   createOpen: boolean;
   joinOpen: boolean;
+  /** From an invite link: fills the join sheet's invite field. */
+  joinPrefill?: { code: string; seq: number } | null;
   userId: string | null;
   onCloseActions: () => void;
   onChooseCreate: () => void;
@@ -28,6 +30,7 @@ export function CommunityActionSheets({
   actionsOpen,
   createOpen,
   joinOpen,
+  joinPrefill,
   userId,
   onCloseActions,
   onChooseCreate,
@@ -49,6 +52,12 @@ export function CommunityActionSheets({
   const [joinInvite, setJoinInvite] = useState("");
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!joinPrefill) return;
+    setJoinInvite(joinPrefill.code);
+    setJoinError(null);
+  }, [joinPrefill]);
 
   const renderActionOption = (
     icon: ThemedIoniconsProps["name"],
@@ -125,7 +134,7 @@ export function CommunityActionSheets({
       closeJoin();
       onCommunityReady(communityId);
     } catch (error) {
-      setJoinError(getErrorMessage(error, "Failed to join from invite."));
+      setJoinError(describeInviteRedeemError(error));
     } finally {
       setJoinLoading(false);
     }
@@ -221,7 +230,7 @@ export function CommunityActionSheets({
             <TextInput
               value={joinInvite}
               onChangeText={setJoinInvite}
-              placeholder={getPlatformInviteInputPlaceholder()}
+              placeholder="Invite code or link"
               placeholderTextColor={placeholderMuted}
               editable={!joinLoading}
               autoCapitalize="characters"
