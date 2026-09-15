@@ -13,6 +13,7 @@ const AUTH = {
   client: "desktop",
   params: { token_hash: "th", type: "signup" },
 } as const;
+const AUTH_PATH = "/auth/confirm/desktop?token_hash=th&type=signup";
 
 const authLink = (params: Record<string, string>): AuthConfirmLinkIntent => ({
   kind: "auth_confirm",
@@ -28,25 +29,30 @@ const PKCE = authLink({ code: "pkce-code" });
 const TOKEN_HASH = authLink({ token_hash: "th", type: "signup" });
 const URL_ERROR = authLink({ error_description: "Email link is invalid" });
 
+/**
+ * `web: true` is the browser shell: it leaves Supabase's own flows alone and
+ * never exchanges a link on arrival — the landing page asks first.
+ */
 function setup(options: { web?: boolean } = {}) {
+  const confirmAuth = vi.fn();
   const deps = {
     navigate: vi.fn(),
     notify: vi.fn(),
-    confirmAuth: vi.fn(),
     askToSwitchAccount: vi.fn(),
+    confirmAuth: options.web ? undefined : confirmAuth,
     ignoreAuthLink: options.web ? isConsumedBySupabaseOnWeb : undefined,
   };
-  return { deps, handle: createLinkActionHandler(deps) };
+  return { deps, confirmAuth, handle: createLinkActionHandler(deps) };
 }
 
 describe("createLinkActionHandler", () => {
   it("opens an invite on the pre-filled invite screen and does nothing else", () => {
-    const { deps, handle } = setup();
+    const { deps, confirmAuth, handle } = setup();
     handle({ type: "open", intent: INVITE });
     expect(deps.navigate).toHaveBeenCalledTimes(1);
     expect(deps.navigate).toHaveBeenCalledWith("/invite/ABCDEF0123");
     expect(deps.notify).not.toHaveBeenCalled();
-    expect(deps.confirmAuth).not.toHaveBeenCalled();
+    expect(confirmAuth).not.toHaveBeenCalled();
   });
 
   it.each<[string, LinkAction, string]>([
@@ -100,25 +106,33 @@ describe("createLinkActionHandler", () => {
     );
   });
 
-  it("shows the confirm screen, then exchanges the auth link", () => {
-    const { deps, handle } = setup();
+  it("opens the landing page for the client that asked, then exchanges", () => {
+    const { deps, confirmAuth, handle } = setup();
     handle({ type: "confirm_auth", intent: AUTH });
-    expect(deps.navigate).toHaveBeenCalledWith("/auth/confirm");
-    expect(deps.confirmAuth).toHaveBeenCalledWith(AUTH);
+    expect(deps.navigate).toHaveBeenCalledWith(AUTH_PATH);
+    expect(confirmAuth).toHaveBeenCalledWith(AUTH);
     expect(deps.navigate.mock.invocationCallOrder[0]).toBeLessThan(
-      deps.confirmAuth.mock.invocationCallOrder[0],
+      confirmAuth.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("keeps the legacy clientless path for links that carry no client", () => {
+    const { deps, handle } = setup();
+    handle({ type: "confirm_auth", intent: TOKEN_HASH });
+    expect(deps.navigate).toHaveBeenCalledWith(
+      "/auth/confirm?token_hash=th&type=signup",
     );
   });
 
   it("asks before switching accounts and never exchanges the link on its own", () => {
-    const { deps, handle } = setup();
+    const { deps, confirmAuth, handle } = setup();
     handle({
       type: "confirm_auth_while_signed_in",
       intent: AUTH,
       signedInUserId: "u1",
     });
     expect(deps.askToSwitchAccount).toHaveBeenCalledWith(AUTH, "u1");
-    expect(deps.confirmAuth).not.toHaveBeenCalled();
+    expect(confirmAuth).not.toHaveBeenCalled();
     expect(deps.navigate).not.toHaveBeenCalled();
   });
 
@@ -147,9 +161,9 @@ describe("isConsumedBySupabaseOnWeb", () => {
 describe("web shell: auth links Supabase already consumed", () => {
   it("never re-exchanges an implicit or PKCE link", () => {
     for (const intent of [IMPLICIT, PKCE]) {
-      const { deps, handle } = setup({ web: true });
+      const { deps, confirmAuth, handle } = setup({ web: true });
       handle({ type: "confirm_auth", intent });
-      expect(deps.confirmAuth).not.toHaveBeenCalled();
+      expect(confirmAuth).not.toHaveBeenCalled();
       expect(deps.navigate).not.toHaveBeenCalled();
     }
   });
@@ -165,14 +179,26 @@ describe("web shell: auth links Supabase already consumed", () => {
   });
 
   it.each([
-    ["a token_hash link", TOKEN_HASH],
-    ["a link carrying an error", URL_ERROR],
-  ])("still handles %s, which Supabase leaves alone", (_label, intent) => {
-    const { deps, handle } = setup({ web: true });
-    handle({ type: "confirm_auth", intent });
-    expect(deps.navigate).toHaveBeenCalledWith("/auth/confirm");
-    expect(deps.confirmAuth).toHaveBeenCalledWith(intent);
-  });
+    [
+      "a token_hash link",
+      TOKEN_HASH,
+      "/auth/confirm?token_hash=th&type=signup",
+    ],
+    [
+      "a link carrying an error",
+      URL_ERROR,
+      "/auth/confirm?error_description=Email%20link%20is%20invalid",
+    ],
+  ])(
+    "shows %s on the landing page and leaves the exchange to it",
+    (_label, intent, path) => {
+      const { deps, confirmAuth, handle } = setup({ web: true });
+      handle({ type: "confirm_auth", intent });
+      expect(deps.navigate).toHaveBeenCalledWith(path);
+      // The browser never spends the token on arrival — a person's click does.
+      expect(confirmAuth).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("linkFromPageUrl", () => {
@@ -187,6 +213,8 @@ describe("linkFromPageUrl", () => {
     "/notifications",
     "/auth/confirm#access_token=at&refresh_token=rt&type=signup",
     "/auth/confirm?token_hash=th&type=signup",
+    "/auth/confirm/web?token_hash=th&type=signup",
+    "/auth/confirm/desktop?token_hash=th&type=recovery",
     "/auth/confirm#error_description=Email+link+is+invalid",
   ])("treats %s as a link", (path) => {
     const href = `${origin}${path}`;
@@ -202,6 +230,7 @@ describe("linkFromPageUrl", () => {
     "/communities",
     "/community/c1/roles",
     "/auth/confirm",
+    "/auth/confirm/web",
   ])("treats %s as an ordinary page", (path) => {
     expect(linkFromPageUrl(`${origin}${path}`, origin)).toBeNull();
   });

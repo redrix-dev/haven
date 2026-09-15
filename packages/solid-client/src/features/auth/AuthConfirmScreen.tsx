@@ -1,20 +1,69 @@
-import { Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import {
+  Match,
+  Switch,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { useSession } from "@solid-client/contexts/SessionProvider";
+import { useBridge } from "@solid-client/contexts/BridgeProvider";
+import { Button } from "@solid-client/components/ui";
+import { parseHavenLink } from "@shared/features/links";
+import { planAuthConfirm } from "./authConfirmPlan";
 
 /**
- * Landing page for confirmation / recovery email links (`/auth/confirm`).
+ * Landing page for confirmation and recovery email links —
+ * `/auth/confirm/:client` and the legacy `/auth/confirm`.
  *
- * On web, Supabase's `detectSessionInUrl` consumes the token from the URL and
- * fires the auth event automatically; on desktop the shell exchanges the
- * `haven://` deep link before routing here. Either way this screen just waits
- * for the session (or recovery gate) to settle, then sends the user on — to the
- * app, or to the set-new-password screen via the recovery gate in AppLayout.
+ * The link itself never signs anyone in (checklist D2). This page reads it and
+ * offers the one action that fits: confirm here, or open the app that asked for
+ * it. Inside the desktop shell there's nothing to ask — the link pipeline has
+ * already exchanged the deep link — so it just waits for the session, then
+ * sends the person on (to the app, or to set-new-password via the recovery gate
+ * in AppLayout).
  */
 export function AuthConfirmScreen() {
-  const { session, passwordRecoveryRequired, authConfirmError } = useSession();
+  const {
+    session,
+    passwordRecoveryRequired,
+    authConfirmError,
+    confirmAuthLink,
+  } = useSession();
+  const bridge = useBridge();
   const navigate = useNavigate();
+
+  // Read the address during render: before any navigation, and before Supabase
+  // clears tokens from the URL (it only does so after a network round-trip).
+  const href = typeof window !== "undefined" ? window.location.href : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const link = parseHavenLink(href, {
+    appOrigins: origin.startsWith("http") ? [origin] : [],
+  });
+  const params = link.kind === "auth_confirm" ? link.params : {};
+  const client = link.kind === "auth_confirm" ? link.client : null;
+
   const [timedOut, setTimedOut] = createSignal(false);
+  const [continueInBrowser, setContinueInBrowser] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
+
+  const plan = createMemo(() =>
+    planAuthConfirm({
+      client,
+      params,
+      // The desktop shell is the one with a deep-link bridge.
+      shell: bridge.onDeepLink ? "app" : "browser",
+      continueInBrowser: continueInBrowser(),
+    }),
+  );
+
+  /** Narrowed for the hand-off branch, so the link is typed rather than cast. */
+  const handOff = createMemo(() => {
+    const current = plan();
+    return current.kind === "open_app" ? current : null;
+  });
 
   createEffect(() => {
     if (passwordRecoveryRequired() || session()) {
@@ -27,41 +76,98 @@ export function AuthConfirmScreen() {
     onCleanup(() => clearTimeout(timer));
   });
 
-  // Desktop exchanges the link itself, so a failure is known straight away.
-  // The timeout stays for web, where Supabase consumes the link and only
-  // success is observable.
-  const failure = () =>
-    authConfirmError() ??
-    (timedOut()
+  // Waiting is the only state that can hang: the shell or Supabase is
+  // exchanging and only success is observable. A link we act on reports its own
+  // failure, so it never needs the timeout.
+  const failure = () => {
+    const current = plan();
+    if (current.kind === "error") return current.message;
+    if (authConfirmError()) return authConfirmError();
+    return current.kind === "working" && timedOut()
       ? "The link may have expired or already been used. Request a new one from the sign-in screen."
-      : null);
+      : null;
+  };
+
+  const purpose = () => params.type?.trim().toLowerCase() ?? "";
+  const title = () =>
+    purpose() === "recovery" ? "Reset your password" : "Confirm your email";
+  const action = () => (purpose() === "recovery" ? "Continue" : "Confirm");
+
+  const confirm = async () => {
+    setBusy(true);
+    const result = await confirmAuthLink(params);
+    // On success the session effect above navigates; on failure the error
+    // surfaces through authConfirmError.
+    if (result.error) setBusy(false);
+  };
 
   return (
-    <div class="flex h-full w-full items-center justify-center bg-background">
-      <Show
-        when={failure()}
-        fallback={
+    <div class="flex h-full w-full items-center justify-center bg-background p-6">
+      <Switch>
+        <Match when={failure()}>
+          {(message) => (
+            <div class="w-full max-w-sm space-y-4 rounded-xl bg-card p-8 text-center shadow-lg">
+              <h1 class="text-lg font-semibold text-foreground">
+                Couldn't confirm that link
+              </h1>
+              <p class="text-sm text-muted-foreground">{message()}</p>
+              <A
+                href="/sign-in"
+                class="inline-block text-sm font-medium text-primary hover:underline"
+              >
+                Back to sign in
+              </A>
+            </div>
+          )}
+        </Match>
+
+        <Match when={handOff()}>
+          {(handOffPlan) => (
+            <div class="w-full max-w-sm space-y-4 rounded-xl bg-card p-8 text-center shadow-lg">
+              <h1 class="text-lg font-semibold text-foreground">{title()}</h1>
+              <p class="text-sm text-muted-foreground">
+                This link was sent from the Haven app. Open it there to finish.
+              </p>
+              <a
+                href={handOffPlan().appLink}
+                class="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                Open Haven
+              </a>
+              <button
+                type="button"
+                onClick={() => setContinueInBrowser(true)}
+                class="text-sm text-muted-foreground hover:text-foreground hover:underline"
+              >
+                Continue in browser
+              </button>
+            </div>
+          )}
+        </Match>
+
+        <Match when={plan().kind === "confirm"}>
+          <div class="w-full max-w-sm space-y-4 rounded-xl bg-card p-8 text-center shadow-lg">
+            <h1 class="text-lg font-semibold text-foreground">{title()}</h1>
+            <p class="text-sm text-muted-foreground">
+              You asked for this link. Press the button to finish.
+            </p>
+            <Button
+              class="w-full"
+              disabled={busy()}
+              onClick={() => void confirm()}
+            >
+              {busy() ? "Working…" : action()}
+            </Button>
+          </div>
+        </Match>
+
+        <Match when={plan().kind === "working"}>
           <div class="flex flex-col items-center gap-3 text-muted-foreground">
             <div class="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-primary" />
             <p class="text-sm">Confirming…</p>
           </div>
-        }
-      >
-        {(message) => (
-          <div class="w-full max-w-sm space-y-4 rounded-xl bg-card p-8 text-center shadow-lg">
-            <h1 class="text-lg font-semibold text-foreground">
-              Couldn't confirm that link
-            </h1>
-            <p class="text-sm text-muted-foreground">{message()}</p>
-            <A
-              href="/sign-in"
-              class="inline-block text-sm font-medium text-primary hover:underline"
-            >
-              Back to sign in
-            </A>
-          </div>
-        )}
-      </Show>
+        </Match>
+      </Switch>
     </div>
   );
 }

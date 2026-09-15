@@ -3,3 +3,4 @@ export { SignUpScreen } from "./SignUpScreen";
 export { ForgotPasswordScreen } from "./ForgotPasswordScreen";
 export { ResetPasswordScreen } from "./ResetPasswordScreen";
 export { AuthConfirmScreen } from "./AuthConfirmScreen";
+export { planAuthConfirm, type AuthConfirmPlan } from "./authConfirmPlan";

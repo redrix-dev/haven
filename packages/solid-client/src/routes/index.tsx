@@ -331,7 +331,10 @@ export const routes: RouteDefinition[] = [
       { path: "/sign-in", component: SignInScreen },
       { path: "/sign-up", component: SignUpScreen },
       { path: "/forgot-password", component: ForgotPasswordScreen },
+      // The client that asked for the email is named in the path, so the page
+      // knows whether to confirm here or hand the link to an installed app.
       { path: "/auth/confirm", component: AuthConfirmScreen },
+      { path: "/auth/confirm/:client", component: AuthConfirmScreen },
       {
         path: "/",
         component: AppLayout,

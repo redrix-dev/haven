@@ -15,7 +15,12 @@ export type AuthConfirmLinkIntent = Extract<
 export type LinkActionDeps = {
   navigate: (path: string) => void;
   notify: (toast: ToastInput) => void;
-  confirmAuth: (intent: AuthConfirmLinkIntent) => void;
+  /**
+   * Exchange the link without asking. Only a shell the person reached by
+   * pressing a button in their browser provides this (desktop). The web shell
+   * omits it: there the landing page is the button (checklist D2).
+   */
+  confirmAuth?: (intent: AuthConfirmLinkIntent) => void;
   askToSwitchAccount: (
     intent: AuthConfirmLinkIntent,
     signedInUserId: string,
@@ -108,8 +113,10 @@ export function createLinkActionHandler(
         return;
       case "confirm_auth":
         if (ignored(action.intent)) return;
-        deps.navigate("/auth/confirm");
-        deps.confirmAuth(action.intent);
+        // The landing page's own address, client and params intact: it decides
+        // whether to confirm here or hand the link to an installed app.
+        deps.navigate(buildHavenLinkPath(action.intent));
+        deps.confirmAuth?.(action.intent);
         return;
       case "confirm_auth_while_signed_in":
         if (ignored(action.intent)) return;

@@ -35,6 +35,7 @@
     "packages/solid-client/src/data/profile/__tests__",
     "packages/solid-client/src/data/social/__tests__",
     "packages/solid-client/src/data/voice/__tests__",
+    "packages/solid-client/src/features/auth/__tests__",
     "packages/solid-client/src/features/community/settings/__tests__",
     "packages/solid-client/src/features/links/__tests__",
     "packages/solid-client/src/features/voice/__tests__",

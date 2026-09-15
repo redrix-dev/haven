@@ -331,3 +331,16 @@ export function buildHavenLink(
 ): string {
   return `${origin.trim().replace(/\/+$/, "")}${buildHavenLinkPath(intent)}`;
 }
+
+/** The app's private scheme. Transport between a web page and an installed app. */
+export const HAVEN_APP_SCHEME = "haven://";
+
+/**
+ * Build the `haven://…` form of an intent — how a web page hands a link to the
+ * installed app (the auth landing page's "Open Haven" button). Never put one of
+ * these in an email: Supabase renders a custom scheme in a template variable as
+ * `#ZgotmplZ`, and a mail client may not make it clickable.
+ */
+export function buildHavenSchemeLink(intent: BuildableHavenLinkIntent): string {
+  return `${HAVEN_APP_SCHEME}${buildHavenLinkPath(intent).replace(/^\/+/, "")}`;
+}

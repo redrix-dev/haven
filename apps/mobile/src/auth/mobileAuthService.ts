@@ -1,5 +1,5 @@
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
-import { getPlatformAuthConfirmRedirectUrl } from "@shared/infrastructure/platform/urls";
+import { buildHavenLink } from "@shared/features/links";
 import {
   buildSignUpMetadata,
   confirmAuthFromParams,
@@ -9,6 +9,17 @@ import {
 } from "@shared/features/auth/domain";
 
 export type MobileAuthResult = { error: unknown | null };
+
+/**
+ * Auth emails land on the app domain's iOS confirm page, which hands the link
+ * back to this app. An https page rather than `haven://` directly, so a link
+ * opened on a laptop still leads somewhere (checklist D2).
+ */
+const AUTH_CONFIRM_REDIRECT_URL = buildHavenLink({
+  kind: "auth_confirm",
+  client: "ios",
+  params: {},
+});
 
 export const signInWithPassword = async (
   email: string,
@@ -51,7 +62,7 @@ export const signUpWithPassword = async (input: {
     email: input.email,
     password: input.password,
     options: {
-      emailRedirectTo: getPlatformAuthConfirmRedirectUrl(),
+      emailRedirectTo: AUTH_CONFIRM_REDIRECT_URL,
       data: buildSignUpMetadata(input.username),
     },
   });
@@ -85,7 +96,7 @@ export const resendConfirmation = async (
     type: "signup",
     email: trimmed,
     options: {
-      emailRedirectTo: getPlatformAuthConfirmRedirectUrl(),
+      emailRedirectTo: AUTH_CONFIRM_REDIRECT_URL,
     },
   });
   return { error };
@@ -101,7 +112,7 @@ export const requestPasswordReset = async (
   const { error } = await getMobileSupabase().auth.resetPasswordForEmail(
     trimmed,
     {
-      redirectTo: getPlatformAuthConfirmRedirectUrl(),
+      redirectTo: AUTH_CONFIRM_REDIRECT_URL,
     },
   );
   return { error };

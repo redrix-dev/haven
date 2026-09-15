@@ -48,7 +48,11 @@ export function LinkActionHost() {
         navigate: (path) =>
           navigate(path, isWebShell ? { replace: true } : undefined),
         notify: (input) => toast.show(input),
-        confirmAuth: (intent) => void confirmAuthLink(intent.params),
+        // Desktop got here from a button the person already pressed in their
+        // browser, so it exchanges straight away. On web the landing page asks.
+        confirmAuth: isWebShell
+          ? undefined
+          : (intent) => void confirmAuthLink(intent.params),
         askToSwitchAccount: (intent) => setSwitchTarget(intent),
         ignoreAuthLink: isWebShell ? isConsumedBySupabaseOnWeb : undefined,
       }),

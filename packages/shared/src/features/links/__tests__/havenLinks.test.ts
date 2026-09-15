@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildHavenLink,
+  buildHavenSchemeLink,
   HAVEN_APP_ORIGIN,
   parseHavenLink,
   type BuildableHavenLinkIntent,
@@ -322,4 +323,30 @@ describe("buildHavenLink", () => {
       expect(parseHavenLink(buildHavenLink(intent))).toEqual(intent);
     },
   );
+
+  describe("buildHavenSchemeLink", () => {
+    it("hands an auth link to the installed app, client and params intact", () => {
+      expect(
+        buildHavenSchemeLink({
+          kind: "auth_confirm",
+          client: "desktop",
+          params: { token_hash: "th", type: "recovery" },
+        }),
+      ).toBe("haven://auth/confirm/desktop?token_hash=th&type=recovery");
+    });
+
+    it("keeps exactly two slashes after the scheme", () => {
+      expect(buildHavenSchemeLink({ kind: "home" })).toBe("haven://");
+      expect(buildHavenSchemeLink({ kind: "invite", code: "ABCDEF0123" })).toBe(
+        "haven://invite/ABCDEF0123",
+      );
+    });
+
+    it.each(buildable.map((intent) => [intent.kind, intent] as const))(
+      "round-trips %s through parseHavenLink",
+      (_kind, intent) => {
+        expect(parseHavenLink(buildHavenSchemeLink(intent))).toEqual(intent);
+      },
+    );
+  });
 });

@@ -1,4 +1,5 @@
 import { confirmAuthFromParams } from "@shared/features/auth/domain/confirmAuthParams";
+import { buildHavenLink } from "@shared/features/links";
 import {
   buildSignUpMetadata,
   validateLegalAcceptance,
@@ -10,17 +11,23 @@ export type SolidAuthResult = { error: unknown | null };
 const authClient = () => requireHavenSolidCore().backends.client.auth;
 
 /**
- * Where Supabase sends the confirmation/recovery email link. On web it's the
- * live origin's `/auth/confirm` (Supabase's `detectSessionInUrl` consumes the
- * token there); on desktop it's the `haven://auth/confirm` deep link, which the
- * link pipeline hands to `confirmAuthLink`. Both must be allow-listed in the
- * Supabase Auth redirect settings (web prod + preview origins, and `haven://`).
+ * Where Supabase sends the confirmation/recovery email link: always an https
+ * page on the app domain, with the client that asked for it named in the path
+ * (`/auth/confirm/web`, `/auth/confirm/desktop`). The page then confirms in the
+ * browser or hands the link to the installed app — so a desktop link opened on
+ * a phone still works. Web uses its own origin so previews and local dev land
+ * on themselves; desktop has no web origin of its own, so it uses the canonical
+ * one. Every pattern must be allow-listed in the Supabase Auth redirect
+ * settings.
  */
 function authConfirmRedirectUrl(): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   return origin.startsWith("http")
-    ? `${origin}/auth/confirm`
-    : "haven://auth/confirm";
+    ? buildHavenLink(
+        { kind: "auth_confirm", client: "web", params: {} },
+        origin,
+      )
+    : buildHavenLink({ kind: "auth_confirm", client: "desktop", params: {} });
 }
 
 export const signInWithPassword = async (
