@@ -8,10 +8,10 @@ import {
   onMount,
   type JSX,
 } from "solid-js";
-import { Navigate, useNavigate } from "@solidjs/router";
+import { Navigate } from "@solidjs/router";
 import type { RouteDefinition, RouteSectionProps } from "@solidjs/router";
 import { SessionProvider, useSession } from "../contexts/SessionProvider";
-import { parseAuthConfirmUrl } from "@shared/features/auth/domain/authConfirm";
+import { LinkActionHost, UnrecognizedLinkView } from "../features/links";
 import {
   ThemeProvider,
   applyStoredThemeToDocument,
@@ -91,6 +91,8 @@ function MainShell(props: RouteSectionProps) {
           <ToastProvider>
             <VoiceProvider>
               <WindowChrome>{props.children}</WindowChrome>
+              {/* Incoming links, desktop and web: see features/links. */}
+              <LinkActionHost />
             </VoiceProvider>
           </ToastProvider>
         </UpdaterProvider>
@@ -110,30 +112,7 @@ function MainShell(props: RouteSectionProps) {
 function WindowChrome(props: { children: JSX.Element }) {
   const bridge = useBridge();
   const updater = useUpdater();
-  const navigate = useNavigate();
-  const { confirmAuthFromUrl } = useSession();
   const win = bridge.window;
-
-  // Route incoming deep links (haven://…). Native windows only; the web shell
-  // exposes no onDeepLink, so this no-ops in a browser. Auth confirmation /
-  // recovery links are exchanged for a session (web does this via
-  // detectSessionInUrl; desktop must do it here), then land on /auth/confirm.
-  onMount(() => {
-    const subscribe = bridge.onDeepLink;
-    if (!subscribe) return;
-    let dispose: (() => void) | undefined;
-    void subscribe((url) => {
-      if (parseAuthConfirmUrl(url)) {
-        navigate("/auth/confirm");
-        void confirmAuthFromUrl(url);
-      } else {
-        navigate(deepLinkToPath(url));
-      }
-    }).then((d) => {
-      dispose = d;
-    });
-    onCleanup(() => dispose?.());
-  });
 
   if (!win) return <>{props.children}</>;
 
@@ -186,12 +165,6 @@ function WindowChrome(props: { children: JSX.Element }) {
 function PopoutLiteShell(props: RouteSectionProps) {
   applyStoredThemeToDocument();
   return <div class="h-full w-full bg-background">{props.children}</div>;
-}
-
-/** `haven://community/x/channel/y` → `/community/x/channel/y`. */
-function deepLinkToPath(url: string): string {
-  const stripped = url.replace(/^haven:\/\//i, "").replace(/^\/+/, "");
-  return "/" + stripped;
 }
 
 /**
@@ -379,6 +352,8 @@ export const routes: RouteDefinition[] = [
           },
         ],
       },
+      // Any address nothing above handles — a broken link, or one from a newer build.
+      { path: "/*all", component: UnrecognizedLinkView },
     ],
   },
 ];

@@ -154,9 +154,14 @@ export interface HavenBridge {
   voice?: VoiceBridge;
   /**
    * Subscribe to incoming deep links (`haven://…`); resolves with an
-   * unsubscribe fn. Absent in a plain browser, which uses normal URLs.
+   * unsubscribe fn. `source` is `"initial"` for the link that launched the app
+   * and `"event"` for one delivered while running — the link pipeline treats
+   * repeats of each differently. Absent in a plain browser, which uses normal
+   * URLs.
    */
-  onDeepLink?(handler: (url: string) => void): Promise<() => void>;
+  onDeepLink?(
+    handler: (url: string, source: "initial" | "event") => void,
+  ): Promise<() => void>;
 }
 
 const BridgeContext = createContext<HavenBridge>();

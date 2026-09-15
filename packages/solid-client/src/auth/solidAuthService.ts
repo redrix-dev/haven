@@ -1,8 +1,4 @@
-import type { EmailOtpType } from "@supabase/supabase-js";
-import {
-  parseAuthConfirmParams,
-  parseAuthConfirmUrl,
-} from "@shared/features/auth/domain/authConfirm";
+import { confirmAuthFromParams } from "./confirmAuthParams";
 import {
   buildSignUpMetadata,
   validateLegalAcceptance,
@@ -17,7 +13,7 @@ const authClient = () => requireHavenSolidCore().backends.client.auth;
  * Where Supabase sends the confirmation/recovery email link. On web it's the
  * live origin's `/auth/confirm` (Supabase's `detectSessionInUrl` consumes the
  * token there); on desktop it's the `haven://auth/confirm` deep link, which the
- * shell forwards to `confirmAuthFromUrl`. Both must be allow-listed in the
+ * link pipeline hands to `confirmAuthLink`. Both must be allow-listed in the
  * Supabase Auth redirect settings (web prod + preview origins, and `haven://`).
  */
 function authConfirmRedirectUrl(): string {
@@ -79,31 +75,10 @@ export const updateRecoveryPassword = async (
 };
 
 /**
- * Exchange a confirmation/recovery link for a session. Needed on desktop, where
- * `detectSessionInUrl` is off and the link arrives as a `haven://` deep link; on
- * web Supabase already consumes the URL, so this is a no-op fallback there.
+ * Exchange an auth email link's params (from the link pipeline) for a session.
+ * Desktop needs this for every link — `detectSessionInUrl` is off there — and
+ * the logic lives in confirmAuthParams so it can be tested without a core.
  */
-export const confirmAuthFromUrl = async (
-  href: string,
-): Promise<SolidAuthResult> => {
-  const parsed = parseAuthConfirmUrl(href);
-  if (!parsed) return { error: new Error("Invalid confirmation link.") };
-
-  const params = parseAuthConfirmParams(parsed);
-  if (params.error_description || params.error) {
-    return { error: new Error(params.error_description ?? params.error) };
-  }
-  if (params.code) {
-    const { error } = await authClient().exchangeCodeForSession(params.code);
-    return { error };
-  }
-  if (params.token_hash && params.type) {
-    const { error } = await authClient().verifyOtp({
-      type: params.type as EmailOtpType,
-      token_hash: params.token_hash,
-    });
-    return { error };
-  }
-  // Implicit (#access_token) links are handled by detectSessionInUrl on web.
-  return { error: null };
-};
+export const confirmAuthLink = (
+  params: Readonly<Record<string, string | undefined>>,
+): Promise<SolidAuthResult> => confirmAuthFromParams(params, authClient());

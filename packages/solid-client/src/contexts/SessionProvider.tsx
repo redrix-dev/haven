@@ -6,7 +6,7 @@ import type { Session } from "@supabase/supabase-js";
 import type { BootstrapPhaseSnapshot } from "@solid-client/core";
 import {
   SolidAuthResult,
-  confirmAuthFromUrl,
+  confirmAuthLink,
   requestPasswordReset,
   signInWithPassword,
   signOutFromAuth,
@@ -28,7 +28,12 @@ type SessionValue = {
   }) => Promise<SolidAuthResult>;
   requestPasswordReset: (email: string) => Promise<SolidAuthResult>;
   updateRecoveryPassword: (password: string) => Promise<SolidAuthResult>;
-  confirmAuthFromUrl: (href: string) => Promise<SolidAuthResult>;
+  /** Exchange an auth email link's params for a session. */
+  confirmAuthLink: (
+    params: Readonly<Record<string, string>>,
+  ) => Promise<SolidAuthResult>;
+  /** Why the last auth link failed, or null. Read by the confirm screen. */
+  authConfirmError: Accessor<string | null>;
 };
 
 const SessionContext = createContext<SessionValue>();
@@ -83,6 +88,8 @@ export function SessionProvider(props: { children: JSX.Element }) {
     const userId = next?.user?.id ?? null;
     if (userId) applySignIn(userId);
     else applySignOut();
+    // Links wait for the session to be known; signing in opens a remembered one.
+    core.links.setSession(userId);
   };
 
   void supabase.auth.getSession().then(({ data }) => {
@@ -109,6 +116,31 @@ export function SessionProvider(props: { children: JSX.Element }) {
     return result;
   };
 
+  const [authConfirmError, setAuthConfirmError] = createSignal<string | null>(
+    null,
+  );
+  // Desktop exchanges auth links itself. An implicit-flow recovery link goes
+  // through setSession, which reports SIGNED_IN rather than PASSWORD_RECOVERY,
+  // so the recovery gate is raised from the link — before the exchange, so the
+  // app never flashes ahead of the set-new-password screen.
+  const confirmAuthLinkAndTrack = async (
+    params: Readonly<Record<string, string | undefined>>,
+  ): Promise<SolidAuthResult> => {
+    const isRecovery = params.type?.toLowerCase() === "recovery";
+    setAuthConfirmError(null);
+    if (isRecovery) setPasswordRecoveryRequired(true);
+    const result = await confirmAuthLink(params);
+    if (result.error) {
+      if (isRecovery) setPasswordRecoveryRequired(false);
+      setAuthConfirmError(
+        result.error instanceof Error && result.error.message
+          ? result.error.message
+          : "Couldn't confirm that link.",
+      );
+    }
+    return result;
+  };
+
   const value: SessionValue = {
     session,
     phase,
@@ -118,7 +150,8 @@ export function SessionProvider(props: { children: JSX.Element }) {
     signUp: signUpWithPassword,
     requestPasswordReset,
     updateRecoveryPassword: updateRecoveryPasswordAndClear,
-    confirmAuthFromUrl,
+    confirmAuthLink: confirmAuthLinkAndTrack,
+    authConfirmError,
   };
 
   return (

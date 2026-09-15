@@ -288,39 +288,46 @@ const encodeQuery = (entries: ReadonlyArray<readonly [string, string]>) =>
     )
     .join("&");
 
-/** Build the canonical https link for an intent. `parseHavenLink` round-trips it. */
-export function buildHavenLink(
-  intent: BuildableHavenLinkIntent,
-  origin: string = HAVEN_APP_ORIGIN,
-): string {
-  const base = origin.trim().replace(/\/+$/, "");
+/**
+ * The in-app path for an intent — the same address the web app serves and the
+ * Solid router matches. `buildHavenLink` is this path on an origin.
+ */
+export function buildHavenLinkPath(intent: BuildableHavenLinkIntent): string {
   const segment = encodeURIComponent;
 
   switch (intent.kind) {
     case "home":
-      return `${base}/`;
+      return "/";
     case "invite":
-      return `${base}/invite/${segment(intent.code)}`;
+      return `/invite/${segment(intent.code)}`;
     case "community":
-      return `${base}/community/${segment(intent.communityId)}`;
+      return `/community/${segment(intent.communityId)}`;
     case "channel":
-      return `${base}/community/${segment(intent.communityId)}/channel/${segment(intent.channelId)}`;
+      return `/community/${segment(intent.communityId)}/channel/${segment(intent.channelId)}`;
     case "dm":
-      return `${base}/direct-messages/${segment(intent.conversationId)}`;
+      return `/direct-messages/${segment(intent.conversationId)}`;
     case "friends": {
-      if (intent.tab === "friends") return `${base}/friends`;
+      if (intent.tab === "friends") return "/friends";
       const query: Array<[string, string]> = [["tab", "requests"]];
       if (intent.requestId) query.push(["request", intent.requestId]);
-      return `${base}/friends?${encodeQuery(query)}`;
+      return `/friends?${encodeQuery(query)}`;
     }
     case "notifications":
-      return `${base}/notifications`;
+      return "/notifications";
     case "auth_confirm": {
       const path = intent.client
         ? `/auth/confirm/${intent.client}`
         : "/auth/confirm";
       const query = encodeQuery(Object.entries(intent.params));
-      return `${base}${path}${query ? `?${query}` : ""}`;
+      return query ? `${path}?${query}` : path;
     }
   }
+}
+
+/** Build the canonical https link for an intent. `parseHavenLink` round-trips it. */
+export function buildHavenLink(
+  intent: BuildableHavenLinkIntent,
+  origin: string = HAVEN_APP_ORIGIN,
+): string {
+  return `${origin.trim().replace(/\/+$/, "")}${buildHavenLinkPath(intent)}`;
 }

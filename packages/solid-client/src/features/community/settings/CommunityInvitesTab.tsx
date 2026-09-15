@@ -1,5 +1,6 @@
 import { For, Show, createSignal, onMount } from "solid-js";
 import { Check, Copy, Link2, Plus, Trash2 } from "lucide-solid";
+import { buildHavenLink } from "@shared/features/links";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { ConfirmDialog } from "@solid-client/components/ui";
 import { useToast } from "@solid-client/contexts/ToastProvider";
@@ -28,15 +29,13 @@ const MAX_USES_OPTIONS: { label: string; value: number | null }[] = [
 ];
 
 /**
- * Build a shareable invite reference. On the web build this is a real
- * `https://…/invite/<code>` URL (the recipient's browser opens it); on desktop
- * the origin isn't a public URL, so we fall back to the bare code — which the
- * redeem flow accepts directly (normalizeInviteCode). Once the Solid app-host
- * registers a browserRuntime, this can move to getPlatformInviteBaseUrl().
+ * The shareable invite link: always the canonical web URL, whatever shell this
+ * runs in. It opens in any browser, is clickable in any chat app, and the apps
+ * pick it up from there. Building it from `window.location.origin` produced
+ * dead `localhost` links on desktop (RED-57).
  */
 function inviteReference(code: string): string {
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  return origin.startsWith("http") ? `${origin}/invite/${code}` : code;
+  return buildHavenLink({ kind: "invite", code });
 }
 
 function formatExpiry(invite: ServerInvite): string {

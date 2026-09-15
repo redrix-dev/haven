@@ -12,7 +12,7 @@ import { useSession } from "@solid-client/contexts/SessionProvider";
  * app, or to the set-new-password screen via the recovery gate in AppLayout.
  */
 export function AuthConfirmScreen() {
-  const { session, passwordRecoveryRequired } = useSession();
+  const { session, passwordRecoveryRequired, authConfirmError } = useSession();
   const navigate = useNavigate();
   const [timedOut, setTimedOut] = createSignal(false);
 
@@ -27,19 +27,32 @@ export function AuthConfirmScreen() {
     onCleanup(() => clearTimeout(timer));
   });
 
+  // Desktop exchanges the link itself, so a failure is known straight away.
+  // The timeout stays for web, where Supabase consumes the link and only
+  // success is observable.
+  const failure = () =>
+    authConfirmError() ??
+    (timedOut()
+      ? "The link may have expired or already been used. Request a new one from the sign-in screen."
+      : null);
+
   return (
     <div class="flex h-full w-full items-center justify-center bg-background">
       <Show
-        when={!timedOut()}
+        when={failure()}
         fallback={
+          <div class="flex flex-col items-center gap-3 text-muted-foreground">
+            <div class="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-primary" />
+            <p class="text-sm">Confirming…</p>
+          </div>
+        }
+      >
+        {(message) => (
           <div class="w-full max-w-sm space-y-4 rounded-xl bg-card p-8 text-center shadow-lg">
             <h1 class="text-lg font-semibold text-foreground">
               Couldn't confirm that link
             </h1>
-            <p class="text-sm text-muted-foreground">
-              The link may have expired or already been used. Request a new one
-              from the sign-in screen.
-            </p>
+            <p class="text-sm text-muted-foreground">{message()}</p>
             <A
               href="/sign-in"
               class="inline-block text-sm font-medium text-primary hover:underline"
@@ -47,12 +60,7 @@ export function AuthConfirmScreen() {
               Back to sign in
             </A>
           </div>
-        }
-      >
-        <div class="flex flex-col items-center gap-3 text-muted-foreground">
-          <div class="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-primary" />
-          <p class="text-sm">Confirming…</p>
-        </div>
+        )}
       </Show>
     </div>
   );

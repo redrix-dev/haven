@@ -153,18 +153,21 @@ export const tauriBridge: HavenBridge = {
     const { onOpenUrl, getCurrent } =
       await import("@tauri-apps/plugin-deep-link");
     unsubscribers.push(
-      await onOpenUrl((urls) => urls.forEach((url) => handler(url))),
+      await onOpenUrl((urls) => urls.forEach((url) => handler(url, "event"))),
     );
 
     // Windows/Linux (running app): forwarded from the single-instance callback.
     const { listen } = await import("@tauri-apps/api/event");
     unsubscribers.push(
-      await listen<string>("deep-link-url", (event) => handler(event.payload)),
+      await listen<string>("deep-link-url", (event) =>
+        handler(event.payload, "event"),
+      ),
     );
 
-    // Cold start: the app was launched by a deep link.
+    // Cold start: the app was launched by a deep link. getCurrent() keeps
+    // returning it for the life of the process; the link pipeline runs it once.
     const initial = await getCurrent();
-    initial?.forEach((url) => handler(url));
+    initial?.forEach((url) => handler(url, "initial"));
 
     return () => unsubscribers.forEach((unsub) => unsub());
   },

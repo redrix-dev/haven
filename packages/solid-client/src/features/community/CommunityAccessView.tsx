@@ -2,6 +2,7 @@ import { Show, createSignal } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import { LogIn, Plus } from "lucide-solid";
 import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode";
+import { describeInviteRedeemError } from "@shared/features/community/utils/inviteRedeemError";
 import { Button, TextField } from "@solid-client/components/ui";
 import { requireHavenSolidCore } from "@solid-client/core";
 
@@ -46,12 +47,12 @@ export function CommunityAccessView() {
     setJoinError(null);
     setJoining(true);
     try {
+      // An existing member gets `joined: false` back and lands on the
+      // community like anyone else — no error.
       const result = await core.joinCommunityByInvite(code);
       navigate(`/community/${result.communityId}`);
     } catch (error) {
-      setJoinError(
-        error instanceof Error ? error.message : "Couldn't join community.",
-      );
+      setJoinError(describeInviteRedeemError(error));
     } finally {
       setJoining(false);
     }

@@ -11,6 +11,10 @@ import {
 } from "@shared/core/routeRealtimeEvent";
 import type { RealtimeMutationTarget } from "@shared/core/realtimeMutationTarget";
 import {
+  createLinkPipeline,
+  type LinkPipeline,
+} from "@shared/core/linkPipeline";
+import {
   createDefaultViewerMessagePolicyState,
   type ViewerMessagePolicyStore,
   viewerCommunityPolicyEqual,
@@ -131,6 +135,8 @@ export class HavenSolidCore implements RealtimeMutationTarget {
   readonly viewerMessagePolicyStore: ViewerMessagePolicyStore;
   readonly authStore: ReturnType<typeof createSolidAuthSessionStore>;
   readonly uiStore: ReturnType<typeof createSolidUiSessionStore>;
+  /** Every incoming link on desktop and web — see @shared/core/linkPipeline. */
+  readonly links: LinkPipeline;
 
   private readonly phase = new BootstrapPhase();
   private realtimeUnsubscribe: (() => void) | null = null;
@@ -144,6 +150,18 @@ export class HavenSolidCore implements RealtimeMutationTarget {
     this.authStore = createSolidAuthSessionStore();
     this.uiStore = createSolidUiSessionStore();
     this.viewerMessagePolicyStore = createSolidViewerMessagePolicyStore();
+    this.links = createLinkPipeline({
+      persistence: options.persistence,
+      // On web, links on this deployment's own origin (a preview, local dev)
+      // are app links too. Tauri's production origin isn't http(s).
+      parse: {
+        appOrigins:
+          typeof window !== "undefined" &&
+          /^https?:$/.test(window.location.protocol)
+            ? [window.location.origin]
+            : [],
+      },
+    });
 
     this.communities = createCommunitySolidNexus(
       options.persistence,
