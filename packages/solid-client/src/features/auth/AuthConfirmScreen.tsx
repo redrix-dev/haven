@@ -26,12 +26,7 @@ import { planAuthConfirm } from "./authConfirmPlan";
  * in AppLayout).
  */
 export function AuthConfirmScreen() {
-  const {
-    session,
-    passwordRecoveryRequired,
-    authConfirmError,
-    confirmAuthLink,
-  } = useSession();
+  const { session, authConfirmError, confirmAuthLink } = useSession();
   const bridge = useBridge();
   const navigate = useNavigate();
 
@@ -77,10 +72,13 @@ export function AuthConfirmScreen() {
     window.location.assign(current.appLink);
   });
 
+  // Leave only once the session exists. The recovery gate is raised *before*
+  // the exchange, so leaving on it alone reached AppLayout with no session yet,
+  // which redirected to /sign-in and stranded the recovery session there. With
+  // the session in hand, AppLayout shows ResetPasswordScreen from the gate; if
+  // the exchange fails, staying here shows why.
   createEffect(() => {
-    if (passwordRecoveryRequired() || session()) {
-      navigate("/", { replace: true });
-    }
+    if (session()) navigate("/", { replace: true });
   });
 
   onMount(() => {
