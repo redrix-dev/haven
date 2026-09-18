@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount } from "solid-js";
+import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { ConfirmDialog } from "@solid-client/components/ui";
 import { requireHavenSolidCore } from "@solid-client/core";
@@ -8,9 +8,10 @@ import { useToast } from "@solid-client/contexts/ToastProvider";
 import {
   createLinkActionHandler,
   isConsumedBySupabaseOnWeb,
-  linkFromPageUrl,
   type AuthConfirmLinkIntent,
 } from "./linkActions";
+import { OpenInAppHandOff } from "./OpenInAppHandOff";
+import { planWebLinkHandOff, type WebLinkHandOff } from "./webLinkHandOff";
 
 /**
  * Connects the shared link pipeline (`core.links`) to this app and carries out
@@ -18,11 +19,13 @@ import {
  *
  * - Desktop: native deep links arrive through `bridge.onDeepLink`.
  * - Web: there is no `onDeepLink`; the page URL the app loaded with is the
- *   link, if it is one (`linkFromPageUrl`). Auth links Supabase's
+ *   link, if it is one (`linkFromPageUrl`). On a computer a destination link
+ *   is offered to the installed app first (`OpenInAppHandOff`) and reaches
+ *   the pipeline only on "Continue in browser". Auth links Supabase's
  *   `detectSessionInUrl` already consumes are left to it.
  *
  * Mount once, inside the router and every provider it uses. It renders only
- * the "already signed in" confirmation.
+ * the app hand-off and the "already signed in" confirmation.
  */
 export function LinkActionHost() {
   const core = requireHavenSolidCore();
@@ -39,6 +42,13 @@ export function LinkActionHost() {
   const [switchTarget, setSwitchTarget] =
     createSignal<AuthConfirmLinkIntent | null>(null);
   const [switching, setSwitching] = createSignal(false);
+  const [handOff, setHandOff] = createSignal<WebLinkHandOff | null>(null);
+
+  const continueInBrowser = () => {
+    const pending = handOff();
+    setHandOff(null);
+    if (pending) core.links.receive(pending.link, "initial");
+  };
 
   onMount(() => {
     core.links.setHandler(
@@ -61,8 +71,12 @@ export function LinkActionHost() {
 
     const subscribe = bridge.onDeepLink;
     if (!subscribe) {
-      const link = linkFromPageUrl(initialHref, window.location.origin);
-      if (link) core.links.receive(link, "initial");
+      const plan = planWebLinkHandOff(initialHref, window.location.origin, {
+        userAgent: navigator.userAgent,
+        maxTouchPoints: navigator.maxTouchPoints,
+      });
+      if (plan?.appLink) setHandOff(plan);
+      else if (plan) core.links.receive(plan.link, "initial");
       return;
     }
 
@@ -95,16 +109,26 @@ export function LinkActionHost() {
   };
 
   return (
-    <ConfirmDialog
-      open={switchTarget() !== null}
-      title="You're already signed in"
-      description={`You're signed in as ${
-        session()?.user.email ?? "another account"
-      }. Sign out and continue with this link?`}
-      confirmLabel="Sign out and continue"
-      pending={switching()}
-      onConfirm={() => void switchAccount()}
-      onCancel={() => setSwitchTarget(null)}
-    />
+    <>
+      <Show when={handOff()?.appLink}>
+        {(appLink) => (
+          <OpenInAppHandOff
+            appLink={appLink()}
+            onContinueInBrowser={continueInBrowser}
+          />
+        )}
+      </Show>
+      <ConfirmDialog
+        open={switchTarget() !== null}
+        title="You're already signed in"
+        description={`You're signed in as ${
+          session()?.user.email ?? "another account"
+        }. Sign out and continue with this link?`}
+        confirmLabel="Sign out and continue"
+        pending={switching()}
+        onConfirm={() => void switchAccount()}
+        onCancel={() => setSwitchTarget(null)}
+      />
+    </>
   );
 }

@@ -6,6 +6,7 @@ A feature release on top of 2.0.2. Links and sign-in emails now work the same wa
 
 - **One kind of link for everything** — invites, communities, channels, DMs, and notifications all use `https://haven.redrixx.com/…` links that work in any app you paste them into. Invite links copied from desktop now work everywhere; previously they could point at a local address.
 - **Signed out? The link waits.** Open an invite while signed out and Haven remembers it; after you sign in or finish signing up, it opens the invite — pre-filled, never joined automatically. Remembered links expire after 7 days.
+- **Links open in the app first.** Open a Haven link in a browser on your computer and it offers to open the desktop app, signed in or not — tick "Always allow" in the browser's prompt to skip the question next time, or continue in the browser instead.
 - **Links Haven can't open say so**, instead of showing a blank screen.
 
 ### Sign-up and password emails
