@@ -1,5 +1,6 @@
 import { createSignal, onCleanup, createContext, useContext } from "solid-js";
 import { requireHavenSolidCore } from "@solid-client/core";
+import { useBridge } from "@solid-client/contexts/BridgeProvider";
 import type { JSX } from "solid-js";
 import type { Accessor } from "solid-js";
 import type { Session } from "@supabase/supabase-js";
@@ -41,6 +42,9 @@ const SessionContext = createContext<SessionValue>();
 export function SessionProvider(props: { children: JSX.Element }) {
   const core = requireHavenSolidCore();
   const supabase = core.backends.client;
+  // Auth emails name the client that asked; the desktop shell is the one with a
+  // deep-link bridge (the page origin can't tell — see authConfirmRedirect.ts).
+  const emailClient = useBridge().onDeepLink ? "desktop" : "web";
 
   const [session, setSession] = createSignal<Session | null | undefined>(
     undefined,
@@ -147,8 +151,8 @@ export function SessionProvider(props: { children: JSX.Element }) {
     passwordRecoveryRequired,
     signIn,
     signOut,
-    signUp: signUpWithPassword,
-    requestPasswordReset,
+    signUp: (input) => signUpWithPassword(input, emailClient),
+    requestPasswordReset: (email) => requestPasswordReset(email, emailClient),
     updateRecoveryPassword: updateRecoveryPasswordAndClear,
     confirmAuthLink: confirmAuthLinkAndTrack,
     authConfirmError,
