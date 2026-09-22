@@ -16,11 +16,19 @@
 //! the API secret never touches the client.
 
 use std::process::Stdio;
+use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, State};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::Mutex;
+
+/// The sidecar's `Command::Leave` on the wire. Commands are tagged JSON
+/// (protocol.rs); a bare `leave` is rejected as a bad command.
+const LEAVE_LINE: &[u8] = b"{\"type\":\"leave\"}\n";
+
+/// How long a leaving sidecar gets to close the room before it's killed.
+const LEAVE_GRACE: Duration = Duration::from_secs(2);
 
 #[derive(Default)]
 pub struct VoiceState(Mutex<Option<VoiceProc>>);
@@ -28,6 +36,20 @@ pub struct VoiceState(Mutex<Option<VoiceProc>>);
 struct VoiceProc {
     child: Child,
     stdin: ChildStdin,
+}
+
+/// Stop a sidecar: ask it to leave, give it a moment to close the room (so the
+/// other participants see us go at once rather than after LiveKit's timeout),
+/// then kill it if it's still running.
+async fn stop(mut proc: VoiceProc) {
+    let _ = proc.stdin.write_all(LEAVE_LINE).await;
+    let _ = proc.stdin.flush().await;
+    if tokio::time::timeout(LEAVE_GRACE, proc.child.wait())
+        .await
+        .is_err()
+    {
+        let _ = proc.child.kill().await;
+    }
 }
 
 /// Resolve the haven-voice binary, in priority order:
@@ -42,7 +64,11 @@ fn voice_bin() -> std::path::PathBuf {
     if let Ok(p) = std::env::var("HAVEN_VOICE_BIN") {
         return std::path::PathBuf::from(p);
     }
-    let exe_name = if cfg!(windows) { "haven-voice.exe" } else { "haven-voice" };
+    let exe_name = if cfg!(windows) {
+        "haven-voice.exe"
+    } else {
+        "haven-voice"
+    };
     if let Ok(exe) = std::env::current_exe() {
         // 2. Bundled sidecar: sits directly beside the app executable.
         if let Some(dir) = exe.parent() {
@@ -80,9 +106,8 @@ pub async fn voice_join(
 ) -> Result<(), String> {
     let mut guard = state.0.lock().await;
     // Tear down any existing session first.
-    if let Some(mut prev) = guard.take() {
-        let _ = prev.stdin.write_all(b"leave\n").await;
-        let _ = prev.child.kill().await;
+    if let Some(prev) = guard.take() {
+        stop(prev).await;
     }
 
     let mut child = Command::new(voice_bin())
@@ -137,10 +162,8 @@ pub async fn voice_send_command(
 #[tauri::command]
 pub async fn voice_leave(state: State<'_, VoiceState>) -> Result<(), String> {
     let mut guard = state.0.lock().await;
-    if let Some(mut proc) = guard.take() {
-        let _ = proc.stdin.write_all(b"leave\n").await;
-        let _ = proc.stdin.flush().await;
-        let _ = proc.child.kill().await;
+    if let Some(proc) = guard.take() {
+        stop(proc).await;
     }
     Ok(())
 }

@@ -10,6 +10,12 @@ import notificationUrl from "@shared/assets/audio/notifications/haven-notificati
  * stub (empty on web), and the solid tsconfig doesn't currently resolve
  * `@platform`. This is a focused web player over the recovered assets; folding
  * it into the shared settings policy (volume / enabled / focus) is a follow-up.
+ *
+ * Known gap: on Linux (WebKitGTK) an `<audio>` element's play() never settles —
+ * from the tauri:// asset URL or from a Blob alike — so these are silent there.
+ * Web Audio (fetch + decodeAudioData + a buffer source) does play on that
+ * engine; that's the fix if the Linux desktop build is ever shipped again (it
+ * isn't as of 2.1.0 — see docs/architecture/NATIVE_VOICE.md).
  */
 
 let lastPlayedAt = 0;
@@ -22,11 +28,14 @@ const play = (url: string, volume = 0.5): void => {
   try {
     const audio = new Audio(url);
     audio.volume = volume;
-    void audio.play().catch(() => {
-      // Autoplay can be blocked before the first user gesture; best-effort.
+    // Best-effort — a sound must never break the voice flow. Logged rather
+    // than swallowed: silent failures are how the Linux gap above went unseen.
+    void audio.play().catch((err: unknown) => {
+      // Autoplay can also be blocked before the first user gesture.
+      console.warn("[sounds] playback failed", url, err);
     });
-  } catch {
-    // best-effort — never let a sound break the voice flow
+  } catch (err) {
+    console.warn("[sounds] couldn't start playback", url, err);
   }
 };
 
