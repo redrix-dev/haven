@@ -26,12 +26,7 @@ import { planAuthConfirm } from "./authConfirmPlan";
  * in AppLayout).
  */
 export function AuthConfirmScreen() {
-  const {
-    session,
-    passwordRecoveryRequired,
-    authConfirmError,
-    confirmAuthLink,
-  } = useSession();
+  const { session, authConfirmError, confirmAuthLink } = useSession();
   const bridge = useBridge();
   const navigate = useNavigate();
 
@@ -65,10 +60,25 @@ export function AuthConfirmScreen() {
     return current.kind === "open_app" ? current : null;
   });
 
+  // Ask the browser to open the app once, as the invite hand-off does; the
+  // button below stays for browsers that block a launch nobody clicked. Only
+  // the app spends the token, so the browser's prompt is still the click
+  // scanners can't make (checklist D2).
+  let launched = false;
   createEffect(() => {
-    if (passwordRecoveryRequired() || session()) {
-      navigate("/", { replace: true });
-    }
+    const current = handOff();
+    if (!current || launched) return;
+    launched = true;
+    window.location.assign(current.appLink);
+  });
+
+  // Leave only once the session exists. The recovery gate is raised *before*
+  // the exchange, so leaving on it alone reached AppLayout with no session yet,
+  // which redirected to /sign-in and stranded the recovery session there. With
+  // the session in hand, AppLayout shows ResetPasswordScreen from the gate; if
+  // the exchange fails, staying here shows why.
+  createEffect(() => {
+    if (session()) navigate("/", { replace: true });
   });
 
   onMount(() => {
@@ -126,7 +136,9 @@ export function AuthConfirmScreen() {
             <div class="w-full max-w-sm space-y-4 rounded-xl bg-card p-8 text-center shadow-lg">
               <h1 class="text-lg font-semibold text-foreground">{title()}</h1>
               <p class="text-sm text-muted-foreground">
-                This link was sent from the Haven app. Open it there to finish.
+                This link was sent from the Haven app. Open it there to finish —
+                tick “Always allow” in your browser's prompt to skip this step
+                next time.
               </p>
               <a
                 href={handOffPlan().appLink}

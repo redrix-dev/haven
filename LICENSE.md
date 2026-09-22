@@ -1,40 +1,21 @@
-Business Source License 1.1
+MIT License
 
-Licensor: Cody Magnuson / Redrixx
-Licensed Work: Haven
-The Licensed Work is (c) 2025-2026 Cody Magnuson / Redrixx
+Copyright (c) 2025-2026 Cody Magnuson / Redrixx
 
-Additional Use Grant:
-The following uses are permitted free of charge:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-- Viewing and inspecting the source code
-- Contributing to the project via pull requests
-- Personal and development use
-- Using Haven as intended through the managed platform at haven.redrixx.com
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-The following are NOT permitted without a commercial license:
-
-- Operating a competing hosted platform or service using this software
-- Sublicensing, reselling, or redistributing the software
-- Using this software to offer community hosting services to third parties
-
-Change Date: To be determined
-Change License: To be determined
-
-For commercial licensing inquiries: legal@redrixx.com
-
----
-
-Parameters
-
-Licensor: Cody Magnuson / Redrixx
-Licensed Work: Haven
-Additional Use Grant: See above
-Change Date: 2030-01-01
-Change License: MIT
-
-Notice
-
-The Business Source License (this document) is not an Open Source license.
-Haven is source-available software. For more information on the BSL, visit
-https://mariadb.com/bsl11/
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

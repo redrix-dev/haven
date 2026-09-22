@@ -8,6 +8,8 @@ description: Use when changing the Haven Tauri desktop shell, apps/tauri bootstr
 ## Read Before Editing
 
 - [docs/architecture/SOLID_CLIENT_SHAPE.md](../../../docs/architecture/SOLID_CLIENT_SHAPE.md)
+- [docs/architecture/LINKS.md](../../../docs/architecture/LINKS.md) for deep
+  links, auth email hand-off, or anything `haven://`
 - [docs/architecture/NATIVE_VOICE.md](../../../docs/architecture/NATIVE_VOICE.md) for
   voice or popout work
 - [apps/tauri/src/bridge.ts](../../../apps/tauri/src/bridge.ts)
@@ -57,12 +59,15 @@ change.
 
 ## Deep Links And Single Instance
 
+Read [docs/architecture/LINKS.md](../../../docs/architecture/LINKS.md) before
+changing anything about links — it owns the link model, the pipeline, auth email
+hand-off, and the scheme-ownership traps. The shell's part only:
+
 - `tauri-plugin-single-instance` must stay first in the builder chain.
-- Windows/Linux second launches forward `haven://` args through the
-  `deep-link-url` event.
-- macOS/plugin delivery uses `onOpenUrl`.
-- Cold start links are read through `getCurrent()`.
-- Keep all three paths when touching deep links.
+- Keep all three delivery paths: `deep-link-url` (Windows/Linux second launch),
+  `onOpenUrl` (macOS), `getCurrent()` (cold start).
+- The shell delivers raw URLs to `core.links` and nothing else — it never parses
+  a link or decides where it goes.
 
 ## Popout Windows
 

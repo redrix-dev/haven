@@ -75,10 +75,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Linux is not shipped as of 2.1.0: the AppImage needs its own
+          # GStreamer/packaging care and the native voice sidecar to stay
+          # current, for no users. The code is kept and documented — see
+          # docs/architecture/NATIVE_VOICE.md — so the platform can come back
+          # by restoring an `ubuntu-22.04` entry here plus its two steps
+          # (apt deps incl. patchelf + gstreamer plugins, sidecar staging).
           - platform: macos-latest
             args: "--target universal-apple-darwin"
-          - platform: ubuntu-22.04
-            args: ""
           - platform: windows-latest
             args: ""
     runs-on: ${{ matrix.platform }}
@@ -109,26 +113,8 @@ jobs:
             ./apps/tauri/src-tauri -> target
             ./apps/tauri/haven-voice -> target
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libasound2-dev
-
       - name: Install JS dependencies
         run: npm ci
-
-      # Build + stage the native voice sidecar so tauri-action bundles it as an
-      # externalBin (declared Linux-only in tauri.linux.conf.json). Linux is the
-      # only platform that ships the sidecar today; mac/win keep in-webview voice.
-      - name: Build native voice sidecar (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: node tooling/scripts/stage-haven-voice-sidecar.mjs
 
       # Write the App Store Connect API key (.p8) to the standard notarytool
       # search path so tauri-action's notarization step finds it automatically.

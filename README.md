@@ -6,7 +6,7 @@
 [![Stack](https://img.shields.io/badge/TypeScript-Solid%20·%20Tauri%20·%20React%20Native-3178c6)](#stack)
 [![Backend](https://img.shields.io/badge/backend-Supabase%20·%20LiveKit-3ecf8e)](#stack)
 [![CI](https://github.com/redrix-dev/haven/actions/workflows/ci.yml/badge.svg)](https://github.com/redrix-dev/haven/actions/workflows/ci.yml)
-[![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-orange)](./LICENSE.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE.md)
 
 Haven is a real-time community chat platform across desktop, web, and iOS. It exists because community chat stopped feeling like it was built for communities — and proving that it could be done differently was worth the effort.
 
@@ -37,7 +37,9 @@ Haven gives streamers and their communities a space that works the way they'd ex
 
 ## Platforms
 
-**iOS** is in active TestFlight distribution. **Desktop and web** are rebuilt on Tauri + Solid at their `2.0.0` release — the previous Electron/React clients shipped to production, proved the product, and were retired in favor of a lighter shell and a faster renderer. All three clients run against the same shared core and backend.
+**iOS** is distributed through TestFlight. **Desktop (Windows and macOS) and web** are rebuilt on Tauri + Solid, currently at `2.1.0` — the previous Electron/React clients shipped to production, proved the product, and were retired in favor of a lighter shell and a faster renderer. All three clients run against the same shared core and backend.
+
+A Linux desktop build exists in the repo but is not shipped as of 2.1.0: packaging it carries upkeep of its own (a native voice sidecar, because WebKitGTK has no WebRTC, and GStreamer bundling) that no current user needs. [NATIVE_VOICE.md](docs/architecture/NATIVE_VOICE.md) documents what it takes to bring it back.
 
 The iOS client runs on a custom OTA update pipeline built on top of Expo Updates — asset hashing, bundle generation, and manifest serving are handled by a local toolchain that publishes to a Supabase-backed Edge Function. This replaces EAS Update entirely and keeps the update infrastructure under the same roof as the rest of the backend. Everything outside of voice works on mobile: DMs, reports, modmail, push notifications, community creation, invites, friends, media upload, and full rich text composition and rendering via [`react-native-enriched-markdown`](https://github.com/software-mansion-labs/react-native-enriched-markdown).
 
@@ -69,7 +71,7 @@ Business logic, types, and domain state live in `packages/shared` and are platfo
 
 | Layer             | Technology                                                                  |
 | ----------------- | --------------------------------------------------------------------------- |
-| Desktop & Web     | Tauri + Solid (`2.0.0`; previous Electron/React clients retired)            |
+| Desktop & Web     | Tauri + Solid (`2.1.0`; previous Electron/React clients retired)            |
 | iOS               | React Native + Expo (dev client, TestFlight)                                |
 | Language          | TypeScript                                                                  |
 | UI                | Solid (desktop/web), UniWind + RN primitives (iOS)                          |
@@ -132,12 +134,16 @@ npm run test:report    # Human-readable proof report with full logs
 
 ## Status
 
-Haven is in active production use on iOS. The desktop and web clients have been rebuilt on Tauri + Solid (`2.0.0`) against the same shared core; the previous Electron and React web clients shipped to production and were retired in June 2026.
+**Haven works and is parked.** `2.1.0` is a deliberate stopping point: the iOS client is on TestFlight, the desktop and web clients are rebuilt on Tauri + Solid against the same shared core, and the previous Electron and React web clients were retired in June 2026.
+
+There is no active user base. Haven was built for a small group of friends who have since moved on, and it is maintained by one person in the open, in bursts, rather than continuously. That shapes what you should expect: the code, tests, and docs are kept honest and current, but issues and pull requests may sit for a while, and features arrive when there is a reason to build them.
+
+If you want to run it, the [documentation](docs/README.md) is written to be enough to stand it up against your own Supabase project.
 
 ---
 
 ## License
 
-Haven is source-available under the [Business Source License 1.1](./LICENSE.md). The source is inspectable but commercial use, competing platforms, and hosted clones require a separate license.
+Haven is open source under the [MIT License](./LICENSE.md) — use it, fork it, build on it. It was previously source-available under BSL 1.1, whose change license was already MIT; that switch was simply made early.
 
-Change Date: 2030-01-01 · Change License: MIT · Inquiries: legal@redrixx.com
+Inquiries: legal@redrixx.com

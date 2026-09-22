@@ -1,5 +1,34 @@
 # Native voice (Linux) — the sidecar, its seam, and the WebRTC pin
 
+> **Status: kept, not shipped (since 2.1.0).** The Linux desktop build was
+> dropped from the release pipeline — packaging an AppImage carries its own
+> upkeep (below) and Haven has no Linux users to carry it for. Nothing here was
+> deleted: the sidecar, its seam, and `tauri.linux.conf.json` all still build,
+> and everything in this doc still applies to a local build. To ship Linux
+> again, restore the `ubuntu-22.04` matrix entry in
+> `.github/workflows/release-desktop.yml` plus its two steps (apt deps
+> including `patchelf`, and `node tooling/scripts/stage-haven-voice-sidecar.mjs`).
+>
+> **Two things to know before you do**, both found the hard way on 2026-09-18:
+>
+> - **The AppImage must bundle GStreamer** (`bundle.linux.appimage.bundleMediaFramework`,
+>   already set in `tauri.linux.conf.json`). Without it the AppImage ships
+>   libgstreamer with no plugins; the first sound WebKit plays finds no
+>   `appsink`/`autoaudiosink`, and its web process hangs — the whole window
+>   freezes on voice join, looking exactly like a voice bug. It isn't one: the
+>   sidecar keeps streaming throughout. Bundling needs `patchelf` on the build
+>   host and adds ~70MB.
+> - **Sounds are silent on WebKitGTK.** An `<audio>` element's `play()` never
+>   settles there, from the `tauri://` asset URL or from a Blob alike. Web Audio
+>   (`fetch` → `decodeAudioData` → buffer source) does play; that's the fix for
+>   `packages/solid-client/src/audio/sounds.ts`, which deliberately still uses
+>   `<audio>` for the platforms Haven actually ships.
+>
+> On Arch specifically, local AppImage builds also need `NO_STRIP=true`
+> (linuxdeploy's bundled `strip` can't read `.relr.dyn`) and
+> `GSTREAMER_HELPERS_DIR=/usr/lib/gstreamer-1.0` (its default is the Debian
+> path).
+
 Maintained alongside [SOLID_CLIENT_SHAPE.md](./SOLID_CLIENT_SHAPE.md). Voice on
 desktop normally runs in-webview via `livekit-client`. **Linux can't** —
 WebKitGTK ships no WebRTC — so on Linux we run a native Rust sidecar
