@@ -34,7 +34,6 @@ A feature release on top of 2.0.2. Links and sign-in emails now work the same wa
 
 ### Voice
 
-- **Native voice on Linux** — voice now runs through a bundled native audio component on Linux, with echo cancellation, device selection, and volume control, instead of relying on the system webview's WebRTC support.
 - Voice presence in the sidebar stays in a stable order, and speaking indicators update correctly.
 
 ### Install
@@ -43,9 +42,11 @@ Download the installer for your platform below.
 
 - **Windows** — `Haven_2.1.0_x64-setup.exe`
 - **macOS** — `Haven_2.1.0_universal.dmg` (Apple Silicon + Intel)
-- **Linux** — `.AppImage`, `.deb`, or `.rpm`
 
 Existing installs on 2.0.x will update automatically.
+
+Linux builds are paused from this release on. The work is kept in the repo and
+can come back; see `docs/architecture/NATIVE_VOICE.md`.
 
 ### Known issues
 

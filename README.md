@@ -37,7 +37,9 @@ Haven gives streamers and their communities a space that works the way they'd ex
 
 ## Platforms
 
-**iOS** is in active TestFlight distribution. **Desktop and web** are rebuilt on Tauri + Solid at their `2.0.0` release — the previous Electron/React clients shipped to production, proved the product, and were retired in favor of a lighter shell and a faster renderer. All three clients run against the same shared core and backend.
+**iOS** is in active TestFlight distribution. **Desktop (Windows and macOS) and web** are rebuilt on Tauri + Solid — the previous Electron/React clients shipped to production, proved the product, and were retired in favor of a lighter shell and a faster renderer. All three clients run against the same shared core and backend.
+
+A Linux desktop build exists in the repo but is not shipped as of 2.1.0: packaging it carries upkeep of its own (a native voice sidecar, because WebKitGTK has no WebRTC, and GStreamer bundling) that no current user needs. [NATIVE_VOICE.md](docs/architecture/NATIVE_VOICE.md) documents what it takes to bring it back.
 
 The iOS client runs on a custom OTA update pipeline built on top of Expo Updates — asset hashing, bundle generation, and manifest serving are handled by a local toolchain that publishes to a Supabase-backed Edge Function. This replaces EAS Update entirely and keeps the update infrastructure under the same roof as the rest of the backend. Everything outside of voice works on mobile: DMs, reports, modmail, push notifications, community creation, invites, friends, media upload, and full rich text composition and rendering via [`react-native-enriched-markdown`](https://github.com/software-mansion-labs/react-native-enriched-markdown).
 
