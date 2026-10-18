@@ -58,7 +58,8 @@ This file is the quick index. Load the relevant project skill under
 ## Guardrails That Matter
 
 - `npm run test:cleave` is the fast merge floor: lint, shared portability,
-  typecheck, mobile typecheck, mobile bundle smoke, and unit tests.
+  typecheck, mobile typecheck, mobile bundle smoke, unit tests, and the Tier-2
+  render settle tests.
 - `npm run test:ci` adds `test:db` and `test:backend`; use it for DB/shared
   behavior changes.
 - `npm run mobile:release:check` gates mobile release work.

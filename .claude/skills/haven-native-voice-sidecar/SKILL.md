@@ -72,5 +72,6 @@ unreleased `libwebrtc` set.
   host code changes
 - `npm run typecheck:solid` when TypeScript bridge/provider code changes
 
-Manual release confidence for Linux voice still requires connect, mute, deafen,
-device switch, per-member volume, and speaking tests with a second participant.
+Linux is not shipped today. Before shipping it again, manual confidence for
+Linux voice requires connect, mute, deafen, device switch, per-member volume,
+and speaking tests with a second participant.

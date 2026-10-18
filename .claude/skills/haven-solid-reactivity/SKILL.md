@@ -81,13 +81,12 @@ Defended, copy these:
 
 - [DirectMessagesView.tsx](../../../packages/solid-client/src/features/direct-messages/DirectMessagesView.tsx) — the `86a20e0` fix
 - [CommunityOverviewTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityOverviewTab.tsx) — reads props, then `untrack(() => load(id))`
-- [CommunityChannelsTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityChannelsTab.tsx) — was known-naked; defended + locked under RED-50
+- [CommunityChannelsTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityChannelsTab.tsx) — defended, with a settle test that locks it
 - [ProfileSettings.tsx](../../../packages/solid-client/src/features/settings/ProfileSettings.tsx) — `untrack(() => void load(id))` around four `ensure*` calls
 
 ### A settling effect is not a defended one
 
-Measured under RED-50: every naked effect on the settings surfaces **already
-settled**, because `inflight` maps in the nexus swallowed the retrigger. They
+Measured on the settings surfaces: every naked effect **already settled**, because `inflight` maps in the nexus swallowed the retrigger. They
 cost one extra effect run and one extra render, not a runaway loop.
 
 So "it doesn't strobe" proves nothing. The defense was an implementation detail
