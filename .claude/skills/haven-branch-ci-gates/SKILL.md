@@ -70,7 +70,8 @@ description: Use when starting, scoping, testing, finishing, or handing off any 
 
 ## CI Shape
 
-- `fast` runs lint, shared portability, typecheck, and unit tests.
+- `fast` runs lockfile discipline, format check, lint, shared portability,
+  typecheck, and unit tests.
 - `mobile` runs ownership, preflight, Expo config, mobile typecheck, and bundle
   smoke.
 - `integration` runs only when DB/shared/test harness inputs changed.
