@@ -1,3 +1,36 @@
+/**
+ * Community data backend — the single implementation of the
+ * `CommunityDataBackend` interface (see communityDataBackend.interface.ts).
+ * Behavior is pinned by communityDataBackend.*.contract.test.ts.
+ *
+ * SHAPE: a band of mostly-pure helpers (top of file) followed by one large
+ * object, `centralCommunityDataBackend`, with ~50 methods. Most methods are
+ * thin wrappers (run a Supabase query/RPC, map rows, return); only a few
+ * orchestrate: fetchChannelPermissions, deleteMessage (storage cleanup),
+ * reportMessage, and the support-report snapshot builder.
+ *
+ * LIFECYCLE: inert until a host calls configureCommunityDataBackendRuntime()
+ * at boot to inject the Supabase client, edge config, media helpers and object
+ * store. The havenCommunity*() guard accessors throw if used before that.
+ *
+ * MAP (top -> bottom):
+ *   1. Runtime wiring & dependency injection
+ *   2. Message-media storage helpers
+ *   3. Raw row types & untyped-JSON coercers
+ *   4. Support-report snapshot builders (reply-thread reconstruction)
+ *   5. Edge-function caller & session readiness
+ *   6. RPC row parsers (trust boundary) & signed-URL enrichment
+ *   7. centralCommunityDataBackend — methods grouped by concern
+ *
+ * GOTCHAS:
+ *   - Supabase embedded relations arrive as object OR one-element array; code
+ *     guards both (CommunityMemberWithProfile / Array.isArray checks).
+ *   - Report-snapshot context paging uses a (created_at, id) keyset tiebreaker;
+ *     do not reduce it to created_at alone.
+ *   - Signed-URL TTLs are load-bearing: attachments 1h, preview thumbnails 30m.
+ *   - Storage blobs must be deleted via the Storage API before the row; blob
+ *     cleanup is best-effort (never orphans a row, tolerates an orphan blob).
+ */
 import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 import type { Database } from "@shared/types/database";
 import type { MessageObjectStore } from "./messageObjectStore";
@@ -69,6 +102,11 @@ type CommunityMemberWithProfile = Pick<
     | null;
 };
 
+// ============================================================================
+// 1. Runtime wiring & dependency injection
+//    Injected once at host boot via configureCommunityDataBackendRuntime();
+//    the havenCommunity*() accessors below fail fast if called before that.
+// ============================================================================
 let havenCommunityClient: HavenSupabaseClient | null = null;
 let havenCommunityEdgeConfig: {
   supabaseUrl: string;
@@ -112,6 +150,10 @@ function havenCommunityStore(): MessageObjectStore {
   return havenCommunityObjectStore;
 }
 
+// ============================================================================
+// 2. Message-media storage helpers
+//    Pure: derive media kind, storage extension and object path for uploads.
+// ============================================================================
 const MESSAGE_MEDIA_BUCKET = "message-media";
 const LINK_PREVIEW_IMAGE_BUCKET = "link-preview-images";
 
@@ -164,6 +206,11 @@ const buildMessageMediaObjectPath = (input: {
   return `${input.communityId}/${input.channelId}/${stamp}-${random}${ext}`;
 };
 
+// ============================================================================
+// 3. Raw row types & untyped-JSON coercers
+//    Shapes for table/RPC rows, plus asObjectRecord/asOptionalString/etc. and
+//    the link-preview snapshot normalizer. Start of the JSON trust boundary.
+// ============================================================================
 type MessageReactionRow = {
   id: string;
   message_id: string;
@@ -308,6 +355,13 @@ const normalizeLinkPreviewSnapshot = (
   };
 };
 
+// ============================================================================
+// 4. Support-report snapshot builders
+//    Capture moderation evidence for a reported message: the author profile
+//    plus surrounding context. Reply chains are rebuilt by walking up to the
+//    thread root then down through replies; non-replies page +/-5 messages with
+//    a (created_at, id) keyset tiebreaker. The most intricate code in the file.
+// ============================================================================
 const getReplyToMessageId = (
   message: Pick<Message, "metadata">,
 ): string | null => {
@@ -528,6 +582,12 @@ const fetchSupportReportMessageSnapshot = async (input: {
   };
 };
 
+// ============================================================================
+// 5. Edge-function caller & session readiness
+//    supabaseFunctionJson(): POST to a Supabase Edge Function, refresh-and-retry
+//    once on 401. waitForConfirmedSupabaseSession(): poll up to 4s for a
+//    server-confirmed session (getUser, not just a local getSession token).
+// ============================================================================
 const supabaseFunctionJson = async <TResponse>(
   functionName: string,
   body: unknown,
@@ -671,6 +731,12 @@ const waitForConfirmedSupabaseSession = async (
   return false;
 };
 
+// ============================================================================
+// 6. RPC row parsers (trust boundary) & signed-URL enrichment
+//    parse*FromRpcJson() validate untyped RPC JSON field-by-field (bad rows are
+//    dropped). Signed URLs are batched: attachments 1h, preview thumbs 30m.
+//    mapChannelMessageRpcRowsToBundles() assembles message + media + preview.
+// ============================================================================
 const mapMessageReactionRows = (
   rows: MessageReactionRow[],
 ): MessageReaction[] =>
@@ -1033,7 +1099,14 @@ const mapChannelMessageRpcRowsToBundles = async (
   });
 };
 
+// ============================================================================
+// 7. centralCommunityDataBackend — the CommunityDataBackend implementation
+//    ~50 methods, grouped by concern below. Most are thin query/RPC wrappers;
+//    the orchestrators are fetchChannelPermissions, deleteMessage, reportMessage.
+// ============================================================================
 export const centralCommunityDataBackend: CommunityDataBackend = {
+  // ---------------- Permissions, membership & moderation ----------------
+  // getMyPermissions, member listing, bans/kicks, and profile reports.
   async getMyPermissions(communityId) {
     const allFalse: ServerPermissions & { isElevated: boolean } = {
       isOwner: false,
@@ -1313,6 +1386,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
+  // ---------------- Channels & channel groups ----------------
   async listChannels(communityId) {
     const { data, error } = await havenCommunitySb()
       .from("channels")
@@ -1493,6 +1567,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
+  // ---------------- Realtime: role lookups & broadcasts ----------------
   async fetchMyMemberRoleAssignmentForRealtime(communityId, userId) {
     const { data: memberRow, error: memberErr } = await havenCommunitySb()
       .from("community_members")
@@ -1548,6 +1623,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
+  // ---------------- Messages: read, reactions, attachments, link previews, media maintenance ----------------
   async listMessages(communityId, channelId) {
     const { data, error } = await havenCommunitySb()
       .from("messages")
@@ -1822,6 +1898,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     });
   },
 
+  // ---------------- Server settings & elevation checks ----------------
   async isElevatedInServer(communityId) {
     const {
       data: { user },
@@ -2074,6 +2151,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     };
   },
 
+  // ---------------- Server roles & role permissions ----------------
   async createServerRole({ communityId, name, color, position }) {
     const { error } = await havenCommunitySb().from("roles").insert({
       community_id: communityId,
@@ -2183,6 +2261,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     }
   },
 
+  // ---------------- Channel CRUD & per-channel permissions ----------------
   async createChannel(input) {
     const {
       data: { user },
@@ -2583,6 +2662,7 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     if (error) throw error;
   },
 
+  // ---------------- Message write path: send, media upload, edit, delete, report ----------------
   async sendUserMessage({
     communityId,
     channelId,
