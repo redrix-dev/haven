@@ -1,15 +1,8 @@
-export {
-  CommunityMessageCache,
-  CommunityMessageNexus,
-  messagesEqual,
-  channelMetaEqual,
-} from "./CommunityMessageCache";
+export { CommunityMessageCache } from "./CommunityMessageCache";
 export type {
   ChannelMeta,
   SendCommunityMessageMediaOptions,
   CommunityMessageStoreState,
 } from "./CommunityMessageCache";
-export {
-  MessageNexusRegistry,
-  createCommunityMessageRegistry,
-} from "./registry";
+export { createCommunityMessageRegistry } from "./registry";
+export type { MessageNexusRegistry } from "./registry";

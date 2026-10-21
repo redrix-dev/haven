@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryPersistence } from "@shared/core";
 import { SocialNexus } from "@mobile-data/social/SocialNexus";
 import { DEFAULT_SOCIAL_COUNTS } from "@shared/infrastructure/constants";
 
@@ -23,7 +22,6 @@ describe("SocialNexus", () => {
     const acceptFriendRequest = vi.fn(async () => {});
     const declineFriendRequest = vi.fn(async () => {});
     const nexus = new SocialNexus(
-      createMemoryPersistence(),
       makeBackend({
         getSocialCounts,
         acceptFriendRequest,
@@ -44,7 +42,6 @@ describe("SocialNexus", () => {
     const blockUser = vi.fn(async () => {});
     const listMyBlocks = vi.fn(async () => ["blocked-user"]);
     const nexus = new SocialNexus(
-      createMemoryPersistence(),
       makeBackend({ getSocialCounts, blockUser, listMyBlocks }),
     );
 

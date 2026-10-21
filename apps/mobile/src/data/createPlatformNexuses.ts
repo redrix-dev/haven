@@ -49,7 +49,7 @@ export function createPlatformNexusBundle(
       persistence,
       backends.serverModmail,
     ),
-    social: new SocialNexus(persistence, backends.social),
+    social: new SocialNexus(backends.social),
     permissions: new PermissionsNexus(persistence),
     profiles: new ProfileNexus(persistence, backends.controlPlane),
     featureFlags: new FeatureFlagNexus(persistence, backends.controlPlane),

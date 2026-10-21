@@ -1,9 +1,8 @@
 export {
   createCommunityMessageRegistry,
-  MessageNexusRegistry,
   CommunityMessageCache,
-  CommunityMessageNexus,
 } from "./messages";
+export type { MessageNexusRegistry } from "./messages";
 export * from "./communities";
 export * from "./channels";
 export * from "./direct-messages";

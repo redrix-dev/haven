@@ -19,10 +19,7 @@ export function useCounts(nexus: SocialNexus): SocialCounts {
 export function useFriends(nexus: SocialNexus): FriendSummary[] {
   return useStoreSelector(
     nexus.reactiveStore,
-    (state) => {
-      void state.revision;
-      return state.friends;
-    },
+    (state) => state.friends,
     friendsEqual,
   );
 }
@@ -30,10 +27,7 @@ export function useFriends(nexus: SocialNexus): FriendSummary[] {
 export function useFriendRequests(nexus: SocialNexus): FriendRequestSummary[] {
   return useStoreSelector(
     nexus.reactiveStore,
-    (state) => {
-      void state.revision;
-      return state.requests;
-    },
+    (state) => state.requests,
     requestsEqual,
   );
 }
@@ -41,10 +35,7 @@ export function useFriendRequests(nexus: SocialNexus): FriendRequestSummary[] {
 export function useBlockedUsers(nexus: SocialNexus): BlockedUserSummary[] {
   return useStoreSelector(
     nexus.reactiveStore,
-    (state) => {
-      void state.revision;
-      return state.blockedUsers;
-    },
+    (state) => state.blockedUsers,
     blockedEqual,
   );
 }

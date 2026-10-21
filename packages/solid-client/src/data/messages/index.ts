@@ -3,4 +3,5 @@ export {
   createCommunityMessageSolidNexus,
 } from "./communityMessageSolidNexus";
 export type { CommunityMessageSolidState } from "./communityMessageSolidNexus";
-export { MessageSolidRegistry, createMessageSolidRegistry } from "./registry";
+export { createMessageSolidRegistry } from "./registry";
+export type { MessageSolidRegistry } from "./registry";
