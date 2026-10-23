@@ -1,1 +1,1 @@
-export { SocialNexus, type SocialNexusState } from "./SocialNexus";
+export { SocialReactNexus } from "./socialReactNexus";

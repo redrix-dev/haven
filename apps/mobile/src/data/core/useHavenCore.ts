@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { requireHavenCore } from "./havenCoreRegistry";
 import type { HavenReactCore } from "./HavenReactCore";
-import type { BootstrapPhaseSnapshot } from "./bootstrapPhase";
+import type { BootstrapPhaseSnapshot } from "@shared/core/bootstrapPhase";
 
 /**
  * Access the active HavenReactCore from inside React.

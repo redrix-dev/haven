@@ -1,14 +1,13 @@
 import type { StoreApi } from "zustand/vanilla";
 
 /**
- * The read-only slice of a vanilla store that the binding packages need:
- * read current state + subscribe to changes. Deliberately excludes `setState`
- * so consumers (React/Solid adapters, anything holding a nexus reference) cannot
- * mutate store state directly and bypass the owning class's action methods,
- * persistence, and revision bookkeeping.
+ * The read-only slice of a vanilla zustand store: read current state and
+ * subscribe. Deliberately excludes `setState`, so code holding a React nexus
+ * binding (`reactiveStore`) cannot write around the nexus's methods and
+ * persistence.
  *
  * Matches zustand's own `ReadonlyStoreApi`, so it satisfies
- * `useStoreWithEqualityFn`/`useStore`; Solid's `fromStore` uses a subset.
+ * `useStoreWithEqualityFn` / `useStore`.
  */
 export type ReadableStore<S> = Pick<
   StoreApi<S>,

@@ -1,1 +1,1 @@
-export { OnboardingNexus, type OnboardingNexusState } from "./OnboardingNexus";
+export { OnboardingReactNexus } from "./onboardingReactNexus";

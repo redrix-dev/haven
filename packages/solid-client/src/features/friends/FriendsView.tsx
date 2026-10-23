@@ -1,4 +1,12 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  untrack,
+} from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { Ban, Check, MessageCircle, Search, UserPlus, X } from "lucide-solid";
 import type { FriendsPanelTab } from "@shared/types/types";
@@ -53,10 +61,14 @@ export function FriendsView() {
     requests().filter((request) => request.direction === "outgoing"),
   );
 
+  // ensureLoaded reads the social store before its first await; this effect
+  // runs once on mount. See haven-solid-reactivity and socialSurfaces.tier2.test.ts.
   createEffect(() => {
     setLoadError(null);
-    void core.social.ensureLoaded().catch((error) => {
-      setLoadError(getErrorMessage(error, "Failed to load friends."));
+    untrack(() => {
+      void core.social.ensureLoaded().catch((error) => {
+        setLoadError(getErrorMessage(error, "Failed to load friends."));
+      });
     });
   });
 
@@ -86,9 +98,10 @@ export function FriendsView() {
         if (!cancelled) setSearchLoading(false);
       });
 
-    return () => {
+    // A newer query supersedes this one; drop its late results.
+    onCleanup(() => {
       cancelled = true;
-    };
+    });
   });
 
   const refresh = async () => {

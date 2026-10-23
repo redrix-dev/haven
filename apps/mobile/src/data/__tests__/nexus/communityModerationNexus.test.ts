@@ -9,7 +9,7 @@ import type {
   ServerReportDetail,
   ServerReportSummary,
 } from "@shared/lib/backend/types";
-import { CommunityModerationNexus } from "@mobile-data/community-management/CommunityModerationNexus";
+import { CommunityModerationReactNexus as CommunityModerationNexus } from "@mobile-data/community-management/communityModerationReactNexus";
 
 const report = (
   reportId: string,
@@ -48,10 +48,7 @@ describe("CommunityModerationNexus", () => {
       listServerReports: vi.fn().mockResolvedValue([report("report-existing")]),
       getServerReport,
     } as unknown as ServerModmailBackend;
-    const nexus = new CommunityModerationNexus(
-      createMemoryPersistence(),
-      backend,
-    );
+    const nexus = new CommunityModerationNexus(backend);
 
     await nexus.load(["community-1"]);
     await nexus.handleReportCreated({
@@ -71,10 +68,7 @@ describe("CommunityModerationNexus", () => {
       listServerReports: vi.fn().mockResolvedValue([report("report-existing")]),
       getServerReport,
     } as unknown as ServerModmailBackend;
-    const nexus = new CommunityModerationNexus(
-      createMemoryPersistence(),
-      backend,
-    );
+    const nexus = new CommunityModerationNexus(backend);
 
     await nexus.load(["community-1"]);
     await nexus.handleReportCreated({
@@ -94,10 +88,7 @@ describe("CommunityModerationNexus", () => {
       listServerReports: vi.fn().mockResolvedValue([report("report-existing")]),
       getServerReport: vi.fn().mockResolvedValue(detail("report-live")),
     } as unknown as ServerModmailBackend;
-    const nexus = new CommunityModerationNexus(
-      createMemoryPersistence(),
-      backend,
-    );
+    const nexus = new CommunityModerationNexus(backend);
     await nexus.load(["community-1"]);
 
     routeRealtimeEvent(

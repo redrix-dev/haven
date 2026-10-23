@@ -1,4 +1,1 @@
-export {
-  DirectMessageSolidNexus,
-  createDirectMessageSolidNexus,
-} from "./directMessageSolidNexus";
+export { DirectMessageSolidNexus } from "./directMessageSolidNexus";

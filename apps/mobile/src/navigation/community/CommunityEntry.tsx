@@ -104,7 +104,8 @@ export function CommunityEntry({ navigation }: Props) {
           className="rounded-xl bg-primary px-5 py-2.5 active:bg-primary-hover"
           onPress={() => {
             routedRef.current = false;
-            if (userId) void core.refreshCommunities(userId);
+            // A failed load is recorded on the communities nexus for the screen.
+            if (userId) void core.communities.load(userId).catch(() => {});
           }}
         >
           <Text className="font-semibold text-primary-foreground">Retry</Text>

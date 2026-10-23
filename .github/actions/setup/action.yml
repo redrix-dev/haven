@@ -10,9 +10,12 @@ description: "Node 24 with cached root and mobile dependencies"
 runs:
   using: "composite"
   steps:
+    # The exact version in .nvmrc, not "24": a bare major accepts whatever 24.x
+    # the runner image already caches, which can predate a security release
+    # (24.22.1 carries the eMudhra CA distrust).
     - uses: actions/setup-node@v4
       with:
-        node-version: 24
+        node-version-file: .nvmrc
 
     # Honor the npm pinned in package.json's "packageManager" so every lane
     # runs the same npm contributors use (prevents lockfile-drift false reds —

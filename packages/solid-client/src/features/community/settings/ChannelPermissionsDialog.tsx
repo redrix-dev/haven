@@ -7,7 +7,7 @@ import {
   untrack,
 } from "solid-js";
 import { ShieldCheck, X } from "lucide-solid";
-import type { HavenChannel } from "@shared/nexus/community/channelTypes";
+import type { HavenChannel } from "@shared/nexus/channels/channelTypes";
 import type {
   ChannelMemberOption,
   ChannelMemberPermissionItem,

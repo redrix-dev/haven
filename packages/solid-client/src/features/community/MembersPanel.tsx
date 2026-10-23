@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal, untrack } from "solid-js";
 import { Ban, Crown, Flag, Undo2, UserMinus, X } from "lucide-solid";
 import { requireHavenSolidCore } from "@solid-client/core";
 import {
@@ -72,23 +72,31 @@ export function MembersPanel(props: { communityId: string }) {
     setReportTarget(null);
   };
 
+  // Each effect tracks its ids only; the loads read the stores they write.
+  // See haven-solid-reactivity and communitySurfaces.tier2.test.ts.
   createEffect(() => {
-    void core.ensureCommunityPermissions(props.communityId);
+    const communityId = props.communityId;
+    untrack(() => {
+      void core.ensureCommunityPermissions(communityId);
+      void core.admin.ensureMembersLoaded(communityId);
+    });
   });
   createEffect(() => {
-    void core.admin.ensureMembersLoaded(props.communityId);
-  });
-  createEffect(() => {
-    if (view() === "bans") void core.admin.loadBans(props.communityId);
+    const communityId = props.communityId;
+    if (view() !== "bans") return;
+    untrack(() => void core.admin.loadBans(communityId));
   });
   createEffect(() => {
     const target = profileTarget();
     if (!target) return;
-    void Promise.all([
-      core.profiles.loadProfileCard(target.userId),
-      core.profiles.ensurePlatformStaff(target.userId),
-    ]).catch(() => {
-      // The profile nexus exposes loading/error state in the dialog.
+    const userId = target.userId;
+    untrack(() => {
+      void Promise.all([
+        core.profiles.loadProfileCard(userId),
+        core.profiles.ensurePlatformStaff(userId),
+      ]).catch(() => {
+        // The profile nexus exposes loading/error state in the dialog.
+      });
     });
   });
 

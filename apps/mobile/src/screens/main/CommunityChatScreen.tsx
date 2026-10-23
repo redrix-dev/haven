@@ -64,7 +64,6 @@ import {
   type CommunityMediaUploadPayload,
 } from "@/features/community/loadPickedCommunityMediaForUpload";
 import { useDataCacheComponentProbe } from "@/debug/useDataCacheComponentProbe";
-import type { CommunityMessageCache } from "@mobile-data/messages/CommunityMessageCache";
 
 type CommunityChatScreenProps = {
   serverId: string;
@@ -87,9 +86,7 @@ export function CommunityChatScreen({
   const user = useAuthStore((state) => state.user);
   const communityId = useActiveCommunityId(core.communities) ?? serverId;
   const navigationChannelId = useActiveChannelId(core.channels);
-  const messageNexus = core.messages.for(
-    communityId ?? "__none__",
-  ) as CommunityMessageCache;
+  const messageNexus = core.messages.for(communityId ?? "__none__");
   const currentUserId = user?.id ?? null;
   const currentUserPlatformStaff = usePlatformStaff(
     core.profiles,
@@ -110,7 +107,7 @@ export function CommunityChatScreen({
   });
   const refreshServers = useCallback(async () => {
     if (!currentUserId) return;
-    await core.refreshCommunities(currentUserId);
+    await core.communities.load(currentUserId);
   }, [core, currentUserId]);
   const havenChannels = useChannels(core.channels, communityId ?? serverId);
   const channelsLoading = useChannelsLoading(

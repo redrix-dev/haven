@@ -1,4 +1,4 @@
-import type { DirectMessageNexusState } from "./dmTypes";
+import type { DirectMessageState } from "./dmTypes";
 import type {
   DirectMessage,
   DirectMessageConversationSummary,
@@ -14,7 +14,7 @@ const EMPTY_CONVERSATIONS: DirectMessageConversationSummary[] = [];
 const EMPTY_MESSAGES: DirectMessage[] = [];
 
 export const projectConversations = (
-  state: DirectMessageNexusState,
+  state: DirectMessageState,
 ): DirectMessageConversationSummary[] => {
   if (state.conversationIds.length === 0) return EMPTY_CONVERSATIONS;
   return state.conversationIds
@@ -23,7 +23,7 @@ export const projectConversations = (
 };
 
 export const projectMessages = (
-  state: DirectMessageNexusState,
+  state: DirectMessageState,
   conversationId: string,
 ): DirectMessage[] => {
   const ids = state.messagesByConversation[conversationId] ?? [];
@@ -37,18 +37,18 @@ export const projectMessages = (
 };
 
 export const selectActiveConversationId = (
-  state: DirectMessageNexusState,
+  state: DirectMessageState,
 ): string | null => state.activeConversationId;
 
 export const selectIsLoadingConversations = (
-  state: DirectMessageNexusState,
+  state: DirectMessageState,
 ): boolean => state.isLoadingConversations;
 
-export const selectComposeDraftPeer = (state: DirectMessageNexusState) =>
+export const selectComposeDraftPeer = (state: DirectMessageState) =>
   state.composeDraftPeer;
 
 export const selectIsLoadingMessages = (
-  state: DirectMessageNexusState,
+  state: DirectMessageState,
   conversationId: string,
 ): boolean => state.loadingByConversation[conversationId] ?? false;
 

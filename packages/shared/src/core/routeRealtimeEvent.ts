@@ -5,10 +5,6 @@ import type {
   MessageBundle,
   ReportStatusUpdatedBroadcastPayload,
 } from "@shared/lib/backend/types";
-import {
-  notifyMemberBanned,
-  notifyMemberChannelAccessRevoked,
-} from "./communityAccessHandlers";
 
 /**
  * The single realtime ingress for Haven.
@@ -176,60 +172,6 @@ export function routeRealtimeEvent(
         return;
       target.channels.removeChannel(channelId, communityId);
       target.messages.for(communityId).evictChannel(channelId);
-      return;
-    }
-
-    case "member_channel_access_revoked": {
-      const channelId =
-        typeof evt.payload.channel_id === "string"
-          ? evt.payload.channel_id
-          : typeof evt.payload.channelId === "string"
-            ? evt.payload.channelId
-            : null;
-      const communityId =
-        typeof evt.payload.community_id === "string"
-          ? evt.payload.community_id
-          : typeof evt.payload.communityId === "string"
-            ? evt.payload.communityId
-            : null;
-      const revokedUserId =
-        typeof evt.payload.revoked_user_id === "string"
-          ? evt.payload.revoked_user_id
-          : typeof evt.payload.revokedUserId === "string"
-            ? evt.payload.revokedUserId
-            : null;
-      if (!channelId || !communityId) return;
-
-      target.channels.removeChannel(channelId, communityId);
-      target.messages.for(communityId).evictChannel(channelId);
-
-      if (revokedUserId) {
-        notifyMemberChannelAccessRevoked({
-          communityId,
-          channelId,
-          revokedUserId,
-        });
-      }
-      return;
-    }
-
-    case "member_banned": {
-      const communityId =
-        typeof evt.payload.community_id === "string"
-          ? evt.payload.community_id
-          : typeof evt.payload.communityId === "string"
-            ? evt.payload.communityId
-            : null;
-      const bannedUserId =
-        typeof evt.payload.banned_user_id === "string"
-          ? evt.payload.banned_user_id
-          : typeof evt.payload.bannedUserId === "string"
-            ? evt.payload.bannedUserId
-            : null;
-      if (!communityId || !bannedUserId) return;
-
-      notifyMemberBanned({ communityId, bannedUserId });
-      void target.ensureCommunityPermissions(communityId);
       return;
     }
 

@@ -1,14 +1,10 @@
 import { describe, beforeAll, beforeEach, afterAll, expect, it } from "vitest";
-import {
-  getDirectMessageBackend,
-  getModerationBackend,
-  getSocialBackend,
-} from "@shared/lib/backend";
 import { loadBootstrappedTestUsers } from "@test-support/fixtures/users";
 import {
   resetFixtureDomainState,
   signInAsTestUser,
   signOutTestUser,
+  testBackends,
 } from "@test-support/setup/supabaseLocal";
 
 const createTestImageFile = () =>
@@ -23,7 +19,7 @@ const createTestImageFile = () =>
 async function ensureDmReportFixture(memberAUsername: string) {
   await signInAsTestUser("member_b");
   try {
-    await getSocialBackend().sendFriendRequest(memberAUsername);
+    await testBackends.social.sendFriendRequest(memberAUsername);
   } catch (error) {
     const msg =
       error instanceof Error
@@ -33,21 +29,21 @@ async function ensureDmReportFixture(memberAUsername: string) {
   }
 
   await signInAsTestUser("member_a");
-  const requests = await getSocialBackend().listFriendRequests();
+  const requests = await testBackends.social.listFriendRequests();
   const incoming = requests.find(
     (row) =>
       row.direction === "incoming" &&
       row.senderUserId === loadBootstrappedTestUsers().member_b.id,
   );
   if (incoming) {
-    await getSocialBackend().acceptFriendRequest(incoming.requestId);
+    await testBackends.social.acceptFriendRequest(incoming.requestId);
   }
 
   const conversationId =
-    await getDirectMessageBackend().getOrCreateDirectConversation(
+    await testBackends.directMessages.getOrCreateDirectConversation(
       loadBootstrappedTestUsers().member_b.id,
     );
-  const sent = await getDirectMessageBackend().sendMessage({
+  const sent = await testBackends.directMessages.sendMessage({
     conversationId,
     content: "",
     metadata: {},
@@ -59,7 +55,7 @@ async function ensureDmReportFixture(memberAUsername: string) {
   });
 
   await signInAsTestUser("member_b");
-  const reportId = await getDirectMessageBackend().reportMessage({
+  const reportId = await testBackends.directMessages.reportMessage({
     messageId: sent.messageId,
     kind: "content_abuse",
     comment: "Moderation backend contract test report",
@@ -88,23 +84,25 @@ describe.sequential("ModerationBackend (contract)", () => {
     const fixture = await ensureDmReportFixture(users.member_a.username);
 
     await signInAsTestUser("platform_staff_active");
-    const reports = await getModerationBackend().listDmMessageReportsForReview({
-      limit: 50,
-    });
+    const reports = await testBackends.moderation.listDmMessageReportsForReview(
+      {
+        limit: 50,
+      },
+    );
     const target = reports.find(
       (report) => report.reportId === fixture.reportId,
     );
     expect(target).toBeTruthy();
     expect(target?.messagePreview).toBe("Sent an image");
 
-    const detail = await getModerationBackend().getDmMessageReportDetail(
+    const detail = await testBackends.moderation.getDmMessageReportDetail(
       fixture.reportId,
     );
     expect(detail?.messageId).toBe(fixture.messageId);
     expect(detail?.messageAttachments).toHaveLength(1);
     expect(detail?.messageAttachments[0]?.signedUrl).toBeTruthy();
 
-    const context = await getModerationBackend().listDmMessageContext({
+    const context = await testBackends.moderation.listDmMessageContext({
       messageId: fixture.messageId,
       before: 5,
       after: 5,
@@ -120,7 +118,7 @@ describe.sequential("ModerationBackend (contract)", () => {
     expect(targetContextRow?.attachments).toHaveLength(1);
     expect(targetContextRow?.attachments[0]?.signedUrl).toBeTruthy();
 
-    const assigned = await getModerationBackend().assignDmMessageReport({
+    const assigned = await testBackends.moderation.assignDmMessageReport({
       reportId: fixture.reportId,
       assigneeUserId: users.platform_staff_active.id,
       notes: "Take ownership",
@@ -128,7 +126,7 @@ describe.sequential("ModerationBackend (contract)", () => {
     expect(assigned).toBe(true);
 
     await expect(
-      getModerationBackend().updateDmMessageReportStatus({
+      testBackends.moderation.updateDmMessageReportStatus({
         reportId: fixture.reportId,
         status: "resolved_actioned",
         notes: "Invalid jump should fail after hardening",
@@ -136,28 +134,28 @@ describe.sequential("ModerationBackend (contract)", () => {
     ).rejects.toThrow(/transition/i);
 
     expect(
-      await getModerationBackend().updateDmMessageReportStatus({
+      await testBackends.moderation.updateDmMessageReportStatus({
         reportId: fixture.reportId,
         status: "triaged",
         notes: "Triaged",
       }),
     ).toBe(true);
     expect(
-      await getModerationBackend().updateDmMessageReportStatus({
+      await testBackends.moderation.updateDmMessageReportStatus({
         reportId: fixture.reportId,
         status: "in_review",
         notes: "Investigating",
       }),
     ).toBe(true);
     expect(
-      await getModerationBackend().updateDmMessageReportStatus({
+      await testBackends.moderation.updateDmMessageReportStatus({
         reportId: fixture.reportId,
         status: "resolved_no_action",
         notes: "No action",
       }),
     ).toBe(true);
 
-    const actions = await getModerationBackend().listDmMessageReportActions(
+    const actions = await testBackends.moderation.listDmMessageReportActions(
       fixture.reportId,
     );
     expect(actions.length).toBeGreaterThan(0);
@@ -166,12 +164,12 @@ describe.sequential("ModerationBackend (contract)", () => {
   it("rejects inactive/non-staff access to moderation review RPCs", async () => {
     await signInAsTestUser("platform_staff_inactive");
     await expect(
-      getModerationBackend().listDmMessageReportsForReview({ limit: 5 }),
+      testBackends.moderation.listDmMessageReportsForReview({ limit: 5 }),
     ).rejects.toThrow(/haven staff/i);
 
     await signInAsTestUser("member_a");
     await expect(
-      getModerationBackend().listDmMessageReportsForReview({ limit: 5 }),
+      testBackends.moderation.listDmMessageReportsForReview({ limit: 5 }),
     ).rejects.toThrow(/haven staff/i);
   });
 });

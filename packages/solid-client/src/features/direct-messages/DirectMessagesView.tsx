@@ -96,11 +96,15 @@ export function DirectMessagesView() {
     });
   });
 
+  // ensureLoaded reads the social store before its first await; track the
+  // picker only. See haven-solid-reactivity and socialSurfaces.tier2.test.ts.
   createEffect(() => {
     if (!friendPickerOpen()) return;
     setFriendOpenError(null);
-    void core.social.ensureLoaded({ freshnessMs: 0 }).catch((error) => {
-      setFriendOpenError(getErrorMessage(error, "Failed to load friends."));
+    untrack(() => {
+      void core.social.ensureLoaded({ freshnessMs: 0 }).catch((error) => {
+        setFriendOpenError(getErrorMessage(error, "Failed to load friends."));
+      });
     });
   });
 

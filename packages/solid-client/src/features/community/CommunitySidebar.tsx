@@ -20,7 +20,7 @@ import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
 import { Avatar } from "@solid-client/components/ui";
-import type { HavenChannel } from "@shared/nexus/community/channelTypes";
+import type { HavenChannel } from "@shared/nexus/channels/channelTypes";
 import { openCommunitySettings } from "./settings/CommunitySettingsPanel";
 import { canOpenCommunitySettingsPanel } from "./settings/communitySettingsAccess";
 import * as KDropdownMenu from "@kobalte/core/dropdown-menu";
@@ -215,8 +215,10 @@ function CommunityChannelList(props: {
       core.permissions.getPermissions(props.communityId),
     );
 
+  // Track the community id only; the permissions load reads its own store.
   createEffect(() => {
-    void core.ensureCommunityPermissions(props.communityId);
+    const communityId = props.communityId;
+    untrack(() => void core.ensureCommunityPermissions(communityId));
   });
 
   return (

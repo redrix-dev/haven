@@ -1,5 +1,1 @@
-export {
-  ProfileNexus,
-  type ProfileNexusState,
-  type ViewerProfileUpdateInput,
-} from "./ProfileNexus";
+export { ProfileReactNexus } from "./profileReactNexus";

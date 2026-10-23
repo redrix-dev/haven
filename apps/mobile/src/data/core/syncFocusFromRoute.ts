@@ -55,7 +55,7 @@ export function applyCommunityFocus(
   options?: ApplyCommunityFocusOptions,
 ): string | null {
   const cached = getCachedChannelsForServer(
-    core.channels.getChannelsSnapshot(serverId),
+    core.channels.getChannels(serverId),
   );
   const channelList = cached ?? [];
   const channelId =

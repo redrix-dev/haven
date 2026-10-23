@@ -29,48 +29,52 @@ history lives in git.
 ## The three layers (the law)
 
 ```
-packages/shared (pure logic)  →  per-platform cache  →  per-platform UI
+packages/shared (logic, nexuses, HavenCore)  →  per-platform binding  →  per-platform UI
 ```
 
-1. **Dependencies point inward.** Shared never imports a platform or a cache. A
-   cache never imports another platform's cache.
-2. **Logic is shared and pure.** Fetching, merging realtime events, visibility and
-   permission filtering, pagination math, event routing, domain rules, types — all
-   of it is data-in → data-out, lives in `packages/shared`, and is identical on
-   every platform. No `react`, no `solid-js`, no React-flavored zustand
-   (`zustand/vanilla` is allowed). Enforced by `check:shared-portable`.
-3. **Caches are per-platform.** Mobile's React cache lives in
-   `apps/mobile/src/data/` (`HavenReactCore` — see
-   [architecture/HAVEN_CORE.md](./architecture/HAVEN_CORE.md)). Desktop/web's
-   Solid-native cache lives in `packages/solid-client/src/data/` (`HavenSolidCore`,
-   being built). A reactive store is **never** shared across frameworks.
+1. **Dependencies point inward.** Shared never imports a platform. A binding
+   never imports another platform's binding.
+2. **Logic is shared.** Fetching, merging realtime events, visibility and
+   permission filtering, pagination, event routing, domain rules, types — and
+   each domain's nexus class and the session's `HavenCore` that run them — live
+   in `packages/shared` and behave identically on every platform. No `react`, no
+   `solid-js`, no React-flavored zustand (`zustand/vanilla` is allowed). Enforced
+   by `check:shared-portable`.
+3. **Reactive memory is per-platform.** A shared nexus reads and writes through
+   a `StatePort`; the store behind it belongs to the platform's binding — a
+   Solid store in `packages/solid-client/src/data/` (`XSolidNexus`,
+   `HavenSolidCore`), a zustand store in `apps/mobile/src/data/` (`XReactNexus`,
+   `HavenReactCore`). A reactive store is **never** shared across frameworks.
+   See [architecture/HAVEN_CORE.md](./architecture/HAVEN_CORE.md).
 
-One sentence: _we share the smarts and let each platform keep its own dumb memory._
+One sentence: _the logic is written once; each platform keeps its own memory and
+reads it its own way._
 
 ## Where things live in `packages/shared`
 
 Canonical homes — one implementation per module, no duplicate trees and no
 re-export shims:
 
-| Concern                                                            | Home                                         |
-| ------------------------------------------------------------------ | -------------------------------------------- |
-| Backend clients, RPC wrappers, network shapes                      | `lib/backend/`                               |
-| Supabase client construction                                       | `lib/createHavenSupabaseClient.ts`           |
-| Domain logic (messaging, auth, notifications, voice, …)            | `features/<domain>/`                         |
-| Realtime routing (pure, over `RealtimeMutationTarget`)             | `core/routeRealtimeEvent.ts`                 |
-| Persistence port + memory adapter                                  | `core/persistence/`                          |
-| Pure selectors + entity type barrels                               | `nexus/` (types/selectors only — no classes) |
-| Platform capability port (`AppHost`)                               | `infrastructure/platform/appHost.ts`         |
-| Themes (tokens, registry — the one place hex literals are allowed) | `themes/`                                    |
-| Shared types, DB types                                             | `types/`                                     |
+| Concern                                                            | Home                                       |
+| ------------------------------------------------------------------ | ------------------------------------------ |
+| Backend clients, RPC wrappers, network shapes                      | `lib/backend/`                             |
+| Supabase client construction                                       | `lib/createHavenSupabaseClient.ts`         |
+| Domain logic (messaging, auth, notifications, voice, …)            | `features/<domain>/`                       |
+| Session composition root (`HavenCore`)                             | `core/havenCore.ts`                        |
+| Realtime routing (pure, over `RealtimeMutationTarget`)             | `core/routeRealtimeEvent.ts`               |
+| Persistence port + memory adapter                                  | `core/persistence/`                        |
+| Nexus classes, state types, selectors, kit (StatePort, LoadGate)   | `nexus/` (recipe: `nexus/NEXUS_RECIPE.md`) |
+| Platform capability port (`AppHost`)                               | `infrastructure/platform/appHost.ts`       |
+| Themes (tokens, registry — the one place hex literals are allowed) | `themes/`                                  |
+| Shared types, DB types                                             | `types/`                                   |
 
 ## Platforms
 
-| Platform | Shell                       | UI                     | Cache                           | Status                                     |
+| Platform | Shell                       | UI                     | Core binding                    | Status                                     |
 | -------- | --------------------------- | ---------------------- | ------------------------------- | ------------------------------------------ |
 | iOS      | Expo dev client             | React Native (UniWind) | `HavenReactCore` (zustand)      | **Live** — TestFlight, custom OTA pipeline |
-| Desktop  | Tauri v2 (Rust + WKWebView) | Solid                  | `HavenSolidCore` (Solid stores) | In rebuild                                 |
-| Web      | Vite (same Solid app)       | Solid                  | same as desktop                 | In rebuild                                 |
+| Desktop  | Tauri v2 (Rust + WKWebView) | Solid                  | `HavenSolidCore` (Solid stores) | **Live** — signed releases                 |
+| Web      | Vite (same Solid app)       | Solid                  | same as desktop                 | **Live** — Vercel                          |
 
 Backend for all of them: Supabase (Auth, Postgres + RLS, Realtime, Edge Functions),
 LiveKit Cloud for voice.

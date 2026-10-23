@@ -1,4 +1,4 @@
-import type { ProfileNexus } from "../profile/ProfileNexus";
+import type { ProfileReactNexus } from "../profile/profileReactNexus";
 import type {
   PlatformStaffInfo,
   UserProfileInfo,
@@ -11,16 +11,13 @@ import type {
 import { useStoreSelector } from "./useStoreSelector";
 
 export function useProfilesRecord(
-  nexus: ProfileNexus,
+  nexus: ProfileReactNexus,
 ): Record<string, LiveProfileIdentity> {
-  return useStoreSelector(nexus.reactiveStore, (state) => {
-    void state.revision;
-    return state.profiles;
-  });
+  return useStoreSelector(nexus.reactiveStore, (state) => state.profiles);
 }
 
 export function useViewerProfile(
-  nexus: ProfileNexus,
+  nexus: ProfileReactNexus,
   userId: string | null | undefined,
 ): UserProfileInfo | null {
   return useStoreSelector(nexus.reactiveStore, (state) =>
@@ -29,7 +26,7 @@ export function useViewerProfile(
 }
 
 export function useProfileCard(
-  nexus: ProfileNexus,
+  nexus: ProfileReactNexus,
   userId: string | null | undefined,
 ): UserProfileCard | null {
   return useStoreSelector(nexus.reactiveStore, (state) =>
@@ -38,7 +35,7 @@ export function useProfileCard(
 }
 
 export function useProfileCardLoading(
-  nexus: ProfileNexus,
+  nexus: ProfileReactNexus,
   userId: string | null | undefined,
 ): boolean {
   return useStoreSelector(nexus.reactiveStore, (state) =>
@@ -47,7 +44,7 @@ export function useProfileCardLoading(
 }
 
 export function useProfileCardError(
-  nexus: ProfileNexus,
+  nexus: ProfileReactNexus,
   userId: string | null | undefined,
 ): string | null {
   return useStoreSelector(nexus.reactiveStore, (state) =>
@@ -56,7 +53,7 @@ export function useProfileCardError(
 }
 
 export function useUserFlairGrants(
-  nexus: ProfileNexus,
+  nexus: ProfileReactNexus,
   userId: string | null | undefined,
 ): UserFlairGrant[] {
   return useStoreSelector(nexus.reactiveStore, (state) =>
@@ -65,7 +62,7 @@ export function useUserFlairGrants(
 }
 
 export function useUserFlairGrantLoading(
-  nexus: ProfileNexus,
+  nexus: ProfileReactNexus,
   userId: string | null | undefined,
 ): boolean {
   return useStoreSelector(nexus.reactiveStore, (state) =>
@@ -74,7 +71,7 @@ export function useUserFlairGrantLoading(
 }
 
 export function useUserFlairGrantError(
-  nexus: ProfileNexus,
+  nexus: ProfileReactNexus,
   userId: string | null | undefined,
 ): string | null {
   return useStoreSelector(nexus.reactiveStore, (state) =>
@@ -83,7 +80,7 @@ export function useUserFlairGrantError(
 }
 
 export function usePlatformStaff(
-  nexus: ProfileNexus,
+  nexus: ProfileReactNexus,
   userId: string | null | undefined,
 ): PlatformStaffInfo | null {
   return useStoreSelector(nexus.reactiveStore, (state) =>

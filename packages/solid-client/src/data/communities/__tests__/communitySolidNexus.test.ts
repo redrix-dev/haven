@@ -6,7 +6,7 @@ import { CommunitySolidNexus } from "../communitySolidNexus";
 const community = (id: string, name = id) => ({
   id,
   name,
-  created_at: "2026-07-15T12:00:00.000Z",
+  createdAt: "2026-07-15T12:00:00.000Z",
 });
 
 describe("CommunitySolidNexus membership changes", () => {

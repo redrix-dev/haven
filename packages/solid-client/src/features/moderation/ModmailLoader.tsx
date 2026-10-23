@@ -1,4 +1,4 @@
-import { createEffect, createMemo } from "solid-js";
+import { createEffect, createMemo, untrack } from "solid-js";
 import { requireHavenSolidCore } from "@solid-client/core";
 
 /**
@@ -23,8 +23,10 @@ export function ModmailLoader() {
       .sort();
   });
 
+  // Track the moderatable set only; the load writes the moderation store.
   createEffect(() => {
-    void core.moderation.load(moderatableIds());
+    const communityIds = moderatableIds();
+    untrack(() => void core.moderation.load(communityIds));
   });
 
   return null;

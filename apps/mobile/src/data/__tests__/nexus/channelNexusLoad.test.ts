@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryPersistence } from "@shared/core";
-import { ChannelNexus } from "@mobile-data/channels/ChannelNexus";
-import { CommunityNexus } from "@mobile-data/communities/CommunityNexus";
+import { ChannelReactNexus as ChannelNexus } from "@mobile-data/channels/channelReactNexus";
+import { CommunityReactNexus as CommunityNexus } from "@mobile-data/communities/communityReactNexus";
 import type { Channel, ChannelGroupState } from "@shared/lib/backend/types";
 
 const channel = (overrides: Partial<Channel> = {}): Channel =>
@@ -38,7 +38,7 @@ describe("ChannelNexus.loadForCommunity", () => {
 
     expect(listChannels).toHaveBeenCalledTimes(1);
     expect(listChannelGroups).toHaveBeenCalledTimes(1);
-    expect(nexus.getChannelsSnapshot("s1").map((c) => c.id)).toEqual(["c1"]);
+    expect(nexus.getChannels("s1").map((c) => c.id)).toEqual(["c1"]);
   });
 
   it("ensureLoaded skips when already cached", async () => {
@@ -57,7 +57,7 @@ describe("ChannelNexus.loadForCommunity", () => {
   it("upsertChannel adds a single channel from realtime", () => {
     const nexus = new ChannelNexus(createMemoryPersistence(), {} as never);
     nexus.upsertChannel(channel({ id: "cNew" }));
-    expect(nexus.getChannelsSnapshot("s1").map((c) => c.id)).toEqual(["cNew"]);
+    expect(nexus.getChannels("s1").map((c) => c.id)).toEqual(["cNew"]);
   });
 
   it("falls back to empty groups when listChannelGroups rejects", async () => {
@@ -69,7 +69,7 @@ describe("ChannelNexus.loadForCommunity", () => {
     } as never);
 
     await nexus.loadForCommunity("s1");
-    expect(nexus.getChannelsSnapshot("s1")).toHaveLength(1);
+    expect(nexus.getChannels("s1")).toHaveLength(1);
   });
 });
 
@@ -84,7 +84,7 @@ describe("CommunityNexus.load", () => {
 
     await nexus.load("u1");
 
-    expect(nexus.getSnapshot("s1")?.name).toBe("haven");
-    expect(nexus.getSnapshot("s2")?.name).toBe("beta");
+    expect(nexus.getCommunity("s1")?.name).toBe("haven");
+    expect(nexus.getCommunity("s2")?.name).toBe("beta");
   });
 });

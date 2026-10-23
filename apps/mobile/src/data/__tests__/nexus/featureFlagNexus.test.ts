@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryPersistence } from "@shared/core";
-import { FeatureFlagNexus } from "@mobile-data/feature-flags/FeatureFlagNexus";
+import { FeatureFlagReactNexus as FeatureFlagNexus } from "@mobile-data/feature-flags/featureFlagReactNexus";
 
 describe("FeatureFlagNexus", () => {
   it("loads feature flags and exposes flag checks", async () => {
@@ -8,7 +7,7 @@ describe("FeatureFlagNexus", () => {
       rich_composer: true,
       disabled_flag: false,
     }));
-    const nexus = new FeatureFlagNexus(createMemoryPersistence(), {
+    const nexus = new FeatureFlagNexus({
       listMyFeatureFlags,
     });
 
@@ -26,7 +25,7 @@ describe("FeatureFlagNexus", () => {
 
   it("dedupes concurrent loads", async () => {
     const listMyFeatureFlags = vi.fn(async () => ({ alpha: true }));
-    const nexus = new FeatureFlagNexus(createMemoryPersistence(), {
+    const nexus = new FeatureFlagNexus({
       listMyFeatureFlags,
     });
 
@@ -39,7 +38,7 @@ describe("FeatureFlagNexus", () => {
     const listMyFeatureFlags = vi.fn(async () => {
       throw new Error("flag service down");
     });
-    const nexus = new FeatureFlagNexus(createMemoryPersistence(), {
+    const nexus = new FeatureFlagNexus({
       listMyFeatureFlags,
     });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryPersistence } from "@shared/core";
-import { NotificationNexus } from "@mobile-data/notifications/NotificationNexus";
+import { NotificationReactNexus as NotificationNexus } from "@mobile-data/notifications/notificationReactNexus";
 import type { NotificationItem } from "@shared/lib/backend/types";
 
 const item = (overrides: Partial<NotificationItem> = {}): NotificationItem =>
@@ -28,7 +28,7 @@ describe("NotificationNexus", () => {
 
     await nexus.loadInbox();
 
-    expect(nexus.getSnapshot("r1")).toBeDefined();
+    expect(nexus.getNotification("r1")).toBeDefined();
     expect(nexus.reactiveStore.getState().counts.unseenCount).toBe(1);
   });
 

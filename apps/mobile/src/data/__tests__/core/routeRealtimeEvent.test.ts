@@ -4,10 +4,10 @@ import {
   routeRealtimeEvent,
   type HavenBackends,
 } from "@shared/core";
-import { ChannelNexus } from "@mobile-data/channels/ChannelNexus";
-import { CommunityNexus } from "@mobile-data/communities/CommunityNexus";
-import { CommunityMessageCache as CommunityMessageNexus } from "@mobile-data/messages/CommunityMessageCache";
-import { ProfileNexus } from "@mobile-data/profile/ProfileNexus";
+import { ChannelReactNexus as ChannelNexus } from "@mobile-data/channels/channelReactNexus";
+import { CommunityReactNexus as CommunityNexus } from "@mobile-data/communities/communityReactNexus";
+import { CommunityMessageReactNexus as CommunityMessageNexus } from "@mobile-data/messages/communityMessageReactNexus";
+import { ProfileReactNexus as ProfileNexus } from "@mobile-data/profile/profileReactNexus";
 import type { RealtimeEvent, RealtimeMutationTarget } from "@shared/core";
 import type { MessageBundle } from "@shared/lib/backend/types";
 
@@ -38,7 +38,7 @@ const buildFakeCore = (
   const persistence = createMemoryPersistence();
   const communities = new CommunityNexus(persistence, {} as never);
   const channels = new ChannelNexus(persistence, {} as never);
-  const profiles = new ProfileNexus(persistence);
+  const profiles = new ProfileNexus({} as never);
   const messageNexuses = new Map<string, CommunityMessageNexus>();
 
   const core: FakeCore = {

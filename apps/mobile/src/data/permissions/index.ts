@@ -1,4 +1,1 @@
-export {
-  PermissionsNexus,
-  type PermissionsNexusState,
-} from "./PermissionsNexus";
+export { PermissionsReactNexus } from "./permissionsReactNexus";

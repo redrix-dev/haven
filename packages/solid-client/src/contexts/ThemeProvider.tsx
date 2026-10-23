@@ -2,6 +2,7 @@ import {
   createContext,
   createEffect,
   createSignal,
+  untrack,
   useContext,
   type Accessor,
   type JSX,
@@ -120,8 +121,11 @@ export function ThemeProvider(props: { children: JSX.Element }) {
   createEffect(() => {
     const id = userId();
     if (!id) return;
-    void core.profiles.ensureViewerProfile(id).catch(() => {
-      // Offline/error: the locally stored theme stays in effect.
+    // ensureViewerProfile reads the profile store before its first await.
+    untrack(() => {
+      void core.profiles.ensureViewerProfile(id).catch(() => {
+        // Offline/error: the locally stored theme stays in effect.
+      });
     });
   });
 

@@ -1,33 +1,32 @@
-import type { OnboardingNexus } from "../onboarding/OnboardingNexus";
+import type { OnboardingReactNexus } from "../onboarding/onboardingReactNexus";
 import type { OnboardingCampaign } from "@shared/lib/backend/types";
 import { campaignsEqual } from "@shared/features/onboarding/logic/equality";
 import { useStoreSelector } from "./useStoreSelector";
 
-export function useCampaigns(nexus: OnboardingNexus): OnboardingCampaign[] {
+export function useCampaigns(
+  nexus: OnboardingReactNexus,
+): OnboardingCampaign[] {
   return useStoreSelector(
     nexus.reactiveStore,
-    (state) => {
-      void state.revision;
-      return state.campaigns;
-    },
+    (state) => state.campaigns,
     campaignsEqual,
   );
 }
 
-export function useLoaded(nexus: OnboardingNexus): boolean {
+export function useLoaded(nexus: OnboardingReactNexus): boolean {
   return useStoreSelector(nexus.reactiveStore, (state) => state.loaded);
 }
 
-export function useLoading(nexus: OnboardingNexus): boolean {
+export function useLoading(nexus: OnboardingReactNexus): boolean {
   return useStoreSelector(nexus.reactiveStore, (state) => state.loading);
 }
 
-export function useError(nexus: OnboardingNexus): string | null {
+export function useError(nexus: OnboardingReactNexus): string | null {
   return useStoreSelector(nexus.reactiveStore, (state) => state.error);
 }
 
 export function useCompletingCampaignKey(
-  nexus: OnboardingNexus,
+  nexus: OnboardingReactNexus,
 ): string | null {
   return useStoreSelector(
     nexus.reactiveStore,
@@ -35,7 +34,7 @@ export function useCompletingCampaignKey(
   );
 }
 
-export function useCompletionError(nexus: OnboardingNexus): string | null {
+export function useCompletionError(nexus: OnboardingReactNexus): string | null {
   return useStoreSelector(
     nexus.reactiveStore,
     (state) => state.completionError,

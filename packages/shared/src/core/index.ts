@@ -50,13 +50,6 @@ export {
   writeCommunityDisplayOrder,
 } from "./communityDisplayOrder";
 export {
-  registerCommunityAccessHandlers,
-  notifyActiveServerAccessLost,
-  notifyActiveChannelAccessLost,
-  notifyMemberBanned,
-  notifyMemberChannelAccessRevoked,
-} from "./communityAccessHandlers";
-export {
   createDefaultViewerMessagePolicyState,
   viewerCommunityPolicyEqual,
   viewerPolicyHiddenAuthorIdsEqual,
@@ -73,8 +66,4 @@ export type {
   UserStatus,
   WorkspaceMode,
 } from "./sessionStorePorts";
-export type {
-  NexusEntry,
-  EntityMapState,
-  NexusState,
-} from "./cache/entityTypes";
+export type { NexusEntry, EntityMapState } from "./cache/entityTypes";

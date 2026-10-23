@@ -60,7 +60,7 @@ export function MobileOnboardingGate({ children }: MobileOnboardingGateProps) {
   const completeCampaign = useCallback(() => {
     if (!campaign) return;
     void core
-      .completeOnboardingCampaign(campaign.key, context)
+      .completeOnboarding(campaign.key, context)
       .catch((completeError) => {
         console.warn("[MobileOnboardingGate] completion failed", completeError);
       });

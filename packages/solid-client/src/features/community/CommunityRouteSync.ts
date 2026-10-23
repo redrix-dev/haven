@@ -1,4 +1,4 @@
-import { createEffect } from "solid-js";
+import { createEffect, untrack } from "solid-js";
 import { useParams } from "@solidjs/router";
 import { requireHavenSolidCore } from "@solid-client/core";
 
@@ -14,12 +14,18 @@ export function createCommunityRouteSync(): void {
   const params = useParams();
   const core = requireHavenSolidCore();
 
+  // Track the route params only. Every call below reads the stores it writes,
+  // so it runs untracked. See haven-solid-reactivity and
+  // communitySurfaces.tier2.test.ts.
   createEffect(() => {
     const communityId = params.communityId;
+    const channelId = params.channelId ?? null;
     if (!communityId) return;
-    core.communities.setActiveId(communityId);
-    core.channels.setActiveChannelId(params.channelId ?? null);
-    void core.channels.ensureLoaded(communityId);
-    void core.ensureCommunityPermissions(communityId);
+    untrack(() => {
+      core.communities.setActiveId(communityId);
+      core.channels.setActiveChannelId(channelId);
+      void core.channels.ensureLoaded(communityId);
+      void core.ensureCommunityPermissions(communityId);
+    });
   });
 }

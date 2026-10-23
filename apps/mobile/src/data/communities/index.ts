@@ -1,3 +1,2 @@
-export { CommunityNexus } from "./CommunityNexus";
-export type { Community, CommunityNexusState } from "./CommunityNexus";
-export { createCommunityNexus } from "./factory";
+export { CommunityReactNexus } from "./communityReactNexus";
+export type { Community } from "@shared/nexus/communities/communityTypes";

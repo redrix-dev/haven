@@ -1,2 +1,1 @@
-export { SocialSolidNexus, createSocialSolidNexus } from "./socialSolidNexus";
-export type { SocialSolidState } from "./socialSolidNexus";
+export { SocialSolidNexus } from "./socialSolidNexus";

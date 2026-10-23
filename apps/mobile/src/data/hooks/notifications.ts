@@ -1,4 +1,4 @@
-import type { NotificationNexus } from "../notifications/NotificationNexus";
+import type { NotificationReactNexus as NotificationNexus } from "../notifications/notificationReactNexus";
 import type {
   NotificationCounts,
   NotificationItem,

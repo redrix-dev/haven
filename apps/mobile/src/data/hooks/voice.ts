@@ -1,18 +1,15 @@
-import type { VoiceNexus } from "../voice/VoiceNexus";
+import type { VoiceReactNexus } from "../voice/voiceReactNexus";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
-import type { VoiceNexusState } from "@shared/features/voice/voiceNexusTypes";
+import type { VoiceState } from "@shared/nexus/voice/voiceTypes";
 import { voiceParticipantRecordsEqual } from "@shared/features/voice/logic";
 import { useStoreSelector } from "./useStoreSelector";
 
-export function useVoiceSession(nexus: VoiceNexus): VoiceNexusState {
-  return useStoreSelector(nexus.reactiveStore, (state) => {
-    void state.revision;
-    return state;
-  });
+export function useVoiceSession(nexus: VoiceReactNexus): VoiceState {
+  return useStoreSelector(nexus.reactiveStore, (state) => state);
 }
 
 export function useVoiceParticipantsByChannel(
-  nexus: VoiceNexus,
+  nexus: VoiceReactNexus,
 ): Record<string, VoiceSidebarParticipant[]> {
   return useStoreSelector(
     nexus.reactiveStore,

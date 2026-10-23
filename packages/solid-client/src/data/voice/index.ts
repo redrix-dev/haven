@@ -1,1 +1,1 @@
-export { VoiceSolidNexus, createVoiceSolidNexus } from "./voiceSolidNexus";
+export { VoiceSolidNexus } from "./voiceSolidNexus";

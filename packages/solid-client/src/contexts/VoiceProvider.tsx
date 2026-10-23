@@ -490,7 +490,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   const toggleMute = () => {
     const next = !voice.isMuted;
     setVoice({ isMuted: next });
-    core.voice.setIsMuted(next);
+    core.voice.setMuted(next);
     const native = nativeVoice();
     if (native) void native.setMuted(next).catch(() => {});
     else
@@ -501,7 +501,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     const next = !voice.isDeafened;
     // Deafening also mutes (mirrors mobile's VoiceNexus.setDeafened).
     setVoice({ isDeafened: next, isMuted: next ? true : voice.isMuted });
-    core.voice.setIsDeafened(next);
+    core.voice.setDeafened(next);
     const native = nativeVoice();
     if (native) {
       // Deafen silences all incoming audio via the sidecar's master volume and

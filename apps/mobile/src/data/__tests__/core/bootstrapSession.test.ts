@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { createMemoryPersistence } from "@shared/core";
 import { resetHavenCore, syncFocusFromRoute } from "@mobile-data";
-import { CommunityNexus } from "@mobile-data/communities/CommunityNexus";
-import { ChannelNexus } from "@mobile-data/channels/ChannelNexus";
-import { CommunityMessageCache as CommunityMessageNexus } from "@mobile-data/messages/CommunityMessageCache";
+import { CommunityReactNexus as CommunityNexus } from "@mobile-data/communities/communityReactNexus";
+import { ChannelReactNexus as ChannelNexus } from "@mobile-data/channels/channelReactNexus";
+import { CommunityMessageReactNexus as CommunityMessageNexus } from "@mobile-data/messages/communityMessageReactNexus";
 import { HavenReactCore } from "@mobile-data/core/HavenReactCore";
 import type { ServerSummary } from "@shared/lib/backend/types";
 
@@ -140,7 +140,7 @@ describe("bootstrapSession", () => {
     expect(core.communities.reactiveStore.getState().orderedIds).toContain(
       "s1",
     );
-    expect(core.communities.getSnapshot("s1")?.name).toBe("Alpha");
+    expect(core.communities.getCommunity("s1")?.name).toBe("Alpha");
     expect(listUserCommunities).toHaveBeenCalledWith("u1");
     unsubscribe();
   });
@@ -182,8 +182,8 @@ describe("syncFocusFromRoute", () => {
 
     syncFocusFromRoute(core, { communityId: "s1" });
 
-    expect(core.communities.getSnapshot).toBeDefined();
-    expect(core.channels.getChannelsSnapshot("s1")[0]?.id).toBe("c1");
+    expect(core.communities.getCommunity).toBeDefined();
+    expect(core.channels.getChannels("s1")[0]?.id).toBe("c1");
   });
 
   it("uses lastChannelByCommunity when present", () => {
@@ -330,7 +330,7 @@ describe("warmup orchestration", () => {
       directMessages: {
         ensureConversationsLoaded,
         ensureMessagesLoaded,
-        getConversationsSnapshot: () => [
+        getConversations: () => [
           { conversationId: "dm1", unreadCount: 2 },
           { conversationId: "dm2", unreadCount: 0 },
         ],
@@ -357,7 +357,7 @@ describe("warmup orchestration", () => {
       expect.anything(),
     );
     expect(warn).toHaveBeenCalledWith(
-      "[HavenReactCore warmup] viewer profile failed",
+      "[HavenCore warm-up] viewer profile failed",
       expect.any(Error),
     );
 
@@ -374,7 +374,7 @@ describe("warmup orchestration", () => {
         ensureConversationsLoaded: vi.fn(async () => {}),
         ensureMessagesLoaded,
         markRead,
-        getConversationsSnapshot: () => [
+        getConversations: () => [
           { conversationId: "dm1", unreadCount: 1 },
           { conversationId: "dm2", unreadCount: 0 },
           { conversationId: "dm3", unreadCount: 4 },
@@ -408,7 +408,7 @@ describe("warmup orchestration", () => {
         ensureLoaded: vi.fn(async () => {}),
         getActiveChannelId: () => "c2",
         setActiveChannelId: vi.fn(),
-        getChannelsSnapshot: () => [
+        getChannels: () => [
           {
             id: "c1",
             communityId: "s1",
@@ -470,29 +470,5 @@ describe("warmup orchestration", () => {
     expect(prepareTextChannelMessages).toHaveBeenCalledWith("s1", "c1");
     expect(prepareTextChannelMessages).toHaveBeenCalledWith("s1", "c3");
     expect(prepareTextChannelMessages).not.toHaveBeenCalledWith("s1", "c5");
-  });
-});
-
-describe("deleteCommunityMessageForModeration", () => {
-  it("delegates community message deletion to the community data backend", async () => {
-    const deleteMessage = vi.fn(async () => {});
-    const core = {
-      backends: {
-        communityData: { deleteMessage },
-      },
-    } as unknown as HavenReactCore;
-
-    await HavenReactCore.prototype.deleteCommunityMessageForModeration.call(
-      core,
-      {
-        communityId: "s1",
-        messageId: "m1",
-      },
-    );
-
-    expect(deleteMessage).toHaveBeenCalledWith({
-      communityId: "s1",
-      messageId: "m1",
-    });
   });
 });

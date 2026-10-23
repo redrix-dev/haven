@@ -1,4 +1,1 @@
-export {
-  FeatureFlagNexus,
-  type FeatureFlagNexusState,
-} from "./FeatureFlagNexus";
+export { FeatureFlagReactNexus } from "./featureFlagReactNexus";

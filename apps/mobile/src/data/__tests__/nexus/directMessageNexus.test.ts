@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryPersistence } from "@shared/core";
-import { DirectMessageNexus } from "@mobile-data/direct-messages/DirectMessageNexus";
+import { DirectMessageReactNexus as DirectMessageNexus } from "@mobile-data/direct-messages/directMessageReactNexus";
 import { conversationsEqual } from "@shared/nexus/direct-messages/dmSelectors";
 import type {
   DirectMessage,
@@ -53,7 +53,7 @@ describe("DirectMessageNexus", () => {
     await Promise.all([nexus.loadConversations(), nexus.loadConversations()]);
 
     expect(listConversations).toHaveBeenCalledTimes(1);
-    expect(nexus.getSnapshot("dm1")).toBeDefined();
+    expect(nexus.getConversation("dm1")).toBeDefined();
   });
 
   it("can load conversations without toggling the loading state", async () => {
@@ -76,7 +76,7 @@ describe("DirectMessageNexus", () => {
     resolveList([conversation()]);
     await promise;
 
-    expect(nexus.getSnapshot("dm1")).toBeDefined();
+    expect(nexus.getConversation("dm1")).toBeDefined();
     expect(nexus.reactiveStore.getState().isLoadingConversations).toBe(false);
   });
 
@@ -291,6 +291,6 @@ describe("DirectMessageNexus", () => {
 
     await nexus.markRead("dm1");
 
-    expect(nexus.getSnapshot("dm1")?.unreadCount).toBe(0);
+    expect(nexus.getConversation("dm1")?.unreadCount).toBe(0);
   });
 });

@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-solid";
-import type { HavenChannel } from "@shared/nexus/community/channelTypes";
+import type { HavenChannel } from "@shared/nexus/channels/channelTypes";
 import type { ChannelGroup, ChannelKind } from "@shared/lib/backend/types";
 import { Button, ConfirmDialog, TextField } from "@solid-client/components/ui";
 import { requireHavenSolidCore } from "@solid-client/core";

@@ -1,5 +1,5 @@
 import type { Channel } from "@shared/lib/backend/types";
-import type { HavenChannel } from "@shared/nexus/community/channelTypes";
+import type { HavenChannel } from "@shared/nexus/channels/channelTypes";
 
 export const toChannel = (channel: HavenChannel): Channel =>
   ({

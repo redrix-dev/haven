@@ -103,7 +103,7 @@ export function CommunityActionSheets({
     setCreateLoading(true);
     setCreateError(null);
     try {
-      const { id } = await core.createCommunity(userId, name);
+      const { id } = await core.createCommunity(name);
       await core.prepareCommunityEntry(id);
       await setLastCommunitySurface("drawer");
       setCreateName("");

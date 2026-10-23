@@ -1,9 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { execFileSync } from "node:child_process";
 import { createHavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
-import { createMemoryPersistence } from "@shared/core";
-import { createHavenCore } from "@mobile-data/core";
-import { createReactHavenCoreOptions } from "@mobile-data/createReactHavenCore";
+import { createHavenBackends } from "@shared/core/backends";
 import type { Database } from "@shared/types/database";
 import { loadBootstrappedTestUsers, type TestUserKey } from "../fixtures/users";
 
@@ -44,16 +42,11 @@ export const supabase = createHavenSupabaseClient(
   },
 );
 
-createHavenCore(
-  createReactHavenCoreOptions({
-    client: supabase,
-    publicConfig: {
-      supabaseUrl: localSupabaseEnv.url,
-      supabaseAnonKey: localSupabaseEnv.anonKey,
-    },
-    persistence: createMemoryPersistence(),
-  }),
-);
+/** Backends over the signed-in test client, for backend contract tests. */
+export const testBackends = createHavenBackends(supabase, {
+  supabaseUrl: localSupabaseEnv.url,
+  supabaseAnonKey: localSupabaseEnv.anonKey,
+});
 
 export async function signInAsTestUser(userKey: TestUserKey) {
   const users = loadBootstrappedTestUsers();

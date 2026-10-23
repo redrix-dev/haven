@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryPersistence } from "@shared/core";
-import { OnboardingNexus } from "@mobile-data/onboarding/OnboardingNexus";
+import { OnboardingReactNexus as OnboardingNexus } from "@mobile-data/onboarding/onboardingReactNexus";
 import type { OnboardingClientContext } from "@shared/lib/backend/types";
 
 const context: OnboardingClientContext = {
@@ -26,7 +25,7 @@ describe("OnboardingNexus", () => {
       },
     ]);
     const completeOnboardingCampaign = vi.fn();
-    const nexus = new OnboardingNexus(createMemoryPersistence(), {
+    const nexus = new OnboardingNexus({
       listMyOnboardingCampaigns,
       completeOnboardingCampaign,
     });
@@ -41,7 +40,7 @@ describe("OnboardingNexus", () => {
 
   it("dedupes concurrent loads", async () => {
     const listMyOnboardingCampaigns = vi.fn(async () => []);
-    const nexus = new OnboardingNexus(createMemoryPersistence(), {
+    const nexus = new OnboardingNexus({
       listMyOnboardingCampaigns,
       completeOnboardingCampaign: vi.fn(),
     });
@@ -73,7 +72,7 @@ describe("OnboardingNexus", () => {
       communityName: "Alpha",
       joined: true,
     }));
-    const nexus = new OnboardingNexus(createMemoryPersistence(), {
+    const nexus = new OnboardingNexus({
       listMyOnboardingCampaigns,
       completeOnboardingCampaign,
     });
@@ -91,7 +90,7 @@ describe("OnboardingNexus", () => {
   });
 
   it("records completion errors and resets state", async () => {
-    const nexus = new OnboardingNexus(createMemoryPersistence(), {
+    const nexus = new OnboardingNexus({
       listMyOnboardingCampaigns: vi.fn(async () => []),
       completeOnboardingCampaign: vi.fn(async () => {
         throw new Error("community missing");

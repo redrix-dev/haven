@@ -85,7 +85,7 @@ export function NotificationInboxList({
   const refresh = useCallback(async () => {
     setRefreshing(true);
     setActionError(null);
-    await withNotificationAction(() => core.notifications.refreshInbox());
+    await withNotificationAction(() => core.notifications.loadInbox());
     setRefreshing(false);
   }, [core.notifications, withNotificationAction]);
 

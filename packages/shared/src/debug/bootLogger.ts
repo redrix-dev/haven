@@ -9,7 +9,7 @@
  * Usage:
  *   import { bootLogger } from '@shared/debug/bootLogger';
  *   bootLogger.mark('js-entry');           // first thing in index.tsx / App.tsx
- *   bootLogger.mark('core-created');       // after createHavenCore()
+ *   bootLogger.mark('core-created');       // after the platform core is created
  *   ...
  *   bootLogger.printReport();             // dump to console
  *   const html = bootLogger.getReportHtml(); // render in a panel

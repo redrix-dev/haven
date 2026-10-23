@@ -1,39 +1,65 @@
-import type { CommunityAdminNexus } from "../community-management/CommunityAdminNexus";
+import { shallow } from "zustand/shallow";
+import type { CommunityAdminReactNexus } from "../community-management/communityAdminReactNexus";
 import type {
-  CommunityAdminChannelPermissionsState,
-  CommunityAdminServerPanelState,
-} from "@shared/nexus/community/communityAdminTypes";
+  CommunityBanItem,
+  PermissionCatalogItem,
+  ServerInvite,
+  ServerMemberRoleItem,
+  ServerRoleItem,
+  ServerSettingsSnapshot,
+} from "@shared/lib/backend/types";
 import { useStoreSelector } from "./useStoreSelector";
 
-export function useChannelPermissionsState(
-  nexus: CommunityAdminNexus,
-): CommunityAdminChannelPermissionsState {
-  return useStoreSelector(nexus.reactiveStore, (state) => ({
-    channelRolePermissions: state.channelRolePermissions,
-    channelMemberPermissions: state.channelMemberPermissions,
-    channelPermissionMemberOptions: state.channelPermissionMemberOptions,
-    channelPermissionsLoading: state.channelPermissionsLoading,
-    channelPermissionsLoadError: state.channelPermissionsLoadError,
-  }));
-}
+/** What the community settings screen shows for one community. */
+export type ServerPanelState = {
+  communityBans: CommunityBanItem[];
+  communityBansLoading: boolean;
+  communityBansError: string | null;
+  serverInvites: ServerInvite[];
+  serverInvitesLoading: boolean;
+  serverInvitesError: string | null;
+  serverRoles: ServerRoleItem[];
+  serverMembers: ServerMemberRoleItem[];
+  serverPermissionCatalog: PermissionCatalogItem[];
+  serverRoleManagementLoading: boolean;
+  serverRoleManagementError: string | null;
+  serverSettingsInitialValues: ServerSettingsSnapshot | null;
+  serverSettingsLoading: boolean;
+  serverSettingsLoadError: string | null;
+};
+
+const NO_BANS: CommunityBanItem[] = [];
+const NO_INVITES: ServerInvite[] = [];
+const NO_ROLES: ServerRoleItem[] = [];
+const NO_MEMBERS: ServerMemberRoleItem[] = [];
+const NO_PERMISSIONS: PermissionCatalogItem[] = [];
 
 export function useServerPanelState(
-  nexus: CommunityAdminNexus,
-): CommunityAdminServerPanelState {
-  return useStoreSelector(nexus.reactiveStore, (state) => ({
-    communityBans: state.communityBans,
-    communityBansLoading: state.communityBansLoading,
-    communityBansError: state.communityBansError,
-    serverInvites: state.serverInvites,
-    serverInvitesLoading: state.serverInvitesLoading,
-    serverInvitesError: state.serverInvitesError,
-    serverRoles: state.serverRoles,
-    serverMembers: state.serverMembers,
-    serverPermissionCatalog: state.serverPermissionCatalog,
-    serverRoleManagementLoading: state.serverRoleManagementLoading,
-    serverRoleManagementError: state.serverRoleManagementError,
-    serverSettingsInitialValues: state.serverSettingsInitialValues,
-    serverSettingsLoading: state.serverSettingsLoading,
-    serverSettingsLoadError: state.serverSettingsLoadError,
-  }));
+  nexus: CommunityAdminReactNexus,
+  communityId: string,
+): ServerPanelState {
+  return useStoreSelector(
+    nexus.reactiveStore,
+    ({ loading, errors, ...state }) => {
+      const roles = state.rolesByCommunity[communityId];
+      return {
+        communityBans: state.bansByCommunity[communityId] ?? NO_BANS,
+        communityBansLoading: loading.bans[communityId] ?? false,
+        communityBansError: errors.bans[communityId] ?? null,
+        serverInvites: state.invitesByCommunity[communityId] ?? NO_INVITES,
+        serverInvitesLoading: loading.invites[communityId] ?? false,
+        serverInvitesError: errors.invites[communityId] ?? null,
+        serverRoles: roles?.roles ?? NO_ROLES,
+        serverMembers: roles?.members ?? NO_MEMBERS,
+        serverPermissionCatalog: roles?.permissionsCatalog ?? NO_PERMISSIONS,
+        serverRoleManagementLoading: loading.roles[communityId] ?? false,
+        serverRoleManagementError: errors.roles[communityId] ?? null,
+        serverSettingsInitialValues:
+          state.settingsByCommunity[communityId] ?? null,
+        serverSettingsLoading: loading.settings[communityId] ?? false,
+        serverSettingsLoadError: errors.settings[communityId] ?? null,
+      };
+    },
+    shallow,
+  );
 }

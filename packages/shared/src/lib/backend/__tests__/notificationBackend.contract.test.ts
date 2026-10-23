@@ -1,11 +1,11 @@
 import { describe, beforeAll, afterAll, beforeEach, expect, it } from "vitest";
-import { getNotificationBackend } from "@shared/lib/backend";
 import { loadBootstrappedTestUsers } from "@test-support/fixtures/users";
 import {
   resetFixtureDomainState,
   serviceSupabase,
   signInAsTestUser,
   signOutTestUser,
+  testBackends,
 } from "@test-support/setup/supabaseLocal";
 
 describe.sequential("NotificationBackend (contract)", () => {
@@ -26,27 +26,29 @@ describe.sequential("NotificationBackend (contract)", () => {
 
   it("reads and updates global notification preferences", async () => {
     const original =
-      await getNotificationBackend().getNotificationPreferences();
+      await testBackends.notifications.getNotificationPreferences();
     expect(original.userId).toBe(users.member_a.id);
 
-    const next = await getNotificationBackend().updateNotificationPreferences({
-      ...original,
-      mentionSoundEnabled: !original.mentionSoundEnabled,
-      dmPushEnabled: !original.dmPushEnabled,
-    });
+    const next = await testBackends.notifications.updateNotificationPreferences(
+      {
+        ...original,
+        mentionSoundEnabled: !original.mentionSoundEnabled,
+        dmPushEnabled: !original.dmPushEnabled,
+      },
+    );
 
     expect(next.userId).toBe(users.member_a.id);
     expect(next.mentionSoundEnabled).toBe(!original.mentionSoundEnabled);
     expect(next.dmPushEnabled).toBe(!original.dmPushEnabled);
 
     const reloaded =
-      await getNotificationBackend().getNotificationPreferences();
+      await testBackends.notifications.getNotificationPreferences();
     expect(reloaded.mentionSoundEnabled).toBe(next.mentionSoundEnabled);
     expect(reloaded.dmPushEnabled).toBe(next.dmPushEnabled);
   });
 
   it("lists inbox notifications and supports read/dismiss mutations", async () => {
-    const notifications = await getNotificationBackend().listNotifications({
+    const notifications = await testBackends.notifications.listNotifications({
       limit: 20,
     });
     expect(Array.isArray(notifications)).toBe(true);
@@ -54,12 +56,12 @@ describe.sequential("NotificationBackend (contract)", () => {
     if (notifications.length === 0) return;
 
     const target = notifications[0];
-    const markedRead = await getNotificationBackend().markNotificationsRead([
+    const markedRead = await testBackends.notifications.markNotificationsRead([
       target.recipientId,
     ]);
     expect(markedRead).toBeGreaterThanOrEqual(0);
 
-    const dismissed = await getNotificationBackend().dismissNotifications([
+    const dismissed = await testBackends.notifications.dismissNotifications([
       target.recipientId,
     ]);
     expect(dismissed).toBeGreaterThanOrEqual(0);
@@ -89,15 +91,14 @@ describe.sequential("NotificationBackend (contract)", () => {
     );
     expect(createError).toBeNull();
 
-    const inboxNotifications = await getNotificationBackend().listNotifications(
-      { limit: 50 },
-    );
+    const inboxNotifications =
+      await testBackends.notifications.listNotifications({ limit: 50 });
     expect(inboxNotifications.some((item) => item.sourceId === sourceId)).toBe(
       false,
     );
 
     const soundNotifications =
-      await getNotificationBackend().listSoundNotifications({ limit: 50 });
+      await testBackends.notifications.listSoundNotifications({ limit: 50 });
     const target = soundNotifications.find(
       (item) => item.sourceId === sourceId,
     );
@@ -111,54 +112,60 @@ describe.sequential("NotificationBackend (contract)", () => {
     const tokenA = `ExponentPushToken[contract-${crypto.randomUUID()}]`;
     const installationId = `vitest-expo-install-${crypto.randomUUID()}`;
 
-    const created = await getNotificationBackend().upsertExpoPushSubscription({
-      expoPushToken: tokenA,
-      platform: "android",
-      installationId,
-      metadata: { suite: "notificationBackend.contract", device: "expo-a1" },
-    });
+    const created = await testBackends.notifications.upsertExpoPushSubscription(
+      {
+        expoPushToken: tokenA,
+        platform: "android",
+        installationId,
+        metadata: { suite: "notificationBackend.contract", device: "expo-a1" },
+      },
+    );
 
     expect(created.userId).toBe(users.member_a.id);
     expect(created.expoPushToken).toBe(tokenA);
     expect(created.installationId).toBe(installationId);
     expect(created.platform).toBe("android");
 
-    const listedA = await getNotificationBackend().listExpoPushSubscriptions();
+    const listedA =
+      await testBackends.notifications.listExpoPushSubscriptions();
     expect(listedA.some((row) => row.expoPushToken === tokenA)).toBe(true);
 
     const tokenB = `ExponentPushToken[contract-${crypto.randomUUID()}]`;
-    const rotated = await getNotificationBackend().upsertExpoPushSubscription({
-      expoPushToken: tokenB,
-      platform: "android",
-      installationId,
-      metadata: {
-        suite: "notificationBackend.contract",
-        device: "expo-a1",
-        rev: 2,
+    const rotated = await testBackends.notifications.upsertExpoPushSubscription(
+      {
+        expoPushToken: tokenB,
+        platform: "android",
+        installationId,
+        metadata: {
+          suite: "notificationBackend.contract",
+          device: "expo-a1",
+          rev: 2,
+        },
       },
-    });
+    );
 
     expect(rotated.expoPushToken).toBe(tokenB);
     const listedAfterRotate =
-      await getNotificationBackend().listExpoPushSubscriptions();
+      await testBackends.notifications.listExpoPushSubscriptions();
     expect(
       listedAfterRotate.filter((row) => row.installationId === installationId),
     ).toHaveLength(1);
 
     await signInAsTestUser("member_b");
-    const listedB = await getNotificationBackend().listExpoPushSubscriptions();
+    const listedB =
+      await testBackends.notifications.listExpoPushSubscriptions();
     expect(listedB.some((row) => row.expoPushToken === tokenB)).toBe(false);
 
     const deletedByB =
-      await getNotificationBackend().deleteExpoPushSubscription(tokenB);
+      await testBackends.notifications.deleteExpoPushSubscription(tokenB);
     expect(deletedByB).toBe(false);
 
     await signInAsTestUser("member_a");
     const deletedByA =
-      await getNotificationBackend().deleteExpoPushSubscription(tokenB);
+      await testBackends.notifications.deleteExpoPushSubscription(tokenB);
     expect(deletedByA).toBe(true);
     const deletedAgain =
-      await getNotificationBackend().deleteExpoPushSubscription(tokenB);
+      await testBackends.notifications.deleteExpoPushSubscription(tokenB);
     expect(deletedAgain).toBe(false);
   });
 
@@ -186,7 +193,7 @@ describe.sequential("NotificationBackend (contract)", () => {
     expect(insertError).toBeNull();
 
     const traces =
-      await getNotificationBackend().listNotificationDeliveryTraces({
+      await testBackends.notifications.listNotificationDeliveryTraces({
         limit: 20,
       });
     const target = traces.find(

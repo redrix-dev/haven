@@ -69,7 +69,7 @@ export function CommunitySettingsSection({
     }),
     [foregroundColor, themeTokens],
   );
-  const serverPanel = useServerPanelState(admin);
+  const serverPanel = useServerPanelState(admin, serverId);
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id ?? null;
 
@@ -149,13 +149,9 @@ export function CommunitySettingsSection({
     if (!serverId || !currentUserId) return;
     await Promise.allSettled([
       admin.loadServerSettings(serverId),
-      admin.loadServerRoleManagement(serverId),
-      canManageInvites
-        ? admin.loadServerInvites(serverId)
-        : Promise.resolve(admin.resetServerInvites()),
-      canManageBans
-        ? admin.loadCommunityBans(serverId)
-        : Promise.resolve(admin.resetCommunityBans()),
+      admin.loadRoleManagement(serverId),
+      canManageInvites ? admin.loadInvites(serverId) : Promise.resolve(),
+      canManageBans ? admin.loadBans(serverId) : Promise.resolve(),
     ]);
   }, [admin, canManageBans, canManageInvites, serverId, currentUserId]);
 
@@ -188,22 +184,22 @@ export function CommunitySettingsSection({
 
   const refreshServers = useCallback(async () => {
     if (!currentUserId) return;
-    await core.refreshCommunities(currentUserId);
+    await core.communities.load(currentUserId);
   }, [core, currentUserId]);
 
   const handleSaveGeneral = async () => {
     if (!snapshots.settings) return;
     setSavingSettings(true);
     try {
-      await admin.saveServerSettings(
-        {
+      await admin.saveServerSettings({
+        communityId: serverId,
+        values: {
           name: draftName,
           description: draftDesc.trim() || null,
           allowPublicInvites: draftPublicInvites,
           requireReportReason: draftReportReason,
         },
-        serverId,
-      );
+      });
       await refreshServers();
       Alert.alert("Saved", "Community settings updated.");
     } catch (e) {
@@ -218,7 +214,10 @@ export function CommunitySettingsSection({
     if (!canManageRoles) return;
     try {
       const merged = [...systemRoles, ...data];
-      await admin.reorderServerRoles(merged, serverId);
+      await admin.reorderRoles({
+        communityId: serverId,
+        orderedRoles: merged,
+      });
     } catch (e) {
       Alert.alert(
         "Reorder failed",
@@ -289,7 +288,8 @@ export function CommunitySettingsSection({
         (max, r) => Math.max(max, r.position),
         -1,
       );
-      await admin.createServerRole({
+      await admin.createRole({
+        communityId: serverId,
         name: trimmed,
         color: DEFAULT_ROLE_COLOR,
         position: maxPosition + 1,
@@ -304,7 +304,7 @@ export function CommunitySettingsSection({
     } finally {
       setCreatingSaving(false);
     }
-  }, [admin, newRoleName, snapshots.roles]);
+  }, [admin, newRoleName, serverId, snapshots.roles]);
 
   const openMemberEditor = useCallback((member: ServerMemberRoleItem) => {
     setEditingMemberId(member.memberId);
@@ -326,13 +326,18 @@ export function CommunitySettingsSection({
 
   const handleSaveMemberRoles = useCallback(
     async (memberId: string) => {
-      if (!canManageRoles) return;
+      if (!canManageRoles || !currentUserId) return;
       setSavingRoles(true);
       try {
         // saveServerMemberRoles fully reconciles the member's roles, so
         // pendingRoleIds (seeded from member.roleIds) must carry the complete
         // desired set — locked system/default roles included.
-        await admin.saveServerMemberRoles(memberId, pendingRoleIds);
+        await admin.saveMemberRoles({
+          communityId: serverId,
+          memberId,
+          roleIds: pendingRoleIds,
+          assignedByUserId: currentUserId,
+        });
         closeMemberEditor();
       } catch (e) {
         Alert.alert(
@@ -343,7 +348,14 @@ export function CommunitySettingsSection({
         setSavingRoles(false);
       }
     },
-    [admin, canManageRoles, pendingRoleIds, closeMemberEditor],
+    [
+      admin,
+      canManageRoles,
+      currentUserId,
+      pendingRoleIds,
+      closeMemberEditor,
+      serverId,
+    ],
   );
 
   const tabs: { key: TabKey; label: string }[] = [
@@ -396,17 +408,29 @@ export function CommunitySettingsSection({
             isCurrentUserOwner={isCurrentUserOwner}
             onBack={() => setSelectedRoleId(null)}
             onSaveDetails={({ name, color }) =>
-              admin.updateServerRole({
+              admin.saveRole({
+                communityId: serverId,
                 roleId: selectedRole.id,
-                name,
-                color,
                 position: selectedRole.position,
+                details: { name, color },
+                permissionKeys: null,
               })
             }
             onSavePermissions={(keys) =>
-              admin.saveServerRolePermissions(selectedRole.id, keys)
+              admin.saveRole({
+                communityId: serverId,
+                roleId: selectedRole.id,
+                position: selectedRole.position,
+                details: null,
+                permissionKeys: keys,
+              })
             }
-            onDelete={() => admin.deleteServerRole(selectedRole.id)}
+            onDelete={() =>
+              admin.deleteRole({
+                communityId: serverId,
+                roleId: selectedRole.id,
+              })
+            }
           />
         ) : (
           <View className="flex-1 pt-4">
@@ -699,9 +723,11 @@ export function CommunitySettingsSection({
               invites={snapshots.invites}
               loadError={loadErrors.invites}
               onCreateInvite={(input) =>
-                admin.createServerInvite(input, serverId)
+                admin.createInvite({ ...input, communityId: serverId })
               }
-              onRevoke={(id) => admin.revokeServerInvite(id, serverId)}
+              onRevoke={(id) =>
+                admin.revokeInvite({ communityId: serverId, inviteId: id })
+              }
             />
           ) : tab === "bans" && canManageBans ? (
             <BansTab
@@ -714,10 +740,10 @@ export function CommunitySettingsSection({
                     text: "Unban",
                     onPress: () =>
                       void admin
-                        .unbanUserFromCurrentServer(
-                          { targetUserId: bannedUserId },
-                          serverId,
-                        )
+                        .unbanMember({
+                          communityId: serverId,
+                          targetUserId: bannedUserId,
+                        })
                         .catch((e) =>
                           Alert.alert(
                             "Error",

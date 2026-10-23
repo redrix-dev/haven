@@ -1,8 +1,9 @@
 export { useStoreSelector } from "./useStoreSelector";
-export { useChannelPermissionsState, useServerPanelState } from "./admin";
+export { useServerPanelState, type ServerPanelState } from "./admin";
 export {
   useActiveChannelId,
   useChannelGroups,
+  useChannelPermissionsState,
   useChannels,
   useChannelsLoading,
 } from "./channels";

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryPersistence } from "@shared/core";
-import { ProfileNexus } from "@mobile-data/profile/ProfileNexus";
+import { ProfileReactNexus as ProfileNexus } from "@mobile-data/profile/profileReactNexus";
 
 describe("ProfileNexus", () => {
   it("loads the viewer profile and mirrors it into live profile identity state", async () => {
@@ -12,7 +11,7 @@ describe("ProfileNexus", () => {
       profileBio: null,
       activeFlair: null,
     }));
-    const nexus = new ProfileNexus(createMemoryPersistence(), {
+    const nexus = new ProfileNexus({
       fetchUserProfile,
     } as never);
 
@@ -44,7 +43,7 @@ describe("ProfileNexus", () => {
         iconKey: "sparkles",
       },
     }));
-    const nexus = new ProfileNexus(createMemoryPersistence(), {
+    const nexus = new ProfileNexus({
       updateUserProfile,
     } as never);
 
@@ -136,7 +135,7 @@ describe("ProfileNexus", () => {
         },
       },
     }));
-    const nexus = new ProfileNexus(createMemoryPersistence(), {
+    const nexus = new ProfileNexus({
       listMyUserFlairs,
       setActiveUserFlair,
       fetchUserProfile,
@@ -165,7 +164,7 @@ describe("ProfileNexus", () => {
       canViewDetails: false,
       details: null,
     }));
-    const nexus = new ProfileNexus(createMemoryPersistence(), {
+    const nexus = new ProfileNexus({
       fetchProfileCard,
     } as never);
 
@@ -184,7 +183,7 @@ describe("ProfileNexus", () => {
     const fetchProfileCard = vi.fn(async () => {
       throw new Error("profile card unavailable");
     });
-    const nexus = new ProfileNexus(createMemoryPersistence(), {
+    const nexus = new ProfileNexus({
       fetchProfileCard,
     } as never);
 
@@ -206,7 +205,7 @@ describe("ProfileNexus", () => {
       isActive: true,
       displayPrefix: "Staff",
     }));
-    const nexus = new ProfileNexus(createMemoryPersistence(), {
+    const nexus = new ProfileNexus({
       fetchPlatformStaff,
     } as never);
 
@@ -221,7 +220,7 @@ describe("ProfileNexus", () => {
     const fetchPlatformStaff = vi.fn(async () => {
       throw new Error("staff unavailable");
     });
-    const nexus = new ProfileNexus(createMemoryPersistence(), {
+    const nexus = new ProfileNexus({
       fetchPlatformStaff,
     } as never);
 

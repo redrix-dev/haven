@@ -22,6 +22,7 @@ import {
   CommunityView,
   CommunityHome,
   CommunityAccessView,
+  CommunityAccessLossHost,
   RoleManagementView,
   CommunitySettingsPanel,
 } from "../features/community";
@@ -306,6 +307,7 @@ function AppLayout(props: RouteSectionProps) {
           </div>
           <NotificationToastLayer />
           <ModmailLoader />
+          <CommunityAccessLossHost />
           <CommunitySettingsPanel />
         </OnboardingGate>
       </Match>
