@@ -1,59 +1,73 @@
 # Realtime — event contract & coverage
 
-Maintained alongside [HAVEN_CORE.md](./HAVEN_CORE.md). One sentence per row: does the private
-user channel broadcast this event, and does `routeRealtimeEvent` route it into a cache?
-The Solid core (`HavenSolidCore`) implements the same `RealtimeMutationTarget` contract
-against this same matrix.
+Maintained alongside [HAVEN_CORE.md](./HAVEN_CORE.md). One row per event: does
+the private user channel broadcast it, and where does `routeRealtimeEvent` send
+it?
 
-> **Post-cleave:** routing logic lives in `packages/shared/src/core/routeRealtimeEvent.ts` and
-> operates on `RealtimeMutationTarget` (implemented by `HavenReactCore` on mobile). Message
-> cache class: `CommunityMessageCache` (`apps/mobile/src/data/messages/`).
+Routing lives in `packages/shared/src/core/routeRealtimeEvent.ts` and operates
+on `RealtimeMutationTarget`, which the shared `HavenCore` implements — so every
+platform routes events identically.
 
 ## Design contract
 
-- **HavenReactCore orchestrates** session bootstrap, `routeEvent`, and cross-cache commands
-  (policy sync, access revoked, focus load).
+- **HavenCore orchestrates** session bootstrap, `routeEvent`, and cross-nexus
+  commands (policy sync, access loss, focus loads).
 - **Realtime is the mutation bus** for data that changed elsewhere.
-- **Default handler shape:** one event → one primary cache → patch, evict, or single-domain reload.
-  Multi-cache work is explicit in `routeRealtimeEvent` or `apps/mobile/src/data/core/commands/*`.
-- **UI writes:** call the authoritative cache (or RPC); let the event path update other surfaces.
+- **Default handler shape:** one event → one primary nexus → patch, evict, or
+  single-domain reload. Work across nexuses is a HavenCore method, called from
+  `routeRealtimeEvent`.
+- **UI writes:** call the authoritative nexus (or RPC); let the event path
+  update other surfaces.
+- **One private channel per user** (`private_user:{userId}`). The only other
+  channels are the voice nexus's room-scoped presence and kick channels.
 
 ## Coverage matrix
 
-| Domain         | Event                           | Backend emits?          | `routeEvent` routes?             | Target                                                       |
-| -------------- | ------------------------------- | ----------------------- | -------------------------------- | ------------------------------------------------------------ |
-| Community      | community list change           | partial (login fetch)   | n/a — fetched on bootstrap       | `CommunityNexus.load`                                        |
-| Channel        | `CHANNEL_INSERT`                | yes                     | yes                              | `ChannelNexus.upsertChannel`                                 |
-| Channel        | `CHANNEL_UPDATE`                | yes                     | yes                              | `ChannelNexus.upsertChannel`                                 |
-| Channel        | `CHANNEL_DELETE`                | yes                     | yes                              | `ChannelNexus.removeChannel` + `messages.evictChannel`       |
-| Channel access | `member_channel_access_revoked` | yes                     | yes                              | `applyAccessRevoked`                                         |
-| Channel group  | `CHANNEL_GROUP_CHANGE`          | yes                     | yes                              | `ChannelNexus.loadForCommunity`                              |
-| Profile        | `PROFILE_IDENTITY_CHANGE`       | yes                     | yes                              | `ProfileNexus.upsert/remove`                                 |
-| Community      | `COMMUNITY_MEMBERSHIP_CHANGE`   | yes                     | yes                              | `CommunityNexus.load(userId)`                                |
-| Message        | `MESSAGE_INSERT`                | yes                     | yes                              | `CommunityMessageCache.insertMessage`                        |
-| Message        | `MESSAGE_UPDATE`                | yes                     | yes                              | `CommunityMessageCache.upsertMessage`                        |
-| Message        | `MESSAGE_DELETE`                | yes                     | yes                              | `CommunityMessageCache.removeMessage`                        |
-| Reaction       | insert / delete                 | per-channel sub removed | partial — via message row update | follow-up: route `REACTION_*`                                |
-| Attachment     | insert / delete                 | per-channel sub removed | partial                          | follow-up: route `ATTACHMENT_*`                              |
-| Link preview   | insert / update                 | per-channel sub removed | partial                          | follow-up: route `LINK_PREVIEW_*`                            |
-| Roles          | `ROLE_CHANGE`                   | yes                     | yes                              | `core.onRoleChange` → hydrate permissions                    |
-| Notifications  | `NOTIFICATION`                  | yes                     | yes                              | `NotificationNexus.loadInbox` + counts refresh               |
-| DM             | `DM_CONVERSATION`               | yes                     | yes                              | `DirectMessageNexus.loadConversations`                       |
-| DM             | `DM_MESSAGE`                    | yes                     | yes                              | `DirectMessageNexus.loadMessages(conversationId)`            |
-| Social         | `SOCIAL_CHANGE`                 | yes                     | yes                              | `SocialNexus.handleSocialChange` + `syncViewerMessagePolicy` |
-| Moderation     | `member_banned`                 | yes                     | yes                              | community access handlers                                    |
-| Moderation     | `report_status_updated`         | yes                     | yes                              | `uiStore` revision bump + inbox refresh where needed         |
+| Domain         | Event                         | Emitted by                                                                                 | Routed to                                                                                                                 |
+| -------------- | ----------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Community      | `COMMUNITY_MEMBERSHIP_CHANGE` | `community_members` insert/delete (join, leave, kick, ban)                                 | `communities.load(userId)`; a dropped community → **access loss**                                                         |
+| Channel        | `CHANNEL_INSERT` / `UPDATE`   | channel triggers                                                                           | `channels.upsertChannel` (reload when the payload isn't a full row)                                                       |
+| Channel        | `CHANNEL_DELETE`              | channel triggers                                                                           | `channels.removeChannel` + evict the channel's messages                                                                   |
+| Channel group  | `CHANNEL_GROUP_CHANGE`        | group / group-channel / preference triggers                                                | `channels.loadForCommunity`                                                                                               |
+| Roles & access | `ROLE_CHANGE`                 | `member_roles`, `role_permissions`, `channel_role_overwrites`, `channel_member_overwrites` | `core.onRoleChange`: permissions + channel list reload, evict hidden channels' messages, move off a hidden active channel |
+| Profile        | `PROFILE_IDENTITY_CHANGE`     | `profile_identities` trigger                                                               | `profiles.upsertProfile` / `removeProfile`                                                                                |
+| Message        | `MESSAGE_INSERT`              | `messages` trigger                                                                         | partial insert, then fetch the full row → message nexus                                                                   |
+| Message        | `MESSAGE_UPDATE`              | `messages` trigger                                                                         | fetch the row → `upsertMessage`                                                                                           |
+| Message        | `MESSAGE_DELETE`              | `messages` trigger                                                                         | `removeMessage`                                                                                                           |
+| Reaction       | insert / delete               | — (per-channel subscription removed)                                                       | partial: via the next message row update                                                                                  |
+| Attachment     | insert / delete               | —                                                                                          | partial                                                                                                                   |
+| Link preview   | insert / update               | —                                                                                          | partial                                                                                                                   |
+| Notifications  | `NOTIFICATION`                | notification pipeline                                                                      | `core.onNotificationEvent`: inbox reload (counts included) + toast; desktop plays a sound                                 |
+| DM             | `DM_CONVERSATION`             | DM triggers                                                                                | `directMessages.loadConversations`                                                                                        |
+| DM             | `DM_MESSAGE`                  | DM triggers                                                                                | partial upsert + `receiveMessage`; `receiveLatest` when no message id                                                     |
+| Social         | `SOCIAL_CHANGE`               | friends / blocks                                                                           | `social.handleSocialChange` + `syncViewerMessagePolicy`                                                                   |
+| Moderation     | `report_created`              | report RPCs                                                                                | `moderation.handleReportCreated`                                                                                          |
+| Moderation     | `report_status_updated`       | report RPCs                                                                                | `moderation.handleReportChange`                                                                                           |
+| Moderation     | `USER_PLATFORM_BANNED`        | platform ban                                                                               | `moderation.handleUserPlatformBanned`                                                                                     |
+
+Unknown event types fall through to a `console.debug` line.
+
+## Access loss
+
+A kick, ban, or deleted community deletes the viewer's `community_members` row,
+which sends `COMMUNITY_MEMBERSHIP_CHANGE`. The reloaded list no longer has the
+community, so HavenCore forgets it (caches and device storage), refocuses, and
+calls the platform's `subscribeCommunityAccessLost` listener to show a notice
+and leave voice. Losing a single channel arrives as `ROLE_CHANGE`. Details in
+[HAVEN_CORE.md](./HAVEN_CORE.md#access-loss).
+
+Retired in 2026-10: `member_banned` (redundant with the membership change) and
+`member_channel_access_revoked` (a self-only broadcast nothing called; overwrite
+triggers carry that signal now).
 
 ## Open holes
 
-1. **Reactions / attachments / link previews.** Per-channel Supabase subscriptions were removed.
-   The message row itself is refreshed via `MESSAGE_UPDATE`, so child-row changes rely on the next
-   message update or initial page reload. Closing this requires server-side union into the message
-   payload or new private-channel events routed in `routeRealtimeEvent`.
-
-## Closed in hook-reduction / cleave
-
-- **Community membership** — `COMMUNITY_MEMBERSHIP_CHANGE` → `CommunityNexus.load(userId)`
-- **Channel groups** — `CHANNEL_GROUP_CHANGE` → `ChannelNexus.loadForCommunity(communityId)`
-- **Profile identities** — `PROFILE_IDENTITY_CHANGE` → `ProfileNexus`
-- **Shared routing decoupled from HavenCore** — `RealtimeMutationTarget` interface (2026-06 cleave)
+1. **Reactions / attachments / link previews.** Per-channel Supabase
+   subscriptions were removed. The message row itself is refreshed via
+   `MESSAGE_UPDATE`, so child-row changes rely on the next message update or an
+   initial page reload. Closing this needs the child rows folded into the
+   message payload, or new private-channel events routed in
+   `routeRealtimeEvent`.
+2. **No catch-up after a reconnect.** Events missed while the socket was down
+   are missed; state is corrected by the next focus-driven load or domain
+   reload (see [BOOTSTRAP.md](./BOOTSTRAP.md#lifecycle-ownership--teardown)).

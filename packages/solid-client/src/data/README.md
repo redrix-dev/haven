@@ -1,83 +1,101 @@
-# `data/` — Solid-native cache layer
+# `data/` — Solid bindings over the shared nexuses
 
-This is the **per-platform cache** for the Solid (Tauri desktop + web) app. It is
-one of the three layers of the architecture (see `docs/ARCHITECTURE.md`):
+This folder is the **Solid read layer** for the desktop (Tauri) and web app.
+The domain logic itself is not here: every domain is one shared class,
+`XNexus`, in `packages/shared/src/nexus/<domain>/`, used unchanged by mobile
+too. A Solid nexus is a thin subclass of it that does two things:
+
+1. builds the shared class's `StatePort` from a Solid store
+   (`kit/solidStatePort.ts`), and
+2. exposes reads: `state` (the live store proxy) and `createMemo` accessors.
 
 ```
-packages/shared (pure logic) → THIS (Solid cache) → solid-client UI
+packages/shared/src/nexus (domain logic, framework-free)
+        ↑ subclassed by
+data/<domain>/xSolidNexus.ts (Solid port + reactive reads)  →  solid-client UI
 ```
 
-Each domain owns a **nexus**: a class that holds a Solid `createStore` proxy,
-exposes reactive projections + named writes, and calls pure functions in
-`@shared` for all the real thinking (fetch/merge/filter/paginate). Nexuses never
-duplicate that logic, and they are **never shared with mobile's React/Zustand
-cache** — the Solid client is deliberately cleaved from mobile so its state layer
-can use Solid's native fine-grained reactivity instead of imitating Zustand.
+Mobile does the same with `XReactNexus` over a zustand port, so a behavior
+change is written once and both platforms get it.
 
-## The nexus pattern (read this first)
+## A binding, whole
 
-A Solid `createStore` proxy **is** the reactive source. There is no subscribe /
-notify / tick / revision machinery — you read fields in a tracking scope
-(component / `createMemo` / `createEffect`) and that subscribes to exactly those
-fields; you write with path-based `setState(...)` and the readers of touched
-fields re-run.
+```ts
+export class ChannelSolidNexus extends ChannelNexus {
+  /** The live store proxy. Read it inside a tracking scope. */
+  readonly state: ChannelState;
+
+  constructor(
+    persistence: NexusPersistence,
+    communityData: CommunityDataBackend,
+  ) {
+    const port = createSolidStatePort(createInitialChannelState());
+    super(port, persistence, communityData);
+    this.state = port.tracked;
+  }
+
+  channels(communityId: Accessor<string>): Accessor<HavenChannel[]> {
+    return createMemo(() => projectChannels(this.state, communityId()));
+  }
+}
+```
+
+That is the whole job. **No commands, loads or writes belong in a binding** —
+add them to the shared nexus.
 
 ```
 data/<domain>/
-  <domain>SolidNexus.ts   the nexus: holds the store, exposes reactive
-                          projection methods (createMemo over `this.state`) +
-                          named write/lifecycle methods, calls @shared logic.
-                          Class is `<Domain>SolidNexus`.
-  index.ts                barrel: re-exports the nexus class + its factory.
+  xSolidNexus.ts   the binding (class XSolidNexus)
+  index.ts         barrel: re-exports the class
 ```
 
-The full step-by-step is in [`NEXUS_RECIPE.md`](./NEXUS_RECIPE.md).
-`channels/channelSolidNexus.ts` (+ [`channelSolidNexus.md`](./channels/channelSolidNexus.md))
-is the worked template; `onboarding/onboardingSolidNexus.ts` read directly by
-`OnboardingGate` (`onboarding.state.campaigns`) is the gold-standard example of a
-component consuming a nexus.
+## How the Solid port behaves
 
-### The one rule
+- **`get()` returns the live proxy**, so shared getters (`getPermissions()`,
+  `getChannels()`) stay reactive when a memo or component calls them.
+- **`set(partial)` reconciles each key**: Solid diffs the new value against the
+  store and notifies only the leaves that changed. Editing one message updates
+  one row; it doesn't re-run other channels or remount the row.
+- **Rows keyed by something other than `id`** must say so when the port is
+  built (`createSolidStatePort(initial, { keys: { participants: "userId" } })`),
+  or a removal morphs every later row into its neighbour. Voice rosters do this.
+- **Values passed to `set` become store-owned.** Initial state always comes from
+  `createInitialXState()`, never a shared constant.
 
-Read through the projection methods, write through the named methods. **Never**
-expose `setState`, never let a caller mutate `state` directly, and never:
+## The one rule for consumers
 
-- `wireSolidReadableStore`, `fromStore`, `createStoreSelector`, manual `.notify()`,
-  or any Zustand-shaped `subscribe` / tick hook;
-- **spreading the proxy into a new object** (`{ ...state }` snapshots it and kills
-  tracking — this is the bug that historically forced the whole notify/subscribe
-  scaffold back in);
-- reading or incrementing `revision` counters — they are vestigial, existing only
-  in the shared `NexusState` type for mobile.
+Read through `state` and the accessors; write through the nexus's methods.
+Never expose or call the store setter, never mutate `state`, never spread the
+proxy into a snapshot (`{ ...state }` kills tracking).
+
+Because shared methods read the live store, **a method that reads and writes
+must run inside `untrack` when called from an effect**: track the ids you
+depend on, then `untrack(() => void core.x.load(id))`. The
+`haven-solid-reactivity` skill explains why, and the tier-2 settle tests in
+`test-support/__tests__/` hold the rule in place.
 
 ## Naming conventions
 
-- **Files:** camelCase matching the folder's full name, no abbreviations
-  (`directMessageSolidNexus.ts`, not `dm…`).
+- **Files:** camelCase matching the folder's full name (`directMessageSolidNexus.ts`).
 - **Classes:** PascalCase with a `SolidNexus` suffix (`ChannelSolidNexus`).
-- **Folders:** match mobile's domain names for cross-platform parity.
+- **Folders:** the same domain names as `packages/shared/src/nexus/` and mobile.
+- **No factories, no state aliases:** construct with `new`; state types come from shared (`ChannelState`).
 
 ## The `communities/` vs `community-management/` split
 
-Two community-related folders, deliberately distinct (mirrors mobile):
-
-- **`communities/`** — the community **entity-list** nexus (`CommunitySolidNexus`):
-  which communities the user is in, active id, display order.
-- **`community-management/`** — community **governance** nexuses: admin
-  (roles/members/settings) + moderation (modmail inbox). Not the entity list.
+- **`communities/`** — the community **list**: which communities the viewer is
+  in, the active one, display order.
+- **`community-management/`** — **governance**: admin (members, bans, roles,
+  settings, invites) and moderation (modmail).
 
 ## `session/`
 
-Session-scoped stores (auth, ui, user status, viewer message policy) live in
-`session/`. These expose `getState()` returning the **live store proxy** (read
-its fields in a tracking scope — same rule as a nexus). A store may keep a no-op
-`subscribe` **only** to satisfy a shared cross-platform contract mobile also
-implements (e.g. `ViewerMessagePolicyStore`'s `ReadableStore` type) — Solid still
-reads the proxy directly and never calls it.
+Session-scoped stores (auth, ui, user status, viewer message policy). Each
+exposes `getState()` returning the live store proxy — read it in a tracking
+scope, like a nexus.
 
 ## Wiring
 
-Nexuses are constructed and owned by `core/HavenSolidCore.ts` (the session
-composition root), which also implements the typed `RealtimeMutationTarget`
-contract from `@shared/core/realtimeMutationTarget.ts`. The UI reads nexuses
-through their projection methods, never by reaching into a nexus's store directly.
+`core/HavenSolidCore.ts` builds every binding in its `createParts()` and hands
+them to the shared `HavenCore`, which owns the session and routes realtime
+events into them. See `docs/architecture/HAVEN_CORE.md`.

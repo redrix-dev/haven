@@ -11,15 +11,14 @@ contract) and [REALTIME.md](./REALTIME.md) (event coverage).
 
 ## The shape in one paragraph
 
-Haven starts along **three separate axes**, and the shorthand "two roots, one
-phase machine" is a simplification worth unpacking: there are **three entry
-points** (`tauri` / `web` / `mobile`), **two core implementations**
-(**`HavenReactCore`** for mobile, **`HavenSolidCore`** for desktop + web), and a
-lifecycle **contract that is mirrored, not shared** — two separate
-`BootstrapPhase` classes and two `bootstrapSession` bodies with identical enums
-and steps, kept in lockstep by discipline. The only lifecycle code shared at
-runtime is `routeRealtimeEvent`, `RealtimeMutationTarget`, and the backend
-clients.
+Haven starts from **three entry points** (`tauri` / `web` / `mobile`) into
+**one shared composition root**, `HavenCore`
+([`packages/shared/src/core/havenCore.ts`](../../packages/shared/src/core/havenCore.ts)).
+Each platform subclasses it only to supply its parts: **`HavenSolidCore`**
+(desktop + web) and **`HavenReactCore`** (mobile) each contribute a
+`createParts()` that builds that framework's nexus bindings and session stores.
+Construction, `bootstrapSession`, `clearSession`, realtime routing and the
+`BootstrapPhase` machine are written once and run identically everywhere.
 
 Each host entrypoint **composes the world** once — build the Supabase client,
 materialize the persistence adapter, construct the core — and construction
@@ -47,7 +46,7 @@ idle → rehydrating → loading_communities → loading_session_data → connec
 | **Desktop (Tauri)**   | [`apps/tauri/src/main.tsx`](../../apps/tauri/src/main.tsx) | `createTauriHavenCore` → `createSolidHavenCore` | `getTauriSupabase()`  | `createTauriPersistence()` (tauri-plugin-store, **async**) | `tauriBridge`                       |
 | **Web (Vite/Vercel)** | [`apps/web/src/main.tsx`](../../apps/web/src/main.tsx)     | `createWebHavenCore` → `createSolidHavenCore`   | `getWebSupabase()`    | `createLocalStoragePersistence()`                          | none (portable browser mode)        |
 | **Mobile (RN/Expo)**  | [`apps/mobile/App.tsx`](../../apps/mobile/App.tsx)         | `createReactHavenCore` → `new HavenReactCore`   | `getMobileSupabase()` | `createMmkvPersistence()`                                  | `registerMobileAppHost()` (AppHost) |
-| Tests                 | —                                                          | `createMemoryPersistence()`                     | mock/local            | memory                                                     | —                                   |
+| Tests                 | —                                                          | `createTestHavenCore()` (shared core tests)     | stub                  | `createMemoryPersistence()`                                | —                                   |
 
 Desktop and web run the **same** Solid client (`packages/solid-client`) and the
 **same** `HavenSolidCore`; they differ only in the three shell choices above.
@@ -101,9 +100,10 @@ paint** on async theme hydration (`loadPersistedThemeId`), rendering the
 provider stack `GestureHandlerRootView → SafeAreaProvider → KeyboardProvider →
 RootNavigator`.
 
-### Core construction order (both cores, identical)
+### Core construction order (shared `HavenCore` constructor)
 
-Inside `createSolidHavenCore` / `new HavenReactCore` the constructor does, in order:
+`new HavenSolidCore(options)` / `new HavenReactCore(options)` call the shared
+constructor with their platform's `createParts`. It does, in order:
 
 1. Store the injected `persistence`.
 2. **`createHavenBackends(client, publicConfig)`** ([`packages/shared/src/core/backends.ts`](../../packages/shared/src/core/backends.ts)):
@@ -115,25 +115,21 @@ Inside `createSolidHavenCore` / `new HavenReactCore` the constructor does, in or
    - construct the remaining backends: `controlPlane`, `directMessages`,
      `moderation`, `notifications`, `social`, `serverModmail`, `voiceToken`;
    - return the `HavenBackends` bag.
-3. **`registerSessionBackends(backends)`** — publishes the bag to the shared
-   `sessionBackendRegistry`. **Currently vestigial:** the only readers are the
-   getter shims in `lib/backend/index.ts` (`getControlPlaneBackend()` etc.), and
-   no runtime code uses them — the real dependency path is injection
-   (`core.backends` + the nexuses). It also carries an init-order asymmetry:
-   `registerSessionBackends` runs **only** here in the constructor, while
-   `clearSession()` calls `resetSessionBackends()` and nothing re-registers, so
-   the global registry is `null` for the rest of the process after the first
-   logout. Inert today (no runtime readers); a footgun the moment a shared
-   accessor is wired into the runtime. Prefer deleting the registry until a real
-   framework-free consumer exists.
-4. Construct the session stores: `authStore`, `uiStore`,
-   `viewerMessagePolicyStore`, and the `links` pipeline.
-5. Construct **every Nexus** (communities, channels, messages registry, direct
+3. Build the `links` pipeline (desktop/web pass their own origins as app links).
+4. **`platform.createParts(...)`** — the one platform-specific step: build the
+   session stores (`authStore`, `uiStore`, `viewerMessagePolicyStore`) and
+   **every nexus binding** (communities, channels, messages registry, direct
    messages, notifications, onboarding, social, permissions, feature flags,
    profiles, admin, moderation, voice), each injected its `persistence` and/or
-   the specific backend(s) it needs. **Caches are empty — no I/O happens here.**
-6. `messages.setBackends(backends)`; wire the policy-sync callbacks
-   (`social` and `permissions` call back into `syncViewerMessagePolicy`).
+   the backend(s) it needs, plus the voice realtime transport. **Caches are
+   empty — no I/O happens here.**
+5. `messages.setBackends(backends)`; wire the policy-sync callbacks (`social`
+   and `permissions` call back into `syncViewerMessagePolicy`) and the
+   communities nexus's membership-lost callback (access loss, see
+   [HAVEN_CORE.md](./HAVEN_CORE.md#access-loss)).
+
+Backends reach code only by injection (`core.backends` and the nexuses); there
+is no global backend registry.
 
 At the end of Phase 0 the core exists, is registered
 (`requireHavenSolidCore()` / `requireHavenCore()`), and is on `window.__haven`
@@ -181,23 +177,21 @@ auth/app switch is driven by `session`.
 
 ## Phase 2 — `bootstrapSession(userId)`
 
-`HavenSolidCore.bootstrapSession`
-([core](../../packages/solid-client/src/core/HavenSolidCore.ts)) and
-`HavenReactCore.bootstrapSession`
-([core](../../apps/mobile/src/data/core/HavenReactCore.ts)) are line-for-line
-mirrors (mobile adds `bootLogger` marks and two extra profile loads) — but they
-are **two independent implementations kept identical by hand**: the phase enum is
-duplicated in each core's `bootstrapPhase.ts`, not shared. Each step sets the
-phase first, then does the work:
+`HavenCore.bootstrapSession`
+([core](../../packages/shared/src/core/havenCore.ts)) is one implementation for
+every surface, driving the shared
+[`BootstrapPhase`](../../packages/shared/src/core/bootstrapPhase.ts) and
+emitting `bootLogger` marks. Each step sets the phase first, then does the
+work:
 
-| Phase                  | Work                                                                                                                                                                                                                                                                                             | Sync/async                     | Waits on                                                                                  |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------------------------- |
-| `rehydrating`          | `communities.rehydrate()` + `loadDisplayOrder`, `channels`/`directMessages`/`notifications` `.rehydrate()`                                                                                                                                                                                       | **synchronous** disk reads     | nothing — paints last-known state instantly, no `await`                                   |
-| `loading_communities`  | `await communities.load(userId)` (HTTP); prune permissions for communities no longer joined; `Promise.allSettled` `ensureCommunityPermissions(id)` for every joined community                                                                                                                    | async, permissions in parallel | communities load must finish first (permissions + policy need the joined ids / active id) |
-| `loading_session_data` | `Promise.allSettled([ directMessages.ensureConversationsLoaded, notifications.ensureInbox, social.ensureLoaded, featureFlags.load ])` (mobile also: `profiles.ensureViewerProfile`, `ensurePlatformStaff`, `notifications.ensurePreferences`); then `syncViewerMessagePolicy(activeCommunityId)` | async, **all in parallel**     | these loads are mutually independent                                                      |
-| `connecting_realtime`  | `subscribeRealtime(userId)` → `controlPlane.subscribeToPrivateUserChannel(userId)` → one `private_user:{userId}` channel → `routeEvent`                                                                                                                                                          | sync subscribe                 | caches must already exist so arriving events land somewhere                               |
-| `ready`                | session live                                                                                                                                                                                                                                                                                     | —                              | —                                                                                         |
-| `error`                | any throw sets `phase = "error"` with the message and re-throws                                                                                                                                                                                                                                  | —                              | —                                                                                         |
+| Phase                  | Work                                                                                                                                                                                                                                                                                                   | Sync/async                     | Waits on                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------------------------- |
+| `rehydrating`          | `communities.rehydrate()` + `loadDisplayOrder`, `channels`/`directMessages`/`notifications` `.rehydrate()`                                                                                                                                                                                             | **synchronous** disk reads     | nothing — paints last-known state instantly, no `await`                                   |
+| `loading_communities`  | `await communities.load(userId)` (HTTP; a failure is logged and the rehydrated list kept; a community missing from the fresh list is handled as **access loss**); prune permissions for communities no longer joined; `Promise.allSettled` `ensureCommunityPermissions(id)` for every joined community | async, permissions in parallel | communities load must finish first (permissions + policy need the joined ids / active id) |
+| `loading_session_data` | `Promise.allSettled([ profiles.ensureViewerProfile, profiles.ensurePlatformStaff, featureFlags.load, directMessages.ensureConversationsLoaded, notifications.ensureInbox, notifications.ensurePreferences, social.ensureLoaded ])`; then `syncViewerMessagePolicy(activeCommunityId)`                  | async, **all in parallel**     | these loads are mutually independent                                                      |
+| `connecting_realtime`  | `subscribeRealtime(userId)` → `controlPlane.subscribeToPrivateUserChannel(userId)` → one `private_user:{userId}` channel → `routeEvent`                                                                                                                                                                | sync subscribe                 | caches must already exist so arriving events land somewhere                               |
+| `ready`                | session live                                                                                                                                                                                                                                                                                           | —                              | —                                                                                         |
+| `error`                | an unexpected throw sets `phase = "error"` with the message and re-throws (failed loads don't reach here; they are logged and skipped)                                                                                                                                                                 | —                              | —                                                                                         |
 
 **What waits for what, in plain terms:**
 
@@ -228,8 +222,8 @@ its own `postgres_changes` listeners. The full event→action matrix lives in
 [REALTIME.md](./REALTIME.md). Beyond realtime, refresh also comes from
 **focus-driven loads** on navigation (`channels.ensureLoaded`,
 `prepareTextChannelMessages`) and from the `syncViewerMessagePolicy`
-recompute (triggered by social changes, permission/elevation changes, active
-community focus, and the show-hidden toggle).
+recompute (triggered by social changes, permission/elevation changes, role
+changes, access loss, and active community focus).
 
 **Voice exception:** room-scoped `voice:presence:{communityId}:{channelId}`
 channels are allowed for WebRTC signaling and in-call presence only.
@@ -249,10 +243,13 @@ null the ref, but both are **test-only** — no runtime caller. The real model i
 **create-once, clear-many, destroy-never**:
 
 - **Logout / account switch** → `clearSession()`: unsubscribe realtime, clear
-  every nexus (~14), reset the UI + viewer-policy stores, `resetSessionBackends()`,
-  `phase = "idle"`. The instance and its backends survive. A switch is
-  `clearSession()` → `bootstrapSession(next)`; `subscribeRealtime` tears down the
-  old channel before opening the new one. **This path is coherent.**
+  every nexus (~14), reset the UI + viewer-policy stores, drop undelivered
+  access-loss notices, `phase = "idle"`. The instance and its backends survive.
+  A switch is `clearSession()` → `bootstrapSession(next)`; `subscribeRealtime`
+  tears down the old channel before opening the new one. Clearing a nexus marks
+  its in-flight loads **stale** (`LoadGate`), so a load that answers after
+  sign-out skips its writes instead of leaking the old account's data into the
+  new session. **This path is coherent.**
 - **Reconnect** is handled at the channel layer, not by re-bootstrapping.
   `subscribeToPrivateUserChannel` keeps an `onAuthStateChange` listener that calls
   `realtime.setAuth` on `TOKEN_REFRESHED` / `SIGNED_IN` (keeping the private
@@ -266,9 +263,10 @@ null the ref, but both are **test-only** — no runtime caller. The real model i
 coherent than the boot sequence:
 
 - **`clearSession` is a hand-written, exhaustive reset** — ~14 nexuses + 2 stores
-  - policy + registry, cleared one by one and maintained in parallel with
-    construction. There is no single `dispose()`; add a nexus and forget a clear
-    line and state bleeds across accounts.
+  - policy, cleared one by one in `HavenCore.clearSession` (one place for every
+    platform now) and maintained alongside `HavenParts`. There is no single
+    `dispose()`; add a nexus and forget a clear line and state bleeds across
+    accounts.
 - **Hot-reload is unhandled.** Nothing registers `import.meta.hot` / Fast Refresh
   teardown. On HMR the module re-runs, a new core overwrites the ref, and the old
   core's realtime channel, auth listener and phase listeners are never cleaned
@@ -294,15 +292,16 @@ domain-cleanup handoff it calls.
 
 ## Key files
 
-| File                                                                                                                                     | Role                                                                                              |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `apps/{tauri,web}/src/main.tsx`, `apps/mobile/App.tsx`                                                                                   | host entrypoints — compose the world                                                              |
-| `apps/tauri/src/bootstrap/createTauriHavenCore.ts`, `apps/web/src/createWebHavenCore.ts`, `apps/mobile/src/data/createReactHavenCore.ts` | per-surface core factories (client + persistence choices)                                         |
-| `packages/solid-client/src/core/HavenSolidCore.ts`, `apps/mobile/src/data/core/HavenReactCore.ts`                                        | the two composition roots (construction + `bootstrapSession` + `clearSession`)                    |
-| `packages/shared/src/core/backends.ts`                                                                                                   | `createHavenBackends` — composes every backend once; calls `configureCommunityDataBackendRuntime` |
-| `packages/{solid-client/src/core,mobile/src/data/core}/bootstrapPhase.ts`                                                                | the phase observable (identical enums)                                                            |
-| `packages/solid-client/src/contexts/SessionProvider.tsx`, `apps/mobile/src/hooks/useAuthSession.ts`                                      | auth boundary — turns a Supabase session into `bootstrapSession` / `clearSession`                 |
-| `packages/shared/src/core/routeRealtimeEvent.ts`                                                                                         | the single shared realtime mutator                                                                |
+| File                                                                                                                                       | Role                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `apps/{tauri,web}/src/main.tsx`, `apps/mobile/App.tsx`                                                                                     | host entrypoints — compose the world                                                              |
+| `apps/tauri/src/bootstrap/createTauriHavenCore.ts`, `apps/web/src/createWebHavenCore.ts`, `apps/mobile/src/data/core/havenCoreRegistry.ts` | per-surface core factories (client + persistence choices)                                         |
+| `packages/shared/src/core/havenCore.ts`                                                                                                    | the shared composition root (construction + `bootstrapSession` + `clearSession` + realtime)       |
+| `packages/solid-client/src/core/HavenSolidCore.ts`, `apps/mobile/src/data/core/HavenReactCore.ts`                                          | platform subclasses: `createParts` only                                                           |
+| `packages/shared/src/core/backends.ts`                                                                                                     | `createHavenBackends` — composes every backend once; calls `configureCommunityDataBackendRuntime` |
+| `packages/shared/src/core/bootstrapPhase.ts`                                                                                               | the phase observable                                                                              |
+| `packages/solid-client/src/contexts/SessionProvider.tsx`, `apps/mobile/src/hooks/useAuthSession.ts`                                        | auth boundary — turns a Supabase session into `bootstrapSession` / `clearSession`                 |
+| `packages/shared/src/core/routeRealtimeEvent.ts`                                                                                           | the single shared realtime mutator                                                                |
 
 ---
 
@@ -318,9 +317,9 @@ domain-cleanup handoff it calls.
   dedup in the auth boundary — but an account switch clears first.
 - **`rehydrate` is synchronous and must not await** — that is what makes the
   first paint show real data instead of a spinner.
-- **`Promise.allSettled` everywhere after communities** means a failing domain
-  degrades silently to `ready`; diagnose from per-domain `console.warn`, not a
-  single thrown error.
+- **Failed loads degrade, they don't abort.** The communities load is caught
+  and `Promise.allSettled` covers everything after it, so a failing domain still
+  reaches `ready`; diagnose from per-domain `console.warn`, not a thrown error.
 - **One realtime channel only** (`private_user:{userId}`); the sole exception is
   room-scoped voice presence.
 - **`communityDataBackend` is inert** until `createHavenBackends` runs

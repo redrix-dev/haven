@@ -1,72 +1,74 @@
 ---
 name: haven-solid-nexus
-description: Use when adding, converting, or changing Solid data nexuses/caches under packages/solid-client/src/data, HavenSolidCore wiring, Solid store projections, Solid realtime cache mutations, or data-layer tests.
+description: Use when adding or changing a data nexus — the shared XNexus in packages/shared/src/nexus, its Solid binding (packages/solid-client/src/data) or React binding (apps/mobile/src/data), StatePort or LoadGate behavior, HavenCore parts wiring, nexus projections, or data-layer tests.
 ---
 
-# Haven Solid Nexus
+# Haven Nexus (shared class + bindings)
 
 ## Read Before Editing
 
-- [packages/solid-client/src/data/README.md](../../../packages/solid-client/src/data/README.md)
-- [packages/solid-client/src/data/NEXUS_RECIPE.md](../../../packages/solid-client/src/data/NEXUS_RECIPE.md)
-- [packages/solid-client/src/data/channels/channelSolidNexus.ts](../../../packages/solid-client/src/data/channels/channelSolidNexus.ts)
+- [packages/shared/src/nexus/NEXUS_RECIPE.md](../../../packages/shared/src/nexus/NEXUS_RECIPE.md) — the step-by-step
+- [packages/solid-client/src/data/README.md](../../../packages/solid-client/src/data/README.md) — how the Solid port behaves
+- [packages/solid-client/src/data/channels/channelSolidNexus.md](../../../packages/solid-client/src/data/channels/channelSolidNexus.md) — worked example
 - [docs/architecture/HAVEN_CORE.md](../../../docs/architecture/HAVEN_CORE.md)
 
 ## Shape
 
-Each domain owns one `XxxSolidNexus`:
-
 ```text
-packages/solid-client/src/data/<domain>/
-  <domain>SolidNexus.ts
-  index.ts
+packages/shared/src/nexus/<domain>/xNexus.ts        class XNexus — all logic, over a StatePort
+packages/solid-client/src/data/<domain>/xSolidNexus.ts  class XSolidNexus extends XNexus — Solid port + reads
+apps/mobile/src/data/<domain>/xReactNexus.ts         class XReactNexus extends XNexus — zustand port + reactiveStore
 ```
 
-- File names are camelCase and use the full domain name.
-- Classes are PascalCase with a `SolidNexus` suffix.
-- Folder names mirror mobile domain names when the domain exists on both
-  platforms.
-- `HavenSolidCore` constructs and owns the nexus.
+- Logic, loads, commands, persistence: **the shared class only.** A binding
+  builds the port and exposes reads; it never adds behavior.
+- State types and `createInitialXState()` live in shared. No platform state
+  aliases, no `createX` factories — construct with `new`.
+- `HavenCore` (shared) owns every nexus; `createSolidParts` /
+  `createReactParts` construct the bindings.
 
-## Non-Negotiable Store Rules
+## Non-Negotiable Rules
 
-- Use Solid `createStore` directly.
-- Read through projection methods that return tracked values or `createMemo`
-  accessors.
-- Write through named methods only.
-- Use path-based `setState("slot", key, value)` for mutations.
-- Keep `setState` private.
-- Never expose mutable store writers to UI.
-- Never spread a store proxy into a snapshot for reactive reads.
-- Never add `wireSolidReadableStore`, `fromStore`, manual `notify()`,
-  subscribe/tick scaffolding, equality wrappers, or revision increments.
+- **No framework imports in `packages/shared`** (`check:shared-portable`).
+- **Write immutably through `port.set`**; build the next value from `port.get()`.
+- **Initial state from a factory**, never a shared constant (the Solid port
+  takes ownership of written values).
+- **Rows keyed by something other than `id`** declare it on the Solid port
+  (`createSolidStatePort(initial, { keys: { rows: "userId" } })`).
+- **Loads go through a `LoadGate`** and check `stale()` after every `await`
+  before writing, so a load answering after sign-out can't leak old data.
+- **Solid consumers never write the store directly** and never spread the
+  proxy; they call nexus methods and read `state` / accessors.
+- **Solid `get()` is the live proxy**: shared getters are reactive, so an effect
+  calling a method that reads and writes must `untrack` it (see
+  `haven-solid-reactivity`).
 
-## Conversion Or Addition Procedure
+## Procedure
 
-1. Scout the full public surface before editing:
-   - Feature usage under `packages/solid-client/src/features`
-   - `HavenSolidCore` calls
-   - `RealtimeMutationTarget` required method names
-   - Existing mobile nexus names for parity
-2. Preserve public method names expected by core/realtime contracts.
-3. Move pure projection logic to `@shared` when the logic must match mobile.
-4. Keep backend access behind injected backend interfaces.
-5. Add lifecycle methods (`load`, `ensureLoaded`, `rehydrate`, `clear`) only when
-   the domain actually needs them.
-6. Add tests beside the domain when projections, persistence, realtime patching,
-   or ordering behavior can regress.
+1. Scout the full surface: feature code, `this.<domain>.` in `havenCore.ts`,
+   the `RealtimeMutationTarget` interface (it fixes method names), mobile hooks.
+2. Change or add behavior in the shared class.
+3. Add only the reads each binding needs (Solid accessors; mobile hooks with
+   stable fallbacks and an equality fn).
+4. New domain: wire `HavenParts`, both `create*Parts`, `clearSession`, and
+   `createTestHavenCore`.
+5. Test at the right level: shared nexus over `createPlainStatePort`;
+   cross-nexus via `createTestHavenCore()`; Solid reactivity in `*.tier2.test.ts`.
+   Break what the test guards and confirm it fails.
 
 ## Validation
 
-- `npm run typecheck:solid`
+- `npm run typecheck` and `npm run mobile:typecheck`
 - `npm run lint`
-- `npx vitest run packages/solid-client/src/data/<domain>` for domain tests
-- `npm run test:unit` before handoff if shared/mobile contracts are touched
+- `npm run test:unit` (every `*.test.ts` except backend contract tests)
+- `npm run test:tier2` when Solid reactivity or effects are involved
 
 ## Footguns
 
-- Solid's Node test environment needs the Vitest alias forcing `solid-js` to the
-  reactive dev build. Do not remove that alias while Solid data tests exist.
-- `revision` may appear in shared state types. Initialize it if the type requires
-  it; do not use it for Solid reactivity.
-- Do not add a Solid cache to `packages/shared`. The cache is platform memory.
+- Node vitest aliases `solid-js/store` to its dev build and inlines `solid-js`
+  (`vitest.config.ts`); without that, the SSR store has no signals and
+  `reconcile` can't shrink arrays. Prove reactivity in tier-2, not node tests.
+- Values handed to `port.set` on Solid are morphed in place by `reconcile`; a
+  shared constant passed in once is corrupted for every later reader.
+- A load that writes after an `await` without checking `stale()` reintroduces
+  cross-account bleed on sign-out.

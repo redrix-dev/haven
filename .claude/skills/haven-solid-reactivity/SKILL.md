@@ -66,6 +66,13 @@ This is what makes the class near-invisible in review: the code reads as
 fire-and-forget, and it isn't. If you only remember one thing from this skill,
 remember this paragraph.
 
+**Shared nexus methods read the live store.** Every nexus's logic lives in
+`packages/shared`, and on Solid its `port.get()` is the live store proxy, so a
+shared method's reads before its first `await` (a cache check, a freshness
+stamp, the old value it is about to merge into) are tracked reads. Assume any
+`core.<domain>.*` command reads the store it writes, and call it inside
+`untrack` from an effect.
+
 ## Self-Check Before You Write An Effect
 
 1. What does this effect _intend_ to depend on? (Usually one or two ids.)
@@ -86,8 +93,10 @@ Defended, copy these:
 
 ### A settling effect is not a defended one
 
-Measured on the settings surfaces: every naked effect **already settled**, because `inflight` maps in the nexus swallowed the retrigger. They
-cost one extra effect run and one extra render, not a runaway loop.
+Measured on the settings and community surfaces: every naked effect **already
+settled**, because the nexus's `LoadGate` made the retriggered call join the
+load already in flight. They cost one or two extra effect runs and renders, not
+a runaway loop — and one fetch either way.
 
 So "it doesn't strobe" proves nothing. The defense was an implementation detail
 of the nexus, one dedupe away from vanishing — exactly the coincidence §5 warns
@@ -95,10 +104,13 @@ about. Judge an effect by whether it reads a store it writes, not by whether you
 can see it misbehave.
 
 The corollary for tests: a settle test on an effect that settles either way
-asserts nothing. Assert the **run count** (naked costs 2, `untrack` costs 1) so
-removing the guard actually fails, and skip the test where no such difference
-exists — `ChannelPermissionsDialog` and `NotificationSettings` measure 1 run in
-every variant, so they carry the `untrack` fix without a settle test.
+asserts nothing. Assert the **run count** (naked costs 2 or 3, `untrack` costs
+
+1. so removing the guard actually fails, and skip the test where no such
+   difference exists — `ChannelPermissionsDialog`, `NotificationSettings` and
+   `ModmailLoader` measure 1 run in every variant, so they carry the `untrack` fix
+   without a settle test. The pairs live in `test-support/__tests__/`
+   (`settingsSurfaces`, `socialSurfaces`, `communitySurfaces`).
 
 ## Ship The Test With The Effect
 
