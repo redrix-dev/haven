@@ -93,7 +93,8 @@ Rules:
 - **No framework imports.** `check:shared-portable` enforces it.
 - **Write immutably**: build the next value, hand it to `port.set`.
 - **Loads go through a `LoadGate`**, and check `stale()` after every `await`
-  before writing data or an error.
+  before writing data or an error. A method that drops one key's data also
+  calls `gate.forget(key)`, or the load in flight writes it back.
 - **Persistence** (if the domain survives restarts): `rehydrate()` /
   `persist()` via the injected `NexusPersistence` and a key in
   `NEXUS_STORAGE_KEYS`.

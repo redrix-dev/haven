@@ -325,6 +325,8 @@ export class CommunityAdminNexus {
     const loading = byResource<boolean>();
     const errors = byResource<string | null>();
     for (const resource of RESOURCES) {
+      // A load answering after this would put the community's data back.
+      this.loads.forget(`${resource}:${communityId}`);
       loading[resource] = omitKey(state.loading[resource], communityId);
       errors[resource] = omitKey(state.errors[resource], communityId);
     }

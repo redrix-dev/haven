@@ -127,7 +127,7 @@ export class ChannelNexus {
         if (stale()) return;
         this.setChannels(communityId, channels, groupState);
       } finally {
-        this.setFlag("loadingByCommunity", communityId, false);
+        if (!stale()) this.setFlag("loadingByCommunity", communityId, false);
       }
     });
   }
@@ -528,6 +528,9 @@ export class ChannelNexus {
   removeCommunity(communityId: string): void {
     const state = this.port.get();
     const channelIds = state.byCommunity[communityId] ?? [];
+    // A load answering after this would put the community back.
+    this.channelLoads.forget(communityId);
+    for (const channelId of channelIds) this.permissionLoads.forget(channelId);
     const entities = { ...state.entities };
     for (const channelId of channelIds) delete entities[channelId];
     this.port.set({

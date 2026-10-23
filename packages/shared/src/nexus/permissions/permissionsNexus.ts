@@ -142,8 +142,12 @@ export class PermissionsNexus {
     ]);
   }
 
-  /** Forget a community's permissions so the next ensureLoaded refetches them. */
+  /**
+   * Forget a community's permissions so the next ensureLoaded refetches them.
+   * A fetch already in flight answered for the old roles: it stops writing.
+   */
   invalidate(communityId: string): void {
+    this.gate.forget(communityId);
     const state = this.port.get();
     const { [communityId]: _p, ...permissionsByCommunityId } =
       state.permissionsByCommunityId;

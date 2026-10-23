@@ -46,9 +46,13 @@ Rules the port imposes on shared code:
   must be `untrack`ed inside an effect (see the `haven-solid-reactivity` skill).
 
 Loads go through a `LoadGate` (`kit/loadGate.ts`): one in-flight load per key,
-and a `stale()` check handed to each task. `clear()` marks running loads stale;
-a task checks `stale()` after each `await` and skips its writes, so a load that
-finishes after sign-out cannot put the previous session's data into the next.
+and a `stale()` check handed to each task. `clear()` marks every running load
+stale and `forget(key)` marks one; a task checks `stale()` after each `await`
+and skips its writes, so a load that finishes after sign-out cannot put the
+previous session's data into the next, and one that finishes after its
+community was lost cannot put that community back. A method that drops one
+key's data (`removeCommunity`, `clearCommunity`, `invalidate`) forgets that
+key's load in the same call.
 
 ## Onboarding rules
 
@@ -202,7 +206,8 @@ kicked, banned, or the community was deleted, including while the app was
 closed — the community nexus reports it lost and HavenCore:
 
 1. forgets it: admin data, channels, messages (memory **and** device storage),
-   permissions;
+   permissions — and `forget`s their in-flight loads, so a request answered
+   just after the kick can't put the community back;
 2. focuses the next community if it was the active one;
 3. tells the platform through `core.subscribeCommunityAccessLost(listener)` with
    `{ communityId, communityName, wasActive, inVoice }`.

@@ -9,23 +9,35 @@
 export interface LoadGate {
   /**
    * Run `task`, or join the load for `key` already in flight. The task gets
-   * `stale()`, which turns true once clear() has run since it started: a task
-   * checks it after each `await` and skips its writes when stale, so a load
-   * that finishes after sign-out can't put the old session's data into the
-   * freshly cleared state.
+   * `stale()`, which turns true once its load is forgotten — by clear() or by
+   * forget(key) — after it started: a task checks it after each `await` and
+   * skips its writes when stale, so a load that finishes after sign-out, or
+   * after its community was lost, can't put the old data back.
    */
   run<T>(key: string, task: (stale: () => boolean) => Promise<T>): Promise<T>;
   isRunning(key: string): boolean;
   /**
-   * Session teardown: forget in-flight loads and mark them stale. Their
-   * promises still settle; a well-behaved task just stops writing.
+   * Mark the load for one key stale and stop deduping on it; the next run for
+   * the key starts a fresh request. Its promise still settles.
+   */
+  forget(key: string): void;
+  /**
+   * Session teardown: forget every in-flight load. Their promises still
+   * settle; a well-behaved task just stops writing.
    */
   clear(): void;
 }
 
 export function createLoadGate(): LoadGate {
-  const inflight = new Map<string, Promise<unknown>>();
-  let generation = 0;
+  type Load = { promise: Promise<unknown>; forgotten: boolean };
+  const inflight = new Map<string, Load>();
+
+  const forget = (key: string) => {
+    const load = inflight.get(key);
+    if (!load) return;
+    load.forgotten = true;
+    inflight.delete(key);
+  };
 
   return {
     run<T>(
@@ -33,15 +45,15 @@ export function createLoadGate(): LoadGate {
       task: (stale: () => boolean) => Promise<T>,
     ): Promise<T> {
       const existing = inflight.get(key);
-      if (existing) return existing as Promise<T>;
+      if (existing) return existing.promise as Promise<T>;
 
-      const startedIn = generation;
-      const stale = () => generation !== startedIn;
-      const promise: Promise<T> = (async () => task(stale))().finally(() => {
-        // After a clear(), a newer load may own this key. Only remove our own.
-        if (inflight.get(key) === promise) inflight.delete(key);
+      const load: Load = { promise: Promise.resolve(), forgotten: false };
+      const promise = (async () => task(() => load.forgotten))().finally(() => {
+        // Once forgotten, a newer load may own this key. Only remove our own.
+        if (inflight.get(key) === load) inflight.delete(key);
       });
-      inflight.set(key, promise);
+      load.promise = promise;
+      inflight.set(key, load);
       return promise;
     },
 
@@ -49,9 +61,10 @@ export function createLoadGate(): LoadGate {
       return inflight.has(key);
     },
 
+    forget,
+
     clear(): void {
-      inflight.clear();
-      generation += 1;
+      for (const key of [...inflight.keys()]) forget(key);
     },
   };
 }

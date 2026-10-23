@@ -71,19 +71,28 @@ const ACKNOWLEDGE_NOTE =
  */
 export class CommunityModerationNexus {
   private readonly gate = createLoadGate();
+  /** The scope of the load in flight, so a different scope replaces it. */
+  private loadingScope: string | null = null;
 
   constructor(
     protected readonly port: StatePort<CommunityModerationState>,
     private readonly backend: ServerModmailBackend,
   ) {}
 
+  /**
+   * Load the inbox for the communities the viewer moderates. A narrower scope
+   * (access revoked) drops the other communities' reports and selection at
+   * once, and a load still fetching the wider scope stops writing.
+   */
   load(communityIds: string[]): Promise<void> {
+    const uniqueIds = Array.from(new Set(communityIds.filter(Boolean))).sort();
+    const scope = uniqueIds.join(",");
+    if (scope !== this.loadingScope) this.gate.forget("load");
+    this.loadingScope = scope;
+    this.narrowTo(uniqueIds);
+    if (uniqueIds.length === 0) return Promise.resolve();
+
     return this.gate.run("load", async (stale) => {
-      const uniqueIds = Array.from(new Set(communityIds.filter(Boolean)));
-      if (uniqueIds.length === 0) {
-        this.port.set({ reports: [], loadedCommunityIds: [] });
-        return;
-      }
       this.port.set({ isLoadingReports: true });
       try {
         const reports = await this.backend.listServerReports(uniqueIds);
@@ -105,9 +114,12 @@ export class CommunityModerationNexus {
     this.port.set({ selectedReportId: reportId, isLoadingDetail: true });
     try {
       const detail = await this.backend.getServerReport(reportId);
+      // Selection moved or was cleared (scope narrowed) while we waited.
+      if (this.port.get().selectedReportId !== reportId) return;
       this.port.set({ detail, isLoadingDetail: false });
     } catch (err) {
       console.warn("[CommunityModerationNexus] selectReport failed", err);
+      if (this.port.get().selectedReportId !== reportId) return;
       this.port.set({ isLoadingDetail: false });
     }
   }
@@ -182,7 +194,40 @@ export class CommunityModerationNexus {
 
   clear(): void {
     this.gate.clear();
+    this.loadingScope = null;
     this.port.set(createInitialCommunityModerationState());
+  }
+
+  /** Drop reports, and the open report, from communities outside `scope`. */
+  private narrowTo(scope: string[]): void {
+    const { reports, loadedCommunityIds, selectedReportId, detail } =
+      this.port.get();
+    const inScope = (communityId: string) => scope.includes(communityId);
+    const selectedCommunityId =
+      detail?.communityId ??
+      reports.find((report) => report.reportId === selectedReportId)
+        ?.communityId;
+    // A selection whose community isn't known yet stays unless nothing is in scope.
+    const dropSelection =
+      selectedReportId !== null &&
+      (scope.length === 0 ||
+        (selectedCommunityId !== undefined && !inScope(selectedCommunityId)));
+    const keptReports = reports.filter((report) => inScope(report.communityId));
+    const keptLoadedIds = loadedCommunityIds.filter(inScope);
+    if (
+      !dropSelection &&
+      keptReports.length === reports.length &&
+      keptLoadedIds.length === loadedCommunityIds.length
+    ) {
+      return;
+    }
+    this.port.set({
+      reports: keptReports,
+      loadedCommunityIds: keptLoadedIds,
+      ...(dropSelection
+        ? { selectedReportId: null, detail: null, isLoadingDetail: false }
+        : {}),
+    });
   }
 
   private shouldSurface(reportId: string, communityId: string): boolean {

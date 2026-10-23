@@ -36,7 +36,9 @@ apps/mobile/src/data/<domain>/xReactNexus.ts         class XReactNexus extends X
 - **Rows keyed by something other than `id`** declare it on the Solid port
   (`createSolidStatePort(initial, { keys: { rows: "userId" } })`).
 - **Loads go through a `LoadGate`** and check `stale()` after every `await`
-  before writing, so a load answering after sign-out can't leak old data.
+  before writing, so a load answering after sign-out can't leak old data. A
+  method that drops one key's data (a lost community) calls `gate.forget(key)`
+  too, or the load in flight writes it back.
 - **Solid consumers never write the store directly** and never spread the
   proxy; they call nexus methods and read `state` / accessors.
 - **Solid `get()` is the live proxy**: shared getters are reactive, so an effect

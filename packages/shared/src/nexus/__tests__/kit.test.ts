@@ -97,6 +97,30 @@ describe("createLoadGate", () => {
     await Promise.all([p1, p2]);
     expect(seen).toEqual({ first: true, second: false });
   });
+
+  it("forget(key) marks only that key's load stale and lets the next run fire", async () => {
+    const gate = createLoadGate();
+    const lost = deferred<void>();
+    const kept = deferred<void>();
+    const seen: Record<string, boolean> = {};
+
+    const p1 = gate.run("lost", async (stale) => {
+      await lost.promise;
+      seen.lost = stale();
+    });
+    const p2 = gate.run("kept", async (stale) => {
+      await kept.promise;
+      seen.kept = stale();
+    });
+    gate.forget("lost");
+    expect(gate.isRunning("lost")).toBe(false);
+    expect(gate.run("lost", async () => undefined)).not.toBe(p1);
+
+    lost.resolve();
+    kept.resolve();
+    await Promise.all([p1, p2]);
+    expect(seen).toEqual({ lost: true, kept: false });
+  });
 });
 
 describe("isFresh", () => {

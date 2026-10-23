@@ -126,7 +126,53 @@ describe("HavenCore community access loss", () => {
     );
     expect(second).not.toHaveBeenCalled();
   });
+
+  it("drops the lost community's loads still in flight", async () => {
+    const pending: (() => void)[] = [];
+    const later = <T>(value: T) =>
+      new Promise<T>((resolve) => pending.push(() => resolve(value)));
+    const lists = [[server("c1"), server("c2")], [server("c2")]];
+    const { core } = createTestHavenCore({
+      controlPlane: {
+        listUserCommunities: async () => lists.shift() ?? [],
+      },
+      communityData: {
+        listChannels: (communityId: string) =>
+          later([channel(`${communityId}-general`, communityId, 0)]),
+        listChannelGroups: async () => ({
+          groups: [],
+          ungroupedChannelIds: [],
+          collapsedGroupIds: [],
+        }),
+        listCommunityMembers: () => later([{ userId: "u2" }]),
+        getMyPermissions: () => later({ isElevated: true }),
+      },
+    });
+    await core.communities.load("u1");
+
+    // Requests authorized just before the kick, answered just after it.
+    const loads = [
+      core.channels.loadForCommunity("c1"),
+      core.admin.loadMembers("c1"),
+      core.permissions.ensureLoaded("c1"),
+    ];
+    await core.communities.load("u1");
+    for (const answer of pending) answer();
+    await Promise.all(loads);
+
+    expect(core.channels.getChannels("c1")).toEqual([]);
+    expect(stateOf(core.channels).loadingByCommunity).not.toHaveProperty("c1");
+    expect(stateOf(core.admin).membersByCommunity).not.toHaveProperty("c1");
+    expect(core.permissions.getPermissionsByCommunityId()).not.toHaveProperty(
+      "c1",
+    );
+  });
 });
+
+/** A nexus's raw state, for checks no public read covers. */
+function stateOf(nexus: object): Record<string, Record<string, unknown>> {
+  return (nexus as { port: { get(): never } }).port.get();
+}
 
 describe("HavenCore sign-out during a load", () => {
   it("keeps a load that finishes after clearSession out of the cleared state", async () => {
