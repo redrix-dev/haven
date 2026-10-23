@@ -4,16 +4,21 @@
   "private": true,
   "main": "expo/AppEntry.js",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=24.22.1 <25"
   },
   "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=24.22.1 <25",
+      "onFail": "error"
+    },
     "packageManager": {
       "name": "npm",
-      "version": "11.18.0",
+      "version": "11.19.1",
       "onFail": "error"
     }
   },
-  "packageManager": "npm@11.18.0",
+  "packageManager": "npm@11.19.1",
   "scripts": {
     "preflight": "node ../../tooling/scripts/mobile/preflight.mjs --strict",
     "dev:metro": "npm run preflight && expo start --dev-client",
