@@ -75,6 +75,28 @@ describe("createLoadGate", () => {
     await p2;
     expect(gate.isRunning("k")).toBe(false);
   });
+
+  it("marks a load stale once clear() runs, and only that load", async () => {
+    const gate = createLoadGate();
+    const first = deferred<void>();
+    const second = deferred<void>();
+    const seen: Record<string, boolean> = {};
+
+    const p1 = gate.run("k", async (stale) => {
+      await first.promise;
+      seen.first = stale();
+    });
+    gate.clear();
+    const p2 = gate.run("k", async (stale) => {
+      await second.promise;
+      seen.second = stale();
+    });
+
+    first.resolve();
+    second.resolve();
+    await Promise.all([p1, p2]);
+    expect(seen).toEqual({ first: true, second: false });
+  });
 });
 
 describe("isFresh", () => {

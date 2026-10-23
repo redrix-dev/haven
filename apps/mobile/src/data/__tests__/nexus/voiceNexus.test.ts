@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryPersistence } from "@shared/core";
-import { createTestViewerMessagePolicyStore } from "@test-support/createTestViewerMessagePolicyStore";
-import {
-  VoiceNexus,
-  type VoiceRealtimeChannel,
-  type VoiceRealtimeTransport,
-} from "@mobile-data/voice/VoiceNexus";
+import type {
+  VoiceRealtimeChannel,
+  VoiceRealtimeTransport,
+} from "@shared/features/voice/types";
+import { selectChannelParticipants } from "@shared/nexus/voice/voiceNexus";
+import { VoiceReactNexus as VoiceNexus } from "@mobile-data/voice/voiceReactNexus";
 import type { VoicePresenceStateRow } from "@shared/types/types";
 
 class FakeVoiceRealtimeChannel implements VoiceRealtimeChannel {
@@ -119,15 +118,9 @@ const buildNexus = () => {
     })),
   };
   const realtime = new FakeVoiceRealtimeTransport();
-  const policy = createTestViewerMessagePolicyStore();
-  const nexus = new VoiceNexus(
-    createMemoryPersistence(),
-    policy,
-    tokenBackend,
-    realtime,
-  );
+  const nexus = new VoiceNexus(tokenBackend, realtime);
 
-  return { nexus, policy, realtime, tokenBackend };
+  return { nexus, realtime, tokenBackend };
 };
 
 describe("VoiceNexus", () => {
@@ -192,32 +185,15 @@ describe("VoiceNexus", () => {
       { userId: "u2", displayName: "Bea" },
     ]);
 
-    expect(nexus.getVisibleParticipantsSnapshot("voice-a")).toEqual([
+    expect(selectChannelParticipants(nexus.getSnapshot(), "voice-a")).toEqual([
       { userId: "u1", displayName: "Uma" },
     ]);
-    expect(nexus.getVisibleParticipantsSnapshot("voice-b")).toEqual([
+    expect(selectChannelParticipants(nexus.getSnapshot(), "voice-b")).toEqual([
       { userId: "u2", displayName: "Bea" },
     ]);
 
     nexus.retainChannelParticipants(["voice-a"]);
-    expect(nexus.getParticipantsByChannelSnapshot()).toEqual({});
-  });
-
-  it("filters hidden participants from visible snapshots", () => {
-    const { nexus, policy } = buildNexus();
-    policy.setState((state) => ({
-      ...state,
-      hiddenAuthorIds: new Set(["blocked"]),
-    }));
-
-    nexus.setChannelParticipants("voice-a", [
-      { userId: "allowed", displayName: "Allowed" },
-      { userId: "blocked", displayName: "Blocked" },
-    ]);
-
-    expect(nexus.getVisibleParticipantsSnapshot("voice-a")).toEqual([
-      { userId: "allowed", displayName: "Allowed" },
-    ]);
+    expect(nexus.getSnapshot().participantsByChannelId).toEqual({});
   });
 
   it("fetches join credentials through the injected voice token backend", async () => {
@@ -279,7 +255,6 @@ describe("VoiceNexus", () => {
         serverUrl: "wss://voice.example.test",
       })),
     };
-    const policy = createTestViewerMessagePolicyStore();
     const channels: DeferredVoiceRealtimeChannel[] = [];
     const removed: DeferredVoiceRealtimeChannel[] = [];
     const realtime: VoiceRealtimeTransport = {
@@ -292,12 +267,7 @@ describe("VoiceNexus", () => {
         removed.push(channel as DeferredVoiceRealtimeChannel);
       },
     };
-    const nexus = new VoiceNexus(
-      createMemoryPersistence(),
-      policy,
-      tokenBackend,
-      realtime,
-    );
+    const nexus = new VoiceNexus(tokenBackend, realtime);
 
     const first = nexus.connectKickChannel({
       communityId: "server-1",
@@ -347,7 +317,7 @@ describe("VoiceNexus", () => {
     });
     channel.emitPresence("sync");
 
-    expect(nexus.getParticipantsByChannelSnapshot()).toEqual({
+    expect(nexus.getSnapshot().participantsByChannelId).toEqual({
       "voice-a": [
         {
           userId: "u1",

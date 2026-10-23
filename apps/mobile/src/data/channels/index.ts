@@ -1,3 +1,2 @@
-export { ChannelNexus } from "./ChannelNexus";
-export type { HavenChannel, ChannelNexusState } from "./ChannelNexus";
-export { createChannelNexus } from "./factory";
+export { ChannelReactNexus } from "./channelReactNexus";
+export type { HavenChannel } from "@shared/nexus/channels/channelTypes";

@@ -1,4 +1,11 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  untrack,
+} from "solid-js";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { SidePanel } from "@solid-client/components/ui/SidePanel";
 import type { CommunitySettingsTab } from "@shared/core/sessionStorePorts";
@@ -76,7 +83,9 @@ export function CommunitySettingsPanel() {
 
   createEffect(() => {
     const id = communityId();
-    if (open() && id) void core.ensureCommunityPermissions(id);
+    if (!open() || !id) return;
+    // The permissions load reads its own store; track open and the id only.
+    untrack(() => void core.ensureCommunityPermissions(id));
   });
 
   createEffect(() => {

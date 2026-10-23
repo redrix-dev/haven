@@ -1,4 +1,1 @@
-export {
-  CommunitySolidNexus,
-  createCommunitySolidNexus,
-} from "./communitySolidNexus";
+export { CommunitySolidNexus } from "./communitySolidNexus";

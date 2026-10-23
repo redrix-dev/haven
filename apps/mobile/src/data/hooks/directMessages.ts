@@ -1,4 +1,4 @@
-import type { DirectMessageNexus } from "../direct-messages/DirectMessageNexus";
+import type { DirectMessageReactNexus } from "../direct-messages/directMessageReactNexus";
 import type { DmComposeDraftPeer } from "@shared/nexus/direct-messages/dmTypes";
 import type {
   DirectMessage,
@@ -17,7 +17,7 @@ import {
 import { useStoreSelector } from "./useStoreSelector";
 
 export function useDmConversations(
-  nexus: DirectMessageNexus,
+  nexus: DirectMessageReactNexus,
 ): DirectMessageConversationSummary[] {
   return useStoreSelector(
     nexus.reactiveStore,
@@ -27,17 +27,19 @@ export function useDmConversations(
 }
 
 export function useActiveDmConversationId(
-  nexus: DirectMessageNexus,
+  nexus: DirectMessageReactNexus,
 ): string | null {
   return useStoreSelector(nexus.reactiveStore, selectActiveConversationId);
 }
 
-export function useDmConversationsLoading(nexus: DirectMessageNexus): boolean {
+export function useDmConversationsLoading(
+  nexus: DirectMessageReactNexus,
+): boolean {
   return useStoreSelector(nexus.reactiveStore, selectIsLoadingConversations);
 }
 
 export function useDmMessages(
-  nexus: DirectMessageNexus,
+  nexus: DirectMessageReactNexus,
   conversationId: string,
 ): DirectMessage[] {
   return useStoreSelector(
@@ -48,7 +50,7 @@ export function useDmMessages(
 }
 
 export function useDmMessagesLoading(
-  nexus: DirectMessageNexus,
+  nexus: DirectMessageReactNexus,
   conversationId: string,
 ): boolean {
   return useStoreSelector(nexus.reactiveStore, (state) =>
@@ -57,7 +59,7 @@ export function useDmMessagesLoading(
 }
 
 export function useDmComposeDraftPeer(
-  nexus: DirectMessageNexus,
+  nexus: DirectMessageReactNexus,
 ): DmComposeDraftPeer | null {
   return useStoreSelector(nexus.reactiveStore, selectComposeDraftPeer);
 }

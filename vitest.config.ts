@@ -26,6 +26,17 @@ export default defineConfig({
       // Vitest runs in a node env, where solid-js's `node` export condition
       // resolves to the non-reactive SSR build (dist/server.js). Force the
       // reactive development build so signals/memos actually update under test.
+      // `solid-js/store` has the same split: its `node` condition is the SSR
+      // build, whose createStore has no signals and whose reconcile is a
+      // shallow copy that cannot shrink arrays. Nexus state lives in stores, so
+      // node tests must run the store that actually ships.
+      {
+        find: /^solid-js\/store$/,
+        replacement: path.resolve(
+          __dirname,
+          "node_modules/solid-js/store/dist/dev.js",
+        ),
+      },
       {
         find: /^solid-js$/,
         replacement: path.resolve(
@@ -108,6 +119,10 @@ export default defineConfig({
     globals: true,
     fileParallelism: false,
     environment: "node",
+    // Process solid-js through Vite so the aliases above also apply inside it:
+    // otherwise Node resolves the store build's own `import "solid-js"` to the
+    // SSR core, and a reactive store paired with a non-reactive core breaks.
+    server: { deps: { inline: [/solid-js/] } },
     setupFiles: [
       "tooling/test-support/setup/env.ts",
       "tooling/test-support/setup/jsdom.ts",

@@ -563,13 +563,13 @@ export function useMobileLiveKitVoiceSession({
 
   const toggleMute = useCallback(() => {
     const next = !core.voice.getSnapshot().isMuted;
-    core.voice.setIsMuted(next);
+    core.voice.setMuted(next);
     playVoiceControlFeedback(next);
   }, [core.voice]);
 
   const toggleDeafen = useCallback(() => {
     const next = !core.voice.getSnapshot().isDeafened;
-    core.voice.setIsDeafened(next);
+    core.voice.setDeafened(next);
     playVoiceControlFeedback(next);
   }, [core.voice]);
 

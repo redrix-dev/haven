@@ -90,7 +90,7 @@ export function ProfileScreen({ navigation }: Props) {
         const { body, contentType } = await loadPickedAvatarForUpload(asset);
         if (body.byteLength <= 0)
           throw new Error("Prepared image is empty; try another photo.");
-        await core.updateUserProfile({
+        await core.profiles.updateViewerProfile({
           userId: identity.userId,
           username,
           avatarUrl: identity.avatarUrl,
@@ -131,7 +131,7 @@ export function ProfileScreen({ navigation }: Props) {
     }
     setIsSavingAccount(true);
     try {
-      await core.updateUserProfile({
+      await core.profiles.updateViewerProfile({
         userId: identity.userId,
         username: nextUsername,
         avatarUrl: identity.avatarUrl,

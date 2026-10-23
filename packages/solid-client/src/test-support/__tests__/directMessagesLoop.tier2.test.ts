@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createEffect, createSignal, untrack } from "solid-js";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { DirectMessageBackend } from "@shared/lib/backend/directMessageBackend";
-import { createDirectMessageSolidNexus } from "../../data/direct-messages/directMessageSolidNexus";
+import { DirectMessageSolidNexus } from "../../data/direct-messages/directMessageSolidNexus";
 import { expectRenderSettles } from "../renderSettleHarness";
 
 // The faithful regression lock for commit 86a20e0: DirectMessagesView's effect
@@ -30,7 +30,7 @@ function makeNexus() {
     setConversationMuted: async () => true,
     reportMessage: async () => "report-1",
   } as unknown as DirectMessageBackend;
-  return createDirectMessageSolidNexus(persistence, backend);
+  return new DirectMessageSolidNexus(persistence, backend);
 }
 
 describe("DirectMessages openConversation — render-level settle (RED-50 Tier 2)", () => {

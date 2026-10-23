@@ -20,6 +20,11 @@
  *   2. `get()` means "read now". Never hold its result across a `set()`: one
  *      platform mutates in place and another replaces, so a held snapshot is
  *      current on one and stale on the other.
+ *   3. Reads may be reactive. On Solid, `get()` is the live store proxy, so a
+ *      getter called inside a component or memo subscribes to what it reads.
+ *      That keeps getters live in the UI — and it is why a nexus method that
+ *      both reads and writes must not run inside a Solid effect without
+ *      `untrack` (see the haven-solid-reactivity skill).
  */
 export interface StatePort<S extends object> {
   /** Current state. Read it fresh; do not keep it across a `set`. */

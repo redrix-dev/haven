@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryPersistence } from "@shared/core";
-import { CommunityMessageCache as CommunityMessageNexus } from "@mobile-data/messages/CommunityMessageCache";
+import { CommunityMessageReactNexus as CommunityMessageNexus } from "@mobile-data/messages/communityMessageReactNexus";
+import { selectChannelMeta } from "@shared/nexus/messages/communityMessageSelectors";
 import type { MessageBundle } from "@shared/lib/backend/types";
 
 const bundle = (overrides: Partial<MessageBundle>): MessageBundle => ({
@@ -166,9 +167,7 @@ describe("CommunityMessageNexus persistence", () => {
     expect(restored.getSnapshot("m2")).toBeDefined();
     expect(restored.getLastMessageId("c1")).toBe("m2");
     // Whole channel fit under the cap, so hasMore stays false.
-    const meta = restored.getChannelMetaSelector("c1")(
-      restored.getReactiveStore().getState(),
-    );
+    const meta = selectChannelMeta(restored.reactiveStore.getState(), "c1");
     expect(meta.hasMore).toBe(false);
   });
 
@@ -197,9 +196,7 @@ describe("CommunityMessageNexus persistence", () => {
     expect(restored.getSnapshot("m59")).toBeDefined();
     expect(restored.getLastMessageId("c1")).toBe("m59");
     // Dropping older messages forces hasMore so scroll-up can refetch.
-    const meta = restored.getChannelMetaSelector("c1")(
-      restored.getReactiveStore().getState(),
-    );
+    const meta = selectChannelMeta(restored.reactiveStore.getState(), "c1");
     expect(meta.hasMore).toBe(true);
   });
 

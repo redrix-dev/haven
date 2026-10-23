@@ -17,6 +17,7 @@ import type {
 } from "@shared/lib/backend/types";
 import { useHavenCore } from "@mobile-data";
 import { useChannelPermissionsState } from "@mobile-data/hooks";
+import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { resolveColorProp } from "@shared/themes";
 
@@ -99,11 +100,14 @@ function ChannelDetail({
   onBack: () => void;
 }) {
   const core = useHavenCore();
-  const admin = core.admin;
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const themeTokens = useMobileThemeTokens();
   const foregroundColor =
     resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
-  const channelPermissions = useChannelPermissionsState(admin);
+  const channelPermissions = useChannelPermissionsState(
+    core.channels,
+    channel.id,
+  );
   const [name, setName] = useState(channel.name);
   const [topic, setTopic] = useState(channel.topic ?? "");
   const [roleRows, setRoleRows] = useState<
@@ -123,14 +127,19 @@ function ChannelDetail({
     try {
       setName(channel.name);
       setTopic(channel.topic ?? "");
-      await admin.loadChannelPermissions(channel.id, serverId);
+      if (!userId) return;
+      await core.channels.loadChannelPermissions({
+        communityId: serverId,
+        channelId: channel.id,
+        userId,
+      });
     } catch (e) {
       Alert.alert(
         "Error",
         getErrorMessage(e, "Failed to load channel settings."),
       );
     }
-  }, [admin, channel, serverId]);
+  }, [core, channel, serverId, userId]);
 
   useEffect(() => {
     void load();
@@ -157,11 +166,12 @@ function ChannelDetail({
   const saveGeneral = async () => {
     setSaving(true);
     try {
-      await admin.saveChannelSettings(
-        { name: name.trim(), topic: topic.trim() || null },
-        serverId,
-        channel.id,
-      );
+      await core.channels.updateChannel({
+        communityId: serverId,
+        channelId: channel.id,
+        name: name.trim(),
+        topic: topic.trim() || null,
+      });
       Alert.alert("Saved", "Channel updated.");
       onBack();
     } catch (e) {
@@ -173,12 +183,12 @@ function ChannelDetail({
 
   const saveRoleRow = async (roleId: string, next: ChannelPermissionState) => {
     try {
-      await admin.saveRoleChannelPermissions(
+      await core.channels.saveRoleChannelPermissions({
+        communityId: serverId,
+        channelId: channel.id,
         roleId,
-        next,
-        serverId,
-        channel.id,
-      );
+        permissions: next,
+      });
       await load();
     } catch (e) {
       Alert.alert("Error", getErrorMessage(e, "Could not update permissions."));

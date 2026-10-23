@@ -73,7 +73,7 @@ export function ThemeVisualPickerCard({
       applyMobileTheme(themeId);
 
       try {
-        await core.updateUserProfile({
+        await core.profiles.updateViewerProfile({
           userId,
           username: trimmedName,
           avatarUrl,

@@ -261,18 +261,7 @@ export type KickCommunityMemberResult = {
   communityId: string;
 };
 
-export type MemberBannedBroadcastPayload = {
-  bannedUserId: string;
-  communityId: string;
-};
-
 export type ChannelAccessRevokedResult = {
-  revokedUserId: string;
-  channelId: string;
-  communityId: string;
-};
-
-export type MemberChannelAccessRevokedBroadcastPayload = {
   revokedUserId: string;
   channelId: string;
   communityId: string;

@@ -1,5 +1,1 @@
-export {
-  OnboardingSolidNexus,
-  createOnboardingSolidNexus,
-  type OnboardingSolidState,
-} from "./onboardingSolidNexus";
+export { OnboardingSolidNexus } from "./onboardingSolidNexus";

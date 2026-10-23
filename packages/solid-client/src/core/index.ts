@@ -10,4 +10,4 @@ export {
   type BootstrapPhaseListener,
   type BootstrapPhaseSnapshot,
   type BootstrapPhaseValue,
-} from "./bootstrapPhase";
+} from "@shared/core/bootstrapPhase";

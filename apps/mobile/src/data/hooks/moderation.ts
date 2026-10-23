@@ -1,4 +1,5 @@
-import type { CommunityModerationNexus } from "../community-management/CommunityModerationNexus";
+import type { CommunityModerationReactNexus } from "../community-management/communityModerationReactNexus";
+import { filterReports } from "@shared/nexus/community-management/communityModerationNexus";
 import type {
   ServerReportDetail,
   ServerReportSummary,
@@ -8,29 +9,19 @@ import { reportsEqual } from "@shared/features/moderation/logic/equality";
 import { useStoreSelector } from "./useStoreSelector";
 
 export function useReports(
-  nexus: CommunityModerationNexus,
+  nexus: CommunityModerationReactNexus,
   serverFilter?: string,
   statusFilter?: SupportReportStatus | "all",
 ): ServerReportSummary[] {
   return useStoreSelector(
     nexus.reactiveStore,
-    (state) => {
-      void state.revision;
-      let filtered = state.reports;
-      if (serverFilter && serverFilter !== "all") {
-        filtered = filtered.filter((r) => r.communityId === serverFilter);
-      }
-      if (statusFilter && statusFilter !== "all") {
-        filtered = filtered.filter((r) => r.status === statusFilter);
-      }
-      return filtered;
-    },
+    (state) => filterReports(state.reports, serverFilter, statusFilter),
     reportsEqual,
   );
 }
 
 export function useSelectedReportId(
-  nexus: CommunityModerationNexus,
+  nexus: CommunityModerationReactNexus,
 ): string | null {
   return useStoreSelector(
     nexus.reactiveStore,
@@ -39,19 +30,23 @@ export function useSelectedReportId(
 }
 
 export function useDetail(
-  nexus: CommunityModerationNexus,
+  nexus: CommunityModerationReactNexus,
 ): ServerReportDetail | null {
   return useStoreSelector(nexus.reactiveStore, (state) => state.detail);
 }
 
-export function useIsLoadingReports(nexus: CommunityModerationNexus): boolean {
+export function useIsLoadingReports(
+  nexus: CommunityModerationReactNexus,
+): boolean {
   return useStoreSelector(
     nexus.reactiveStore,
     (state) => state.isLoadingReports,
   );
 }
 
-export function useIsLoadingDetail(nexus: CommunityModerationNexus): boolean {
+export function useIsLoadingDetail(
+  nexus: CommunityModerationReactNexus,
+): boolean {
   return useStoreSelector(
     nexus.reactiveStore,
     (state) => state.isLoadingDetail,

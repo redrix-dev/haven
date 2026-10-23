@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { CommunityMessageCache } from "../messages/CommunityMessageCache";
+import type { CommunityMessageReactNexus } from "../messages/communityMessageReactNexus";
 import type { MessageBundle } from "@shared/lib/backend/types";
 import {
   viewerCommunityPolicyEqual,
@@ -13,7 +13,11 @@ import {
 import {
   projectVisibleChannelMessages,
   projectVisibleChannelMessagesBlockOnly,
-} from "@shared/nexus/community/projectVisibleChannelMessages";
+} from "@shared/nexus/messages/projectVisibleChannelMessages";
+import {
+  selectChannelMessages,
+  selectChannelMeta,
+} from "@shared/nexus/messages/communityMessageSelectors";
 import { useStoreSelector } from "./useStoreSelector";
 import { createMobileViewerMessagePolicyStore } from "../session/viewerMessagePolicyStore";
 
@@ -27,18 +31,18 @@ import { createMobileViewerMessagePolicyStore } from "../session/viewerMessagePo
 const EMPTY_VIEWER_POLICY_STORE = createMobileViewerMessagePolicyStore();
 
 export function useChannel(
-  cache: CommunityMessageCache,
+  cache: CommunityMessageReactNexus,
   channelId: string,
 ): MessageBundle[] {
   return useStoreSelector(
     cache.reactiveStore,
-    cache.getChannelStateSelector(channelId),
+    (state) => selectChannelMessages(state, channelId),
     messagesEqual,
   );
 }
 
 export function useVisibleChannel(
-  cache: CommunityMessageCache,
+  cache: CommunityMessageReactNexus,
   channelId: string,
 ): MessageBundle[] {
   const raw = useChannel(cache, channelId);
@@ -90,18 +94,18 @@ export function useVisibleChannel(
 }
 
 export function useChannelMeta(
-  cache: CommunityMessageCache,
+  cache: CommunityMessageReactNexus,
   channelId: string,
 ): ChannelMeta {
   return useStoreSelector(
     cache.reactiveStore,
-    cache.getChannelMetaSelector(channelId),
+    (state) => selectChannelMeta(state, channelId),
     channelMetaEqual,
   );
 }
 
 export function useIsLoadingInitial(
-  cache: CommunityMessageCache,
+  cache: CommunityMessageReactNexus,
   channelId: string,
 ): boolean {
   return useStoreSelector(
@@ -111,7 +115,7 @@ export function useIsLoadingInitial(
 }
 
 export function useIsLoadingOlder(
-  cache: CommunityMessageCache,
+  cache: CommunityMessageReactNexus,
   channelId: string,
 ): boolean {
   return useStoreSelector(
@@ -121,7 +125,7 @@ export function useIsLoadingOlder(
 }
 
 export function useHasInitialLoadCompleted(
-  cache: CommunityMessageCache,
+  cache: CommunityMessageReactNexus,
   channelId: string,
 ): boolean {
   return useStoreSelector(

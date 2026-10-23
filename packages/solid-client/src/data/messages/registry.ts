@@ -1,6 +1,6 @@
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
-import { CommunityMessageRegistry } from "@shared/nexus/community/communityMessageRegistry";
+import { CommunityMessageRegistry } from "@shared/nexus/messages/communityMessageRegistry";
 import { CommunityMessageSolidNexus } from "./communityMessageSolidNexus";
 
 export type MessageSolidRegistry =

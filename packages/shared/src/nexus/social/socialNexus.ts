@@ -68,7 +68,7 @@ export class SocialNexus {
   }
 
   load(): Promise<void> {
-    return this.gate.run("load", async () => {
+    return this.gate.run("load", async (stale) => {
       this.port.set({ isLoading: true });
       try {
         const [
@@ -86,6 +86,7 @@ export class SocialNexus {
           this.backend.listFriendRequests(),
           this.backend.listBlockedUsers(),
         ]);
+        if (stale()) return;
         this.port.set({
           counts,
           friends,

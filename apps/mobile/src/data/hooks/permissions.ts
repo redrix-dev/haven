@@ -1,10 +1,10 @@
-import type { PermissionsNexus } from "../permissions/PermissionsNexus";
+import type { PermissionsReactNexus } from "../permissions/permissionsReactNexus";
 import type { ServerPermissions } from "@shared/lib/backend/types";
 import { EMPTY_PERMISSIONS } from "@shared/features/permissions/logic/constants";
 import { useStoreSelector } from "./useStoreSelector";
 
 export function usePermissions(
-  nexus: PermissionsNexus,
+  nexus: PermissionsReactNexus,
   communityId: string,
 ): ServerPermissions {
   return useStoreSelector(
@@ -14,10 +14,10 @@ export function usePermissions(
 }
 
 export function usePermissionsByCommunityId(
-  nexus: PermissionsNexus,
+  nexus: PermissionsReactNexus,
 ): Record<string, ServerPermissions> {
-  return useStoreSelector(nexus.reactiveStore, (state) => {
-    void state.revision;
-    return state.permissionsByCommunityId;
-  });
+  return useStoreSelector(
+    nexus.reactiveStore,
+    (state) => state.permissionsByCommunityId,
+  );
 }

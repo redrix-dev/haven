@@ -13,8 +13,6 @@ import {
 } from "@shared/nexus/social/socialNexus";
 import { createSolidStatePort } from "../kit/solidStatePort";
 
-export type SocialSolidState = SocialState;
-
 /** Solid read bindings over the shared SocialNexus. All logic lives in the base class. */
 export class SocialSolidNexus extends SocialNexus {
   /** The live store proxy. Read it inside a tracking scope. */
@@ -45,10 +43,4 @@ export class SocialSolidNexus extends SocialNexus {
   loading(): Accessor<boolean> {
     return createMemo(() => this.state.isLoading);
   }
-}
-
-export function createSocialSolidNexus(
-  backend: SocialBackend,
-): SocialSolidNexus {
-  return new SocialSolidNexus(backend);
 }

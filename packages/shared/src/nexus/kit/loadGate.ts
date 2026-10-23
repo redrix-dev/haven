@@ -7,21 +7,37 @@
  * nexus used to carry.
  */
 export interface LoadGate {
-  run<T>(key: string, task: () => Promise<T>): Promise<T>;
+  /**
+   * Run `task`, or join the load for `key` already in flight. The task gets
+   * `stale()`, which turns true once clear() has run since it started: a task
+   * checks it after each `await` and skips its writes when stale, so a load
+   * that finishes after sign-out can't put the old session's data into the
+   * freshly cleared state.
+   */
+  run<T>(key: string, task: (stale: () => boolean) => Promise<T>): Promise<T>;
   isRunning(key: string): boolean;
-  /** Forget in-flight loads (session teardown). Their promises still settle. */
+  /**
+   * Session teardown: forget in-flight loads and mark them stale. Their
+   * promises still settle; a well-behaved task just stops writing.
+   */
   clear(): void;
 }
 
 export function createLoadGate(): LoadGate {
   const inflight = new Map<string, Promise<unknown>>();
+  let generation = 0;
 
   return {
-    run<T>(key: string, task: () => Promise<T>): Promise<T> {
+    run<T>(
+      key: string,
+      task: (stale: () => boolean) => Promise<T>,
+    ): Promise<T> {
       const existing = inflight.get(key);
       if (existing) return existing as Promise<T>;
 
-      const promise: Promise<T> = (async () => task())().finally(() => {
+      const startedIn = generation;
+      const stale = () => generation !== startedIn;
+      const promise: Promise<T> = (async () => task(stale))().finally(() => {
         // After a clear(), a newer load may own this key. Only remove our own.
         if (inflight.get(key) === promise) inflight.delete(key);
       });
@@ -35,6 +51,7 @@ export function createLoadGate(): LoadGate {
 
     clear(): void {
       inflight.clear();
+      generation += 1;
     },
   };
 }

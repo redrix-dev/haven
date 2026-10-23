@@ -7,15 +7,13 @@ import {
   CommunityMessageNexus,
   createInitialCommunityMessageState,
   type CommunityMessageState,
-} from "@shared/nexus/community/communityMessageNexus";
+} from "@shared/nexus/messages/communityMessageNexus";
 import {
   projectChannelMessagesForViewer,
   selectChannelMessages,
   selectChannelMeta,
-} from "@shared/nexus/community/communityMessageSelectors";
+} from "@shared/nexus/messages/communityMessageSelectors";
 import { createSolidStatePort } from "../kit/solidStatePort";
-
-export type CommunityMessageSolidState = CommunityMessageState;
 
 /** Solid read bindings over the shared CommunityMessageNexus. All logic lives in the base class. */
 export class CommunityMessageSolidNexus extends CommunityMessageNexus {
@@ -65,16 +63,4 @@ export class CommunityMessageSolidNexus extends CommunityMessageNexus {
       () => this.state.initialLoadComplete[channelId()] ?? false,
     );
   }
-}
-
-export function createCommunityMessageSolidNexus(
-  communityId: string,
-  persistence: NexusPersistence,
-  viewerMessagePolicyStore: ViewerMessagePolicyStore,
-): CommunityMessageSolidNexus {
-  return new CommunityMessageSolidNexus(
-    communityId,
-    persistence,
-    viewerMessagePolicyStore,
-  );
 }

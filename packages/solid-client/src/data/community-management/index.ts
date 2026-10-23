@@ -1,9 +1,2 @@
-export {
-  CommunityAdminSolidNexus,
-  createCommunityAdminSolidNexus,
-} from "./communityAdminSolidNexus";
-export type { CommunityAdminSolidState } from "./communityAdminSolidNexus";
-export {
-  CommunityModerationSolidNexus,
-  createCommunityModerationSolidNexus,
-} from "./communityModerationSolidNexus";
+export { CommunityAdminSolidNexus } from "./communityAdminSolidNexus";
+export { CommunityModerationSolidNexus } from "./communityModerationSolidNexus";

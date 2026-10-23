@@ -18,7 +18,6 @@ import type {
   MessageReaction,
   MessageReportKind,
   MessageReportTarget,
-  MemberChannelAccessRevokedBroadcastPayload,
   ReportStatusUpdatedBroadcastPayload,
   ServerPermissions,
   ServerRoleManagementSnapshot,
@@ -75,9 +74,6 @@ export interface CommunityDataBackend {
     communityId: string,
     userId: string,
   ): Promise<{ memberId: string; roleIds: string[] } | null>;
-  broadcastMemberChannelAccessRevoked(
-    input: MemberChannelAccessRevokedBroadcastPayload,
-  ): Promise<void>;
   broadcastReportStatusUpdated(
     input: ReportStatusUpdatedBroadcastPayload,
   ): Promise<void>;

@@ -1,7 +1,6 @@
 export { HavenReactCore, type HavenReactCoreOptions } from "./HavenReactCore";
 export {
   createReactHavenCore,
-  createHavenCore,
   getHavenCore,
   registerHavenCore,
   requireHavenCore,
@@ -13,7 +12,7 @@ export {
   type BootstrapPhaseListener,
   type BootstrapPhaseSnapshot,
   type BootstrapPhaseValue,
-} from "./bootstrapPhase";
+} from "@shared/core/bootstrapPhase";
 export { syncFocusFromRoute, applyCommunityFocus } from "./syncFocusFromRoute";
 export type {
   FocusFromRouteInput,
@@ -28,12 +27,3 @@ export {
   syncNotificationSounds,
 } from "./syncNotificationSounds";
 export type { NotificationSoundSyncState } from "./syncNotificationSounds";
-export { applyAccessRevoked } from "./commands/applyAccessRevoked";
-export { applyModerationEvent } from "./commands/applyModerationEvent";
-export {
-  registerSessionStores,
-  resetSessionStores,
-  requireAuthStore,
-  requireUiStore,
-  requireUserStatusStore,
-} from "./sessionStoreRegistry";

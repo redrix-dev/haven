@@ -17,7 +17,7 @@ import { createPlainStatePort } from "@shared/nexus/kit/statePort";
 import {
   CommunityMessageNexus,
   createInitialCommunityMessageState,
-} from "@shared/nexus/community/communityMessageNexus";
+} from "@shared/nexus/messages/communityMessageNexus";
 import {
   SocialNexus,
   createInitialSocialState,

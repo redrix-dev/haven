@@ -1,8 +1,1 @@
-export {
-  ProfileSolidNexus,
-  createProfileSolidNexus,
-} from "./profileSolidNexus";
-export type {
-  ProfileSolidState,
-  ViewerProfileUpdateInput,
-} from "./profileSolidNexus";
+export { ProfileSolidNexus } from "./profileSolidNexus";

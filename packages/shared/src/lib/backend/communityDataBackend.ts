@@ -1589,22 +1589,6 @@ export const centralCommunityDataBackend: CommunityDataBackend = {
     return { memberId: memberRow.id, roleIds };
   },
 
-  async broadcastMemberChannelAccessRevoked({
-    communityId,
-    channelId,
-    revokedUserId,
-  }) {
-    const { error } = await havenCommunitySb().rpc(
-      "broadcast_member_channel_access_revoked" as never,
-      {
-        p_community_id: communityId,
-        p_channel_id: channelId,
-        p_revoked_user_id: revokedUserId,
-      } as never,
-    );
-    if (error) throw error;
-  },
-
   async broadcastReportStatusUpdated({
     reportId,
     status,

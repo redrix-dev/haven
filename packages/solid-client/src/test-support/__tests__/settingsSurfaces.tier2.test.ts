@@ -72,10 +72,11 @@ describe("CommunityChannelsTab ensureLoaded — settle (RED-50 Tier 2)", () => {
       });
       return null;
     });
-    // ensureLoaded reads state.byCommunity before its first await, so the
-    // load's own write retriggers the effect. inflight stops it running away,
-    // but the extra run is the leak made visible.
-    expect(result.runs).toBe(2);
+    // ensureLoaded reads byCommunity, and its loading-flag write reads
+    // loadingByCommunity, before the first await. The channel write and the
+    // flag reset each retrigger the effect. The load gate keeps it to one
+    // fetch, but the two extra runs are the leak made visible.
+    expect(result.runs).toBe(3);
   });
 
   it("the shipped untracked shape settles in a single run", async () => {

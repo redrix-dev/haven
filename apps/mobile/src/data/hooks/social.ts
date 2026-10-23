@@ -1,4 +1,4 @@
-import type { SocialNexus } from "../social/SocialNexus";
+import type { SocialReactNexus } from "../social/socialReactNexus";
 import type {
   BlockedUserSummary,
   FriendRequestSummary,
@@ -12,11 +12,11 @@ import {
 } from "@shared/features/social/logic";
 import { useStoreSelector } from "./useStoreSelector";
 
-export function useCounts(nexus: SocialNexus): SocialCounts {
+export function useCounts(nexus: SocialReactNexus): SocialCounts {
   return useStoreSelector(nexus.reactiveStore, (state) => state.counts);
 }
 
-export function useFriends(nexus: SocialNexus): FriendSummary[] {
+export function useFriends(nexus: SocialReactNexus): FriendSummary[] {
   return useStoreSelector(
     nexus.reactiveStore,
     (state) => state.friends,
@@ -24,7 +24,9 @@ export function useFriends(nexus: SocialNexus): FriendSummary[] {
   );
 }
 
-export function useFriendRequests(nexus: SocialNexus): FriendRequestSummary[] {
+export function useFriendRequests(
+  nexus: SocialReactNexus,
+): FriendRequestSummary[] {
   return useStoreSelector(
     nexus.reactiveStore,
     (state) => state.requests,
@@ -32,7 +34,7 @@ export function useFriendRequests(nexus: SocialNexus): FriendRequestSummary[] {
   );
 }
 
-export function useBlockedUsers(nexus: SocialNexus): BlockedUserSummary[] {
+export function useBlockedUsers(nexus: SocialReactNexus): BlockedUserSummary[] {
   return useStoreSelector(
     nexus.reactiveStore,
     (state) => state.blockedUsers,
@@ -40,6 +42,6 @@ export function useBlockedUsers(nexus: SocialNexus): BlockedUserSummary[] {
   );
 }
 
-export function useIsLoading(nexus: SocialNexus): boolean {
+export function useIsLoading(nexus: SocialReactNexus): boolean {
   return useStoreSelector(nexus.reactiveStore, (state) => state.isLoading);
 }

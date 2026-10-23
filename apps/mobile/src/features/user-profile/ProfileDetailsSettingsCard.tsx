@@ -101,7 +101,10 @@ export function ProfileDetailsSettingsCard({
 
     setSavingFlairId(grant?.userFlairId ?? "none");
     try {
-      await core.setActiveUserFlair(userId, grant?.userFlairId ?? null);
+      await core.profiles.setActiveUserFlair(
+        userId,
+        grant?.userFlairId ?? null,
+      );
     } catch (error) {
       Alert.alert(
         "Could not update flair",
@@ -125,7 +128,7 @@ export function ProfileDetailsSettingsCard({
 
     setSaving(true);
     try {
-      await core.updateUserProfile({
+      await core.profiles.updateViewerProfile({
         userId,
         username: trimmedUsername,
         avatarUrl,

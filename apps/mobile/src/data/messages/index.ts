@@ -1,8 +1,3 @@
-export { CommunityMessageCache } from "./CommunityMessageCache";
-export type {
-  ChannelMeta,
-  SendCommunityMessageMediaOptions,
-  CommunityMessageStoreState,
-} from "./CommunityMessageCache";
+export { CommunityMessageReactNexus } from "./communityMessageReactNexus";
 export { createCommunityMessageRegistry } from "./registry";
-export type { MessageNexusRegistry } from "./registry";
+export type { MessageReactRegistry } from "./registry";

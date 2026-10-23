@@ -1,4 +1,3 @@
-import { requireSessionBackends } from "./sessionBackendRegistry";
 import type { CommunityDataBackend } from "./communityDataBackend.interface";
 import type { ControlPlaneBackend } from "./controlPlaneBackend";
 import type { DirectMessageBackend } from "./directMessageBackend";
@@ -28,31 +27,3 @@ const resolveBackendModeFromEnv = (): string | undefined => {
 const backendMode = parseBackendMode(resolveBackendModeFromEnv());
 
 export const getBackendMode = (): BackendMode => backendMode;
-
-export const getControlPlaneBackend = (): ControlPlaneBackend =>
-  requireSessionBackends().controlPlane;
-
-export const getCommunityDataBackend = (
-  _communityId: string,
-): CommunityDataBackend => requireSessionBackends().communityData;
-
-export const getNotificationBackend = (): NotificationBackend =>
-  requireSessionBackends().notifications;
-
-export const getSocialBackend = (): SocialBackend =>
-  requireSessionBackends().social;
-
-export const getDirectMessageBackend = (): DirectMessageBackend =>
-  requireSessionBackends().directMessages;
-
-export const getModerationBackend = (): ModerationBackend =>
-  requireSessionBackends().moderation;
-
-export const getServerModmailBackend = (): ServerModmailBackend =>
-  requireSessionBackends().serverModmail;
-
-export {
-  registerSessionBackends,
-  resetSessionBackends,
-  requireSessionBackends,
-} from "./sessionBackendRegistry";

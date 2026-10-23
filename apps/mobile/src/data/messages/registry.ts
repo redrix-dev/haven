@@ -1,18 +1,18 @@
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ViewerMessagePolicyStore } from "@shared/core/viewerMessagePolicy";
-import { CommunityMessageRegistry } from "@shared/nexus/community/communityMessageRegistry";
-import { CommunityMessageCache } from "./CommunityMessageCache";
+import { CommunityMessageRegistry } from "@shared/nexus/messages/communityMessageRegistry";
+import { CommunityMessageReactNexus } from "./communityMessageReactNexus";
 
-export type MessageNexusRegistry =
-  CommunityMessageRegistry<CommunityMessageCache>;
+export type MessageReactRegistry =
+  CommunityMessageRegistry<CommunityMessageReactNexus>;
 
 export function createCommunityMessageRegistry(
   persistence: NexusPersistence,
   viewerMessagePolicyStore: ViewerMessagePolicyStore,
-): MessageNexusRegistry {
+): MessageReactRegistry {
   return new CommunityMessageRegistry(
     (communityId) =>
-      new CommunityMessageCache(
+      new CommunityMessageReactNexus(
         communityId,
         persistence,
         viewerMessagePolicyStore,

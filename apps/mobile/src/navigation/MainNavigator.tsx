@@ -443,6 +443,39 @@ function MainNavigationShell({ userId }: { userId: string }) {
       });
   }, [dismissVoiceSheet, forceDisconnectVoice]);
 
+  // Losing access to a community (kicked, banned, or deleted): the core has
+  // already forgotten it and focused another. Leave its voice channel, move
+  // off it if it was on screen, and say why. The only subscriber on mobile, so
+  // it also gets losses found at sign-in.
+  useEffect(
+    () =>
+      core.subscribeCommunityAccessLost((loss) => {
+        if (loss.inVoice) {
+          dismissVoiceSheet();
+          void forceDisconnectVoice("access_lost").catch((error: unknown) => {
+            console.warn(
+              "[voice] Failed to disconnect after access loss.",
+              error,
+            );
+          });
+        }
+        if (loss.wasActive) {
+          const nextCommunityId = core.communities.getActiveId();
+          navigation.navigate("Main", {
+            screen: "Community",
+            params: nextCommunityId
+              ? { serverId: nextCommunityId }
+              : { serverId: null, openDrawer: true },
+          });
+        }
+        Alert.alert(
+          "Removed from community",
+          `You no longer have access to ${loss.communityName}.`,
+        );
+      }),
+    [core, dismissVoiceSheet, forceDisconnectVoice, navigation],
+  );
+
   const handleVoiceInterrupted = useCallback(() => {
     setInterruptionNoticeVisible(true);
   }, []);
@@ -686,7 +719,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
       refreshUrgentSurfaces: () => {
         void dm.loadConversations();
         void core.social.load();
-        void core.notifications.refreshInbox();
+        void core.notifications.loadInbox();
       },
     });
 

@@ -5,8 +5,8 @@ import { createPlainStatePort } from "../kit/statePort";
 import {
   CommunityMessageNexus,
   createInitialCommunityMessageState,
-} from "../community/communityMessageNexus";
-import { selectChannelMessages } from "../community/communityMessageSelectors";
+} from "../messages/communityMessageNexus";
+import { selectChannelMessages } from "../messages/communityMessageSelectors";
 
 const BASE = Date.UTC(2026, 0, 1);
 

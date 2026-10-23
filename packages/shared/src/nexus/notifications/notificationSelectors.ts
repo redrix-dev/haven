@@ -1,4 +1,4 @@
-import type { NotificationNexusState } from "./notificationTypes";
+import type { NotificationState } from "./notificationTypes";
 import type {
   NotificationCounts,
   NotificationItem,
@@ -14,7 +14,7 @@ import type {
 const EMPTY_NOTIFICATIONS: NotificationItem[] = [];
 
 export const projectNotifications = (
-  state: NotificationNexusState,
+  state: NotificationState,
 ): NotificationItem[] => {
   if (state.recipientOrder.length === 0) return EMPTY_NOTIFICATIONS;
   return state.recipientOrder
@@ -22,24 +22,21 @@ export const projectNotifications = (
     .filter((item): item is NotificationItem => item !== undefined);
 };
 
-export const selectCounts = (
-  state: NotificationNexusState,
-): NotificationCounts => state.counts;
+export const selectCounts = (state: NotificationState): NotificationCounts =>
+  state.counts;
 
-export const selectIsLoading = (state: NotificationNexusState): boolean =>
+export const selectIsLoading = (state: NotificationState): boolean =>
   state.isLoading;
 
 export const selectPreferences = (
-  state: NotificationNexusState,
+  state: NotificationState,
 ): NotificationPreferences | null => state.preferences;
 
-export const selectPreferencesLoading = (
-  state: NotificationNexusState,
-): boolean => state.preferencesLoading;
+export const selectPreferencesLoading = (state: NotificationState): boolean =>
+  state.preferencesLoading;
 
-export const selectPreferencesSaving = (
-  state: NotificationNexusState,
-): boolean => state.preferencesSaving;
+export const selectPreferencesSaving = (state: NotificationState): boolean =>
+  state.preferencesSaving;
 
 export const notificationsEqual = (
   a: NotificationItem[],

@@ -2,15 +2,15 @@ import type {
   DirectMessage,
   DirectMessageConversationSummary,
 } from "@shared/lib/backend/types";
-import type { NexusState } from "@shared/core/cache/entityTypes";
+import type { EntityMapState } from "@shared/core/cache/entityTypes";
 
 export type DmComposeDraftPeer = {
   userId: string;
   displayName: string;
 };
 
-export type DirectMessageNexusState =
-  NexusState<DirectMessageConversationSummary> & {
+export type DirectMessageState =
+  EntityMapState<DirectMessageConversationSummary> & {
     conversationIds: string[];
     messagesByConversation: Record<string, string[]>;
     messageEntities: Record<string, DirectMessage>;
