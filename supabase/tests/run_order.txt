@@ -31,3 +31,4 @@ supabase/tests/sql/18_community_flair_grant_rules.sql
 supabase/tests/sql/19_onboarding_campaigns.sql
 supabase/tests/sql/20_internal_function_acl.sql
 supabase/tests/sql/21_background_cron_health.sql
+supabase/tests/sql/22_access_loss_broadcasts.sql
