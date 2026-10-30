@@ -11,12 +11,14 @@ type MessageActionsSheetProps = {
   onClose: () => void;
   target: MessageActionTarget | null;
   communityName: string;
+  canCopy: boolean;
   canEdit: boolean;
   canDelete: boolean;
   canReport: boolean;
   canKick: boolean;
   canBan: boolean;
   onReply: () => void;
+  onCopy: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onReport: () => void;
@@ -29,12 +31,14 @@ export function MessageActionsSheet({
   onClose,
   target,
   communityName,
+  canCopy,
   canEdit,
   canDelete,
   canReport,
   canKick,
   canBan,
   onReply,
+  onCopy,
   onEdit,
   onDelete,
   onReport,
@@ -73,6 +77,19 @@ export function MessageActionsSheet({
               Reply
             </Text>
           </Pressable>
+          {canCopy ? (
+            <Pressable
+              className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
+              onPress={() => {
+                onCopy();
+                onClose();
+              }}
+            >
+              <Text className="text-center text-base font-medium text-foreground">
+                Copy text
+              </Text>
+            </Pressable>
+          ) : null}
           {canEdit ? (
             <Pressable
               className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"

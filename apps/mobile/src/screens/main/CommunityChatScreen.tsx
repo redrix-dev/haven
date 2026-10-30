@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
+import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
 import { type EnrichedMarkdownTextInputInstance } from "react-native-enriched-markdown";
 import { useAuthStore } from "@mobile-data/session/authStore";
@@ -36,6 +37,7 @@ import {
 } from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { getMessageActions } from "@shared/features/messaging/logic";
+import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from "@shared/lib/backend/mediaAttachmentUtils";
 import {
   buildChatListItemsFromChatMessages,
   buildMessageBundleById,
@@ -481,6 +483,12 @@ export function CommunityChatScreen({
       : { canEdit: false, canDelete: false, canReport: false };
   }, [currentUserId, messageActionsTarget, messageById, permissions]);
   const canReportMessageTarget = targetActions.canReport;
+  const targetText = messageActionsTarget
+    ? (messageById.get(messageActionsTarget.messageId)?.content ?? "")
+    : "";
+  const canCopyTarget =
+    targetText.trim().length > 0 &&
+    targetText !== MEDIA_ONLY_CONTENT_PLACEHOLDER;
 
   const startEditing = (target: MessageActionTarget) => {
     const bundle = messageById.get(target.messageId);
@@ -660,6 +668,7 @@ export function CommunityChatScreen({
         onClose={() => setMessageActionsTarget(null)}
         target={messageActionsTarget}
         communityName={community?.name ?? "Community"}
+        canCopy={canCopyTarget}
         canEdit={targetActions.canEdit}
         canDelete={targetActions.canDelete}
         canReport={canReportMessageTarget}
@@ -669,6 +678,9 @@ export function CommunityChatScreen({
           if (!messageActionsTarget) return;
           if (editingMessageId) cancelEditing();
           setPendingReplyToMessageId(messageActionsTarget.messageId);
+        }}
+        onCopy={() => {
+          void Clipboard.setStringAsync(targetText);
         }}
         onEdit={() => {
           if (messageActionsTarget) startEditing(messageActionsTarget);

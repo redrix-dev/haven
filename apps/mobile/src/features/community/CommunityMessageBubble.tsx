@@ -214,7 +214,10 @@ export function CommunityMessageBubble({
           </Text>
         ) : null}
 
+        {/* Not selectable: on iOS a long-press would open the text-selection
+            menu on top of the message actions sheet. Copy lives in the sheet. */}
         <EnrichedMarkdownText
+          selectable={false}
           markdown={text}
           flavor="github"
           md4cFlags={COMMUNITY_MARKDOWN_MD4C_FLAGS}
