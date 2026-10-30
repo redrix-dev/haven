@@ -448,7 +448,7 @@ export class CommunityMessageNexus {
       });
     } catch (error) {
       this.removeMessage(id, channelId);
-      await this.deleteMessageRpc(id);
+      await this.deleteMessage(id);
       throw error;
     }
   }
@@ -466,19 +466,56 @@ export class CommunityMessageNexus {
     });
   }
 
+  /**
+   * Edit a message's text. A cached message shows the new text at once and
+   * gets its old text back if the database refuses or the request fails; the
+   * realtime update then confirms it.
+   */
   async edit(messageId: string, content: string): Promise<void> {
-    await this.requireBackend("edit").editUserMessage({
-      communityId: this.communityId,
-      messageId,
-      content,
-    });
+    const text = content.trim();
+    if (!text) throw new Error("A message can't be empty.");
+    const previous = this.port.get().entities[messageId]?.data;
+    if (previous?.content === text) return;
+
+    if (previous) {
+      this.updateMessage(messageId, {
+        content: text,
+        editedAt: new Date().toISOString(),
+      });
+    }
+    try {
+      await this.requireBackend("edit").editUserMessage({
+        communityId: this.communityId,
+        messageId,
+        content: text,
+      });
+    } catch (error) {
+      if (previous) {
+        this.updateMessage(messageId, {
+          content: previous.content,
+          editedAt: previous.editedAt,
+        });
+      }
+      throw error;
+    }
   }
 
-  async deleteMessageRpc(messageId: string): Promise<void> {
-    await this.requireBackend("deleteMessageRpc").deleteMessage({
-      communityId: this.communityId,
-      messageId,
-    });
+  /**
+   * Delete a message. A cached message leaves the list at once and comes back
+   * if the database refuses or the request fails.
+   */
+  async deleteMessage(messageId: string): Promise<void> {
+    const removed = this.port.get().entities[messageId]?.data;
+    if (removed) this.removeMessage(messageId, removed.channelId);
+    try {
+      await this.requireBackend("deleteMessage").deleteMessage({
+        communityId: this.communityId,
+        messageId,
+      });
+    } catch (error) {
+      if (removed) this.upsertMessage(removed);
+      throw error;
+    }
   }
 
   async toggleReaction(

@@ -29,11 +29,13 @@ import {
   useChannelMeta,
   useHasInitialLoadCompleted,
   useIsLoadingOlder,
+  usePermissions,
   usePlatformStaff,
   useProfilesRecord,
   useVisibleChannel,
 } from "@mobile-data/hooks";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { getMessageActions } from "@shared/features/messaging/logic";
 import {
   buildChatListItemsFromChatMessages,
   buildMessageBundleById,
@@ -300,6 +302,8 @@ export function CommunityChatScreen({
     useState<MessageActionTarget | null>(null);
   const [reportMessageTarget, setReportMessageTarget] =
     useState<MessageActionTarget | null>(null);
+  // While set, the composer holds this message's text and Send saves the edit.
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
   const pendingReplyTargetLabel = useMemo(
     () =>
@@ -359,6 +363,21 @@ export function CommunityChatScreen({
       ? await composerInputRef.current.getMarkdown()
       : draft;
     const text = fromInput.trim();
+    if (editingMessageId) {
+      if (!text) return;
+      try {
+        setIsSending(true);
+        await messageNexus.edit(editingMessageId, text);
+        setEditingMessageId(null);
+        setDraft("");
+        composerInputRef.current?.setValue("");
+      } catch (e) {
+        Alert.alert("Edit failed", getErrorMessage(e, "Could not save edit."));
+      } finally {
+        setIsSending(false);
+      }
+      return;
+    }
     if (!text && !pendingCommunityMedia) return;
     const replyToMessageId =
       pendingReplyToMessageId && messageById.has(pendingReplyToMessageId)
@@ -389,7 +408,9 @@ export function CommunityChatScreen({
     }
   }, [
     draft,
+    editingMessageId,
     messageById,
+    messageNexus,
     pendingCommunityMedia,
     pendingReplyToMessageId,
     sendMessage,
@@ -440,10 +461,60 @@ export function CommunityChatScreen({
     [community?.name, communityId, onOpenProfileCard],
   );
 
-  const canReportMessageTarget = Boolean(
-    messageActionsTarget?.authorUserId &&
-    messageActionsTarget.authorUserId !== currentUserId,
-  );
+  const permissions = usePermissions(core.permissions, communityId ?? serverId);
+  const targetActions = useMemo(() => {
+    const bundle = messageActionsTarget
+      ? messageById.get(messageActionsTarget.messageId)
+      : undefined;
+    return bundle
+      ? getMessageActions({
+          message: bundle,
+          viewerId: currentUserId,
+          permissions,
+        })
+      : { canEdit: false, canDelete: false, canReport: false };
+  }, [currentUserId, messageActionsTarget, messageById, permissions]);
+  const canReportMessageTarget = targetActions.canReport;
+
+  const startEditing = (target: MessageActionTarget) => {
+    const bundle = messageById.get(target.messageId);
+    if (!bundle) return;
+    setPendingReplyToMessageId(null);
+    setPendingCommunityMedia(null);
+    setEditingMessageId(target.messageId);
+    setDraft(bundle.content);
+    composerInputRef.current?.setValue(bundle.content);
+    composerInputRef.current?.focus();
+  };
+
+  const cancelEditing = () => {
+    setEditingMessageId(null);
+    setDraft("");
+    composerInputRef.current?.setValue("");
+  };
+
+  const confirmDelete = (target: MessageActionTarget) => {
+    Alert.alert(
+      "Delete message?",
+      "It will be removed for everyone. This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            if (editingMessageId === target.messageId) cancelEditing();
+            messageNexus.deleteMessage(target.messageId).catch((e) => {
+              Alert.alert(
+                "Couldn't delete message",
+                getErrorMessage(e, "Try again in a moment."),
+              );
+            });
+          },
+        },
+      ],
+    );
+  };
 
   const phase: "loading" | "ready" | "missing" | "error" =
     serversStatus === "loading" && servers.length === 0
@@ -528,9 +599,17 @@ export function CommunityChatScreen({
               canSend={canSendCommunityMessage}
               onChangeMarkdown={setDraft}
               onSend={() => void handleSend()}
-              onPickMedia={() => void handlePickCommunityMedia()}
+              onPickMedia={() => {
+                if (!editingMessageId) void handlePickCommunityMedia();
+              }}
               strips={
                 <>
+                  {editingMessageId ? (
+                    <ChatReplyStrip
+                      label="Editing message"
+                      onCancel={cancelEditing}
+                    />
+                  ) : null}
                   {pendingReplyToMessageId ? (
                     <ChatReplyStrip
                       label={`Replying to ${pendingReplyTargetLabel ?? "a message"}`}
@@ -555,12 +634,21 @@ export function CommunityChatScreen({
         onClose={() => setMessageActionsTarget(null)}
         target={messageActionsTarget}
         communityName={community?.name ?? "Community"}
+        canEdit={targetActions.canEdit}
+        canDelete={targetActions.canDelete}
         canReport={canReportMessageTarget}
         canKick={false}
         canBan={false}
         onReply={() => {
-          if (messageActionsTarget)
-            setPendingReplyToMessageId(messageActionsTarget.messageId);
+          if (!messageActionsTarget) return;
+          if (editingMessageId) cancelEditing();
+          setPendingReplyToMessageId(messageActionsTarget.messageId);
+        }}
+        onEdit={() => {
+          if (messageActionsTarget) startEditing(messageActionsTarget);
+        }}
+        onDelete={() => {
+          if (messageActionsTarget) confirmDelete(messageActionsTarget);
         }}
         onReport={() => {
           if (messageActionsTarget && canReportMessageTarget) {

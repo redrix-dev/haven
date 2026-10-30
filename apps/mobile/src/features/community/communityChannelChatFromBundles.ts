@@ -96,6 +96,7 @@ export function mapBundlesToChatMessages(
       authorAvatarUrl: liveAvatar,
       isAuthorStaff: Boolean(bundle.authorUserId && bundle.isPlatformStaff),
       timestampLabel: formatTime(bundle.createdAt),
+      isEdited: bundle.editedAt !== null,
       replyTargetLabel: getReplyTargetLabel(
         bundle.replyToMessageId,
         messageById,

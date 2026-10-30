@@ -1,11 +1,14 @@
 import { Show } from "solid-js";
-import { CornerUpLeft, Flag, UserX } from "lucide-solid";
+import { CornerUpLeft, Flag, Pencil, Trash2, UserX } from "lucide-solid";
+import { getMessageActions } from "@shared/features/messaging/logic";
+import type { ServerPermissions } from "@shared/lib/backend/types";
 import {
   ActionsMenu,
   Avatar,
   Markdown,
   type ActionMenuItem,
 } from "@solid-client/components/ui";
+import { MessageEditor } from "./MessageEditor";
 import type { MessageRowItem } from "./messageViewModel";
 
 function timeLabel(iso: string): string {
@@ -15,31 +18,65 @@ function timeLabel(iso: string): string {
   });
 }
 
-/** Report-related row props are threaded from the list (renderer seam: no core). */
+/** The viewer's permissions a row needs to decide its actions. */
+export type MessageRowPermissions = Pick<
+  ServerPermissions,
+  "isOwner" | "canManageMessages" | "canCreateReports"
+>;
+
+/** Row action props, threaded from the list (renderer seam: no core). */
 export type MessageRowActions = {
   viewerId?: string | null;
-  canReport?: boolean;
+  permissions?: MessageRowPermissions;
+  /** The message whose text is being edited inline, if any. */
+  editingMessageId?: string | null;
+  onEditMessage?: (messageId: string) => void;
+  onSaveEdit?: (messageId: string, content: string) => Promise<void>;
+  onCancelEdit?: () => void;
+  onDeleteMessage?: (messageId: string, preview: string) => void;
   onReportMessage?: (messageId: string, preview: string) => void;
   onReportUser?: (userId: string, name: string) => void;
+};
+
+const NO_PERMISSIONS: MessageRowPermissions = {
+  isOwner: false,
+  canManageMessages: false,
+  canCreateReports: false,
 };
 
 export function MessageRow(
   props: { item: MessageRowItem } & MessageRowActions,
 ) {
   const m = () => props.item.message;
+  const editing = () => props.editingMessageId === m().id;
 
   const items = (): ActionMenuItem[] => {
     const msg = m();
-    const authorId = msg.authorUserId;
-    const reportable =
-      Boolean(props.canReport) &&
-      Boolean(props.viewerId) &&
-      Boolean(authorId) &&
-      authorId !== props.viewerId;
-    if (!reportable || !authorId) return [];
+    const permissions = props.permissions ?? NO_PERMISSIONS;
+    const actions = getMessageActions({
+      message: msg,
+      viewerId: props.viewerId,
+      permissions,
+    });
 
     const list: ActionMenuItem[] = [];
-    if (msg.deletedAt === null) {
+    if (actions.canEdit) {
+      list.push({
+        label: "Edit message",
+        icon: Pencil,
+        onSelect: () => props.onEditMessage?.(msg.id),
+      });
+    }
+    if (actions.canDelete) {
+      list.push({
+        label: "Delete message",
+        icon: Trash2,
+        danger: true,
+        onSelect: () =>
+          props.onDeleteMessage?.(msg.id, reportPreview(msg.content)),
+      });
+    }
+    if (actions.canReport) {
       list.push({
         label: "Report message",
         icon: Flag,
@@ -48,17 +85,35 @@ export function MessageRow(
           props.onReportMessage?.(msg.id, reportPreview(msg.content)),
       });
     }
-    list.push({
-      label: `Report ${props.item.authorName}`,
-      icon: UserX,
-      danger: true,
-      onSelect: () => props.onReportUser?.(authorId, props.item.authorName),
-    });
+    const authorId = msg.authorUserId;
+    if (
+      authorId &&
+      props.viewerId &&
+      authorId !== props.viewerId &&
+      permissions.canCreateReports
+    ) {
+      list.push({
+        label: `Report ${props.item.authorName}`,
+        icon: UserX,
+        danger: true,
+        onSelect: () => props.onReportUser?.(authorId, props.item.authorName),
+      });
+    }
     return list;
   };
 
+  const content = () => (
+    <Show when={editing()} fallback={<MessageContent item={props.item} />}>
+      <MessageEditor
+        initialContent={m().content}
+        onSave={(text) => props.onSaveEdit?.(m().id, text) ?? Promise.resolve()}
+        onCancel={() => props.onCancelEdit?.()}
+      />
+    </Show>
+  );
+
   return (
-    <ActionsMenu items={items()} label="Message actions">
+    <ActionsMenu items={items()} label="Message actions" enabled={!editing()}>
       <div
         class="px-4 py-0.5 hover:bg-surface-message-row-hover"
         classList={{ "mt-2": props.item.showHeader }}
@@ -75,11 +130,7 @@ export function MessageRow(
 
         <Show
           when={props.item.showHeader}
-          fallback={
-            <div class="pl-[52px]">
-              <MessageContent item={props.item} />
-            </div>
-          }
+          fallback={<div class="pl-[52px]">{content()}</div>}
         >
           <div class="flex gap-3">
             <Avatar
@@ -102,7 +153,7 @@ export function MessageRow(
                   {timeLabel(m().createdAt)}
                 </span>
               </div>
-              <MessageContent item={props.item} />
+              {content()}
             </div>
           </div>
         </Show>

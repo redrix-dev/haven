@@ -5,6 +5,10 @@
  *
  * Storage blobs must be deleted through the Storage API before the row; blob
  * cleanup is best-effort (never orphans a row, tolerates an orphan blob).
+ *
+ * Edit and delete throw MessageWriteRefusedError when RLS refuses them: a
+ * refused update/delete matches no rows instead of erroring, which would
+ * otherwise look like success.
  */
 import {
   havenCommunitySb,
@@ -20,6 +24,18 @@ import {
 } from "./messageMedia";
 import { mapChannelMessageRpcRowsToBundles } from "./messageRows";
 import type { MessageBundle, LiveProfileIdentity } from "../types";
+
+/** The database refused an edit or delete (not yours, or no permission). */
+export class MessageWriteRefusedError extends Error {
+  constructor(readonly action: "edit" | "delete") {
+    super(
+      action === "edit"
+        ? "You can only edit your own messages."
+        : "You don't have permission to delete this message.",
+    );
+    this.name = "MessageWriteRefusedError";
+  }
+}
 
 export interface CommunityMessageBackend {
   listChannelMessages(input: {
@@ -379,15 +395,18 @@ export const communityMessageBackend: CommunityMessageBackend = {
   },
 
   async editUserMessage({ communityId, messageId, content }) {
-    const { error } = await havenCommunitySb()
+    const { data, error } = await havenCommunitySb()
       .from("messages")
       .update({
         content,
         edited_at: new Date().toISOString(),
       })
       .eq("community_id", communityId)
-      .eq("id", messageId);
+      .eq("id", messageId)
+      .select("id");
     if (error) throw error;
+    // RLS refuses by matching no rows, not by erroring.
+    if (!data?.length) throw new MessageWriteRefusedError("edit");
   },
 
   async deleteMessage({ communityId, messageId }) {
@@ -426,11 +445,13 @@ export const communityMessageBackend: CommunityMessageBackend = {
       }
     }
 
-    const { error } = await havenCommunitySb()
+    const { data, error } = await havenCommunitySb()
       .from("messages")
       .delete()
       .eq("community_id", communityId)
-      .eq("id", messageId);
+      .eq("id", messageId)
+      .select("id");
     if (error) throw error;
+    if (!data?.length) throw new MessageWriteRefusedError("delete");
   },
 };

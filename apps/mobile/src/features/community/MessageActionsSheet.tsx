@@ -11,10 +11,14 @@ type MessageActionsSheetProps = {
   onClose: () => void;
   target: MessageActionTarget | null;
   communityName: string;
+  canEdit: boolean;
+  canDelete: boolean;
   canReport: boolean;
   canKick: boolean;
   canBan: boolean;
   onReply: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
   onReport: () => void;
   onKick: () => void;
   onBan: () => void;
@@ -25,10 +29,14 @@ export function MessageActionsSheet({
   onClose,
   target,
   communityName,
+  canEdit,
+  canDelete,
   canReport,
   canKick,
   canBan,
   onReply,
+  onEdit,
+  onDelete,
   onReport,
   onKick,
   onBan,
@@ -65,6 +73,32 @@ export function MessageActionsSheet({
               Reply
             </Text>
           </Pressable>
+          {canEdit ? (
+            <Pressable
+              className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
+              onPress={() => {
+                onEdit();
+                onClose();
+              }}
+            >
+              <Text className="text-center text-base font-medium text-foreground">
+                Edit
+              </Text>
+            </Pressable>
+          ) : null}
+          {canDelete ? (
+            <Pressable
+              className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
+              onPress={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              <Text className="text-center text-base font-medium text-destructive">
+                Delete
+              </Text>
+            </Pressable>
+          ) : null}
           {canReport ? (
             <Pressable
               className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"

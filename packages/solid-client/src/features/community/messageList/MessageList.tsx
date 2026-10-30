@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal, splitProps } from "solid-js";
 import { VList, type VListHandle } from "virtua/solid";
 import type { MessageViewItem } from "./messageViewModel";
 import { MessageRow, type MessageRowActions } from "./MessageRow";
@@ -20,6 +20,7 @@ export function MessageList(
     onReachTop?: () => void;
   } & MessageRowActions,
 ) {
+  const [, rowActions] = splitProps(props, ["items", "onReachTop"]);
   let handle: VListHandle | undefined;
   // Plain mutables, deliberately non-reactive: read inside callbacks/effects
   // only, and re-render must not depend on them.
@@ -86,13 +87,7 @@ export function MessageList(
             <span class="h-px flex-1 bg-border" />
           </div>
         ) : (
-          <MessageRow
-            item={item}
-            viewerId={props.viewerId}
-            canReport={props.canReport}
-            onReportMessage={props.onReportMessage}
-            onReportUser={props.onReportUser}
-          />
+          <MessageRow item={item} {...rowActions} />
         )
       }
     </VList>
