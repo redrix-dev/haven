@@ -96,7 +96,9 @@ if (fs.existsSync(path.join(iosAppDir, "AppDelegate.swift"))) {
     "utf8",
   );
   if (!pbxproj.includes("SceneDelegate.swift in Sources")) {
-    fail(`SceneDelegate.swift is not compiled by the app target — ${regenerate}`);
+    fail(
+      `SceneDelegate.swift is not compiled by the app target — ${regenerate}`,
+    );
   }
 } else {
   console.warn(
