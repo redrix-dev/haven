@@ -156,6 +156,14 @@ iOS 27 terminates any app that has not adopted the UIScene lifecycle: built with
 - A link that cold-starts the app arrives in the scene's `connectionOptions`, not in launch options, but `Linking.getInitialURL()` reads launch options. `SceneDelegate` rebuilds them before starting React Native.
 - Push and VoIP are untouched: remote-notification registration and PushKit stay on the app delegate, which scenes do not change.
 
+**Testing links on a simulator.** Build Release (no dev launcher between the link and JS), signed to run locally with the team ID so the entitlements are embedded. `CODE_SIGNING_ALLOWED=NO` strips them, which drops the associated domains and breaks keychain access:
+
+```bash
+xcodebuild -workspace HavenMobile.xcworkspace -scheme HavenMobile -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/dd CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=9H229274JB PROVISIONING_PROFILE_SPECIFIER= build
+```
+
+Install it, then cold-start and warm-start it with `xcrun simctl openurl <udid> "haven://invite/test123"` and `… "https://haven.redrixx.com/invite/test123"`. Signed out, each link should raise one "Sign in to use this invite" alert. If the https link opens Safari instead, the simulator has not fetched the AASA yet (it goes through Apple's CDN after install).
+
 When the app moves to Expo SDK 57+, replace `SceneDelegate` with a subclass of `ExpoAppSceneDelegate` (or drop it if the template ships one) and delete the forwarding.
 
 ### dev-client crash postmortem (ordering contract)
