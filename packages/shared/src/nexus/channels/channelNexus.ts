@@ -1,7 +1,7 @@
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
 import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
+import type { CommunityChannelBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type {
   Channel,
   ChannelAccessRevokedResult,
@@ -72,7 +72,7 @@ export class ChannelNexus {
   constructor(
     protected readonly port: StatePort<ChannelState>,
     private readonly persistence: NexusPersistence,
-    private readonly communityData: CommunityDataBackend,
+    private readonly communityData: CommunityChannelBackend,
   ) {}
 
   // ─── reads ─────────────────────────────────────────────────────────────────

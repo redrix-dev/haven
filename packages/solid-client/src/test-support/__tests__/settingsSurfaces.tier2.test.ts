@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createEffect, createSignal, untrack } from "solid-js";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend";
+import type { CommunityChannelBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend";
 import { ChannelSolidNexus } from "../../data/channels/channelSolidNexus";
 import { ProfileSolidNexus } from "../../data/profile/profileSolidNexus";
@@ -37,7 +37,7 @@ function makeChannelNexus(channels: unknown[]) {
       ungroupedChannelIds: [],
       collapsedGroupIds: [],
     }),
-  } as unknown as CommunityDataBackend;
+  } as unknown as CommunityChannelBackend;
   return {
     nexus: new ChannelSolidNexus(memoryPersistence(), backend),
     listChannels,

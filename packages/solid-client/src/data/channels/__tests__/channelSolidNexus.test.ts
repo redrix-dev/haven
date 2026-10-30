@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryPersistence } from "@shared/core";
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
+import type { CommunityChannelBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type { Channel, ChannelGroupState } from "@shared/lib/backend/types";
 import { ChannelSolidNexus } from "../channelSolidNexus";
 
@@ -27,7 +27,7 @@ describe("ChannelSolidNexus channel management", () => {
       .mockResolvedValue(channel("channel-3", 2, "announcements"));
     const nexus = new ChannelSolidNexus(createMemoryPersistence(), {
       createChannel,
-    } as unknown as CommunityDataBackend);
+    } as unknown as CommunityChannelBackend);
     nexus.setChannels(
       "community-1",
       [channel("channel-1", 0), channel("channel-2", 1)],
@@ -57,7 +57,7 @@ describe("ChannelSolidNexus channel management", () => {
     const updateChannel = vi.fn().mockResolvedValue(undefined);
     const nexus = new ChannelSolidNexus(createMemoryPersistence(), {
       updateChannel,
-    } as unknown as CommunityDataBackend);
+    } as unknown as CommunityChannelBackend);
     nexus.setChannels("community-1", [channel("channel-1", 0)], {
       ...groups,
       ungroupedChannelIds: ["channel-1"],
@@ -81,7 +81,7 @@ describe("ChannelSolidNexus channel management", () => {
     const deleteChannel = vi.fn().mockResolvedValue(undefined);
     const nexus = new ChannelSolidNexus(createMemoryPersistence(), {
       deleteChannel,
-    } as unknown as CommunityDataBackend);
+    } as unknown as CommunityChannelBackend);
     nexus.setChannels(
       "community-1",
       [channel("channel-1", 0), channel("channel-2", 1)],
@@ -106,7 +106,7 @@ describe("ChannelSolidNexus channel management", () => {
     const deleteChannel = vi.fn().mockResolvedValue(undefined);
     const nexus = new ChannelSolidNexus(createMemoryPersistence(), {
       deleteChannel,
-    } as unknown as CommunityDataBackend);
+    } as unknown as CommunityChannelBackend);
     nexus.setChannels("community-1", [channel("channel-1", 0)], {
       ...groups,
       ungroupedChannelIds: ["channel-1"],
@@ -153,7 +153,7 @@ describe("ChannelSolidNexus channel management", () => {
       setChannelGroupForChannel,
       listChannels,
       listChannelGroups,
-    } as unknown as CommunityDataBackend);
+    } as unknown as CommunityChannelBackend);
     nexus.setChannels(
       "community-1",
       [channel("channel-1", 0), channel("channel-2", 1)],
@@ -200,7 +200,7 @@ describe("ChannelSolidNexus channel management", () => {
     const nexus = new ChannelSolidNexus(createMemoryPersistence(), {
       renameChannelGroup,
       setChannelGroupCollapsed,
-    } as unknown as CommunityDataBackend);
+    } as unknown as CommunityChannelBackend);
     nexus.setChannels("community-1", [channel("channel-1", 0)], {
       groups: [
         {
@@ -241,7 +241,7 @@ describe("ChannelSolidNexus channel management", () => {
       deleteChannelGroup,
       listChannels,
       listChannelGroups,
-    } as unknown as CommunityDataBackend);
+    } as unknown as CommunityChannelBackend);
     nexus.setChannels("community-1", [channel("channel-1", 0)], {
       groups: [
         {
@@ -317,7 +317,7 @@ describe("ChannelSolidNexus channel management", () => {
       fetchChannelPermissions,
       saveRoleChannelPermissions,
       saveMemberChannelPermissions,
-    } as unknown as CommunityDataBackend);
+    } as unknown as CommunityChannelBackend);
 
     await nexus.loadChannelPermissions({
       communityId: "community-1",
@@ -347,7 +347,7 @@ describe("ChannelSolidNexus channel management", () => {
   it("reports channel permission load failures", async () => {
     const nexus = new ChannelSolidNexus(createMemoryPersistence(), {
       fetchChannelPermissions: vi.fn().mockRejectedValue(new Error("Denied")),
-    } as unknown as CommunityDataBackend);
+    } as unknown as CommunityChannelBackend);
 
     await expect(
       nexus.loadChannelPermissions({

@@ -1,6 +1,6 @@
 import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 import type { Database } from "@shared/types/database";
-import type { CommunityDataBackend } from "./communityDataBackend.interface";
+import type { CommunityReportBackend } from "./communityDataBackend.interface";
 import type {
   ServerReportDetail,
   ServerReportLinkedChannel,
@@ -346,7 +346,10 @@ export interface ServerModmailBackend {
 
 export function createServerModmailBackend(
   client: HavenSupabaseClient,
-  communityBackend: CommunityDataBackend,
+  communityBackend: Pick<
+    CommunityReportBackend,
+    "broadcastReportStatusUpdated"
+  >,
 ): ServerModmailBackend {
   const modmail: ServerModmailBackend = {
     async listServerReports(communityIds) {
