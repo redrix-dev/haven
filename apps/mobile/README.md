@@ -152,6 +152,13 @@ npm run mobile:native:prebuild
 
 **Build iOS** with **`HavenMobile.xcworkspace`** (CocoaPods), not the raw `.xcodeproj`, when running `xcodebuild` locally or in CI.
 
+### Xcode 27 build notes
+
+- **Pod deployment targets.** Xcode 27 fails the build when a pod targets an iOS version below 15.0 (several still declare 6.0–13.4). `./plugins/withPodDeploymentTargetFloor` adds a `post_install` step that raises those pods to the app's deployment target; it changes nothing about which devices the app supports.
+- **`pod install` needs a UTF-8 locale.** From a non-interactive or agent shell it dies with `Encoding::CompatibilityError`, and prebuild then silently skips pods. Run `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install` in `ios/`.
+- **Stale Node path after a Node upgrade.** `ios/.xcode.env.local` pins `NODE_BINARY` to a versioned Homebrew path; after `brew upgrade` the Hermes build phase fails with "No such file or directory". Point it at `/opt/homebrew/opt/node@24/bin/node`, which survives upgrades.
+- **iOS 27 needs the UIScene lifecycle.** The app currently launches on iOS 26 simulators but is terminated at launch on iOS 27 (`…ForNoSceneLifecycleAdoption`) until the delegate adopts scenes.
+
 ## Post-prebuild: verify iOS delegate + templates
 
 From repo root:
