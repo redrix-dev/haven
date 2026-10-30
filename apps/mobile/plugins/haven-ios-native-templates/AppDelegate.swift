@@ -4,10 +4,12 @@ import React
 import ReactAppDependencyProvider
 import UIKit
 
-/// iOS app delegate (Expo SDK 55 template + VoIP). `startReactNative` runs before
-/// `super.application(_:didFinishLaunchingWithOptions:)` so dev-client can set up the React root view.
+/// iOS app delegate (Expo SDK 55 template + VoIP + UIScene lifecycle). It creates the React Native
+/// factory; `SceneDelegate` owns the window and calls `startReactNative` when the scene connects,
+/// and forwards links back to the overrides below (UIKit no longer calls them under scenes).
 @main
 class AppDelegate: ExpoAppDelegate {
+  /// Set by `SceneDelegate`; kept for code that reads `UIApplication.shared.delegate?.window`.
   var window: UIWindow?
 
   var reactNativeDelegate: ExpoReactNativeFactoryDelegate?
@@ -24,19 +26,10 @@ class AppDelegate: ExpoAppDelegate {
     reactNativeDelegate = reactDelegate
     reactNativeFactory = factory
 
-#if os(iOS) || os(tvOS)
-    window = UIWindow(frame: UIScreen.main.bounds)
-    factory.startReactNative(
-      withModuleName: "main",
-      in: window,
-      launchOptions: launchOptions
-    )
-#endif
-
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  // MARK: - Linking
+  // MARK: - Linking (called by SceneDelegate)
 
   override func application(
     _ app: UIApplication,

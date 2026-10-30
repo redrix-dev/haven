@@ -1,5 +1,6 @@
 /**
- * After `expo prebuild`, verify Haven iOS templates + generated AppDelegate still match expectations.
+ * After `expo prebuild`, verify Haven iOS templates + generated App/SceneDelegate, the Info.plist
+ * scene manifest, and the Xcode project still match expectations.
  * Optional: run xcodebuild if apps/mobile/ios exists (simulator, generic destination).
  */
 import { spawnSync } from "node:child_process";
@@ -17,14 +18,46 @@ const iosAppDir = path.join(mobileRoot, "ios/HavenMobile");
 
 const requiredTemplates = [
   "AppDelegate.swift",
+  "SceneDelegate.swift",
   "HavenVoipPushBridge.m",
   "HavenVoipPushBridge.h",
   "Bridging-Header.h",
 ];
 
+// UIScene lifecycle (iOS 27 terminates apps without it): the app delegate only builds the
+// factory; the scene delegate owns the window and starts React Native into it. Starting it
+// in both would make two windows, so the app delegate must not call startReactNative.
+const swiftExpectations = {
+  "AppDelegate.swift": {
+    includes: ["ExpoReactNativeFactory", "internal import Expo"],
+    excludes: [".startReactNative(", "UIWindow(frame:"],
+  },
+  "SceneDelegate.swift": {
+    includes: [
+      "UIWindowSceneDelegate",
+      "UIWindow(windowScene:",
+      ".startReactNative(",
+      "openURLContexts",
+      "continue userActivity",
+    ],
+    excludes: [],
+  },
+};
+
 function fail(msg) {
   console.error(`[revalidate-ios-delegate] ${msg}`);
   process.exit(1);
+}
+
+function checkSwift(file, label) {
+  const body = fs.readFileSync(file, "utf8");
+  const { includes, excludes } = swiftExpectations[path.basename(file)];
+  for (const needle of includes) {
+    if (!body.includes(needle)) fail(`${label} must include "${needle}"`);
+  }
+  for (const needle of excludes) {
+    if (body.includes(needle)) fail(`${label} must not include "${needle}"`);
+  }
 }
 
 for (const name of requiredTemplates) {
@@ -34,33 +67,36 @@ for (const name of requiredTemplates) {
   }
 }
 
-const swiftTemplate = fs.readFileSync(
-  path.join(templateDir, "AppDelegate.swift"),
-  "utf8",
-);
-for (const needle of [
-  "ExpoReactNativeFactory",
-  "startReactNative",
-  "internal import Expo",
-]) {
-  if (!swiftTemplate.includes(needle)) {
-    fail(`Template AppDelegate.swift must include "${needle}"`);
-  }
+for (const name of Object.keys(swiftExpectations)) {
+  checkSwift(path.join(templateDir, name), `Template ${name}`);
 }
 
-const generated = path.join(iosAppDir, "AppDelegate.swift");
-if (fs.existsSync(generated)) {
-  const body = fs.readFileSync(generated, "utf8");
+const regenerate =
+  "re-run prebuild with withHavenIOSNative last in app.json plugins";
+if (fs.existsSync(path.join(iosAppDir, "AppDelegate.swift"))) {
+  for (const name of Object.keys(swiftExpectations)) {
+    const generated = path.join(iosAppDir, name);
+    const label = `Generated ${path.relative(repoRoot, generated)}`;
+    if (!fs.existsSync(generated)) fail(`${label} is missing — ${regenerate}`);
+    checkSwift(generated, `${label} (${regenerate})`);
+  }
+
+  const plist = fs.readFileSync(path.join(iosAppDir, "Info.plist"), "utf8");
   for (const needle of [
-    "ExpoReactNativeFactory",
-    "startReactNative",
-    "internal import Expo",
+    "<key>UIApplicationSceneManifest</key>",
+    "<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>",
   ]) {
-    if (!body.includes(needle)) {
-      fail(
-        `Generated ${path.relative(repoRoot, generated)} missing "${needle}" — re-run prebuild with withHavenIOSNative last in app.json plugins`,
-      );
+    if (!plist.includes(needle)) {
+      fail(`Generated Info.plist missing ${needle} — ${regenerate}`);
     }
+  }
+
+  const pbxproj = fs.readFileSync(
+    path.join(mobileRoot, "ios/HavenMobile.xcodeproj/project.pbxproj"),
+    "utf8",
+  );
+  if (!pbxproj.includes("SceneDelegate.swift in Sources")) {
+    fail(`SceneDelegate.swift is not compiled by the app target — ${regenerate}`);
   }
 } else {
   console.warn(
