@@ -51,6 +51,7 @@
       "react-native-enriched-markdown",
       "expo-build-properties",
       "./plugins/withNewArchPodfileProperties",
+      "./plugins/withPodDeploymentTargetFloor",
       "./plugins/withHavenIOSNative"
     ],
     "ios": {
