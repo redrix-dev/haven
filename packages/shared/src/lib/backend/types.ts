@@ -670,12 +670,6 @@ export type SupportReportInternalNote = {
   createdAt: string;
 };
 
-export type ServerReportLinkedMessage = {
-  messageId: string;
-  channelId: string | null;
-  channelName: string | null;
-};
-
 export type ServerReportLinkedChannel = {
   channelId: string;
   channelName: string | null;
@@ -700,7 +694,6 @@ export type ServerReportSummary = {
 export type ServerReportDetail = ServerReportSummary & {
   notes: Record<string, unknown> | null;
   linkedChannels: ServerReportLinkedChannel[];
-  linkedMessages: ServerReportLinkedMessage[];
   internalNotes: SupportReportInternalNote[];
   targetUserId: string | null;
   targetDisplayName: string | null;

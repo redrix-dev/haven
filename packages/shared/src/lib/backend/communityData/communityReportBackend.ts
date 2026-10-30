@@ -193,7 +193,8 @@ export const communityReportBackend: CommunityReportBackend = {
         });
       if (hsError) throw hsError;
 
-      // Link both rows to the same channel and message for context
+      // Link both rows to the channel for context; the message itself is
+      // evidence in the snapshot.
       for (const reportId of [serverAdminsId, havenStaffId]) {
         const { error: channelLinkError } = await havenCommunitySb()
           .from("support_report_channels")
@@ -203,14 +204,6 @@ export const communityReportBackend: CommunityReportBackend = {
             channel_id: channelId,
           });
         if (channelLinkError) throw channelLinkError;
-
-        const { error: messageLinkError } = await havenCommunitySb()
-          .from("support_report_messages")
-          .insert({
-            report_id: reportId,
-            message_id: messageId,
-          });
-        if (messageLinkError) throw messageLinkError;
       }
       return;
     }
@@ -241,14 +234,6 @@ export const communityReportBackend: CommunityReportBackend = {
         channel_id: channelId,
       });
     if (channelLinkError) throw channelLinkError;
-
-    const { error: messageLinkError } = await havenCommunitySb()
-      .from("support_report_messages")
-      .insert({
-        report_id: reportId,
-        message_id: messageId,
-      });
-    if (messageLinkError) throw messageLinkError;
   },
 
   async broadcastReportStatusUpdated({
