@@ -65,19 +65,11 @@ updates:
       tauri-shell-minor-and-patch:
         update-types: ["minor", "patch"]
 
-  # ── Native voice sidecar (Rust) ──
-  # NOTE: `livekit` is a deliberate git-rev pin (libwebrtc ABI); Dependabot
-  # will not bump a git dependency, so that pin is reviewed by hand.
-  - package-ecosystem: "cargo"
-    directory: "/apps/tauri/haven-voice"
-    schedule:
-      interval: "weekly"
-    target-branch: "staging"
-    open-pull-requests-limit: 3
-    labels: ["dependencies"]
-    groups:
-      haven-voice-minor-and-patch:
-        update-types: ["minor", "patch"]
+  # NOTE: the native voice sidecar (/apps/tauri/haven-voice) is intentionally
+  # NOT tracked here. It is quarantined (desktop no longer ships to Linux) —
+  # nothing builds it, so its livekit/libwebrtc deps must not generate update
+  # PRs or alerts. Re-add a cargo entry here to resurrect it. See
+  # apps/tauri/haven-voice/QUARANTINE.md.
 
   # ── GitHub Actions workflows ──
   - package-ecosystem: "github-actions"

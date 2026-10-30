@@ -1,0 +1,51 @@
+name: Linux voice resurrection check
+
+# MANUAL ONLY. The Linux native voice sidecar (apps/tauri/haven-voice) and its
+# Tauri host (apps/tauri/src-tauri/src/voice.rs, cfg(target_os = "linux")) are
+# quarantined — desktop ships macOS + Windows only, so nothing builds them on a
+# normal PR and they can rot silently. Run this by hand (Actions ▸ this workflow
+# ▸ Run workflow) to check they still compile for Linux before relying on a
+# resurrection. It is intentionally NOT part of `gate`. See
+# apps/tauri/haven-voice/QUARANTINE.md.
+on:
+  workflow_dispatch:
+
+jobs:
+  linux-voice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ./apps/tauri/src-tauri -> target
+            ./apps/tauri/haven-voice -> target
+      # cpal needs ALSA; webrtc-sys's prebuilt libwebrtc links the GTK/glib
+      # desktop stack at build time.
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libglib2.0-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev
+
+      # 1. The standalone sidecar crate still builds — proves livekit/libwebrtc
+      #    and its Cargo.lock still resolve.
+      - name: Build native voice sidecar
+        run: cargo build --locked --manifest-path apps/tauri/haven-voice/Cargo.toml
+
+      # 2. The Tauri shell's Linux voice path still compiles. generate_context!
+      #    needs the built frontend, and on Linux the build pulls voice.rs + its
+      #    tokio dep back in — this is what rots unseen on macOS/Windows PRs.
+      - name: Install JS dependencies
+        run: npm ci
+      - name: Build Solid frontend
+        run: npm run build:solid
+      - name: Check Tauri shell for Linux (compiles voice.rs)
+        run: cargo check --manifest-path apps/tauri/src-tauri/Cargo.toml

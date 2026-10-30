@@ -8,9 +8,10 @@ apps/mobile/.expo/
 apps/mobile/ios/
 apps/mobile/android/
 apps/tauri/src-tauri/target/
-# The native voice sidecar is a standalone Cargo workspace; its build/coverage
-# output lives here and is gitignored, but Prettier still scans it unless told.
-apps/tauri/haven-voice/target/
+# The native voice sidecar is QUARANTINED (Linux-only, desktop ships mac+win).
+# Skip the whole standalone Cargo workspace so no check touches it until it is
+# resurrected. See apps/tauri/haven-voice/QUARANTINE.md.
+apps/tauri/haven-voice/
 # Tauri-generated schemas (gitignored via a nested .gitignore that Prettier
 # doesn't read; list here so format:check skips them too).
 apps/tauri/src-tauri/gen/

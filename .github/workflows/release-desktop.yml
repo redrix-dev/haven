@@ -108,11 +108,13 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          # Two independent Cargo workspaces: the Tauri app and the standalone
-          # native voice sidecar (Linux).
+          # Only the Tauri app is built here. The standalone native voice
+          # sidecar (apps/tauri/haven-voice) is Linux-only and quarantined —
+          # nothing in the macOS/Windows release builds it. Restore its
+          # `-> target` line when resurrecting Linux. See
+          # apps/tauri/haven-voice/QUARANTINE.md.
           workspaces: |
             ./apps/tauri/src-tauri -> target
-            ./apps/tauri/haven-voice -> target
 
       - name: Install JS dependencies
         run: npm ci
