@@ -14,7 +14,12 @@ const mobileDataRoot = path.join(mobileSrcRoot, "data");
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [sharedPackageRoot];
+// Expo SDK 56's TypeScript resolver (@expo/metro-file-map) resolves this
+// app's tsconfig `extends: ../../tsconfig.base.json` and that base's
+// monorepo-root-relative `paths`. Those escape above a project-only root and
+// throw "Failed to collapse", so the workspace root must be a watched root.
+// (SDK 55's metro-file-map tolerated the leaner `[sharedPackageRoot]`.)
+config.watchFolders = [monorepoRoot];
 config.resolver.nodeModulesPaths = [
   mobileNodeModules,
   path.resolve(monorepoRoot, "node_modules"),

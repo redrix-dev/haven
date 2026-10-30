@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
     height: 24,
   },
   dateDividerLine: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     top: 12,
     bottom: undefined,
     borderTopWidth: 1,
