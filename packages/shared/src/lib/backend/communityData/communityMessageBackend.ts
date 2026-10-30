@@ -1,6 +1,7 @@
 /**
- * Community messages: reading channel pages, reactions, attachments, link
- * previews, media maintenance, and the write path (send, upload, edit, delete).
+ * Community messages: reading channel pages (with reactions, attachments and
+ * link previews folded in), reactions, link-preview backfill, and the write
+ * path (send, upload, edit, delete).
  *
  * Storage blobs must be deleted through the Storage API before the row; blob
  * cleanup is best-effort (never orphans a row, tolerates an orphan blob).
@@ -17,28 +18,10 @@ import {
   deriveMessageMediaKindFromMimeType,
   buildMessageMediaObjectPath,
 } from "./messageMedia";
-import {
-  mapMessageReactionRows,
-  mapMessageAttachmentRowsWithSignedUrls,
-  mapMessageLinkPreviewRowsWithSignedUrls,
-  mapChannelMessageRpcRowsToBundles,
-} from "./messageRows";
-import type {
-  MessageReactionRow,
-  MessageAttachmentRow,
-  MessageLinkPreviewRow,
-} from "./messageRows";
-import type {
-  Message,
-  MessageAttachment,
-  MessageLinkPreview,
-  MessageReaction,
-  MessageBundle,
-  LiveProfileIdentity,
-} from "../types";
+import { mapChannelMessageRpcRowsToBundles } from "./messageRows";
+import type { MessageBundle, LiveProfileIdentity } from "../types";
 
 export interface CommunityMessageBackend {
-  listMessages(communityId: string, channelId: string): Promise<Message[]>;
   listChannelMessages(input: {
     communityId: string;
     channelId: string;
@@ -61,25 +44,12 @@ export interface CommunityMessageBackend {
     communityId: string;
     authorUserIds: string[];
   }): Promise<LiveProfileIdentity[]>;
-  listMessageReactions(
-    communityId: string,
-    channelId: string,
-  ): Promise<MessageReaction[]>;
   toggleMessageReaction(input: {
     communityId: string;
     channelId: string;
     messageId: string;
     emoji: string;
   }): Promise<void>;
-  listMessageAttachments(
-    communityId: string,
-    channelId: string,
-  ): Promise<MessageAttachment[]>;
-  cleanupExpiredMessageAttachments(limit?: number): Promise<number>;
-  listMessageLinkPreviews(
-    communityId: string,
-    channelId: string,
-  ): Promise<MessageLinkPreview[]>;
   requestChannelLinkPreviewBackfill(input: {
     communityId: string;
     channelId: string;
@@ -89,13 +59,6 @@ export interface CommunityMessageBackend {
     skipped: number;
     alreadyPresent: number;
     requested: number;
-  }>;
-  runMessageMediaMaintenance(limit?: number): Promise<{
-    deletedMessages: number;
-    claimedDeletionJobs: number;
-    deletedObjects: number;
-    retryableFailures: number;
-    deadLetters: number;
   }>;
   sendUserMessage(input: {
     communityId: string;
@@ -139,7 +102,6 @@ export interface CommunityMessageBackend {
     communityId: string;
     messageId: string;
   }): Promise<void>;
-  deleteMessage(input: { messageId: string }): Promise<void>;
 }
 
 type MessageAttachmentStorageRow = {
@@ -148,19 +110,6 @@ type MessageAttachmentStorageRow = {
 };
 
 export const communityMessageBackend: CommunityMessageBackend = {
-  async listMessages(communityId, channelId) {
-    const { data, error } = await havenCommunitySb()
-      .from("messages")
-      .select("*")
-      .eq("community_id", communityId)
-      .eq("channel_id", channelId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-    return data ?? [];
-  },
-
   async listChannelMessages(input) {
     const { communityId, channelId, beforeCreatedAt, beforeMessageId } = input;
     const rpcLimit = input.limit ?? 50;
@@ -240,19 +189,6 @@ export const communityMessageBackend: CommunityMessageBackend = {
     });
   },
 
-  async listMessageReactions(communityId, channelId) {
-    const { data, error } = await havenCommunitySb()
-      .from("message_reactions" as never)
-      .select("id, message_id, user_id, emoji, created_at")
-      .eq("community_id", communityId)
-      .eq("channel_id", channelId)
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-
-    return mapMessageReactionRows((data ?? []) as MessageReactionRow[]);
-  },
-
   async toggleMessageReaction({ communityId, channelId, messageId, emoji }) {
     const normalizedEmoji = emoji.trim();
     if (normalizedEmoji.length === 0) {
@@ -324,55 +260,6 @@ export const communityMessageBackend: CommunityMessageBackend = {
     throw insertError;
   },
 
-  async listMessageAttachments(communityId, channelId) {
-    const nowIso = new Date().toISOString();
-    const { data, error } = await havenCommunitySb()
-      .from("message_attachments" as never)
-      .select(
-        "id, message_id, community_id, channel_id, owner_user_id, bucket_name, object_path, original_filename, mime_type, media_kind, size_bytes, created_at, expires_at",
-      )
-      .eq("community_id", communityId)
-      .eq("channel_id", channelId)
-      .gt("expires_at", nowIso)
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-
-    return await mapMessageAttachmentRowsWithSignedUrls(
-      (data ?? []) as MessageAttachmentRow[],
-    );
-  },
-
-  async cleanupExpiredMessageAttachments(limit = 100) {
-    const boundedLimit = Number.isFinite(limit)
-      ? Math.min(Math.max(Math.floor(limit), 1), 500)
-      : 100;
-
-    const { data, error } = await havenCommunitySb().rpc(
-      "cleanup_expired_message_attachments" as never,
-      { p_limit: boundedLimit } as never,
-    );
-    if (error) throw error;
-    return Number(data ?? 0);
-  },
-
-  async listMessageLinkPreviews(communityId, channelId) {
-    const { data, error } = await havenCommunitySb()
-      .from("message_link_previews" as never)
-      .select(
-        "id, message_id, community_id, channel_id, source_url, normalized_url, status, cache_id, snapshot, embed_provider, thumbnail_bucket_name, thumbnail_object_path, created_at, updated_at",
-      )
-      .eq("community_id", communityId)
-      .eq("channel_id", channelId)
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-
-    return await mapMessageLinkPreviewRowsWithSignedUrls(
-      (data ?? []) as MessageLinkPreviewRow[],
-    );
-  },
-
   async requestChannelLinkPreviewBackfill({
     communityId,
     channelId,
@@ -401,24 +288,6 @@ export const communityMessageBackend: CommunityMessageBackend = {
       channelId,
       messageIds: boundedMessageIds,
       limit: Math.min(Math.max(requestedCount, 1), 100),
-    });
-  },
-
-  async runMessageMediaMaintenance(limit = 50) {
-    const boundedLimit = Number.isFinite(limit)
-      ? Math.min(Math.max(Math.floor(limit), 1), 200)
-      : 50;
-
-    return await supabaseFunctionJson<{
-      deletedMessages: number;
-      claimedDeletionJobs: number;
-      deletedObjects: number;
-      retryableFailures: number;
-      deadLetters: number;
-    }>("message-media-maintenance", {
-      mode: "authenticated-fallback",
-      maxExpiredMessages: boundedLimit,
-      maxDeletionJobs: boundedLimit,
     });
   },
 
@@ -521,68 +390,47 @@ export const communityMessageBackend: CommunityMessageBackend = {
     if (error) throw error;
   },
 
-  async deleteMessage(
-    input: { communityId: string; messageId: string } | { messageId: string },
-  ) {
-    if ("communityId" in input && typeof input.communityId === "string") {
-      const { communityId, messageId } = input;
-      // Storage objects must be removed through the Storage API, not direct SQL.
-      const { data: attachmentRows, error: attachmentRowsError } =
-        await havenCommunitySb()
-          .from("message_attachments" as never)
-          .select("bucket_name, object_path")
-          .eq("community_id", communityId)
-          .eq("message_id", messageId);
-      if (attachmentRowsError) throw attachmentRowsError;
-
-      const attachmentPathsByBucket = new Map<string, string[]>();
-      for (const attachmentRow of (attachmentRows ??
-        []) as MessageAttachmentStorageRow[]) {
-        const existingPaths =
-          attachmentPathsByBucket.get(attachmentRow.bucket_name) ?? [];
-        existingPaths.push(attachmentRow.object_path);
-        attachmentPathsByBucket.set(attachmentRow.bucket_name, existingPaths);
-      }
-
-      for (const [bucketName, paths] of attachmentPathsByBucket.entries()) {
-        if (paths.length === 0) continue;
-
-        try {
-          await havenCommunityStore().removeObjects(bucketName, paths);
-        } catch (removeError) {
-          console.warn(
-            "Failed to remove message attachment objects before message delete:",
-            {
-              messageId,
-              bucketName,
-              removeError,
-            },
-          );
-        }
-      }
-
-      const { error } = await havenCommunitySb()
-        .from("messages")
-        .delete()
+  async deleteMessage({ communityId, messageId }) {
+    // Storage objects must be removed through the Storage API, not direct SQL.
+    const { data: attachmentRows, error: attachmentRowsError } =
+      await havenCommunitySb()
+        .from("message_attachments" as never)
+        .select("bucket_name, object_path")
         .eq("community_id", communityId)
-        .eq("id", messageId);
-      if (error) throw error;
-      return;
+        .eq("message_id", messageId);
+    if (attachmentRowsError) throw attachmentRowsError;
+
+    const attachmentPathsByBucket = new Map<string, string[]>();
+    for (const attachmentRow of (attachmentRows ??
+      []) as MessageAttachmentStorageRow[]) {
+      const existingPaths =
+        attachmentPathsByBucket.get(attachmentRow.bucket_name) ?? [];
+      existingPaths.push(attachmentRow.object_path);
+      attachmentPathsByBucket.set(attachmentRow.bucket_name, existingPaths);
     }
 
-    const { messageId } = input;
-    const {
-      data: { user },
-      error: authError,
-    } = await havenCommunitySb().auth.getUser();
-    if (authError) throw authError;
-    if (!user?.id) throw new Error("Not authenticated.");
+    for (const [bucketName, paths] of attachmentPathsByBucket.entries()) {
+      if (paths.length === 0) continue;
+
+      try {
+        await havenCommunityStore().removeObjects(bucketName, paths);
+      } catch (removeError) {
+        console.warn(
+          "Failed to remove message attachment objects before message delete:",
+          {
+            messageId,
+            bucketName,
+            removeError,
+          },
+        );
+      }
+    }
 
     const { error } = await havenCommunitySb()
       .from("messages")
       .delete()
-      .eq("id", messageId)
-      .eq("author_user_id", user.id);
+      .eq("community_id", communityId)
+      .eq("id", messageId);
     if (error) throw error;
   },
 };

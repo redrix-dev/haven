@@ -11,7 +11,6 @@ import {
 import type {
   MessageReportKind,
   MessageReportTarget,
-  Message,
   SupportReportMessageSnapshot,
   SupportReportProfileSnapshot,
   ReportStatusUpdatedBroadcastPayload,

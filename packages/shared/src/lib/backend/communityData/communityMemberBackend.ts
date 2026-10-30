@@ -33,13 +33,6 @@ export interface CommunityMemberBackend {
     targetUserId: string;
     reason?: string | null;
   }): Promise<void>;
-  /** Resolves the signed-in user's `community_members` row id and assigned `role_id`s in this community. */
-  fetchMyMemberRoleAssignmentForRealtime(
-    communityId: string,
-    userId: string,
-  ): Promise<{ memberId: string; roleIds: string[] } | null>;
-  isElevatedInServer(communityId: string): Promise<boolean>;
-  canSendInChannel(channelId: string): Promise<boolean>;
 }
 
 type BanCommunityMemberRpcRow = {
@@ -265,87 +258,5 @@ export const communityMemberBackend: CommunityMemberBackend = {
           : undefined,
     });
     if (error) throw error;
-  },
-
-  async fetchMyMemberRoleAssignmentForRealtime(communityId, userId) {
-    const { data: memberRow, error: memberErr } = await havenCommunitySb()
-      .from("community_members")
-      .select("id")
-      .eq("community_id", communityId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (memberErr) throw memberErr;
-    if (!memberRow?.id) return null;
-
-    const { data: roleRows, error: roleErr } = await havenCommunitySb()
-      .from("member_roles")
-      .select("role_id")
-      .eq("member_id", memberRow.id)
-      .eq("community_id", communityId);
-    if (roleErr) throw roleErr;
-
-    const roleIds = [...new Set((roleRows ?? []).map((r) => r.role_id))];
-    return { memberId: memberRow.id, roleIds };
-  },
-
-  async isElevatedInServer(communityId) {
-    const {
-      data: { user },
-      error: authError,
-    } = await havenCommunitySb().auth.getUser();
-    if (authError) throw authError;
-    if (!user?.id || !communityId) return false;
-
-    const { data: memberRow, error: memberError } = await havenCommunitySb()
-      .from("community_members")
-      .select("id, is_owner")
-      .eq("community_id", communityId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (memberError) throw memberError;
-    if (!memberRow) return false;
-    if (memberRow.is_owner) return true;
-
-    const { data: memberRoleRows, error: memberRoleError } =
-      await havenCommunitySb()
-        .from("member_roles")
-        .select("role_id")
-        .eq("community_id", communityId)
-        .eq("member_id", memberRow.id);
-    if (memberRoleError) throw memberRoleError;
-
-    const roleIds = Array.from(
-      new Set(
-        (memberRoleRows ?? [])
-          .map((row) => row.role_id)
-          .filter((roleId): roleId is string => Boolean(roleId)),
-      ),
-    );
-    if (roleIds.length === 0) return false;
-
-    const { data: roleRows, error: roleError } = await havenCommunitySb()
-      .from("roles")
-      .select("name, is_system")
-      .eq("community_id", communityId)
-      .in("id", roleIds);
-    if (roleError) throw roleError;
-
-    return (roleRows ?? []).some(
-      (role) =>
-        role.is_system === true &&
-        (role.name === "Admin" || role.name === "Moderator"),
-    );
-  },
-
-  async canSendInChannel(channelId) {
-    const { data, error } = await havenCommunitySb().rpc(
-      "can_send_in_channel",
-      {
-        p_channel_id: channelId,
-      },
-    );
-
-    if (error) throw error;
-    return Boolean(data);
   },
 };

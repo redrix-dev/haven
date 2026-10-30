@@ -3,7 +3,6 @@ import type { CommunityMemberBackend } from "./communityData/communityMemberBack
 import type { CommunityMessageBackend } from "./communityData/communityMessageBackend";
 import type { CommunityReportBackend } from "./communityData/communityReportBackend";
 import type { CommunitySettingsBackend } from "./communityData/communitySettingsBackend";
-import type { Message } from "./types";
 
 export type {
   CommunityChannelBackend,
@@ -11,16 +10,6 @@ export type {
   CommunityMessageBackend,
   CommunityReportBackend,
   CommunitySettingsBackend,
-};
-
-export type MessagePageCursor = {
-  createdAt: string;
-  id: string;
-};
-
-export type MessagePageResult = {
-  messages: Message[];
-  hasMore: boolean;
 };
 
 /**

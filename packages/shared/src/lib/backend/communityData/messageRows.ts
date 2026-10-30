@@ -19,14 +19,6 @@ import type {
   MessageBundle,
 } from "../types";
 
-export type MessageReactionRow = {
-  id: string;
-  message_id: string;
-  user_id: string;
-  emoji: string;
-  created_at: string;
-};
-
 export type MessageAttachmentRow = {
   id: string;
   message_id: string;
@@ -117,17 +109,6 @@ const normalizeLinkPreviewSnapshot = (
     embed,
   };
 };
-
-export const mapMessageReactionRows = (
-  rows: MessageReactionRow[],
-): MessageReaction[] =>
-  rows.map((row) => ({
-    id: row.id,
-    messageId: row.message_id,
-    userId: row.user_id,
-    emoji: row.emoji,
-    createdAt: row.created_at,
-  }));
 
 const normalizeMessageMetadata = (value: unknown): Record<string, unknown> => {
   const record = asObjectRecord(value);

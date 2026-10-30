@@ -30,11 +30,7 @@ import { communitySettingsBackend } from "./communityData/communitySettingsBacke
 import type { CommunityDataBackend } from "./communityDataBackend.interface";
 
 export { configureCommunityDataBackendRuntime } from "./communityData/runtime";
-export type {
-  CommunityDataBackend,
-  MessagePageCursor,
-  MessagePageResult,
-} from "./communityDataBackend.interface";
+export type { CommunityDataBackend } from "./communityDataBackend.interface";
 
 export const centralCommunityDataBackend: CommunityDataBackend = {
   ...communityMemberBackend,
