@@ -168,8 +168,16 @@ phase:
 - `session === undefined` → splash / spinner (hydrating from storage).
 - `session === null` → `SignInScreen` / auth stack.
 - `session` present → the authenticated app, itself gated on the **onboarding**
-  load (Solid `routes/index.tsx`), while `bootstrapSession`'s phases run
-  underneath.
+  load (Solid `routes/index.tsx`, mobile `MobileOnboardingGate`), while
+  `bootstrapSession`'s phases run underneath.
+
+Onboarding campaigns live in `public.onboarding_campaigns` and the gate shows
+the ones `list_my_onboarding_campaigns` returns for the client's platform:
+mobile sends `ios`/`android`, Solid sends `desktop`/`web`. A campaign's
+`platform_scope` is `all`, `mobile` (iOS and Android), or one platform; a
+client sending no or an unknown platform only gets `all` campaigns. The Alpha
+campaign (`alpha_2026`, required, joins the Alpha community) is `mobile`, so
+desktop and web sign-ups land on create-or-join instead.
 
 The `phase` observable is mirrored into UI state and logged
 (`[session] phase → …`); it drives fine-grained boot UI, while the coarse
