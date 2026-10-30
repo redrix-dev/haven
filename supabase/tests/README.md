@@ -30,3 +30,15 @@ Schema migrations live in `supabase/migrations/` at the repo root (standard Supa
 - Tests use `SET LOCAL ROLE ...` + `request.jwt.claim.*` settings to exercise RLS.
 - Most suites run inside `BEGIN; ... ROLLBACK;` so data changes do not persist.
 - Fixture files are idempotent and safe to re-run on a local dev DB.
+
+## macOS 27: Supabase CLI killed on launch
+
+If `npx supabase start` (or `npm run test:db`) dies at once with SIGKILL /
+exit 137, macOS is rejecting the npm CLI binary's ad-hoc signature
+(`codesign --verify` reports "invalid signature"; a fresh `npm ci` copy is
+the same, so it is upstream, not tampering — seen with CLI 2.105.0).
+Re-sign the local copy after each install:
+
+```sh
+codesign --force --sign - node_modules/@supabase/cli-darwin-arm64/bin/supabase
+```
