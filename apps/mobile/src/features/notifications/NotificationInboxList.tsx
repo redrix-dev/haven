@@ -13,7 +13,7 @@ import {
   View,
   type ListRenderItem,
 } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
+import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { ThemedIonicons } from "@/theme-rn";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import type { NotificationItem } from "@shared/lib/backend/types";
@@ -171,7 +171,7 @@ export function NotificationInboxList({
       const unread = item.readAt == null;
 
       return (
-        <Swipeable
+        <ReanimatedSwipeable
           renderRightActions={() => renderRightActions(item)}
           overshootRight={false}
         >
@@ -235,7 +235,7 @@ export function NotificationInboxList({
               </Pressable>
             ) : null}
           </View>
-        </Swipeable>
+        </ReanimatedSwipeable>
       );
     },
     [expandedIds, liveProfiles, onNavigate, renderRightActions, toggleExpanded],
@@ -267,7 +267,7 @@ export function NotificationInboxList({
       ListHeaderComponent={
         visibleError ? (
           <Text className="mb-3 text-sm text-destructive">{visibleError}</Text>
-        ) : null
+        ) : undefined
       }
       ListEmptyComponent={
         <View className="items-center py-10">
