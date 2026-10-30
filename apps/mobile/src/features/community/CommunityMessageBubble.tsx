@@ -42,6 +42,7 @@ export type ChatMessage = {
   authorAvatarUrl?: string | null;
   isAuthorStaff?: boolean;
   timestampLabel?: string;
+  isEdited?: boolean;
   replyTargetLabel?: string | null;
   attachments?: MessageAttachment[];
   linkPreview?: MessageLinkPreview | null;
@@ -93,6 +94,7 @@ export function CommunityMessageBubble({
   authorAvatarUrl,
   isAuthorStaff,
   timestampLabel,
+  isEdited,
   replyTargetLabel,
   attachments,
   isCondensed,
@@ -212,7 +214,10 @@ export function CommunityMessageBubble({
           </Text>
         ) : null}
 
+        {/* Not selectable: on iOS a long-press would open the text-selection
+            menu on top of the message actions sheet. Copy lives in the sheet. */}
         <EnrichedMarkdownText
+          selectable={false}
           markdown={text}
           flavor="github"
           md4cFlags={COMMUNITY_MARKDOWN_MD4C_FLAGS}
@@ -231,6 +236,11 @@ export function CommunityMessageBubble({
             void Linking.openURL(url);
           }}
         />
+        {isEdited ? (
+          <Text style={[styles.editedLabel, { color: c.timestamp }]}>
+            (edited)
+          </Text>
+        ) : null}
 
         {attachments?.map((attachment) => {
           if (!attachment.signedUrl) {
@@ -458,6 +468,10 @@ const styles = StyleSheet.create({
   replyLabel: {
     marginBottom: 2,
     fontSize: 12,
+  },
+  editedLabel: {
+    marginTop: 1,
+    fontSize: 11,
   },
   dateDivider: {
     position: "relative",

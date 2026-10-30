@@ -8,3 +8,4 @@ export * from "./persistSnapshot";
 export * from "./mediaSendRules";
 export * from "./optimisticSend";
 export * from "./realtimePartialMessage";
+export * from "./messageActions";

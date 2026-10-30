@@ -8,11 +8,13 @@ import {
   signOutTestUser,
   testBackends,
 } from "@test-support/setup/supabaseLocal";
+import { MessageWriteRefusedError } from "../communityData/communityMessageBackend";
 
 /**
  * The message part against the real database: what a page returns, and who
- * may edit or delete a message. The edit/delete rows pin RLS as the client
- * sees it — a refused edit or delete does not throw, it changes nothing.
+ * may edit or delete a message. RLS refuses an edit or delete by matching no
+ * rows; the backend turns that into MessageWriteRefusedError, and nothing
+ * changes.
  */
 describe.sequential("CommunityMessageBackend (contract)", () => {
   const users = loadBootstrappedTestUsers();
@@ -99,7 +101,7 @@ describe.sequential("CommunityMessageBackend (contract)", () => {
     expect(edited?.editedAt).not.toBeNull();
   });
 
-  it("another member's edit is refused without an error and changes nothing", async () => {
+  it("another member's edit is refused with an error and changes nothing", async () => {
     const id = await send("contract: not yours");
 
     await signInAsTestUser("member_b");
@@ -109,16 +111,18 @@ describe.sequential("CommunityMessageBackend (contract)", () => {
         messageId: id,
         content: "hijack",
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toBeInstanceOf(MessageWriteRefusedError);
 
     expect((await read(id))?.content).toBe("contract: not yours");
   });
 
-  it("a member without manage_messages cannot delete someone else's message", async () => {
+  it("a member without manage_messages is refused deleting someone else's message", async () => {
     const id = await send("contract: keep me");
 
     await signInAsTestUser("member_b");
-    await backend.deleteMessage({ communityId, messageId: id });
+    await expect(
+      backend.deleteMessage({ communityId, messageId: id }),
+    ).rejects.toBeInstanceOf(MessageWriteRefusedError);
 
     expect(await read(id)).not.toBeNull();
   });

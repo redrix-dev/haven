@@ -145,3 +145,97 @@ describe("CommunityMessageNexus loading", () => {
     expect(a.byChannel).not.toBe(b.byChannel);
   });
 });
+
+describe("CommunityMessageNexus edit and delete", () => {
+  /** A backend call that waits until the test settles it. */
+  function pending() {
+    let settle!: (error?: Error) => void;
+    const call = vi.fn(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          settle = (error) => (error ? reject(error) : resolve());
+        }),
+    );
+    return { call, settle: (error?: Error) => settle(error) };
+  }
+
+  it("edit shows the new text while the request is in flight", async () => {
+    const { nexus } = setup();
+    nexus.insertMessage(bundle("m1", 1, { content: "before" }));
+    const backend = pending();
+    nexus.setCommunityData({ editUserMessage: backend.call } as never);
+
+    const editing = nexus.edit("m1", "  after  ");
+    expect(nexus.getSnapshot("m1")).toMatchObject({ content: "after" });
+    expect(nexus.getSnapshot("m1")?.editedAt).not.toBeNull();
+
+    backend.settle();
+    await editing;
+    expect(backend.call).toHaveBeenCalledWith({
+      communityId: "s1",
+      messageId: "m1",
+      content: "after",
+    });
+  });
+
+  it("a refused edit puts the old text back and rethrows", async () => {
+    const { nexus } = setup();
+    nexus.insertMessage(bundle("m1", 1, { content: "before" }));
+    const backend = pending();
+    nexus.setCommunityData({ editUserMessage: backend.call } as never);
+
+    const editing = nexus.edit("m1", "after");
+    backend.settle(new Error("refused"));
+
+    await expect(editing).rejects.toThrow("refused");
+    expect(nexus.getSnapshot("m1")).toMatchObject({
+      content: "before",
+      editedAt: null,
+    });
+  });
+
+  it("edit refuses empty text and skips an unchanged one", async () => {
+    const { nexus } = setup();
+    nexus.insertMessage(bundle("m1", 1, { content: "same" }));
+    const editUserMessage = vi.fn(async () => undefined);
+    nexus.setCommunityData({ editUserMessage } as never);
+
+    await expect(nexus.edit("m1", "   ")).rejects.toThrow("empty");
+    await nexus.edit("m1", "same");
+    expect(editUserMessage).not.toHaveBeenCalled();
+  });
+
+  it("delete removes the message while the request is in flight", async () => {
+    const { nexus, order } = setup();
+    nexus.insertMessage(bundle("m1", 1));
+    nexus.insertMessage(bundle("m2", 2));
+    const backend = pending();
+    nexus.setCommunityData({ deleteMessage: backend.call } as never);
+
+    const deleting = nexus.deleteMessage("m1");
+    expect(order()).toEqual(["m2"]);
+
+    backend.settle();
+    await deleting;
+    expect(order()).toEqual(["m2"]);
+    expect(backend.call).toHaveBeenCalledWith({
+      communityId: "s1",
+      messageId: "m1",
+    });
+  });
+
+  it("a refused delete puts the message back in its place and rethrows", async () => {
+    const { nexus, order } = setup();
+    nexus.insertMessage(bundle("m1", 1));
+    nexus.insertMessage(bundle("m2", 2));
+    const backend = pending();
+    nexus.setCommunityData({ deleteMessage: backend.call } as never);
+
+    const deleting = nexus.deleteMessage("m1");
+    backend.settle(new Error("refused"));
+
+    await expect(deleting).rejects.toThrow("refused");
+    expect(order()).toEqual(["m1", "m2"]);
+    expect(nexus.getSnapshot("m1")?.content).toBe("body m1");
+  });
+});

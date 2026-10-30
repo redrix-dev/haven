@@ -4,6 +4,7 @@ import { requireHavenSolidCore } from "@solid-client/core";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useToast } from "@solid-client/contexts/ToastProvider";
 import {
+  ConfirmDialog,
   ReportDialog,
   type ReportDialogResult,
 } from "@solid-client/components/ui";
@@ -140,8 +141,36 @@ function ChannelChat(props: {
   void core.ensureCommunityPermissions(props.communityId);
 
   const viewerId = () => session()?.user.id ?? null;
-  const canReport = () =>
-    core.permissions.getPermissions(props.communityId).canCreateReports;
+  const permissions = () => core.permissions.getPermissions(props.communityId);
+
+  const [editingId, setEditingId] = createSignal<string | null>(null);
+  const saveEdit = async (messageId: string, content: string) => {
+    await nexus.edit(messageId, content);
+    setEditingId(null);
+  };
+
+  const [pendingDelete, setPendingDelete] = createSignal<{
+    messageId: string;
+    preview: string;
+  } | null>(null);
+  const [deleting, setDeleting] = createSignal(false);
+  const confirmDelete = async () => {
+    const target = pendingDelete();
+    if (!target || deleting()) return;
+    setDeleting(true);
+    try {
+      await nexus.deleteMessage(target.messageId);
+      setPendingDelete(null);
+    } catch (e) {
+      setPendingDelete(null);
+      toast.show({
+        title: "Couldn't delete message",
+        body: e instanceof Error ? e.message : "Try again in a moment.",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const [report, setReport] = createSignal<ReportSubject | null>(null);
   const isMessageReport = () => report()?.kind === "message";
@@ -236,7 +265,14 @@ function ChannelChat(props: {
               items={items()}
               onReachTop={onReachTop}
               viewerId={viewerId()}
-              canReport={canReport()}
+              permissions={permissions()}
+              editingMessageId={editingId()}
+              onEditMessage={setEditingId}
+              onSaveEdit={saveEdit}
+              onCancelEdit={() => setEditingId(null)}
+              onDeleteMessage={(messageId, preview) =>
+                setPendingDelete({ messageId, preview })
+              }
               onReportMessage={(messageId, preview) =>
                 setReport({ kind: "message", messageId, preview })
               }
@@ -248,6 +284,16 @@ function ChannelChat(props: {
         </Show>
       </div>
       <Composer channelName={props.channelName} onSend={send} />
+      <ConfirmDialog
+        open={pendingDelete() !== null}
+        title="Delete message?"
+        description={`“${pendingDelete()?.preview ?? ""}” will be removed for everyone. This can't be undone.`}
+        confirmLabel="Delete"
+        danger
+        pending={deleting()}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+      />
       <ReportDialog
         open={report() !== null}
         title={dialogTitle()}
