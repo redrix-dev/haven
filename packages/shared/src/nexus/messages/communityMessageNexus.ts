@@ -474,8 +474,13 @@ export class CommunityMessageNexus {
   async edit(messageId: string, content: string): Promise<void> {
     const text = content.trim();
     if (!text) throw new Error("A message can't be empty.");
-    const previous = this.port.get().entities[messageId]?.data;
-    if (previous?.content === text) return;
+    const current = this.port.get().entities[messageId]?.data;
+    if (current?.content === text) return;
+    // Copy the values, not the object: on Solid, get() is the live store and
+    // the optimistic write below would change `current` along with it.
+    const previous = current
+      ? { content: current.content, editedAt: current.editedAt }
+      : null;
 
     if (previous) {
       this.updateMessage(messageId, {

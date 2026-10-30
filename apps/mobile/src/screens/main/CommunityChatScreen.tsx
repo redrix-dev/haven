@@ -303,7 +303,13 @@ export function CommunityChatScreen({
   const [reportMessageTarget, setReportMessageTarget] =
     useState<MessageActionTarget | null>(null);
   // While set, the composer holds this message's text and Send saves the edit.
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  // It remembers the conversation it started in (see the effect below).
+  const [editing, setEditing] = useState<{
+    messageId: string;
+    communityId: string;
+    channelId: string | null;
+  } | null>(null);
+  const editingMessageId = editing?.messageId ?? null;
 
   const pendingReplyTargetLabel = useMemo(
     () =>
@@ -368,7 +374,7 @@ export function CommunityChatScreen({
       try {
         setIsSending(true);
         await messageNexus.edit(editingMessageId, text);
-        setEditingMessageId(null);
+        setEditing(null);
         setDraft("");
         composerInputRef.current?.setValue("");
       } catch (e) {
@@ -481,17 +487,37 @@ export function CommunityChatScreen({
     if (!bundle) return;
     setPendingReplyToMessageId(null);
     setPendingCommunityMedia(null);
-    setEditingMessageId(target.messageId);
+    setEditing({
+      messageId: target.messageId,
+      communityId,
+      channelId: activeChannelId ?? null,
+    });
     setDraft(bundle.content);
     composerInputRef.current?.setValue(bundle.content);
     composerInputRef.current?.focus();
   };
 
   const cancelEditing = () => {
-    setEditingMessageId(null);
+    setEditing(null);
     setDraft("");
     composerInputRef.current?.setValue("");
   };
+
+  // The screen stays mounted across channel and community switches. Leaving
+  // the conversation an edit started in drops the edit and its text, so Send
+  // can't save it into a different channel or community.
+  useEffect(() => {
+    if (!editing) return;
+    if (
+      editing.communityId === communityId &&
+      editing.channelId === (activeChannelId ?? null)
+    ) {
+      return;
+    }
+    setEditing(null);
+    setDraft("");
+    composerInputRef.current?.setValue("");
+  }, [activeChannelId, communityId, editing]);
 
   const confirmDelete = (target: MessageActionTarget) => {
     Alert.alert(
