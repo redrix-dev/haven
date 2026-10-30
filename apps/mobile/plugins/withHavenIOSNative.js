@@ -1,6 +1,8 @@
 /**
  * Re-applies Haven’s iOS native setup after `npx expo prebuild` (or CI):
  * - Swift `ExpoAppDelegate` + `ExpoReactNativeFactory` + `startReactNative` (dev-client order fix; SDK 55 template)
+ * - UIScene lifecycle: `SceneDelegate.swift` + `UIApplicationSceneManifest` in Info.plist (iOS 27
+ *   terminates apps without it; Expo SDK 55 has no scene delegate of its own)
  * - PushKit → `react-native-voip-push-notification` via `HavenVoipPushBridge` + Swift bridging header
  * - Removes legacy `main.m` / ObjC `AppDelegate` from disk and the Xcode project when present
  *
@@ -8,7 +10,7 @@
  */
 const fs = require("fs");
 const path = require("path");
-const { withXcodeProject } = require("expo/config-plugins");
+const { withInfoPlist, withXcodeProject } = require("expo/config-plugins");
 const {
   getProjectName,
   getHackyProjectName,
@@ -22,14 +24,32 @@ const {
 
 const TEMPLATE_DIR = path.join(__dirname, "haven-ios-native-templates");
 const TEMPLATE_SWIFT = path.join(TEMPLATE_DIR, "AppDelegate.swift");
+const TEMPLATE_SCENE = path.join(TEMPLATE_DIR, "SceneDelegate.swift");
 const TEMPLATE_BRIDGE_H = path.join(TEMPLATE_DIR, "HavenVoipPushBridge.h");
 const TEMPLATE_BRIDGE_M = path.join(TEMPLATE_DIR, "HavenVoipPushBridge.m");
 const TEMPLATE_BRIDGING = path.join(TEMPLATE_DIR, "Bridging-Header.h");
 
+/** One window scene, delegated to `SceneDelegate` in the app module. */
+const SCENE_MANIFEST = {
+  UIApplicationSupportsMultipleScenes: false,
+  UISceneConfigurations: {
+    UIWindowSceneSessionRoleApplication: [
+      {
+        UISceneConfigurationName: "Default Configuration",
+        UISceneDelegateClassName: "$(PRODUCT_MODULE_NAME).SceneDelegate",
+      },
+    ],
+  },
+};
+
 /**
- * @param {import('@expo/config-plugins').ExpoConfig} _config
+ * @param {import('@expo/config-plugins').ExpoConfig} config
  */
 function withHavenIOSNative(config) {
+  config = withInfoPlist(config, (conf) => {
+    conf.modResults.UIApplicationSceneManifest = SCENE_MANIFEST;
+    return conf;
+  });
   return withXcodeProject(config, (conf) => {
     const { projectRoot, platformProjectRoot } = conf.modRequest;
     let projectName;
@@ -49,6 +69,7 @@ function withHavenIOSNative(config) {
     }
 
     fs.copyFileSync(TEMPLATE_SWIFT, path.join(appDir, "AppDelegate.swift"));
+    fs.copyFileSync(TEMPLATE_SCENE, path.join(appDir, "SceneDelegate.swift"));
     fs.copyFileSync(
       TEMPLATE_BRIDGE_H,
       path.join(appDir, "HavenVoipPushBridge.h"),
@@ -77,15 +98,16 @@ function withHavenIOSNative(config) {
     }
 
     const pr = conf.modResults;
-    const relVoipM = path.join(projectName, "HavenVoipPushBridge.m");
-
-    if (!pr.hasFile(relVoipM) && !pr.hasFile("HavenVoipPushBridge.m")) {
-      addBuildSourceFileToGroup({
-        filepath: relVoipM,
-        groupName: projectName,
-        project: pr,
-        verbose: false,
-      });
+    for (const name of ["HavenVoipPushBridge.m", "SceneDelegate.swift"]) {
+      const rel = path.join(projectName, name);
+      if (!pr.hasFile(rel) && !pr.hasFile(name)) {
+        addBuildSourceFileToGroup({
+          filepath: rel,
+          groupName: projectName,
+          project: pr,
+          verbose: false,
+        });
+      }
     }
 
     const legacyRefs = [
@@ -152,3 +174,4 @@ function setBridgingHeaderInAppTarget(project, projectName, bridgingRelative) {
 }
 
 module.exports = withHavenIOSNative;
+module.exports.SCENE_MANIFEST = SCENE_MANIFEST;

@@ -59,6 +59,15 @@ production-sensitive, even when the user asks for a small UI tweak.
   then run `npm run mobile:native:prebuild`.
 - For iOS delegate/native template work, run:
   `node tooling/scripts/mobile/revalidate-ios-delegate.mjs`
+- The app uses the UIScene lifecycle (iOS 27 kills apps that don't).
+  `SceneDelegate` owns the window and starts React Native; `AppDelegate` only
+  builds the factory. UIKit sends URLs, universal links and foreground/background
+  events to the scene, so a new app-delegate hook for any of these also needs
+  forwarding from `SceneDelegate`. See "UIScene lifecycle" in the mobile README.
+- `prebuild` only runs `pod install` under a UTF-8 locale; otherwise run
+  `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install` in `apps/mobile/ios`.
+- Test native changes on the newest iOS simulator runtime as well as an older
+  one: iOS 26 only warns about some things that iOS 27 terminates the app for.
 - Build local iOS from `HavenMobile.xcworkspace`, not the raw `.xcodeproj`.
 
 ## Validation

@@ -144,13 +144,40 @@ npm run mobile:native:prebuild
 
 - **Prebuild** (`npm run mobile:native:prebuild` or `expo prebuild`) generates `ios/` and `android/` from `app.json` and config plugins. Committed `ios`/`android` in other setups are optional; here, `ios/` is gitignored and reproduced locally or on CI.
 - **EAS** commands use **`npx eas-cli`** (EAS is not a direct npm dependency) so we avoid a second copy of Expo tooling and keep `npx expo-doctor`’s “global CLI in package.json” check clean.
-- **`./plugins/withHavenIOSNative`** (listed last in `app.json` `plugins`) re-applies Swift `AppDelegate`, VoIP bridge, and Xcode settings from `plugins/haven-ios-native-templates/` after prebuild. Edit the **templates**, not only the generated `ios/` copy, or your changes are lost on the next prebuild.
+- **`./plugins/withHavenIOSNative`** (listed last in `app.json` `plugins`) re-applies Swift `AppDelegate` + `SceneDelegate`, the Info.plist scene manifest, VoIP bridge, and Xcode settings from `plugins/haven-ios-native-templates/` after prebuild. Edit the **templates**, not only the generated `ios/` copy, or your changes are lost on the next prebuild.
+
+### UIScene lifecycle (iOS 27)
+
+iOS 27 terminates any app that has not adopted the UIScene lifecycle: built with Xcode 27, the app hits `EXC_BREAKPOINT` in `_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption` before any JS runs. iOS 26 and older only warn, so a build can look fine on an older simulator and still crash for every iOS 27 user. Expo SDK 55 has no scene delegate (`ExpoAppDelegate` only has a TODO for it; SDK 57 adds `ExpoAppSceneDelegate`), so Haven carries its own, modelled on SDK 57's:
+
+- `Info.plist` `UIApplicationSceneManifest` names `$(PRODUCT_MODULE_NAME).SceneDelegate` as the one window scene. The plugin writes it; without it UIKit never creates a scene and iOS 27 kills the app.
+- `AppDelegate` only builds the `ExpoReactNativeFactory`. `SceneDelegate` creates the `UIWindow` from the scene, calls `startReactNative` into it, and mirrors the window onto `AppDelegate.window`.
+- Under scenes UIKit stops calling the app delegate's URL, universal-link and foreground/background methods. `SceneDelegate` forwards each to the matching `AppDelegate` method, so Expo subscribers (dev launcher, expo-linking) and `RCTLinkingManager` still see them.
+- A link that cold-starts the app arrives in the scene's `connectionOptions`, not in launch options, but `Linking.getInitialURL()` reads launch options. `SceneDelegate` rebuilds them before starting React Native.
+- Push and VoIP are untouched: remote-notification registration and PushKit stay on the app delegate, which scenes do not change.
+
+**Testing links on a simulator.** Build Release (no dev launcher between the link and JS), signed to run locally with the team ID so the entitlements are embedded. `CODE_SIGNING_ALLOWED=NO` strips them, which drops the associated domains and breaks keychain access:
+
+```bash
+xcodebuild -workspace HavenMobile.xcworkspace -scheme HavenMobile -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/dd CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=9H229274JB PROVISIONING_PROFILE_SPECIFIER= build
+```
+
+Install it, then cold-start and warm-start it with `xcrun simctl openurl <udid> "haven://invite/test123"` and `… "https://haven.redrixx.com/invite/test123"`. Signed out, each link should raise one "Sign in to use this invite" alert. If the https link opens Safari instead, the simulator has not fetched the AASA yet (it goes through Apple's CDN after install).
+
+When the app moves to Expo SDK 57+, replace `SceneDelegate` with a subclass of `ExpoAppSceneDelegate` (or drop it if the template ships one) and delete the forwarding.
 
 ### dev-client crash postmortem (ordering contract)
 
-`expo-dev-launcher` requires **`autoSetupPrepare`** to run before **`autoSetupStart`**. The prepare step happens when the **Expo React Native factory** creates the root view. An older Objective-C delegate that only called `super` never ran the factory + `startReactNative` _before_ `super`, so `ExpoAppDelegate`’s subscribers (dev-launcher) ran `autoSetupStart` too early and `EXDevLauncherController` could throw. The **supported fix** (aligned with the Expo SDK 55 bare template) is: create `ExpoReactNativeFactory`, call `startReactNative` **then** `super.application(...)` (Expo SDK 55 removed the old `bindReactNativeFactory` hook), which is what the template `AppDelegate.swift` and plugin enforce.
+`expo-dev-launcher` requires **`autoSetupPrepare`** to run before **`autoSetupStart`**. The prepare step happens when the **Expo React Native factory** creates the root view. An older Objective-C delegate that only called `super` never ran the factory + `startReactNative` _before_ `super`, so `ExpoAppDelegate`’s subscribers (dev-launcher) ran `autoSetupStart` too early and `EXDevLauncherController` could throw. The **supported fix** (aligned with the Expo SDK 55 bare template) is: create `ExpoReactNativeFactory`, call `startReactNative` **then** `super.application(...)` (Expo SDK 55 removed the old `bindReactNativeFactory` hook), which is what the template `AppDelegate.swift` and plugin enforced. Since the UIScene move, `startReactNative` runs in `SceneDelegate` after `didFinishLaunching` has returned. That is safe on SDK 55: `expo-dev-launcher` no longer has `autoSetupStart`, and it starts from `createReactRootView`, inside `startReactNative`.
 
 **Build iOS** with **`HavenMobile.xcworkspace`** (CocoaPods), not the raw `.xcodeproj`, when running `xcodebuild` locally or in CI.
+
+### Xcode 27 build notes
+
+- **Pod deployment targets.** Xcode 27 fails the build when a pod targets an iOS version below 15.0 (several still declare 6.0–13.4). `./plugins/withPodDeploymentTargetFloor` adds a `post_install` step that raises those pods to the app's deployment target; it changes nothing about which devices the app supports.
+- **`pod install` needs a UTF-8 locale.** From a non-interactive or agent shell it dies with `Encoding::CompatibilityError`, and prebuild then silently skips pods. Run `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install` in `ios/`.
+- **Stale Node path after a Node upgrade.** `ios/.xcode.env.local` pins `NODE_BINARY` to a versioned Homebrew path; after `brew upgrade` the Hermes build phase fails with "No such file or directory". Point it at `/opt/homebrew/opt/node@24/bin/node`, which survives upgrades.
+- **iOS 27 needs the UIScene lifecycle.** Without it the app is terminated at launch on iOS 27 (`…ForNoSceneLifecycleAdoption`) while still running on iOS 26. Adopted; see [UIScene lifecycle (iOS 27)](#uiscene-lifecycle-ios-27).
 
 ## Post-prebuild: verify iOS delegate + templates
 
@@ -160,7 +187,7 @@ From repo root:
 node tooling/scripts/mobile/revalidate-ios-delegate.mjs
 ```
 
-This checks that the `withHavenIOSNative` template files and expected symbols exist (and optionally that `HavenMobile.xcworkspace` builds, if the `ios` folder is present). Run it after any `expo prebuild` or when upgrading the Expo SDK.
+This checks that the `withHavenIOSNative` template files and expected symbols exist, that `AppDelegate` no longer starts React Native itself, and, after prebuild, that the generated `Info.plist` has the scene manifest and the Xcode project compiles `SceneDelegate.swift` (and optionally that `HavenMobile.xcworkspace` builds, if the `ios` folder is present). Run it after any `expo prebuild` or when upgrading the Expo SDK.
 
 ## SDK upgrades and voice / WebRTC
 
