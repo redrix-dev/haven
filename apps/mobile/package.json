@@ -111,7 +111,7 @@
     "punycode": "^2.3.1",
     "react": "19.3.0",
     "react-native": "0.88.1",
-    "react-native-callkeep": "4.3.16",
+    "react-native-callkeep": "^4.6.1",
     "react-native-draggable-flatlist": "^4.0.3",
     "react-native-enriched-markdown": "^0.5.0",
     "react-native-gesture-handler": "~3.3.0",
