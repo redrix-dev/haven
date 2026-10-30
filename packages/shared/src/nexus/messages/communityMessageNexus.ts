@@ -19,7 +19,10 @@ import {
   type ChannelMeta,
   type SendCommunityMessageMediaOptions,
 } from "@shared/features/messaging/logic";
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
+import type {
+  CommunityMessageBackend,
+  CommunityReportBackend,
+} from "@shared/lib/backend/communityDataBackend.interface";
 import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from "@shared/lib/backend/mediaAttachmentUtils";
 import type {
   MessageBundle,
@@ -28,6 +31,10 @@ import type {
 } from "@shared/lib/backend/types";
 import { createLoadGate } from "../kit/loadGate";
 import type { StatePort } from "../kit/statePort";
+
+/** The community data calls a channel's messages make: the message backend, plus reporting one. */
+type MessageNexusBackend = CommunityMessageBackend &
+  Pick<CommunityReportBackend, "reportMessage">;
 
 export type CommunityMessageState = {
   entities: Record<string, NexusEntry<MessageBundle>>;
@@ -75,7 +82,7 @@ const cachedEntry = (message: MessageBundle): NexusEntry<MessageBundle> => ({
  */
 export class CommunityMessageNexus {
   private readonly gate = createLoadGate();
-  private communityData: CommunityDataBackend | null = null;
+  private communityData: MessageNexusBackend | null = null;
 
   constructor(
     readonly communityId: string,
@@ -90,7 +97,7 @@ export class CommunityMessageNexus {
 
   // ─── backend ───────────────────────────────────────────────────────────────
 
-  setCommunityData(communityData: CommunityDataBackend): void {
+  setCommunityData(communityData: MessageNexusBackend): void {
     this.communityData = communityData;
   }
 
@@ -98,7 +105,7 @@ export class CommunityMessageNexus {
     return this.communityData !== null;
   }
 
-  private requireBackend(method: string): CommunityDataBackend {
+  private requireBackend(method: string): MessageNexusBackend {
     if (!this.communityData) {
       throw new Error(
         `CommunityMessageNexus.${method} called before backend attached.`,

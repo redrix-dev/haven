@@ -48,7 +48,7 @@ export class ChannelNexus {
   constructor(
     protected readonly port: StatePort<ChannelState>,
     private readonly persistence: NexusPersistence,
-    private readonly communityData: CommunityDataBackend,
+    private readonly communityData: CommunityChannelBackend,
   ) {}
 }
 ```
@@ -100,7 +100,7 @@ export class ChannelSolidNexus extends ChannelNexus {
 
   constructor(
     persistence: NexusPersistence,
-    communityData: CommunityDataBackend,
+    communityData: CommunityChannelBackend,
   ) {
     const port = createSolidStatePort(createInitialChannelState());
     super(port, persistence, communityData);

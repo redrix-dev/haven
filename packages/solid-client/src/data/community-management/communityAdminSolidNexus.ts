@@ -1,5 +1,4 @@
 import { createMemo, type Accessor } from "solid-js";
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type {
   CommunityBanItem,
   CommunityMemberListItem,
@@ -11,6 +10,7 @@ import {
   CommunityAdminNexus,
   createInitialCommunityAdminState,
   type AdminControlPlane,
+  type CommunityAdminBackend,
 } from "@shared/nexus/community-management/communityAdminNexus";
 import type { CommunityAdminState } from "@shared/nexus/community-management/communityAdminTypes";
 import { createSolidStatePort } from "../kit/solidStatePort";
@@ -25,7 +25,7 @@ export class CommunityAdminSolidNexus extends CommunityAdminNexus {
   readonly state: CommunityAdminState;
 
   constructor(
-    communityData: CommunityDataBackend,
+    communityData: CommunityAdminBackend,
     controlPlane: AdminControlPlane,
   ) {
     const port = createSolidStatePort(createInitialCommunityAdminState());

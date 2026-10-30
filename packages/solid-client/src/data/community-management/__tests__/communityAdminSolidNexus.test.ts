@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
+import type { CommunityAdminBackend } from "@shared/nexus/community-management/communityAdminNexus";
 import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend.interface";
 import { CommunityAdminSolidNexus } from "../communityAdminSolidNexus";
 
@@ -12,7 +12,7 @@ describe("CommunityAdminSolidNexus", () => {
       joined: true,
     });
     const nexus = new CommunityAdminSolidNexus(
-      {} as CommunityDataBackend,
+      {} as CommunityAdminBackend,
       {
         createCommunity,
         redeemCommunityInvite,
@@ -49,7 +49,7 @@ describe("CommunityAdminSolidNexus", () => {
       {
         fetchServerSettings,
         updateServerSettings,
-      } as unknown as CommunityDataBackend,
+      } as unknown as CommunityAdminBackend,
       {} as ControlPlaneBackend,
     );
     await nexus.loadServerSettings("community-1");
@@ -72,7 +72,7 @@ describe("CommunityAdminSolidNexus", () => {
     const deleteCommunity = vi.fn().mockResolvedValue(undefined);
     const renameCommunity = vi.fn().mockResolvedValue(undefined);
     const nexus = new CommunityAdminSolidNexus(
-      {} as CommunityDataBackend,
+      {} as CommunityAdminBackend,
       {
         leaveCommunity,
         deleteCommunity,

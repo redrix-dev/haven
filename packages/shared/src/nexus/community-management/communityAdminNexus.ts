@@ -1,4 +1,7 @@
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
+import type {
+  CommunityMemberBackend,
+  CommunitySettingsBackend,
+} from "@shared/lib/backend/communityDataBackend.interface";
 import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend.interface";
 import type {
   CommunityBanItem,
@@ -15,6 +18,10 @@ import { createLoadGate } from "../kit/loadGate";
 import { omitKey } from "../kit/records";
 import type { StatePort } from "../kit/statePort";
 import type { AdminResource, CommunityAdminState } from "./communityAdminTypes";
+
+/** The community data calls administration makes: members and bans, settings and roles. */
+export type CommunityAdminBackend = CommunityMemberBackend &
+  CommunitySettingsBackend;
 
 /** The control-plane calls community administration makes. */
 export type AdminControlPlane = Pick<
@@ -84,7 +91,7 @@ export class CommunityAdminNexus {
 
   constructor(
     protected readonly port: StatePort<CommunityAdminState>,
-    private readonly communityData: CommunityDataBackend,
+    private readonly communityData: CommunityAdminBackend,
     private readonly controlPlane: AdminControlPlane,
   ) {}
 

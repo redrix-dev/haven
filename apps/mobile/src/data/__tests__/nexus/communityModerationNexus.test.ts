@@ -34,7 +34,6 @@ const detail = (reportId: string): ServerReportDetail => ({
   ...report(reportId),
   notes: null,
   linkedChannels: [],
-  linkedMessages: [],
   internalNotes: [],
   targetUserId: null,
   targetDisplayName: null,

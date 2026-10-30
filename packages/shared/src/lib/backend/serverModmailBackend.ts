@@ -1,10 +1,9 @@
 import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 import type { Database } from "@shared/types/database";
-import type { CommunityDataBackend } from "./communityDataBackend.interface";
+import type { CommunityReportBackend } from "./communityDataBackend.interface";
 import type {
   ServerReportDetail,
   ServerReportLinkedChannel,
-  ServerReportLinkedMessage,
   ServerReportSummary,
   SupportReportDestination,
   SupportReportInternalNote,
@@ -54,21 +53,6 @@ type SupportReportChannelLinkRow = {
     | Array<Pick<Database["public"]["Tables"]["channels"]["Row"], "name">>
     | null;
 };
-
-type SupportReportMessageLinkRow = Pick<
-  Database["public"]["Tables"]["support_report_messages"]["Row"],
-  "message_id"
->;
-
-type MessageChannelRow = Pick<
-  Database["public"]["Tables"]["messages"]["Row"],
-  "id" | "channel_id"
->;
-
-type ChannelNameRow = Pick<
-  Database["public"]["Tables"]["channels"]["Row"],
-  "id" | "name"
->;
 
 type RoleNameRow = Pick<
   Database["public"]["Tables"]["roles"]["Row"],
@@ -239,26 +223,6 @@ const mapSupportReportRowToSummary = (
   };
 };
 
-const loadChannelNameMap = async (
-  sb: HavenSupabaseClient,
-  channelIds: readonly string[],
-) => {
-  const uniqueChannelIds = Array.from(new Set(channelIds.filter(Boolean)));
-  if (uniqueChannelIds.length === 0) {
-    return new Map<string, string>();
-  }
-
-  const { data, error } = await sb
-    .from("channels")
-    .select("id, name")
-    .in("id", uniqueChannelIds);
-  if (error) throw error;
-
-  return new Map(
-    (data ?? []).map((row) => [row.id, (row as ChannelNameRow).name]),
-  );
-};
-
 const loadEscalationContext = async (
   sb: HavenSupabaseClient,
   communityId: string,
@@ -346,7 +310,10 @@ export interface ServerModmailBackend {
 
 export function createServerModmailBackend(
   client: HavenSupabaseClient,
-  communityBackend: CommunityDataBackend,
+  communityBackend: Pick<
+    CommunityReportBackend,
+    "broadcastReportStatusUpdated"
+  >,
 ): ServerModmailBackend {
   const modmail: ServerModmailBackend = {
     async listServerReports(communityIds) {
@@ -377,22 +344,11 @@ export function createServerModmailBackend(
       const summary = mapSupportReportRowToSummary(reportRow);
       const notes = parseJsonRecord(reportRow.notes);
 
-      const [
-        { data: channelLinks, error: channelLinksError },
-        { data: messageLinks, error: messageLinksError },
-      ] = await Promise.all([
-        client
-          .from("support_report_channels")
-          .select("channel_id, channels(name)")
-          .eq("report_id", reportId),
-        client
-          .from("support_report_messages")
-          .select("message_id")
-          .eq("report_id", reportId),
-      ]);
-
+      const { data: channelLinks, error: channelLinksError } = await client
+        .from("support_report_channels")
+        .select("channel_id, channels(name)")
+        .eq("report_id", reportId);
       if (channelLinksError) throw channelLinksError;
-      if (messageLinksError) throw messageLinksError;
 
       const linkedChannels: ServerReportLinkedChannel[] = (
         (channelLinks ?? []) as SupportReportChannelLinkRow[]
@@ -401,44 +357,10 @@ export function createServerModmailBackend(
         channelName: takeFirst(row.channels)?.name ?? null,
       }));
 
-      const messageIds = (
-        (messageLinks ?? []) as SupportReportMessageLinkRow[]
-      ).map((row) => row.message_id);
-
-      let linkedMessages: ServerReportLinkedMessage[] = [];
-      if (messageIds.length > 0) {
-        const { data: messages, error: messagesError } = await client
-          .from("messages")
-          .select("id, channel_id")
-          .in("id", messageIds);
-        if (messagesError) throw messagesError;
-
-        const messageRows = (messages ?? []) as MessageChannelRow[];
-        const channelNameMap = await loadChannelNameMap(
-          client,
-          messageRows
-            .map((row) => row.channel_id)
-            .filter((channelId): channelId is string => Boolean(channelId)),
-        );
-
-        linkedMessages = messageIds.map((messageId) => {
-          const messageRow =
-            messageRows.find((row) => row.id === messageId) ?? null;
-          return {
-            messageId,
-            channelId: messageRow?.channel_id ?? null,
-            channelName: messageRow?.channel_id
-              ? (channelNameMap.get(messageRow.channel_id) ?? null)
-              : null,
-          };
-        });
-      }
-
       return {
         ...summary,
         notes,
         linkedChannels,
-        linkedMessages,
         internalNotes: parseInternalNotes(notes),
         targetUserId: getTargetUserId(
           summary.reportType,
@@ -573,16 +495,11 @@ export function createServerModmailBackend(
       const parsedOriginalNotes = parseJsonRecord(reportRow.notes);
       const [
         { data: originalChannelLinks, error: channelLinksError },
-        { data: originalMessageLinks, error: messageLinksError },
         { data: originalReporter, error: originalReporterError },
       ] = await Promise.all([
         client
           .from("support_report_channels")
           .select("channel_id")
-          .eq("report_id", reportId),
-        client
-          .from("support_report_messages")
-          .select("message_id")
           .eq("report_id", reportId),
         client
           .from("profiles")
@@ -592,7 +509,6 @@ export function createServerModmailBackend(
       ]);
 
       if (channelLinksError) throw channelLinksError;
-      if (messageLinksError) throw messageLinksError;
       if (originalReporterError) throw originalReporterError;
 
       const communityId = reportRow.community_id;
@@ -644,19 +560,6 @@ export function createServerModmailBackend(
           .from("support_report_channels")
           .insert(nextChannelLinks);
         if (copyChannelLinksError) throw copyChannelLinksError;
-      }
-
-      const nextMessageLinks = (
-        (originalMessageLinks ?? []) as Array<{ message_id: string }>
-      ).map((row) => ({
-        report_id: escalatedReportId,
-        message_id: row.message_id,
-      }));
-      if (nextMessageLinks.length > 0) {
-        const { error: copyMessageLinksError } = await client
-          .from("support_report_messages")
-          .insert(nextMessageLinks);
-        if (copyMessageLinksError) throw copyMessageLinksError;
       }
 
       await modmail.updateReportStatus(reportId, "escalated");

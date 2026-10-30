@@ -46,8 +46,29 @@ The SQL suite runs against local Supabase via `psql`.
 - `npm run test:db:rls` assumes local Supabase is running and runs helpers,
   fixtures, and SQL.
 - `npm run test:db:quick` assumes fixtures are already loaded.
-- `npm run test:backend` runs backend seam contract/integration tests.
+- `npm run test:backend` runs every `*.contract.test.ts` in
+  `packages/shared/src/lib/backend/__tests__/` against local Supabase (found
+  on disk, no list to update). Pass files to run just those:
+  `node tooling/scripts/test/run-vitest-with-local-env.mjs backend <file>`.
 - Use `npm run test:ci` for DB/shared/backend behavior before signoff.
+
+## Backend Contract Tests
+
+- The community data backend is five parts in
+  `packages/shared/src/lib/backend/communityData/` (members, channels,
+  settings, messages, reports); each has a `community<Part>Backend.contract.test.ts`.
+  Add a test to the part whose method you change.
+- The fixture reset only clears messages and social/DM rows. A test that
+  changes channels, roles, settings or membership builds its own community
+  with `createScratchCommunity` (`tooling/test-support/setup/scratchCommunity.ts`)
+  and calls `dispose()` in `afterAll`.
+- RLS refusals on update/delete do **not** throw from the client: the call
+  resolves and changes nothing. Assert the state afterwards, not a rejection.
+- Prove each test by breaking what it guards: the client code, or the policy
+  itself with `alter policy` through `psql` (then `npm run test:db` to restore).
+- A table dropped by a migration can stay in `packages/shared/src/types/database.ts`
+  until `npm run supabase:types` runs, so code using it still compiles.
+  Regenerate types in the migration's change.
 
 ## Where Tests Go
 

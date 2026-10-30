@@ -1,5 +1,5 @@
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
+import type { CommunityChannelBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type { ReadableStore } from "@shared/nexus/storeTypes";
 import {
   ChannelNexus,
@@ -14,7 +14,7 @@ export class ChannelReactNexus extends ChannelNexus {
 
   constructor(
     persistence: NexusPersistence,
-    communityData: CommunityDataBackend,
+    communityData: CommunityChannelBackend,
   ) {
     const port = createZustandStatePort(createInitialChannelState());
     super(port, persistence, communityData);

@@ -1,6 +1,6 @@
 import { createMemo, type Accessor } from "solid-js";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
-import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
+import type { CommunityChannelBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type {
   ChannelGroupState,
   ChannelPermissionsSnapshot,
@@ -31,7 +31,7 @@ export class ChannelSolidNexus extends ChannelNexus {
 
   constructor(
     persistence: NexusPersistence,
-    communityData: CommunityDataBackend,
+    communityData: CommunityChannelBackend,
   ) {
     const port = createSolidStatePort(createInitialChannelState());
     super(port, persistence, communityData);

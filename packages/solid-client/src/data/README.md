@@ -27,7 +27,7 @@ export class ChannelSolidNexus extends ChannelNexus {
 
   constructor(
     persistence: NexusPersistence,
-    communityData: CommunityDataBackend,
+    communityData: CommunityChannelBackend,
   ) {
     const port = createSolidStatePort(createInitialChannelState());
     super(port, persistence, communityData);

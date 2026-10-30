@@ -109,8 +109,10 @@ constructor with their platform's `createParts`. It does, in order:
 2. **`createHavenBackends(client, publicConfig)`** ([`packages/shared/src/core/backends.ts`](../../packages/shared/src/core/backends.ts)):
    - build `messageStore` + `media` helpers from the client;
    - **`configureCommunityDataBackendRuntime({ client, edge, media, messageStore })`** —
-     this flips the `communityDataBackend` module singletons from "throw if used"
-     to live (see the header of
+     this flips the community data backend's module singletons from "throw if
+     used" to live (see
+     [`communityData/runtime.ts`](../../packages/shared/src/lib/backend/communityData/runtime.ts);
+     the backend's parts are mapped in the header of
      [`communityDataBackend.ts`](../../packages/shared/src/lib/backend/communityDataBackend.ts));
    - construct the remaining backends: `controlPlane`, `directMessages`,
      `moderation`, `notifications`, `social`, `serverModmail`, `voiceToken`;
