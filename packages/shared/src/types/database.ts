@@ -3709,6 +3709,10 @@ export type Database = {
         Args: { p_feature_flag_key: string; p_user_id: string }
         Returns: boolean
       }
+      onboarding_platform_matches: {
+        Args: { p_platform: string; p_scope: string }
+        Returns: boolean
+      }
       onboarding_semver_parts: { Args: { p_value: string }; Returns: number[] }
       recheck_expo_push_notification_jobs_for_send: {
         Args: { p_job_ids: string[] }

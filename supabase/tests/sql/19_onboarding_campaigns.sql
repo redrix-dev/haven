@@ -5,6 +5,12 @@ select test_support.cleanup_fixture_domain_state();
 
 set local role postgres;
 
+select test_support.assert_eq_text(
+  (select platform_scope from public.onboarding_campaigns where key = 'alpha_2026'),
+  'mobile',
+  'the Alpha campaign is scoped to mobile clients'
+);
+
 update public.onboarding_campaigns
 set is_active = false
 where key = 'alpha_2026';
@@ -237,6 +243,159 @@ select test_support.assert_eq_int(
   ),
   1,
   'matching platform campaigns should appear'
+);
+
+reset role;
+set local role postgres;
+update public.onboarding_campaigns
+set platform_scope = 'mobile'
+where key = 'onboarding_test_alpha';
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('ios', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  1,
+  'mobile-scoped campaign reaches a ios client'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('android', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  1,
+  'mobile-scoped campaign reaches a android client'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('web', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  0,
+  'mobile-scoped campaign skips a web client'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('desktop', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  0,
+  'mobile-scoped campaign skips a desktop client'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('all', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  0,
+  'mobile-scoped campaign skips a all client'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns(null, 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  0,
+  'mobile-scoped campaign skips a platform-less client'
+);
+reset role;
+set local role postgres;
+update public.onboarding_campaigns
+set platform_scope = 'web'
+where key = 'onboarding_test_alpha';
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('web', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  1,
+  'web-scoped campaign reaches a web client'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('desktop', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  0,
+  'web-scoped campaign skips a desktop client'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('ios', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  0,
+  'web-scoped campaign skips a ios client'
+);
+reset role;
+set local role postgres;
+update public.onboarding_campaigns
+set platform_scope = 'desktop'
+where key = 'onboarding_test_alpha';
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('desktop', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  1,
+  'desktop-scoped campaign reaches a desktop client'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('web', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  0,
+  'desktop-scoped campaign skips a web client'
+);
+
+select test_support.assert_eq_int(
+  (
+    select count(*)::bigint
+    from public.list_my_onboarding_campaigns('android', 'all', '0.0.0')
+    where campaign_key = 'onboarding_test_alpha'
+  ),
+  0,
+  'desktop-scoped campaign skips a android client'
+);
+
+select test_support.expect_exception(
+  'select * from public.complete_onboarding_campaign(''onboarding_test_alpha'', ''web'', ''all'', ''0.0.0'')',
+  'not available'
 );
 
 reset role;
