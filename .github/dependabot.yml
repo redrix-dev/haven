@@ -1,0 +1,92 @@
+# Dependabot version updates.
+#
+# Why this exists: with only default security *alerts* on (no config), findings
+# pile up unbatched — 70+ open at once — and never become actionable PRs. This
+# turns on *version updates* so fixes arrive as small, reviewable PRs on a
+# cadence instead.
+#
+# Conventions that match the repo:
+#   - PRs target `staging`, the integration branch (never `main`). See AGENTS.md.
+#   - minor+patch are grouped per ecosystem into one PR so routine bumps don't
+#     fan out; majors stay ungrouped (one PR each) because they need a human
+#     decision — especially the mobile Expo SDK and the Tauri/webkit stack.
+version: 2
+updates:
+  # ── Root workspace: desktop/web Solid client + shared + build/test tooling ──
+  # Everything here is devDependency / build tooling; nothing ships to users.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "staging"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    groups:
+      root-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # ── Mobile app (Expo / React Native) — a live release surface ──
+  # Group the small stuff; let majors (Expo SDK, metro, etc.) land one at a
+  # time so an SDK bump can be verified with mobile:release:check on its own.
+  - package-ecosystem: "npm"
+    directory: "/apps/mobile"
+    schedule:
+      interval: "weekly"
+    target-branch: "staging"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    groups:
+      mobile-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # ── Mobile Ruby tooling (Fastlane / CocoaPods) ──
+  - package-ecosystem: "bundler"
+    directory: "/apps/mobile"
+    schedule:
+      interval: "weekly"
+    target-branch: "staging"
+    open-pull-requests-limit: 3
+    labels: ["dependencies"]
+    groups:
+      mobile-gems-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # ── Tauri desktop shell (Rust) ──
+  # Keep Windows/Linux/macOS lockfile churn reviewable — one grouped PR, and
+  # mind the documented cross-platform Cargo.lock footgun before merging.
+  - package-ecosystem: "cargo"
+    directory: "/apps/tauri/src-tauri"
+    schedule:
+      interval: "weekly"
+    target-branch: "staging"
+    open-pull-requests-limit: 3
+    labels: ["dependencies"]
+    groups:
+      tauri-shell-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # ── Native voice sidecar (Rust) ──
+  # NOTE: `livekit` is a deliberate git-rev pin (libwebrtc ABI); Dependabot
+  # will not bump a git dependency, so that pin is reviewed by hand.
+  - package-ecosystem: "cargo"
+    directory: "/apps/tauri/haven-voice"
+    schedule:
+      interval: "weekly"
+    target-branch: "staging"
+    open-pull-requests-limit: 3
+    labels: ["dependencies"]
+    groups:
+      haven-voice-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # ── GitHub Actions workflows ──
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "staging"
+    open-pull-requests-limit: 3
+    labels: ["dependencies"]
+    groups:
+      github-actions-all:
+        patterns: ["*"]
