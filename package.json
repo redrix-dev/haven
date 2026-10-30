@@ -113,7 +113,7 @@
     "@typescript-eslint/parser": "^8.58.0",
     "eslint": "^9.39.2",
     "eslint-import-resolver-typescript": "^4.4.5",
-    "eslint-plugin-boundaries": "^6.0.2",
+    "eslint-plugin-boundaries": "^7.4.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
