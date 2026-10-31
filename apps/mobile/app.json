@@ -15,6 +15,7 @@
       "expo-font",
       "expo-sharing",
       "expo-dev-client",
+      "expo-splash-screen",
       [
         "@livekit/react-native-expo-plugin",
         {
