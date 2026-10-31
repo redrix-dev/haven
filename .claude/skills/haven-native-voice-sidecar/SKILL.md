@@ -5,6 +5,16 @@ description: Use when changing Linux native voice sidecar code, apps/tauri/haven
 
 # Haven Native Voice Sidecar
 
+> **Quarantined (2026-10-31).** Desktop ships macOS + Windows only, so this whole
+> surface is kept-but-inert: `apps/tauri/src-tauri/src/voice.rs` is
+> `#[cfg(target_os = "linux")]` and the sidecar is off CI/Dependabot. **Read
+> [apps/tauri/haven-voice/QUARANTINE.md](../../../apps/tauri/haven-voice/QUARANTINE.md)
+> first** — it is the canonical status + resurrection runbook. Everything below
+> still describes how the sidecar works and applies when you bring it back.
+> Because voice.rs is cfg'd out on mac/win, a plain `cargo check` there no longer
+> compiles it; use the `linux-voice-resurrection-check` workflow to validate
+> Linux voice changes.
+
 ## Read Before Editing
 
 - [docs/architecture/NATIVE_VOICE.md](../../../docs/architecture/NATIVE_VOICE.md)
