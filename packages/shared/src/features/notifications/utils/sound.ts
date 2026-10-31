@@ -9,15 +9,7 @@ type NotificationSoundRequest = {
   suppressWhenUnfocused?: boolean;
 };
 
-type VoicePresenceSoundRequest = {
-  event: VoicePresenceSoundEvent;
-  audioSettings: NotificationAudioSettings;
-};
-
-export type VoicePresenceSoundEvent =
-  | "voice_presence_join"
-  | "voice_presence_leave";
-export type AppSoundEvent = NotificationKind | VoicePresenceSoundEvent;
+export type AppSoundEvent = NotificationKind;
 
 export type NotificationSoundPlayResult = {
   played: boolean;
@@ -59,16 +51,6 @@ const SOUND_CONFIG_BY_EVENT: Record<
     url: RUNTIME_AUDIO_URLS.notifications.default,
     getVolume: (audioSettings) => audioSettings.notificationSoundVolume,
     enabledWhen: () => true,
-  },
-  voice_presence_join: {
-    url: RUNTIME_AUDIO_URLS.voicePresence.join,
-    getVolume: (audioSettings) => audioSettings.voicePresenceSoundVolume,
-    enabledWhen: (audioSettings) => audioSettings.voicePresenceSoundEnabled,
-  },
-  voice_presence_leave: {
-    url: RUNTIME_AUDIO_URLS.voicePresence.leave,
-    getVolume: (audioSettings) => audioSettings.voicePresenceSoundVolume,
-    enabledWhen: (audioSettings) => audioSettings.voicePresenceSoundEnabled,
   },
 };
 
@@ -156,16 +138,6 @@ const playSoundEvent = async ({
     return { played: false, reasonCode: "provider_retryable_failure" };
   }
 };
-
-export const playVoicePresenceSound = async ({
-  event,
-  audioSettings,
-}: VoicePresenceSoundRequest): Promise<NotificationSoundPlayResult> =>
-  playSoundEvent({
-    event,
-    deliverSound: true,
-    audioSettings,
-  });
 
 export const playNotificationSound = async ({
   kind,

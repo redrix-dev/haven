@@ -1,15 +1,10 @@
-import joinUrl from "@shared/assets/audio/voice/haven-connected.mp3";
-import leaveUrl from "@shared/assets/audio/voice/haven-disconnected.mp3";
 import notificationUrl from "@shared/assets/audio/notifications/haven-notification.mp3";
 
 /**
- * Web sound playback for voice presence + notifications.
+ * Web notification playback. Voice cues use audio/voiceSounds.ts and the
+ * shared voice sound policy, with independent enabled/volume preferences.
  *
- * The shared `notifications/utils/sound.ts` is the cross-platform,
- * settings-aware player — but it reads `RUNTIME_AUDIO_URLS` from the `@platform`
- * stub (empty on web), and the solid tsconfig doesn't currently resolve
- * `@platform`. This is a focused web player over the recovered assets; folding
- * it into the shared settings policy (volume / enabled / focus) is a follow-up.
+ * Notification consolidation remains separate from local voice confirmations.
  *
  * Known gap: on Linux (WebKitGTK) an `<audio>` element's play() never settles —
  * from the tauri:// asset URL or from a Blob alike — so these are silent there.
@@ -39,6 +34,4 @@ const play = (url: string, volume = 0.5): void => {
   }
 };
 
-export const playVoiceJoinSound = (): void => play(joinUrl);
-export const playVoiceLeaveSound = (): void => play(leaveUrl);
 export const playNotificationSound = (): void => play(notificationUrl);

@@ -18,6 +18,7 @@ import type {
 } from "@shared/features/voice/types";
 import type { VoiceSettings } from "@shared/types/settings";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { playMobileVoiceSound } from "./mobileVoiceSounds";
 import {
   startVoiceForegroundService,
   stopVoiceForegroundService,
@@ -349,6 +350,11 @@ export function useMobileLiveKitVoiceSession({
 
   const cleanupVoiceSession = useCallback(async () => {
     const room = roomRef.current;
+    const wasJoined = core.voice.getSnapshot().joined;
+    room?.localParticipant.audioTrackPublications.forEach((publication) => {
+      const track = publication.audioTrack?.mediaStreamTrack;
+      if (track) track.enabled = false;
+    });
     joinGenerationRef.current += 1;
     intentionalDisconnectRef.current = true;
     stopInputLevelPolling();
@@ -375,6 +381,11 @@ export function useMobileLiveKitVoiceSession({
       // Presence cleanup is best-effort; Supabase also removes presence on socket close.
     }
     try {
+      if (wasJoined)
+        await playMobileVoiceSound(
+          "leave",
+          core.voice.getSnapshot().soundSettings,
+        );
       room?.disconnect();
     } catch {
       // Ignore disconnect races.
@@ -467,6 +478,7 @@ export function useMobileLiveKitVoiceSession({
         );
       }
       timer.mark("audio output selected");
+      void playMobileVoiceSound("join", core.voice.getSnapshot().soundSettings);
 
       core.voice.setJoined(true);
       core.voice.setVoiceConnected(true);
@@ -567,12 +579,20 @@ export function useMobileLiveKitVoiceSession({
     const next = !core.voice.getSnapshot().isMuted;
     core.voice.setMuted(next);
     playVoiceControlFeedback(next);
+    void playMobileVoiceSound(
+      next ? "mute" : "unmute",
+      core.voice.getSnapshot().soundSettings,
+    );
   }, [core.voice]);
 
   const toggleDeafen = useCallback(() => {
     const next = !core.voice.getSnapshot().isDeafened;
     core.voice.setDeafened(next);
     playVoiceControlFeedback(next);
+    void playMobileVoiceSound(
+      next ? "deafen" : "undeafen",
+      core.voice.getSnapshot().soundSettings,
+    );
   }, [core.voice]);
 
   const updateVoiceSettingsPatch = useCallback(

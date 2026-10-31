@@ -3,6 +3,7 @@ import type {
   VoiceSidebarParticipant,
 } from "@shared/types/types";
 import type { VoiceConnectionPhase } from "@shared/features/voice/types";
+import type { VoiceSoundSettings } from "@shared/features/voice/utils/voiceSounds";
 
 export type VoiceSessionSnapshot = {
   joined: boolean;
@@ -11,6 +12,7 @@ export type VoiceSessionSnapshot = {
 };
 
 export type VoiceState = {
+  soundSettings: VoiceSoundSettings;
   phase: VoiceConnectionPhase;
   activeChannel: VoiceChannelReference | null;
   pendingChannel: VoiceChannelReference | null;

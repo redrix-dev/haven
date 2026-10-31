@@ -134,35 +134,8 @@ describe("notification sound helpers", () => {
     expect(audioContexts[0]?.close).toHaveBeenCalledTimes(1);
   });
 
-  it("plays the configured voice join and leave assets", async () => {
-    const { playVoicePresenceSound } = await loadSoundModule();
-
-    vi.setSystemTime(new Date("2026-03-17T12:00:00.000Z"));
-    const joinResult = await playVoicePresenceSound({
-      event: "voice_presence_join",
-      audioSettings: baseAudioSettings,
-    });
-
-    vi.setSystemTime(new Date("2026-03-17T12:00:01.000Z"));
-    const leaveResult = await playVoicePresenceSound({
-      event: "voice_presence_leave",
-      audioSettings: baseAudioSettings,
-    });
-
-    expect(joinResult).toEqual({ played: true, reasonCode: "sent" });
-    expect(leaveResult).toEqual({ played: true, reasonCode: "sent" });
-    expect(audioInstances[0]?.src).toBe(RUNTIME_AUDIO_URLS.voicePresence.join);
-    expect(audioInstances[1]?.src).toBe(RUNTIME_AUDIO_URLS.voicePresence.leave);
-    expect(audioContexts).toHaveLength(2);
-    expect(audioContexts[0]?.gainNode.gain.value).toBe(0.55);
-    expect(audioContexts[1]?.gainNode.gain.value).toBe(0.55);
-    expect(audioContexts[0]?.source.start).toHaveBeenCalledWith(0);
-    expect(audioContexts[1]?.source.start).toHaveBeenCalledWith(0);
-  });
-
-  it("respects local sound preference gates for notification and voice sounds", async () => {
-    const { playNotificationSound, playVoicePresenceSound } =
-      await loadSoundModule();
+  it("respects local notification sound preferences", async () => {
+    const { playNotificationSound } = await loadSoundModule();
 
     vi.setSystemTime(new Date("2026-03-17T12:00:00.000Z"));
     const notificationResult = await playNotificationSound({
@@ -172,16 +145,7 @@ describe("notification sound helpers", () => {
     });
 
     vi.setSystemTime(new Date("2026-03-17T12:00:01.000Z"));
-    const voiceResult = await playVoicePresenceSound({
-      event: "voice_presence_join",
-      audioSettings: { ...baseAudioSettings, playSoundsWhenFocused: false },
-    });
-
     expect(notificationResult).toEqual({
-      played: false,
-      reasonCode: "sound_pref_disabled",
-    });
-    expect(voiceResult).toEqual({
       played: false,
       reasonCode: "sound_pref_disabled",
     });
