@@ -17,6 +17,7 @@ import type {
   VoiceParticipant,
 } from "@shared/features/voice/types";
 import type { VoiceSettings } from "@shared/types/settings";
+import { VoiceInputGate } from "@shared/features/voice/utils/inputGate";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   startVoiceForegroundService,
@@ -78,7 +79,6 @@ type UseMobileLiveKitVoiceSessionInput = {
   onInterrupted?: () => void;
 };
 
-const VOICE_ACTIVITY_GATE_RELEASE_MS = 220;
 const INPUT_LEVEL_INTERVAL_MS = 80;
 const VOICE_CONTROL_CHANNEL_FAILURE_MESSAGE =
   "We're having trouble connecting you to voice services. Please try again, and contact support if this keeps happening.";
@@ -226,7 +226,6 @@ export function useMobileLiveKitVoiceSession({
   const inputLevelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
-  const lastVoiceActivityAtRef = useRef(0);
   const previousChannelKeyRef = useRef<string | null>(null);
   const intentionalDisconnectRef = useRef(false);
   const joinGenerationRef = useRef(0);
@@ -320,32 +319,55 @@ export function useMobileLiveKitVoiceSession({
 
   const startInputLevelPolling = useCallback(() => {
     stopInputLevelPolling();
-    inputLevelIntervalRef.current = setInterval(() => {
+    const gate = new VoiceInputGate();
+    const generation = joinGenerationRef.current;
+    let sampling = false;
+    inputLevelIntervalRef.current = setInterval(async () => {
       const room = roomRef.current;
-      if (!room) return;
-      const level = Math.max(
-        0,
-        Math.min(1, room.localParticipant.audioLevel ?? 0),
-      );
-      const threshold = Math.max(
-        0,
-        Math.min(1, voiceSettingsRef.current.voiceActivationThreshold / 100),
-      );
-      const now = Date.now();
-      if (level >= threshold) {
-        lastVoiceActivityAtRef.current = now;
+      const sender = room?.localParticipant.getTrackPublication(
+        Track.Source.Microphone,
+      )?.audioTrack?.sender;
+      if (!sender || sampling) return;
+      sampling = true;
+      try {
+        const { level, gateOpen } = await gate.sample(
+          sender,
+          voiceSettingsRef.current,
+          () => {
+            const session = core.voice.getSnapshot();
+            return (
+              generation !== joinGenerationRef.current ||
+              session.isMuted ||
+              session.isDeafened
+            );
+          },
+          Date.now(),
+        );
+        if (
+          generation !== joinGenerationRef.current ||
+          !inputLevelIntervalRef.current
+        )
+          return;
+        setLocalInputLevel((previous) =>
+          Math.abs(previous - level) > 0.01 ? level : previous,
+        );
+        setVoiceActivityGateOpen((previous) =>
+          previous === gateOpen ? previous : gateOpen,
+        );
+      } catch (error) {
+        if (generation !== joinGenerationRef.current) return;
+        // Do not retry by re-enabling capture after a native control failure.
+        if (sender.track) sender.track.enabled = false;
+        core.voice.setMuted(true);
+        stopInputLevelPolling();
+        setError(
+          getErrorMessage(error, "Could not control microphone transmission."),
+        );
+      } finally {
+        sampling = false;
       }
-      const gateOpen =
-        level >= threshold ||
-        now - lastVoiceActivityAtRef.current <= VOICE_ACTIVITY_GATE_RELEASE_MS;
-      setLocalInputLevel((previous) =>
-        Math.abs(previous - level) > 0.01 ? level : previous,
-      );
-      setVoiceActivityGateOpen((previous) =>
-        previous === gateOpen ? previous : gateOpen,
-      );
     }, INPUT_LEVEL_INTERVAL_MS);
-  }, [stopInputLevelPolling]);
+  }, [core.voice, stopInputLevelPolling]);
 
   const cleanupVoiceSession = useCallback(async () => {
     const room = roomRef.current;
@@ -638,6 +660,7 @@ export function useMobileLiveKitVoiceSession({
       }
     };
     const handleDisconnected = () => {
+      stopInputLevelPolling();
       setConnectionState(ConnectionState.Disconnected);
       core.voice.setVoiceConnected(false);
       if (!intentionalDisconnectRef.current) {
@@ -674,28 +697,19 @@ export function useMobileLiveKitVoiceSession({
         .off(RoomEvent.ParticipantMetadataChanged, syncParticipants)
         .off(RoomEvent.ParticipantNameChanged, syncParticipants);
     };
-  }, [applyParticipants, core.voice]);
+  }, [applyParticipants, core.voice, stopInputLevelPolling]);
 
   useEffect(() => {
     if (!joined) return;
     const room = roomRef.current;
     if (!room) return;
-    const baseAllowsSend = !isMuted && !isDeafened;
-    const shouldSend =
-      baseAllowsSend &&
-      (voiceSettings.transmissionMode === "open_mic" || voiceActivityGateOpen);
-
+    // Hard mute/deafen disable capture immediately. The activity gate only
+    // controls RTP encodings, never this source track.
     room.localParticipant.audioTrackPublications.forEach((publication) => {
       const track = publication.audioTrack?.mediaStreamTrack;
-      if (track) track.enabled = shouldSend;
+      if (track) track.enabled = !isMuted && !isDeafened;
     });
-  }, [
-    isDeafened,
-    isMuted,
-    joined,
-    voiceActivityGateOpen,
-    voiceSettings.transmissionMode,
-  ]);
+  }, [isDeafened, isMuted, joined]);
 
   useEffect(() => {
     if (!joined) return;
