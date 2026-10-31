@@ -58,7 +58,7 @@ function createReactParts({
       backends.controlPlane,
     ),
     moderation: new CommunityModerationReactNexus(backends.serverModmail),
-    voice: new VoiceReactNexus(backends.voiceToken, voiceRealtime),
+    voice: new VoiceReactNexus(backends.voiceToken, voiceRealtime, persistence),
     viewerMessagePolicyStore,
     authStore: useAuthStore,
     uiStore: useUiStore,

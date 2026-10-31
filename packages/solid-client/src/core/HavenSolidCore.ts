@@ -54,7 +54,7 @@ function createSolidParts({
       backends.controlPlane,
     ),
     moderation: new CommunityModerationSolidNexus(backends.serverModmail),
-    voice: new VoiceSolidNexus(backends.voiceToken, voiceRealtime),
+    voice: new VoiceSolidNexus(backends.voiceToken, voiceRealtime, persistence),
     viewerMessagePolicyStore,
     authStore: createSolidAuthSessionStore(),
     uiStore: createSolidUiSessionStore(),

@@ -13,6 +13,7 @@ import type { VoiceParticipant } from "@shared/features/voice/types";
 import { HavenModalShell } from "@/components/HavenModalShell";
 import { VoiceMorphShell } from "@/features/voice/VoiceMorphShell";
 import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
+import { VoiceSoundControls } from "./VoiceSoundControls";
 import type {
   MobileVoiceControllerActions,
   MobileVoiceControllerState,
@@ -377,6 +378,7 @@ export function VoiceSessionSheet({
           </View>
         </View>
 
+        <VoiceSoundControls />
         <View className="gap-3">
           <Text className="text-base font-semibold text-foreground">
             Audio output

@@ -7,6 +7,7 @@ import {
 } from "@shared/nexus/voice/voiceNexus";
 import type { VoiceState } from "@shared/nexus/voice/voiceTypes";
 import { createZustandStatePort } from "../kit/zustandStatePort";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 
 /** React read binding over the shared VoiceNexus: the store the hooks read. */
 export class VoiceReactNexus extends VoiceNexus {
@@ -15,9 +16,10 @@ export class VoiceReactNexus extends VoiceNexus {
   constructor(
     tokenBackend?: VoiceTokenBackend,
     realtime?: VoiceRealtimeTransport,
+    persistence?: NexusPersistence,
   ) {
     const port = createZustandStatePort(createInitialVoiceState());
-    super(port, tokenBackend ?? null, realtime ?? null);
+    super(port, tokenBackend ?? null, realtime ?? null, persistence);
     this.reactiveStore = port.store;
   }
 }
