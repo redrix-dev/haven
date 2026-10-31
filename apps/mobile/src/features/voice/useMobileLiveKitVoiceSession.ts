@@ -17,6 +17,7 @@ import type {
   VoiceParticipant,
 } from "@shared/features/voice/types";
 import type { VoiceSettings } from "@shared/types/settings";
+import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
   startVoiceForegroundService,
@@ -45,6 +46,7 @@ export type MobileVoiceControllerState = {
   notice: string | null;
   localInputLevel: number;
   voiceActivityGateOpen: boolean;
+  localSpeaking: boolean;
   remoteVolumes: Record<string, number>;
   outputDevices: MobileVoiceOutputOption[];
   selectedOutputDeviceId: string;
@@ -198,6 +200,8 @@ export function useMobileLiveKitVoiceSession({
   const [notice, setNotice] = useState<string | null>(null);
   const [localInputLevel, setLocalInputLevel] = useState(0);
   const [voiceActivityGateOpen, setVoiceActivityGateOpen] = useState(false);
+  const [localSpeaking, setLocalSpeaking] = useState(false);
+  const speakingRef = useRef<ReadonlyMap<string, boolean>>(new Map());
   const [outputDevices, setOutputDevices] = useState<MobileVoiceOutputOption[]>(
     [{ id: "default", label: "Auto" }],
   );
@@ -249,9 +253,6 @@ export function useMobileLiveKitVoiceSession({
 
   const buildParticipantsFromRoom = useCallback(
     (room: Room): VoiceParticipant[] => {
-      const activeSpeakerIds = new Set(
-        room.activeSpeakers.map((participant) => participant.identity),
-      );
       return Array.from(room.remoteParticipants.values()).map(
         (participant: RemoteParticipant) => {
           const micPublication = participant.getTrackPublication(
@@ -261,7 +262,9 @@ export function useMobileLiveKitVoiceSession({
             userId: participant.identity,
             displayName: participant.name || participant.identity,
             avatarUrl: tryParseAvatarUrl(participant.metadata),
-            isSpeaking: activeSpeakerIds.has(participant.identity),
+            isSpeaking:
+              speakingRef.current.get(participant.identity) ??
+              participant.isSpeaking,
             muted: !micPublication || micPublication.isMuted,
             deafened: false,
           };
@@ -677,6 +680,20 @@ export function useMobileLiveKitVoiceSession({
   }, [applyParticipants, core.voice]);
 
   useEffect(() => {
+    if (!joined || !roomRef.current) {
+      speakingRef.current = new Map();
+      setLocalSpeaking(false);
+      return;
+    }
+    const room = roomRef.current;
+    return monitorSpeaking(room, (speaking) => {
+      speakingRef.current = speaking;
+      setLocalSpeaking(speaking.get(room.localParticipant.identity) ?? false);
+      applyParticipants(room);
+    });
+  }, [joined, applyParticipants]);
+
+  useEffect(() => {
     if (!joined) return;
     const room = roomRef.current;
     if (!room) return;
@@ -748,6 +765,7 @@ export function useMobileLiveKitVoiceSession({
       notice,
       localInputLevel,
       voiceActivityGateOpen,
+      localSpeaking,
       remoteVolumes,
       outputDevices,
       selectedOutputDeviceId,
