@@ -160,10 +160,12 @@ function formatOutputLabel(id: string): string {
 
 async function ensureAndroidVoicePermissions(): Promise<void> {
   if (Platform.OS !== "android") return;
-  const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
-  if (Number(Platform.Version) >= 33) {
-    permissions.push(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
-  }
+  const permissions = [
+    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+    ...(Number(Platform.Version) >= 33
+      ? [PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS]
+      : []),
+  ];
   const results = await PermissionsAndroid.requestMultiple(permissions);
   const microphoneResult = results[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
   if (microphoneResult !== PermissionsAndroid.RESULTS.GRANTED) {

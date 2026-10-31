@@ -622,7 +622,7 @@ export function CommunityChatScreen({
               <View className="py-2.5">
                 <ActivityIndicator color={composerColors.spinner} />
               </View>
-            ) : null
+            ) : undefined
           }
           composer={
             <ChatComposer

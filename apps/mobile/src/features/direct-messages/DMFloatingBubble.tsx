@@ -888,7 +888,7 @@ export function DMFloatingBubble(props: FloatingDMBubbleProps = {}) {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   bubble: {
     position: "absolute",
@@ -906,7 +906,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   bubbleInner: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },
