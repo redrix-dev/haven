@@ -218,7 +218,7 @@ export function VoiceSessionSheet({
     userId: currentUser.id ?? "current-user",
     displayName: currentUser.displayName,
     avatarUrl: currentUser.avatarUrl,
-    isSpeaking: state.voiceActivityGateOpen,
+    isSpeaking: state.localSpeaking,
     muted: state.isMuted,
     deafened: state.isDeafened,
   };
