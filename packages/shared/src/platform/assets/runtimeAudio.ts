@@ -1,10 +1,10 @@
 /**
  * Mobile stub for @platform/assets/runtimeAudio.
  *
- * On mobile, notification and voice sounds are played via Expo AV in
- * sound.native.ts — this file is never imported at runtime.  It exists so
- * that the mobile TypeScript compiler can resolve the shared/src/…/sound.ts
- * import (which Metro replaces with sound.native.ts at bundle time).
+ * This exists so the mobile TypeScript compiler can resolve the web
+ * notification player's imports (Metro replaces sound.ts with the native
+ * notification stub). Mobile voice confirmations use HavenVoiceSounds through
+ * mobileVoiceSounds.ts, not this URL map. See docs/architecture/VOICE_SOUNDS.md.
  *
  * A desktop/web shell that plays these sounds should provide its own
  * implementation with real asset URLs and the same shape.

@@ -20,6 +20,7 @@ import type { VoiceSettings } from "@shared/types/settings";
 import { VoiceInputGate } from "@shared/features/voice/utils/inputGate";
 import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { playMobileVoiceSound } from "./mobileVoiceSounds";
 import {
   startVoiceForegroundService,
   stopVoiceForegroundService,
@@ -232,6 +233,7 @@ export function useMobileLiveKitVoiceSession({
   );
   const previousChannelKeyRef = useRef<string | null>(null);
   const intentionalDisconnectRef = useRef(false);
+  const cleanupPromiseRef = useRef<Promise<void> | null>(null);
   const joinGenerationRef = useRef(0);
 
   const remoteParticipantIds = useMemo(
@@ -372,46 +374,67 @@ export function useMobileLiveKitVoiceSession({
     }, INPUT_LEVEL_INTERVAL_MS);
   }, [core.voice, stopInputLevelPolling]);
 
-  const cleanupVoiceSession = useCallback(async () => {
-    const room = roomRef.current;
-    joinGenerationRef.current += 1;
-    intentionalDisconnectRef.current = true;
-    stopInputLevelPolling();
-    setJoining(false);
-    setError(null);
-    setNotice(null);
-    setParticipants([]);
-    core.voice.setParticipants([]);
-    core.voice.setVoiceConnected(false);
-    core.voice.setJoined(false);
-    core.voice.setSessionState({
-      joined: false,
-      isMuted: core.voice.getSnapshot().isMuted,
-      isDeafened: core.voice.getSnapshot().isDeafened,
+  const cleanupVoiceSession = useCallback((): Promise<void> => {
+    if (cleanupPromiseRef.current) return cleanupPromiseRef.current;
+    const cleanup = async () => {
+      const room = roomRef.current;
+      const wasJoined = core.voice.getSnapshot().joined;
+      room?.localParticipant.audioTrackPublications.forEach((publication) => {
+        const track = publication.audioTrack?.mediaStreamTrack;
+        if (track) track.enabled = false;
+      });
+      joinGenerationRef.current += 1;
+      intentionalDisconnectRef.current = true;
+      stopInputLevelPolling();
+      setJoining(false);
+      setError(null);
+      setNotice(null);
+      setParticipants([]);
+      core.voice.setParticipants([]);
+      core.voice.setVoiceConnected(false);
+      core.voice.setJoined(false);
+      core.voice.setSessionState({
+        joined: false,
+        isMuted: core.voice.getSnapshot().isMuted,
+        isDeafened: core.voice.getSnapshot().isDeafened,
+      });
+      try {
+        await core.voice.disconnectKickChannel();
+      } catch {
+        // The kick channel is best-effort cleanup.
+      }
+      try {
+        await core.voice.disconnectPresenceChannel();
+      } catch {
+        // Presence cleanup is best-effort; Supabase also removes presence on socket close.
+      }
+      try {
+        if (wasJoined)
+          await playMobileVoiceSound(
+            "leave",
+            core.voice.getSnapshot().soundSettings,
+          );
+        room?.disconnect();
+      } catch {
+        // Ignore disconnect races.
+      }
+      try {
+        await AudioSession.stopAudioSession();
+      } catch {
+        // Native audio session might already be stopped.
+      }
+      await stopVoiceForegroundService();
+      setConnectionState(ConnectionState.Disconnected);
+      intentionalDisconnectRef.current = false;
+    };
+    // Leave, channel switching and unmount can request teardown together.
+    // Share the whole teardown, including the cue, before a new join starts.
+    const pending = cleanup().finally(() => {
+      if (cleanupPromiseRef.current === pending)
+        cleanupPromiseRef.current = null;
     });
-    try {
-      await core.voice.disconnectKickChannel();
-    } catch {
-      // The kick channel is best-effort cleanup.
-    }
-    try {
-      await core.voice.disconnectPresenceChannel();
-    } catch {
-      // Presence cleanup is best-effort; Supabase also removes presence on socket close.
-    }
-    try {
-      room?.disconnect();
-    } catch {
-      // Ignore disconnect races.
-    }
-    try {
-      await AudioSession.stopAudioSession();
-    } catch {
-      // Native audio session might already be stopped.
-    }
-    await stopVoiceForegroundService();
-    setConnectionState(ConnectionState.Disconnected);
-    intentionalDisconnectRef.current = false;
+    cleanupPromiseRef.current = pending;
+    return pending;
   }, [core.voice, stopInputLevelPolling]);
 
   const joinVoiceChannel = useCallback(async () => {
@@ -492,6 +515,7 @@ export function useMobileLiveKitVoiceSession({
         );
       }
       timer.mark("audio output selected");
+      void playMobileVoiceSound("join", core.voice.getSnapshot().soundSettings);
 
       core.voice.setJoined(true);
       core.voice.setVoiceConnected(true);
@@ -592,12 +616,20 @@ export function useMobileLiveKitVoiceSession({
     const next = !core.voice.getSnapshot().isMuted;
     core.voice.setMuted(next);
     playVoiceControlFeedback(next);
+    void playMobileVoiceSound(
+      next ? "mute" : "unmute",
+      core.voice.getSnapshot().soundSettings,
+    );
   }, [core.voice]);
 
   const toggleDeafen = useCallback(() => {
     const next = !core.voice.getSnapshot().isDeafened;
     core.voice.setDeafened(next);
     playVoiceControlFeedback(next);
+    void playMobileVoiceSound(
+      next ? "deafen" : "undeafen",
+      core.voice.getSnapshot().soundSettings,
+    );
   }, [core.voice]);
 
   const updateVoiceSettingsPatch = useCallback(

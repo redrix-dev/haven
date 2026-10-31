@@ -9,6 +9,7 @@ import {
 import type { VoiceState } from "@shared/nexus/voice/voiceTypes";
 import type { VoiceSidebarParticipant } from "@shared/types/types";
 import { createSolidStatePort } from "../kit/solidStatePort";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 
 const NO_PARTICIPANTS: VoiceSidebarParticipant[] = [];
 
@@ -20,12 +21,13 @@ export class VoiceSolidNexus extends VoiceNexus {
   constructor(
     tokenBackend?: VoiceTokenBackend,
     realtime?: VoiceRealtimeTransport,
+    persistence?: NexusPersistence,
   ) {
     // Rosters reconcile by userId so rows keep their identity across updates.
     const port = createSolidStatePort(createInitialVoiceState(), {
       keys: { participants: "userId", participantsByChannelId: "userId" },
     });
-    super(port, tokenBackend ?? null, realtime ?? null);
+    super(port, tokenBackend ?? null, realtime ?? null, persistence);
     this.state = port.tracked;
   }
 
