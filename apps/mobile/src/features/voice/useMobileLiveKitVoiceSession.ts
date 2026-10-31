@@ -355,6 +355,11 @@ export function useMobileLiveKitVoiceSession({
           previous === gateOpen ? previous : gateOpen,
         );
       } catch (error) {
+        if (generation !== joinGenerationRef.current) return;
+        // Do not retry by re-enabling capture after a native control failure.
+        if (sender.track) sender.track.enabled = false;
+        core.voice.setMuted(true);
+        stopInputLevelPolling();
         setError(
           getErrorMessage(error, "Could not control microphone transmission."),
         );
