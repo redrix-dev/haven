@@ -1,13 +1,21 @@
 # Native voice (Linux) — the sidecar, its seam, and the WebRTC pin
 
-> **Status: kept, not shipped (since 2.1.0).** The Linux desktop build was
-> dropped from the release pipeline — packaging an AppImage carries its own
-> upkeep (below) and Haven has no Linux users to carry it for. Nothing here was
-> deleted: the sidecar, its seam, and `tauri.linux.conf.json` all still build,
-> and everything in this doc still applies to a local build. To ship Linux
-> again, restore the `ubuntu-22.04` matrix entry in
-> `.github/workflows/release-desktop.yml` plus its two steps (apt deps
-> including `patchelf`, and `node tooling/scripts/stage-haven-voice-sidecar.mjs`).
+> **Status: quarantined, not shipped (dropped from release 2.1.0; fully
+> quarantined 2026-10-31).** Desktop ships macOS + Windows only. The Linux
+> native voice path is **kept in the tree but removed from the active build /
+> dependency / CI graph**: the Tauri host (`apps/tauri/src-tauri/src/voice.rs`)
+> is now `#[cfg(target_os = "linux")]`, its `tokio` dep sits on a Linux target
+> table, and the CI `sidecar` lane plus the `haven-voice` Dependabot entry are
+> gone — so its livekit/libwebrtc deps are no longer resolved, alerted on, or
+> compiled on mac/win. Nothing was deleted; everything in this doc still applies
+> to a Linux build.
+>
+> **`apps/tauri/haven-voice/QUARANTINE.md` is the canonical runbook** — it lists
+> every severed entrypoint and how to reverse it. To resurrect: follow that
+> table, run the `linux-voice-resurrection-check` workflow (manual
+> `workflow_dispatch`) to catch rot, then restore the `ubuntu-22.04` release
+> matrix entry and its two steps (apt deps incl. `patchelf`, and
+> `node tooling/scripts/stage-haven-voice-sidecar.mjs`).
 >
 > **Two things to know before you do**, both found the hard way on 2026-09-18:
 >

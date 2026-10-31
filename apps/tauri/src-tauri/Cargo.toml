@@ -21,5 +21,11 @@ tauri-plugin-deep-link = "2"
 tauri-plugin-store = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# For spawning and talking to the haven-voice sidecar over stdio (Linux voice).
+
+# The haven-voice sidecar IPC (src/voice.rs) is Linux-only — WebKitGTK has no
+# WebRTC, so Linux spawns the native sidecar while macOS/Windows run
+# livekit-client in the webview. Desktop no longer ships to Linux, so voice.rs
+# is quarantined behind cfg(target_os = "linux"); keep its only extra dep
+# (tokio) off the macOS/Windows graph too. See apps/tauri/haven-voice/QUARANTINE.md.
+[target.'cfg(target_os = "linux")'.dependencies]
 tokio = { version = "1", features = ["process", "io-util", "sync", "time"] }
