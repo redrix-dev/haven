@@ -406,6 +406,7 @@ export class VoiceNexus {
     if (
       !event ||
       !context ||
+      !this.port.get().joined ||
       event.targetUserId !== context.currentUserId ||
       event.communityId !== context.communityId ||
       event.channelId !== context.channelId ||

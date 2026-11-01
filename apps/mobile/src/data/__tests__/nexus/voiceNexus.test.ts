@@ -260,6 +260,9 @@ describe("VoiceNexus", () => {
     });
     nexus.setJoined(false);
     expect(nexus.getSnapshot().controlNotice?.action).toBe("remove");
+    // Teardown may still be awaiting presence cleanup when a command arrives.
+    nexus.applyRemoteControl({ ...event, target_session_id: "current-call" });
+    expect(onKick).toHaveBeenCalledOnce();
     await nexus.disconnectKickChannel();
     nexus.applyRemoteControl({ ...event, target_session_id: "current-call" });
     expect(onKick).toHaveBeenCalledOnce();
