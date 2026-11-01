@@ -30,6 +30,8 @@ Schema migrations live in `supabase/migrations/` at the repo root (standard Supa
 - Tests use `SET LOCAL ROLE ...` + `request.jwt.claim.*` settings to exercise RLS.
 - Most suites run inside `BEGIN; ... ROLLBACK;` so data changes do not persist.
 - Fixture files are idempotent and safe to re-run on a local dev DB.
+- Register every new SQL suite in `run_order.txt`; files are not discovered
+  automatically. Confirm the log names the new suite before counting it as run.
 
 ## macOS 27: Supabase CLI killed on launch
 

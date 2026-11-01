@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { routeRealtimeEvent } from "@shared/core/routeRealtimeEvent";
+import type { RealtimeMutationTarget } from "@shared/core/realtimeMutationTarget";
 import type {
   VoiceRealtimeChannel,
   VoiceRealtimeTransport,
@@ -112,6 +114,7 @@ class DeferredVoiceRealtimeChannel extends FakeVoiceRealtimeChannel {
 
 const buildNexus = () => {
   const tokenBackend = {
+    sendControl: vi.fn(async () => {}),
     fetchToken: vi.fn(async () => ({
       token: "voice-token",
       serverUrl: "wss://voice.example.test",
@@ -208,92 +211,101 @@ describe("VoiceNexus", () => {
     expect(tokenBackend.fetchToken).toHaveBeenCalledWith("server-1", "voice-a");
   });
 
-  it("connects, sends, receives, and disconnects kick broadcasts", async () => {
-    const { nexus, realtime } = buildNexus();
+  it("routes courtesy controls through the backend and scopes receipt to the active call", async () => {
+    const { nexus, realtime, tokenBackend } = buildNexus();
     const onKick = vi.fn();
-
     await nexus.connectKickChannel({
       communityId: "server-1",
       channelId: "voice-a",
       currentUserId: "target",
+      sessionId: "current-call",
       onKick,
     });
-
-    const channel = realtime.channels[0];
-    await nexus.kickParticipant("other", "voice-a");
-    expect(channel.sent).toEqual([
-      {
-        type: "broadcast",
-        event: "voice_kick",
-        payload: {
-          targetUserId: "other",
-          channelId: "voice-a",
-          kickedBy: "target",
-        },
-      },
+    nexus.setJoined(true);
+    nexus.setParticipantSessions([
+      { userId: "other", sessionId: "other-call" },
     ]);
-
-    channel.emitBroadcast("voice_kick", {
-      targetUserId: "target",
+    await nexus.kickParticipant("other", "voice-a");
+    expect(tokenBackend.sendControl).toHaveBeenCalledWith({
+      communityId: "server-1",
       channelId: "voice-a",
-      kickedBy: "moderator",
+      targetUserId: "other",
+      targetSessionId: "other-call",
+      action: "remove",
+    });
+    expect(realtime.channels).toHaveLength(0);
+    const event = {
+      community_id: "server-1",
+      channel_id: "voice-a",
+      channel_name: "Alpha",
+      target_user_id: "target",
+      target_session_id: "old-call",
+      actor_user_id: "moderator",
+      actor_name: "Jamie",
+      action: "remove",
+    };
+    nexus.applyRemoteControl(event);
+    expect(onKick).not.toHaveBeenCalled();
+    // This event touches only voice; other domains are deliberately absent.
+    routeRealtimeEvent({ voice: nexus } as unknown as RealtimeMutationTarget, {
+      type: "VOICE_CONTROL",
+      payload: { ...event, target_session_id: "current-call" },
     });
     expect(onKick).toHaveBeenCalledWith({
       targetUserId: "target",
       channelId: "voice-a",
       kickedBy: "moderator",
+      kickedByName: "Jamie",
+      channelName: "Alpha",
     });
-
+    nexus.setJoined(false);
+    expect(nexus.getSnapshot().controlNotice?.action).toBe("remove");
+    // Teardown may still be awaiting presence cleanup when a command arrives.
+    nexus.applyRemoteControl({ ...event, target_session_id: "current-call" });
+    expect(onKick).toHaveBeenCalledOnce();
     await nexus.disconnectKickChannel();
-    expect(realtime.removed).toContain(channel);
+    nexus.applyRemoteControl({ ...event, target_session_id: "current-call" });
+    expect(onKick).toHaveBeenCalledOnce();
   });
 
-  it("discards stale overlapping kick channel connects", async () => {
-    const tokenBackend = {
-      fetchToken: vi.fn(async () => ({
-        token: "voice-token",
-        serverUrl: "wss://voice.example.test",
-      })),
-    };
-    const channels: DeferredVoiceRealtimeChannel[] = [];
-    const removed: DeferredVoiceRealtimeChannel[] = [];
-    const realtime: VoiceRealtimeTransport = {
-      channel: (topic) => {
-        const channel = new DeferredVoiceRealtimeChannel(topic);
-        channels.push(channel);
-        return channel;
-      },
-      removeChannel: async (channel) => {
-        removed.push(channel as DeferredVoiceRealtimeChannel);
-      },
-    };
-    const nexus = new VoiceNexus(tokenBackend, realtime);
-
-    const first = nexus.connectKickChannel({
+  it("lets self and a moderator reverse mute/deafen without a lock", async () => {
+    const { nexus } = buildNexus();
+    await nexus.connectKickChannel({
       communityId: "server-1",
       channelId: "voice-a",
       currentUserId: "target",
+      sessionId: "current-call",
       onKick: vi.fn(),
     });
-    await Promise.resolve();
-    const second = nexus.connectKickChannel({
-      communityId: "server-1",
-      channelId: "voice-b",
-      currentUserId: "target",
-      onKick: vi.fn(),
-    });
-    await Promise.resolve();
-
-    channels[1]?.emitStatus("SUBSCRIBED");
-    await second;
-    channels[0]?.emitStatus("SUBSCRIBED");
-    await first;
-
-    await nexus.kickParticipant("other", "voice-b");
-
-    expect(channels[0]?.sent).toEqual([]);
-    expect(channels[1]?.sent).toHaveLength(1);
-    expect(removed).toContain(channels[0]);
+    nexus.setJoined(true);
+    const event = {
+      community_id: "server-1",
+      channel_id: "voice-a",
+      channel_name: "Alpha",
+      target_user_id: "target",
+      target_session_id: "current-call",
+      actor_user_id: "moderator",
+      actor_name: "Jamie",
+      action: "mute",
+    };
+    nexus.applyRemoteControl(event);
+    expect(nexus.getSnapshot().isMuted).toBe(true);
+    expect(nexus.getSnapshot().controlNotice?.actorName).toBe("Jamie");
+    nexus.setMuted(false);
+    expect(nexus.getSnapshot().isMuted).toBe(false);
+    expect(nexus.getSnapshot().controlNotice).toBeNull();
+    nexus.applyRemoteControl({ ...event, action: "deafen" });
+    expect(nexus.getSnapshot().isDeafened).toBe(true);
+    nexus.setDeafened(false);
+    expect(nexus.getSnapshot().isDeafened).toBe(false);
+    expect(nexus.getSnapshot().controlNotice).toBeNull();
+    nexus.applyRemoteControl(event);
+    nexus.applyRemoteControl({ ...event, action: "unmute" });
+    expect(nexus.getSnapshot().isMuted).toBe(false);
+    nexus.applyRemoteControl({ ...event, action: "deafen" });
+    nexus.applyRemoteControl({ ...event, action: "undeafen" });
+    expect(nexus.getSnapshot().isDeafened).toBe(false);
+    expect(nexus.getSnapshot().controlNotice).toBeNull();
   });
 
   it("subscribes to presence channels and cleans them up", () => {

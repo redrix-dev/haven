@@ -48,6 +48,9 @@ export interface RealtimeModerationCache {
  * Platform cores (HavenReactCore, future HavenSolidCore) implement this.
  */
 export interface RealtimeMutationTarget {
+  readonly voice?: {
+    applyRemoteControl(payload: Record<string, unknown>): void;
+  };
   readonly backends: HavenBackends;
   readonly messages: RealtimeMessageRegistry;
   readonly channels: RealtimeChannelCache;

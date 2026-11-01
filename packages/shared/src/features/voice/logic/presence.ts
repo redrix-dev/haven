@@ -2,7 +2,6 @@ import type {
   VoicePresenceStateRow,
   VoiceSidebarParticipant,
 } from "@shared/types/types";
-import type { VoiceKickPayload, VoiceRealtimeEventPayload } from "../types";
 
 export const voiceParticipantListsEqual = (
   left: VoiceSidebarParticipant[],
@@ -58,23 +57,4 @@ export const normalizePresenceRows = (
   return Array.from(participantsByUserId.values()).sort((left, right) =>
     left.displayName.localeCompare(right.displayName),
   );
-};
-
-export const resolveKickPayload = (
-  eventPayload: VoiceRealtimeEventPayload,
-): VoiceKickPayload | null => {
-  const payload = eventPayload.payload;
-  if (typeof payload !== "object" || payload === null) return null;
-  const record = payload as Record<string, unknown>;
-  const targetUserId = record.targetUserId;
-  const channelId = record.channelId;
-  const kickedBy = record.kickedBy;
-  if (
-    typeof targetUserId !== "string" ||
-    typeof channelId !== "string" ||
-    typeof kickedBy !== "string"
-  ) {
-    return null;
-  }
-  return { targetUserId, channelId, kickedBy };
 };

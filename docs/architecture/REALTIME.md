@@ -19,7 +19,9 @@ platform routes events identically.
 - **UI writes:** call the authoritative nexus (or RPC); let the event path
   update other surfaces.
 - **One private channel per user** (`private_user:{userId}`). The only other
-  channels are the voice nexus's room-scoped presence and kick channels.
+  channels are the voice nexus's room-scoped presence channels. Voice controls
+  arrive as server-authorized `VOICE_CONTROL` events on the private user channel
+  and route to `VoiceNexus.applyRemoteControl`.
 
 ## Coverage matrix
 

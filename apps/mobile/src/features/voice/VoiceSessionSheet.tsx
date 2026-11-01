@@ -14,6 +14,7 @@ import { VoiceMorphShell } from "@/features/voice/VoiceMorphShell";
 import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
 import { VoiceSoundControls } from "./VoiceSoundControls";
 import { VoiceSensitivityControl } from "./VoiceSensitivityControl";
+import { VoiceControlNotice } from "./VoiceControlNotice";
 import type {
   MobileVoiceControllerActions,
   MobileVoiceControllerState,
@@ -231,6 +232,7 @@ export function VoiceSessionSheet({
       contentContainerStyle={{ paddingBottom: 8 }}
       showsVerticalScrollIndicator={false}
     >
+      <VoiceControlNotice />
       <View className="gap-5">
         <View>
           <Text

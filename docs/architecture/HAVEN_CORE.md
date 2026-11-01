@@ -87,7 +87,7 @@ re-bundle reads or re-fetch what realtime already delivers.
 | `moderation`       | `CommunityModerationNexus`         | `load()`, report changes                                          |
 | `featureFlags`     | `FeatureFlagNexus`                 | `load()`                                                          |
 | `onboarding`       | `OnboardingNexus`                  | `load()`, `complete()`                                            |
-| `voice`            | `VoiceNexus`                       | session phase, rosters, presence and kick channels                |
+| `voice`            | `VoiceNexus`                       | session phase, rosters, presence and private-user voice controls  |
 
 Binding classes expose reads and imperative methods only — **no `use*` methods
 on classes**. Mobile reads go through `@mobile-data/hooks`; Solid reads through
@@ -177,8 +177,10 @@ There is exactly **one domain realtime subscription per user**:
 `core.subscribeRealtime(userId)` → `private_user:{userId}` → `routeEvent`.
 Nexuses and features must not open parallel `postgres_changes` listeners.
 
-**Voice exception:** room-scoped `voice:presence:{communityId}:{channelId}` and
-`voice:kick:…` channels, owned by the voice nexus.
+**Voice exception:** room-scoped `voice:presence:{communityId}:{channelId}`
+channels, owned by the voice nexus. Courtesy voice controls use the existing
+private-user ingress (`VOICE_CONTROL`), with server authorization and a per-call
+correlation id; no peer kick channel is opened.
 
 Most handlers do **one** of: **patch** a row the nexus owns, **evict** a slice,
 or **reload one domain**. Events `routeRealtimeEvent` handles:

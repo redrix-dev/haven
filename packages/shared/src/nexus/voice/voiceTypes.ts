@@ -4,6 +4,8 @@ import type {
 } from "@shared/types/types";
 import type { VoiceConnectionPhase } from "@shared/features/voice/types";
 import type { VoiceSoundSettings } from "@shared/features/voice/utils/voiceSounds";
+import type { VoiceControlEvent } from "@shared/features/voice/utils/memberControls";
+import type { VoiceSettings } from "@shared/types/settings";
 
 export type VoiceSessionSnapshot = {
   joined: boolean;
@@ -12,6 +14,8 @@ export type VoiceSessionSnapshot = {
 };
 
 export type VoiceState = {
+  settings: VoiceSettings;
+  controlNotice: VoiceControlEvent | null;
   soundSettings: VoiceSoundSettings;
   phase: VoiceConnectionPhase;
   activeChannel: VoiceChannelReference | null;

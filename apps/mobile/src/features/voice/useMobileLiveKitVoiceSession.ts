@@ -15,22 +15,24 @@ import { useVoiceMemberVolumes } from "@/features/voice/hooks/useVoiceMemberVolu
 import type {
   VoiceControllerChannel,
   VoiceParticipant,
+  VoiceKickPayload,
 } from "@shared/features/voice/types";
 import type { VoiceSettings } from "@shared/types/settings";
-import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
 import { VoiceInputGate } from "@shared/features/voice/utils/inputGate";
+import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { playMobileVoiceSound } from "./mobileVoiceSounds";
+import {
+  createVoiceControlSessionId,
+  readVoiceControlSessionId,
+  readVoiceDeafened,
+  readVoiceHardMuted,
+  mergeVoiceMetadata,
+} from "@shared/features/voice/utils/memberControls";
 import {
   startVoiceForegroundService,
   stopVoiceForegroundService,
 } from "@/features/voice/mobileVoiceForegroundService";
-
-type VoiceKickPayload = {
-  targetUserId: string;
-  channelId: string;
-  kickedBy: string;
-};
 
 export type MobileVoiceOutputOption = {
   id: string;
@@ -263,11 +265,15 @@ export function useMobileLiveKitVoiceSession({
             userId: participant.identity,
             displayName: participant.name || participant.identity,
             avatarUrl: tryParseAvatarUrl(participant.metadata),
+            sessionId: readVoiceControlSessionId(participant.metadata),
             isSpeaking:
               speakingRef.current.get(participant.identity) ??
               participant.isSpeaking,
-            muted: !micPublication || micPublication.isMuted,
-            deafened: false,
+            muted:
+              !micPublication ||
+              micPublication.isMuted ||
+              readVoiceHardMuted(participant.metadata),
+            deafened: readVoiceDeafened(participant.metadata),
           };
         },
       );
@@ -278,6 +284,7 @@ export function useMobileLiveKitVoiceSession({
   const applyParticipants = useCallback(
     (room: Room) => {
       const next = buildParticipantsFromRoom(room);
+      core.voice.setParticipantSessions(next);
       setParticipants(next);
       core.voice.setParticipants(
         next.map((participant) => ({
@@ -489,6 +496,7 @@ export function useMobileLiveKitVoiceSession({
       timer.mark("foreground service ready");
 
       const room = roomRef.current ?? createRoom();
+      const controlSessionId = createVoiceControlSessionId();
       roomRef.current = room;
       const { token, serverUrl } = await credentialsPromise;
 
@@ -497,7 +505,14 @@ export function useMobileLiveKitVoiceSession({
       timer.mark("room connected");
 
       void room.localParticipant
-        .setMetadata(JSON.stringify({ avatarUrl: user.avatarUrl ?? null }))
+        .setMetadata(
+          JSON.stringify({
+            avatarUrl: user.avatarUrl ?? null,
+            voiceSessionId: controlSessionId,
+            deafened: core.voice.getSnapshot().isDeafened,
+            hardMuted: core.voice.getSnapshot().isMuted,
+          }),
+        )
         .then(() => {
           timer.mark("local metadata set");
         })
@@ -555,6 +570,24 @@ export function useMobileLiveKitVoiceSession({
 
       void core.voice
         .connectKickChannel({
+          sessionId: controlSessionId,
+          onControl: (event) => {
+            const room = roomRef.current;
+            if (room)
+              void room.localParticipant
+                .setMetadata(
+                  mergeVoiceMetadata(room.localParticipant.metadata, {
+                    deafened: core.voice.getSnapshot().isDeafened,
+                    hardMuted: core.voice.getSnapshot().isMuted,
+                  }),
+                )
+                .catch(() => {});
+            if (event.action !== "remove")
+              void playMobileVoiceSound(
+                event.action,
+                core.voice.getSnapshot().soundSettings,
+              );
+          },
           communityId: targetChannel.communityId,
           channelId: targetChannel.channelId,
           currentUserId: user.id,
@@ -615,6 +648,15 @@ export function useMobileLiveKitVoiceSession({
   const toggleMute = useCallback(() => {
     const next = !core.voice.getSnapshot().isMuted;
     core.voice.setMuted(next);
+    const room = roomRef.current;
+    if (room)
+      void room.localParticipant
+        .setMetadata(
+          mergeVoiceMetadata(room.localParticipant.metadata, {
+            hardMuted: next,
+          }),
+        )
+        .catch(() => {});
     playVoiceControlFeedback(next);
     void playMobileVoiceSound(
       next ? "mute" : "unmute",
@@ -625,6 +667,17 @@ export function useMobileLiveKitVoiceSession({
   const toggleDeafen = useCallback(() => {
     const next = !core.voice.getSnapshot().isDeafened;
     core.voice.setDeafened(next);
+    const room = roomRef.current;
+    if (room) {
+      void room.localParticipant
+        .setMetadata(
+          mergeVoiceMetadata(room.localParticipant.metadata, {
+            deafened: next,
+            hardMuted: core.voice.getSnapshot().isMuted,
+          }),
+        )
+        .catch(() => {});
+    }
     playVoiceControlFeedback(next);
     void playMobileVoiceSound(
       next ? "deafen" : "undeafen",
