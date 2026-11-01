@@ -180,11 +180,11 @@ export function VoiceProvider(props: { children: JSX.Element }) {
         setVoice("audioPlaybackBlocked", !next.canPlaybackAudio);
       })
       .on(RoomEvent.ParticipantConnected, () => {
-        void playVoiceCue("join");
+        if (voice.joined && !intentionalDisconnect) void playVoiceCue("join");
         syncParticipants();
       })
       .on(RoomEvent.ParticipantDisconnected, () => {
-        void playVoiceCue("leave");
+        if (voice.joined && !intentionalDisconnect) void playVoiceCue("leave");
         applyRemoteVolumes(voice.isDeafened);
         syncParticipants();
       })
