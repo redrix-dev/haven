@@ -4,7 +4,6 @@ import type {
 } from "@shared/lib/backend/voiceTokenBackend";
 import {
   normalizePresenceRows,
-  resolveKickPayload,
   voiceParticipantListsEqual,
   voiceParticipantRecordsEqual,
 } from "@shared/features/voice/logic";
@@ -26,10 +25,19 @@ import {
 } from "@shared/features/voice/utils/voiceSounds";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
+import {
+  parseVoiceControlEvent,
+  type VoiceControlEvent,
+  type VoiceMemberAction,
+} from "@shared/features/voice/utils/memberControls";
+import { normalizeVoiceSettings } from "@shared/features/voice/utils/settings";
+import type { VoiceSettings } from "@shared/types/settings";
 
 const CHANNEL_CONNECT_TIMEOUT_MS = 12_000;
 
 export const createInitialVoiceState = (): VoiceState => ({
+  settings: normalizeVoiceSettings(null),
+  controlNotice: null,
   soundSettings: defaultVoiceSoundSettings(),
   phase: "idle",
   activeChannel: null,
@@ -63,6 +71,8 @@ export const selectChannelParticipants = (
 };
 
 type ConnectKickChannelInput = {
+  sessionId: string;
+  onControl?: (event: VoiceControlEvent) => void;
   communityId: string;
   channelId: string;
   currentUserId: string;
@@ -92,8 +102,8 @@ type SubscribePresenceChannelsInput = {
 
 /**
  * The voice session: connection phase, mute/deafen flags, who is in which
- * voice channel, the voice token fetch, and the Supabase presence and kick
- * channels (the documented exception to the single private realtime channel).
+ * voice channel, voice preferences, the voice token fetch, room presence and
+ * server-authorized controls delivered through the private-user event ingress.
  * The media connection itself (LiveKit room or native sidecar) lives with the
  * platform's session controller, which reports into this nexus.
  *
@@ -102,10 +112,8 @@ type SubscribePresenceChannelsInput = {
  * them (replacing rows crashes WebKitGTK's <For> mid-update).
  */
 export class VoiceNexus {
-  private kickChannel: VoiceRealtimeChannel | null = null;
-  private kickContext: { currentUserId: string; channelId: string } | null =
-    null;
-  private kickConnectionSerial = 0;
+  private kickContext: ConnectKickChannelInput | null = null;
+  private participantSessions = new Map<string, string>();
   private presenceChannel: VoiceRealtimeChannel | null = null;
   private presenceConnectionSerial = 0;
   /**
@@ -128,6 +136,29 @@ export class VoiceNexus {
         });
     } catch {
       /* Damaged preferences fall back to the default. */
+    }
+    try {
+      const raw = persistence?.getString(NEXUS_STORAGE_KEYS.voiceSettings);
+      if (raw)
+        this.port.set({ settings: normalizeVoiceSettings(JSON.parse(raw)) });
+    } catch {
+      /* Keep defaults for damaged device preferences. */
+    }
+  }
+
+  updateSettings(patch: Partial<VoiceSettings>): void {
+    const settings = normalizeVoiceSettings({
+      ...this.port.get().settings,
+      ...patch,
+    });
+    this.port.set({ settings });
+    try {
+      this.persistence?.set(
+        NEXUS_STORAGE_KEYS.voiceSettings,
+        JSON.stringify(settings),
+      );
+    } catch {
+      /* Non-fatal device preference. */
     }
   }
 
@@ -216,17 +247,23 @@ export class VoiceNexus {
   // ─── session flags ─────────────────────────────────────────────────────────
 
   setJoined(joined: boolean): void {
+    if (!joined && this.port.get().controlNotice?.action !== "remove")
+      this.port.set({ controlNotice: null });
     if (this.port.get().joined === joined) return;
     this.port.set({ joined });
   }
 
   setMuted(isMuted: boolean): void {
+    if (!isMuted && this.port.get().controlNotice?.action === "mute")
+      this.port.set({ controlNotice: null });
     if (this.port.get().isMuted === isMuted) return;
     this.port.set({ isMuted });
   }
 
   /** Deafening also mutes; undeafening leaves the mute as it is. */
   setDeafened(isDeafened: boolean): void {
+    if (!isDeafened && this.port.get().controlNotice?.action === "deafen")
+      this.port.set({ controlNotice: null });
     this.port.set(isDeafened ? { isDeafened, isMuted: true } : { isDeafened });
   }
 
@@ -339,67 +376,86 @@ export class VoiceNexus {
   // ─── kick channel ──────────────────────────────────────────────────────────
 
   async connectKickChannel(input: ConnectKickChannelInput): Promise<void> {
-    const realtime = this.requireRealtime();
-    const serial = ++this.kickConnectionSerial;
-    await this.removeKickChannel();
-
-    const channel = realtime.channel(
-      `voice:kick:${input.communityId}:${input.channelId}`,
-    );
-    channel.on("broadcast", { event: "voice_kick" }, (eventPayload) => {
-      const payload = resolveKickPayload(eventPayload);
-      if (!payload) return;
-      if (payload.targetUserId !== input.currentUserId) return;
-      if (payload.channelId !== input.channelId) return;
-      input.onKick(payload);
-    });
-
-    await subscribeOrThrow(
-      channel,
-      "Timed out connecting to voice.",
-      "Voice kick channel connection failed.",
-    );
-
-    // A newer connect or a disconnect started while this one was subscribing.
-    if (serial !== this.kickConnectionSerial) {
-      await realtime.removeChannel(channel);
-      return;
-    }
-
-    this.kickChannel = channel;
-    this.kickContext = {
-      currentUserId: input.currentUserId,
-      channelId: input.channelId,
-    };
+    // Compatibility name for session controllers. Delivery now uses the one
+    // server-authorized private-user subscription, never a peer kick topic.
+    this.kickContext = input;
   }
 
   async disconnectKickChannel(): Promise<void> {
-    this.kickConnectionSerial += 1;
-    await this.removeKickChannel();
+    this.kickContext = null;
+    this.participantSessions.clear();
+  }
+
+  setParticipantSessions(
+    participants: { userId: string; sessionId?: string }[],
+  ): void {
+    this.participantSessions = new Map(
+      participants
+        .filter((p) => p.sessionId)
+        .map((p) => [p.userId, p.sessionId!]),
+    );
+  }
+
+  dismissControlNotice(): void {
+    this.port.set({ controlNotice: null });
+  }
+
+  applyRemoteControl(payload: Record<string, unknown>): void {
+    const event = parseVoiceControlEvent(payload);
+    const context = this.kickContext;
+    if (
+      !event ||
+      !context ||
+      event.targetUserId !== context.currentUserId ||
+      event.communityId !== context.communityId ||
+      event.channelId !== context.channelId ||
+      event.targetSessionId !== context.sessionId
+    )
+      return;
+    if (event.action === "mute" || event.action === "unmute")
+      this.setMuted(event.action === "mute");
+    if (event.action === "deafen" || event.action === "undeafen")
+      this.setDeafened(event.action === "deafen");
+    if (["mute", "deafen", "remove"].includes(event.action))
+      this.port.set({ controlNotice: event });
+    context.onControl?.(event);
+    if (event.action === "remove")
+      context.onKick({
+        targetUserId: event.targetUserId,
+        channelId: event.channelId,
+        kickedBy: event.actorUserId,
+        kickedByName: event.actorName,
+        channelName: event.channelName,
+      });
+  }
+
+  async controlParticipant(
+    targetUserId: string,
+    channelId: string,
+    action: VoiceMemberAction,
+  ): Promise<void> {
+    const context = this.kickContext;
+    const targetSessionId = this.participantSessions.get(targetUserId);
+    if (!context || context.channelId !== channelId || !targetSessionId)
+      throw new Error(
+        "The participant's current voice session is unavailable.",
+      );
+    if (!this.tokenBackend?.sendControl)
+      throw new Error("Voice controls are unavailable.");
+    await this.tokenBackend.sendControl({
+      communityId: context.communityId,
+      channelId,
+      targetUserId,
+      targetSessionId,
+      action,
+    });
   }
 
   async kickParticipant(
     targetUserId: string,
     channelId: string,
   ): Promise<void> {
-    const channel = this.kickChannel;
-    const context = this.kickContext;
-    if (!channel || !context) {
-      throw new Error("Not connected to a voice channel.");
-    }
-
-    const sendStatus = await channel.send({
-      type: "broadcast",
-      event: "voice_kick",
-      payload: {
-        targetUserId,
-        channelId,
-        kickedBy: context.currentUserId,
-      } satisfies VoiceKickPayload,
-    });
-    if (sendStatus !== "ok") {
-      throw new Error("Failed to remove member from the voice channel.");
-    }
+    await this.controlParticipant(targetUserId, channelId, "remove");
 
     // Drop the kicked user from the presence roster now, so they can't linger
     // there as a phantom until presence catches up.
@@ -571,6 +627,7 @@ export class VoiceNexus {
     this.speakingIds.clear();
     this.port.set({
       ...createInitialVoiceState(),
+      settings: { ...this.port.get().settings },
       // Device audio preferences survive sign-out; voice session state does not.
       soundSettings: { ...this.port.get().soundSettings },
       sessionState: { joined: false, isMuted: false, isDeafened: false },
@@ -586,14 +643,6 @@ export class VoiceNexus {
       throw new Error("Voice realtime transport is not configured.");
     }
     return this.realtime;
-  }
-
-  private async removeKickChannel(): Promise<void> {
-    const channel = this.kickChannel;
-    this.kickChannel = null;
-    this.kickContext = null;
-    if (!channel || !this.realtime) return;
-    await this.realtime.removeChannel(channel);
   }
 
   private async removePresenceChannel(): Promise<void> {

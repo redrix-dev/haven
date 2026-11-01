@@ -3827,6 +3827,16 @@ export type Database = {
         }
         Returns: string
       }
+      send_voice_control: {
+        Args: {
+          p_action: string
+          p_channel_id: string
+          p_community_id: string
+          p_target_session_id: string
+          p_target_user_id: string
+        }
+        Returns: Json
+      }
       set_active_user_flair: {
         Args: { p_user_flair_id: string }
         Returns: undefined

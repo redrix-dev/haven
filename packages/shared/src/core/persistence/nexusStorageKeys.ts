@@ -4,6 +4,7 @@ export const NEXUS_STORAGE_KEYS = {
   channels: "haven:nexus:channels:global",
   notifications: "haven:nexus:notifications:global",
   voiceSounds: "haven:preferences:voice-sounds",
+  voiceSettings: "haven:preferences:voice-settings",
   directMessages: "haven:nexus:direct-messages:global",
   /** A destination link clicked while signed out; opened once after sign-in (see linkPipeline). */
   pendingLink: "haven:nexus:links:pending",

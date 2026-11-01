@@ -1,7 +1,7 @@
 # Voice drawer and participant controls (#92)
 
-Approved product behavior from the October 31 design discussion. This document
-is an implementation specification, not a claim that the surfaces exist yet.
+Implemented product behavior from the October 31 design discussion. Real-call
+and device signoff remains required before promotion from staging.
 
 ## Three levels of detail
 
@@ -71,22 +71,36 @@ Scope actions to the current voice session/channel and ignore stale commands
 after leaving or switching channels. Commands change current flags; they do not
 create durable mute/deafen restrictions or grant new authority.
 
-Trace the existing `voice:kick` broadcast path before extending it. Current
-client kick payloads carry an actor id but no display name; remote mute/deafen
-commands do not exist yet. Any new authorization path needs SQL/backend tests,
-including ordinary-member refusal and hierarchy boundaries, alongside client
-tests proving self reversal and notice lifetime.
+`send_voice_control` derives actor identity/name from authenticated database
+state and checks channel visibility, membership, manage-members authority and
+role hierarchy. It sends `VOICE_CONTROL` on the recipient's existing private
+user channel. The old peer `voice:kick` broadcast is no longer used. A random
+per-call correlation id in LiveKit metadata prevents delayed commands affecting
+a later call; it is not an authorization token. Older participants without
+session metadata retain personal volume controls, but remote actions are hidden.
+No durable mute/deafen restriction is created.
+
+Mobile keeps the microphone publication while hard mute disables capture. Its
+metadata carries `hardMuted` alongside `deafened`, so other clients can show the
+correct reversible action. These flags describe the call UI and grant no authority.
 
 ## Audio and prerequisites
 
 - #88 repairs voice activation and the capture meter.
 - #90 supplies locally measured speaking feedback; SDK participant events alone
   have the same server cadence as `activeSpeakers`.
-- #89's threshold-slider mockup awaits visual feedback before implementation.
+- #89 implements the approved threshold-marker/live-input design on mobile.
 - #91 adds the shared voice-sound policy and persisted enabled/volume controls.
   Voice sounds default on. Integrate those controls into the settings surface.
 - Desktop transmission-mode settings must actually govern sending before the
   drawer exposes them. Persist mode, threshold, devices, and push-to-talk binding.
+
+The browser/desktop LiveKit controller uses the shared capture gate for voice
+activity, open mic and push to talk. Push to talk works while Haven has focus;
+blur releases the shortcut. Linux's native sidecar does not implement these
+transmission modes, so its settings omit those controls. Device changes persist
+only after the actual switch succeeds. Mobile retains its existing preference
+storage key and its two supported modes.
 
 ## Exit criteria
 

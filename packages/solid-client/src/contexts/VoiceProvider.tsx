@@ -1,5 +1,6 @@
 import {
   createContext,
+  Show,
   createEffect,
   onCleanup,
   useContext,
@@ -26,6 +27,16 @@ import { openVoiceSyncChannel, type VoiceMirrorState } from "./voiceSync";
 import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
 import { playWebVoiceSound } from "../audio/voiceSounds";
 import type { VoiceSoundEvent } from "@shared/features/voice/utils/voiceSounds";
+import {
+  createVoiceControlSessionId,
+  readVoiceControlSessionId,
+  readVoiceDeafened,
+  readVoiceHardMuted,
+  mergeVoiceMetadata,
+  voiceControlMessage,
+} from "@shared/features/voice/utils/memberControls";
+import { VoiceInputGate } from "@shared/features/voice/utils/inputGate";
+import { matchesVoicePushToTalkBinding } from "@shared/features/voice/utils/pushToTalk";
 
 /**
  * The voice session controller — Solid port of mobile's
@@ -61,9 +72,12 @@ export type VoiceUiState = {
   audioPlaybackBlocked: boolean;
   memberVolumes: Record<string, number>;
   localSpeaking: boolean;
+  localInputLevel: number;
+  voiceActivityGateOpen: boolean;
 };
 
 type VoiceContextValue = {
+  supportsTransmissionModes: boolean;
   voice: VoiceUiState;
   joinChannel: (channel: VoiceControllerChannel) => Promise<void>;
   leave: () => Promise<void>;
@@ -96,6 +110,8 @@ const initialState = (): VoiceUiState => ({
   audioPlaybackBlocked: false,
   memberVolumes: {},
   localSpeaking: false,
+  localInputLevel: 0,
+  voiceActivityGateOpen: false,
 });
 
 function tryParseAvatarUrl(metadata: string | undefined): string | null {
@@ -129,6 +145,105 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   let intentionalDisconnect = false;
   let stopSpeakingMonitor: (() => void) | undefined;
   let speaking: ReadonlyMap<string, boolean> = new Map();
+  let inputTimer: ReturnType<typeof setInterval> | undefined;
+  let pushToTalkHeld = false;
+  const stopInputMonitor = () => {
+    clearInterval(inputTimer);
+    inputTimer = undefined;
+    pushToTalkHeld = false;
+    setVoice({ localInputLevel: 0, voiceActivityGateOpen: false });
+  };
+  const startInputMonitor = (connectedRoom: Room) => {
+    stopInputMonitor();
+    const gate = new VoiceInputGate();
+    const generation = joinGeneration;
+    let settingsSignature = "";
+    let sampling = false;
+    inputTimer = setInterval(async () => {
+      const sender = connectedRoom.localParticipant.getTrackPublication(
+        Track.Source.Microphone,
+      )?.audioTrack?.sender;
+      if (!sender || sampling) return;
+      sampling = true;
+      try {
+        const settings = core.voice.getSnapshot().settings;
+        const signature = JSON.stringify([
+          settings.transmissionMode,
+          settings.pushToTalkBinding,
+        ]);
+        if (signature !== settingsSignature) {
+          pushToTalkHeld = false;
+          settingsSignature = signature;
+        }
+        const { level, gateOpen } = await gate.sample(
+          sender,
+          settings,
+          () =>
+            generation !== joinGeneration ||
+            !voice.joined ||
+            voice.isMuted ||
+            voice.isDeafened,
+          Date.now(),
+          pushToTalkHeld,
+        );
+        if (generation === joinGeneration && inputTimer)
+          setVoice({ localInputLevel: level, voiceActivityGateOpen: gateOpen });
+      } catch (error) {
+        if (generation !== joinGeneration) return;
+        if (sender.track) sender.track.enabled = false;
+        core.voice.setMuted(true);
+        stopInputMonitor();
+        setVoice({
+          isMuted: true,
+          error: getErrorMessage(
+            error,
+            "Microphone control failed. Leave and rejoin voice.",
+          ),
+        });
+      } finally {
+        sampling = false;
+      }
+    }, 80);
+  };
+  const keyDown = (event: KeyboardEvent) => {
+    if (
+      !voice.joined ||
+      core.voice.getSnapshot().settings.transmissionMode !== "push_to_talk"
+    )
+      return;
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      (target.isContentEditable || target.closest("input,textarea,select"))
+    )
+      return;
+    if (
+      matchesVoicePushToTalkBinding(
+        event,
+        core.voice.getSnapshot().settings.pushToTalkBinding,
+      )
+    ) {
+      event.preventDefault();
+      pushToTalkHeld = true;
+    }
+  };
+  const keyUp = (event: KeyboardEvent) => {
+    if (
+      event.code === core.voice.getSnapshot().settings.pushToTalkBinding?.code
+    )
+      pushToTalkHeld = false;
+  };
+  const blur = () => {
+    pushToTalkHeld = false;
+  };
+  window.addEventListener("keydown", keyDown);
+  window.addEventListener("keyup", keyUp);
+  window.addEventListener("blur", blur);
+  onCleanup(() => {
+    window.removeEventListener("keydown", keyDown);
+    window.removeEventListener("keyup", keyUp);
+    window.removeEventListener("blur", blur);
+  });
 
   // On Linux (WebKitGTK has no WebRTC) the shell exposes a native voice
   // sidecar; we drive that instead of a livekit-client Room. Everywhere else
@@ -161,6 +276,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
         if (state === ConnectionState.Connected) core.voice.markConnected();
       })
       .on(RoomEvent.Disconnected, () => {
+        stopInputMonitor();
         stopSpeakingMonitor?.();
         setVoice("localSpeaking", false);
         core.voice.setVoiceConnected(false);
@@ -187,11 +303,11 @@ export function VoiceProvider(props: { children: JSX.Element }) {
         setVoice("audioPlaybackBlocked", !next.canPlaybackAudio);
       })
       .on(RoomEvent.ParticipantConnected, () => {
-        void playVoiceCue("join");
+        if (voice.joined && !intentionalDisconnect) void playVoiceCue("join");
         syncParticipants();
       })
       .on(RoomEvent.ParticipantDisconnected, () => {
-        void playVoiceCue("leave");
+        if (voice.joined && !intentionalDisconnect) void playVoiceCue("leave");
         applyRemoteVolumes(voice.isDeafened);
         syncParticipants();
       })
@@ -214,10 +330,14 @@ export function VoiceProvider(props: { children: JSX.Element }) {
           userId: participant.identity,
           displayName: participant.name || participant.identity,
           avatarUrl: tryParseAvatarUrl(participant.metadata),
+          sessionId: readVoiceControlSessionId(participant.metadata),
           isSpeaking:
             speaking.get(participant.identity) ?? participant.isSpeaking,
-          muted: !micPublication || micPublication.isMuted,
-          deafened: false,
+          muted:
+            !micPublication ||
+            micPublication.isMuted ||
+            readVoiceHardMuted(participant.metadata),
+          deafened: readVoiceDeafened(participant.metadata),
         };
       },
     );
@@ -225,6 +345,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
 
   const applyParticipants = (fromRoom: Room) => {
     const next = buildParticipants(fromRoom);
+    core.voice.setParticipantSessions(next);
     setVoice("participants", reconcile(next));
     core.voice.setParticipants(
       next.map((p) => ({
@@ -281,6 +402,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   };
 
   const cleanup = async () => {
+    stopInputMonitor();
     stopSpeakingMonitor?.();
     speaking = new Map();
     setVoice("localSpeaking", false);
@@ -343,6 +465,11 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     }
     for (const element of audioElements.values()) element.remove();
     audioElements.clear();
+    room = null;
+    setVoice({
+      selectedInputDeviceId: "default",
+      selectedOutputDeviceId: "default",
+    });
     intentionalDisconnect = false;
   };
 
@@ -368,6 +495,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     });
     intentionalDisconnect = false;
     const generation = (joinGeneration += 1);
+    const controlSessionId = createVoiceControlSessionId();
 
     try {
       const credentialsPromise = core.voice.fetchJoinCredentials(
@@ -434,10 +562,24 @@ export function VoiceProvider(props: { children: JSX.Element }) {
 
         void room.localParticipant
           .setMetadata(
-            JSON.stringify({ avatarUrl: profile?.avatarUrl ?? null }),
+            JSON.stringify({
+              avatarUrl: profile?.avatarUrl ?? null,
+              voiceSessionId: controlSessionId,
+              deafened: voice.isDeafened,
+            }),
           )
           .catch(() => {});
-        await room.localParticipant.setMicrophoneEnabled(!voice.isMuted);
+        await room.localParticipant.setMicrophoneEnabled(
+          !voice.isMuted && !voice.isDeafened,
+        );
+        const preferences = core.voice.getSnapshot().settings;
+        if (preferences.preferredInputDeviceId !== "default")
+          await switchInputDevice(preferences.preferredInputDeviceId);
+        if (
+          voice.supportsOutputSelection &&
+          preferences.preferredOutputDeviceId !== "default"
+        )
+          await setOutputDevice(preferences.preferredOutputDeviceId);
       }
 
       core.voice.setJoined(true);
@@ -450,6 +592,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       setVoice({ joined: true });
       void playVoiceCue("join");
       if (room && !native) {
+        startInputMonitor(room);
         const connectedRoom = room;
         stopSpeakingMonitor?.();
         stopSpeakingMonitor = monitorSpeaking(connectedRoom, (next) => {
@@ -483,12 +626,40 @@ export function VoiceProvider(props: { children: JSX.Element }) {
 
       void core.voice
         .connectKickChannel({
+          sessionId: controlSessionId,
+          onControl: (event) => {
+            if (event.action === "remove") return;
+            const state = core.voice.getSnapshot();
+            setVoice({ isMuted: state.isMuted, isDeafened: state.isDeafened });
+            if (native) {
+              void native.setMuted(state.isMuted).catch(() => {});
+              void native
+                .setMasterVolume(state.isDeafened ? 0 : 1)
+                .catch(() => {});
+            } else {
+              void room?.localParticipant
+                .setMicrophoneEnabled(!state.isMuted && !state.isDeafened)
+                .catch(() => {});
+              if (room)
+                void room.localParticipant
+                  .setMetadata(
+                    mergeVoiceMetadata(room.localParticipant.metadata, {
+                      deafened: state.isDeafened,
+                    }),
+                  )
+                  .catch(() => {});
+              applyRemoteVolumes(state.isDeafened);
+            }
+            void playVoiceCue(event.action);
+          },
           communityId: channel.communityId,
           channelId: channel.channelId,
           currentUserId: uid,
-          onKick: () => {
+          onKick: (payload) => {
             void cleanup().then(() => {
-              setVoice({ notice: "You were removed from the voice channel." });
+              setVoice({
+                notice: `You've been removed from ${payload.channelName ?? channel.channelName} by ${payload.kickedByName ?? "a moderator"}.`,
+              });
             });
           },
         })
@@ -520,7 +691,9 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     const native = nativeVoice();
     if (native) void native.setMuted(next).catch(() => {});
     else
-      void room?.localParticipant.setMicrophoneEnabled(!next).catch(() => {});
+      void room?.localParticipant
+        .setMicrophoneEnabled(!next && !voice.isDeafened)
+        .catch(() => {});
   };
 
   const toggleDeafen = () => {
@@ -528,6 +701,15 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     // Deafening also mutes (mirrors mobile's VoiceNexus.setDeafened).
     setVoice({ isDeafened: next, isMuted: next ? true : voice.isMuted });
     core.voice.setDeafened(next);
+    if (room) {
+      void room.localParticipant
+        .setMetadata(
+          mergeVoiceMetadata(room.localParticipant.metadata, {
+            deafened: next,
+          }),
+        )
+        .catch(() => {});
+    }
     void playVoiceCue(next ? "deafen" : "undeafen");
     const native = nativeVoice();
     if (native) {
@@ -537,8 +719,9 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       if (next) void native.setMuted(true).catch(() => {});
     } else {
       applyRemoteVolumes(next);
-      if (next)
-        void room?.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+      void room?.localParticipant
+        .setMicrophoneEnabled(!voice.isMuted && !next)
+        .catch(() => {});
     }
   };
 
@@ -557,10 +740,19 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   };
 
   const switchInputDevice = async (deviceId: string) => {
-    setVoice({ selectedInputDeviceId: deviceId });
     const native = nativeVoice();
-    if (native) await native.setInputDevice(deviceId).catch(() => {});
-    else await room?.switchActiveDevice("audioinput", deviceId).catch(() => {});
+    try {
+      if (native) await native.setInputDevice(deviceId);
+      else if (room) await room.switchActiveDevice("audioinput", deviceId);
+      else return;
+      setVoice({ selectedInputDeviceId: deviceId });
+      core.voice.updateSettings({ preferredInputDeviceId: deviceId });
+    } catch (error) {
+      setVoice(
+        "error",
+        getErrorMessage(error, "Could not select voice microphone."),
+      );
+    }
   };
 
   const setOutputDevice = async (deviceId: string) => {
@@ -571,6 +763,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       else return;
       // Cues must follow the output actually selected, not a failed request.
       setVoice({ selectedOutputDeviceId: deviceId });
+      core.voice.updateSettings({ preferredOutputDeviceId: deviceId });
     } catch (error) {
       setVoice(
         "error",
@@ -677,6 +870,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   });
 
   const value: VoiceContextValue = {
+    supportsTransmissionModes: !nativeVoice(),
     voice,
     joinChannel,
     leave,
@@ -692,6 +886,23 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   return (
     <VoiceContext.Provider value={value}>
       {props.children}
+      <Show when={core.voice.state.controlNotice}>
+        {(notice) => (
+          <div
+            role="status"
+            aria-live="polite"
+            class="fixed bottom-4 right-4 z-[100] max-w-sm rounded-lg border border-border bg-card p-4 text-sm text-foreground shadow-xl"
+          >
+            <p>{voiceControlMessage(notice())}</p>
+            <button
+              class="mt-2 text-xs text-muted-foreground underline"
+              onClick={() => core.voice.dismissControlNotice()}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+      </Show>
     </VoiceContext.Provider>
   );
 }

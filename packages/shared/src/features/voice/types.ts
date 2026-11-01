@@ -13,6 +13,7 @@ export type VoiceControllerChannel = {
 export type ForceDisconnectVoiceReason = "access_lost" | "kicked" | "ban";
 
 export type VoiceParticipant = {
+  sessionId?: string;
   userId: string;
   displayName: string;
   avatarUrl?: string | null;
@@ -93,6 +94,8 @@ export type VoiceKickPayload = {
   targetUserId: string;
   channelId: string;
   kickedBy: string;
+  kickedByName?: string;
+  channelName?: string;
 };
 
 export type VoiceRealtimeStatus =

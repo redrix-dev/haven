@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { normalizeVoiceSettings } from "@shared/features/voice/utils/settings";
 import { DEFAULT_VOICE_SETTINGS } from "@shared/infrastructure/constants";
 import type {
   VoiceSettings,
@@ -24,29 +25,11 @@ function coerceTransmissionMode(value: unknown): MobileTransmissionMode {
   return value === "open_mic" ? "open_mic" : "voice_activity";
 }
 
-function coerceThreshold(value: unknown): number {
-  const numeric = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(numeric))
-    return MOBILE_DEFAULT_VOICE_SETTINGS.voiceActivationThreshold;
-  return Math.max(0, Math.min(100, Math.round(numeric)));
-}
-
 function coerceVoiceSettings(value: unknown): VoiceSettings {
-  if (typeof value !== "object" || value == null) {
-    return MOBILE_DEFAULT_VOICE_SETTINGS;
-  }
-  const record = value as Partial<VoiceSettings>;
+  const settings = normalizeVoiceSettings(value);
   return {
-    preferredInputDeviceId:
-      typeof record.preferredInputDeviceId === "string"
-        ? record.preferredInputDeviceId
-        : MOBILE_DEFAULT_VOICE_SETTINGS.preferredInputDeviceId,
-    preferredOutputDeviceId:
-      typeof record.preferredOutputDeviceId === "string"
-        ? record.preferredOutputDeviceId
-        : MOBILE_DEFAULT_VOICE_SETTINGS.preferredOutputDeviceId,
-    transmissionMode: coerceTransmissionMode(record.transmissionMode),
-    voiceActivationThreshold: coerceThreshold(record.voiceActivationThreshold),
+    ...settings,
+    transmissionMode: coerceTransmissionMode(settings.transmissionMode),
     pushToTalkBinding: null,
   };
 }

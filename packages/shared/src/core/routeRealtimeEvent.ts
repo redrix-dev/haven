@@ -35,6 +35,9 @@ export function routeRealtimeEvent(
   evt: RealtimeEvent,
 ): void {
   switch (evt.type) {
+    case "VOICE_CONTROL":
+      target.voice?.applyRemoteControl(evt.payload);
+      return;
     case "MESSAGE_INSERT": {
       const communityId = evt.payload.community_id;
       const channelId = evt.payload.channel_id;

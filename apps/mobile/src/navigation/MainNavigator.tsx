@@ -1,4 +1,6 @@
 import { useNavigation } from "@react-navigation/native";
+import type { VoiceKickPayload } from "@shared/features/voice/types";
+import { VoiceControlNotice } from "@/features/voice/VoiceControlNotice";
 import type { NavigationProp } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
@@ -429,19 +431,23 @@ function MainNavigationShell({ userId }: { userId: string }) {
     [dismissVoiceSheet, disconnectVoiceSession],
   );
 
-  const handleVoiceKick = useCallback(() => {
-    dismissVoiceSheet();
-    void forceDisconnectVoice("kicked")
-      .then(() => {
-        Alert.alert(
-          "Removed from voice",
-          "You were removed from the voice channel.",
-        );
-      })
-      .catch((error: unknown) => {
-        console.warn("[voice] Failed to disconnect after kick.", error);
-      });
-  }, [dismissVoiceSheet, forceDisconnectVoice]);
+  const handleVoiceKick = useCallback(
+    (payload: VoiceKickPayload) => {
+      dismissVoiceSheet();
+      void forceDisconnectVoice("kicked")
+        .then(() => {
+          Alert.alert(
+            "Removed from voice",
+            `You've been removed from ${payload.channelName ?? "the voice channel"} by ${payload.kickedByName ?? "a moderator"}.`,
+            [{ text: "OK", onPress: () => core.voice.dismissControlNotice() }],
+          );
+        })
+        .catch((error: unknown) => {
+          console.warn("[voice] Failed to disconnect after kick.", error);
+        });
+    },
+    [core.voice, dismissVoiceSheet, forceDisconnectVoice],
+  );
 
   // Losing access to a community (kicked, banned, or deleted): the core has
   // already forgotten it and focused another. Leave its voice channel, move
@@ -912,6 +918,7 @@ export function MainNavigator() {
         audioSettings={MOBILE_DEFAULT_NOTIFICATION_AUDIO}
       />
       <MainNavigationShell userId={userId} />
+      <VoiceControlNotice floating />
     </>
   );
 }
