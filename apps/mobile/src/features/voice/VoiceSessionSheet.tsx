@@ -5,7 +5,6 @@ import {
   ScrollView,
   Text,
   View,
-  type DimensionValue,
 } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import type { VoiceSettings } from "@shared/types/settings";
@@ -13,6 +12,7 @@ import type { VoiceParticipant } from "@shared/features/voice/types";
 import { HavenModalShell } from "@/components/HavenModalShell";
 import { VoiceMorphShell } from "@/features/voice/VoiceMorphShell";
 import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
+import { VoiceSensitivityControl } from "./VoiceSensitivityControl";
 import type {
   MobileVoiceControllerActions,
   MobileVoiceControllerState,
@@ -223,9 +223,6 @@ export function VoiceSessionSheet({
     deafened: state.isDeafened,
   };
   const participantCount = state.participants.length + (state.joined ? 1 : 0);
-  const threshold = voiceSettings.voiceActivationThreshold;
-  const levelPercent = `${Math.round(state.localInputLevel * 100)}%`;
-  const levelWidth = levelPercent as DimensionValue;
 
   const body = (
     <ScrollView
@@ -324,57 +321,21 @@ export function VoiceSessionSheet({
               }
             />
           </View>
-          <View className="rounded-lg bg-surface-panel p-3">
-            <View className="mb-2 flex-row items-center justify-between">
-              <Text className="text-sm font-medium text-foreground">
-                Input level
-              </Text>
-              <Text className="text-xs text-muted-foreground">
-                {levelPercent}
-              </Text>
-            </View>
-            <View className="h-2 overflow-hidden rounded-full bg-surface-embedded">
-              <View
-                className="h-full rounded-full bg-primary"
-                style={{ width: levelWidth }}
-              />
-            </View>
-            <View className="mt-3 flex-row items-center justify-between">
-              <Pressable
-                accessibilityRole="button"
-                className="h-9 w-9 items-center justify-center rounded-lg bg-surface-embedded active:bg-surface-hover"
-                onPress={() =>
-                  actions.updateVoiceSettingsPatch({
-                    voiceActivationThreshold: Math.max(0, threshold - 5),
-                  })
-                }
-              >
-                <ThemedIonicons
-                  name="remove"
-                  size={18}
-                  colorClassName="accent-foreground"
-                />
-              </Pressable>
-              <Text className="text-sm text-muted-foreground">
-                Threshold {threshold}%
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                className="h-9 w-9 items-center justify-center rounded-lg bg-surface-embedded active:bg-surface-hover"
-                onPress={() =>
-                  actions.updateVoiceSettingsPatch({
-                    voiceActivationThreshold: Math.min(100, threshold + 5),
-                  })
-                }
-              >
-                <ThemedIonicons
-                  name="add"
-                  size={18}
-                  colorClassName="accent-foreground"
-                />
-              </Pressable>
-            </View>
-          </View>
+          <VoiceSensitivityControl
+            threshold={voiceSettings.voiceActivationThreshold}
+            inputLevel={state.localInputLevel}
+            gateOpen={
+              state.joined &&
+              !state.isMuted &&
+              !state.isDeafened &&
+              (voiceSettings.transmissionMode === "open_mic" ||
+                state.voiceActivityGateOpen)
+            }
+            disabled={voiceSettings.transmissionMode !== "voice_activity"}
+            onChange={(voiceActivationThreshold) =>
+              actions.updateVoiceSettingsPatch({ voiceActivationThreshold })
+            }
+          />
         </View>
 
         <View className="gap-3">
