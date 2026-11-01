@@ -9,6 +9,7 @@ import {
 } from "lucide-solid";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
 import { Button, Tooltip } from "@solid-client/components/ui";
+import { VoiceSoundControls } from "./VoiceSoundControls";
 
 /**
  * The connected-voice control strip pinned under the sidebar: channel name,
@@ -106,6 +107,7 @@ export function VoiceDock() {
               </Button>
             </Tooltip>
           </div>
+          <VoiceSoundControls />
         </div>
       )}
     </Show>

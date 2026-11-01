@@ -19,10 +19,18 @@ import type {
 } from "@shared/types/types";
 import type { StatePort } from "../kit/statePort";
 import type { VoiceSessionSnapshot, VoiceState } from "./voiceTypes";
+import {
+  defaultVoiceSoundSettings,
+  normalizeVoiceSoundSettings,
+  type VoiceSoundSettings,
+} from "@shared/features/voice/utils/voiceSounds";
+import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
 
 const CHANNEL_CONNECT_TIMEOUT_MS = 12_000;
 
 export const createInitialVoiceState = (): VoiceState => ({
+  soundSettings: defaultVoiceSoundSettings(),
   phase: "idle",
   activeChannel: null,
   pendingChannel: null,
@@ -110,7 +118,34 @@ export class VoiceNexus {
     protected readonly port: StatePort<VoiceState>,
     private readonly tokenBackend: VoiceTokenBackend | null,
     private readonly realtime: VoiceRealtimeTransport | null,
-  ) {}
+    private readonly persistence?: NexusPersistence,
+  ) {
+    try {
+      const raw = persistence?.getString(NEXUS_STORAGE_KEYS.voiceSounds);
+      if (raw)
+        this.port.set({
+          soundSettings: normalizeVoiceSoundSettings(JSON.parse(raw)),
+        });
+    } catch {
+      /* Damaged preferences fall back to the default. */
+    }
+  }
+
+  updateSoundSettings(patch: Partial<VoiceSoundSettings>): void {
+    const soundSettings = normalizeVoiceSoundSettings({
+      ...this.port.get().soundSettings,
+      ...patch,
+    });
+    this.port.set({ soundSettings });
+    try {
+      this.persistence?.set(
+        NEXUS_STORAGE_KEYS.voiceSounds,
+        JSON.stringify(soundSettings),
+      );
+    } catch {
+      /* A storage failure must not interrupt voice. */
+    }
+  }
 
   getSnapshot(): VoiceState {
     return this.port.get();
@@ -536,6 +571,8 @@ export class VoiceNexus {
     this.speakingIds.clear();
     this.port.set({
       ...createInitialVoiceState(),
+      // Device audio preferences survive sign-out; voice session state does not.
+      soundSettings: { ...this.port.get().soundSettings },
       sessionState: { joined: false, isMuted: false, isDeafened: false },
     });
     void this.disconnectKickChannel();

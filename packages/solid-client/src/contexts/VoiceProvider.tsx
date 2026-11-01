@@ -23,7 +23,8 @@ import { requireHavenSolidCore } from "../core";
 import { useSession } from "./SessionProvider";
 import { useBridge } from "./BridgeProvider";
 import { openVoiceSyncChannel, type VoiceMirrorState } from "./voiceSync";
-import { playVoiceJoinSound, playVoiceLeaveSound } from "../audio/sounds";
+import { playWebVoiceSound } from "../audio/voiceSounds";
+import type { VoiceSoundEvent } from "@shared/features/voice/utils/voiceSounds";
 import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
 
 /**
@@ -116,6 +117,12 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   const viewerProfile = core.profiles.viewerProfile(userId);
 
   const [voice, setVoice] = createStore<VoiceUiState>(initialState());
+  const playVoiceCue = (event: VoiceSoundEvent) =>
+    playWebVoiceSound(
+      event,
+      core.voice.getSnapshot().soundSettings,
+      voice.selectedOutputDeviceId,
+    );
 
   let room: Room | null = null;
   let joinGeneration = 0;
@@ -180,11 +187,11 @@ export function VoiceProvider(props: { children: JSX.Element }) {
         setVoice("audioPlaybackBlocked", !next.canPlaybackAudio);
       })
       .on(RoomEvent.ParticipantConnected, () => {
-        playVoiceJoinSound();
+        if (voice.joined && !intentionalDisconnect) void playVoiceCue("join");
         syncParticipants();
       })
       .on(RoomEvent.ParticipantDisconnected, () => {
-        playVoiceLeaveSound();
+        if (voice.joined && !intentionalDisconnect) void playVoiceCue("leave");
         applyRemoteVolumes(voice.isDeafened);
         syncParticipants();
       })
@@ -441,7 +448,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
         isDeafened: voice.isDeafened,
       });
       setVoice({ joined: true });
-      playVoiceJoinSound();
+      void playVoiceCue("join");
       if (room && !native) {
         const connectedRoom = room;
         stopSpeakingMonitor?.();
@@ -501,7 +508,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   };
 
   const leave = async () => {
-    playVoiceLeaveSound();
+    void playVoiceCue("leave");
     await cleanup();
   };
 
@@ -509,6 +516,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     const next = !voice.isMuted;
     setVoice({ isMuted: next });
     core.voice.setMuted(next);
+    void playVoiceCue(next ? "mute" : "unmute");
     const native = nativeVoice();
     if (native) void native.setMuted(next).catch(() => {});
     else
@@ -520,6 +528,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     // Deafening also mutes (mirrors mobile's VoiceNexus.setDeafened).
     setVoice({ isDeafened: next, isMuted: next ? true : voice.isMuted });
     core.voice.setDeafened(next);
+    void playVoiceCue(next ? "deafen" : "undeafen");
     const native = nativeVoice();
     if (native) {
       // Deafen silences all incoming audio via the sidecar's master volume and
@@ -555,11 +564,19 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   };
 
   const setOutputDevice = async (deviceId: string) => {
-    setVoice({ selectedOutputDeviceId: deviceId });
     const native = nativeVoice();
-    if (native) await native.setOutputDevice(deviceId).catch(() => {});
-    else
-      await room?.switchActiveDevice("audiooutput", deviceId).catch(() => {});
+    try {
+      if (native) await native.setOutputDevice(deviceId);
+      else if (room) await room.switchActiveDevice("audiooutput", deviceId);
+      else return;
+      // Cues must follow the output actually selected, not a failed request.
+      setVoice({ selectedOutputDeviceId: deviceId });
+    } catch (error) {
+      setVoice(
+        "error",
+        getErrorMessage(error, "Could not select voice output."),
+      );
+    }
   };
 
   const enableAudioPlayback = async () => {

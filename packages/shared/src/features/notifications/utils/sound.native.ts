@@ -9,15 +9,7 @@ type NotificationSoundRequest = {
   suppressWhenUnfocused?: boolean;
 };
 
-type VoicePresenceSoundRequest = {
-  event: VoicePresenceSoundEvent;
-  audioSettings: NotificationAudioSettings;
-};
-
-export type VoicePresenceSoundEvent =
-  | "voice_presence_join"
-  | "voice_presence_leave";
-export type AppSoundEvent = NotificationKind | VoicePresenceSoundEvent;
+export type AppSoundEvent = NotificationKind;
 
 export type NotificationSoundPlayResult = {
   played: boolean;
@@ -40,17 +32,6 @@ const getSkippedResult = (
   }
   return { played: false, reasonCode: "provider_retryable_failure" };
 };
-
-export const playVoicePresenceSound = async ({
-  event,
-  audioSettings,
-}: VoicePresenceSoundRequest): Promise<NotificationSoundPlayResult> =>
-  getSkippedResult(
-    audioSettings,
-    event === "voice_presence_join" || event === "voice_presence_leave"
-      ? audioSettings.voicePresenceSoundEnabled
-      : false,
-  );
 
 export const playNotificationSound = async ({
   deliverSound,
