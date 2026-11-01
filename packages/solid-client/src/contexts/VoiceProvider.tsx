@@ -25,6 +25,7 @@ import { useBridge } from "./BridgeProvider";
 import { openVoiceSyncChannel, type VoiceMirrorState } from "./voiceSync";
 import { playWebVoiceSound } from "../audio/voiceSounds";
 import type { VoiceSoundEvent } from "@shared/features/voice/utils/voiceSounds";
+import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
 
 /**
  * The voice session controller — Solid port of mobile's
@@ -59,6 +60,7 @@ export type VoiceUiState = {
   /** Browser blocked autoplay — a user gesture must call enableAudioPlayback. */
   audioPlaybackBlocked: boolean;
   memberVolumes: Record<string, number>;
+  localSpeaking: boolean;
 };
 
 type VoiceContextValue = {
@@ -93,6 +95,7 @@ const initialState = (): VoiceUiState => ({
     "setSinkId" in HTMLMediaElement.prototype,
   audioPlaybackBlocked: false,
   memberVolumes: {},
+  localSpeaking: false,
 });
 
 function tryParseAvatarUrl(metadata: string | undefined): string | null {
@@ -124,6 +127,8 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   let room: Room | null = null;
   let joinGeneration = 0;
   let intentionalDisconnect = false;
+  let stopSpeakingMonitor: (() => void) | undefined;
+  let speaking: ReadonlyMap<string, boolean> = new Map();
 
   // On Linux (WebKitGTK has no WebRTC) the shell exposes a native voice
   // sidecar; we drive that instead of a livekit-client Room. Everywhere else
@@ -156,6 +161,8 @@ export function VoiceProvider(props: { children: JSX.Element }) {
         if (state === ConnectionState.Connected) core.voice.markConnected();
       })
       .on(RoomEvent.Disconnected, () => {
+        stopSpeakingMonitor?.();
+        setVoice("localSpeaking", false);
         core.voice.setVoiceConnected(false);
         if (!intentionalDisconnect) {
           core.voice.setJoined(false);
@@ -198,9 +205,6 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   };
 
   const buildParticipants = (fromRoom: Room): VoiceParticipant[] => {
-    const activeSpeakerIds = new Set(
-      fromRoom.activeSpeakers.map((p) => p.identity),
-    );
     return Array.from(fromRoom.remoteParticipants.values()).map(
       (participant: RemoteParticipant) => {
         const micPublication = participant.getTrackPublication(
@@ -210,7 +214,8 @@ export function VoiceProvider(props: { children: JSX.Element }) {
           userId: participant.identity,
           displayName: participant.name || participant.identity,
           avatarUrl: tryParseAvatarUrl(participant.metadata),
-          isSpeaking: activeSpeakerIds.has(participant.identity),
+          isSpeaking:
+            speaking.get(participant.identity) ?? participant.isSpeaking,
           muted: !micPublication || micPublication.isMuted,
           deafened: false,
         };
@@ -276,6 +281,9 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   };
 
   const cleanup = async () => {
+    stopSpeakingMonitor?.();
+    speaking = new Map();
+    setVoice("localSpeaking", false);
     joinGeneration += 1;
     intentionalDisconnect = true;
     // Clearing activeChannel re-fires the sidebar's presence effect, which
@@ -442,6 +450,16 @@ export function VoiceProvider(props: { children: JSX.Element }) {
       setVoice({ joined: true });
       void playVoiceCue("join");
       if (room && !native) {
+        const connectedRoom = room;
+        stopSpeakingMonitor?.();
+        stopSpeakingMonitor = monitorSpeaking(connectedRoom, (next) => {
+          speaking = next;
+          setVoice(
+            "localSpeaking",
+            next.get(connectedRoom.localParticipant.identity) ?? false,
+          );
+          applyParticipants(connectedRoom);
+        });
         applyParticipants(room);
         applyRemoteVolumes(voice.isDeafened);
         void refreshInputDevices();
@@ -589,6 +607,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
     joining: voice.joining,
     isMuted: voice.isMuted,
     isDeafened: voice.isDeafened,
+    localSpeaking: voice.localSpeaking,
     participants: voice.participants.map((p) => ({
       userId: p.userId,
       displayName: p.displayName,
