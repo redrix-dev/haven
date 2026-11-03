@@ -115,4 +115,96 @@ describe("VoiceInputGate", () => {
     ).rejects.toThrow("native failure");
     expect(mic.track.enabled).toBe(false);
   });
+
+  it("reopens from a capture monitor while gated sender stats read zero", async () => {
+    const mic = microphone();
+    const gate = new VoiceInputGate();
+    expect(await gate.sample(mic.sender, settings, () => false, 1000)).toEqual({
+      level: 0,
+      gateOpen: false,
+    });
+    expect(mic.transmitting()).toBe(false);
+    // iOS keeps reporting zero through sender stats once the gate closes the
+    // encoding; only the native capture monitor still sees the loud speech.
+    let captureLevel: number | undefined = 0.8;
+    const captureSource = { get: () => captureLevel };
+    expect(
+      await gate.sample(
+        mic.sender,
+        settings,
+        () => false,
+        1080,
+        false,
+        captureSource,
+      ),
+    ).toEqual({ level: 0.8, gateOpen: true });
+    expect(mic.transmitting()).toBe(true);
+    captureLevel = 0.1;
+    // The release tail keeps the gate briefly open after speech drops.
+    expect(
+      (
+        await gate.sample(
+          mic.sender,
+          settings,
+          () => false,
+          1240,
+          false,
+          captureSource,
+        )
+      ).gateOpen,
+    ).toBe(true);
+    expect(
+      await gate.sample(
+        mic.sender,
+        settings,
+        () => false,
+        1320,
+        false,
+        captureSource,
+      ),
+    ).toEqual({ level: 0.1, gateOpen: false });
+    expect(mic.transmitting()).toBe(false);
+    // A stale monitor must not hold the gate; the gate falls back to stats.
+    captureLevel = undefined;
+    expect(
+      await gate.sample(
+        mic.sender,
+        settings,
+        () => false,
+        1400,
+        false,
+        captureSource,
+      ),
+    ).toEqual({ level: 0, gateOpen: false });
+  });
+
+  it("keeps hard mute closed when a capture monitor reports speech", async () => {
+    const mic = microphone();
+    const gate = new VoiceInputGate();
+    const captureSource = { get: () => 0.9 };
+    expect(
+      await gate.sample(
+        mic.sender,
+        settings,
+        () => true,
+        1000,
+        false,
+        captureSource,
+      ),
+    ).toEqual({ level: 0, gateOpen: false });
+    expect(mic.track.enabled).toBe(false);
+    expect(mic.transmitting()).toBe(false);
+    // Unmuting resumes live measurement from the capture monitor.
+    expect(
+      await gate.sample(
+        mic.sender,
+        settings,
+        () => false,
+        1080,
+        false,
+        captureSource,
+      ),
+    ).toEqual({ level: 0.9, gateOpen: true });
+    expect(mic.transmitting()).toBe(true);
+  });
 });

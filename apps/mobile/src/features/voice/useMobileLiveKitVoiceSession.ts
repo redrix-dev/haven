@@ -7,6 +7,7 @@ import {
   Room,
   RoomEvent,
   Track,
+  type LocalAudioTrack,
   type RemoteParticipant,
 } from "livekit-client";
 import { useHavenCore } from "@mobile-data";
@@ -19,9 +20,14 @@ import type {
 } from "@shared/features/voice/types";
 import type { VoiceSettings } from "@shared/types/settings";
 import { VoiceInputGate } from "@shared/features/voice/utils/inputGate";
+import type { VoiceCaptureLevelSource } from "@shared/features/voice/utils/inputGate";
 import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { playMobileVoiceSound } from "./mobileVoiceSounds";
+import {
+  monitorNativeCaptureLevel,
+  type NativeCaptureTrack,
+} from "./mobileVoiceCaptureMonitor";
 import {
   createVoiceControlSessionId,
   readVoiceControlSessionId,
@@ -85,6 +91,10 @@ type UseMobileLiveKitVoiceSessionInput = {
 };
 
 const INPUT_LEVEL_INTERVAL_MS = 80;
+// iOS sender stats stop reporting capture levels once the activity gate
+// deactivates the sender's encoding, so the meter and the reopen decision read
+// the native capture monitor instead (its samples arrive about every 40 ms).
+const NATIVE_CAPTURE_LEVEL_MAX_AGE_MS = 300;
 const VOICE_CONTROL_CHANNEL_FAILURE_MESSAGE =
   "We're having trouble connecting you to voice services. Please try again, and contact support if this keeps happening.";
 
@@ -204,6 +214,28 @@ export function useMobileLiveKitVoiceSession({
   const [localInputLevel, setLocalInputLevel] = useState(0);
   const [voiceActivityGateOpen, setVoiceActivityGateOpen] = useState(false);
   const [localSpeaking, setLocalSpeaking] = useState(false);
+  const [localMicTrack, setLocalMicTrack] = useState<LocalAudioTrack | null>(
+    null,
+  );
+  // Native capture measurement for the gate. Readings arrive from the native
+  // volume processor about every 40 ms — including silence — so freshness is
+  // keyed to the arrival, not to React state changes. (The LiveKit
+  // `useTrackVolume` hook drops zero readings, which would make exact silence
+  // look like a stale frozen speech level.)
+  const nativeCaptureSampleRef = useRef<{
+    level: number;
+    updatedAt: number;
+  } | null>(null);
+  useEffect(() => {
+    if (Platform.OS !== "ios" || !localMicTrack) return;
+    const stop = monitorNativeCaptureLevel(
+      localMicTrack.mediaStreamTrack as NativeCaptureTrack,
+      (level) => {
+        nativeCaptureSampleRef.current = { level, updatedAt: Date.now() };
+      },
+    );
+    return stop ?? undefined;
+  }, [localMicTrack]);
   const speakingRef = useRef<ReadonlyMap<string, boolean>>(new Map());
   const [outputDevices, setOutputDevices] = useState<MobileVoiceOutputOption[]>(
     [{ id: "default", label: "Auto" }],
@@ -333,6 +365,22 @@ export function useMobileLiveKitVoiceSession({
     stopInputLevelPolling();
     const gate = new VoiceInputGate();
     const generation = joinGenerationRef.current;
+    // iOS sender stats report zero while the gate has the encoding
+    // deactivated, so the gate reopens from the native capture monitor; a
+    // stale monitor falls back to sender stats rather than holding the gate.
+    const captureLevelSource: VoiceCaptureLevelSource | undefined =
+      Platform.OS === "ios"
+        ? {
+            get: () => {
+              const sample = nativeCaptureSampleRef.current;
+              if (!sample) return undefined;
+              return Date.now() - sample.updatedAt <=
+                NATIVE_CAPTURE_LEVEL_MAX_AGE_MS
+                ? sample.level
+                : undefined;
+            },
+          }
+        : undefined;
     let sampling = false;
     inputLevelIntervalRef.current = setInterval(async () => {
       const room = roomRef.current;
@@ -354,6 +402,8 @@ export function useMobileLiveKitVoiceSession({
             );
           },
           Date.now(),
+          false,
+          captureLevelSource,
         );
         if (
           generation !== joinGenerationRef.current ||
@@ -393,6 +443,7 @@ export function useMobileLiveKitVoiceSession({
       joinGenerationRef.current += 1;
       intentionalDisconnectRef.current = true;
       stopInputLevelPolling();
+      setLocalMicTrack(null);
       setJoining(false);
       setError(null);
       setNotice(null);
@@ -524,6 +575,10 @@ export function useMobileLiveKitVoiceSession({
       timer.mark("local metadata queued");
       await room.localParticipant.setMicrophoneEnabled(true);
       timer.mark("microphone enabled");
+      setLocalMicTrack(
+        room.localParticipant.getTrackPublication(Track.Source.Microphone)
+          ?.audioTrack ?? null,
+      );
       if (selectedOutputDeviceId !== "default" || Platform.OS === "ios") {
         await AudioSession.selectAudioOutput(selectedOutputDeviceId).catch(
           () => {},
@@ -749,6 +804,7 @@ export function useMobileLiveKitVoiceSession({
     };
     const handleDisconnected = () => {
       stopInputLevelPolling();
+      setLocalMicTrack(null);
       setConnectionState(ConnectionState.Disconnected);
       core.voice.setVoiceConnected(false);
       if (!intentionalDisconnectRef.current) {

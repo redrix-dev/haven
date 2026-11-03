@@ -1,5 +1,18 @@
 import type { VoiceSettings } from "../../../types/settings";
 
+/**
+ * Platform capture measurement. `get` returns the freshest microphone level in
+ * [0,1], or undefined when no fresh sample exists. Sender stats stop reporting
+ * capture levels on some platforms (iOS) once the transmission gate deactivates
+ * the sender's encoding, so those platforms supply a native capture monitor
+ * here; it measures the microphone before RTP and keeps the meter and the
+ * reopen decision live while gated. When it returns undefined, the gate falls
+ * back to sender stats.
+ */
+export type VoiceCaptureLevelSource = {
+  get: () => number | undefined;
+};
+
 /** Capture stays live while RTP is gated. Hard mute/deafen still disable capture. */
 export class VoiceInputGate {
   private lastAboveThreshold = -Infinity;
@@ -13,6 +26,7 @@ export class VoiceInputGate {
     isBlocked: () => boolean,
     now: number,
     pushToTalkHeld = false,
+    captureLevelSource?: VoiceCaptureLevelSource,
   ): Promise<{ level: number; gateOpen: boolean }> {
     const track = sender.track;
     if (!track) return { level: 0, gateOpen: false };
@@ -31,6 +45,12 @@ export class VoiceInputGate {
         }
       }
     });
+    const captured = captureLevelSource?.get();
+    if (typeof captured === "number" && Number.isFinite(captured)) {
+      // The capture monitor sees speech even while the gate holds the sender's
+      // encoding closed, so it replaces the stats reading while it is fresh.
+      level = Math.max(0, Math.min(1, captured));
+    }
     if (blocked) {
       level = 0;
       this.lastAboveThreshold = -Infinity;
