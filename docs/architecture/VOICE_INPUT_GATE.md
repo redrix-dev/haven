@@ -2,6 +2,16 @@
 
 Mobile measures the microphone's WebRTC `media-source.audioLevel` through the
 published track's sender stats, every 80 ms with at most one request in flight.
+On iOS those sender stats stop reporting capture levels once an encoding is
+deactivated, so iOS additionally feeds the gate the native LiveKit capture
+monitor (`LK_VOLUME_PROCESSED` events from a native renderer that measures the
+microphone before RTP). Every reading re-timestamps the sample — including
+silence — so freshness tracks reading arrival, not value change. While the
+monitor's sample is fresh it is the level the gate and the meter read; sender
+stats remain the fallback on Android and when a monitor goes stale. Hard mute
+and deafen zero the level and close the gate no matter what any monitor
+reports.
+
 `VoiceInputGate` keeps capture enabled while voice activation closes outgoing
 RTP encodings (`RTCRtpEncodingParameters.active`). Disabling the source track
 for voice activation creates a feedback loop: silence closes the gate, then
@@ -29,6 +39,7 @@ On both iOS and Android, join with a second participant and verify:
    must recover. Open mic must remain audible.
 4. Leave, rejoin, and repeat; background/foreground and change audio route.
 
-If native sender stats stop reporting capture levels while an encoding is
-inactive, this strategy requires a native capture monitor; do not substitute
-`localParticipant.audioLevel` (the server's outgoing-audio feedback).
+iOS sender stats are known to stop reporting capture levels while an encoding
+is inactive; that is why the gate accepts a platform capture monitor. Do not
+substitute `localParticipant.audioLevel` (the server's outgoing-audio
+feedback).
