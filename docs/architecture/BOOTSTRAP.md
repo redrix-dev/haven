@@ -91,8 +91,9 @@ hanging on "Warming up the perch…".
 `<html>` and the console, `createWebHavenCore()`, expose `window.__haven` +
 `window.__havenBuild`, remove the splash, `render(<App />)` with **no** bridge.
 
-**Mobile** — side effects run at **module load**, before React renders:
-`bootLogger.mark("js-entry")` → `registerMobileAppHost()` → LiveKit
+**Mobile** — [`apps/mobile/index.js`](../../apps/mobile/index.js) enables
+`perfTrace` and marks `js-entry` before it loads Expo or `App`. `App.tsx` then
+runs its module body: `app-body-start` → `registerMobileAppHost()` → LiveKit
 `registerGlobals()` → `bootstrapDataCacheDebug()` → `getMobileSupabase()` →
 `createReactHavenCore({ client, publicConfig, persistence: createMmkvPersistence() })`
 → set the Expo notification handler. The `App` component then gates its **first
@@ -191,7 +192,7 @@ auth/app switch is driven by `session`.
 ([core](../../packages/shared/src/core/havenCore.ts)) is one implementation for
 every surface, driving the shared
 [`BootstrapPhase`](../../packages/shared/src/core/bootstrapPhase.ts) and
-emitting `bootLogger` marks. Each step sets the phase first, then does the
+emitting `perfTrace` spans for each step below. Each step sets the phase first, then does the
 work:
 
 | Phase                  | Work                                                                                                                                                                                                                                                                                                   | Sync/async                     | Waits on                                                                                  |
@@ -289,29 +290,30 @@ domain-cleanup handoff it calls.
 
 ## Per-surface differences at a glance
 
-| Concern              | Desktop (Tauri)                                                                    | Web                              | Mobile                                                       |
-| -------------------- | ---------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------ |
-| Core built           | in `await boot()` **before** `render`                                              | in sync `boot()` before `render` | at **module load**, before React renders                     |
-| First-paint splash   | `index.html` `.boot-splash` ("Warming up the perch…"), removed after core + render | same, minus the `await`          | native splash → `ActivityIndicator` until `session` hydrates |
-| Persistence          | tauri-plugin-store (async to build)                                                | `localStorage`                   | MMKV                                                         |
-| Bridge               | `tauriBridge` injected                                                             | none (portable mode)             | `AppHost` via `registerMobileAppHost()`                      |
-| Boot instrumentation | —                                                                                  | `buildInfo` stamp                | `bootLogger` marks (`js-entry` … `bootstrap-ready`)          |
-| Theme gate           | in-app                                                                             | in-app                           | blocks first paint on `loadPersistedThemeId`                 |
+| Concern              | Desktop (Tauri)                                                                    | Web                              | Mobile                                                              |
+| -------------------- | ---------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------- |
+| Core built           | in `await boot()` **before** `render`                                              | in sync `boot()` before `render` | at **module load**, before React renders                            |
+| First-paint splash   | `index.html` `.boot-splash` ("Warming up the perch…"), removed after core + render | same, minus the `await`          | native splash → `ActivityIndicator` until `session` hydrates        |
+| Persistence          | tauri-plugin-store (async to build)                                                | `localStorage`                   | MMKV                                                                |
+| Bridge               | `tauriBridge` injected                                                             | none (portable mode)             | `AppHost` via `registerMobileAppHost()`                             |
+| Boot instrumentation | —                                                                                  | `buildInfo` stamp                | `perfTrace` (`js-entry` … `chat-first-commit`), filter `haven-perf` |
+| Theme gate           | in-app                                                                             | in-app                           | blocks first paint on `loadPersistedThemeId`                        |
 
 ---
 
 ## Key files
 
-| File                                                                                                                                       | Role                                                                                              |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `apps/{tauri,web}/src/main.tsx`, `apps/mobile/App.tsx`                                                                                     | host entrypoints — compose the world                                                              |
-| `apps/tauri/src/bootstrap/createTauriHavenCore.ts`, `apps/web/src/createWebHavenCore.ts`, `apps/mobile/src/data/core/havenCoreRegistry.ts` | per-surface core factories (client + persistence choices)                                         |
-| `packages/shared/src/core/havenCore.ts`                                                                                                    | the shared composition root (construction + `bootstrapSession` + `clearSession` + realtime)       |
-| `packages/solid-client/src/core/HavenSolidCore.ts`, `apps/mobile/src/data/core/HavenReactCore.ts`                                          | platform subclasses: `createParts` only                                                           |
-| `packages/shared/src/core/backends.ts`                                                                                                     | `createHavenBackends` — composes every backend once; calls `configureCommunityDataBackendRuntime` |
-| `packages/shared/src/core/bootstrapPhase.ts`                                                                                               | the phase observable                                                                              |
-| `packages/solid-client/src/contexts/SessionProvider.tsx`, `apps/mobile/src/hooks/useAuthSession.ts`                                        | auth boundary — turns a Supabase session into `bootstrapSession` / `clearSession`                 |
-| `packages/shared/src/core/routeRealtimeEvent.ts`                                                                                           | the single shared realtime mutator                                                                |
+| File                                                                                                                                       | Role                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `apps/{tauri,web}/src/main.tsx`, `apps/mobile/index.js`, `apps/mobile/App.tsx`                                                             | host entrypoints — compose the world                                                                 |
+| `apps/tauri/src/bootstrap/createTauriHavenCore.ts`, `apps/web/src/createWebHavenCore.ts`, `apps/mobile/src/data/core/havenCoreRegistry.ts` | per-surface core factories (client + persistence choices)                                            |
+| `packages/shared/src/core/havenCore.ts`                                                                                                    | the shared composition root (construction + `bootstrapSession` + `clearSession` + realtime)          |
+| `packages/solid-client/src/core/HavenSolidCore.ts`, `apps/mobile/src/data/core/HavenReactCore.ts`                                          | platform subclasses: `createParts` only                                                              |
+| `packages/shared/src/core/backends.ts`                                                                                                     | `createHavenBackends` — composes every backend once; calls `configureCommunityDataBackendRuntime`    |
+| `packages/shared/src/core/bootstrapPhase.ts`                                                                                               | the phase observable                                                                                 |
+| `packages/shared/src/debug/perfTrace.ts`, `apps/mobile/index.js`                                                                           | mobile perf log. One `haven-perf` line per mark or span. Disabled until the mobile entry enables it. |
+| `packages/solid-client/src/contexts/SessionProvider.tsx`, `apps/mobile/src/hooks/useAuthSession.ts`                                        | auth boundary — turns a Supabase session into `bootstrapSession` / `clearSession`                    |
+| `packages/shared/src/core/routeRealtimeEvent.ts`                                                                                           | the single shared realtime mutator                                                                   |
 
 ---
 
@@ -337,3 +339,10 @@ domain-cleanup handoff it calls.
   "used before initialized".
 - **Shell gates on `session`, boot UI on `phase`** — they are two different
   signals; don't conflate them.
+- **Mobile perf tracing is opt-in at the entry.** `apps/mobile/index.js` calls
+  `perfTrace.enable()` before it loads the app graph. Lines start with
+  `haven-perf`. Tests and the other surfaces stay quiet until something enables
+  it. Native `did-finish-launching`, `scene-will-connect`, and
+  `start-react-native` show up after the next iOS prebuild, in Console and in
+  Instruments' Points of Interest lane. Those lines carry `origin=native` and
+  are not on the JS elapsed clock.

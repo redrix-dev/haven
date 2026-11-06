@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { requireHavenCore } from "@mobile-data";
 import { dataCacheDebug } from "@shared/debug";
+import { perfTrace } from "@shared/debug/perfTrace";
 import { getMobileSupabase } from "../supabase/getMobileSupabase";
 import { clearAllChannelScrollExits } from "../storage/communityTimelinePrefs";
 import { useAuthStore } from "@mobile-data/session/authStore";
@@ -37,6 +38,7 @@ export function useAuthSession(): Session | null | undefined {
 
     const applySignIn = (userId: string) => {
       if (activeUserIdRef.current === userId) return;
+      perfTrace.markOnce("auth-user");
       activeUserIdRef.current = userId;
       core.links.setSession(userId);
       void core.bootstrapSession(userId).catch((err) => {
@@ -44,23 +46,32 @@ export function useAuthSession(): Session | null | undefined {
       });
     };
 
+    const sessionSpan = perfTrace.begin("auth-session");
     try {
       const supabase = getMobileSupabase();
       useAuthStore.getState().setIsLoading(true);
 
-      void supabase.auth.getSession().then(({ data }) => {
-        const nextSession = data.session ?? null;
-        const userId = nextSession?.user?.id ?? null;
-        if (!userId) {
-          applySignOut();
-        } else {
-          applySignIn(userId);
-        }
-        setSession(nextSession);
-        useAuthStore.getState().setSession(nextSession);
-        useAuthStore.getState().setUser(nextSession?.user ?? null);
-        useAuthStore.getState().setIsLoading(false);
-      });
+      void supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          const nextSession = data.session ?? null;
+          const userId = nextSession?.user?.id ?? null;
+          sessionSpan.end({ signedIn: userId ? 1 : 0 });
+          if (!userId) {
+            applySignOut();
+            perfTrace.flushSummary("auth-signed-out");
+          } else {
+            applySignIn(userId);
+          }
+          setSession(nextSession);
+          useAuthStore.getState().setSession(nextSession);
+          useAuthStore.getState().setUser(nextSession?.user ?? null);
+          useAuthStore.getState().setIsLoading(false);
+        })
+        .catch((error: unknown) => {
+          sessionSpan.end({ error: 1 });
+          throw error;
+        });
 
       const {
         data: { subscription: sub },
@@ -89,6 +100,7 @@ export function useAuthSession(): Session | null | undefined {
       });
       subscription = sub;
     } catch {
+      sessionSpan.end({ error: 1 });
       core.links.setSession(null);
       setSession(null);
       useAuthStore.getState().setSession(null);

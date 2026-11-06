@@ -22,6 +22,7 @@ import type { VoiceSettings } from "@shared/types/settings";
 import { VoiceInputGate } from "@shared/features/voice/utils/inputGate";
 import type { VoiceCaptureLevelSource } from "@shared/features/voice/utils/inputGate";
 import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
+import { perfTrace } from "@shared/debug/perfTrace";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { playMobileVoiceSound } from "./mobileVoiceSounds";
 import {
@@ -109,25 +110,21 @@ function playVoiceControlFeedback(enabled: boolean): void {
 }
 
 type VoiceJoinTimer = {
-  mark: (label: string, details?: Record<string, unknown>) => void;
+  mark: (label: string) => void;
+  finish: (failed?: boolean) => void;
 };
 
-function createVoiceJoinTimer(channelName: string): VoiceJoinTimer {
-  const enabled = typeof __DEV__ !== "undefined" && __DEV__;
-  const startedAt = Date.now();
-  let previousAt = startedAt;
-
+function createVoiceJoinTimer(channelId: string): VoiceJoinTimer {
+  const span = perfTrace.begin("voice.join", { channelId });
+  let closed = false;
   return {
-    mark: (label, details = {}) => {
-      if (!enabled) return;
-      const now = Date.now();
-      console.info("[voice:join]", label, {
-        channelName,
-        elapsedMs: now - startedAt,
-        deltaMs: now - previousAt,
-        ...details,
-      });
-      previousAt = now;
+    mark: (label) => {
+      perfTrace.mark(`voice.join.${label}`, { channelId });
+    },
+    finish: (failed = false) => {
+      if (closed) return;
+      closed = true;
+      span.end(failed ? { error: 1, channelId } : { channelId });
     },
   };
 }
@@ -512,12 +509,13 @@ export function useMobileLiveKitVoiceSession({
     setNotice(null);
     intentionalDisconnectRef.current = false;
     const joinGeneration = (joinGenerationRef.current += 1);
-    const timer = createVoiceJoinTimer(targetChannel.channelName);
-    timer.mark("start", { channelId: targetChannel.channelId });
+    const timer = createVoiceJoinTimer(targetChannel.channelId);
+    timer.mark("start");
+    let joinFailed = false;
 
     try {
       await ensureAndroidVoicePermissions();
-      timer.mark("permissions ready");
+      timer.mark("permissions-ready");
 
       const credentialsPromise = core.voice
         .fetchJoinCredentials(
@@ -525,11 +523,11 @@ export function useMobileLiveKitVoiceSession({
           targetChannel.channelId,
         )
         .then((credentials) => {
-          timer.mark("token ready");
+          timer.mark("token-ready");
           return credentials;
         });
       void credentialsPromise.catch(() => {});
-      timer.mark("token request started");
+      timer.mark("token-request-started");
 
       await AudioSession.configureAudio({
         android: {
@@ -538,22 +536,22 @@ export function useMobileLiveKitVoiceSession({
         },
         ios: { defaultOutput: "speaker" },
       });
-      timer.mark("audio configured");
+      timer.mark("audio-configured");
       await AudioSession.startAudioSession();
-      timer.mark("audio session started");
+      timer.mark("audio-session-started");
       await refreshAudioOutputs();
-      timer.mark("audio outputs refreshed");
+      timer.mark("audio-outputs-refreshed");
       await startVoiceForegroundService(targetChannel.channelName);
-      timer.mark("foreground service ready");
+      timer.mark("foreground-service-ready");
 
       const room = roomRef.current ?? createRoom();
       const controlSessionId = createVoiceControlSessionId();
       roomRef.current = room;
       const { token, serverUrl } = await credentialsPromise;
 
-      timer.mark("room connect started");
+      timer.mark("room-connect-started");
       await room.connect(serverUrl, token, { autoSubscribe: true });
-      timer.mark("room connected");
+      timer.mark("room-connected");
 
       void room.localParticipant
         .setMetadata(
@@ -565,16 +563,14 @@ export function useMobileLiveKitVoiceSession({
           }),
         )
         .then(() => {
-          timer.mark("local metadata set");
+          timer.mark("local-metadata-set");
         })
-        .catch((metadataError: unknown) => {
-          timer.mark("local metadata failed", {
-            message: getErrorMessage(metadataError, "Unknown metadata error."),
-          });
+        .catch(() => {
+          timer.mark("local-metadata-failed");
         });
-      timer.mark("local metadata queued");
+      timer.mark("local-metadata-queued");
       await room.localParticipant.setMicrophoneEnabled(true);
-      timer.mark("microphone enabled");
+      timer.mark("microphone-enabled");
       setLocalMicTrack(
         room.localParticipant.getTrackPublication(Track.Source.Microphone)
           ?.audioTrack ?? null,
@@ -584,7 +580,7 @@ export function useMobileLiveKitVoiceSession({
           () => {},
         );
       }
-      timer.mark("audio output selected");
+      timer.mark("audio-output-selected");
       void playMobileVoiceSound("join", core.voice.getSnapshot().soundSettings);
 
       core.voice.setJoined(true);
@@ -608,19 +604,14 @@ export function useMobileLiveKitVoiceSession({
           avatarUrl: user.avatarUrl ?? null,
         })
         .then(() => {
-          timer.mark("presence published");
+          timer.mark("presence-published");
         })
         .catch((presenceError) => {
           console.warn(
             "[voice] Failed to publish voice presence.",
             presenceError,
           );
-          timer.mark("presence publish failed", {
-            message: getErrorMessage(
-              presenceError,
-              "Failed to publish voice presence.",
-            ),
-          });
+          timer.mark("presence-publish-failed");
         });
 
       void core.voice
@@ -682,12 +673,14 @@ export function useMobileLiveKitVoiceSession({
         joinError,
         "Failed to join voice channel.",
       );
-      timer.mark("failed", { message });
+      joinFailed = true;
+      timer.mark("failed");
       core.voice.setError(message);
       await cleanupVoiceSession();
       setError(message);
       onSessionErrorRef.current?.(message);
     } finally {
+      timer.finish(joinFailed);
       setJoining(false);
     }
   }, [

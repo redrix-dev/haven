@@ -1,6 +1,5 @@
 import "react-native-gesture-handler";
-import { bootLogger } from "@shared/debug/bootLogger";
-bootLogger.mark("js-entry");
+import { perfTrace } from "@shared/debug/perfTrace";
 import { PortalHost } from "@rn-primitives/portal";
 import "./global.css";
 
@@ -25,13 +24,15 @@ import { useMobileThemePreferenceStore } from "./src/stores/mobileThemePreferenc
 import { bootstrapDataCacheDebug } from "./src/debug/bootstrapDataCacheDebug";
 import { MobileDevToolsOverlay } from "./src/dev/MobileDevToolsOverlay";
 
+perfTrace.mark("app-body-start");
 registerMobileAppHost();
-bootLogger.mark("app-host-registered");
+perfTrace.mark("app-host-registered");
 registerGlobals();
+perfTrace.mark("livekit-globals-registered");
 bootstrapDataCacheDebug();
 
 const mobileClient = getMobileSupabase();
-bootLogger.mark("supabase-client-created");
+perfTrace.mark("supabase-client-created");
 const mobileConfig = resolveMobileSupabaseConfig();
 createReactHavenCore({
   client: mobileClient,
@@ -41,7 +42,7 @@ createReactHavenCore({
   },
   persistence: createMmkvPersistence(),
 });
-bootLogger.mark("core-created");
+perfTrace.mark("core-created");
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -60,6 +61,7 @@ function App() {
 
   useLayoutEffect(() => {
     let cancelled = false;
+    const span = perfTrace.begin("theme-storage");
     void (async () => {
       try {
         const raw = await loadPersistedThemeId();
@@ -67,6 +69,7 @@ function App() {
           useMobileThemePreferenceStore.getState().setSelectedThemeId(raw);
         }
       } finally {
+        span.end();
         if (!cancelled) setThemeStorageReady(true);
       }
     })();

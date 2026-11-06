@@ -14,6 +14,7 @@ import type {
   NotificationPreferenceUpdate,
   NotificationPreferences,
 } from "@shared/lib/backend/types";
+import { tracePersist } from "@shared/debug/tracePersist";
 import { createLoadGate, isFresh } from "../kit/loadGate";
 import type { StatePort } from "../kit/statePort";
 import { projectNotifications } from "./notificationSelectors";
@@ -302,9 +303,10 @@ export class NotificationNexus {
         counts: state.counts,
         inboxLastLoadedAt: state.inboxLastLoadedAt,
       };
-      this.persistence.set(
+      tracePersist(
+        this.persistence,
         NEXUS_STORAGE_KEYS.notifications,
-        JSON.stringify(persisted),
+        persisted,
       );
     } catch (error) {
       console.warn("[NotificationNexus] persist failed", error);

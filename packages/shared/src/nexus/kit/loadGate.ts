@@ -1,3 +1,5 @@
+import { perfTrace } from "@shared/debug/perfTrace";
+
 /**
  * One load per key at a time. A second `run` for a key that is already in
  * flight gets the same promise instead of firing a second request, so rapid
@@ -5,6 +7,10 @@
  *
  * This replaces the hand-written `loadInflight` fields and inflight maps every
  * nexus used to carry.
+ *
+ * When perf tracing is on, a new load is one `loadgate` span (`inflight=new`,
+ * `stale=0|1`) and a joined caller is one `loadgate.join` mark. Tracing does
+ * not change which promise callers share.
  */
 export interface LoadGate {
   /**
@@ -45,10 +51,20 @@ export function createLoadGate(): LoadGate {
       task: (stale: () => boolean) => Promise<T>,
     ): Promise<T> {
       const existing = inflight.get(key);
-      if (existing) return existing.promise as Promise<T>;
+      if (existing) {
+        perfTrace.mark("loadgate.join", { key, inflight: "joined" });
+        return existing.promise as Promise<T>;
+      }
 
       const load: Load = { promise: Promise.resolve(), forgotten: false };
-      const promise = (async () => task(() => load.forgotten))().finally(() => {
+      const span = perfTrace.begin("loadgate", { key, inflight: "new" });
+      let sawStale = false;
+      const promise = (async () =>
+        task(() => {
+          if (load.forgotten) sawStale = true;
+          return load.forgotten;
+        }))().finally(() => {
+        span.end({ stale: sawStale ? 1 : 0 });
         // Once forgotten, a newer load may own this key. Only remove our own.
         if (inflight.get(key) === load) inflight.delete(key);
       });

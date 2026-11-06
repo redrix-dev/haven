@@ -1,5 +1,6 @@
 import { createMMKV, type MMKV } from "react-native-mmkv";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import { tracePersistence } from "@shared/debug/tracePersist";
 
 const DEFAULT_STORAGE_ID = "haven-nexus-storage";
 
@@ -19,7 +20,7 @@ export function createMmkvPersistence(
     return mmkv;
   };
 
-  return {
+  return tracePersistence({
     getString(key) {
       const value = getStorage().getString(key);
       return value === undefined ? null : value;
@@ -30,5 +31,5 @@ export function createMmkvPersistence(
     remove(key) {
       getStorage().remove(key);
     },
-  };
+  });
 }

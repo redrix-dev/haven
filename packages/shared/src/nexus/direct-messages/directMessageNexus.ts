@@ -7,6 +7,7 @@ import type {
   DirectMessageConversationSummary,
   DirectMessageReportKind,
 } from "@shared/lib/backend/types";
+import { tracePersist } from "@shared/debug/tracePersist";
 import { createLoadGate, isFresh } from "../kit/loadGate";
 import type { StatePort } from "../kit/statePort";
 import {
@@ -650,9 +651,10 @@ export class DirectMessageNexus {
         activeConversationId: state.activeConversationId,
         composeDraftPeer: state.composeDraftPeer,
       };
-      this.persistence.set(
+      tracePersist(
+        this.persistence,
         NEXUS_STORAGE_KEYS.directMessages,
-        JSON.stringify(persisted),
+        persisted,
       );
     } catch (error) {
       console.warn("[DirectMessageNexus] Failed to persist", error);

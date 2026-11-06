@@ -11,7 +11,7 @@ import type {
   OnboardingCompletionResult,
   ServerSettingsUpdate,
 } from "@shared/lib/backend/types";
-import { bootLogger } from "@shared/debug/bootLogger";
+import { perfTrace } from "@shared/debug/perfTrace";
 import type { ChannelNexus } from "@shared/nexus/channels/channelNexus";
 import type { CommunityNexus } from "@shared/nexus/communities/communityNexus";
 import type { CommunityAdminNexus } from "@shared/nexus/community-management/communityAdminNexus";
@@ -212,25 +212,33 @@ export class HavenCore<
   async bootstrapSession(userId: string): Promise<void> {
     if (!userId) throw new Error("bootstrapSession requires a userId");
     this.sessionUserId = userId;
+    const boot = perfTrace.begin("bootstrap");
 
     try {
       this.phase.set("rehydrating");
-      this.communities.rehydrate();
-      this.communities.loadDisplayOrder(userId);
-      this.channels.rehydrate();
-      this.directMessages.rehydrate();
-      this.notifications.rehydrate();
-      bootLogger.mark("bootstrap-rehydrated");
+      perfTrace.measure("rehydrate.communities", () => {
+        this.communities.rehydrate();
+        this.communities.loadDisplayOrder(userId);
+      });
+      perfTrace.measure("rehydrate.channels", () => {
+        this.channels.rehydrate();
+      });
+      perfTrace.measure("rehydrate.direct-messages", () => {
+        this.directMessages.rehydrate();
+      });
+      perfTrace.measure("rehydrate.notifications", () => {
+        this.notifications.rehydrate();
+      });
 
       this.phase.set("loading_communities");
-      bootLogger.mark("bootstrap-communities-start");
-      try {
-        await this.communities.load(userId);
-      } catch (error) {
-        // The rehydrated list stays; the nexus records the error for the UI.
-        console.warn("[HavenCore] communities.load failed", error);
-      }
-      bootLogger.mark("bootstrap-communities-done");
+      await perfTrace.measure("bootstrap.communities", async () => {
+        try {
+          await this.communities.load(userId);
+        } catch (error) {
+          // The rehydrated list stays; the nexus records the error for the UI.
+          console.warn("[HavenCore] communities.load failed", error);
+        }
+      });
 
       const joinedIds = new Set(this.communities.getCommunityIds());
       for (const id of Object.keys(
@@ -239,41 +247,69 @@ export class HavenCore<
         if (!joinedIds.has(id)) this.permissions.invalidate(id);
       }
       if (joinedIds.size > 0) {
-        bootLogger.mark("bootstrap-permissions-start", {
-          count: joinedIds.size,
-        });
-        await Promise.allSettled(
-          Array.from(joinedIds, (id) => this.ensureCommunityPermissions(id)),
+        await perfTrace.measure(
+          "bootstrap.permissions",
+          async () => {
+            await Promise.allSettled(
+              Array.from(joinedIds, (id) =>
+                perfTrace.measure(
+                  "bootstrap.permission",
+                  () => this.ensureCommunityPermissions(id),
+                  { communityId: id },
+                ),
+              ),
+            );
+          },
+          { count: joinedIds.size },
         );
-        bootLogger.mark("bootstrap-permissions-done");
       }
 
       this.phase.set("loading_session_data");
-      bootLogger.mark("bootstrap-session-data-start");
       const activeCommunityId = this.communities.getActiveId();
-      await Promise.allSettled([
-        this.profiles.ensureViewerProfile(userId),
-        this.profiles.ensurePlatformStaff(userId),
-        this.featureFlags.load(),
-        this.directMessages.ensureConversationsLoaded(),
-        this.notifications.ensureInbox(),
-        this.notifications.ensurePreferences(),
-        this.social.ensureLoaded(),
-      ]);
-      bootLogger.mark("bootstrap-session-data-done");
-      this.syncViewerMessagePolicy(activeCommunityId);
+      await perfTrace.measure("bootstrap.session-data", async () => {
+        await Promise.allSettled([
+          perfTrace.measure("bootstrap.viewer-profile", () =>
+            this.profiles.ensureViewerProfile(userId),
+          ),
+          perfTrace.measure("bootstrap.platform-staff", () =>
+            this.profiles.ensurePlatformStaff(userId),
+          ),
+          perfTrace.measure("bootstrap.feature-flags", () =>
+            this.featureFlags.load(),
+          ),
+          perfTrace.measure("bootstrap.dm-inbox", () =>
+            this.directMessages.ensureConversationsLoaded(),
+          ),
+          perfTrace.measure("bootstrap.notification-inbox", () =>
+            this.notifications.ensureInbox(),
+          ),
+          perfTrace.measure("bootstrap.notification-preferences", () =>
+            this.notifications.ensurePreferences(),
+          ),
+          perfTrace.measure("bootstrap.social", () =>
+            this.social.ensureLoaded(),
+          ),
+        ]);
+      });
+      perfTrace.measure("bootstrap.viewer-policy", () => {
+        this.syncViewerMessagePolicy(activeCommunityId);
+      });
 
       this.phase.set("connecting_realtime");
-      bootLogger.mark("bootstrap-realtime-start");
-      this.subscribeRealtime(userId);
-      bootLogger.mark("bootstrap-realtime-done");
+      perfTrace.measure("bootstrap.realtime", () => {
+        this.subscribeRealtime(userId);
+      });
 
       this.phase.set("ready");
-      bootLogger.mark("bootstrap-ready");
+      boot.end();
+      perfTrace.mark("bootstrap-ready");
+      perfTrace.flushSummary("bootstrap-ready");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error ?? "unknown");
       console.error("[HavenCore] bootstrapSession failed", error);
+      boot.end({ error: 1 });
+      perfTrace.flushSummary("bootstrap-error");
       this.phase.set("error", message);
       throw error;
     }
@@ -493,27 +529,33 @@ export class HavenCore<
     communityId: string,
     options?: { lastVisitedChannelId?: string | null },
   ): Promise<{ channelId: string | null }> {
-    await this.channels.ensureLoaded(communityId);
-    try {
-      await this.ensureCommunityPermissions(communityId);
-    } catch (error) {
-      console.warn("[HavenCore] ensureCommunityPermissions failed", error);
-    }
+    return perfTrace.measure(
+      "prepare-community",
+      async () => {
+        await this.channels.ensureLoaded(communityId);
+        try {
+          await this.ensureCommunityPermissions(communityId);
+        } catch (error) {
+          console.warn("[HavenCore] ensureCommunityPermissions failed", error);
+        }
 
-    const channelId = resolvePreferredChannelIdForServer(
-      this.channels.getChannels(communityId).map(toChannel),
-      {
-        lastVisitedChannelId: options?.lastVisitedChannelId,
-        previousChannelId: this.channels.getActiveChannelId(),
-        lastChannelId: this.channels.getLastChannelId(communityId),
-        defaultChannelId: this.channels.getDefaultChannelId(communityId),
+        const channelId = resolvePreferredChannelIdForServer(
+          this.channels.getChannels(communityId).map(toChannel),
+          {
+            lastVisitedChannelId: options?.lastVisitedChannelId,
+            previousChannelId: this.channels.getActiveChannelId(),
+            lastChannelId: this.channels.getLastChannelId(communityId),
+            defaultChannelId: this.channels.getDefaultChannelId(communityId),
+          },
+        );
+        this.communities.setActiveId(communityId);
+        this.channels.setActiveChannelId(channelId);
+        if (channelId)
+          await this.prepareTextChannelMessages(communityId, channelId);
+        return { channelId };
       },
+      { communityId },
     );
-    this.communities.setActiveId(communityId);
-    this.channels.setActiveChannelId(channelId);
-    if (channelId)
-      await this.prepareTextChannelMessages(communityId, channelId);
-    return { channelId };
   }
 
   /**
@@ -524,25 +566,47 @@ export class HavenCore<
     communityId: string,
     channelId: string,
   ): Promise<void> {
-    this.syncViewerMessagePolicy(communityId);
-    if (this.channels.getChannel(channelId)?.kind !== "text") return;
+    return perfTrace.measure(
+      "prepare-channel",
+      async () => {
+        this.syncViewerMessagePolicy(communityId);
+        if (this.channels.getChannel(channelId)?.kind !== "text") return;
 
-    const messageNexus = this.messages.for(communityId);
-    if (!messageNexus.isCommunityDataAttached()) return;
+        const messageNexus = this.messages.for(communityId);
+        if (!messageNexus.isCommunityDataAttached()) return;
 
-    try {
-      await this.permissions.loadRevokedAuthorIdsForChannel(
-        communityId,
-        channelId,
-      );
-      this.syncViewerMessagePolicy(communityId);
-    } catch (error) {
-      console.warn("[HavenCore] loadRevokedAuthorIdsForChannel failed", error);
-    }
+        try {
+          await perfTrace.measure(
+            "prepare-channel.revoked-authors",
+            () =>
+              this.permissions.loadRevokedAuthorIdsForChannel(
+                communityId,
+                channelId,
+              ),
+            { communityId, channelId },
+          );
+          this.syncViewerMessagePolicy(communityId);
+        } catch (error) {
+          console.warn(
+            "[HavenCore] loadRevokedAuthorIdsForChannel failed",
+            error,
+          );
+        }
 
-    await messageNexus.ensureInitialLoaded(channelId);
-    // Current author identities, so avatars render fresh. Never blocks messages.
-    void this.primeMessageAuthorProfiles(communityId, channelId);
+        await perfTrace.measure(
+          "prepare-channel.messages",
+          () => messageNexus.ensureInitialLoaded(channelId),
+          { communityId, channelId },
+        );
+        // Current author identities, so avatars render fresh. Never blocks messages.
+        void perfTrace.measure(
+          "prepare-channel.author-profiles",
+          () => this.primeMessageAuthorProfiles(communityId, channelId),
+          { communityId, channelId },
+        );
+      },
+      { communityId, channelId },
+    );
   }
 
   /** Get a DM thread ready to show: its messages, and mark it read unless told not to. */
@@ -906,7 +970,7 @@ async function warm(
   task: () => Promise<unknown>,
 ): Promise<void> {
   try {
-    await task();
+    await perfTrace.measure("warm", task, { step: label });
   } catch (error) {
     console.warn(`[HavenCore warm-up] ${label} failed`, error);
   }

@@ -1,6 +1,31 @@
 internal import Expo
+import os
 import React
 import UIKit
+
+// haven-perf native boot marks are DEBUG-only — compiled out of release builds
+// so the tracer never runs or logs in production.
+#if DEBUG
+private let havenPerfLog = Logger(
+  subsystem: "com.redrix.haven.mobile",
+  category: "haven-perf"
+)
+
+/// Points of Interest signpost log for the Instruments timeline. `OSLog.pointsOfInterest`
+/// is not a real member; the Points of Interest category is built explicitly.
+private let havenSignpostLog = OSLog(
+  subsystem: "com.redrix.haven.mobile",
+  category: .pointsOfInterest
+)
+
+/// Dot decimal, independent of the device locale. `String(format:)` would print `12,3` in de_DE.
+private func havenPerfMilliseconds(_ ms: Double) -> String {
+  let tenths = Int((ms * 10).rounded())
+  let sign = tenths < 0 ? "-" : ""
+  let absolute = abs(tenths)
+  return "\(sign)\(absolute / 10).\(absolute % 10)"
+}
+#endif
 
 /// Scene delegate (UIScene lifecycle). iOS 27 terminates apps that have not adopted scenes, and
 /// Expo SDK 55 ships no scene delegate (SDK 57 adds `ExpoAppSceneDelegate`; this mirrors it).
@@ -21,6 +46,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     willConnectTo session: UISceneSession,
     options connectionOptions: UIScene.ConnectionOptions
   ) {
+    #if DEBUG
+    let line = "[haven-perf] kind=mark name=scene-will-connect origin=native"
+    havenPerfLog.notice("\(line, privacy: .public)")
+    os_signpost(.event, log: havenSignpostLog, name: "scene-will-connect")
+    #endif
+
     guard let windowScene = scene as? UIWindowScene else { return }
     guard let appDelegate, let factory = appDelegate.reactNativeFactory else {
       fatalError("SceneDelegate: AppDelegate must create reactNativeFactory in didFinishLaunching")
@@ -36,14 +67,29 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     let browsingWebActivity = connectionOptions.userActivities.first {
       $0.activityType == NSUserActivityTypeBrowsingWeb
     }
-    factory.startReactNative(
-      withModuleName: "main",
-      in: window,
-      launchOptions: Self.launchOptions(
-        url: connectionOptions.urlContexts.first?.url,
-        userActivity: browsingWebActivity
+    do {
+      #if DEBUG
+      let signpostLog = havenSignpostLog
+      let signpostId = OSSignpostID(log: signpostLog)
+      let started = CFAbsoluteTimeGetCurrent()
+      os_signpost(.begin, log: signpostLog, name: "start-react-native", signpostID: signpostId)
+      defer {
+        os_signpost(.end, log: signpostLog, name: "start-react-native", signpostID: signpostId)
+        let durationMs = (CFAbsoluteTimeGetCurrent() - started) * 1000
+        let reactLine =
+          "[haven-perf] kind=span name=start-react-native duration=\(havenPerfMilliseconds(durationMs)) origin=native"
+        havenPerfLog.notice("\(reactLine, privacy: .public)")
+      }
+      #endif
+      factory.startReactNative(
+        withModuleName: "main",
+        in: window,
+        launchOptions: Self.launchOptions(
+          url: connectionOptions.urlContexts.first?.url,
+          userActivity: browsingWebActivity
+        )
       )
-    )
+    }
 
     connectionOptions.urlContexts.forEach { open($0) }
     connectionOptions.userActivities.forEach { continueActivity($0) }
