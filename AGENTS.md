@@ -115,3 +115,11 @@ This file is the quick index. Load the relevant project skill under
   consolidate only when a real third surface needs it.
 - Desktop voice popout routing exists, but the launcher is hidden until
   cross-window sync moves off BroadcastChannel and onto a Tauri-safe event path.
+- `expo-modules-core` is pinned at 58.0.28 and carries
+  `apps/mobile/patches/expo-modules-core+58.0.28.patch` (matches Expo PR #52631)
+  because 58.0.28 built from source crashes `swift-frontend` under Xcode 27.2 /
+  Swift 6.4.2 (SIL-gen, `switch consume` + `as any Error` cast —
+  swiftlang/swift#93625, expo/expo#52610). Fixed upstream in 58.0.29+. Revisit
+  dropping the patch when upgrading `expo`/`expo-modules-core` looks stable; the
+  postinstall guard `tooling/scripts/mobile/check-expo-modules-core-patch.mjs`
+  shouts once the installed version moves past 58.0.28.

@@ -1,0 +1,21 @@
+diff --git a/node_modules/expo-modules-core/ios/Core/Functions/AsyncFunctionDefinition.swift b/node_modules/expo-modules-core/ios/Core/Functions/AsyncFunctionDefinition.swift
+index 48ee585..51e0861 100644
+--- a/node_modules/expo-modules-core/ios/Core/Functions/AsyncFunctionDefinition.swift
++++ b/node_modules/expo-modules-core/ios/Core/Functions/AsyncFunctionDefinition.swift
+@@ -194,10 +194,15 @@ public class AsyncFunctionDefinition<Args, FirstArgType, ReturnType>: AnyAsyncFu
+       let promiseValue = promise.asValue()
+ 
+       self.call(appContext, this: this, arguments: arguments) { [promise] result in
++        // Haven patch (patches/expo-modules-core+58.0.28.patch): matches Expo PR #52631.
++        // The `as any Error` cast inside `switch consume` segfaults swift-frontend during
++        // SIL-gen (emitDestructiveCaseBlocks) on Swift 6.4.2 / Xcode 27.2 — swiftlang/swift#93625.
++        // `consume` stays (resolve/reject take ownership of the payload); dropping the
++        // redundant cast avoids the crash. Fixed upstream in 58.0.29+; drop this on upgrade.
+         switch consume result {
+         case .success(let value):
+           promise.resolve(value)
+-        case .failure(let error as any Error):
++        case .failure(let error):
+           promise.reject(error)
+         }
+       }
