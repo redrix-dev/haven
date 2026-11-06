@@ -15,9 +15,21 @@ description: Use when starting, scoping, testing, finishing, or handing off any 
 3. Base feature/fix/docs work on `staging`.
    - `git switch staging`
    - `git pull --ff-only origin staging`
-   - `git switch -c <type>/<short-name>`
+   - `git switch -c <type>/hav-<n>-<short-name>` (e.g. `fix/hav-12-voice-gate`)
+   - If no ticket exists, create one in the Linear Haven team first.
+   - Exception: trivial chores (typo, formatting) may use
+     `<type>/<short-name>`.
 4. Do not merge `main` into feature work unless the release workflow explicitly
    calls for it. `main` is promotion, not the day-to-day base.
+
+## Commits And Merging
+
+- Every commit on a ticketed branch includes `Fixes HAV-<n>` in the message
+  body. The Conventional Commit subject stays as-is.
+- PRs target `staging`. Merge with a merge commit. Never squash or
+  rebase-merge, for feature → staging or staging → main.
+- After a release merges to `main`, merge `main` back into `staging` so release
+  tags are reachable from staging.
 
 ## Runtime And Install Discipline
 
@@ -82,6 +94,7 @@ description: Use when starting, scoping, testing, finishing, or handing off any 
 ## Before Handoff
 
 - Run `git status --short --branch`.
+- Confirm the PR title or branch carries the HAV ID so Linear linked it.
 - State exactly which validation commands passed.
 - State which expected commands were not run and why.
 - Include doc updates in the same change when behavior or architecture changed.

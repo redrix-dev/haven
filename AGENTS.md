@@ -11,6 +11,8 @@ This file is the quick index. Load the relevant project skill under
 
 - Treat `staging` as the integration truth. New feature/fix branches start from
   `staging`, not `main`; promotion to `main` only happens after staged signoff.
+- Work is tracked in the Linear Haven team (`HAV-<n>`). Branch naming, commit
+  message, and merge rules are in `haven-branch-ci-gates`.
 - Read [docs/PRINCIPLES.md](docs/PRINCIPLES.md) before architectural work.
   The prime rule is understandable correctness.
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before moving state,
@@ -122,4 +124,5 @@ This file is the quick index. Load the relevant project skill under
   swiftlang/swift#93625, expo/expo#52610). Fixed upstream in 58.0.29+. Revisit
   dropping the patch when upgrading `expo`/`expo-modules-core` looks stable; the
   postinstall guard `tooling/scripts/mobile/check-expo-modules-core-patch.mjs`
-  shouts once the installed version moves past 58.0.28.
+  shouts once the installed version moves past 58.0.28. Tracked in
+  redrix-dev/haven#100.

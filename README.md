@@ -136,7 +136,7 @@ npm run test:report    # Human-readable proof report with full logs
 
 **Haven works and is parked.** `2.1.0` is a deliberate stopping point: the iOS client is on TestFlight, the desktop and web clients are rebuilt on Tauri + Solid against the same shared core, and the previous Electron and React web clients were retired in June 2026.
 
-There is no active user base. Haven was built for a small group of friends who have since moved on, and it is maintained by one person in the open, in bursts, rather than continuously. That shapes what you should expect: the code, tests, and docs are kept honest and current, but issues and pull requests may sit for a while, and features arrive when there is a reason to build them.
+There is no active user base. Haven was built for a small group of friends who have since moved on, and it is maintained by one person in the open, in bursts, rather than continuously. That shapes what you should expect: the code, tests, and docs are kept honest and current, but issues and pull requests may sit for a while, and features arrive when there is a reason to build them. Bugs and requests go in [GitHub Issues](https://github.com/redrix-dev/haven/issues) on this repo and sync to the internal tracker.
 
 If you want to run it, the [documentation](docs/README.md) is written to be enough to stand it up against your own Supabase project.
 

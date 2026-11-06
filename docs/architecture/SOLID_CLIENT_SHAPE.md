@@ -210,8 +210,9 @@ caller's tracking scope. `void someAsyncThing()` inside an effect still
 subscribes to whatever that function reads on its way to the first `await`.
 This is what makes the class near-invisible in review.
 
-**A settling effect is not a defended one.** Measured under RED-50 and again
-after the shared-nexus cutover: every naked effect on the settings and community
+**A settling effect is not a defended one.** Measured when this rule landed
+(commit `1fe7693`) and again after the shared-nexus cutover: every naked effect
+on the settings and community
 surfaces already settled, because the nexus's `LoadGate` made the retriggered
 call join the load in flight. The defense was an implementation detail one
 dedupe away from vanishing. Judge an effect by whether it reads a store it
