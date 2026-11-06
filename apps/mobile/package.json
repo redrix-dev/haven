@@ -2,7 +2,7 @@
   "name": "haven-mobile",
   "version": "0.0.0",
   "private": true,
-  "main": "expo/AppEntry.js",
+  "main": "index.js",
   "engines": {
     "node": ">=24.22.1 <25"
   },

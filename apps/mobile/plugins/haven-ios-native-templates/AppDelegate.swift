@@ -1,8 +1,33 @@
 internal import Expo
+import os
 import PushKit
 import React
 import ReactAppDependencyProvider
 import UIKit
+
+// haven-perf native boot marks are DEBUG-only — compiled out of release builds
+// so the tracer never runs or logs in production.
+#if DEBUG
+private let havenPerfLog = Logger(
+  subsystem: "com.redrix.haven.mobile",
+  category: "haven-perf"
+)
+
+/// Points of Interest signpost log for the Instruments timeline. `OSLog.pointsOfInterest`
+/// is not a real member; the Points of Interest category is built explicitly.
+private let havenSignpostLog = OSLog(
+  subsystem: "com.redrix.haven.mobile",
+  category: .pointsOfInterest
+)
+
+/// Dot decimal, independent of the device locale. `String(format:)` would print `12,3` in de_DE.
+private func havenPerfMilliseconds(_ ms: Double) -> String {
+  let tenths = Int((ms * 10).rounded())
+  let sign = tenths < 0 ? "-" : ""
+  let absolute = abs(tenths)
+  return "\(sign)\(absolute / 10).\(absolute % 10)"
+}
+#endif
 
 /// iOS app delegate (Expo SDK 55 template + VoIP + UIScene lifecycle). It creates the React Native
 /// factory; `SceneDelegate` owns the window and calls `startReactNative` when the scene connects,
@@ -19,6 +44,20 @@ class AppDelegate: ExpoAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    #if DEBUG
+    let signpostLog = havenSignpostLog
+    let signpostId = OSSignpostID(log: signpostLog)
+    let started = CFAbsoluteTimeGetCurrent()
+    os_signpost(.begin, log: signpostLog, name: "did-finish-launching", signpostID: signpostId)
+    defer {
+      os_signpost(.end, log: signpostLog, name: "did-finish-launching", signpostID: signpostId)
+      let durationMs = (CFAbsoluteTimeGetCurrent() - started) * 1000
+      let line =
+        "[haven-perf] kind=span name=did-finish-launching duration=\(havenPerfMilliseconds(durationMs)) origin=native"
+      havenPerfLog.notice("\(line, privacy: .public)")
+    }
+    #endif
+
     let reactDelegate = ReactNativeDelegate()
     let factory = ExpoReactNativeFactory(delegate: reactDelegate)
     reactDelegate.dependencyProvider = RCTAppDependencyProvider()

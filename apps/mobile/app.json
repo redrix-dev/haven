@@ -31,6 +31,7 @@
       "@config-plugins/react-native-webrtc",
       "./plugins/withAndroidVoiceForegroundService",
       "./plugins/withHavenVoiceSounds",
+      "./plugins/withHavenPerfLog",
       "expo-notifications",
       [
         "expo-camera",

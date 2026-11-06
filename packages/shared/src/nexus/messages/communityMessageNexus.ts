@@ -1,3 +1,4 @@
+import { tracePersist } from "@shared/debug/tracePersist";
 import type { NexusEntry } from "@shared/core/cache/entityTypes";
 import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
@@ -607,7 +608,7 @@ export class CommunityMessageNexus {
         initialLoadComplete: state.initialLoadComplete,
         entities: state.entities,
       });
-      this.persistence.set(this.storageKey, JSON.stringify(snapshot));
+      tracePersist(this.persistence, this.storageKey, snapshot);
     } catch (error) {
       console.warn("[CommunityMessageNexus] Failed to persist", error);
     }

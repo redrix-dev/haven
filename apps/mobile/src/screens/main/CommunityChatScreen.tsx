@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +42,7 @@ import {
   useProfilesRecord,
   useVisibleChannel,
 } from "@mobile-data/hooks";
+import { perfTrace } from "@shared/debug/perfTrace";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { getMessageActions } from "@shared/features/messaging/logic";
 import { MEDIA_ONLY_CONTENT_PLACEHOLDER } from "@shared/lib/backend/mediaAttachmentUtils";
@@ -173,6 +181,20 @@ export function CommunityChatScreen({
   ]);
 
   const activeChannelIdForLoad = activeChannelId;
+
+  useLayoutEffect(() => {
+    if (
+      perfTrace.markOnce("chat-first-commit", {
+        serverId,
+        channelId: activeChannelId ?? "",
+      })
+    ) {
+      perfTrace.flushSummary("chat-first-commit");
+    }
+    // First layout of this screen only. Later channel switches stay on the
+    // prepare-channel spans; this mark is the cold-start paint.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!communityId || !activeChannelIdForLoad) return;

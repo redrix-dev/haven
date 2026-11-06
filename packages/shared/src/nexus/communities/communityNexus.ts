@@ -10,6 +10,7 @@ import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend.interface";
 import type { ServerSummary } from "@shared/lib/backend/types";
+import { tracePersist } from "@shared/debug/tracePersist";
 import { messageFromError } from "../kit/errors";
 import { createLoadGate } from "../kit/loadGate";
 import type { StatePort } from "../kit/statePort";
@@ -220,10 +221,7 @@ export class CommunityNexus {
         orderedIds: state.orderedIds,
         activeId: state.activeId,
       };
-      this.persistence.set(
-        NEXUS_STORAGE_KEYS.communities,
-        JSON.stringify(persisted),
-      );
+      tracePersist(this.persistence, NEXUS_STORAGE_KEYS.communities, persisted);
     } catch (error) {
       console.warn("[CommunityNexus] Failed to persist", error);
     }

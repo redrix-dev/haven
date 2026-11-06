@@ -1,3 +1,4 @@
+import { perfTrace } from "@shared/debug/perfTrace";
 import { useHavenCore } from "@mobile-data";
 import {
   useCampaigns,
@@ -31,18 +32,26 @@ export function MobileOnboardingGate({ children }: MobileOnboardingGateProps) {
   const completionError = useCompletionError(core.onboarding);
 
   const loadCampaigns = useCallback(() => {
-    void core.onboarding.load(context).catch((loadError) => {
-      console.warn("[MobileOnboardingGate] load failed", loadError);
-    });
+    const span = perfTrace.begin("onboarding-campaigns");
+    void core.onboarding
+      .load(context)
+      .catch((loadError) => {
+        console.warn("[MobileOnboardingGate] load failed", loadError);
+      })
+      .finally(() => {
+        span.end();
+      });
   }, [context, core]);
 
   useEffect(() => {
     let cancelled = false;
+    const span = perfTrace.begin("onboarding-assets");
     void Asset.loadAsync(MOBILE_ONBOARDING_ASSETS)
       .catch((assetError) => {
         console.warn("[MobileOnboardingGate] asset preload failed", assetError);
       })
       .finally(() => {
+        span.end();
         if (!cancelled) setAssetsLoaded(true);
       });
 

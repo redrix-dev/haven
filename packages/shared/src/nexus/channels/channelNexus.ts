@@ -10,6 +10,7 @@ import type {
   ChannelPermissionState,
   ChannelPermissionsSnapshot,
 } from "@shared/lib/backend/types";
+import { tracePersist } from "@shared/debug/tracePersist";
 import { messageFromError } from "../kit/errors";
 import { createLoadGate } from "../kit/loadGate";
 import { omitKey } from "../kit/records";
@@ -612,10 +613,7 @@ export class ChannelNexus {
         activeChannelId: state.activeChannelId,
         lastChannelByCommunity: state.lastChannelByCommunity,
       };
-      this.persistence.set(
-        NEXUS_STORAGE_KEYS.channels,
-        JSON.stringify(persisted),
-      );
+      tracePersist(this.persistence, NEXUS_STORAGE_KEYS.channels, persisted);
     } catch (error) {
       console.warn("[ChannelNexus] Failed to persist", error);
     }

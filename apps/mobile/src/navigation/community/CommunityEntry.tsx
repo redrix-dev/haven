@@ -6,6 +6,7 @@ import {
   resolveCommunityEntrypointTarget,
   toServerSummaries,
 } from "@shared/core";
+import { perfTrace } from "@shared/debug/perfTrace";
 import {
   applyCommunityFocus,
   useBootstrapPhase,
@@ -41,42 +42,49 @@ export function CommunityEntry({ navigation }: Props) {
 
     routedRef.current = true;
     const routeToCommunity = async () => {
-      const servers = toServerSummaries(communities);
-      if (servers.length === 0) {
-        navigation.replace("Community", { serverId: null, openDrawer: true });
-        return;
-      }
+      await perfTrace.measure("community-entry", async () => {
+        const servers = toServerSummaries(communities);
+        if (servers.length === 0) {
+          perfTrace.mark("community-entry.navigate", { serverId: "" });
+          navigation.replace("Community", { serverId: null, openDrawer: true });
+          return;
+        }
 
-      const activeCommunityId = core.communities.getActiveId();
-      const target = resolveCommunityEntrypointTarget({
-        activeCommunityId,
-        communityIds: servers.map((server) => server.id),
-      });
-      const targetCommunityId = target.communityId;
+        const activeCommunityId = core.communities.getActiveId();
+        const target = resolveCommunityEntrypointTarget({
+          activeCommunityId,
+          communityIds: servers.map((server) => server.id),
+        });
+        const targetCommunityId = target.communityId;
 
-      if (!targetCommunityId) {
-        navigation.replace("Community", { serverId: null, openDrawer: true });
-        return;
-      }
+        if (!targetCommunityId) {
+          perfTrace.mark("community-entry.navigate", { serverId: "" });
+          navigation.replace("Community", { serverId: null, openDrawer: true });
+          return;
+        }
 
-      try {
-        await core.prepareCommunityEntry(targetCommunityId);
-        await core.warmCommunitySurface(targetCommunityId);
-      } catch (error) {
-        console.warn("[CommunityEntry] prepareCommunityEntry failed", error);
-        applyCommunityFocus(core, targetCommunityId);
-      }
+        try {
+          await core.prepareCommunityEntry(targetCommunityId);
+          await core.warmCommunitySurface(targetCommunityId);
+        } catch (error) {
+          console.warn("[CommunityEntry] prepareCommunityEntry failed", error);
+          applyCommunityFocus(core, targetCommunityId);
+        }
 
-      if (userId) {
-        await core.warmSessionSurfaces(userId);
-      }
+        if (userId) {
+          await core.warmSessionSurfaces(userId);
+        }
 
-      const lastSurface = target.restoredActiveCommunity
-        ? await getLastCommunitySurface()
-        : null;
-      navigation.replace("Community", {
-        serverId: targetCommunityId,
-        openDrawer: lastSurface !== "chat",
+        const lastSurface = target.restoredActiveCommunity
+          ? await getLastCommunitySurface()
+          : null;
+        perfTrace.mark("community-entry.navigate", {
+          serverId: targetCommunityId,
+        });
+        navigation.replace("Community", {
+          serverId: targetCommunityId,
+          openDrawer: lastSurface !== "chat",
+        });
       });
     };
 
