@@ -95,6 +95,10 @@ If `docs/releases/<tag>.md` is absent, the workflow falls back to a generic
 "installer below / auto-updates" body — so a missing notes file degrades safely
 rather than leaking anything.
 
+The command suite doesn't cover how the native apps feel to use. For that, build
+the same `staging` commit locally on each host as described in
+[LOCAL_NATIVE_TESTING.md](./LOCAL_NATIVE_TESTING.md).
+
 ---
 
 ## All-platforms release (coordinated)
