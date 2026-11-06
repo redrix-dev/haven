@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 // When you upgrade to >= 58.0.29 and confirm a clean iOS build under current
 // Xcode: delete patches/expo-modules-core+58.0.28.patch, this script (drop it
 // from apps/mobile package.json postinstall), the AGENTS.md "Known Rough Edges"
-// entry, and close the tracking Linear ticket.
+// entry, and close HAV-1.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
