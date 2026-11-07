@@ -35,6 +35,9 @@ implemented. There is no public Room API for separately cancelling its reader.
 postinstall. It validates the exact SDK version and every replacement before
 writing. It patches the SDK source and both shipped bundles (ESM and minified
 UMD); changing only TypeScript source would leave Metro's runtime unchanged.
+CI caches installed dependencies, including these mutations. Its cache key includes
+package manifests, mobile scripts, and patch files as well as lockfiles, so changing
+a postinstall hook cannot restore an older, unpatched SDK from cache.
 
 The patch closes signalling before awaiting native peer disposal, with peer
 cleanup in `finally`. It treats read failures as debug diagnostics only for a
