@@ -41,7 +41,7 @@
     "ios:device": "npm run run:ios:device",
     "android": "npm run run:android",
     "prebuild": "npm run native:prebuild",
-    "postinstall": "patch-package && node ../../tooling/scripts/mobile/patch-expo-cli-lockdown-debug.mjs && node ../../tooling/scripts/mobile/check-expo-modules-core-patch.mjs"
+    "postinstall": "patch-package && node ../../tooling/scripts/mobile/patch-expo-cli-lockdown-debug.mjs && node ../../tooling/scripts/mobile/check-expo-modules-core-patch.mjs && node ../../tooling/scripts/mobile/patch-livekit-signal-teardown.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^15.0.2",
