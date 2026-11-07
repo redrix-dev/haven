@@ -96,7 +96,7 @@
         "expo-channel-name": "production"
       }
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.0",
     "extra": {
       "supabaseUrl": "",
       "supabaseAnonKey": "",

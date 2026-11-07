@@ -37,11 +37,11 @@ type VolumeProcessedEvent = {
 /**
  * Subscribe to the native capture-level monitor for a local mic track.
  *
- * The renderer measures the microphone before RTP, so readings keep arriving
- * while the transmission gate has the sender's encoding deactivated — the
- * state where iOS sender stats report no capture level at all. Every reading
- * calls `onLevel`, including silence (0): the LiveKit `useTrackVolume` hook
- * drops zero readings, so it cannot be used where freshness matters.
+ * The renderer measures before RTP. The caller must explicitly keep the SDK's
+ * recording prepared while encoding gating stops transmission; without that,
+ * the renderer also loses its input. Every reading calls `onLevel`, including
+ * repeated silence (0). `useTrackVolume` exposes a React value rather than
+ * reading arrivals, so it cannot establish freshness when the value repeats.
  *
  * Returns a stop function, or null when this platform has no monitor.
  */

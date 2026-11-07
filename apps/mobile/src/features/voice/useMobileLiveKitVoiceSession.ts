@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
 import * as Haptics from "expo-haptics";
 import { AndroidAudioTypePresets, AudioSession } from "@livekit/react-native";
+import { AudioDeviceModule } from "@livekit/react-native-webrtc";
 import {
   ConnectionState,
   Room,
@@ -29,6 +30,7 @@ import {
   monitorNativeCaptureLevel,
   type NativeCaptureTrack,
 } from "./mobileVoiceCaptureMonitor";
+import { CaptureRecordingController } from "./mobileVoiceCaptureRecording";
 import {
   createVoiceControlSessionId,
   readVoiceControlSessionId,
@@ -216,14 +218,40 @@ export function useMobileLiveKitVoiceSession({
   );
   // Native capture measurement for the gate. Readings arrive from the native
   // volume processor about every 40 ms — including silence — so freshness is
-  // keyed to the arrival, not to React state changes. (The LiveKit
-  // `useTrackVolume` hook drops zero readings, which would make exact silence
-  // look like a stale frozen speech level.)
+  // keyed to the arrival, not to React state changes. `useTrackVolume` exposes
+  // a value, not sample arrivals; repeated equal readings need fresh timestamps.
   const nativeCaptureSampleRef = useRef<{
     level: number;
     updatedAt: number;
   } | null>(null);
+  // Serialize the SDK's explicit recording requests across mute/leave/rejoin.
+  // Holding recording independently of RTP keeps native meter callbacks alive.
+  const nativeRecording = useMemo(
+    () =>
+      new CaptureRecordingController(
+        {
+          start: () => AudioDeviceModule.startLocalRecording(),
+          setPrepared: (enabled) =>
+            AudioDeviceModule.setRecordingAlwaysPreparedMode(enabled),
+          stop: () => AudioDeviceModule.stopLocalRecording(),
+          isRecording: () => AudioDeviceModule.isRecording(),
+        },
+        (enabled) =>
+          perfTrace.mark(
+            enabled ? "voice.capture.start" : "voice.capture.stop",
+          ),
+      ),
+    [],
+  );
+  const setNativeRecording = useCallback(
+    (enabled: boolean): Promise<void> =>
+      Platform.OS === "ios"
+        ? nativeRecording.setEnabled(enabled)
+        : Promise.resolve(),
+    [nativeRecording],
+  );
   useEffect(() => {
+    nativeCaptureSampleRef.current = null;
     if (Platform.OS !== "ios" || !localMicTrack) return;
     const stop = monitorNativeCaptureLevel(
       localMicTrack.mediaStreamTrack as NativeCaptureTrack,
@@ -231,7 +259,10 @@ export function useMobileLiveKitVoiceSession({
         nativeCaptureSampleRef.current = { level, updatedAt: Date.now() };
       },
     );
-    return stop ?? undefined;
+    return () => {
+      stop?.();
+      nativeCaptureSampleRef.current = null;
+    };
   }, [localMicTrack]);
   const speakingRef = useRef<ReadonlyMap<string, boolean>>(new Map());
   const [outputDevices, setOutputDevices] = useState<MobileVoiceOutputOption[]>(
@@ -362,6 +393,10 @@ export function useMobileLiveKitVoiceSession({
     stopInputLevelPolling();
     const gate = new VoiceInputGate();
     const generation = joinGenerationRef.current;
+    let source = "sender-stats";
+    let sampleAgeMs = -1;
+    let previousTraceState = "";
+    let lastTraceAt = -Infinity;
     // iOS sender stats report zero while the gate has the encoding
     // deactivated, so the gate reopens from the native capture monitor; a
     // stale monitor falls back to sender stats rather than holding the gate.
@@ -370,11 +405,12 @@ export function useMobileLiveKitVoiceSession({
         ? {
             get: () => {
               const sample = nativeCaptureSampleRef.current;
-              if (!sample) return undefined;
-              return Date.now() - sample.updatedAt <=
-                NATIVE_CAPTURE_LEVEL_MAX_AGE_MS
-                ? sample.level
-                : undefined;
+              sampleAgeMs = sample ? Date.now() - sample.updatedAt : -1;
+              const fresh =
+                sample !== null &&
+                sampleAgeMs <= NATIVE_CAPTURE_LEVEL_MAX_AGE_MS;
+              source = fresh ? "native-capture" : "sender-stats";
+              return fresh ? sample.level : undefined;
             },
           }
         : undefined;
@@ -387,7 +423,7 @@ export function useMobileLiveKitVoiceSession({
       if (!sender || sampling) return;
       sampling = true;
       try {
-        const { level, gateOpen } = await gate.sample(
+        let { level, gateOpen } = await gate.sample(
           sender,
           voiceSettingsRef.current,
           () => {
@@ -402,11 +438,48 @@ export function useMobileLiveKitVoiceSession({
           false,
           captureLevelSource,
         );
+        const beforeRecording = core.voice.getSnapshot();
+        if (
+          Platform.OS === "ios" &&
+          !beforeRecording.isMuted &&
+          !beforeRecording.isDeafened &&
+          generation === joinGenerationRef.current
+        )
+          await nativeRecording.ensureRecording();
         if (
           generation !== joinGenerationRef.current ||
           !inputLevelIntervalRef.current
         )
           return;
+        const snapshot = core.voice.getSnapshot();
+        const blocked = snapshot.isMuted || snapshot.isDeafened;
+        if (blocked) {
+          level = 0;
+          gateOpen = false;
+        }
+        const settings = voiceSettingsRef.current;
+        const traceState = `${source}:${gateOpen}:${blocked}:${settings.transmissionMode}:${settings.voiceActivationThreshold}`;
+        const now = Date.now();
+        if (traceState !== previousTraceState || now - lastTraceAt >= 1000) {
+          previousTraceState = traceState;
+          lastTraceAt = now;
+          perfTrace.mark("voice.input-gate", {
+            source,
+            sampleAgeMs,
+            levelPercent: level * 100,
+            threshold: settings.voiceActivationThreshold,
+            mode: settings.transmissionMode,
+            gateOpen,
+            blocked,
+            trackEnabled: sender.track?.enabled ?? false,
+            recording:
+              Platform.OS === "ios" ? AudioDeviceModule.isRecording() : false,
+            prepared:
+              Platform.OS === "ios"
+                ? AudioDeviceModule.isRecordingAlwaysPreparedMode()
+                : false,
+          });
+        }
         setLocalInputLevel((previous) =>
           Math.abs(previous - level) > 0.01 ? level : previous,
         );
@@ -426,7 +499,7 @@ export function useMobileLiveKitVoiceSession({
         sampling = false;
       }
     }, INPUT_LEVEL_INTERVAL_MS);
-  }, [core.voice, stopInputLevelPolling]);
+  }, [core.voice, nativeRecording, stopInputLevelPolling]);
 
   const cleanupVoiceSession = useCallback((): Promise<void> => {
     if (cleanupPromiseRef.current) return cleanupPromiseRef.current;
@@ -469,10 +542,18 @@ export function useMobileLiveKitVoiceSession({
             "leave",
             core.voice.getSnapshot().soundSettings,
           );
-        room?.disconnect();
+        await room?.disconnect();
       } catch {
         // Ignore disconnect races.
       }
+      try {
+        await setNativeRecording(false);
+      } catch (error) {
+        setError(
+          getErrorMessage(error, "Could not stop microphone recording."),
+        );
+      }
+      nativeCaptureSampleRef.current = null;
       try {
         await AudioSession.stopAudioSession();
       } catch {
@@ -490,7 +571,7 @@ export function useMobileLiveKitVoiceSession({
     });
     cleanupPromiseRef.current = pending;
     return pending;
-  }, [core.voice, stopInputLevelPolling]);
+  }, [core.voice, setNativeRecording, stopInputLevelPolling]);
 
   const joinVoiceChannel = useCallback(async () => {
     const targetChannel = activeChannelRef.current;
@@ -569,6 +650,8 @@ export function useMobileLiveKitVoiceSession({
           timer.mark("local-metadata-failed");
         });
       timer.mark("local-metadata-queued");
+      const snapshot = core.voice.getSnapshot();
+      await setNativeRecording(!snapshot.isMuted && !snapshot.isDeafened);
       await room.localParticipant.setMicrophoneEnabled(true);
       timer.mark("microphone-enabled");
       setLocalMicTrack(
@@ -691,6 +774,7 @@ export function useMobileLiveKitVoiceSession({
     refreshAudioOutputs,
     selectedOutputDeviceId,
     startInputLevelPolling,
+    setNativeRecording,
   ]);
 
   const toggleMute = useCallback(() => {
@@ -797,6 +881,11 @@ export function useMobileLiveKitVoiceSession({
     };
     const handleDisconnected = () => {
       stopInputLevelPolling();
+      void setNativeRecording(false).catch((error) => {
+        setError(
+          getErrorMessage(error, "Could not stop microphone recording."),
+        );
+      });
       setLocalMicTrack(null);
       setConnectionState(ConnectionState.Disconnected);
       core.voice.setVoiceConnected(false);
@@ -834,7 +923,12 @@ export function useMobileLiveKitVoiceSession({
         .off(RoomEvent.ParticipantMetadataChanged, syncParticipants)
         .off(RoomEvent.ParticipantNameChanged, syncParticipants);
     };
-  }, [applyParticipants, core.voice, stopInputLevelPolling]);
+  }, [
+    applyParticipants,
+    core.voice,
+    setNativeRecording,
+    stopInputLevelPolling,
+  ]);
 
   useEffect(() => {
     if (!joined || !roomRef.current) {
@@ -860,7 +954,14 @@ export function useMobileLiveKitVoiceSession({
       const track = publication.audioTrack?.mediaStreamTrack;
       if (track) track.enabled = !isMuted && !isDeafened;
     });
-  }, [isDeafened, isMuted, joined]);
+    nativeCaptureSampleRef.current = null;
+    void setNativeRecording(!isMuted && !isDeafened).catch((error) => {
+      core.voice.setMuted(true);
+      setError(
+        getErrorMessage(error, "Could not control microphone recording."),
+      );
+    });
+  }, [core.voice, isDeafened, isMuted, joined, setNativeRecording]);
 
   useEffect(() => {
     if (!joined) return;
