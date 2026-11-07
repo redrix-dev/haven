@@ -1,5 +1,8 @@
 # Voice capture and transmission
 
+For leave/rejoin lifecycle and signal-stream errors, see
+[Voice signalling teardown](./VOICE_SIGNAL_TEARDOWN.md).
+
 Mobile measures the microphone's WebRTC `media-source.audioLevel` through the
 published track's sender stats, every 80 ms with at most one request in flight.
 On iOS those sender stats stop reporting capture levels once an encoding is
