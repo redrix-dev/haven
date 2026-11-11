@@ -195,15 +195,34 @@ Checked on 2026-11-11 against flex, driven from Windows:
 - The Expo config flips OTA off, sets Android cleartext and the iOS display
   name only when `HAVEN_DEV_BACKEND=1`.
 
+- A dev-backend iOS build on a real iPhone reaches the stack by the full
+  MagicDNS name and shows onboarding.
+
 Not yet proven:
 
-1. An iOS build reaching the stack by the full MagicDNS name. The short name
-   was tried on a real iPhone on 2026-11-11 and failed with "A server with the
-   specified hostname could not be found".
-2. A packaged macOS desktop build reaches the stack over http.
-3. A dev-backend iOS and Android build signs in and stays off the OTA channel.
-4. Voice, which needs the LiveKit dev project keys.
-5. The stack coming back by itself after flex reboots.
+1. A packaged macOS desktop build reaches the stack over http.
+2. An Android dev-backend build, and either mobile build staying off the OTA
+   channel over time.
+3. Voice in a real call. `voice-token` returns a token; nobody has joined.
+4. The stack coming back by itself after flex reboots.
+5. Whether iOS resolves the short name `flex5-linux`. It failed once, but
+   NextDNS was on at the time (see below), so that test proved nothing.
+
+## Troubleshooting
+
+**"A server with the specified hostname could not be found" on the phone.**
+Another DNS profile is answering instead of Tailscale. NextDNS on the iPhone
+did exactly this on 2026-11-11: the build was correct, the phone was on the
+tailnet, and no request ever reached flex. Turning NextDNS off fixed it. Check
+with Safari on the phone: load `DEVDB_MOBILE_API_URL` from `.env.devdb` plus
+`/auth/v1/health`. If Safari fails too, it is the phone's DNS, not the app.
+
+**`EBUSY ... watch ... src-tauri\target` during `tauri dev` on Windows.** Vite
+was watching Cargo's build folder. Fixed in `apps/tauri/vite.config.ts`.
+
+**Voice returns a non-2xx from `voice-token`.** The `LIVEKIT_` lines in
+`~/haven-devdb/functions.env` on flex are still commented out, or the stack was
+not restarted (`down`, then `up`) after editing them.
 
 Known gaps:
 
