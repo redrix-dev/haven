@@ -144,6 +144,10 @@ case "$cmd" in
     cd "$ROOT"
     "$SUPABASE" status -o env
     ;;
+  fqdn)
+    # This machine's full MagicDNS name, e.g. flex5-linux.<tailnet>.ts.net
+    tailscale status --json | grep -m1 '"DNSName"' | cut -d'"' -f4 | sed 's/[.]$//'
+    ;;
   ip)
     tailnet_ip
     ;;

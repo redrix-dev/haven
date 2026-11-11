@@ -67,15 +67,19 @@ Tailscale HTTPS would add a public certificate, and every public certificate is
 written to the Certificate Transparency logs, machine name included. Plain
 http avoids that, and the platforms allow it:
 
-| Target                  | Why `http://flex5-linux:54321` is allowed                                                                              |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| iOS                     | `NSAllowsLocalNetworking` permits http to dotless hosts. Expo's generated `Info.plist` already sets it.                |
-| macOS desktop           | Dotless hosts are allowed by default. Raw IP addresses are **not** since macOS 14.                                     |
-| Desktop webview (Tauri) | The app page is `tauri://localhost` (macOS, Linux) or `http://tauri.localhost` (Windows); neither blocks http fetches. |
-| Android                 | Release builds block http by default; the dev-backend flag sets `usesCleartextTraffic`.                                |
-| Browser                 | `vite dev` serves the page over http, so there is no mixed content.                                                    |
+| Target                  | Why `http://flex5-linux:54321` is allowed                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| iOS                     | iOS does **not** resolve the short name, so mobile uses the full MagicDNS name. `app.config.js` adds an `NSExceptionDomains` entry for it. |
+| macOS desktop           | Dotless hosts are allowed by default. Raw IP addresses are **not** since macOS 14.                                                         |
+| Desktop webview (Tauri) | The app page is `tauri://localhost` (macOS, Linux) or `http://tauri.localhost` (Windows); neither blocks http fetches.                     |
+| Android                 | Release builds block http by default; the dev-backend flag sets `usesCleartextTraffic`.                                                    |
+| Browser                 | `vite dev` serves the page over http, so there is no mixed content.                                                                        |
 
-**Always use the name `flex5-linux`, never the IP.** macOS blocks the IP, and
+`devdb run` hands desktop and web the short name and mobile the full name
+(`DEVDB_MOBILE_API_URL` in `.env.devdb`). The full name is looked up from flex at
+run time and only ever lands in the built app, never in this repo.
+
+**Always use a name, never the IP.** macOS blocks the IP, and
 the IP changes when flex is reinstalled.
 
 Sources: Apple
@@ -193,8 +197,9 @@ Checked on 2026-11-11 against flex, driven from Windows:
 
 Not yet proven:
 
-1. The iPhone resolves the short name `flex5-linux`. If it does not, use the
-   full MagicDNS name plus an `NSExceptionDomains` entry.
+1. An iOS build reaching the stack by the full MagicDNS name. The short name
+   was tried on a real iPhone on 2026-11-11 and failed with "A server with the
+   specified hostname could not be found".
 2. A packaged macOS desktop build reaches the stack over http.
 3. A dev-backend iOS and Android build signs in and stays off the OTA channel.
 4. Voice, which needs the LiveKit dev project keys.

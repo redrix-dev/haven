@@ -145,6 +145,8 @@ function down() {
 }
 
 function readStackEnv() {
+  // host.sh on the host may be older than this checkout.
+  if (!IS_LOCAL) pushHostScript();
   const result = IS_LOCAL
     ? localCli(["status", "-o", "env"], { capture: true })
     : host(["env"], { capture: true });
@@ -158,8 +160,17 @@ function readStackEnv() {
   }
   const url = new URL(apiUrl);
   url.hostname = PUBLIC_HOST;
+  // iOS cannot resolve the tailnet short name, so mobile gets the full
+  // MagicDNS name. Desktop keeps the short one: macOS allows http to a
+  // dotless host without any app setting.
+  const mobileUrl = new URL(url);
+  if (!IS_LOCAL) {
+    const fqdn = host(["fqdn"], { capture: true }).stdout.trim();
+    if (fqdn) mobileUrl.hostname = fqdn;
+  }
   return {
     DEVDB_API_URL: url.toString().replace(/\/$/, ""),
+    DEVDB_MOBILE_API_URL: mobileUrl.toString().replace(/\/$/, ""),
     DEVDB_ANON_KEY: anonKey,
     DEVDB_SERVICE_ROLE_KEY: serviceRoleKey,
   };
@@ -182,7 +193,8 @@ function writeEnvFile() {
 function loadEnvFile() {
   if (!existsSync(ENV_FILE)) return writeEnvFile();
   const env = parseEnvLines(readFileSync(ENV_FILE, "utf8"));
-  if (!env.DEVDB_API_URL || !env.DEVDB_ANON_KEY) return writeEnvFile();
+  if (!env.DEVDB_API_URL || !env.DEVDB_ANON_KEY || !env.DEVDB_MOBILE_API_URL)
+    return writeEnvFile();
   // The file is a cache for one host. After switching DEVDB_HOST it is stale.
   if (new URL(env.DEVDB_API_URL).hostname !== PUBLIC_HOST)
     return writeEnvFile();
@@ -394,7 +406,7 @@ function run(args) {
       ...process.env,
       VITE_SUPABASE_URL: env.DEVDB_API_URL,
       VITE_SUPABASE_ANON_KEY: env.DEVDB_ANON_KEY,
-      EXPO_PUBLIC_SUPABASE_URL: env.DEVDB_API_URL,
+      EXPO_PUBLIC_SUPABASE_URL: env.DEVDB_MOBILE_API_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: env.DEVDB_ANON_KEY,
       // Mobile reads this in app.config.js: production OTA off, cleartext on.
       HAVEN_DEV_BACKEND: "1",

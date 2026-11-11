@@ -9,6 +9,31 @@
  * over itself, and has to be allowed plain http to a tailnet host.
  * These land in the native projects, so they take effect at prebuild.
  */
+/**
+ * iOS does not resolve a tailnet short name (`flex5-linux`): the request fails
+ * with "A server with the specified hostname could not be found". So mobile
+ * gets the full MagicDNS name, and a full name needs its own http exception.
+ * The name is read from the URL at build time, never written in this repo.
+ */
+function devBackendTransportSecurity() {
+  let url;
+  try {
+    url = new URL(process.env.EXPO_PUBLIC_SUPABASE_URL ?? "");
+  } catch {
+    return {};
+  }
+  if (url.protocol !== "http:" || !url.hostname.includes(".")) return {};
+  return {
+    NSAppTransportSecurity: {
+      NSAllowsArbitraryLoads: false,
+      NSAllowsLocalNetworking: true,
+      NSExceptionDomains: {
+        [url.hostname]: { NSExceptionAllowsInsecureHTTPLoads: true },
+      },
+    },
+  };
+}
+
 function withDevBackend(config) {
   return {
     ...config,
@@ -19,8 +44,8 @@ function withDevBackend(config) {
       infoPlist: {
         ...config.ios?.infoPlist,
         // So the home screen says which backend this install talks to.
-        // iOS already allows http to a dotless host (NSAllowsLocalNetworking).
         CFBundleDisplayName: "Haven Dev",
+        ...devBackendTransportSecurity(),
       },
     },
     plugins: (config.plugins ?? []).map((plugin) =>
