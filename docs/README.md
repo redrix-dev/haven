@@ -12,6 +12,7 @@ Small on purpose — a handful of living documents plus one detailed-contract fo
 - [RELEASE_CADENCE.md](./RELEASE_CADENCE.md) — the three release trains, version semantics, branch workflow, and standard + hotfix paths per platform.
 - [releases/](./releases/) — one file per release tag; the public release-notes source.
 - [LOCAL_NATIVE_TESTING.md](./LOCAL_NATIVE_TESTING.md) — building a `staging` commit locally on each native host for feel testing: unsigned desktop bundles, Release mobile builds without Metro, and confirming which JavaScript is actually running.
+- [DEV_BACKEND.md](./DEV_BACKEND.md) — the shared non-production Supabase stack on flex: `npm run devdb`, pointing web, desktop and mobile builds at it, and the seed packs that can be destroyed and rebuilt.
 
 ## Detailed contracts (`architecture/`)
 

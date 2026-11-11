@@ -25,6 +25,7 @@
     "test:db:fixtures": "node tooling/scripts/test/run-supabase-sql-suite.mjs --fixtures-only",
     "test:db:rls": "node tooling/scripts/test/run-supabase-sql-suite.mjs",
     "test:db:quick": "node tooling/scripts/test/run-supabase-sql-suite.mjs --skip-fixtures",
+    "devdb": "node tooling/scripts/devdb/devdb.mjs",
     "test:db": "node tooling/scripts/test/run-db-suite.mjs",
     "supabase:types": "node tooling/scripts/generate-supabase-types.mjs",
     "test:notifications:smoke": "node tooling/scripts/test/run-notification-dispatch-smoke.mjs",

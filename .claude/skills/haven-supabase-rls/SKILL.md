@@ -46,6 +46,9 @@ The SQL suite runs against local Supabase via `psql`.
 - `npm run test:db:rls` assumes local Supabase is running and runs helpers,
   fixtures, and SQL.
 - `npm run test:db:quick` assumes fixtures are already loaded.
+- `npm run devdb -- reset` sends the working tree's `supabase/` to the shared
+  dev backend and reseeds it, for trying a migration against real clients. It
+  is separate from the test stack; see `docs/DEV_BACKEND.md`.
 - `npm run test:backend` runs every `*.contract.test.ts` in
   `packages/shared/src/lib/backend/__tests__/` against local Supabase (found
   on disk, no list to update). Pass files to run just those:

@@ -118,8 +118,19 @@ async function ensureUser(adminClient, spec) {
   };
 }
 
+// `npm run devdb` seeds the shared dev backend on another machine, where the
+// local CLI's `supabase status` knows nothing. It passes the target instead.
+function resolveTarget() {
+  const apiUrl = process.env.HAVEN_BOOTSTRAP_API_URL?.trim();
+  const serviceRoleKey = process.env.HAVEN_BOOTSTRAP_SERVICE_ROLE_KEY?.trim();
+  if (apiUrl && serviceRoleKey) {
+    return { API_URL: apiUrl, SERVICE_ROLE_KEY: serviceRoleKey, remote: true };
+  }
+  return { ...resolveSupabaseLocalEnv(), remote: false };
+}
+
 async function main() {
-  const env = resolveSupabaseLocalEnv();
+  const env = resolveTarget();
   const adminClient = createClient(env.API_URL, env.SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -127,6 +138,12 @@ async function main() {
   const results = [];
   for (const spec of TEST_USERS) {
     results.push(await ensureUser(adminClient, spec));
+  }
+
+  if (env.remote) {
+    // users.json feeds the backend tests, which run against the local stack.
+    console.log(`Bootstrapped ${results.length} auth users on ${env.API_URL}`);
+    return;
   }
 
   const outDir = path.resolve(
