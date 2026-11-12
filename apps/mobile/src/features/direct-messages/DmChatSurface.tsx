@@ -147,7 +147,6 @@ export function DmChatSurface() {
         imageArrayBuffer?: ArrayBuffer;
         imageContentType?: string;
         imageFilename?: string;
-        imageExpiresInHours?: number;
         optimisticAttachmentUri?: string | null;
       },
     ) => {
@@ -188,14 +187,12 @@ export function DmChatSurface() {
           ? {
               body: options.imageArrayBuffer as ArrayBuffer,
               filename: inferredFilename,
-              expiresInHours: options.imageExpiresInHours,
               contentType: options.imageContentType?.trim(),
             }
           : hasBlob
             ? {
                 body: options.imageBody as Blob,
                 filename: inferredFilename,
-                expiresInHours: options.imageExpiresInHours,
               }
             : undefined,
         optimisticAttachmentUri: options?.optimisticAttachmentUri ?? null,

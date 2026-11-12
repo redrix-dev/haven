@@ -762,7 +762,6 @@ export type Database = {
           bucket_name: string
           conversation_id: string
           created_at: string
-          expires_at: string
           id: string
           media_kind: string
           message_id: string
@@ -776,7 +775,6 @@ export type Database = {
           bucket_name?: string
           conversation_id: string
           created_at?: string
-          expires_at: string
           id?: string
           media_kind: string
           message_id: string
@@ -790,7 +788,6 @@ export type Database = {
           bucket_name?: string
           conversation_id?: string
           created_at?: string
-          expires_at?: string
           id?: string
           media_kind?: string
           message_id?: string
@@ -1633,7 +1630,6 @@ export type Database = {
           channel_id: string
           community_id: string
           created_at: string
-          expires_at: string
           id: string
           media_kind: string
           message_id: string
@@ -1648,7 +1644,6 @@ export type Database = {
           channel_id: string
           community_id: string
           created_at?: string
-          expires_at: string
           id?: string
           media_kind: string
           message_id: string
@@ -1663,7 +1658,6 @@ export type Database = {
           channel_id?: string
           community_id?: string
           created_at?: string
-          expires_at?: string
           id?: string
           media_kind?: string
           message_id?: string
@@ -2940,14 +2934,6 @@ export type Database = {
           reason: string
           status: string
         }[]
-      }
-      cleanup_expired_dm_message_attachments: {
-        Args: { p_limit?: number }
-        Returns: number
-      }
-      cleanup_expired_message_attachments: {
-        Args: { p_limit?: number }
-        Returns: number
       }
       clear_user_feature_flag: {
         Args: { p_flag_key: string; p_user_id: string }

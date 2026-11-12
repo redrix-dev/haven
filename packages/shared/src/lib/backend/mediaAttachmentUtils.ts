@@ -10,8 +10,6 @@ export type UploadedMessageMedia = {
   mimeType: string;
   mediaKind: AttachmentMediaKind;
   sizeBytes: number;
-  expiresAt: string;
-  expiresInHours: number;
 };
 
 type SignedUrlRow = {
@@ -25,8 +23,6 @@ const DEFAULT_ALLOWED_MEDIA_KINDS: AttachmentMediaKind[] = [
   "file",
 ];
 
-export const DEFAULT_MEDIA_EXPIRES_IN_HOURS = 24;
-export const MAX_MEDIA_EXPIRES_IN_HOURS = 24 * 30;
 export const MEDIA_ONLY_CONTENT_PLACEHOLDER = "\u200B";
 
 export const sanitizeAttachmentFileName = (value: string): string => {
@@ -54,7 +50,6 @@ export const getSignedUrlMapKey = (
 export type MessageMediaUploadBody = {
   body: Blob | ArrayBuffer;
   filename?: string;
-  expiresInHours?: number;
   /** Required when `body` is an `ArrayBuffer` (e.g. React Native Hermes). Ignored for `Blob`. */
   contentType?: string;
 };
@@ -90,12 +85,6 @@ export function createMediaAttachmentHelpers(
     if (!input.mediaUpload?.body) return null;
 
     const body = input.mediaUpload.body;
-    const expiresInHours =
-      input.mediaUpload.expiresInHours ?? DEFAULT_MEDIA_EXPIRES_IN_HOURS;
-    const boundedExpiresInHours = Math.min(
-      Math.max(Math.floor(expiresInHours), 1),
-      MAX_MEDIA_EXPIRES_IN_HOURS,
-    );
     const originalFilename = sanitizeAttachmentFileName(
       input.mediaUpload.filename || "media",
     );
@@ -138,10 +127,6 @@ export function createMediaAttachmentHelpers(
       mimeType,
       mediaKind,
       sizeBytes,
-      expiresAt: new Date(
-        Date.now() + boundedExpiresInHours * 60 * 60 * 1000,
-      ).toISOString(),
-      expiresInHours: boundedExpiresInHours,
     };
   };
 

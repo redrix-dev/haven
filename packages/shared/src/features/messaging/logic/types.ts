@@ -8,7 +8,6 @@ export type SendCommunityMessageMediaOptions = {
   mediaArrayBuffer?: ArrayBuffer;
   mediaContentType?: string;
   mediaFilename?: string;
-  mediaExpiresInHours?: number;
   optimisticMediaUri?: string | null;
   senderUserId?: string | null;
   senderIsPlatformStaff?: boolean;

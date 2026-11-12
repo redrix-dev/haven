@@ -63,8 +63,7 @@ select * from public.send_dm_message(
     'originalFilename', 'dm-report-test.png',
     'mimeType', 'image/png',
     'mediaKind', 'image',
-    'sizeBytes', 3072,
-    'expiresInHours', 24
+    'sizeBytes', 3072
   )
 );
 

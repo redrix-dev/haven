@@ -50,7 +50,6 @@ async function ensureDmReportFixture(memberAUsername: string) {
     imageUpload: {
       body: createTestImageFile(),
       filename: "test.png",
-      expiresInHours: 24,
     },
   });
 

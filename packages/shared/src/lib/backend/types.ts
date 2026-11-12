@@ -26,7 +26,6 @@ export type MessageAttachment = {
   mediaKind: "image" | "video" | "file";
   sizeBytes: number;
   createdAt: string;
-  expiresAt: string;
   signedUrl: string | null;
 };
 
@@ -42,7 +41,6 @@ export type DirectMessageAttachment = {
   mediaKind: "image";
   sizeBytes: number;
   createdAt: string;
-  expiresAt: string;
   signedUrl: string | null;
 };
 

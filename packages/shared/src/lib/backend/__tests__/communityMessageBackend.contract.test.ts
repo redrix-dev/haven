@@ -157,4 +157,39 @@ describe.sequential("CommunityMessageBackend (contract)", () => {
     await toggle();
     expect((await read(id))?.reactions).toEqual([]);
   });
+
+  it("an uploaded image comes back on the message, with no expiry", async () => {
+    const image = new File(
+      [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])],
+      "contract.png",
+      { type: "image/png" },
+    );
+    const upload = await backend.uploadMessageMedia({
+      communityId,
+      channelId,
+      file: image,
+      filename: "contract.png",
+      mimeType: "image/png",
+    });
+    const id = await send("contract: photo");
+    await backend.insertMessageAttachment({
+      messageId: id,
+      communityId,
+      channelId,
+      objectPath: upload.objectPath,
+      mimeType: upload.mimeType,
+      sizeBytes: upload.sizeBytes,
+      mediaKind: upload.mediaKind,
+      filename: "contract.png",
+    });
+
+    const attachment = (await read(id))?.attachment;
+    expect(attachment).toMatchObject({
+      messageId: id,
+      objectPath: upload.objectPath,
+      mimeType: "image/png",
+      mediaKind: "image",
+    });
+    expect(attachment).not.toHaveProperty("expiresAt");
+  });
 });

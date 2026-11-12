@@ -8,7 +8,6 @@ import {
   ascendingMessagesFromRpcPage,
   buildOptimisticSendBundle,
   buildPersistedMessageSnapshot,
-  coerceMediaExpiresInHours,
   inferMediaFilename,
   insertMessageIntoChannelIndex,
   mergePageIntoChannelMeta,
@@ -409,7 +408,6 @@ export class CommunityMessageNexus {
       mimeType:
         options?.mediaContentType?.trim() ??
         (blobType || "application/octet-stream"),
-      expiresInHours: coerceMediaExpiresInHours(options?.mediaExpiresInHours),
       contentType: options?.mediaContentType?.trim() ?? (blobType || undefined),
     });
 
@@ -427,7 +425,6 @@ export class CommunityMessageNexus {
         sizeBytes: upload.sizeBytes,
         mediaKind: upload.mediaKind,
         filename,
-        expiresAt: upload.expiresAt,
       });
       this.updateMessage(id, {
         attachment: {
@@ -443,7 +440,6 @@ export class CommunityMessageNexus {
           mediaKind: upload.mediaKind,
           sizeBytes: upload.sizeBytes,
           createdAt: new Date().toISOString(),
-          expiresAt: upload.expiresAt,
           signedUrl: options?.optimisticMediaUri ?? null,
         },
       });

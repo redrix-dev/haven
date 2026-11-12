@@ -50,7 +50,6 @@ type DmSendOptions = {
   imageUpload?: {
     body: Blob;
     filename?: string;
-    expiresInHours?: number;
   };
   optimisticAttachmentUri?: string | null;
 };
