@@ -2,6 +2,8 @@
 -- "DEV: Hearth", a community to click around in. Safe to re-run.
 -- Owner rls_owner; members rls_member_a, rls_member_b, rls_server_mod (Moderator).
 -- rls_non_member stays out so "not a member" paths have someone to test with.
+-- It is also the Alpha onboarding target, so mobile onboarding can be
+-- finished on the dev backend (rls_non_member is the account to try it with).
 
 select test_support.note('seeds/dev/10_community: DEV: Hearth');
 
@@ -82,4 +84,10 @@ begin
     (v_community, v_channel, v_moderator, true, true, true)
   on conflict (channel_id, role_id) do update
   set can_view = excluded.can_view, can_send = excluded.can_send, can_manage = excluded.can_manage;
+
+  -- Alpha onboarding joins new mobile accounts here. Without a target the
+  -- required campaign is not offered at all (HAV-24).
+  update public.onboarding_campaigns
+  set target_community_id = v_community
+  where key = 'alpha_2026';
 end $$;
