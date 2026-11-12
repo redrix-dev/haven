@@ -101,3 +101,8 @@ The SQL suite runs against local Supabase via `psql`.
   intentionally runs DB/backend lanes for those paths.
 - Generated local Supabase files under `.temp/` and `.generated/` are not source
   artifacts.
+- Dropping or renaming a column: regenerated types and a green typecheck do not
+  prove the clients stopped using it. Backend inserts are cast `as never`, and
+  RPC JSON is parsed by hand-written row parsers that may _require_ the field
+  and silently drop rows without it. `git grep` the column and its camelCase
+  name, and cover the write path with a contract test (HAV-19 found both).
