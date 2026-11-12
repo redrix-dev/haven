@@ -32,7 +32,6 @@ export type MessageAttachmentRow = {
   media_kind: "image" | "video" | "file";
   size_bytes: number;
   created_at: string;
-  expires_at: string;
 };
 
 export type MessageLinkPreviewRow = {
@@ -150,7 +149,6 @@ const parseMessageAttachmentRowFromRpcJson = (
   const media_kind = r.media_kind;
   const size_bytes = typeof r.size_bytes === "number" ? r.size_bytes : null;
   const created_at = typeof r.created_at === "string" ? r.created_at : null;
-  const expires_at = typeof r.expires_at === "string" ? r.expires_at : null;
   if (
     !id ||
     !message_id ||
@@ -164,8 +162,7 @@ const parseMessageAttachmentRowFromRpcJson = (
       media_kind !== "video" &&
       media_kind !== "file") ||
     size_bytes == null ||
-    !created_at ||
-    !expires_at
+    !created_at
   ) {
     return null;
   }
@@ -188,7 +185,6 @@ const parseMessageAttachmentRowFromRpcJson = (
     media_kind,
     size_bytes,
     created_at,
-    expires_at,
   };
 };
 
@@ -299,7 +295,6 @@ export const mapMessageAttachmentRowsWithSignedUrls = async (
     mediaKind: row.media_kind,
     sizeBytes: row.size_bytes,
     createdAt: row.created_at,
-    expiresAt: row.expires_at,
     signedUrl:
       signedUrlByBucketAndPath.get(`${row.bucket_name}/${row.object_path}`) ??
       null,

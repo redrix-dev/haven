@@ -14,7 +14,6 @@ export type DirectMessageAttachmentRow = {
   media_kind: "image";
   size_bytes: number;
   created_at: string;
-  expires_at: string;
 };
 
 const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
@@ -55,7 +54,6 @@ const parseDirectMessageAttachmentRow = (
   const mediaKind = obj.media_kind ?? obj.mediaKind;
   const sizeBytes = asFiniteNumber(obj.size_bytes ?? obj.sizeBytes);
   const createdAt = asRequiredString(obj.created_at ?? obj.createdAt);
-  const expiresAt = asRequiredString(obj.expires_at ?? obj.expiresAt);
 
   if (
     !id ||
@@ -67,8 +65,7 @@ const parseDirectMessageAttachmentRow = (
     !mimeType ||
     mediaKind !== "image" ||
     sizeBytes === null ||
-    !createdAt ||
-    !expiresAt
+    !createdAt
   ) {
     return null;
   }
@@ -87,7 +84,6 @@ const parseDirectMessageAttachmentRow = (
     media_kind: "image",
     size_bytes: sizeBytes,
     created_at: createdAt,
-    expires_at: expiresAt,
   };
 };
 
@@ -135,7 +131,6 @@ export const mapDirectMessageAttachmentRowsWithSignedUrls = async (
     mediaKind: row.media_kind,
     sizeBytes: row.size_bytes,
     createdAt: row.created_at,
-    expiresAt: row.expires_at,
     signedUrl:
       signedUrlByBucketAndPath.get(
         getSignedUrlMapKey(row.bucket_name, row.object_path),

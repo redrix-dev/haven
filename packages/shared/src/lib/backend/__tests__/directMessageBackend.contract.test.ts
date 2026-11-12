@@ -84,7 +84,6 @@ describe.sequential("DirectMessageBackend (contract)", () => {
       imageUpload: {
         body: createTestImageFile(),
         filename: "test.png",
-        expiresInHours: 24,
       },
     });
     expect(sentImage.attachments).toHaveLength(1);

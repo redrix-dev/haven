@@ -67,7 +67,6 @@ const imageAttachment = (
   mediaKind: "image",
   sizeBytes: input.sizeBytes ?? 12,
   createdAt: input.createdAt ?? "2026-06-13T10:01:00.000Z",
-  expiresAt: input.expiresAt ?? "2026-06-14T10:01:00.000Z",
   signedUrl: input.signedUrl ?? null,
 });
 

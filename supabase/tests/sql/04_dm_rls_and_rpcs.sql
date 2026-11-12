@@ -164,8 +164,7 @@ select * from public.send_dm_message(
     'originalFilename', 'dm-test.png',
     'mimeType', 'image/png',
     'mediaKind', 'image',
-    'sizeBytes', 2048,
-    'expiresInHours', 24
+    'sizeBytes', 2048
   )
 );
 
@@ -254,89 +253,6 @@ select test_support.assert_eq_int(
   ),
   0,
   'non-members cannot read DM image storage objects'
-);
-
-reset role;
-set local role authenticated;
-select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
-
-create temp table tmp_dm_expiring_image_upload on commit drop as
-select
-  format(
-    '%s/%s-dm-expiring-test.png',
-    (select id::text from dm_ids where key = 'conversation'),
-    gen_random_uuid()::text
-  ) as object_path;
-
-insert into storage.objects (
-  bucket_id,
-  name,
-  owner,
-  metadata
-)
-select
-  'dm-message-media',
-  object_path,
-  test_support.fixture_user_id('member_a'),
-  jsonb_build_object('mimetype', 'image/png', 'size', 4096)
-from tmp_dm_expiring_image_upload;
-
-create temp table tmp_dm_expiring_image_message on commit drop as
-select * from public.send_dm_message(
-  (select id from dm_ids where key = 'conversation'),
-  '',
-  '{}'::jsonb,
-  jsonb_build_object(
-    'bucketName', 'dm-message-media',
-    'objectPath', (select object_path from tmp_dm_expiring_image_upload),
-    'originalFilename', 'dm-expiring-test.png',
-    'mimeType', 'image/png',
-    'mediaKind', 'image',
-    'sizeBytes', 4096,
-    'expiresInHours', 1
-  )
-);
-
-insert into dm_ids (key, id)
-select 'message_image_expiring', message_id from tmp_dm_expiring_image_message
-on conflict (key) do update set id = excluded.id;
-
-reset role;
-update public.dm_message_attachments
-set expires_at = timezone('utc', now()) - interval '5 minutes'
-where message_id = (select id from dm_ids where key = 'message_image_expiring');
-
-set local role authenticated;
-select test_support.set_jwt_claims(test_support.fixture_user_id('member_a'));
-
-select test_support.assert_eq_int(
-  public.cleanup_expired_dm_message_attachments(10),
-  1,
-  'expired DM image cleanup should delete the message'
-);
-
-reset role;
-select test_support.clear_jwt_claims();
-
-select test_support.assert_eq_int(
-  (
-    select count(*)::bigint
-    from public.dm_messages
-    where id = (select id from dm_ids where key = 'message_image_expiring')
-  ),
-  0,
-  'expired DM image cleanup should remove the DM row'
-);
-
-select test_support.assert_eq_int(
-  (
-    select count(*)::bigint
-    from public.message_attachment_deletion_jobs
-    where bucket_name = 'dm-message-media'
-      and object_path = (select object_path from tmp_dm_expiring_image_upload)
-  ),
-  1,
-  'expired DM image cleanup should enqueue storage deletion'
 );
 
 set local role authenticated;

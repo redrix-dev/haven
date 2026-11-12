@@ -10,7 +10,6 @@ import {
 
 type MaintenanceRequest = {
   mode?: "cron" | "authenticated-fallback";
-  maxExpiredMessages?: number;
   maxDeletionJobs?: number;
 };
 
@@ -87,12 +86,6 @@ Deno.serve(async (req) => {
   }
 
   const body = (await parseJsonBody<MaintenanceRequest>(req)) ?? {};
-  const maxExpiredMessages = clampInt(
-    body.maxExpiredMessages,
-    1,
-    isCron ? 500 : 100,
-    isCron ? 200 : 50,
-  );
   const maxDeletionJobs = clampInt(
     body.maxDeletionJobs,
     1,
@@ -105,47 +98,14 @@ Deno.serve(async (req) => {
     env.serviceRoleKey,
   );
 
-  let deletedMessages = 0;
-  let deletedChannelMessages = 0;
-  let deletedDmMessages = 0;
   let claimedDeletionJobs = 0;
   let deletedObjects = 0;
   let retryableFailures = 0;
   let deadLetters = 0;
 
-  const { data: cleanupCount, error: cleanupError } = await supabaseAdmin.rpc(
-    "cleanup_expired_message_attachments",
-    { p_limit: maxExpiredMessages },
-  );
-  if (cleanupError) {
-    console.error(
-      "message-media-maintenance cleanup rpc failed:",
-      cleanupError,
-    );
-    return jsonResponse(
-      { code: 500, message: "Failed to cleanup expired message attachments" },
-      500,
-    );
-  }
-  deletedChannelMessages = Number(cleanupCount ?? 0) || 0;
-
-  const { data: cleanupDmCount, error: cleanupDmError } =
-    await supabaseAdmin.rpc("cleanup_expired_dm_message_attachments", {
-      p_limit: maxExpiredMessages,
-    });
-  if (cleanupDmError) {
-    console.error(
-      "message-media-maintenance DM cleanup rpc failed:",
-      cleanupDmError,
-    );
-    return jsonResponse(
-      { code: 500, message: "Failed to cleanup expired DM image attachments" },
-      500,
-    );
-  }
-  deletedDmMessages = Number(cleanupDmCount ?? 0) || 0;
-  deletedMessages = deletedChannelMessages + deletedDmMessages;
-
+  // Media does not expire (HAV-19). This worker only removes storage objects
+  // whose attachment rows were deleted: by a message, account or community
+  // deletion, through the deletion job queue.
   const { data: claimedJobs, error: claimError } = await supabaseAdmin.rpc(
     "claim_message_attachment_deletion_jobs",
     { p_limit: maxDeletionJobs, p_lease_seconds: isCron ? 90 : 60 },
@@ -238,9 +198,6 @@ Deno.serve(async (req) => {
 
   return jsonResponse({
     mode: isCron ? "cron" : "authenticated-fallback",
-    deletedMessages,
-    deletedChannelMessages,
-    deletedDmMessages,
     claimedDeletionJobs,
     deletedObjects,
     retryableFailures,

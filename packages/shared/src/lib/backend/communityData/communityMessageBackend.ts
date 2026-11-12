@@ -89,14 +89,12 @@ export interface CommunityMessageBackend {
     file: Blob | ArrayBuffer;
     filename?: string;
     mimeType: string;
-    expiresInHours: 1 | 24 | 168 | 720;
     contentType?: string;
   }): Promise<{
     objectPath: string;
     mimeType: string;
     sizeBytes: number;
     mediaKind: "image" | "video" | "file";
-    expiresAt: string;
   }>;
   insertMessageAttachment(input: {
     messageId: string;
@@ -107,7 +105,6 @@ export interface CommunityMessageBackend {
     sizeBytes: number;
     mediaKind: "image" | "video" | "file";
     filename?: string;
-    expiresAt: string;
   }): Promise<void>;
   editUserMessage(input: {
     communityId: string;
@@ -355,16 +352,11 @@ export const communityMessageBackend: CommunityMessageBackend = {
       });
     if (uploadError) throw uploadError;
 
-    const expiresAt = new Date(
-      Date.now() + input.expiresInHours * 60 * 60 * 1000,
-    ).toISOString();
-
     return {
       objectPath,
       mimeType: input.mimeType,
       sizeBytes,
       mediaKind,
-      expiresAt,
     };
   },
 
@@ -389,7 +381,6 @@ export const communityMessageBackend: CommunityMessageBackend = {
         mime_type: input.mimeType,
         media_kind: input.mediaKind,
         size_bytes: input.sizeBytes,
-        expires_at: input.expiresAt,
       } as never);
     if (error) throw error;
   },

@@ -33,3 +33,4 @@ supabase/tests/sql/20_internal_function_acl.sql
 supabase/tests/sql/21_background_cron_health.sql
 supabase/tests/sql/22_access_loss_broadcasts.sql
 supabase/tests/sql/23_voice_controls.sql
+supabase/tests/sql/24_media_kept_until_deleted.sql

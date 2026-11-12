@@ -67,7 +67,6 @@ const makeAttachment = (
   mediaKind: "image",
   sizeBytes: 128,
   createdAt: nowIso,
-  expiresAt: nowIso,
   signedUrl: null,
 });
 

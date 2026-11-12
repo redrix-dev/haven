@@ -30,7 +30,6 @@ export interface DirectMessageBackend {
     imageUpload?: {
       body: Blob | ArrayBuffer;
       filename?: string;
-      expiresInHours?: number;
       /** Required when `body` is an `ArrayBuffer` (e.g. React Native Hermes). */
       contentType?: string;
     };
@@ -216,7 +215,6 @@ export function createDirectMessageBackend(
           ? {
               body: input.imageUpload.body,
               filename: input.imageUpload.filename,
-              expiresInHours: input.imageUpload.expiresInHours,
               contentType: input.imageUpload.contentType,
             }
           : undefined,
@@ -238,7 +236,6 @@ export function createDirectMessageBackend(
                   mimeType: uploadedImage.mimeType,
                   mediaKind: uploadedImage.mediaKind,
                   sizeBytes: uploadedImage.sizeBytes,
-                  expiresInHours: uploadedImage.expiresInHours,
                 }
               : null,
           } as never,

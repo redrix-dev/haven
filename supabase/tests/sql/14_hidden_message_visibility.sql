@@ -49,8 +49,7 @@ insert into public.message_attachments (
   original_filename,
   mime_type,
   media_kind,
-  size_bytes,
-  expires_at
+  size_bytes
 )
 values (
   (select id from test_ids where key = 'hidden_message'),
@@ -61,8 +60,7 @@ values (
   'hidden-message-attachment.png',
   'image/png',
   'image',
-  512,
-  timezone('utc', now()) + interval '1 day'
+  512
 );
 
 insert into public.message_link_previews (
