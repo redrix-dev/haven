@@ -584,4 +584,63 @@ select test_support.expect_exception(
   'cannot join this community'
 );
 
+-- HAV-24: a campaign is listed only if it can be completed. A required
+-- campaign blocks the app, so offering one that completion refuses strands the
+-- user.
+reset role;
+set local role postgres;
+
+insert into public.communities (id, name, created_by_user_id)
+values ('00000000-0000-4000-8000-000000000241', 'Onboarding target', test_support.fixture_user_id('community_owner'));
+
+insert into public.onboarding_campaigns (key, feature_flag_key, title, target_community_id, required, is_active, sort_order)
+values
+  ('onboarding_no_target_test', 'mobile_onboarding_test', 'Required, no target', null, true, true, 3),
+  ('onboarding_target_deleted_test', 'mobile_onboarding_test', 'Required, target deleted later',
+   '00000000-0000-4000-8000-000000000241', true, true, 4),
+  ('onboarding_optional_test', 'mobile_onboarding_test', 'Optional, no target', null, false, true, 5);
+
+reset role;
+set local role authenticated;
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_b'));
+
+select test_support.assert_eq_int(
+  (select count(*)::bigint from public.list_my_onboarding_campaigns('ios', 'all', '0.0.0')
+   where campaign_key = 'onboarding_no_target_test'),
+  0,
+  'a required campaign without a target community is not offered'
+);
+select test_support.expect_exception(
+  'select * from public.complete_onboarding_campaign(''onboarding_no_target_test'', ''ios'', ''all'', ''0.0.0'')',
+  'not available'
+);
+select test_support.assert_eq_int(
+  (select count(*)::bigint from public.list_my_onboarding_campaigns('ios', 'all', '0.0.0')
+   where campaign_key = 'onboarding_optional_test'),
+  1,
+  'an optional campaign without a target community is still offered'
+);
+select test_support.assert_eq_int(
+  (select count(*)::bigint from public.list_my_onboarding_campaigns('ios', 'all', '0.0.0')
+   where campaign_key = 'onboarding_target_deleted_test'),
+  1,
+  'a required campaign with a target community is offered'
+);
+
+-- The owner deletes the target community; the campaign's target goes null.
+select test_support.set_jwt_claims(test_support.fixture_user_id('community_owner'));
+delete from public.communities where id = '00000000-0000-4000-8000-000000000241';
+
+select test_support.set_jwt_claims(test_support.fixture_user_id('member_b'));
+select test_support.assert_eq_int(
+  (select count(*)::bigint from public.list_my_onboarding_campaigns('ios', 'all', '0.0.0')
+   where campaign_key = 'onboarding_target_deleted_test'),
+  0,
+  'deleting the target community stops the required campaign being offered'
+);
+select test_support.expect_exception(
+  'select * from public.complete_onboarding_campaign(''onboarding_target_deleted_test'', ''ios'', ''all'', ''0.0.0'')',
+  'not available'
+);
+
 rollback;
