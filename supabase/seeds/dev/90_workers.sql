@@ -1,33 +1,27 @@
 -- Pack: workers
--- Turns on the pg_cron jobs that call the edge functions (link previews, media
--- maintenance, Expo push), pointed at the stack's own gateway.
+-- Tells the database where the worker functions live, so new jobs (push,
+-- link previews, file deletion, mail) wake them through the stack's own
+-- gateway. See docs/architecture/DATABASE.md, "Jobs and workers".
 --
 -- The shared secret is not in this file. devdb passes it to psql as
 -- :haven_cron_secret, read from the functions .env on the host. With no secret
--- the jobs are switched off instead, so nothing calls a function that would
--- reject it.
+-- the settings are removed instead, so the database queues jobs and calls
+-- nobody rather than calling a function that would reject it.
 
-select test_support.note('seeds/dev/90_workers: background cron config');
+select test_support.note('seeds/dev/90_workers: where the workers live');
 
-select set_config('haven.devdb_cron_secret', :'haven_cron_secret', false);
+select set_config('haven.devdb_worker_secret', :'haven_cron_secret', false);
 
 do $$
 declare
-  v_secret text := trim(current_setting('haven.devdb_cron_secret', true));
-  v_enabled boolean := char_length(coalesce(v_secret, '')) >= 16;
+  v_secret text := trim(current_setting('haven.devdb_worker_secret', true));
 begin
-  insert into public.background_worker_cron_config (id, enabled, edge_base_url, cron_shared_secret)
-  values (true, v_enabled, 'http://kong:8000', case when v_enabled then v_secret end)
-  on conflict (id) do update
-  set enabled = excluded.enabled,
-      edge_base_url = excluded.edge_base_url,
-      cron_shared_secret = excluded.cron_shared_secret;
-
-  perform public.configure_haven_background_cron_jobs();
-
-  if v_enabled then
-    raise notice 'background workers ON, calling http://kong:8000';
+  if char_length(coalesce(v_secret, '')) >= 16 then
+    perform private.set_setting('edge_base_url', 'http://kong:8000/functions/v1');
+    perform private.set_setting('worker_secret', v_secret);
+    raise notice 'workers ON, called at http://kong:8000/functions/v1';
   else
-    raise notice 'background workers OFF: no HAVEN_WORKER_CRON_SECRET of 16+ characters in the functions .env';
+    delete from vault.secrets s where s.name in ('haven.edge_base_url', 'haven.worker_secret');
+    raise notice 'workers OFF: no HAVEN_WORKER_CRON_SECRET of 16+ characters in the functions .env';
   end if;
 end $$;

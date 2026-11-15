@@ -1,87 +1,61 @@
 -- Pack: chatter
--- A short, readable conversation in DEV: Hearth covering the message shapes
--- the clients render: replies, an edit, a soft delete, a link, a mention,
--- a long message, and an announcement. Re-running replaces it.
--- Needs pack: community.
+-- A short conversation in DEV: Hearth #dev-chat, sent through the real RPCs:
+-- replies, an edit, a deleted message, a link, a mention, reactions, and long
+-- and multi-line messages. Needs the "community" pack. Safe to re-run.
 
-select test_support.note('seeds/dev/20_chatter: conversation in DEV: Hearth');
+select test_support.note('seeds/dev/20_chatter: a conversation in #dev-chat');
+select test_support.become(null);
+
+delete from public.messages m
+using public.channels ch, public.communities c
+where m.channel_id = ch.id and ch.community_id = c.id and c.name = 'DEV: Hearth' and ch.name = 'dev-chat';
+delete from private.rate_limit_hits where true;
 
 do $$
 declare
-  v_owner uuid := test_support.fixture_user_id('community_owner');
-  v_a uuid := test_support.fixture_user_id('member_a');
-  v_b uuid := test_support.fixture_user_id('member_b');
-  v_mod uuid := test_support.fixture_user_id('server_mod');
-  v_community uuid;
-  v_chat uuid;
-  v_general uuid;
-  v_announce uuid;
-  v_staff uuid;
+  v_channel uuid;
   v_first uuid;
-  v_id uuid;
-  v_base timestamptz := timezone('utc', now()) - interval '3 hours';
+  v_question uuid;
+  v_typo uuid;
+  v_regret uuid;
+
+  -- Send as one of the test users and come back.
+  -- (plpgsql has no nested functions, so this is spelled out below.)
 begin
-  select c.id into v_community from public.communities c
-  where c.name = 'DEV: Hearth' order by c.created_at limit 1;
-  if v_community is null then
-    raise exception 'Pack "chatter" needs pack "community" first.';
+  select ch.id into v_channel
+  from public.channels ch join public.communities c on c.id = ch.community_id
+  where c.name = 'DEV: Hearth' and ch.name = 'dev-chat';
+  if v_channel is null then
+    raise exception 'Seed the "community" pack first: DEV: Hearth #dev-chat is missing.';
   end if;
 
-  select id into v_chat from public.channels where community_id = v_community and name = 'dev-chat';
-  select id into v_general from public.channels where community_id = v_community and name = 'general';
-  select id into v_announce from public.channels where community_id = v_community and name = 'announcements';
-  select id into v_staff from public.channels where community_id = v_community and name = 'staff-room';
+  perform test_support.become('owner');
+  v_first := (public.send_message(v_channel, 'Welcome to the dev backend. Everything here is seeded and can be thrown away.')).id;
 
-  delete from public.messages m
-  where m.channel_id in (v_chat, v_general, v_announce, v_staff);
+  perform test_support.become('member_a');
+  v_question := (public.send_message(v_channel, 'Does a reply show the message it answers?', v_first)).id;
 
-  v_first := test_support.insert_fixture_message(v_community, v_chat, v_owner,
-    'Welcome to the dev backend. Nothing here is real and all of it gets rebuilt.');
-  update public.messages set created_at = v_base where id = v_first;
+  perform test_support.become('member_b');
+  perform public.send_message(v_channel, 'It should. This one is a reply to the question.', v_question);
+  v_typo := (public.send_message(v_channel, 'This mesage has a typo.')).id;
+  perform public.edit_message(v_typo, 'This message had a typo, and was edited.');
 
-  v_id := test_support.insert_fixture_message(v_community, v_chat, v_a,
-    'Good. I plan to break things in here on purpose.');
-  update public.messages
-  set created_at = v_base + interval '1 minute', reply_to_message_id = v_first
-  where id = v_id;
+  perform test_support.become('member_a');
+  v_regret := (public.send_message(v_channel, 'This one gets deleted. You should never see it.')).id;
+  perform public.delete_message(v_regret);
+  perform public.send_message(v_channel, 'A link, for the preview card: https://example.com/');
+  perform public.send_message(v_channel, 'A mention: @rls_owner can you see this highlighted?');
 
-  v_id := test_support.insert_fixture_message(v_community, v_chat, v_b,
-    'This one was edited after sending.');
-  update public.messages
-  set created_at = v_base + interval '2 minutes', edited_at = v_base + interval '3 minutes'
-  where id = v_id;
+  perform test_support.become('server_mod');
+  perform public.send_message(v_channel, E'Several lines:\n\n- one\n- two\n- three\n\nand a closing line.');
+  perform public.send_message(v_channel, repeat('A long message to check wrapping and the composer''s height. ', 30));
 
-  v_id := test_support.insert_fixture_message(v_community, v_chat, v_a,
-    'This one was deleted by its author.');
-  update public.messages
-  set created_at = v_base + interval '4 minutes', deleted_at = v_base + interval '5 minutes'
-  where id = v_id;
-
-  v_id := test_support.insert_fixture_message(v_community, v_chat, v_mod,
-    'Link preview check: https://example.com/');
-  update public.messages set created_at = v_base + interval '6 minutes' where id = v_id;
-
-  v_id := test_support.insert_fixture_message(v_community, v_chat, v_b,
-    'Mention check: @rls_owner can you see this?');
-  update public.messages set created_at = v_base + interval '7 minutes' where id = v_id;
-
-  v_id := test_support.insert_fixture_message(v_community, v_chat, v_owner,
-    'Long message check. ' || repeat('The quick brown fox jumps over the lazy dog. ', 60));
-  update public.messages set created_at = v_base + interval '8 minutes' where id = v_id;
-
-  v_id := test_support.insert_fixture_message(v_community, v_chat, v_a,
-    E'Multi-line check:\n- one\n- two\n- three\n\n`inline code` and **bold** and unicode: café, 日本語, 🎉');
-  update public.messages set created_at = v_base + interval '9 minutes' where id = v_id;
-
-  v_id := test_support.insert_fixture_message(v_community, v_general, v_owner,
-    'general is quiet on purpose: one message, so empty-ish states are easy to see.');
-  update public.messages set created_at = v_base where id = v_id;
-
-  v_id := test_support.insert_fixture_message(v_community, v_announce, v_mod,
-    'Members can read this channel but cannot post in it.');
-  update public.messages set created_at = v_base where id = v_id;
-
-  v_id := test_support.insert_fixture_message(v_community, v_staff, v_mod,
-    'Only moderators and the owner can see staff-room.');
-  update public.messages set created_at = v_base where id = v_id;
+  perform test_support.become('owner');
+  perform public.set_reaction(v_first, '👋', true);
+  perform test_support.become('member_a');
+  perform public.set_reaction(v_first, '👋', true);
+  perform public.set_reaction(v_first, '🎉', true);
+  perform test_support.become(null);
 end $$;
+
+delete from private.rate_limit_hits where true;

@@ -1,5 +1,13 @@
 # Realtime — event contract & coverage
 
+> **The database side of this page changed on 2026-11-13.** The database was
+> rebuilt ([DATABASE.md](./DATABASE.md#realtime)): the topic is now
+> `user:<id>`, and the events it sends have new names and carry more. The
+> matrix below is still what `routeRealtimeEvent` handles today, which is the
+> old set. Until the shared core is rewritten, **the apps do not hear the new
+> database**. "From old events to new" at the end of this page is the map for
+> that rewrite.
+
 Maintained alongside [HAVEN_CORE.md](./HAVEN_CORE.md). One row per event: does
 the private user channel broadcast it, and where does `routeRealtimeEvent` send
 it?
@@ -73,3 +81,29 @@ triggers carry that signal now).
 2. **No catch-up after a reconnect.** Events missed while the socket was down
    are missed; state is corrected by the next focus-driven load or domain
    reload (see [BOOTSTRAP.md](./BOOTSTRAP.md#lifecycle-ownership--teardown)).
+
+Hole 1 is closed on the database side: a message event now carries the whole
+message, with its files, reactions and link preview, and any change to one of
+those is a `message.updated`. It stays open in the apps until they route it.
+
+## From old events to new
+
+What the rebuilt database sends in place of each event above. Full list,
+audiences and payloads: [DATABASE.md](./DATABASE.md#realtime).
+
+| Old event                                 | New event                                               | What changed for the handler                                                                              |
+| ----------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `COMMUNITY_MEMBERSHIP_CHANGE`             | `member.joined` `.updated` `.left`, `community.deleted` | Carries the membership row. The person removed is sent `member.left` too: that is the access-loss signal  |
+| `CHANNEL_INSERT` / `UPDATE` / `DELETE`    | `channel.created` `.updated` `.deleted`                 | Always the full row; no reload needed                                                                     |
+| `CHANNEL_GROUP_CHANGE`                    | `category.created` `.updated` `.deleted`                | Carries the row. Folding a category is not an event                                                       |
+| `ROLE_CHANGE`                             | `access.changed` `{community_id}`, plus `role.*`        | One per statement, not one per row                                                                        |
+| `PROFILE_IDENTITY_CHANGE`                 | `profile.updated`                                       | Carries the profile record; `deleted: true` for someone who left Haven                                    |
+| `MESSAGE_INSERT` / `UPDATE` / `DELETE`    | `message.created` `.updated` `.deleted`                 | Carries the whole message record: no follow-up fetch                                                      |
+| `DM_CONVERSATION`, `DM_MESSAGE`           | `channel.created`, `message.*`                          | A conversation is a channel; the same handlers serve both                                                 |
+| `NOTIFICATION`                            | `notification.created`, `notifications.changed`         | The first carries the row; the second means "reload the inbox"                                            |
+| `SOCIAL_CHANGE`                           | `friend_request.*`, `friendship.*`, `block.*`           | Carries the row                                                                                           |
+| `report_created`, `report_status_updated` | `report.created` `.updated`, `case.changed`             | Never sent to the person the report is about                                                              |
+| `USER_PLATFORM_BANNED`                    | `account.restricted` `{ends_at}`                        | Sent to the person; their apps sign out                                                                   |
+| —                                         | `channel.read`                                          | New: a read mark made on one device clears the badge on the others                                        |
+| —                                         | `member.banned` `.unbanned`                             | New: a ban hides or shows that person's messages                                                          |
+| `VOICE_CONTROL`                           | `voice.control`                                         | Same payload, with `actor_id` for `actor_user_id`. Voice presence moves to the `voice:<channel id>` topic |

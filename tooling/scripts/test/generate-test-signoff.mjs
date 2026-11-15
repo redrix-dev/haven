@@ -46,16 +46,10 @@ const commandSets = {
       args: ["run", "build:solid"],
     },
     {
-      id: "notif_smoke",
-      label: "Notification Dispatch Smoke",
+      id: "functions",
+      label: "Edge Functions",
       command: "npm",
-      args: [
-        "run",
-        "test:notifications:smoke",
-        "--",
-        "--skip-worker",
-        "--json",
-      ],
+      args: ["run", "test:functions"],
     },
   ],
   quick: [

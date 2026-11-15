@@ -17,6 +17,9 @@ This file is the quick index. Load the relevant project skill under
   The prime rule is understandable correctness.
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before moving state,
   adding shared logic, or changing app boundaries.
+- Read [docs/architecture/DATABASE.md](docs/architecture/DATABASE.md) before
+  touching the database or anything that calls it. The database is shaped by
+  what the product needs; the application follows it, never the reverse.
 - If code and docs disagree, the code wins and the docs are fixed in the same
   change.
 - Keep generated local artifacts out of commits: `dist/`, `test-reports/`,

@@ -1,8 +1,25 @@
 # Reporting
 
-Status: **HAV-16 design, agreed 2026-11-12. Not built yet.** The "Today"
-section describes `staging` as of that date. Everything from "Decisions" on is
-the rebuild.
+Status: **HAV-16 design, agreed 2026-11-12. The database half was built on
+2026-11-13 as part of the full database rebuild
+([DATABASE.md](./DATABASE.md#safety)); the clients and the staff site are
+not.** The "Today" section describes the system before that. Everything from
+"Decisions" on is the design.
+
+Where the built database differs from this page, the database and
+DATABASE.md are right:
+
+- Evidence stays where it is while a case holds it and is moved to the
+  private `evidence` bucket only when the case is flagged as CSAM (this page
+  says a `case-evidence` copy is made up front).
+- A suspension or ban is a row in `account_restrictions`, enforced by every
+  RPC and by an auth hook. Nothing is written to Supabase Auth.
+- Nobody handles a report about themselves: that covers moderators and
+  staff, for reading, hearing about and acting.
+- A reporter is told when their community report is closed.
+- Opening an evidence file is what unlocks it, for ten minutes, for the
+  person who opened it.
+- RPC and table names follow DATABASE.md, not the tables below.
 
 Reporting is how people tell someone that something is wrong. Haven has two
 audiences for that, and the rebuild gives each one its own table:
