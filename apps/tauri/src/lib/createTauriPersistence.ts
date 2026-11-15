@@ -1,4 +1,4 @@
-import { createLocalStoragePersistence } from "@shared/core";
+import { createLocalStoragePersistence } from "@shared/core/persistence/createLocalStoragePersistence";
 import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
 import { createTauriPluginStorePersistence } from "./createTauriPluginStorePersistence";
 import { isTauriRuntime } from "./isTauriRuntime";

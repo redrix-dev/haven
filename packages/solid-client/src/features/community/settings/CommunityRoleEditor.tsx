@@ -1,12 +1,13 @@
-import { For, Show, createMemo, createSignal, onMount } from "solid-js";
-import { Plus, Trash2 } from "lucide-solid";
+import { For, Show, createMemo, createSignal } from "solid-js";
+import { Plus } from "lucide-solid";
+import type { Permission, Role } from "@shared/lib/backend/records";
+import { rolesOf, rolesOfMember } from "@shared/collections/roles/selectors";
+import { membersOf } from "@shared/collections/members/selectors";
+import { memberKey } from "@shared/collections/members/members";
+import { permissionGroups } from "@shared/features/permissions/permissionCatalog";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { ConfirmDialog } from "@solid-client/components/ui";
-import { buildVisiblePermissionGroups } from "@shared/features/permissions/communityPermissionMeta";
-import type {
-  PermissionCatalogItem,
-  ServerRoleItem,
-} from "@shared/lib/backend/types";
 
 export const ROLE_COLORS = [
   "#99aab5",
@@ -20,160 +21,129 @@ export const ROLE_COLORS = [
 ];
 
 /**
- * Community role list + editor. Used inside the settings panel and as a
- * standalone full-page surface for deep links.
+ * A community's roles, highest first, for those with `manage_roles`: what
+ * each allows and who holds it. The database refuses anything at or above
+ * the person's own rank, and says so; what a role allows comes back with the
+ * reload `access.changed` asks for.
  */
 export function CommunityRoleEditor(props: { communityId: string }) {
   const core = requireHavenSolidCore();
-  const communityId = () => props.communityId;
-
-  const snapshot = core.admin.roleSnapshot(communityId);
-  const loading = core.admin.roleManagementLoading(communityId);
-  const canManageRoles = () =>
-    core.permissions.getPermissions(communityId()).canManageRoles;
-  const myUserId = core.authStore.getState().user?.id ?? null;
-  const isOwner = () =>
-    snapshot()?.members.find((member) => member.userId === myUserId)?.isOwner ??
-    false;
-
+  const roles = createMemo(() => rolesOf(core.stores.roles, props.communityId));
   const [selectedRoleId, setSelectedRoleId] = createSignal<string | null>(null);
+  const selectedRole = () =>
+    roles().find((role) => role.id === selectedRoleId()) ?? null;
+  const [error, setError] = createSignal<string | null>(null);
 
-  onMount(() => {
-    void core.ensureCommunityPermissions(communityId());
-    void core.admin.loadRoleManagement(communityId());
-  });
+  const holders = (roleId: string) =>
+    Object.entries(core.stores.roles.held).filter(
+      ([key, ids]) =>
+        key.startsWith(`${props.communityId}:`) && ids.includes(roleId),
+    ).length;
 
-  const roles = () => snapshot()?.roles ?? [];
-  const catalog = () => snapshot()?.permissionsCatalog ?? [];
-  const selectedRole = createMemo(
-    () => roles().find((role) => role.id === selectedRoleId()) ?? null,
-  );
-
-  const createRole = () => {
-    void core.admin
-      .createRole({
-        communityId: communityId(),
-        name: "New Role",
+  const createRole = async () => {
+    setError(null);
+    try {
+      const role = await core.roles.create(props.communityId, "New role", {
         color: ROLE_COLORS[0],
-        position: roles().length,
-      })
-      .catch((err) =>
-        console.warn("[CommunityRoleEditor] createRole failed", err),
-      );
+      });
+      setSelectedRoleId(role.id);
+    } catch (cause) {
+      setError(getErrorMessage(cause, "Couldn't create the role."));
+    }
   };
 
   return (
-    <Show
-      when={canManageRoles()}
-      fallback={
-        <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
-          You don't have permission to manage roles.
-        </div>
-      }
-    >
-      <div class="flex h-full min-h-0">
-        <div class="flex w-56 shrink-0 flex-col border-r border-border">
-          <div class="flex items-center justify-between px-3 py-2">
-            <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Roles
-            </span>
-            <button
-              type="button"
-              title="New role"
-              onClick={() => createRole()}
-              class="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
-          <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-            <Show
-              when={!loading() || roles().length > 0}
-              fallback={
-                <p class="px-1 text-sm text-muted-foreground">Loading…</p>
-              }
-            >
-              <For each={roles()}>
-                {(role) => (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRoleId(role.id)}
-                    class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors"
-                    classList={{
-                      "bg-surface-row-selected text-foreground":
-                        selectedRoleId() === role.id,
-                      "text-body-soft hover:bg-surface-list-hover":
-                        selectedRoleId() !== role.id,
-                    }}
-                  >
-                    <span
-                      class="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ "background-color": role.color }}
-                    />
-                    <span class="min-w-0 flex-1 truncate">{role.name}</span>
-                    <span class="shrink-0 text-xs text-muted-foreground">
-                      {role.memberCount}
-                    </span>
-                  </button>
-                )}
-              </For>
-            </Show>
-          </div>
-        </div>
-
-        <div class="min-h-0 flex-1 overflow-y-auto">
-          <Show
-            when={selectedRole()}
-            keyed
-            fallback={
-              <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Select a role to edit.
-              </div>
-            }
+    <div class="flex h-full min-h-0">
+      <div class="flex w-56 shrink-0 flex-col border-r border-border">
+        <div class="flex items-center justify-between px-3 py-2">
+          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Roles
+          </span>
+          <button
+            type="button"
+            title="New role"
+            onClick={() => void createRole()}
+            class="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
           >
+            <Plus size={16} />
+          </button>
+        </div>
+        <Show when={error()}>
+          <p class="px-3 pb-2 text-xs text-destructive">{error()}</p>
+        </Show>
+        <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          <For each={roles()}>
             {(role) => (
-              <RoleEditor
-                role={role}
-                catalog={catalog()}
-                isOwner={isOwner()}
-                communityId={communityId()}
-                onDeleted={() => setSelectedRoleId(null)}
-              />
+              <button
+                type="button"
+                onClick={() => setSelectedRoleId(role.id)}
+                class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors"
+                classList={{
+                  "bg-surface-row-selected text-foreground":
+                    selectedRoleId() === role.id,
+                  "text-body-soft hover:bg-surface-list-hover":
+                    selectedRoleId() !== role.id,
+                }}
+              >
+                <span
+                  class="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ "background-color": role.color }}
+                />
+                <span class="min-w-0 flex-1 truncate">
+                  {role.is_everyone ? "@everyone" : role.name}
+                </span>
+                <Show when={!role.is_everyone}>
+                  <span class="shrink-0 text-xs text-muted-foreground">
+                    {holders(role.id)}
+                  </span>
+                </Show>
+              </button>
             )}
-          </Show>
+          </For>
         </div>
       </div>
-    </Show>
+
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <Show
+          when={selectedRole()}
+          keyed
+          fallback={
+            <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Select a role to edit.
+            </div>
+          }
+        >
+          {(role) => (
+            <RoleEditor
+              role={role}
+              communityId={props.communityId}
+              onDeleted={() => setSelectedRoleId(null)}
+            />
+          )}
+        </Show>
+      </div>
+    </div>
   );
 }
 
 function RoleEditor(props: {
-  role: ServerRoleItem;
-  catalog: PermissionCatalogItem[];
-  isOwner: boolean;
+  role: Role;
   communityId: string;
   onDeleted: () => void;
 }) {
   const core = requireHavenSolidCore();
   const [name, setName] = createSignal(props.role.name);
   const [color, setColor] = createSignal(props.role.color);
-  const [keys, setKeys] = createSignal<string[]>([
-    ...props.role.permissionKeys,
+  const [keys, setKeys] = createSignal<Permission[]>([
+    ...(core.stores.roles.permissions[props.role.id] ?? []),
   ]);
   const [saving, setSaving] = createSignal(false);
   const [deleting, setDeleting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [confirmDelete, setConfirmDelete] = createSignal(false);
+  const groups = permissionGroups();
 
-  const canEditDetails =
-    !props.role.isDefault && (!props.role.isSystem || props.isOwner);
-  const canEditPermissions = !props.role.isSystem || props.isOwner;
-  const canDelete =
-    !props.role.isDefault && (!props.role.isSystem || props.isOwner);
-
-  const groups = createMemo(() => buildVisiblePermissionGroups(props.catalog));
-
-  const toggle = (key: string) =>
+  const toggle = (key: Permission) =>
     setKeys((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
@@ -182,17 +152,15 @@ function RoleEditor(props: {
     setSaving(true);
     setError(null);
     try {
-      await core.admin.saveRole({
-        communityId: props.communityId,
-        roleId: props.role.id,
-        position: props.role.position,
-        details: canEditDetails
-          ? { name: name().trim() || props.role.name, color: color() }
-          : null,
-        permissionKeys: canEditPermissions ? keys() : null,
-      });
+      if (!props.role.is_everyone) {
+        await core.roles.update(props.role.id, {
+          name: name().trim() || props.role.name,
+          color: color(),
+        });
+      }
+      await core.roles.setPermissions(props.role.id, keys());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save role.");
+      setError(getErrorMessage(e, "Couldn't save the role."));
     } finally {
       setSaving(false);
     }
@@ -201,17 +169,43 @@ function RoleEditor(props: {
   const doDelete = async () => {
     setDeleting(true);
     try {
-      await core.admin.deleteRole({
-        communityId: props.communityId,
-        roleId: props.role.id,
-      });
+      await core.roles.remove(props.role.id);
       setConfirmDelete(false);
       props.onDeleted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete role.");
+      setError(getErrorMessage(e, "Couldn't delete the role."));
       setConfirmDelete(false);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const members = createMemo(() =>
+    membersOf(core.stores.members, props.communityId)
+      .map((m) => ({
+        id: m.user_id,
+        name: core.nameOf(m.user_id, props.communityId),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  const holds = (userId: string) =>
+    (
+      core.stores.roles.held[memberKey(props.communityId, userId)] ?? []
+    ).includes(props.role.id);
+  const setHolds = async (userId: string, on: boolean) => {
+    setError(null);
+    const current = rolesOfMember(
+      core.stores.roles,
+      props.communityId,
+      userId,
+    ).map((r) => r.id);
+    const next = on
+      ? [...new Set([...current, props.role.id])]
+      : current.filter((id) => id !== props.role.id);
+    try {
+      await core.roles.setMemberRoles(props.communityId, userId, next);
+    } catch (e) {
+      setError(getErrorMessage(e, "Couldn't change their roles."));
     }
   };
 
@@ -223,25 +217,22 @@ function RoleEditor(props: {
           style={{ "background-color": color() }}
         />
         <h2 class="flex-1 text-lg font-semibold text-foreground">
-          {props.role.name}
+          {props.role.is_everyone ? "@everyone" : props.role.name}
         </h2>
-        <Show when={props.role.isDefault}>
-          <span class="text-xs text-muted-foreground">Default</span>
-        </Show>
-        <Show when={props.role.isSystem && !props.role.isDefault}>
-          <span class="text-xs text-muted-foreground">System</span>
-        </Show>
       </div>
 
+      <Show when={error()}>
+        <p class="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error()}
+        </p>
+      </Show>
+
       <Show
-        when={canEditDetails}
+        when={!props.role.is_everyone}
         fallback={
           <p class="mb-5 text-sm text-muted-foreground">
-            {props.role.isSystem
-              ? "System role details are fixed."
-              : props.role.isDefault
-                ? "The default role's name and color are fixed."
-                : "You can't edit this role."}
+            Everyone in the community holds this role. What it allows, every
+            member may do.
           </p>
         }
       >
@@ -286,16 +277,10 @@ function RoleEditor(props: {
         </div>
       </Show>
 
-      <h3 class="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+      <h3 class="mb-3 text-xs font-semibold uppercase text-muted-foreground">
         Permissions
       </h3>
-      <Show when={!canEditPermissions}>
-        <p class="mb-3 text-xs text-muted-foreground">
-          Read-only — you can't change this role's permissions.
-        </p>
-      </Show>
-
-      <For each={groups()}>
+      <For each={groups}>
         {(group) => (
           <div class="mb-5">
             <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -304,21 +289,21 @@ function RoleEditor(props: {
             <div class="space-y-1.5">
               <For each={group.permissions}>
                 {(perm) => (
-                  <div class="flex items-center justify-between rounded-lg border border-border bg-surface-panel px-3 py-2.5">
+                  <label class="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-surface-panel px-3 py-2.5">
                     <div class="min-w-0 flex-1 pr-3">
                       <p class="text-sm text-foreground">{perm.label}</p>
-                      <Show when={perm.description}>
-                        <p class="text-xs text-muted-foreground">
-                          {perm.description}
-                        </p>
-                      </Show>
+                      <p class="text-xs text-muted-foreground">
+                        {perm.description}
+                      </p>
                     </div>
-                    <PermissionSwitch
+                    <input
+                      type="checkbox"
                       checked={keys().includes(perm.key)}
-                      disabled={!canEditPermissions || saving()}
-                      onToggle={() => toggle(perm.key)}
+                      disabled={saving()}
+                      onChange={() => toggle(perm.key)}
+                      class="h-4 w-4 accent-primary"
                     />
-                  </div>
+                  </label>
                 )}
               </For>
             </div>
@@ -326,37 +311,54 @@ function RoleEditor(props: {
         )}
       </For>
 
-      <Show when={error()}>
-        <p class="mb-3 text-sm text-destructive">{error()}</p>
-      </Show>
-
-      <div class="flex items-center gap-3">
-        <Show when={canEditDetails || canEditPermissions}>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={saving()}
+          onClick={() => void save()}
+          class="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+        >
+          {saving() ? "Saving…" : "Save role"}
+        </button>
+        <Show when={!props.role.is_everyone}>
           <button
             type="button"
-            disabled={saving()}
-            onClick={() => void save()}
-            class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            {saving() ? "Saving…" : "Save role"}
-          </button>
-        </Show>
-        <Show when={canDelete}>
-          <button
-            type="button"
+            disabled={deleting()}
             onClick={() => setConfirmDelete(true)}
-            class="flex items-center gap-1 rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-primary-foreground"
+            class="rounded px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
           >
-            <Trash2 size={14} />
-            Delete
+            Delete role
           </button>
         </Show>
       </div>
 
+      <Show when={!props.role.is_everyone}>
+        <h3 class="mb-2 mt-8 text-xs font-semibold uppercase text-muted-foreground">
+          Members with this role
+        </h3>
+        <div class="space-y-1">
+          <For each={members()}>
+            {(member) => (
+              <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-body-soft hover:bg-surface-list-hover">
+                <input
+                  type="checkbox"
+                  checked={holds(member.id)}
+                  onChange={(e) =>
+                    void setHolds(member.id, e.currentTarget.checked)
+                  }
+                  class="h-4 w-4 accent-primary"
+                />
+                {member.name}
+              </label>
+            )}
+          </For>
+        </div>
+      </Show>
+
       <ConfirmDialog
         open={confirmDelete()}
-        title={`Delete "${props.role.name}"?`}
-        description="This removes the role from every member."
+        title={`Delete ${props.role.name}?`}
+        description="Everyone who holds it loses what it allows."
         confirmLabel="Delete"
         danger
         pending={deleting()}
@@ -364,31 +366,5 @@ function RoleEditor(props: {
         onCancel={() => setConfirmDelete(false)}
       />
     </div>
-  );
-}
-
-function PermissionSwitch(props: {
-  checked: boolean;
-  disabled?: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={props.checked}
-      disabled={props.disabled}
-      onClick={() => props.onToggle()}
-      class="relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50"
-      classList={{
-        "bg-primary": props.checked,
-        "bg-surface-input": !props.checked,
-      }}
-    >
-      <span
-        class="absolute top-0.5 h-4 w-4 rounded-full bg-foreground transition-all"
-        classList={{ "left-[18px]": props.checked, "left-0.5": !props.checked }}
-      />
-    </button>
   );
 }

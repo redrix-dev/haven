@@ -39,10 +39,15 @@ const signInFirst = (intent: SessionLinkIntent): ToastInput =>
         title: "Sign in to use this invite",
         body: "It'll open as soon as you're signed in.",
       }
-    : {
-        title: "Sign in to open this link",
-        body: "We'll take you there as soon as you're signed in.",
-      };
+    : intent.kind === "friend_link"
+      ? {
+          title: "Sign in to see this friend request",
+          body: "You'll be asked whether to accept it once you're signed in.",
+        }
+      : {
+          title: "Sign in to open this link",
+          body: "We'll take you there as soon as you're signed in.",
+        };
 
 const hasParam = (intent: AuthConfirmLinkIntent, key: string): boolean => {
   const value: string | undefined = intent.params[key];

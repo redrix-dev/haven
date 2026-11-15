@@ -66,7 +66,7 @@ This is what makes the class near-invisible in review: the code reads as
 fire-and-forget, and it isn't. If you only remember one thing from this skill,
 remember this paragraph.
 
-**Shared nexus methods read the live store.** Every nexus's logic lives in
+**Shared collection methods read the live store.** Every collection's logic lives in
 `packages/shared`, and on Solid its `port.get()` is the live store proxy, so a
 shared method's reads before its first `await` (a cache check, a freshness
 stamp, the old value it is about to merge into) are tracked reads. Assume any
@@ -86,31 +86,28 @@ stamp, the old value it is about to merge into) are tracked reads. Assume any
 
 Defended, copy these:
 
-- [DirectMessagesView.tsx](../../../packages/solid-client/src/features/direct-messages/DirectMessagesView.tsx) — the `86a20e0` fix
-- [CommunityOverviewTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityOverviewTab.tsx) — reads props, then `untrack(() => load(id))`
-- [CommunityChannelsTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityChannelsTab.tsx) — defended, with a settle test that locks it
-- [ProfileSettings.tsx](../../../packages/solid-client/src/features/settings/ProfileSettings.tsx) — `untrack(() => void load(id))` around four `ensure*` calls
+- [CommunityRouteSync.ts](../../../packages/solid-client/src/features/community/CommunityRouteSync.ts) — tracks the route params, then `untrack(() => core.openChannel(…))`
+- [ChannelChat.tsx](../../../packages/solid-client/src/features/community/ChannelChat.tsx) — tracks what the window shows, then ensures profiles, file links and replied-to messages untracked
+- [FriendLinkView.tsx](../../../packages/solid-client/src/features/friends/FriendLinkView.tsx) — tracks the code, then `untrack(() => core.social.openLink(code))`
 
 ### A settling effect is not a defended one
 
-Measured on the settings and community surfaces: every naked effect **already
-settled**, because the nexus's `LoadGate` made the retriggered call join the
-load already in flight. They cost one or two extra effect runs and renders, not
-a runaway loop — and one fetch either way.
+Measured on the collections (2026-11-15, `coreSurfaces.tier2.test.ts`):
+untracked, every screen's call runs its effect once. Naked, every one runs
+again on its own writes. Most cost one or two extra runs, because a load
+already running absorbs the retrigger. But loads that always start fresh
+(`refresh`: friend links, opening a friend link, a community's reports,
+report notes) **loop for as long as they are allowed to**. Whether a naked
+effect strobes depends on how the command it calls dedupes, an
+implementation detail one change away from flipping.
 
-So "it doesn't strobe" proves nothing. The defense was an implementation detail
-of the nexus, one dedupe away from vanishing — exactly the coincidence §5 warns
-about. Judge an effect by whether it reads a store it writes, not by whether you
-can see it misbehave.
+So "it doesn't strobe" proves nothing. Judge an effect by whether it reads a
+store it writes, not by whether you can see it misbehave.
 
 The corollary for tests: a settle test on an effect that settles either way
-asserts nothing. Assert the **run count** (naked costs 2 or 3, `untrack` costs
-
-1. so removing the guard actually fails, and skip the test where no such
-   difference exists — `ChannelPermissionsDialog`, `NotificationSettings` and
-   `ModmailLoader` measure 1 run in every variant, so they carry the `untrack` fix
-   without a settle test. The pairs live in `test-support/__tests__/`
-   (`settingsSurfaces`, `socialSurfaces`, `communitySurfaces`).
+asserts nothing. Assert the **run count** both ways: untracked is 1, naked is
+what was measured (`NAKED_RUNS` in `coreSurfaces.tier2.test.ts`). A new
+screen effect adds its call to `CASES` there.
 
 ## Ship The Test With The Effect
 
@@ -136,9 +133,10 @@ proof.
   **async** write (after an RPC/load) retriggered it. Proven finding: this class
   does **not** reproduce in a bare reactive graph — it only loops under Solid's
   real render scheduler, so the test must render (`@solidjs/testing-library`).
-  Drive the **real nexus method** (e.g. `openConversation`), not a synthetic
-  mimic — a hand-built store synthetic won't capture the exact subscription that
-  leaks. See `directMessagesLoop.tier2.test.ts`.
+  Drive the **real command** (e.g. `core.openConversation`) on a real
+  `HavenSolidCore` (`createSolidTestCore()` in `test-support/`), not a
+  synthetic mimic — a hand-built store won't capture the exact subscription
+  that leaks. See `coreSurfaces.tier2.test.ts`.
 
 **Rule of thumb:** if the retriggering write happens **after an `await`** (RPC,
 load, mark-read), it's the async class → Tier 2. If the effect blows the stack

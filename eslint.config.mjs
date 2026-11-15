@@ -430,7 +430,9 @@ export default [
             },
             {
               from: { type: "contexts" },
-              allow: { to: { type: ["core", "auth", "data"] } },
+              // ui is the bottom layer (dumb primitives): a context that shows an
+              // app-wide dialog, like PeopleProvider, renders with it.
+              allow: { to: { type: ["core", "auth", "data", "ui"] } },
             },
             { from: { type: "auth" }, allow: { to: { type: "core" } } },
             { from: { type: "core" }, allow: { to: { type: "data" } } },

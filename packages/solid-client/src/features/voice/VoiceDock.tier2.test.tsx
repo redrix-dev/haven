@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "solid-js/web";
+import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { VoiceSolidNexus } from "@solid-client/data/voice/voiceSolidNexus";
+import { createSolidTestCore } from "@solid-client/test-support/solidTestCore";
 import { VoiceDock } from "./VoiceDock";
 
 let core: any;
@@ -19,37 +20,34 @@ afterEach(() => {
 
 describe("voice drawer", () => {
   it("expands, opens the full call and saves threshold without leaving or refetching on speaking updates", async () => {
-    const memory = new Map<string, string>();
-    const persistence = {
-      getString: (key: string) => memory.get(key) ?? null,
-      set: (key: string, value: string) => void memory.set(key, value),
-      remove: (key: string) => void memory.delete(key),
-    };
-    const nexus = new VoiceSolidNexus(undefined, undefined, persistence);
-    const control = vi.spyOn(nexus, "controlParticipant").mockResolvedValue();
-    const [permissions, setPermissions] = createStore({
-      canManageMembers: false,
-      canManageBans: false,
+    const test = createSolidTestCore();
+    core = test.core;
+    // Signed in as "self", owner of the community, with Jamie a member.
+    core.state.set({ userId: "self" });
+    core.communities.applyCommunity({
+      id: "community",
+      name: "Hearth",
+      owner_id: "self",
+      description: null,
+      invites_enabled: true,
+      report_reason_required: false,
+      created_at: "2026-11-14T00:00:00.000Z",
+      updated_at: "2026-11-14T00:00:00.000Z",
     });
-    core = {
-      voice: nexus,
-      authStore: { getState: () => ({ user: { id: "self" } }) },
-      profiles: { viewerProfile: () => () => ({ username: "Cody" }) },
-      admin: {
-        roleSnapshot: () => () => ({
-          roles: [],
-          members: [
-            { userId: "self", isOwner: true, roleIds: [] },
-            { userId: "jamie", isOwner: false, roleIds: [] },
-          ],
-        }),
-        loadRoleManagement: vi.fn(async () => {}),
-        members: () => () => [{ userId: "jamie", isOwner: false }],
-        ensureMembersLoaded: vi.fn(async () => {}),
-      },
-      permissions: { getPermissions: () => permissions },
-      ensureCommunityPermissions: vi.fn(async () => {}),
-    };
+    core.members.applyMember({
+      community_id: "community",
+      user_id: "jamie",
+      nickname: "Jamie",
+      joined_at: "2026-11-14T00:00:00.000Z",
+    });
+    const [canManage, setCanManage] = createSignal(false);
+    vi.spyOn(core.communities, "can").mockImplementation(
+      (_id: string, permission: string) =>
+        permission === "manage_members" && canManage(),
+    );
+    const control = vi
+      .spyOn(core.voice, "controlParticipant")
+      .mockResolvedValue();
     const [voice, setVoice] = createStore({
       activeChannel: {
         communityId: "community",
@@ -104,7 +102,6 @@ describe("voice drawer", () => {
       document.querySelector('[aria-label="Voice participants"]')?.textContent,
     ).toContain("Jamie");
     setVoice("participants", 0, "isSpeaking", true);
-    expect(core.admin.ensureMembersLoaded).toHaveBeenCalledTimes(1);
     click("Actions for Jamie");
     await Promise.resolve();
     expect(
@@ -115,7 +112,7 @@ describe("voice drawer", () => {
         (button) => button.textContent === "Remove from channel",
       );
     expect(actionButton()).toBeUndefined();
-    setPermissions("canManageMembers", true);
+    setCanManage(true);
     expect(actionButton()).toBeDefined();
     actionButton()!.click();
     expect(control).toHaveBeenCalledWith("jamie", "channel", "remove");
@@ -134,10 +131,7 @@ describe("voice drawer", () => {
     expect(slider).not.toBeNull();
     slider.value = "31";
     slider.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(
-      new VoiceSolidNexus(undefined, undefined, persistence).getSnapshot()
-        .settings.voiceActivationThreshold,
-    ).toBe(31);
+    expect(core.stores.voice.settings.voiceActivationThreshold).toBe(31);
     click("Close audio settings");
     click("Collapse participants");
     expect(

@@ -55,7 +55,7 @@ Dependencies point **down** this table, never up, never sideways between feature
 | `App.tsx` (app) | routes, contexts, core, ui, other root files               |
 | `routes/`       | features (**index barrel only**), contexts, core, ui       |
 | `features/*`    | data, ui, contexts, auth, core — **never another feature** |
-| `contexts/`     | core, auth, data                                           |
+| `contexts/`     | core, auth, data, UI primitives                            |
 | `auth/`         | core                                                       |
 | `core/`         | data                                                       |
 | `data/`, `ui/`  | nothing above — only `@shared` and solid-js                |

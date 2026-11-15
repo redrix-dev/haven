@@ -2,7 +2,7 @@ import { Show, createSignal } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import { LogIn, Plus } from "lucide-solid";
 import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode";
-import { describeInviteRedeemError } from "@shared/features/community/utils/inviteRedeemError";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { buildHavenSchemeLink } from "@shared/features/links";
 import {
   Button,
@@ -42,12 +42,10 @@ export function CommunityAccessView() {
     setCreateError(null);
     setCreating(true);
     try {
-      const community = await core.createCommunity(communityName);
-      navigate(`/community/${community.id}`);
+      const communityId = await core.createCommunity(communityName);
+      navigate(`/community/${communityId}`);
     } catch (error) {
-      setCreateError(
-        error instanceof Error ? error.message : "Couldn't create community.",
-      );
+      setCreateError(getErrorMessage(error, "Couldn't create community."));
     } finally {
       setCreating(false);
     }
@@ -64,10 +62,10 @@ export function CommunityAccessView() {
     try {
       // An existing member gets `joined: false` back and lands on the
       // community like anyone else — no error.
-      const result = await core.joinCommunityByInvite(code);
-      navigate(`/community/${result.communityId}`);
+      const communityId = await core.joinCommunity(code);
+      navigate(`/community/${communityId}`);
     } catch (error) {
-      setJoinError(describeInviteRedeemError(error));
+      setJoinError(getErrorMessage(error, "Couldn't join that community."));
     } finally {
       setJoining(false);
     }

@@ -1,10 +1,19 @@
-import { For, Show, createSignal, onMount } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  untrack,
+} from "solid-js";
 import { Check, Copy, Link2, Plus, Trash2 } from "lucide-solid";
 import { buildHavenLink } from "@shared/features/links";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { ConfirmDialog } from "@solid-client/components/ui";
 import { useToast } from "@solid-client/contexts/ToastProvider";
-import type { ServerInvite } from "@shared/lib/backend/types";
+import type { Invite } from "@shared/lib/backend/records";
+import { invitesOf } from "@shared/collections/communities/selectors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 /** Expiry choices, in hours; null = never. */
 const EXPIRY_OPTIONS: { label: string; hours: number | null }[] = [
@@ -38,9 +47,9 @@ function inviteReference(code: string): string {
   return buildHavenLink({ kind: "invite", code });
 }
 
-function formatExpiry(invite: ServerInvite): string {
-  if (!invite.expiresAt) return "Never expires";
-  const when = new Date(invite.expiresAt);
+function formatExpiry(invite: Invite): string {
+  if (!invite.expires_at) return "Never expires";
+  const when = new Date(invite.expires_at);
   if (Number.isNaN(when.getTime())) return "Never expires";
   return `Expires ${when.toLocaleDateString(undefined, {
     month: "short",
@@ -48,11 +57,9 @@ function formatExpiry(invite: ServerInvite): string {
   })}`;
 }
 
-function formatUses(invite: ServerInvite): string {
-  const max = invite.maxUses;
-  return max == null
-    ? `${invite.currentUses} uses`
-    : `${invite.currentUses} / ${max} uses`;
+function formatUses(invite: Invite): string {
+  const max = invite.max_uses;
+  return max == null ? `${invite.uses} uses` : `${invite.uses} / ${max} uses`;
 }
 
 /** Active-invite management for the community settings panel's Invites tab. */
@@ -61,27 +68,33 @@ export function CommunityInvitesTab(props: { communityId: string }) {
   const toast = useToast();
   const communityId = () => props.communityId;
 
-  const invites = core.admin.invites(communityId);
-  const loading = core.admin.invitesLoading(communityId);
-  const error = core.admin.invitesError(communityId);
+  const invites = createMemo(() =>
+    invitesOf(core.stores.communities, communityId()),
+  );
+  const status = () =>
+    core.stores.communities.requests[`invites:${communityId()}`];
+  const loading = () => status()?.running ?? true;
+  const error = () =>
+    status()?.error
+      ? getErrorMessage(status()!.error, "Couldn't load invites.")
+      : null;
   const canManageInvites = () =>
-    core.permissions.getPermissions(communityId()).canManageInvites;
+    core.communities.can(communityId(), "manage_invites");
 
   const [maxUses, setMaxUses] = createSignal<number | null>(null);
   const [expiresInHours, setExpiresInHours] = createSignal<number | null>(168);
   const [creating, setCreating] = createSignal(false);
   const [copiedId, setCopiedId] = createSignal<string | null>(null);
-  const [revokeTarget, setRevokeTarget] = createSignal<ServerInvite | null>(
-    null,
-  );
+  const [revokeTarget, setRevokeTarget] = createSignal<Invite | null>(null);
   const [revoking, setRevoking] = createSignal(false);
 
-  onMount(() => {
-    void core.ensureCommunityPermissions(communityId());
-    void core.admin.loadInvites(communityId());
+  // Track the community only; loading reads the store it writes.
+  createEffect(() => {
+    const id = communityId();
+    untrack(() => void core.communities.loadInvites(id));
   });
 
-  const copy = async (invite: ServerInvite) => {
+  const copy = async (invite: Invite) => {
     const ref = inviteReference(invite.code);
     try {
       await navigator.clipboard.writeText(ref);
@@ -95,10 +108,9 @@ export function CommunityInvitesTab(props: { communityId: string }) {
   const create = async () => {
     setCreating(true);
     try {
-      const invite = await core.admin.createInvite({
-        communityId: communityId(),
-        maxUses: maxUses(),
-        expiresInHours: expiresInHours(),
+      const invite = await core.communities.createInvite(communityId(), {
+        max_uses: maxUses(),
+        expires_in_hours: expiresInHours(),
       });
       const ref = inviteReference(invite.code);
       try {
@@ -110,7 +122,7 @@ export function CommunityInvitesTab(props: { communityId: string }) {
     } catch (e) {
       toast.show({
         title: "Couldn't create invite",
-        body: e instanceof Error ? e.message : "Please try again.",
+        body: getErrorMessage(e, "Please try again."),
       });
     } finally {
       setCreating(false);
@@ -122,15 +134,12 @@ export function CommunityInvitesTab(props: { communityId: string }) {
     if (!target) return;
     setRevoking(true);
     try {
-      await core.admin.revokeInvite({
-        communityId: communityId(),
-        inviteId: target.id,
-      });
+      await core.communities.revokeInvite(communityId(), target.id);
       setRevokeTarget(null);
     } catch (e) {
       toast.show({
         title: "Couldn't revoke invite",
-        body: e instanceof Error ? e.message : "Please try again.",
+        body: getErrorMessage(e, "Please try again."),
       });
     } finally {
       setRevoking(false);

@@ -1,1 +1,0 @@
-export { CommunitySolidNexus } from "./communitySolidNexus";

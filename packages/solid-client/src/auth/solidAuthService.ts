@@ -11,7 +11,7 @@ import { requireHavenSolidCore } from "@solid-client/core";
 
 export type SolidAuthResult = { error: unknown | null };
 
-const authClient = () => requireHavenSolidCore().backends.client.auth;
+const authClient = () => requireHavenSolidCore().client.auth;
 
 const pageOrigin = () =>
   typeof window !== "undefined" ? window.location.origin : "";

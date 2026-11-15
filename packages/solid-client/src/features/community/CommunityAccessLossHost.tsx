@@ -1,14 +1,14 @@
-import { onCleanup, onMount } from "solid-js";
+import { createEffect } from "solid-js";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useToast } from "@solid-client/contexts/ToastProvider";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
 
 /**
- * Renders nothing — tells the viewer when they lose access to a community
- * (kicked, banned, or it was deleted) and leaves its voice channel. The core
- * has already forgotten the community; CommunityView's route guard moves off
- * it. The platform's single subscriber, so it also receives losses found at
- * sign-in (kicked while the app was closed).
+ * Renders nothing. Tells the person when a community is gone for them (they
+ * left, here or on another device, were removed or banned, or it was
+ * deleted) and leaves its voice channel. The core has already forgotten the
+ * community, so its name is remembered here; CommunityView's route guard
+ * moves off it.
  *
  * Mounted once in the authed layout.
  */
@@ -16,16 +16,26 @@ export function CommunityAccessLossHost() {
   const core = requireHavenSolidCore();
   const toast = useToast();
   const voice = useVoice();
+  const names = new Map<string, string>();
 
-  onMount(() => {
-    const unsubscribe = core.subscribeCommunityAccessLost((loss) => {
-      if (loss.inVoice) void voice.leave();
+  createEffect(() => {
+    for (const community of Object.values(core.stores.communities.byId)) {
+      names.set(community.id, community.name);
+    }
+  });
+
+  core.listen({
+    communityGone: (communityId) => {
+      if (voice.voice.activeChannel?.communityId === communityId) {
+        void voice.leave();
+      }
+      const name = names.get(communityId);
+      names.delete(communityId);
       toast.show({
-        title: "Removed from community",
-        body: `You no longer have access to ${loss.communityName}.`,
+        title: "No longer in a community",
+        body: name ? `You're no longer in ${name}.` : undefined,
       });
-    });
-    onCleanup(unsubscribe);
+    },
   });
 
   return null;

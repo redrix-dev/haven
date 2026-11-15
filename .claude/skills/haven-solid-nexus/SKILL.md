@@ -5,11 +5,14 @@ description: Use when adding or changing a data nexus — the shared XNexus in p
 
 # Haven Nexus (shared class + bindings)
 
+> Desktop and web no longer use nexuses: they run on the collections
+> (docs/architecture/COLLECTIONS.md, `packages/solid-client/src/data/README.md`).
+> This skill describes what mobile still runs until it moves; then it goes.
+
 ## Read Before Editing
 
 - [packages/shared/src/nexus/NEXUS_RECIPE.md](../../../packages/shared/src/nexus/NEXUS_RECIPE.md) — the step-by-step
 - [packages/solid-client/src/data/README.md](../../../packages/solid-client/src/data/README.md) — how the Solid port behaves
-- [packages/solid-client/src/data/channels/channelSolidNexus.md](../../../packages/solid-client/src/data/channels/channelSolidNexus.md) — worked example
 - [docs/architecture/HAVEN_CORE.md](../../../docs/architecture/HAVEN_CORE.md)
 
 ## Shape

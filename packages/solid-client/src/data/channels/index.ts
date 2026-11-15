@@ -1,1 +1,0 @@
-export { ChannelSolidNexus } from "./channelSolidNexus";

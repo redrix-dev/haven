@@ -1,52 +1,51 @@
-import { For, Show, createMemo, createSignal } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  untrack,
+} from "solid-js";
 import { ShieldAlert } from "lucide-solid";
-import { requireHavenSolidCore } from "@solid-client/core";
-import { Avatar } from "@solid-client/components/ui";
-import { useToast } from "@solid-client/contexts/ToastProvider";
 import type {
-  ServerReportDetail,
-  ServerReportSummary,
-  SupportReportMessageSnapshot,
-  SupportReportSnapshot,
-  SupportReportStatus,
-} from "@shared/lib/backend/types";
+  CommunityReportRecord,
+  ReportStatus,
+} from "@shared/lib/backend/records";
+import { communityReports } from "@shared/collections/reports/selectors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { requireHavenSolidCore } from "@solid-client/core";
+import { Avatar, Button, ConfirmDialog } from "@solid-client/components/ui";
+import { useToast } from "@solid-client/contexts/ToastProvider";
 
-const STATUS_LABELS: Record<SupportReportStatus, string> = {
-  pending: "Pending",
-  under_review: "Under review",
+const STATUS_LABELS: Record<ReportStatus, string> = {
+  open: "Open",
+  in_review: "In review",
   resolved: "Resolved",
   dismissed: "Dismissed",
-  escalated: "Escalated",
-  resolved_by_platform: "Resolved by platform",
+  escalated: "Sent to Haven",
 };
 
-/** Statuses a community mod can set directly (escalate/acknowledge are buttons). */
-const SETTABLE_STATUSES: SupportReportStatus[] = [
-  "pending",
-  "under_review",
+/** What a moderator sets; escalating is its own button, and final. */
+const SETTABLE: Exclude<ReportStatus, "escalated">[] = [
+  "open",
+  "in_review",
   "resolved",
   "dismissed",
 ];
 
-const OPEN_STATUSES: SupportReportStatus[] = ["pending", "under_review"];
+const WAITING: ReportStatus[] = ["open", "in_review"];
 
-function statusTone(status: SupportReportStatus): string {
+function statusTone(status: ReportStatus): string {
   switch (status) {
-    case "pending":
+    case "open":
       return "bg-destructive/15 text-destructive";
-    case "under_review":
+    case "in_review":
       return "bg-primary/15 text-primary";
     case "escalated":
       return "bg-accent-amber/15 text-accent-amber";
     default:
       return "bg-surface-input text-muted-foreground";
   }
-}
-
-function isMessageSnapshot(
-  snapshot: SupportReportSnapshot,
-): snapshot is SupportReportMessageSnapshot {
-  return "reportedMessage" in snapshot;
 }
 
 function formatTime(iso: string): string {
@@ -61,27 +60,27 @@ function formatTime(iso: string): string {
 }
 
 /**
- * Community modmail inbox — a unified queue of reports across every community
- * the viewer can moderate. The cross-community load + realtime arrivals are
- * driven by ModmailLoader (mounted in the authed layout); this view just reads
- * the nexus projections and drives selection + triage.
+ * Modmail: the reports of every community the person moderates, newest
+ * first. A report shows what the database wrote down when it was filed (the
+ * message, its neighbours, the person), never who filed it.
  */
 export function ModmailView() {
   const core = requireHavenSolidCore();
-  const reports = core.moderation.reports();
-  const loading = core.moderation.reportsLoading();
-  const selectedId = core.moderation.selectedReportId();
-  const detail = core.moderation.reportDetail();
-  const detailLoading = core.moderation.detailLoading();
+  const [showAll, setShowAll] = createSignal(false);
+  const [selectedId, setSelectedId] = createSignal<string | null>(null);
 
-  const [showResolved, setShowResolved] = createSignal(false);
-
-  const visible = createMemo(() => {
-    const all = reports();
-    return showResolved()
-      ? all
-      : all.filter((r) => OPEN_STATUSES.includes(r.status));
-  });
+  const reports = createMemo(() =>
+    Object.keys(core.stores.reports.byCommunity)
+      .flatMap((id) => communityReports(core.stores.reports, id))
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
+  );
+  const visible = createMemo(() =>
+    showAll() ? reports() : reports().filter((r) => WAITING.includes(r.status)),
+  );
+  const selected = () => {
+    const id = selectedId();
+    return id ? core.stores.reports.byId[id] : undefined;
+  };
 
   return (
     <div class="flex h-full min-h-0 flex-col">
@@ -91,65 +90,81 @@ export function ModmailView() {
         <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
           <input
             type="checkbox"
-            checked={showResolved()}
-            onChange={(e) => setShowResolved(e.currentTarget.checked)}
+            checked={showAll()}
+            onChange={(e) => setShowAll(e.currentTarget.checked)}
           />
-          Show resolved
+          Show handled
         </label>
       </header>
 
       <div class="flex min-h-0 flex-1">
-        {/* List */}
         <div class="flex w-80 shrink-0 flex-col border-r border-border">
           <Show
-            when={!loading() || reports().length > 0}
-            fallback={<p class="p-4 text-sm text-muted-foreground">Loading…</p>}
-          >
-            <Show
-              when={visible().length > 0}
-              fallback={
-                <div class="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                  {showResolved()
-                    ? "No reports."
-                    : "No open reports. You're all caught up."}
-                </div>
-              }
-            >
-              <ul class="min-h-0 flex-1 overflow-y-auto">
-                <For each={visible()}>
-                  {(report) => (
-                    <ReportListRow
-                      report={report}
-                      selected={selectedId() === report.reportId}
-                      onSelect={() =>
-                        void core.moderation.selectReport(report.reportId)
-                      }
-                    />
-                  )}
-                </For>
-              </ul>
-            </Show>
-          </Show>
-        </div>
-
-        {/* Detail */}
-        <div class="min-h-0 flex-1 overflow-y-auto">
-          <Show
-            when={selectedId()}
+            when={visible().length > 0}
             fallback={
-              <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Select a report to review.
+              <div class="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                {showAll()
+                  ? "No reports."
+                  : "Nothing waiting. You're all caught up."}
               </div>
             }
           >
-            <Show
-              when={detail() && !detailLoading()}
-              fallback={
-                <p class="p-6 text-sm text-muted-foreground">Loading…</p>
-              }
-            >
-              <ReportDetailPane detail={detail()!} />
-            </Show>
+            <ul class="min-h-0 flex-1 overflow-y-auto">
+              <For each={visible()}>
+                {(report) => (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(report.id)}
+                      class="flex w-full flex-col gap-1 border-b border-border px-4 py-3 text-left hover:bg-surface-list-hover"
+                      classList={{
+                        "bg-surface-row-selected": selectedId() === report.id,
+                      }}
+                    >
+                      <div class="flex items-center gap-2">
+                        <span class="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                          {report.subject_kind === "message"
+                            ? "Message"
+                            : "Member"}{" "}
+                          ·{" "}
+                          {
+                            core.stores.communities.byId[report.community_id]
+                              ?.name
+                          }
+                        </span>
+                        <span
+                          class={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${statusTone(report.status)}`}
+                        >
+                          {STATUS_LABELS[report.status]}
+                        </span>
+                      </div>
+                      <span class="truncate text-xs text-muted-foreground">
+                        {report.reason ||
+                          report.snapshot.message?.body ||
+                          "No reason given"}
+                      </span>
+                      <span class="text-[11px] text-muted-foreground">
+                        {formatTime(report.created_at)}
+                      </span>
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <Show
+            when={selected()}
+            keyed
+            fallback={
+              <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
+                Select a report.
+              </div>
+            }
+          >
+            {(report) => <ReportDetail report={report} />}
           </Show>
         </div>
       </div>
@@ -157,291 +172,236 @@ export function ModmailView() {
   );
 }
 
-function ReportListRow(props: {
-  report: ServerReportSummary;
-  selected: boolean;
-  onSelect: () => void;
-}) {
+function ContextLine(props: { username: string | null; body: string }) {
   return (
-    <li>
-      <button
-        type="button"
-        onClick={() => props.onSelect()}
-        class="flex w-full flex-col gap-1 border-b border-border px-3 py-2.5 text-left transition-colors"
-        classList={{
-          "bg-surface-row-selected": props.selected,
-          "hover:bg-surface-list-hover": !props.selected,
-        }}
-      >
-        <div class="flex items-center gap-2">
-          <span class="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-            {props.report.title}
-          </span>
-          <span
-            class={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${statusTone(props.report.status)}`}
-          >
-            {STATUS_LABELS[props.report.status]}
-          </span>
-        </div>
-        <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span class="truncate">{props.report.serverName}</span>
-          <span>·</span>
-          <span class="shrink-0">{formatTime(props.report.createdAt)}</span>
-        </div>
-      </button>
-    </li>
+    <p class="text-muted-foreground">
+      <span class="font-semibold">{props.username ?? "Deleted user"}:</span>{" "}
+      {props.body}
+    </p>
   );
 }
 
-function ReportDetailPane(props: { detail: ServerReportDetail }) {
+function ReportDetail(props: { report: CommunityReportRecord }) {
   const core = requireHavenSolidCore();
   const toast = useToast();
+  const report = () =>
+    core.stores.reports.byId[props.report.id] ?? props.report;
+  const snapshot = () => report().snapshot;
+  const notes = () => core.stores.reports.notes[props.report.id] ?? [];
   const [note, setNote] = createSignal("");
-  const [busy, setBusy] = createSignal(false);
+  const [working, setWorking] = createSignal(false);
+  const [escalating, setEscalating] = createSignal(false);
 
-  const reportId = () => props.detail.reportId;
+  // Track the report only; loading notes writes the reports store.
+  createEffect(() => {
+    const id = props.report.id;
+    untrack(() => void core.reports.loadNotes(id));
+  });
+  createEffect(() => {
+    const ids = [report().subject_user_id, ...notes().map((n) => n.author_id)];
+    untrack(() => void core.profiles.ensure(ids));
+  });
 
-  const run = async (fn: () => Promise<unknown>, errLabel: string) => {
-    setBusy(true);
+  const run = async (work: () => Promise<unknown>, done?: string) => {
+    setWorking(true);
     try {
-      await fn();
-    } catch (e) {
+      await work();
+      if (done) toast.show({ title: done });
+    } catch (error) {
       toast.show({
-        title: errLabel,
-        body: e instanceof Error ? e.message : "Please try again.",
+        title: "That didn't work",
+        body: getErrorMessage(error, "Try again in a moment."),
       });
     } finally {
-      setBusy(false);
+      setWorking(false);
     }
   };
 
-  const setStatus = (status: SupportReportStatus) =>
-    void run(
-      () => core.moderation.updateStatus(reportId(), status),
-      "Couldn't update status",
-    );
-
-  const addNote = () => {
-    const body = note().trim();
-    if (!body) return;
-    void run(async () => {
-      await core.moderation.addNote(reportId(), body);
-      setNote("");
-    }, "Couldn't add note");
+  const subject = () => report().subject_user_id;
+  const before = () => {
+    const at = snapshot().message?.created_at ?? "";
+    return (snapshot().context ?? []).filter((c) => c.created_at < at);
+  };
+  const after = () => {
+    const at = snapshot().message?.created_at ?? "";
+    return (snapshot().context ?? []).filter((c) => c.created_at > at);
   };
 
-  const escalate = () =>
-    void run(async () => {
-      await core.moderation.escalate(reportId());
-      toast.show({ title: "Escalated to Platform Moderation" });
-    }, "Couldn't escalate");
-
-  const acknowledge = () =>
-    void run(
-      () => core.moderation.acknowledge(reportId()),
-      "Couldn't acknowledge",
-    );
-
   return (
-    <div class="mx-auto max-w-2xl space-y-6 p-6">
-      <div>
-        <div class="mb-1 flex items-center gap-2">
-          <h2 class="flex-1 text-lg font-semibold text-foreground">
-            {props.detail.title}
-          </h2>
-          <span
-            class={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold uppercase ${statusTone(props.detail.status)}`}
-          >
-            {STATUS_LABELS[props.detail.status]}
-          </span>
-        </div>
-        <p class="text-xs text-muted-foreground">
-          {props.detail.serverName} · {formatTime(props.detail.createdAt)}
-        </p>
-      </div>
-
-      {/* Reporter */}
-      <div class="flex items-center gap-2">
+    <div class="mx-auto max-w-2xl space-y-5 p-6">
+      <div class="flex items-center gap-3">
         <Avatar
-          src={props.detail.reporterAvatarUrl}
-          name={props.detail.reporterUsername ?? "Unknown"}
-          size="sm"
+          src={core.avatarUrl(subject())}
+          name={core.nameOf(subject())}
+          size="lg"
         />
-        <div class="text-sm">
-          <span class="text-muted-foreground">Reported by </span>
-          <span class="text-foreground">
-            {props.detail.reporterUsername ?? "Unknown"}
-          </span>
+        <div class="min-w-0 flex-1">
+          <p class="font-semibold text-foreground">
+            {core.nameOf(subject(), report().community_id)}
+          </p>
+          <p class="text-xs text-muted-foreground">
+            Reported {formatTime(report().created_at)} in{" "}
+            {core.stores.communities.byId[report().community_id]?.name}
+          </p>
         </div>
+        <span
+          class={`rounded px-2 py-1 text-xs font-semibold ${statusTone(report().status)}`}
+        >
+          {STATUS_LABELS[report().status]}
+        </span>
       </div>
 
-      {/* Snapshot */}
-      <Show when={props.detail.snapshot}>
-        {(snap) => <SnapshotBlock snapshot={snap()} detail={props.detail} />}
+      <Show when={report().reason}>
+        <section>
+          <h3 class="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+            Reason
+          </h3>
+          <p class="whitespace-pre-wrap text-sm text-body-soft">
+            {report().reason}
+          </p>
+        </section>
       </Show>
 
-      {/* Internal notes */}
-      <div class="space-y-2">
-        <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Internal notes
-        </p>
-        <Show
-          when={props.detail.internalNotes.length > 0}
-          fallback={<p class="text-sm text-muted-foreground">No notes yet.</p>}
-        >
-          <ul class="space-y-2">
-            <For each={props.detail.internalNotes}>
-              {(n) => (
-                <li class="rounded-lg border border-border bg-surface-panel px-3 py-2">
-                  <p class="text-xs text-muted-foreground">
-                    {n.authorDisplayName ?? "Moderator"} ·{" "}
-                    {formatTime(n.createdAt)}
-                  </p>
-                  <p class="whitespace-pre-wrap text-sm text-foreground">
-                    {n.body}
-                  </p>
-                </li>
-              )}
-            </For>
-          </ul>
-        </Show>
-        <div class="flex gap-2">
-          <input
-            value={note()}
-            disabled={busy()}
-            placeholder="Add an internal note…"
-            onInput={(e) => setNote(e.currentTarget.value)}
-            onKeyDown={(e) => e.key === "Enter" && addNote()}
-            class="flex-1 rounded border border-input bg-surface-input px-3 py-2 text-sm text-foreground outline-hidden focus:border-primary"
-          />
-          <button
-            type="button"
-            disabled={busy() || note().trim().length === 0}
-            onClick={() => addNote()}
-            class="rounded-lg bg-surface-input px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-hover disabled:opacity-50"
-          >
-            Add
-          </button>
-        </div>
-      </div>
-
-      {/* Triage actions */}
-      <div class="space-y-3 border-t border-border pt-4">
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Status
-          </span>
-          <select
-            value={props.detail.status}
-            disabled={
-              busy() || !SETTABLE_STATUSES.includes(props.detail.status)
-            }
-            onChange={(e) =>
-              setStatus(e.currentTarget.value as SupportReportStatus)
-            }
-            class="rounded border border-input bg-surface-input px-2 py-1.5 text-sm text-foreground outline-hidden focus:border-primary disabled:opacity-60"
-          >
-            <For each={SETTABLE_STATUSES}>
-              {(s) => <option value={s}>{STATUS_LABELS[s]}</option>}
-            </For>
-            <Show when={!SETTABLE_STATUSES.includes(props.detail.status)}>
-              <option value={props.detail.status}>
-                {STATUS_LABELS[props.detail.status]}
-              </option>
-            </Show>
-          </select>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy() || props.detail.status === "escalated"}
-            onClick={() => escalate()}
-            class="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-hover disabled:opacity-50"
-          >
-            Escalate to Platform
-          </button>
-          <Show when={props.detail.platformAction}>
-            <button
-              type="button"
-              disabled={busy()}
-              onClick={() => acknowledge()}
-              class="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-            >
-              Acknowledge platform action
-            </button>
-          </Show>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SnapshotBlock(props: {
-  snapshot: SupportReportSnapshot;
-  detail: ServerReportDetail;
-}) {
-  return (
-    <Show
-      when={isMessageSnapshot(props.snapshot) ? props.snapshot : null}
-      fallback={
-        <div class="rounded-lg border border-border bg-surface-panel px-3 py-2.5 text-sm">
-          <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Reported user
-          </p>
-          <p class="text-foreground">
-            {props.detail.targetDisplayName ?? "Unknown user"}
-          </p>
-        </div>
-      }
-    >
-      {(msgSnap) => (
-        <div class="space-y-1">
-          <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Reported message
-          </p>
-          <SnapshotMessage message={msgSnap().reportedMessage} highlighted />
-          <Show when={msgSnap().contextAfter.length > 0}>
-            <div class="opacity-70">
-              <For each={msgSnap().contextAfter.slice(0, 2)}>
-                {(m) => <SnapshotMessage message={m} />}
+      <Show when={snapshot().message}>
+        {(message) => (
+          <section>
+            <h3 class="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+              The message, as it was when reported
+            </h3>
+            <div class="space-y-1 rounded border border-border bg-surface-panel p-3 text-sm">
+              <For each={before()}>
+                {(line) => (
+                  <ContextLine username={line.username} body={line.body} />
+                )}
+              </For>
+              <p class="rounded bg-destructive/10 px-2 py-1 text-foreground">
+                <span class="font-semibold">
+                  {snapshot().author?.username ?? "Deleted user"}:
+                </span>{" "}
+                {message().body}
+              </p>
+              <For each={after()}>
+                {(line) => (
+                  <ContextLine username={line.username} body={line.body} />
+                )}
               </For>
             </div>
-          </Show>
-        </div>
-      )}
-    </Show>
-  );
-}
+          </section>
+        )}
+      </Show>
 
-function SnapshotMessage(props: {
-  message: SupportReportMessageSnapshot["reportedMessage"];
-  highlighted?: boolean;
-}) {
-  return (
-    <div
-      class="rounded-lg border px-3 py-2"
-      classList={{
-        "border-destructive/40 bg-destructive/5": props.highlighted,
-        "border-border bg-surface-panel": !props.highlighted,
-      }}
-    >
-      <div class="mb-0.5 flex items-center gap-2">
-        <Avatar
-          src={props.message.avatarUrl}
-          name={props.message.authorUsername ?? "Unknown"}
-          size="sm"
-        />
-        <span class="text-sm font-medium text-foreground">
-          {props.message.authorUsername ?? "Unknown"}
-        </span>
-        <span class="text-xs text-muted-foreground">
-          {formatTime(props.message.createdAt)}
-        </span>
-      </div>
-      <p class="whitespace-pre-wrap text-sm text-body-soft">
-        {props.message.content}
-      </p>
+      <Show when={snapshot().profile}>
+        {(person) => (
+          <section>
+            <h3 class="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+              Their profile, as it was when reported
+            </h3>
+            <div class="rounded border border-border bg-surface-panel p-3 text-sm">
+              <p class="font-semibold text-foreground">
+                {person().username ?? "Deleted user"}
+              </p>
+              <p class="mt-1 whitespace-pre-wrap text-body-soft">
+                {person().bio || "No bio."}
+              </p>
+            </div>
+          </section>
+        )}
+      </Show>
+
+      <Show when={report().status !== "escalated"}>
+        <section class="flex flex-wrap items-center gap-2">
+          <For each={SETTABLE}>
+            {(status) => (
+              <Button
+                size="sm"
+                variant={report().status === status ? "primary" : "ghost"}
+                disabled={working() || report().status === status}
+                onClick={() =>
+                  void run(() => core.reports.setStatus(report().id, status))
+                }
+              >
+                {STATUS_LABELS[status]}
+              </Button>
+            )}
+          </For>
+          <Button
+            size="sm"
+            variant="ghost"
+            class="text-accent-amber"
+            disabled={working()}
+            onClick={() => setEscalating(true)}
+          >
+            Send to Haven staff
+          </Button>
+        </section>
+      </Show>
+
+      <section>
+        <h3 class="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+          Moderator notes
+        </h3>
+        <For
+          each={notes()}
+          fallback={<p class="text-sm text-muted-foreground">No notes yet.</p>}
+        >
+          {(entry) => (
+            <div class="mb-2 rounded border border-border bg-surface-panel p-2 text-sm">
+              <p class="text-xs text-muted-foreground">
+                {core.nameOf(entry.author_id, report().community_id)} ·{" "}
+                {formatTime(entry.created_at)}
+              </p>
+              <p class="mt-1 whitespace-pre-wrap text-body-soft">
+                {entry.body}
+              </p>
+            </div>
+          )}
+        </For>
+        <form
+          class="mt-2 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const body = note().trim();
+            if (!body) return;
+            void run(async () => {
+              await core.reports.addNote(report().id, body);
+              setNote("");
+            });
+          }}
+        >
+          <input
+            value={note()}
+            onInput={(e) => setNote(e.currentTarget.value)}
+            placeholder="Add a note for other moderators"
+            class="min-w-0 flex-1 rounded border border-border-control bg-surface-input px-3 py-2 text-sm text-foreground"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            disabled={working() || !note().trim()}
+          >
+            Add
+          </Button>
+        </form>
+      </section>
+
+      <ConfirmDialog
+        open={escalating()}
+        title="Send this report to Haven staff?"
+        description="Haven's safety team takes it over. It can't be taken back."
+        confirmLabel="Send to Haven"
+        reason={{
+          label: "Why",
+          placeholder: "Optional: what staff should know",
+        }}
+        pending={working()}
+        onConfirm={(reason) =>
+          void run(
+            () => core.reports.escalate(report().id, reason || undefined),
+            "Sent to Haven staff",
+          ).then(() => setEscalating(false))
+        }
+        onCancel={() => setEscalating(false)}
+      />
     </div>
   );
 }

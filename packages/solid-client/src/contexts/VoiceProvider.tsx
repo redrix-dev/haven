@@ -130,13 +130,23 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   const core = requireHavenSolidCore();
   const { session } = useSession();
   const userId = () => session()?.user.id ?? null;
-  const viewerProfile = core.profiles.viewerProfile(userId);
+  /** The person as voice shows them: their name and picture, from profiles. */
+  const viewerProfile = () => {
+    const id = userId();
+    const profile = id ? core.stores.profiles.byId[id] : undefined;
+    return profile
+      ? {
+          username: profile.username ?? "Member",
+          avatarUrl: core.avatarUrl(profile.id),
+        }
+      : null;
+  };
 
   const [voice, setVoice] = createStore<VoiceUiState>(initialState());
   const playVoiceCue = (event: VoiceSoundEvent) =>
     playWebVoiceSound(
       event,
-      core.voice.getSnapshot().soundSettings,
+      core.stores.voice.soundSettings,
       voice.selectedOutputDeviceId,
     );
 
@@ -499,7 +509,6 @@ export function VoiceProvider(props: { children: JSX.Element }) {
 
     try {
       const credentialsPromise = core.voice.fetchJoinCredentials(
-        channel.communityId,
         channel.channelId,
       );
       void credentialsPromise.catch(() => {});
@@ -886,7 +895,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   return (
     <VoiceContext.Provider value={value}>
       {props.children}
-      <Show when={core.voice.state.controlNotice}>
+      <Show when={core.stores.voice.controlNotice}>
         {(notice) => (
           <div
             role="status"
