@@ -14,9 +14,9 @@ import type {
   ServerSettingsUpdate,
 } from "@shared/lib/backend/types";
 import { messageFromError } from "../kit/errors";
-import { createLoadGate } from "../kit/loadGate";
+import { createLoadGate } from "@shared/collections/kit/loadGate";
 import { omitKey } from "../kit/records";
-import type { StatePort } from "../kit/statePort";
+import type { StatePort } from "@shared/collections/kit/statePort";
 import type { AdminResource, CommunityAdminState } from "./communityAdminTypes";
 
 /** The community data calls administration makes: members and bans, settings and roles. */

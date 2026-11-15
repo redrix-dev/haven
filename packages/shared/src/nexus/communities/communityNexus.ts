@@ -12,8 +12,8 @@ import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBacken
 import type { ServerSummary } from "@shared/lib/backend/types";
 import { tracePersist } from "@shared/debug/tracePersist";
 import { messageFromError } from "../kit/errors";
-import { createLoadGate } from "../kit/loadGate";
-import type { StatePort } from "../kit/statePort";
+import { createLoadGate } from "@shared/collections/kit/loadGate";
+import type { StatePort } from "@shared/collections/kit/statePort";
 import { projectCommunities } from "./communitySelectors";
 import type { Community, CommunityState } from "./communityTypes";
 

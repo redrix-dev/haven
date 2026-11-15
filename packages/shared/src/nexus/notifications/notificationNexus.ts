@@ -15,8 +15,8 @@ import type {
   NotificationPreferences,
 } from "@shared/lib/backend/types";
 import { tracePersist } from "@shared/debug/tracePersist";
-import { createLoadGate, isFresh } from "../kit/loadGate";
-import type { StatePort } from "../kit/statePort";
+import { createLoadGate, isFresh } from "@shared/collections/kit/loadGate";
+import type { StatePort } from "@shared/collections/kit/statePort";
 import { projectNotifications } from "./notificationSelectors";
 import type { NotificationState } from "./notificationTypes";
 

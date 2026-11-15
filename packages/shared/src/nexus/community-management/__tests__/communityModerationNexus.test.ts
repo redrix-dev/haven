@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ServerModmailBackend } from "@shared/lib/backend/serverModmailBackend";
 import type { ServerReportDetail } from "@shared/lib/backend/types";
-import { createPlainStatePort } from "../../kit/statePort";
+import { createPlainStatePort } from "@shared/collections/kit/statePort";
 import {
   CommunityModerationNexus,
   createInitialCommunityModerationState,

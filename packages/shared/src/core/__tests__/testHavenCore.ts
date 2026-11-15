@@ -30,7 +30,7 @@ import {
   FeatureFlagNexus,
   createInitialFeatureFlagState,
 } from "@shared/nexus/feature-flags/featureFlagNexus";
-import { createPlainStatePort } from "@shared/nexus/kit/statePort";
+import { createPlainStatePort } from "@shared/collections/kit/statePort";
 import {
   CommunityMessageNexus,
   createInitialCommunityMessageState,

@@ -29,8 +29,8 @@ import type {
   MessageReportKind,
   MessageReportTarget,
 } from "@shared/lib/backend/types";
-import { createLoadGate } from "../kit/loadGate";
-import type { StatePort } from "../kit/statePort";
+import { createLoadGate } from "@shared/collections/kit/loadGate";
+import type { StatePort } from "@shared/collections/kit/statePort";
 
 /** The community data calls a channel's messages make: the message backend, plus reporting one. */
 type MessageNexusBackend = CommunityMessageBackend &

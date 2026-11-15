@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryPersistence } from "@shared/core";
-import { createLoadGate } from "@shared/nexus/kit/loadGate";
+import { createLoadGate } from "@shared/collections/kit/loadGate";
 import { bootLogger } from "../bootLogger";
 import { parsePerfLine, perfTrace } from "../perfTrace";
 import { tracePersist, tracePersistence } from "../tracePersist";

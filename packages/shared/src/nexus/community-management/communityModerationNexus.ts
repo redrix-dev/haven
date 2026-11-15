@@ -6,8 +6,8 @@ import type {
   ServerReportSummary,
   SupportReportStatus,
 } from "@shared/lib/backend/types";
-import { createLoadGate } from "../kit/loadGate";
-import type { StatePort } from "../kit/statePort";
+import { createLoadGate } from "@shared/collections/kit/loadGate";
+import type { StatePort } from "@shared/collections/kit/statePort";
 
 export type CommunityModerationState = {
   reports: ServerReportSummary[];

@@ -150,7 +150,7 @@ describe("signed in", () => {
     const { pipeline, persistence, actions } = setup();
     pipeline.setSession("u1");
     pipeline.receive(INVITE_URL);
-    pipeline.receive("/?kind=dm_message&conversationId=c1");
+    pipeline.receive("/?kind=direct_message&channel_id=c1");
     expect(actions).toEqual([
       { type: "open", intent: INVITE },
       { type: "open", intent: { kind: "dm", conversationId: "c1" } },

@@ -1,5 +1,5 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { StatePort } from "@shared/nexus/kit/statePort";
+import type { StatePort } from "@shared/collections/kit/statePort";
 
 /** A state port backed by a vanilla zustand store, plus the store for React hooks. */
 export type ZustandStatePort<S extends object> = StatePort<S> & {

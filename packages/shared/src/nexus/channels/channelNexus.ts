@@ -12,9 +12,9 @@ import type {
 } from "@shared/lib/backend/types";
 import { tracePersist } from "@shared/debug/tracePersist";
 import { messageFromError } from "../kit/errors";
-import { createLoadGate } from "../kit/loadGate";
+import { createLoadGate } from "@shared/collections/kit/loadGate";
 import { omitKey } from "../kit/records";
-import type { StatePort } from "../kit/statePort";
+import type { StatePort } from "@shared/collections/kit/statePort";
 import { projectChannelGroups, projectChannels } from "./channelSelectors";
 import type { ChannelState, HavenChannel } from "./channelTypes";
 

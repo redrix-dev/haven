@@ -47,9 +47,9 @@ describe("auth policy helpers", () => {
 
   it("builds signup metadata from shared constants", () => {
     const metadata = buildSignUpMetadata("  haven-user  ");
-    expect(metadata.username).toBe("haven-user");
-    expect(metadata.accepted_tos).toBe(true);
-    expect(metadata.tos_version).toBe(CURRENT_TOS_VERSION);
-    expect(typeof metadata.tos_accepted_at).toBe("string");
+    expect(metadata).toEqual({
+      username: "haven-user",
+      terms_version: CURRENT_TOS_VERSION,
+    });
   });
 });

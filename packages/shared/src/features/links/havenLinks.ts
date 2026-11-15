@@ -24,14 +24,20 @@ export type AuthConfirmClient = (typeof AUTH_CONFIRM_CLIENTS)[number];
 
 export type FriendsTab = "friends" | "requests";
 
-/** Invite codes are 10 uppercase hex characters (see `create_community_invite`). */
-const BARE_INVITE_CODE = /^[0-9a-f]{10}$/i;
+/**
+ * Invite and friend link codes are 10 characters from an alphabet without
+ * look-alikes (`private.new_invite_code`). A bare code is a community invite.
+ */
+const BARE_INVITE_CODE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{10}$/i;
 
 export type HavenLinkIntent =
   | { kind: "home" }
   | { kind: "invite"; code: string }
+  /** Someone's friend link: opening it only shows who it is from. */
+  | { kind: "friend_link"; code: string }
   | { kind: "community"; communityId: string }
   | { kind: "channel"; communityId: string; channelId: string }
+  /** `conversationId` is the conversation's channel id. */
   | { kind: "dm"; conversationId: string }
   /** `requestId` is only meaningful on the `requests` tab. */
   | { kind: "friends"; tab: FriendsTab; requestId: string | null }
@@ -110,39 +116,54 @@ const toSegments = (path: string): string[] =>
     .filter(Boolean)
     .map((segment) => decodeURIComponent(segment));
 
+/** What a notification points at: the fields of a notification, or of its push `data`. */
+export type NotificationTarget = {
+  kind: string;
+  community_id?: string | null;
+  channel_id?: string | null;
+};
+
 /**
- * The query-style links `expo-push-worker` puts in push `data.url`
- * (`/?kind=dm_message&conversationId=…`). Returns null for an unknown kind.
+ * Where opening a notification goes: the inbox row and the push tap use the
+ * same answer. Null for a kind this build does not know.
  */
-const fromNotificationQuery = (params: Params): HavenLinkIntent | null => {
-  switch (param(params, "kind")?.toLowerCase()) {
-    case "dm_message": {
-      const conversationId = param(params, "conversationId");
-      return conversationId
-        ? { kind: "dm", conversationId }
-        : { kind: "notifications" };
-    }
-    case "friend_request_received":
-      return {
-        kind: "friends",
-        tab: "requests",
-        requestId: param(params, "friendRequestId"),
-      };
-    case "friend_request_accepted":
+export function notificationIntent(
+  target: NotificationTarget,
+): BuildableHavenLinkIntent | null {
+  const communityId = target.community_id ?? null;
+  const channelId = target.channel_id ?? null;
+  const place = (): BuildableHavenLinkIntent =>
+    channelId === null
+      ? { kind: "notifications" }
+      : communityId === null
+        ? { kind: "dm", conversationId: channelId }
+        : { kind: "channel", communityId, channelId };
+  switch (target.kind) {
+    case "direct_message":
+    case "mention":
+      return place();
+    case "friend_request":
+      return { kind: "friends", tab: "requests", requestId: null };
+    case "friend_accepted":
+    case "friend_link":
       return { kind: "friends", tab: "friends", requestId: null };
-    case "channel_mention": {
-      const communityId = param(params, "communityId");
-      const channelId = param(params, "channelId");
-      return communityId && channelId
-        ? { kind: "channel", communityId, channelId }
-        : { kind: "notifications" };
-    }
+    case "report_received":
+    case "report_outcome":
+    case "moderation_decision":
     case "system":
       return { kind: "notifications" };
     default:
       return null;
   }
-};
+}
+
+/** A notification as a query (`/?kind=mention&channel_id=…`), the push data's fields. */
+const fromNotificationQuery = (params: Params): HavenLinkIntent | null =>
+  notificationIntent({
+    kind: param(params, "kind")?.toLowerCase() ?? "",
+    community_id: param(params, "community_id"),
+    channel_id: param(params, "channel_id"),
+  });
 
 const routeLink = ({
   path,
@@ -168,6 +189,10 @@ const routeLink = ({
       const code =
         second?.trim() || param(params, "code") || param(params, "invite");
       return code ? { kind: "invite", code: code.toUpperCase() } : null;
+    }
+    case "friend": {
+      if (segments.length !== 2 || !second?.trim()) return null;
+      return { kind: "friend_link", code: second.trim().toUpperCase() };
     }
     case "community":
       if (second !== undefined && segments.length === 2) {
@@ -300,6 +325,8 @@ export function buildHavenLinkPath(intent: BuildableHavenLinkIntent): string {
       return "/";
     case "invite":
       return `/invite/${segment(intent.code)}`;
+    case "friend_link":
+      return `/friend/${segment(intent.code)}`;
     case "community":
       return `/community/${segment(intent.communityId)}`;
     case "channel":

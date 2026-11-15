@@ -34,7 +34,11 @@ binding.
 ## Put Code In The Canonical Home
 
 - Backend clients, RPC wrappers, and network shapes:
-  `packages/shared/src/lib/backend/`
+  `packages/shared/src/lib/backend/` — one client per DATABASE.md area,
+  composed by `createBackend(client)`. Records keep the database's field
+  names (`records.ts`); every failure is a `HavenError` with the database's
+  reason word; realtime is one topic per person (`realtime.ts`,
+  `HavenEventMap` lists every event).
 - Supabase client construction:
   `packages/shared/src/lib/createHavenSupabaseClient.ts`
 - Domain logic:

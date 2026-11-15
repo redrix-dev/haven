@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_SOCIAL_COUNTS } from "@shared/infrastructure/constants";
-import { createPlainStatePort } from "../kit/statePort";
+import { createPlainStatePort } from "@shared/collections/kit/statePort";
 import { SocialNexus, createInitialSocialState } from "../social/socialNexus";
 
 const makeBackend = (overrides: Record<string, unknown> = {}) =>

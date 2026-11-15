@@ -40,9 +40,12 @@ export const validateRecoveryPassword = (
   return validatePasswordConfirmation(password, confirmPassword);
 };
 
+/**
+ * What sign-up sends with the new login. The database (on_auth_user_created)
+ * reads `username`, and records the terms the person agreed to when
+ * `terms_version` names a published version.
+ */
 export const buildSignUpMetadata = (username: string) => ({
   username: username.trim(),
-  accepted_tos: true,
-  tos_version: CURRENT_TOS_VERSION,
-  tos_accepted_at: new Date().toISOString(),
+  terms_version: CURRENT_TOS_VERSION,
 });

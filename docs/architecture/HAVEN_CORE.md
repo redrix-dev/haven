@@ -45,7 +45,7 @@ Rules the port imposes on shared code:
   getters stay reactive in memos — and a shared method that reads and writes
   must be `untrack`ed inside an effect (see the `haven-solid-reactivity` skill).
 
-Loads go through a `LoadGate` (`kit/loadGate.ts`): one in-flight load per key,
+Loads go through a `LoadGate` (`collections/kit/loadGate.ts`): one in-flight load per key,
 and a `stale()` check handed to each task. `clear()` marks every running load
 stale and `forget(key)` marks one; a task checks `stale()` after each `await`
 and skips its writes, so a load that finishes after sign-out cannot put the

@@ -8,8 +8,8 @@ import type {
   DirectMessageReportKind,
 } from "@shared/lib/backend/types";
 import { tracePersist } from "@shared/debug/tracePersist";
-import { createLoadGate, isFresh } from "../kit/loadGate";
-import type { StatePort } from "../kit/statePort";
+import { createLoadGate, isFresh } from "@shared/collections/kit/loadGate";
+import type { StatePort } from "@shared/collections/kit/statePort";
 import {
   directMessagePreview,
   isMessageCurrentOrNewerThanSummary,

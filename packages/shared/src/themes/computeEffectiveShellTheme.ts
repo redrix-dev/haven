@@ -1,4 +1,4 @@
-import type { FeatureFlagsSnapshot } from "@shared/lib/backend/types";
+import type { FeatureFlag } from "@shared/lib/backend/records";
 import { getTheme, resolveTheme, themes } from "@shared/themes/registry";
 import { featureFlagsToEntitlementKeys } from "@shared/themes/themeEntitlements";
 import { readSessionStoredThemeId } from "@shared/themes/sessionThemeStorage";
@@ -20,7 +20,7 @@ export function getRequestedShellThemeId(
 /** Resolved theme after entitlement checks — matches shell CSS. */
 export function computeEffectiveShellTheme(input: {
   profileThemeId: string | null;
-  featureFlags: FeatureFlagsSnapshot;
+  featureFlags: readonly FeatureFlag[];
   featureFlagsLoaded: boolean;
   userId: string | null | undefined;
 }): HavenTheme {

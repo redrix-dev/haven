@@ -1,8 +1,28 @@
-import type {
-  VoicePresenceStateRow,
-  VoiceSidebarParticipant,
-} from "@shared/types/types";
 import type { VoiceSettings } from "@shared/types/settings";
+
+/** Someone in a voice channel, as the sidebar and the call show them. */
+export type VoiceSidebarParticipant = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  isSpeaking?: boolean;
+};
+
+/** The voice channel a session is in. */
+export type VoiceChannelReference = {
+  id: string;
+  name: string;
+  community_id: string;
+};
+
+/** What each person announces on a voice channel's presence topic. */
+export type VoicePresenceStateRow = {
+  user_id?: string | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  is_speaking?: boolean | null;
+  joined_at?: string | null;
+};
 
 export type VoiceControllerChannel = {
   communityId: string;
@@ -132,5 +152,3 @@ export type VoiceRealtimeTransport = {
   removeChannel: (channel: VoiceRealtimeChannel) => Promise<unknown> | unknown;
   getChannels?: () => VoiceRealtimeChannel[];
 };
-
-export type { VoiceSidebarParticipant };

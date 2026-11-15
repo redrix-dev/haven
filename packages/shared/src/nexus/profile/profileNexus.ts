@@ -10,8 +10,8 @@ import type {
   UserProfileCard,
 } from "@shared/lib/backend/types";
 import { messageFromError } from "../kit/errors";
-import { createLoadGate, isFresh } from "../kit/loadGate";
-import type { StatePort } from "../kit/statePort";
+import { createLoadGate, isFresh } from "@shared/collections/kit/loadGate";
+import type { StatePort } from "@shared/collections/kit/statePort";
 
 export type ProfileState = {
   /** Live identities (name, avatar) for everyone the viewer has seen — the render path prefers these over message snapshots. */

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryPersistence } from "@shared/core";
 import type { MessageBundle } from "@shared/lib/backend/types";
-import { createPlainStatePort } from "../kit/statePort";
+import { createPlainStatePort } from "@shared/collections/kit/statePort";
 import {
   CommunityMessageNexus,
   createInitialCommunityMessageState,

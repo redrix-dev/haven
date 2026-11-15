@@ -1,8 +1,8 @@
 import type { ControlPlaneBackend } from "@shared/lib/backend/controlPlaneBackend.interface";
 import type { FeatureFlagsSnapshot } from "@shared/lib/backend/types";
 import { messageFromError } from "../kit/errors";
-import { createLoadGate } from "../kit/loadGate";
-import type { StatePort } from "../kit/statePort";
+import { createLoadGate } from "@shared/collections/kit/loadGate";
+import type { StatePort } from "@shared/collections/kit/statePort";
 
 export type FeatureFlagControlPlane = Pick<
   ControlPlaneBackend,

@@ -1,8 +1,8 @@
 import type { CommunityDataBackend } from "@shared/lib/backend/communityDataBackend.interface";
 import type { ServerPermissions } from "@shared/lib/backend/types";
 import { EMPTY_PERMISSIONS } from "@shared/features/permissions/logic/constants";
-import { createLoadGate } from "../kit/loadGate";
-import type { StatePort } from "../kit/statePort";
+import { createLoadGate } from "@shared/collections/kit/loadGate";
+import type { StatePort } from "@shared/collections/kit/statePort";
 
 export type PermissionsBackend = Pick<
   CommunityDataBackend,
