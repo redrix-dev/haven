@@ -48,6 +48,31 @@ describe("signing up (contract)", { timeout: 20_000 }, () => {
     }
   });
 
+  it("tells a visitor whether a name is taken", async () => {
+    const visitor = createBackend(
+      createHavenSupabaseClient(
+        localSupabaseEnv.url,
+        localSupabaseEnv.anonKey,
+        {
+          auth: { persistSession: false, autoRefreshToken: false },
+        },
+      ),
+    );
+    const name = `taken_${randomUUID().slice(0, 8)}`;
+    expect(await visitor.people.usernameTaken(name)).toBe(false);
+    const { data } = await serviceSupabase.auth.admin.createUser({
+      email: `${name}@example.test`,
+      password: "a long enough password",
+      email_confirm: true,
+      user_metadata: buildSignUpMetadata(name),
+    });
+    try {
+      expect(await visitor.people.usernameTaken(name.toUpperCase())).toBe(true);
+    } finally {
+      await serviceSupabase.auth.admin.deleteUser(data.user!.id);
+    }
+  });
+
   // The database swaps a name that breaks its rule for `user_<id>` instead of
   // refusing, so the form's check is the only place a person hears about it.
   // It must refuse exactly what the database would swap.

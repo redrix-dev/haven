@@ -313,6 +313,23 @@ begin
 end;
 $$;
 
+-- Whether a name is in use, in any case, so the sign-up form can say so
+-- before the trigger above swaps it for a generated one. The one thing a
+-- visitor may call: sign-up has no session yet. It says only that the name is
+-- used, never by whom; names are shown to everyone in the app anyway.
+create function public.username_taken(p_username text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where lower(p.username) = lower(private.clean_text(p_username))
+  );
+$$;
+
 create function public.update_my_profile(
   p_username text default null,
   p_bio text default null
@@ -400,6 +417,7 @@ end;
 $$;
 
 grant execute on function public.get_profiles(uuid[]) to authenticated;
+grant execute on function public.username_taken(text) to anon;
 grant execute on function public.update_my_profile(text, text) to authenticated;
 grant execute on function public.update_my_settings(text, public.audience, public.audience, public.audience) to authenticated;
 grant execute on function public.accept_terms(text) to authenticated;

@@ -2,10 +2,7 @@ import { Show, createSignal } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { useSession } from "@solid-client/contexts/SessionProvider";
 import { Button, TextField } from "@solid-client/components/ui";
-import {
-  validatePasswordConfirmation,
-  validateUsername,
-} from "@shared/features/auth/domain/policies";
+import { validatePasswordConfirmation } from "@shared/features/auth/domain/policies";
 import {
   HAVEN_PRIVACY_URL,
   HAVEN_TERMS_URL,
@@ -29,11 +26,6 @@ export function SignUpScreen() {
     e.preventDefault();
     setError(null);
 
-    const name = validateUsername(username());
-    if (!name.ok) {
-      setError(name.error);
-      return;
-    }
     const match = validatePasswordConfirmation(password(), confirm());
     if (!match.ok) {
       setError(match.error);

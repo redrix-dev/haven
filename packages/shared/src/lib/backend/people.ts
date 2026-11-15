@@ -97,6 +97,13 @@ export function createPeopleBackend(client: HavenSupabaseClient) {
       return found ?? null;
     },
 
+    /** Whether a name is in use, in any case. Works signed out, for sign-up. */
+    async usernameTaken(username: string): Promise<boolean> {
+      return (await rpc(client, "username_taken", {
+        p_username: username,
+      })) as boolean;
+    },
+
     async updateMyProfile(changes: ProfileChanges): Promise<ProfileRecord> {
       return (await rpc(client, "update_my_profile", {
         p_username: changes.username,

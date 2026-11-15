@@ -18,7 +18,9 @@ Everything below is one of these applied to one feature.
    only `public`. Helpers, triggers, the job queue and the rule views live in
    `private`, which a client cannot reach.
 2. **Nothing is reachable unless a line grants it.** New tables and functions
-   are closed to everyone by default. Visitors (`anon`) can do nothing at all.
+   are closed to everyone by default. Visitors (`anon`) can do one thing: ask
+   `username_taken`, so the sign-up form can say a name is taken before the
+   sign-up trigger would swap it for `user_<id>`.
 3. **Tables are read through RLS and written through RPCs.** No table has an
    insert, update or delete grant. A few tables (messages, profiles, files,
    reports) have no select grant either and are read through RPCs.
@@ -82,14 +84,14 @@ moves to 18.
 
 ### People
 
-| Table                  | Read                                                                  | Written by                                                                |
-| ---------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `profiles`             | `get_profiles`, `get_profile_card`, `find_user`; `get_my_profile`     | sign-up trigger, `update_my_profile`, `set_my_avatar`, `set_active_flair` |
-| `user_settings`        | RLS: own row                                                          | `update_my_settings`                                                      |
-| `terms_versions`       | RLS: anyone signed in                                                 | operator                                                                  |
-| `terms_acceptances`    | RLS: own rows                                                         | sign-up trigger, `accept_terms`                                           |
-| `platform_staff`       | RLS: staff                                                            | operator (no RPC makes someone staff)                                     |
-| `account_restrictions` | RLS: staff. The person reads theirs through `list_decisions_about_me` | `staff_record_decision`, `staff_reverse_decision`                         |
+| Table                  | Read                                                                                             | Written by                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `profiles`             | `get_profiles`, `get_profile_card`, `find_user`; `get_my_profile`; `username_taken` (signed out) | sign-up trigger, `update_my_profile`, `set_my_avatar`, `set_active_flair` |
+| `user_settings`        | RLS: own row                                                                                     | `update_my_settings`                                                      |
+| `terms_versions`       | RLS: anyone signed in                                                                            | operator                                                                  |
+| `terms_acceptances`    | RLS: own rows                                                                                    | sign-up trigger, `accept_terms`                                           |
+| `platform_staff`       | RLS: staff                                                                                       | operator (no RPC makes someone staff)                                     |
+| `account_restrictions` | RLS: staff. The person reads theirs through `list_decisions_about_me`                            | `staff_record_decision`, `staff_reverse_decision`                         |
 
 Everyone's view of a person is `profile_record` (name, picture, staff badge).
 What only the person sees of their own profile (bio, the flair they chose) is

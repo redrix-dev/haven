@@ -2872,6 +2872,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      username_taken: { Args: { p_username: string }; Returns: boolean }
       worker_claim_jobs: {
         Args: { p_kind: string; p_lease_seconds?: number; p_limit?: number }
         Returns: {

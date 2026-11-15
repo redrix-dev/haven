@@ -61,7 +61,7 @@ select test_support.assert_eq_text(
           'get_my_feature_flags', 'list_my_onboarding', 'get_my_profile', 'unregister_push_device']),
   '', 'every RPC checks the caller is signed in, not deleted and not restricted, with eight stated exceptions');
 
--- The rest of public is for the workers and Supabase Auth.
+-- The rest of public is for the workers, Supabase Auth and the sign-up form.
 select test_support.assert_eq_text(
   pg_temp.differs(
     array(select p.proname::text from pg_proc p
@@ -70,7 +70,7 @@ select test_support.assert_eq_text(
       'worker_claim_jobs', 'worker_finish_job', 'worker_push_delivery', 'worker_push_token_invalid',
       'worker_media_to_delete', 'worker_media_deleted', 'worker_media_to_quarantine', 'worker_media_quarantined',
       'worker_record_media_scan', 'worker_link_preview_url', 'worker_link_preview_result', 'worker_email_content',
-      'auth_hook_access_token'
+      'auth_hook_access_token', 'username_taken'
     ]),
   '', 'the functions a signed-in person cannot call are exactly these');
 select test_support.assert_query_count(
@@ -118,10 +118,11 @@ select test_support.assert_query_count(
      where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'v', 'p', 'm')
        and has_table_privilege('anon', c.oid, 'select, insert, update, delete, truncate') $$, 0,
   'a visitor cannot touch any table');
-select test_support.assert_query_count(
-  $$ select 1 from pg_proc p
-     where p.pronamespace = 'public'::regnamespace and has_function_privilege('anon', p.oid, 'execute') $$, 0,
-  'a visitor cannot call any function');
+select test_support.assert_eq_text(
+  (select coalesce(string_agg(p.proname, ',' order by p.proname), '') from pg_proc p
+     where p.pronamespace = 'public'::regnamespace and has_function_privilege('anon', p.oid, 'execute')),
+  'username_taken',
+  'a visitor can call one function: whether a name is taken, for the sign-up form');
 select test_support.assert_query_count(
   $$ select 1 from pg_class c
      where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and not c.relrowsecurity $$, 0,

@@ -6,6 +6,7 @@ import {
 import {
   buildSignUpMetadata,
   validateLegalAcceptance,
+  validateUsername,
 } from "@shared/features/auth/domain/policies";
 import { requireHavenSolidCore } from "@solid-client/core";
 
@@ -40,6 +41,18 @@ export const signUpWithPassword = async (
   const legal = validateLegalAcceptance(input.acceptedLegal);
   if (!legal.ok) {
     return { error: new Error(legal.error ?? "Legal acceptance is required.") };
+  }
+  const name = validateUsername(input.username);
+  if (!name.ok) return { error: new Error(name.error ?? "") };
+  // Ask first: a taken name would not refuse the sign-up, the database would
+  // swap it for user_<id>. Someone can still take it in between; then the
+  // swap happens and they rename in settings.
+  if (
+    await requireHavenSolidCore().backend.people.usernameTaken(input.username)
+  ) {
+    return {
+      error: new Error(`"${input.username.trim()}" is taken. Try another.`),
+    };
   }
   const { error } = await authClient().signUp({
     email: input.email.trim(),

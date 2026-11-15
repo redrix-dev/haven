@@ -35,3 +35,6 @@
 02 @@ a friend request rule left out is reset @@ select pg_temp.mutate('public.update_my_settings(text,public.audience,public.audience,public.audience)', $m$coalesce(p_friend_requests_from, s.friend_requests_from)$m$, $m$coalesce(p_friend_requests_from, 'nobody')$m$);
 02 @@ a privacy rule is not saved @@ select pg_temp.mutate('public.update_my_settings(text,public.audience,public.audience,public.audience)', $m$dms_from = coalesce(p_dms_from, s.dms_from)$m$, $m$dms_from = s.dms_from$m$);
 03 @@ friend requests can come from "friends" @@ select pg_temp.mutate('public.update_my_settings(text,public.audience,public.audience,public.audience)', $m$if p_friend_requests_from = 'friends' then$m$, $m$if false then$m$);
+02 @@ a taken name in another case reads as free @@ select pg_temp.mutate('public.username_taken(text)', $m$lower(p.username) = lower(private.clean_text(p_username))$m$, $m$p.username = private.clean_text(p_username)$m$);
+02 @@ the name is not trimmed before the check @@ select pg_temp.mutate('public.username_taken(text)', $m$lower(private.clean_text(p_username))$m$, $m$lower(p_username)$m$);
+02 @@ a visitor cannot ask whether a name is taken @@ revoke execute on function public.username_taken(text) from anon;

@@ -66,6 +66,11 @@ select test_support.expect_error($$ select public.get_profiles('{}') $$, 'not_si
 select test_support.assert_eq_text(pg_temp.code_of($$ select public.get_profiles('{}') $$), 'PT401', 'no session is a 401');
 select set_config('role', 'anon', true);
 select test_support.expect_error($$ select public.get_profiles('{}') $$, 'permission denied');
+-- Except asking whether a name is taken, which the sign-up form does.
+select test_support.assert_eq_text(
+  public.username_taken(' Rls_Member_B ')::text, 'true', 'a visitor learns a name is taken, in any case');
+select test_support.assert_eq_text(
+  public.username_taken('nobody_has_this')::text, 'false', 'and that a free one is free');
 select test_support.become(null);
 
 -- ── Changing your name and bio ──────────────────────────────────────────────
