@@ -41,6 +41,27 @@ export const validateRecoveryPassword = (
 };
 
 /**
+ * The database's username rule (`profiles.username` check). Hyphens and other
+ * marks are out because a mention is `@` and these characters. Sign-up must
+ * check it first: the database swaps a name that breaks it for `user_<id>`
+ * rather than refuse the sign-up.
+ */
+export const USERNAME_PATTERN = /^[A-Za-z0-9_]{2,32}$/;
+
+export const validateUsername = (
+  username: string,
+): PasswordValidationResult => {
+  if (!USERNAME_PATTERN.test(username.trim())) {
+    return {
+      ok: false,
+      error:
+        "Usernames are 2 to 32 letters, numbers or underscores, with no spaces or hyphens.",
+    };
+  }
+  return { ok: true, error: null };
+};
+
+/**
  * What sign-up sends with the new login. The database (on_auth_user_created)
  * reads `username`, and records the terms the person agreed to when
  * `terms_version` names a published version.
