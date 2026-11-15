@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createMemoryPersistence } from "@shared/core";
+import { createMemoryPersistence } from "@shared/core/persistence/createMemoryPersistence";
 import { createLoadGate } from "@shared/collections/kit/loadGate";
 import { bootLogger } from "../bootLogger";
 import { parsePerfLine, perfTrace } from "../perfTrace";

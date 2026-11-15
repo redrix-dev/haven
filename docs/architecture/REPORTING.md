@@ -28,11 +28,11 @@ audiences for that, and the rebuild gives each one its own table:
    apply.
 2. **Platform cases** go to Haven staff. Haven's Terms and the law apply.
 
-## Today (being replaced)
+## Before the rebuild (replaced 2026-11)
 
 Every report starts in one of five places:
 
-| Entry                  | Clients                                                                                            | Path today                                                                                   |
+| Entry                  | Clients                                                                                            | Path then                                                                                    |
 | ---------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | Message in a community | Solid `MessageRow` → `CommunityView`; mobile `CommunityChatScreen` → `CommunityReportMessageModal` | `communityMessageNexus.report` → `communityReportBackend.reportMessage` (client inserts)     |
 | Profile                | Solid `MembersPanel`, `CommunityView`; mobile `UserProfileModal` → `ProfileReportSheet`            | `HavenCore.reportUserProfile` → `reportUserProfile` / `reportPlatformUserProfile`            |
@@ -207,7 +207,7 @@ Community reports send no notices beyond the moderators' modmail update.
 - Staff are emailed for new platform cases only. A failed alert is recorded on
   the case as an event, so it is visible, not just logged.
 - Realtime for community reports goes to the community's report readers, not
-  every member, and routes through `routeRealtimeEvent`.
+  every member, and is applied by the core's event table (REALTIME.md).
 
 ### Deletion, in one table
 
@@ -234,7 +234,7 @@ the haven-site status mapping.
 
 - **SQL**: every RLS rule, every RPC, and every deletion row above, each proven
   by breaking it.
-- **Backend contract tests**: the nexus calls against local Supabase.
+- **Backend contract tests**: the backend clients' calls against local Supabase.
 - **Real clients on the dev backend** (`docs/DEV_BACKEND.md`): a written matrix
   of every path (each report kind, escalate, each staff action, each deletion
   in the table above) run in desktop, web and mobile dev builds pointed at the
@@ -265,7 +265,7 @@ the design above provides.
 | ------------------------------------------------------------ | ---------- | ----------------------------------------------------------------------------------------------- |
 | Apple 1.2: report offensive content                          | Met        | Met                                                                                             |
 | Apple 1.2: timely response                                   | Gap        | Case age and status are queryable; staff alert per case. Response time is a practice, not code. |
-| Apple 1.2: block abusive users                               | Met        | Met (`socialNexus` blocking)                                                                    |
+| Apple 1.2: block abusive users                               | Met        | Met (`social` collection blocking)                                                              |
 | Apple 1.2: filter objectionable content                      | To confirm | Moderator removal and hiding, plus the scan slot. Confirm Apple accepts this.                   |
 | Apple 1.2: published contact information                     | Met        | Met                                                                                             |
 | 18 U.S.C. §2258A: report apparent CSAM to NCMEC              | Gap        | `staff_flag_csam` + `staff_record_ncmec_report`, logged. Needs NCMEC registration.              |

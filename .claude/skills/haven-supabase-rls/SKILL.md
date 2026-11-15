@@ -17,8 +17,8 @@ description: Use when changing Supabase migrations, Postgres RLS policies, secur
 
 The database was rebuilt on 2026-11-13, with its Edge Functions
 (`supabase/functions/README.md`) and the shared backend clients
-(`packages/shared/src/lib/backend/`). The nexuses and the apps have not been
-rewritten against it yet; DATABASE.md, "What follows", says what is left.
+(`packages/shared/src/lib/backend/`); the collections and all three apps run
+on it. DATABASE.md, "What follows", says what is left.
 
 ## The Six Rules
 

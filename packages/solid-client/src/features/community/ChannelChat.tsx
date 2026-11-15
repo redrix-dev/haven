@@ -18,7 +18,7 @@ import { draftFor } from "@shared/collections/session/selectors";
 import { memberColor } from "@shared/collections/roles/selectors";
 import { isNewer } from "@shared/collections/kit/ids";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import { buildMessageViewItems } from "./messageList/messageViewModel";
+import { buildMessageViewItems } from "@shared/features/messaging/messageViewModel";
 import { MessageList } from "./messageList/MessageList";
 import { Composer } from "./Composer";
 

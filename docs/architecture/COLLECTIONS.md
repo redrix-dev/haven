@@ -1,15 +1,14 @@
 # Collections: the app's copy of the database
 
-> Status: agreed design (2026-11-14), being built. It replaces the nexuses
-> (`packages/shared/src/nexus/`). Built so far, in
+> Status: built (2026-11-15). It replaced the nexuses. In
 > `packages/shared/src/collections/`: the kit (`rows`, `requests`, `events`,
-> `deviceCopies`, `ids`, plus `StatePort` and `LoadGate` moved from the nexus
-> kit), and the `channels`, `messages`, `communities`, `members`, `roles`,
-> `categories`, `profiles`, `social`, `notifications`, `account`, `reports`,
-> `cases` and `session` collections, `attachments` and `voice`, and the new
-> `HavenCore` over them (`collections/core/`). Desktop and web run on it
-> (`packages/solid-client`). Mobile does not yet: until it moves, the old
-> `core/havenCore.ts` and `NEXUS_RECIPE.md` describe the code mobile runs.
+> `deviceCopies`, `ids`, `StatePort`, `LoadGate`), the `channels`,
+> `messages`, `communities`, `members`, `roles`, `categories`, `profiles`,
+> `social`, `notifications`, `account`, `reports`, `cases` and `session`
+> collections, `attachments` and `voice`, and `HavenCore` over them
+> (`collections/core/`). Desktop, web (`packages/solid-client`) and mobile
+> (`apps/mobile/src/data/`) all run on it. How each app starts it:
+> [BOOTSTRAP.md](BOOTSTRAP.md).
 
 The apps keep a copy of the records the person can see, kept current by
 realtime events. This document is the shape of that copy. It follows the
@@ -18,21 +17,21 @@ database hands out, named and shaped the way the database names them.
 
 ## Why it changes
 
-The nexuses grew around screens. Each one mixes four things that age
+The nexuses grew around screens. Each one mixed four things that age
 differently:
 
-| Mixed into one nexus today | Where it goes                       |
+| Mixed into one nexus       | Where it goes                       |
 | -------------------------- | ----------------------------------- |
 | Records from the server    | a **collection**                    |
 | Indexes over those records | **selectors**, worked out when read |
 | What the person is doing   | **session state**                   |
 | Whether a load is running  | **request status**, per request     |
 
-They also save every change to the device as one JSON blob, which brings the
+They also saved every change to the device as one JSON blob, which brought the
 problems Slack wrote about when it stopped
 ([Making Slack faster by being lazy, part 2](https://slack.engineering/making-slack-faster-by-being-lazy-part-2/)),
-and keeps text the database has deleted. And since a direct message became a
-channel, the community-message and direct-message nexuses are one thing
+and kept text the database had deleted. And since a direct message became a
+channel, the community-message and direct-message nexuses were one thing
 written twice.
 
 Other chat apps settle on the same split: Discord's per-type stores,
@@ -201,9 +200,9 @@ store for each collection), device storage, and where the app runs.
 
 Each platform makes the stores (`makePort`, typed by `StoreStates`) and
 keeps them: desktop and web as `HavenSolidCore.stores`, live Solid store
-proxies that screens read through the selectors. The old
-`core/havenCore.ts`, over the nexuses, still runs mobile until it moves;
-then it is deleted.
+proxies that screens read through the selectors; mobile as
+`HavenReactCore.stores`, Zustand stores that screens read with `useStore`
+and `useCore`, which render only when what the selector read changed.
 
 The platform seam stays as it is: shared code writes through `StatePort`, and
 Solid and React only build the store and expose reads

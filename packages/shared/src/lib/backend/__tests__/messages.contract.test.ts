@@ -121,7 +121,10 @@ describe.sequential("messages (contract)", { timeout: 20_000 }, () => {
       await memberA.backend.messages.deleteMessage(sent.id);
 
       const about = (name: string) =>
-        heard.filter((e) => e.event === name && e.payload.id === sent.id);
+        heard.filter(
+          (e) =>
+            e.event === name && "id" in e.payload && e.payload.id === sent.id,
+        );
       await eventually(() => about("message.deleted").length === 1);
       expect(about("message.updated").length).toBeGreaterThanOrEqual(2);
       expect(await memberB.backend.messages.getMessages([sent.id])).toEqual([]);

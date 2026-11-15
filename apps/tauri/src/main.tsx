@@ -9,7 +9,7 @@ async function boot(): Promise<void> {
   const core = await createTauriHavenCore();
 
   // Dev affordance: poke the live caches from the console, e.g.
-  //   __haven.communities.getCommunityIds()
+  //   __haven.stores.communities.byId
   (window as Window & { __haven?: unknown }).__haven = core;
 
   // Solid's render() appends into the container — clear the index.html boot

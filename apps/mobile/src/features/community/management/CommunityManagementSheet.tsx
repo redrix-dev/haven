@@ -1,84 +1,118 @@
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import type { Channel, ServerPermissions } from "@shared/lib/backend/types";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useHavenCore, useStore } from "@mobile-data";
 import { HavenListSheet } from "@/components/HavenListSheet";
-import { CommunitySettingsSection } from "./CommunitySettingsSection";
-import { ChannelSettingsSection } from "./ChannelSettingsSection";
+import { ChannelsSection } from "./ChannelsSection";
+import { InvitesSection } from "./InvitesSection";
+import { MembersSection } from "./MembersSection";
+import { OverviewSection } from "./OverviewSection";
+import { RolesSection } from "./RolesSection";
 
-type Tab = "community" | "channels";
+export type SettingsTab =
+  | "overview"
+  | "channels"
+  | "roles"
+  | "members"
+  | "invites";
 
-type Props = {
-  visible: boolean;
-  initialTab: Tab;
-  serverId: string;
-  communityName: string;
-  channels: Channel[];
-  perms: ServerPermissions;
-  onDismiss: () => void;
+const LABELS: Record<SettingsTab, string> = {
+  overview: "Overview",
+  channels: "Channels",
+  roles: "Roles",
+  members: "Members",
+  invites: "Invites",
 };
+
+/**
+ * The tabs the person may use, from what the database says they may do here
+ * (`get_my_permissions`). The overview is for everyone: it is where a
+ * member leaves.
+ */
+function useVisibleTabs(communityId: string): SettingsTab[] {
+  const core = useHavenCore();
+  return useStore("communities", () => {
+    const can = (p: Parameters<typeof core.communities.can>[1]) =>
+      core.communities.can(communityId, p);
+    const tabs: SettingsTab[] = ["overview"];
+    if (can("manage_channels")) tabs.push("channels");
+    if (can("manage_roles")) tabs.push("roles");
+    if (can("manage_members") || can("manage_bans")) tabs.push("members");
+    if (can("manage_invites")) tabs.push("invites");
+    return tabs;
+  });
+}
 
 export function CommunityManagementSheet({
   visible,
-  initialTab,
-  serverId,
-  communityName,
-  channels,
-  perms,
+  communityId,
   onDismiss,
-}: Props) {
-  const [tab, setTab] = useState<Tab>(initialTab);
+}: {
+  visible: boolean;
+  communityId: string;
+  onDismiss: () => void;
+}) {
+  const tabs = useVisibleTabs(communityId);
+  const [tab, setTab] = useState<SettingsTab>("overview");
+  const name = useStore(
+    "communities",
+    (s) => s.byId[communityId]?.name ?? "Community",
+  );
 
-  // Sync tab when sheet is re-opened with a different initial tab
   useEffect(() => {
-    if (visible) setTab(initialTab);
-  }, [visible, initialTab]);
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "community", label: "Community" },
-    { key: "channels", label: "Channels" },
-  ];
+    if (visible) setTab("overview");
+  }, [visible]);
+  // A tab whose permission went away goes back to the overview.
+  useEffect(() => {
+    if (!tabs.includes(tab)) setTab("overview");
+  }, [tab, tabs]);
 
   return (
     <HavenListSheet
       visible={visible}
       onDismiss={onDismiss}
+      title={name}
       bodyScrollable={false}
     >
-      {/* Top-level tab pills */}
-      <View className="mb-4 flex-row gap-2">
-        {tabs.map((t) => (
-          <Pressable
-            key={t.key}
-            onPress={() => setTab(t.key)}
-            className={`flex-1 rounded-xl py-2 ${tab === t.key ? "bg-primary" : "bg-surface-panel"}`}
-          >
-            <Text
-              className={`text-center text-sm font-semibold ${
-                tab === t.key
-                  ? "text-primary-foreground"
-                  : "text-muted-foreground"
-              }`}
+      {tabs.length > 1 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="mb-4 max-h-10 grow-0"
+          contentContainerStyle={{ gap: 8 }}
+        >
+          {tabs.map((t) => (
+            <Pressable
+              key={t}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: tab === t }}
+              onPress={() => setTab(t)}
+              className={`rounded-full px-4 py-2 ${tab === t ? "bg-primary" : "bg-surface-panel"}`}
             >
-              {t.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+              <Text
+                className={`text-sm font-semibold ${
+                  tab === t
+                    ? "text-primary-foreground"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {LABELS[t]}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
 
-      {/* Section content */}
       <View className="min-h-0 flex-1">
-        {tab === "community" ? (
-          <CommunitySettingsSection
-            serverId={serverId}
-            communityName={communityName}
-            perms={perms}
-          />
+        {tab === "overview" ? (
+          <OverviewSection communityId={communityId} onDone={onDismiss} />
+        ) : tab === "channels" ? (
+          <ChannelsSection communityId={communityId} />
+        ) : tab === "roles" ? (
+          <RolesSection communityId={communityId} />
+        ) : tab === "members" ? (
+          <MembersSection communityId={communityId} />
         ) : (
-          <ChannelSettingsSection
-            serverId={serverId}
-            channels={channels}
-            perms={perms}
-          />
+          <InvitesSection communityId={communityId} />
         )}
       </View>
     </HavenListSheet>

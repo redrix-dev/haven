@@ -12,7 +12,7 @@ import {
   type RemoteParticipant,
 } from "livekit-client";
 import { useHavenCore } from "@mobile-data";
-import { useVoiceSession } from "@mobile-data/hooks";
+import { useVoiceSession } from "@mobile-data";
 import { useVoiceMemberVolumes } from "@/features/voice/hooks/useVoiceMemberVolumes";
 import type {
   VoiceControllerChannel,
@@ -202,7 +202,7 @@ export function useMobileLiveKitVoiceSession({
   livekitRoom: Room;
 } {
   const core = useHavenCore();
-  const voiceSession = useVoiceSession(core.voice);
+  const voiceSession = useVoiceSession();
   const joined = voiceSession.joined;
   const isMuted = voiceSession.isMuted;
   const isDeafened = voiceSession.isDeafened;
@@ -599,10 +599,7 @@ export function useMobileLiveKitVoiceSession({
       timer.mark("permissions-ready");
 
       const credentialsPromise = core.voice
-        .fetchJoinCredentials(
-          targetChannel.communityId,
-          targetChannel.channelId,
-        )
+        .fetchJoinCredentials(targetChannel.channelId)
         .then((credentials) => {
           timer.mark("token-ready");
           return credentials;

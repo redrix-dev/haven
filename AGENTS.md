@@ -33,7 +33,6 @@ This file is the quick index. Load the relevant project skill under
 | Starting, scoping, testing, or handing off any change                                                              | [haven-branch-ci-gates](.claude/skills/haven-branch-ci-gates/SKILL.md)             |
 | Changing `packages/shared`, backend clients, HavenCore contracts, realtime routing, or platform ports              | [haven-shared-core-boundary](.claude/skills/haven-shared-core-boundary/SKILL.md)   |
 | Adding or changing a desktop/web Solid feature, route, UI primitive, or popout                                     | [haven-solid-feature-slice](.claude/skills/haven-solid-feature-slice/SKILL.md)     |
-| Adding or changing a data nexus (shared class, Solid or React binding), StatePort/LoadGate, or HavenCore parts     | [haven-solid-nexus](.claude/skills/haven-solid-nexus/SKILL.md)                     |
 | Writing or changing any Solid `createEffect`, store subscription, or realtime handler                              | [haven-solid-reactivity](.claude/skills/haven-solid-reactivity/SKILL.md)           |
 | Changing the Tauri desktop shell, bridge, capabilities, deep links, updater bridge, persistence, or popout windows | [haven-tauri-desktop-shell](.claude/skills/haven-tauri-desktop-shell/SKILL.md)     |
 | Changing desktop release workflow, updater signing, version sync, release notes, or packaged build behavior        | [haven-tauri-release](.claude/skills/haven-tauri-release/SKILL.md)                 |
@@ -52,10 +51,10 @@ This file is the quick index. Load the relevant project skill under
   client.
 - `apps/web` - Vite static web shell for the same Solid client.
 - `packages/shared` - portable domain logic, backend clients, shared types,
-  themes, realtime routing, every domain's nexus class, and the shared
-  `HavenCore`. No React, no Solid; reactive stores belong to the platforms.
-- `packages/solid-client` - Solid UI, Solid nexus bindings, the desktop/web
-  `HavenSolidCore` subclass, and feature slices.
+  themes, the collections and the shared `HavenCore` with its realtime event
+  table. No React, no Solid; reactive stores belong to the platforms.
+- `packages/solid-client` - Solid UI, the desktop/web `HavenSolidCore`
+  (Solid stores for the collections), and feature slices.
 - `supabase` - migrations, RLS policies, Edge Functions, fixtures, helpers, and
   SQL regression suites.
 - `tooling` - repo checks, mobile wrappers, Supabase test runners, release
@@ -80,11 +79,12 @@ This file is the quick index. Load the relevant project skill under
 - Do not put permission decisions in UI. Security lives in Postgres RLS or
   security-definer RPCs; clients reflect database truth.
 - Do not share reactive memory across frameworks. Domain logic lives once in
-  the shared nexus classes; React and Solid bindings only build the store and
-  expose reads. A behavior change written in a binding is a second
-  implementation.
+  the shared collections and `HavenCore`; `HavenSolidCore` and
+  `HavenReactCore` only make the stores and expose reads. A behavior change
+  written in a platform is a second implementation.
 - Do not create Supabase clients, call RPCs, or open domain realtime channels in
-  UI/features. Use host bootstrap, HavenCore, backend clients, and nexuses.
+  UI/features. Screens call the core's and the collections' commands, and
+  `core.backend` only for a read no collection holds.
 - Do not import features from other features in `packages/solid-client`.
   Shared code moves down into `data/`, `components/ui/`, or `packages/shared`.
 - Do not add `@tauri-apps/*` to `packages/solid-client`; the Solid client must
@@ -110,11 +110,6 @@ This file is the quick index. Load the relevant project skill under
 
 - Path aliases are an interim compatibility layer. The durable target is real
   workspace packages with `exports`.
-- Some shared selectors still live under `@shared/nexus/*` while others live
-  under `@shared/features/*/logic`. Follow the existing domain imports; do not
-  consolidate as drive-by cleanup.
-- Realtime still has documented holes for reactions, attachments, and link
-  previews; see [docs/architecture/REALTIME.md](docs/architecture/REALTIME.md).
 - Desktop Linux voice has two overlapping bridge concepts (`VoiceBridge` and
   `VoiceRuntimeBridge`). Use the documented `VoiceBridge` seam for the sidecar;
   consolidate only when a real third surface needs it.

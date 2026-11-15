@@ -6,9 +6,8 @@ needs, not from the code that existed. The nine files in
 `supabase/migrations/` are the whole database, and this page is how to read
 them.
 
-**State:** the database, the Edge Functions and the shared backend clients
-are built and tested. The nexuses and the apps have not been rewritten
-against them yet (see [What follows](#what-follows)).
+**State:** the database, the Edge Functions, the shared backend clients, the
+collections and all three apps run on it (see [What follows](#what-follows)).
 
 ## The six rules
 
@@ -494,15 +493,9 @@ These were not specified anywhere. Each is one obvious place in the SQL.
 Not done, in the order it makes sense to do it:
 
 Done: the database, the dev seeds, the Edge Functions
-(`supabase/functions/`), the generated types and the shared backend clients
-(`packages/shared/src/lib/backend/`). Left, in order:
-
-1. **The nexuses and `HavenCore`** in `packages/shared`, rewritten as
-   collections onto the new clients and the one realtime topic
-   ([COLLECTIONS.md](COLLECTIONS.md)). `npm run typecheck` lists every file
-   still on the old clients.
-2. **The apps** (Solid and mobile).
-3. **A scanner** (`scan-worker`) once a vendor is chosen.
-4. **`npm run devdb -- reset`**, to put all of it on the shared dev backend.
+(`supabase/functions/`), the generated types, the shared backend clients
+(`packages/shared/src/lib/backend/`), the collections and `HavenCore` over
+them ([COLLECTIONS.md](COLLECTIONS.md)), and desktop, web and mobile on them.
+Left: **a scanner** (`scan-worker`) once a vendor is chosen.
 
 The old migrations and suites are in git history before this change.

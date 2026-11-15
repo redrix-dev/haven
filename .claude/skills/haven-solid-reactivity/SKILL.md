@@ -1,6 +1,6 @@
 ---
 name: haven-solid-reactivity
-description: Use when writing or changing any createEffect, createMemo, store subscription, or realtime handler in packages/solid-client — including effects that call a nexus load/open/mark method. Covers the self-retriggering effect class that strobes the UI, the untrack rule, the async-prefix trap, and the settle test every new effect ships with.
+description: Use when writing or changing any createEffect, createMemo, store subscription, or realtime handler in packages/solid-client — including effects that call a core or collection load/open/mark command. Covers the self-retriggering effect class that strobes the UI, the untrack rule, the async-prefix trap, and the settle test every new effect ships with.
 ---
 
 # Haven Solid Reactivity
@@ -8,7 +8,7 @@ description: Use when writing or changing any createEffect, createMemo, store su
 ## Read Before Editing
 
 - [docs/architecture/SOLID_CLIENT_SHAPE.md](../../../docs/architecture/SOLID_CLIENT_SHAPE.md)
-- [docs/architecture/HAVEN_CORE.md](../../../docs/architecture/HAVEN_CORE.md)
+- [docs/architecture/COLLECTIONS.md](../../../docs/architecture/COLLECTIONS.md)
 
 ## The Failure This Prevents
 
@@ -142,7 +142,7 @@ proof.
 load, mark-read), it's the async class → Tier 2. If the effect blows the stack
 synchronously, it's Tier 1. When unsure, Tier 2 — it catches both.
 
-Nexus-side store writes belong to `haven-solid-nexus`; component structure and
+Collection-side store writes belong to `haven-shared-core-boundary`; component structure and
 layer law belong to `haven-solid-feature-slice`. This skill owns the reactive
 graph between them.
 

@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, splitProps } from "solid-js";
 import { VList, type VListHandle } from "virtua/solid";
-import type { MessageViewItem } from "./messageViewModel";
+import type { MessageViewItem } from "@shared/features/messaging/messageViewModel";
 import { MessageRow, type MessageRowActions } from "./MessageRow";
 
 /**

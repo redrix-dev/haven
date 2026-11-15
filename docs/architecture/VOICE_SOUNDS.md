@@ -1,9 +1,9 @@
 # Voice confirmation sounds
 
 Voice cues use one portable policy (`features/voice/utils/voiceSounds.ts`) with
-platform players. They are enabled by default at 50% volume. The voice nexus
-persists device preferences through `NexusPersistence`; session cleanup and
-sign-out preserve them. Notifications retain their separate preferences and
+platform players. They are enabled by default at 50% volume. The voice
+collection (`collections/voice`) keeps device preferences through
+`NexusPersistence`; session cleanup and sign-out preserve them. Notifications retain their separate preferences and
 focus/throttle policy. The old notification voice-presence API and hardcoded
 web join/leave player are removed.
 

@@ -29,23 +29,24 @@ history lives in git.
 ## The three layers (the law)
 
 ```
-packages/shared (logic, nexuses, HavenCore)  →  per-platform binding  →  per-platform UI
+packages/shared (logic, collections, HavenCore)  →  per-platform stores  →  per-platform UI
 ```
 
-1. **Dependencies point inward.** Shared never imports a platform. A binding
-   never imports another platform's binding.
-2. **Logic is shared.** Fetching, merging realtime events, visibility and
-   permission filtering, pagination, event routing, domain rules, types — and
-   each domain's nexus class and the session's `HavenCore` that run them — live
-   in `packages/shared` and behave identically on every platform. No `react`, no
-   `solid-js`, no React-flavored zustand (`zustand/vanilla` is allowed). Enforced
-   by `check:shared-portable`.
-3. **Reactive memory is per-platform.** A shared nexus reads and writes through
-   a `StatePort`; the store behind it belongs to the platform's binding — a
-   Solid store in `packages/solid-client/src/data/` (`XSolidNexus`,
-   `HavenSolidCore`), a zustand store in `apps/mobile/src/data/` (`XReactNexus`,
-   `HavenReactCore`). A reactive store is **never** shared across frameworks.
-   See [architecture/HAVEN_CORE.md](./architecture/HAVEN_CORE.md).
+1. **Dependencies point inward.** Shared never imports a platform. One
+   platform never imports another's.
+2. **Logic is shared.** Fetching, applying realtime events, paging, domain
+   rules, types — and each collection and the session's `HavenCore` that run
+   them — live in `packages/shared` and behave identically on every platform.
+   No `react`, no `solid-js`, no React-flavored zustand (`zustand/vanilla` is
+   allowed). Enforced by `check:shared-portable`.
+3. **Reactive memory is per-platform.** A collection reads and writes through
+   a `StatePort`; the store behind it is the platform's, made by the core's
+   `makePort`: a Solid store for desktop and web (`HavenSolidCore`, in
+   `packages/solid-client/src/core/`), a Zustand store on the phone
+   (`HavenReactCore`, in `apps/mobile/src/data/core/`). A reactive store is
+   **never** shared across frameworks. Screens read the stores through the
+   collections' selectors and change things through commands. See
+   [architecture/COLLECTIONS.md](./architecture/COLLECTIONS.md).
 
 One sentence: _the logic is written once; each platform keeps its own memory and
 reads it its own way._
@@ -55,18 +56,17 @@ reads it its own way._
 Canonical homes — one implementation per module, no duplicate trees and no
 re-export shims:
 
-| Concern                                                            | Home                                       |
-| ------------------------------------------------------------------ | ------------------------------------------ |
-| Backend clients, RPC wrappers, network shapes                      | `lib/backend/`                             |
-| Supabase client construction                                       | `lib/createHavenSupabaseClient.ts`         |
-| Domain logic (messaging, auth, notifications, voice, …)            | `features/<domain>/`                       |
-| Session composition root (`HavenCore`)                             | `core/havenCore.ts`                        |
-| Realtime routing (pure, over `RealtimeMutationTarget`)             | `core/routeRealtimeEvent.ts`               |
-| Persistence port + memory adapter                                  | `core/persistence/`                        |
-| Nexus classes, state types, selectors, kit (StatePort, LoadGate)   | `nexus/` (recipe: `nexus/NEXUS_RECIPE.md`) |
-| Platform capability port (`AppHost`)                               | `infrastructure/platform/appHost.ts`       |
-| Themes (tokens, registry — the one place hex literals are allowed) | `themes/`                                  |
-| Shared types, DB types                                             | `types/`                                   |
+| Concern                                                            | Home                                        |
+| ------------------------------------------------------------------ | ------------------------------------------- |
+| Backend clients, RPC wrappers, network shapes                      | `lib/backend/`                              |
+| Supabase client construction                                       | `lib/createHavenSupabaseClient.ts`          |
+| Domain logic (messaging, auth, notifications, voice, …)            | `features/<domain>/`                        |
+| The session (`HavenCore`) and its event table                      | `collections/core/havenCore.ts`             |
+| Collections, their selectors, kit (StatePort, requests, events)    | `collections/` (see COLLECTIONS.md)         |
+| Device storage port + adapters; incoming links                     | `core/persistence/`, `core/linkPipeline.ts` |
+| Platform capability port (`AppHost`)                               | `infrastructure/platform/appHost.ts`        |
+| Themes (tokens, registry — the one place hex literals are allowed) | `themes/`                                   |
+| Shared types, DB types                                             | `types/`                                    |
 
 ## Platforms
 
@@ -81,11 +81,10 @@ LiveKit Cloud for voice.
 
 ## Realtime (one subscription)
 
-Exactly **one** domain realtime subscription per user: `private_user:{userId}` →
-`routeRealtimeEvent` → targeted cache patch/evict/reload. Feature code never opens
-its own `postgres_changes` listener (voice room presence is the documented
-exception). Coverage matrix and open holes:
-[architecture/REALTIME.md](./architecture/REALTIME.md).
+Exactly **one** domain realtime subscription per user: `user:<id>` → the
+core's event table → the collections. Feature code never opens its own
+listener (voice presence, `voice:<channel id>`, is the documented exception).
+What each event does: [architecture/REALTIME.md](./architecture/REALTIME.md).
 
 ## Guardrails (decisions, encoded)
 

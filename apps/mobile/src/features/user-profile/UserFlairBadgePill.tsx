@@ -1,10 +1,10 @@
 import { Text, View } from "react-native";
-import type { UserFlairBadge } from "@shared/lib/backend/types";
+import type { ProfileFlair } from "@shared/lib/backend/records";
 import { resolveColorProp } from "@shared/themes";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 
 type UserFlairBadgePillProps = {
-  flair: UserFlairBadge;
+  flair: Pick<ProfileFlair, "label" | "color_token" | "background_token">;
   align?: "start" | "center";
 };
 
@@ -14,11 +14,11 @@ export function UserFlairBadgePill({
 }: UserFlairBadgePillProps) {
   const themeTokens = useMobileThemeTokens();
   const color =
-    resolveColorProp(themeTokens, flair.colorToken) ??
+    resolveColorProp(themeTokens, flair.color_token) ??
     resolveColorProp(themeTokens, "foreground") ??
     "#111827";
   const backgroundColor =
-    resolveColorProp(themeTokens, flair.backgroundToken) ??
+    resolveColorProp(themeTokens, flair.background_token) ??
     resolveColorProp(themeTokens, "muted") ??
     "#F3F4F6";
 

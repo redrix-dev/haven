@@ -1,5 +1,5 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
-import type { FriendsPanelTab } from "@shared/types/types";
+import type { FriendsTab } from "@/features/friends/FriendsSurface";
 
 export type MainStackParamList = {
   CommunityEntry: undefined;
@@ -11,17 +11,13 @@ export type MainStackParamList = {
     pendingInviteCode?: string;
   };
   Friends:
-    | { initialTab?: FriendsPanelTab; highlightedRequestId?: string | null }
+    | { initialTab?: FriendsTab; highlightedRequestId?: string | null }
     | undefined;
+  /** Someone's friend link, opened: shows who it is from and asks. */
+  FriendLink: { code: string };
   Notifications: undefined;
   Profile: undefined;
   Settings: undefined;
-};
-
-/** @deprecated Use MainStackParamList — kept for gradual migration. */
-export type MainTabParamList = {
-  CommunityEntry: undefined;
-  Community: undefined;
 };
 
 export type RootStackParamList = {

@@ -5,7 +5,7 @@ import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import type { Session } from "@supabase/supabase-js";
-import { useHavenCore } from "@mobile-data";
+import { requireHavenCore, useHavenCore } from "@mobile-data";
 
 const INSTALLATION_ID_KEY = "haven:mobilePushInstallationId";
 const LAST_EXPO_TOKEN_KEY = "haven:lastExpoPushToken";
@@ -19,7 +19,23 @@ async function getOrCreateInstallationId(): Promise<string> {
 }
 
 /**
- * Registers the device Expo push token with Supabase after sign-in and removes it on sign-out.
+ * Stops pushes to this phone. Signing out calls it first: the database only
+ * takes it from someone signed in.
+ */
+export async function unregisterThisPushDevice(): Promise<void> {
+  const stored = (await AsyncStorage.getItem(LAST_EXPO_TOKEN_KEY))?.trim();
+  if (!stored) return;
+  try {
+    await requireHavenCore().backend.notifications.unregisterPushDevice(stored);
+  } catch (error) {
+    console.warn("[mobile push] Failed to unregister this phone.", error);
+  }
+  await AsyncStorage.removeItem(LAST_EXPO_TOKEN_KEY);
+}
+
+/**
+ * Registers the device Expo push token after sign-in. Sign-out removes it
+ * (`unregisterThisPushDevice`, from the auth service) before the session ends.
  * Notification tap routing lives in `useMobilePushNotificationRouting` (handlers from main shell).
  */
 export function useMobileExpoPushRegistration(
@@ -27,29 +43,6 @@ export function useMobileExpoPushRegistration(
 ): void {
   const core = useHavenCore();
   const registeringRef = useRef(false);
-
-  useEffect(() => {
-    if (session !== null) return undefined;
-
-    let cancelled = false;
-    void (async () => {
-      const stored = await AsyncStorage.getItem(LAST_EXPO_TOKEN_KEY);
-      if (!stored?.trim() || cancelled) return;
-      try {
-        await core.notifications.deleteExpoPushSubscription(stored.trim());
-      } catch (error) {
-        console.warn(
-          "[mobile push] Failed to delete expo push token on sign-out.",
-          error,
-        );
-      }
-      await AsyncStorage.removeItem(LAST_EXPO_TOKEN_KEY);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [core.notifications, session]);
 
   useEffect(() => {
     if (!session?.user?.id) return undefined;
@@ -109,18 +102,12 @@ export function useMobileExpoPushRegistration(
         if (!expoPushToken || cancelled) return;
 
         const installationId = await getOrCreateInstallationId();
-        const platform =
-          Platform.OS === "ios"
-            ? "ios"
-            : Platform.OS === "android"
-              ? "android"
-              : "unknown";
+        if (Platform.OS !== "ios" && Platform.OS !== "android") return;
 
-        await core.notifications.upsertExpoPushSubscription({
-          expoPushToken,
-          platform,
-          installationId,
-          metadata: { source: "haven-mobile" },
+        await core.backend.notifications.registerPushDevice({
+          token: expoPushToken,
+          platform: Platform.OS,
+          installation_id: installationId,
         });
 
         await AsyncStorage.setItem(LAST_EXPO_TOKEN_KEY, expoPushToken);
@@ -136,5 +123,5 @@ export function useMobileExpoPushRegistration(
     return () => {
       cancelled = true;
     };
-  }, [core.notifications, session?.user?.id]);
+  }, [core, session?.user?.id]);
 }

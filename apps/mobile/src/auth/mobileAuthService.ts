@@ -6,7 +6,11 @@ import {
   validateLegalAcceptance,
   validatePasswordConfirmation,
   validateRecoveryPassword,
+  validateUsername,
 } from "@shared/features/auth/domain";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { requireHavenCore } from "@mobile-data";
+import { unregisterThisPushDevice } from "@/hooks/useMobileExpoPushRegistration";
 
 export type MobileAuthResult = { error: unknown | null };
 
@@ -55,6 +59,17 @@ export const signUpWithPassword = async (input: {
   if (!passwordValidation.ok) {
     return {
       error: new Error(passwordValidation.error ?? "Passwords do not match."),
+    };
+  }
+
+  const name = validateUsername(input.username);
+  if (!name.ok) return { error: new Error(name.error ?? "") };
+  // Ask first: a taken name would not refuse the sign-up, the database would
+  // swap it for user_<id>. Someone can still take it in between; then the
+  // swap happens and they rename in settings.
+  if (await requireHavenCore().backend.people.usernameTaken(input.username)) {
+    return {
+      error: new Error(`"${input.username.trim()}" is taken. Try another.`),
     };
   }
 
@@ -138,17 +153,20 @@ export const completePasswordRecovery = async (
   return { error };
 };
 
+/** Stops pushes to this phone while still signed in, then signs out. */
 export const signOutFromAuth = async (): Promise<void> => {
+  await unregisterThisPushDevice();
   await getMobileSupabase().auth.signOut();
 };
 
-/** Matches web `AuthContext.deleteAccount`: RPC then sign out so session listeners clear state. */
+/**
+ * Deletes the account (refused, `owns_communities`, while they own a
+ * community with others in it), then signs out so the session clears.
+ */
 export const deleteOwnAccount = async (): Promise<void> => {
-  const supabase = getMobileSupabase();
-  const { error: deleteError } = await supabase.rpc("delete_own_account");
-  if (deleteError) throw deleteError;
-
-  const { error: signOutError } = await supabase.auth.signOut();
+  await requireHavenCore().account.deleteAccount();
+  await AsyncStorage.removeItem("haven:lastExpoPushToken");
+  const { error: signOutError } = await getMobileSupabase().auth.signOut();
   if (signOutError) {
     console.warn("Failed to sign out after account deletion:", signOutError);
   }

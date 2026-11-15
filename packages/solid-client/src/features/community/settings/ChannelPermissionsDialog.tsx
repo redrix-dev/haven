@@ -13,7 +13,7 @@ import { requireHavenSolidCore } from "@solid-client/core";
 import {
   channelPermissionLabel,
   nextChannelPermission,
-} from "./channelPermissionControls";
+} from "@shared/features/permissions/channelPermissionControls";
 
 type PermissionKey = keyof OverwriteValues;
 

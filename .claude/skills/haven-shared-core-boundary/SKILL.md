@@ -1,6 +1,6 @@
 ---
 name: haven-shared-core-boundary
-description: Use when changing packages/shared, backend clients, shared domain logic, HavenCore contracts, RealtimeMutationTarget, routeRealtimeEvent, platform ports, persistence ports, themes, or any code that crosses mobile/Solid/web boundaries.
+description: Use when changing packages/shared, backend clients, shared domain logic, the collections, HavenCore and its realtime event table, platform ports, persistence ports, themes, or any code that crosses mobile/Solid/web boundaries.
 ---
 
 # Haven Shared Core Boundary
@@ -9,7 +9,7 @@ description: Use when changing packages/shared, backend clients, shared domain l
 
 - [docs/PRINCIPLES.md](../../../docs/PRINCIPLES.md)
 - [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md)
-- [docs/architecture/HAVEN_CORE.md](../../../docs/architecture/HAVEN_CORE.md)
+- [docs/architecture/COLLECTIONS.md](../../../docs/architecture/COLLECTIONS.md)
 - [docs/architecture/REALTIME.md](../../../docs/architecture/REALTIME.md) when routing,
   subscriptions, notifications, messages, DMs, social, moderation, or profile
   events change.
@@ -19,17 +19,16 @@ description: Use when changing packages/shared, backend clients, shared domain l
 `packages/shared` is portable logic and contracts only.
 
 - Allowed: pure domain functions, backend interfaces/clients, shared types,
-  framework-free selectors, the shared nexus classes and `HavenCore`,
-  `zustand/vanilla`, persistence ports, platform ports, theme token sources,
-  realtime routing over typed interfaces.
+  framework-free selectors, the collections and `HavenCore`,
+  `zustand/vanilla`, persistence ports, platform ports, theme token sources.
 - Forbidden: React, Solid, React Native, DOM assumptions in portable paths,
   `createClient` call sites outside host bootstrap, direct env reads for
   Supabase config, and hook-shaped `use*` exports under `shared/core`.
 
-Share the logic, not the memory. Every nexus's logic lives once in shared and
-reads/writes through a `StatePort`; the reactive store behind that port is
-always the platform's own (a Solid store or a zustand store), built by its
-binding.
+Share the logic, not the memory. Every collection's logic lives once in
+shared and reads/writes through a `StatePort`; the reactive store behind that
+port is always the platform's own (a Solid store or a Zustand store), made by
+its core's `makePort`.
 
 ## Put Code In The Canonical Home
 
@@ -43,15 +42,14 @@ binding.
   `packages/shared/src/lib/createHavenSupabaseClient.ts`
 - Domain logic:
   `packages/shared/src/features/<domain>/`
-- Realtime routing:
-  `packages/shared/src/core/routeRealtimeEvent.ts`
-- Realtime platform contract:
-  `packages/shared/src/core/realtimeMutationTarget.ts`
-- Persistence ports:
-  `packages/shared/src/core/persistence/`
-- Nexus classes, state types, selectors, and the nexus kit (StatePort,
-  LoadGate): `packages/shared/src/nexus/` (see `NEXUS_RECIPE.md` there)
-- The session composition root: `packages/shared/src/core/havenCore.ts`
+- Collections, their selectors, and the kit (StatePort, requests, events,
+  device copies): `packages/shared/src/collections/` (COLLECTIONS.md)
+- The session, and the realtime event table:
+  `packages/shared/src/collections/core/havenCore.ts`
+- Device storage ports and the link pipeline:
+  `packages/shared/src/core/persistence/`, `core/linkPipeline.ts`
+- Render-ready view models both apps use (no store, no framework):
+  `packages/shared/src/features/<domain>/` (e.g. `messageViewModel`)
 - Platform capability port:
   `packages/shared/src/infrastructure/platform/appHost.ts`
 - Theme token source:
@@ -62,18 +60,16 @@ is a one-line shim with an expiry, not a copy.
 
 ## Data-Layer Change Recipe
 
-1. Put the behavior in the shared nexus (or `HavenCore` when it spans
-   nexuses). Platform bindings only add reads; a behavior change written in a
-   binding is a second implementation.
+1. Put the behavior in the shared collection (or `HavenCore` when it spans
+   collections). Platforms only make stores and read them; a behavior change
+   written in a platform is a second implementation.
 2. Add or update backend interfaces before UI call sites.
-3. Add a nexus or HavenCore command for UI writes. Do not let UI import backend
-   factories or call Supabase directly.
-4. Route new private-user realtime events in `routeRealtimeEvent` by patching,
-   evicting, or reloading one primary domain.
-5. Extend `RealtimeMutationTarget` only when shared routing genuinely needs a new
-   core capability.
-6. Add the reads each platform needs (Solid accessor, mobile hook).
-7. Update architecture docs in the same change if the contract changed.
+3. Add a collection or HavenCore command for UI writes. Do not let UI import
+   backend factories or call Supabase directly.
+4. A new realtime event is one row in `eventTable()` in `HavenCore`, applied
+   to the collections; add it to REALTIME.md's table.
+5. Add a selector when both platforms read the same view.
+6. Update architecture docs in the same change if the contract changed.
 
 ## Guardrails
 

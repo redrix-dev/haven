@@ -1,1 +1,0 @@
-export { SocialReactNexus } from "./socialReactNexus";

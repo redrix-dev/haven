@@ -1,19 +1,19 @@
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import { Image, Modal, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHavenCore } from "@mobile-data";
+import { isMuted, otherPerson } from "@shared/collections/channels/selectors";
 import {
-  useActiveDmConversationId,
-  useDmConversations,
-  useProfilesRecord,
-} from "@mobile-data/hooks";
-import {
-  resolveLiveAvatarUrl,
-  resolveLiveUsername,
-} from "@shared/lib/liveProfiles";
+  useAvatarUrl,
+  useHavenCore,
+  useMe,
+  useNameOf,
+  useStore,
+} from "@mobile-data";
 import { ThemedIonicons } from "@/theme-rn";
 
 const HEADER_ROW_HEIGHT = 82;
+/** Muting a conversation is until it is unmuted. */
+const MUTED_FOR_GOOD = "9999-12-31T00:00:00.000Z";
 
 type DmTopBarProps = {
   /** Called when the user taps the title / menu area to open the inbox drawer. */
@@ -23,58 +23,29 @@ type DmTopBarProps = {
 export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
   const insets = useSafeAreaInsets();
   const core = useHavenCore();
-  const dm = core.directMessages;
-  const liveProfiles = useProfilesRecord(core.profiles);
+  const me = useMe() ?? "";
   const [actionsOpen, setActionsOpen] = useState(false);
-
-  const activeConversationId = useActiveDmConversationId(dm);
-  const conversations = useDmConversations(dm);
-
-  const activeConversation = useMemo(
-    () =>
-      activeConversationId
-        ? (conversations.find(
-            (c) => c.conversationId === activeConversationId,
-          ) ?? null)
-        : null,
-    [activeConversationId, conversations],
+  const channelId = useStore("session", (s) =>
+    s.place?.kind === "conversation" ? s.place.channel_id : null,
   );
-
-  const peerName = useMemo(() => {
-    if (!activeConversation) return null;
-    return (
-      resolveLiveUsername(
-        liveProfiles,
-        activeConversation.otherUserId,
-        activeConversation.otherUsername,
-      )?.trim() ||
-      activeConversation.otherUsername ||
-      "Direct"
-    );
-  }, [activeConversation, liveProfiles]);
-
-  const peerAvatarUrl = useMemo(() => {
-    if (!activeConversation) return null;
-    return resolveLiveAvatarUrl(
-      liveProfiles,
-      activeConversation.otherUserId,
-      activeConversation.otherAvatarUrl,
-    );
-  }, [activeConversation, liveProfiles]);
-
-  const peerInitial = (peerName ?? "M").trim().charAt(0).toUpperCase() || "M";
-
-  const handleMuteToggle = useCallback(
-    (nextMuted: boolean) => {
-      if (!activeConversation) return;
-      void (async () => {
-        await dm.setMuted(activeConversation.conversationId, nextMuted);
-        await dm.loadConversations();
-        setActionsOpen(false);
-      })().catch(() => {});
-    },
-    [activeConversation, dm],
+  const peerId = useStore("channels", (s) =>
+    channelId ? otherPerson(s, channelId, me) : null,
   );
+  const muted = useStore("channels", (s) =>
+    channelId ? isMuted(s, channelId) : false,
+  );
+  const peerName = useNameOf(peerId ?? "");
+  const peerAvatarUrl = useAvatarUrl(peerId);
+  const title = peerId ? peerName : "Messages";
+  const peerInitial = title.trim().charAt(0).toUpperCase() || "M";
+
+  const toggleMute = () => {
+    if (!channelId) return;
+    void core.channels
+      .mute(channelId, muted ? null : MUTED_FOR_GOOD)
+      .catch(() => {});
+    setActionsOpen(false);
+  };
 
   return (
     <View
@@ -101,7 +72,7 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            peerName
+            peerId
               ? `Conversation with ${peerName}, open inbox`
               : "Open messages inbox"
           }
@@ -112,9 +83,7 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
             <Image
               source={{ uri: peerAvatarUrl }}
               className="h-9 w-9 rounded-full"
-              accessibilityLabel={
-                peerName ? `${peerName} avatar` : "Conversation avatar"
-              }
+              accessibilityLabel={`${peerName} avatar`}
               accessibilityIgnoresInvertColors
             />
           ) : (
@@ -128,14 +97,14 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
             className="mt-1 max-w-full text-center text-lg font-semibold leading-6 text-foreground"
             numberOfLines={1}
           >
-            {peerName ?? "Messages"}
+            {title}
           </Text>
         </Pressable>
 
-        {activeConversation ? (
+        {channelId ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Direct message options"
+            accessibilityLabel="Conversation options"
             className="h-11 w-11 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
             onPress={() => setActionsOpen(true)}
           >
@@ -169,16 +138,14 @@ export function DmTopBar({ onOpenDrawer }: DmTopBarProps) {
               className="mb-3 text-center text-xs text-muted-foreground"
               numberOfLines={2}
             >
-              {peerName ?? "Direct message"}
+              {title}
             </Text>
             <Pressable
               className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
-              onPress={() => handleMuteToggle(!activeConversation?.isMuted)}
+              onPress={toggleMute}
             >
               <Text className="text-center text-base font-medium text-foreground">
-                {activeConversation?.isMuted
-                  ? "Unmute conversation"
-                  : "Mute conversation"}
+                {muted ? "Unmute conversation" : "Mute conversation"}
               </Text>
             </Pressable>
             <Pressable

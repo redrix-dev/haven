@@ -14,7 +14,7 @@ import {
   type ActionMenuItem,
 } from "@solid-client/components/ui";
 import { MessageEditor } from "./MessageEditor";
-import type { MessageRowItem } from "./messageViewModel";
+import type { MessageRowItem } from "@shared/features/messaging/messageViewModel";
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
