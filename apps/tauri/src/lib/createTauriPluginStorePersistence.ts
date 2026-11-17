@@ -1,16 +1,16 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
-import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { DevicePersistence } from "@shared/core/persistence/DevicePersistence";
 
-/** Matches mobile MMKV id — one store file for all nexus keys. */
-const NEXUS_STORE_FILE = "haven-nexus-storage.json";
+/** Matches mobile's MMKV id: one store file for every key. */
+const STORE_FILE = "haven-device-storage.json";
 
 /**
  * Durable desktop persistence via tauri-plugin-store.
- * Nexus APIs are sync; this adapter keeps an in-memory cache and writes through
+ * Device storage is read synchronously, so this keeps an in-memory copy and writes through
  * to the plugin store asynchronously (autoSave debounced on the plugin side).
  */
-export async function createTauriPluginStorePersistence(): Promise<NexusPersistence> {
-  const store = new LazyStore(NEXUS_STORE_FILE, {
+export async function createTauriPluginStorePersistence(): Promise<DevicePersistence> {
+  const store = new LazyStore(STORE_FILE, {
     defaults: {},
     autoSave: 100,
   });

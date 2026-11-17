@@ -4,69 +4,21 @@ import reactHooks from "eslint-plugin-react-hooks";
 import boundaries from "eslint-plugin-boundaries";
 
 /**
- * HavenCore architecture boundary restrictions.
- * The Nexus layer is the only authority that may touch backend factories,
- * Supabase clients, or persistence directly. Features and UI must read state
- * through `requireHavenCore()` / nexus hooks instead.
+ * The core boundary. Screens read the core's stores and call its commands;
+ * only the host builds the core, its Supabase client and its device storage.
+ * Shared code never touches a platform's storage.
  */
-const havenCoreDeprecatedImports = [
-  {
-    group: [
-      "@mobile-data/session/navigationStore",
-      "**/stores/navigationStore",
-      "@shared/features/community/hooks/useCommunityWorkspace",
-      "**/useCommunityWorkspace",
-      "@shared/features/social/hooks/useSocialWorkspace",
-      "**/useSocialWorkspace",
-      "@shared/features/community/communityNavigation",
-      "**/communityNavigation",
-      "@shared/infrastructure/realtime/communityAccessBroadcastBridge",
-      "**/communityAccessBroadcastBridge",
-      "@shared/features/community/hooks/useChannelGroups",
-      "**/useChannelGroups",
-      "@shared/features/messaging/hooks/useMessageNexus",
-      "**/useMessageNexus",
-      "@shared/features/profile/hooks/useLiveProfiles",
-      "**/useLiveProfiles",
-      "**/useChatAppOrchestration",
-    ],
-    message:
-      "Deprecated HavenCore migration shims are deleted. Use requireHavenCore().communities/channels for focus, uiStore for workspace UI, and core.social for social counts.",
-  },
-];
-
-const havenCoreNexusBoundary = [
+const sharedStorageBoundary = [
   {
     group: ["react-native-mmkv", "react-native-mmkv/*"],
     message:
-      "Persistence must flow through NexusPersistence. Only @shared/core/persistence/createMmkvPersistence.ts may import react-native-mmkv.",
-  },
-  {
-    group: [
-      "@shared/runtime",
-      "@shared/runtime/*",
-      "@shared/infrastructure/runtime",
-      "@shared/infrastructure/runtime/*",
-      "@shared/lib/bootstrap/*",
-      "@shared/infrastructure/bootstrap/*",
-    ],
-    message:
-      "Legacy runtime/bootstrap modules have been removed. Use createHavenCore + requireHavenCore from @shared/core.",
-  },
-  {
-    group: [
-      "@shared/infrastructure/realtime/HavenEventBus",
-      "**/HavenEventBus",
-    ],
-    message:
-      "HavenEventBus is removed. Use requireHavenCore().routeEvent for ingestion and core.messages.* for reads.",
+      "Shared code does not touch device storage. The host passes a DevicePersistence when it builds the core.",
   },
 ];
 
 /**
- * Temporary quarantine for known pre-finality migration seams. New UI/feature
- * files are held to the HavenCore -> Nexus -> UI Consumer boundary; remove
- * entries here as each existing seam is migrated.
+ * Files that build the core, its stores or its client, and tests, may reach
+ * below the boundary.
  */
 const havenCoreConsumerBoundaryIgnores = [
   "**/__tests__/**",
@@ -78,23 +30,12 @@ const havenCoreConsumerBoundaryIgnores = [
   "apps/mobile/src/supabase/**",
 ];
 
-const havenCoreBackendFactoryImportNames = [
-  "getCommunityDataBackend",
-  "getControlPlaneBackend",
-  "getDirectMessageBackend",
-  "getModerationBackend",
-  "getNotificationBackend",
-  "getServerModmailBackend",
-  "getSocialBackend",
-  "getVoiceTokenBackend",
-];
-
 const havenCoreConsumerRestrictedImportPaths = [
   {
     name: "@shared/lib/backend",
-    importNames: havenCoreBackendFactoryImportNames,
+    importNames: ["createBackend"],
     message:
-      "UI/features must not import backend factories directly. Route reads/writes through useHavenCore()/requireHavenCore() and a domain Nexus/HavenCore command.",
+      "UI/features must not build a backend. Call the core's commands, or core.backend for a read no collection holds.",
   },
   {
     name: "@shared/lib/createHavenSupabaseClient",
@@ -110,16 +51,10 @@ const havenCoreConsumerRestrictedImportPaths = [
 ];
 
 const havenCoreConsumerRestrictedImportPatterns = [
-  ...havenCoreDeprecatedImports,
   {
     group: ["@shared/core/persistence/*"],
     message:
-      "Persistence adapters are injected into HavenCore/Nexus construction. UI/features must not import persistence directly.",
-  },
-  {
-    group: ["@shared/nexus", "@shared/nexus/*"],
-    message:
-      "UI/features must access domain nexuses through useHavenCore()/requireHavenCore(), not by importing or constructing nexus classes.",
+      "Device storage is passed to the core when the host builds it. UI/features must not import it directly.",
   },
 ];
 
@@ -127,7 +62,7 @@ const havenCoreConsumerRestrictedSyntax = [
   {
     selector: "Literal[value='postgres_changes']",
     message:
-      "Domain realtime must use HavenCore.subscribeRealtime -> routeRealtimeEvent. Voice hooks are the documented exception.",
+      "Realtime arrives through the core's topic (docs/architecture/REALTIME.md). Voice is the documented exception.",
   },
   {
     selector: "CallExpression[callee.name='createClient']",
@@ -143,37 +78,37 @@ const havenCoreConsumerRestrictedSyntax = [
     selector:
       "CallExpression[callee.property.name='rpc'][callee.object.name='supabase']",
     message:
-      "UI/features must not call Supabase RPC directly. Put the RPC behind a backend/Nexus/HavenCore command.",
+      "UI/features must not call Supabase RPC directly. Put it in a backend client and call it through the core.",
   },
   {
     selector:
       "CallExpression[callee.property.name='rpc'][callee.object.name='client']",
     message:
-      "UI/features must not call Supabase RPC directly. Put the RPC behind a backend/Nexus/HavenCore command.",
+      "UI/features must not call Supabase RPC directly. Put it in a backend client and call it through the core.",
   },
   {
     selector:
       "CallExpression[callee.property.name='from'][callee.object.name='supabase']",
     message:
-      "UI/features must not query Supabase directly. Put the query behind a backend/Nexus/HavenCore command.",
+      "UI/features must not query Supabase directly. Put it in a backend client and call it through the core.",
   },
   {
     selector:
       "CallExpression[callee.property.name='from'][callee.object.name='client']",
     message:
-      "UI/features must not query Supabase directly. Put the query behind a backend/Nexus/HavenCore command.",
+      "UI/features must not query Supabase directly. Put it in a backend client and call it through the core.",
   },
   {
     selector:
       "CallExpression[callee.property.name='channel'][callee.object.name='supabase']",
     message:
-      "UI/features must not subscribe to Supabase channels directly. Use HavenCore.subscribeRealtime -> routeRealtimeEvent.",
+      "UI/features must not subscribe to Supabase channels directly. The core's event table applies every event (docs/architecture/REALTIME.md).",
   },
   {
     selector:
       "CallExpression[callee.property.name='channel'][callee.object.name='client']",
     message:
-      "UI/features must not subscribe to Supabase channels directly. Use HavenCore.subscribeRealtime -> routeRealtimeEvent.",
+      "UI/features must not subscribe to Supabase channels directly. The core's event table applies every event (docs/architecture/REALTIME.md).",
   },
 ];
 
@@ -241,7 +176,6 @@ export default [
   },
   {
     files: ["packages/shared/src/**/*.{ts,tsx}"],
-    ignores: ["packages/shared/src/core/persistence/createMmkvPersistence.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -253,7 +187,7 @@ export default [
                 "Import getAppHost from @shared/infrastructure/platform/appHost instead. Each shell registers its own bridge at bootstrap.",
             },
           ],
-          patterns: [...havenCoreNexusBoundary, ...havenCoreDeprecatedImports],
+          patterns: sharedStorageBoundary,
         },
       ],
     },
@@ -274,7 +208,7 @@ export default [
             ...havenCoreConsumerRestrictedImportPaths,
           ],
           patterns: [
-            ...havenCoreNexusBoundary,
+            ...sharedStorageBoundary,
             ...havenCoreConsumerRestrictedImportPatterns,
           ],
         },

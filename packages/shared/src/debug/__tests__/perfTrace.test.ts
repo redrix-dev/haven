@@ -237,7 +237,7 @@ describe("perfTrace", () => {
     perfTrace.setNow(() => times[index++] ?? 32);
 
     const memory = tracePersistence(createMemoryPersistence());
-    tracePersist(memory, "haven:nexus:communities:global", { ok: true });
+    tracePersist(memory, "haven:ana:communities:v1", { ok: true });
     expect(perfTrace.getEvents().map((event) => event.name)).toEqual([]);
     expect(perfTrace.getPersistStats()).toMatchObject({
       writes: 1,
@@ -246,11 +246,11 @@ describe("perfTrace", () => {
       slowWrites: 0,
       slowStringifies: 0,
     });
-    expect(memory.getString("haven:nexus:communities:global")).toBe(
+    expect(memory.getString("haven:ana:communities:v1")).toBe(
       JSON.stringify({ ok: true }),
     );
 
-    tracePersist(memory, "haven:nexus:channels:global", { slow: true });
+    tracePersist(memory, "haven:ana:channels:v1", { slow: true });
     const names = perfTrace.getEvents().map((event) => event.name);
     expect(names).toContain("persist.stringify");
     expect(names).toContain("persist.write");
@@ -263,7 +263,7 @@ describe("perfTrace", () => {
     expect(stringify?.duration).toBe(9);
     expect(write?.duration).toBe(12);
     expect(write?.fields?.bytes).toBe(JSON.stringify({ slow: true }).length);
-    expect(stringify?.fields?.key).toBe("haven:nexus:channels:global");
+    expect(stringify?.fields?.key).toBe("haven:ana:channels:v1");
   });
 
   it("writes the same JSON when tracing is off", () => {

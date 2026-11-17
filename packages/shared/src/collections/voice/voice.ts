@@ -20,8 +20,8 @@ import {
   normalizeVoiceSoundSettings,
   type VoiceSoundSettings,
 } from "@shared/features/voice/utils/voiceSounds";
-import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
-import { NEXUS_STORAGE_KEYS } from "@shared/core/persistence/nexusStorageKeys";
+import type { DevicePersistence } from "@shared/core/persistence/DevicePersistence";
+import { STORAGE_KEYS } from "@shared/core/persistence/storageKeys";
 import {
   voiceControlEvent,
   type VoiceControlEvent,
@@ -118,7 +118,7 @@ type SubscribePresenceChannelsInput = {
  * voice channel, voice preferences, the voice token fetch, room presence and
  * server-authorized controls delivered through the private-user event ingress.
  * The media connection itself (LiveKit room or native sidecar) lives with the
- * platform's session controller, which reports into this nexus.
+ * platform's session controller, which reports into this collection.
  *
  * Rosters are keyed by userId. The Solid port reconciles them by that key, so
  * a speaking flip or a join/leave updates rows in place instead of replacing
@@ -139,10 +139,10 @@ export class Voice {
     protected readonly port: StatePort<VoiceState>,
     private readonly voiceBackend: VoiceBackend | null,
     private readonly realtime: VoicePresence | null,
-    private readonly persistence?: NexusPersistence,
+    private readonly persistence?: DevicePersistence,
   ) {
     try {
-      const raw = persistence?.getString(NEXUS_STORAGE_KEYS.voiceSounds);
+      const raw = persistence?.getString(STORAGE_KEYS.voiceSounds);
       if (raw)
         this.port.set({
           soundSettings: normalizeVoiceSoundSettings(JSON.parse(raw)),
@@ -151,7 +151,7 @@ export class Voice {
       /* Damaged preferences fall back to the default. */
     }
     try {
-      const raw = persistence?.getString(NEXUS_STORAGE_KEYS.voiceSettings);
+      const raw = persistence?.getString(STORAGE_KEYS.voiceSettings);
       if (raw)
         this.port.set({ settings: normalizeVoiceSettings(JSON.parse(raw)) });
     } catch {
@@ -167,7 +167,7 @@ export class Voice {
     this.port.set({ settings });
     try {
       this.persistence?.set(
-        NEXUS_STORAGE_KEYS.voiceSettings,
+        STORAGE_KEYS.voiceSettings,
         JSON.stringify(settings),
       );
     } catch {
@@ -183,7 +183,7 @@ export class Voice {
     this.port.set({ soundSettings });
     try {
       this.persistence?.set(
-        NEXUS_STORAGE_KEYS.voiceSounds,
+        STORAGE_KEYS.voiceSounds,
         JSON.stringify(soundSettings),
       );
     } catch {

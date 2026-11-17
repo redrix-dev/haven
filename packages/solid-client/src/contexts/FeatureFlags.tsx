@@ -6,7 +6,7 @@ import { requireHavenSolidCore } from "../core";
  *
  * Flags are loaded once at bootstrap (HavenSolidCore.loading_session_data) and
  * reset on sign-out, living in `core.featureFlags`. These helpers are the read
- * side: a flag's enabled state is read from the nexus store inside a tracking
+ * side: a flag's enabled state is read from the core's store inside a tracking
  * scope, so anything gated re-renders the moment flags arrive or change.
  *
  * Lives in contexts/ (not components/ui) because it reaches into core, which the

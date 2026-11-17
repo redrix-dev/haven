@@ -33,7 +33,7 @@ import type {
   OnboardingOutcome,
   ProfileRecord,
 } from "@shared/lib/backend/records";
-import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { DevicePersistence } from "@shared/core/persistence/DevicePersistence";
 import { perfTrace } from "@shared/debug/perfTrace";
 import {
   createInitialVoiceState,
@@ -180,7 +180,7 @@ export type HavenCoreOptions = {
   backend: Backend;
   /** The platform's store: Solid's, or a Zustand store on mobile. */
   makePort: MakePort;
-  storage: NexusPersistence;
+  storage: DevicePersistence;
   /** Where the app runs, which decides the introductions offered. */
   context: OnboardingContext;
   /** When device copies are written; tests pass one they control. */

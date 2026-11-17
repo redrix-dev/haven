@@ -74,9 +74,8 @@ export function useVoice({
   );
   const voiceSessionState = storedVoiceSessionState ?? defaultVoiceSessionState;
 
-  // VOICE_NEXUS_RESHAPE_TODO: this wrapper preserves the app-shaped
-  // state/derived/actions contract for now. Later, move callers to direct
-  // core.voice selectors/actions and split browser/RN adapter concerns.
+  // TODO: this wrapper keeps the app-shaped state/derived/actions contract.
+  // Later, move callers to core.voice directly.
 
   const setStoredVoiceConnected = React.useCallback(
     (connected: boolean) => {

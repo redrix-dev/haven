@@ -1,10 +1,10 @@
-import type { NexusPersistence } from "./NexusPersistence";
+import type { DevicePersistence } from "./DevicePersistence";
 
 /**
- * In-memory NexusPersistence for tests and any host without a disk adapter.
+ * In-memory DevicePersistence for tests and any host without a disk adapter.
  * State is process-local; nothing survives reload.
  */
-export function createMemoryPersistence(): NexusPersistence {
+export function createMemoryPersistence(): DevicePersistence {
   const store = new Map<string, string>();
 
   return {

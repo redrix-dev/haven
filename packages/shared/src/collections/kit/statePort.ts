@@ -1,8 +1,8 @@
 /**
- * Where a nexus's state lives — the one seam between shared domain logic and a
+ * Where a collection's state lives — the one seam between shared domain logic and a
  * platform's reactivity.
  *
- * A shared nexus never imports React, Solid or a store library. It reads and
+ * A collection never imports React, Solid or a store library. It reads and
  * writes through this port; the platform that builds the port decides how a
  * read becomes reactive:
  *
@@ -12,7 +12,7 @@
  *     (`@mobile-data/kit/zustandStatePort`).
  *   - Tests / headless: `createPlainStatePort` below.
  *
- * Rules for nexus code written against a port:
+ * Rules for collection code written against a port:
  *
  *   1. Write immutably. Build the next value from the current one and pass it
  *      to `set` — never mutate what `get()` returned. Unchanged entries keep
@@ -22,7 +22,7 @@
  *      current on one and stale on the other.
  *   3. Reads may be reactive. On Solid, `get()` is the live store proxy, so a
  *      getter called inside a component or memo subscribes to what it reads.
- *      That keeps getters live in the UI — and it is why a nexus method that
+ *      That keeps getters live in the UI — and it is why a collection command that
  *      both reads and writes must not run inside a Solid effect without
  *      `untrack` (see the haven-solid-reactivity skill).
  */

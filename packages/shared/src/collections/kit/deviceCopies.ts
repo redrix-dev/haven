@@ -14,7 +14,7 @@
  *     text did not change is not written at all.
  */
 
-import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { DevicePersistence } from "@shared/core/persistence/DevicePersistence";
 import { perfTrace } from "@shared/debug/perfTrace";
 import type { StatePort } from "./statePort";
 
@@ -56,7 +56,7 @@ export class DeviceCopies {
   private callOff: (() => void) | null = null;
 
   constructor(
-    private readonly storage: NexusPersistence,
+    private readonly storage: DevicePersistence,
     private readonly schedule: WriteScheduler = writeSoon(),
   ) {}
 

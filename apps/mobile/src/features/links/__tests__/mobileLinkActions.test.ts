@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createLinkPipeline } from "@shared/core/linkPipeline";
-import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { DevicePersistence } from "@shared/core/persistence/DevicePersistence";
 import {
   createMobileLinkActionHandler,
   isRecoveryLink,
@@ -34,7 +34,7 @@ function fakeHandlers() {
   } satisfies MobilePushNavigationHandlers;
 }
 
-function memoryPersistence(): NexusPersistence {
+function memoryPersistence(): DevicePersistence {
   const values = new Map<string, string>();
   return {
     getString: (key) => values.get(key) ?? null,

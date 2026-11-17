@@ -5,9 +5,6 @@ import { perfTrace } from "@shared/debug/perfTrace";
  * flight gets the same promise instead of firing a second request, so rapid
  * navigation or overlapping triggers cost one round trip and one state write.
  *
- * This replaces the hand-written `loadInflight` fields and inflight maps every
- * nexus used to carry.
- *
  * When perf tracing is on, a new load is one `loadgate` span (`inflight=new`,
  * `stale=0|1`) and a joined caller is one `loadgate.join` mark. Tracing does
  * not change which promise callers share.

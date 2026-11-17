@@ -211,9 +211,9 @@ subscribes to whatever that function reads on its way to the first `await`.
 This is what makes the class near-invisible in review.
 
 **A settling effect is not a defended one.** Measured when this rule landed
-(commit `1fe7693`) and again after the shared-nexus cutover: every naked effect
+(commit `1fe7693`) and again after the move to shared domain logic: every naked effect
 on the settings and community
-surfaces already settled, because the nexus's `LoadGate` made the retriggered
+surfaces already settled, because the shared `LoadGate` made the retriggered
 call join the load in flight. The defense was an implementation detail one
 dedupe away from vanishing. Judge an effect by whether it reads a store it
 writes — not by whether you can watch it misbehave. Shared collection

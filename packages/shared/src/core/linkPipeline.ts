@@ -1,5 +1,5 @@
-import type { NexusPersistence } from "./persistence/NexusPersistence";
-import { NEXUS_STORAGE_KEYS } from "./persistence/nexusStorageKeys";
+import type { DevicePersistence } from "./persistence/DevicePersistence";
+import { STORAGE_KEYS } from "./persistence/storageKeys";
 import {
   parseHavenLink,
   type HavenLinkIntent,
@@ -61,7 +61,7 @@ export type LinkAction =
 export type LinkSource = "initial" | "event";
 
 export type LinkPipelineOptions = {
-  persistence: NexusPersistence;
+  persistence: DevicePersistence;
   now?: () => number;
   parse?: ParseHavenLinkOptions;
   pendingTtlMs?: number;
@@ -114,7 +114,7 @@ export function createLinkPipeline(options: LinkPipelineOptions): LinkPipeline {
     pendingTtlMs = PENDING_LINK_TTL_MS,
     dedupeWindowMs = LINK_DEDUPE_WINDOW_MS,
   } = options;
-  const pendingKey = NEXUS_STORAGE_KEYS.pendingLink;
+  const pendingKey = STORAGE_KEYS.pendingLink;
 
   let session: SessionState = { status: "unknown" };
   let handler: ((action: LinkAction) => void) | null = null;

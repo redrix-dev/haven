@@ -16,6 +16,7 @@ Small on purpose — a handful of living documents plus one detailed-contract fo
 
 ## Detailed contracts (`architecture/`)
 
+- [DATABASE.md](./architecture/DATABASE.md) — the database: every table, who may read and change it, the RPCs, the realtime events. The apps follow it.
 - [COLLECTIONS.md](./architecture/COLLECTIONS.md) — the data layer: the collections that hold the app's copy of the database, the shared `HavenCore` over them, what the device keeps.
 - [BOOTSTRAP.md](./architecture/BOOTSTRAP.md) — how each app goes from launch to a signed-in session, and back.
 - [SOLID_CLIENT_SHAPE.md](./architecture/SOLID_CLIENT_SHAPE.md) — the desktop/web client's shape law: feature slices, routes, layering boundaries.

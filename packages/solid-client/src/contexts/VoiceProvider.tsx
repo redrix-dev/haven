@@ -45,9 +45,10 @@ import { matchesVoicePushToTalkBinding } from "@shared/features/voice/utils/push
  * feature) because the session must outlive route changes: you stay connected
  * while browsing channels.
  *
- * Division of labor: VoiceSolidNexus owns Supabase presence/kick channels and
- * the shared session state; this provider owns the LiveKit Room and the
- * UI-facing state/actions. Mirrors mobile's split (VoiceNexus / LiveKit hook).
+ * Division of labor: the shared voice collection (`core.voice`) owns the
+ * presence channel, remote controls and the session state; this provider owns
+ * the LiveKit Room and the UI-facing state/actions. Mobile splits it the same
+ * way (`core.voice` / its LiveKit hook).
  *
  * Cross-window: the joined window broadcasts mirror state and executes
  * commands over the voiceSync BroadcastChannel (see voiceSync.ts for the
@@ -707,7 +708,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
 
   const toggleDeafen = () => {
     const next = !voice.isDeafened;
-    // Deafening also mutes (mirrors mobile's VoiceNexus.setDeafened).
+    // Deafening also mutes (as `core.voice.setDeafened` does).
     setVoice({ isDeafened: next, isMuted: next ? true : voice.isMuted });
     core.voice.setDeafened(next);
     if (room) {

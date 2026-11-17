@@ -8,7 +8,7 @@ import {
   createLinkPipeline,
   type LinkPipeline,
 } from "@shared/core/linkPipeline";
-import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { DevicePersistence } from "@shared/core/persistence/DevicePersistence";
 import { displayName } from "@shared/collections/members/selectors";
 import { createBackend, type Backend } from "@shared/lib/backend";
 import type { OnboardingContext } from "@shared/lib/backend/people";
@@ -23,7 +23,7 @@ export type ReactStores = {
 export type HavenReactCoreOptions = {
   client: HavenSupabaseClient;
   /** MMKV on the phone. */
-  persistence: NexusPersistence;
+  persistence: DevicePersistence;
   /** Where the app runs, which decides the introductions offered. */
   context: OnboardingContext;
   /** The backend clients over `client`; tests pass a fake instead. */

@@ -9,13 +9,14 @@ wins and this file gets fixed in the same change. Governing mindset: [PRINCIPLES
 
 ```
 apps/
-  mobile/          React Native + Expo. LIVE on TestFlight (production target).
+  mobile/          React Native + Expo, on TestFlight.
                    Own package.json + node_modules (react is mobile-owned).
-  tauri/           Tauri v2 shell for the desktop/web rebuild (in progress).
+  tauri/           Tauri v2 desktop shell around the Solid client.
+  web/             The same Solid client as a static site (Vercel).
 packages/
-  shared/          PURE logic, types, backend clients. Zero framework, zero
-                   reactivity. Consumed by every platform.
-  solid-client/    Solid UI + Solid-native caches for desktop/web (in progress).
+  shared/          Logic, types, backend clients, the collections and HavenCore.
+                   No UI framework. Used by every platform.
+  solid-client/    Solid UI and HavenSolidCore for desktop and web.
                    Folder shape + dependency law: architecture/SOLID_CLIENT_SHAPE.md.
 supabase/          Migrations, RLS policies, Edge Functions, SQL test suites.
 tooling/           Scripts (checks, test harness, mobile ops) + test-support.
@@ -79,6 +80,38 @@ re-export shims:
 Backend for all of them: Supabase (Auth, Postgres + RLS, Realtime, Edge Functions),
 LiveKit Cloud for voice.
 
+iOS updates its JavaScript over the air without EAS Update: a local toolchain
+(`npm run mobile:ota:deploy`, `tooling/scripts/mobile/deploy-ota.sh`) hashes the
+assets, builds the bundle and publishes it, and the `update-manifest` Edge
+Function serves the Expo Updates manifest the app checks at launch. Update
+hosting stays with the rest of the backend.
+
+## Security
+
+Every permission is decided in Postgres: an RLS policy on a table, or a check
+inside a security-definer function. The apps never decide; they show what the
+database returned. A modified client or a person with devtools gets exactly
+what the policies allow and nothing more. Channel access, ban enforcement,
+moderation visibility and who may reach whom all end there
+([architecture/DATABASE.md](./architecture/DATABASE.md)).
+
+That is why two things that look risky are safe:
+
+- **The Supabase key in the apps is public.** It is the publishable anon key,
+  and it can do only what the policies permit. The service role key never ships
+  in an app. Voice credentials live in Edge Function secrets, and
+  `voice-token` returns one only to a signed-in caller the database says may
+  join (`get_voice_access`).
+- **The source is public.** The schema, the policies, the migrations and the
+  voice function are all in this repo. A security model that only holds while
+  hidden doesn't hold.
+
+To check it yourself: the client is built in
+`packages/shared/src/lib/createHavenSupabaseClient.ts`, the policies are in
+`supabase/migrations/`, the voice secret handling is in
+`supabase/functions/voice-token/handler.ts`, and `npm run test:db` runs the
+database's own tests of who may and may not do each thing.
+
 ## Realtime (one subscription)
 
 Exactly **one** domain realtime subscription per user: `user:<id>` → the
@@ -95,7 +128,7 @@ What each event does: [architecture/REALTIME.md](./architecture/REALTIME.md).
 | `mobile:ownership`                                                        | Root must not own react/expo deps; mobile must not own solid/tauri/vite                                                  | Dependency ownership mirrors the layer split                                                                |
 | `check:themes`                                                            | Theme bridge outputs match their source                                                                                  | Mobile themes are generated from shared tokens; drift = visual divergence                                   |
 | `check:chat-surface` / `check:mobile-uniwind` / `check:mobile-typography` | Mobile UI conventions                                                                                                    | Theme/typography consistency on the live app                                                                |
-| eslint boundary rules                                                     | UI/features can't import backend factories, construct Supabase clients, touch persistence, or open realtime directly     | The HavenCore → cache → UI consumer contract                                                                |
+| eslint boundary rules                                                     | UI/features can't build a backend or a Supabase client, touch device storage, or open realtime directly                  | Screens go through the core                                                                                 |
 | solid-client shape boundaries (`boundaries/dependencies`)                 | One-way layer flow inside `packages/solid-client`; features isolated + barrel-only entry; no `@tauri-apps`/react imports | The committed desktop/web shape: [architecture/SOLID_CLIENT_SHAPE.md](./architecture/SOLID_CLIENT_SHAPE.md) |
 | `mobile:bundle`                                                           | Headless Metro export resolves the whole mobile module graph                                                             | Catches broken imports/aliases in CI without a simulator                                                    |
 

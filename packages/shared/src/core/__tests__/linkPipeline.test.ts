@@ -6,11 +6,11 @@ import {
   type LinkAction,
   type LinkPipeline,
 } from "../linkPipeline";
-import type { NexusPersistence } from "../persistence/NexusPersistence";
+import type { DevicePersistence } from "../persistence/DevicePersistence";
 import { createMemoryPersistence } from "../persistence/createMemoryPersistence";
-import { NEXUS_STORAGE_KEYS } from "../persistence/nexusStorageKeys";
+import { STORAGE_KEYS } from "../persistence/storageKeys";
 
-const PENDING_KEY = NEXUS_STORAGE_KEYS.pendingLink;
+const PENDING_KEY = STORAGE_KEYS.pendingLink;
 const HOUR = 60 * 60 * 1000;
 
 const INVITE_URL = "https://haven.redrixx.com/invite/ABCDEF0123";
@@ -28,7 +28,7 @@ const AUTH = {
 
 type Harness = {
   pipeline: LinkPipeline;
-  persistence: NexusPersistence;
+  persistence: DevicePersistence;
   actions: LinkAction[];
   advance: (ms: number) => void;
   /** Same storage and clock, fresh process — an app restart. */
@@ -36,7 +36,7 @@ type Harness = {
 };
 
 function setup(
-  persistence: NexusPersistence = createMemoryPersistence(),
+  persistence: DevicePersistence = createMemoryPersistence(),
   clock = { now: Date.UTC(2026, 8, 15, 12) },
 ): Harness {
   const pipeline = createLinkPipeline({ persistence, now: () => clock.now });

@@ -17,9 +17,9 @@ export type SolidStatePort<S extends object> = StatePort<S> & {
  *
  * Reads: `get()` is the live store proxy. Shared getters such as
  * `getPermissions()` or `getSnapshot()` therefore stay reactive when a Solid
- * component or memo calls them, exactly as the per-platform nexuses did.
+ * component or memo calls them.
  *
- * Writes: shared nexus code builds a whole next value
+ * Writes: collection code builds a whole next value
  * (`{ ...entities, [id]: entry }`) and hands it to `set`. Writing that object
  * straight in would replace the store node and wake every reader of it, which
  * re-ran every open channel on every message write. Instead each key is

@@ -28,7 +28,7 @@ export default defineConfig({
       // reactive development build so signals/memos actually update under test.
       // `solid-js/store` has the same split: its `node` condition is the SSR
       // build, whose createStore has no signals and whose reconcile is a
-      // shallow copy that cannot shrink arrays. Nexus state lives in stores, so
+      // shallow copy that cannot shrink arrays. Collection state lives in stores, so
       // node tests must run the store that actually ships.
       {
         find: /^solid-js\/store$/,
