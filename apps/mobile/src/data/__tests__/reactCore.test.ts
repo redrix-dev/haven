@@ -14,6 +14,7 @@ import { shallow } from "zustand/shallow";
 import type { Backend } from "@shared/lib/backend";
 import { createMemoryPersistence } from "@shared/core/persistence/createMemoryPersistence";
 import { membersOf } from "@shared/collections/members/selectors";
+import type { StoreStates } from "@shared/collections/core/havenCore";
 import { HavenReactCore } from "../core/HavenReactCore";
 import { cachedSnapshot, subscribeStores } from "../core/coreSnapshot";
 
@@ -77,6 +78,29 @@ describe("mobile's HavenCore", () => {
     const second = snapshot();
     expect(second).not.toBe(first);
     expect(second).toEqual(["ana", "ben"]);
+  });
+
+  it("hands back the same value for a selector shallow equality can't settle", () => {
+    const core = makeCore();
+    core.members.applyMember(member("ana"));
+    // Rows built fresh each call, as the channel drawer's groups are: two
+    // calls are never shallow-equal, and React loops on "getSnapshot should
+    // be cached" unless nothing re-runs while nothing changed.
+    const select = (s: Pick<StoreStates, "members">) =>
+      membersOf(s.members, "hearth").map((m) => ({ id: m.user_id }));
+    const snapshot = cachedSnapshot<"members", { id: string }[]>(
+      core.stores,
+      ["members"],
+      () => ({ select, equal: shallow }),
+    );
+    const first = snapshot();
+    expect(snapshot()).toBe(first);
+    core.profiles.applyProfile(profile("ana"));
+    expect(snapshot()).toBe(first);
+
+    core.members.applyMember(member("ben"));
+    expect(snapshot()).not.toBe(first);
+    expect(snapshot()).toEqual([{ id: "ana" }, { id: "ben" }]);
   });
 
   it("follows each store it reads, and tells the screen when any changes", () => {
