@@ -38,9 +38,26 @@ Mobile uses the CNG-generated `HavenVoiceSounds` module. iOS AVAudioPlayer share
 LiveKit's existing AVAudioSession without changing category, mode, activation or
 route. Android MediaPlayer uses voice-communication audio attributes to follow
 the selected communication device rather than the media output. Players release
-after completion/error and have a two-second watchdog. The leave cue finishes
-before the audio session stops; microphone capture is disabled immediately when
-leaving. No new third-party playback dependency is required.
+after completion/error and have a two-second watchdog. No new third-party
+playback dependency is required.
+
+### iOS: a cue must not overlap a capture change
+
+Both of these were heard on a device (2026-11-17), and both are in
+`useMobileLiveKitVoiceSession.ts`:
+
+- **Starting or stopping capture reconfigures the shared audio session,** and a
+  cue playing across that change stutters (heard as a short doubled cue).
+  In a call, a mute or deafen cue waits until the capture change has finished
+  (`pendingCueRef`). The leave cue plays first, before anything is torn down.
+- **Never disable the mic track while the engine is still recording.**
+  LiveKit's audio engine mutes in its voice-processing mode by default, so a
+  disabled track over running capture is a voice-processing input mute, and
+  iOS answers it with its own system mic sound (a Siri-like tone). Stop
+  recording first, then disable the track. Mute does this; leaving does too.
+
+A leave probe settled the second one: space each teardown step 1.5 s apart
+with a log line before each, and listen for which step the sound follows.
 
 The plugin/templates are the source of truth. A native rebuild is required;
 an OTA alone cannot install this module.

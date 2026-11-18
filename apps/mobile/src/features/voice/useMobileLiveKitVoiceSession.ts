@@ -535,13 +535,21 @@ export function useMobileLiveKitVoiceSession({
           core.voice.getSnapshot().soundSettings,
         ).catch(() => false);
       }
+      // Stop recording before disabling the track, as mute does. A disabled
+      // track over a still-recording engine is a voice-processing input mute,
+      // and iOS plays its system mic sound for that (heard as a Siri-like tone).
+      let recordingError: unknown = null;
+      try {
+        await setNativeRecording(false);
+      } catch (error) {
+        recordingError = error;
+      }
       room?.localParticipant.audioTrackPublications.forEach((publication) => {
         const track = publication.audioTrack?.mediaStreamTrack;
         if (track) track.enabled = false;
       });
       joinGenerationRef.current += 1;
       intentionalDisconnectRef.current = true;
-      stopInputLevelPolling();
       setLocalMicTrack(null);
       setJoining(false);
       setError(null);
@@ -570,13 +578,13 @@ export function useMobileLiveKitVoiceSession({
       } catch {
         // Ignore disconnect races.
       }
-      try {
-        await setNativeRecording(false);
-      } catch (error) {
+      if (recordingError)
         setError(
-          getErrorMessage(error, "Could not stop microphone recording."),
+          getErrorMessage(
+            recordingError,
+            "Could not stop microphone recording.",
+          ),
         );
-      }
       nativeCaptureSampleRef.current = null;
       try {
         await AudioSession.stopAudioSession();
