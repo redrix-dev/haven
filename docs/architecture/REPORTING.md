@@ -147,9 +147,10 @@ Supporting tables:
 
 ### Media scanning slot
 
-`media_scans`: one row per uploaded attachment.
+Columns on each `media` row (`scan_status`, `scan_vendor`, `scan_detail`,
+`scanned_at`, `withheld_at`), not a table of their own.
 
-- `status`: `not_scanned` (no vendor configured), `pending`, `clear`,
+- `scan_status`: `not_scanned` (no vendor configured), `pending`, `clear`,
   `match`, `error`.
 - A `match` quarantines the object: storage RLS stops serving it, nothing
   deletes it, and the scanner opens a platform case with source `media_scan`,
@@ -187,8 +188,8 @@ tables directly.
 
 - The staff site signs in as a staff user and reads through RLS. The service
   role is for jobs only.
-- CSAM-flagged media is viewable only by staff with the `csam_reviewer` staff
-  role, and every view writes a case event.
+- CSAM-flagged media is viewable only by staff with `can_review_csam` set on
+  their `platform_staff` row, and every view writes a case event.
 
 ### Notices
 
@@ -204,8 +205,9 @@ Community reports send no notices beyond the moderators' modmail update.
 
 ### Alerts and realtime
 
-- Staff are emailed for new platform cases only. A failed alert is recorded on
-  the case as an event, so it is visible, not just logged.
+- Staff are emailed for new platform cases only (the `staff_case_opened` mail
+  job). A send that keeps failing ends as a `failed` row in `private.jobs`; it
+  is not written to the case.
 - Realtime for community reports goes to the community's report readers, not
   every member, and is applied by the core's event table (REALTIME.md).
 
