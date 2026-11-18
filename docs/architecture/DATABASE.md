@@ -103,6 +103,15 @@ app, `aal2`): `require_staff` refuses without one
 (`second_factor_required`), and every staff read checks it
 (`private.is_staff_session`, `private.has_second_factor`).
 
+The access-token hook marks a staff account's token `staff_account: true`, so
+the apps sign it out the moment sign-in returns, before anything loads
+(`isStaffAccountToken` in `packages/shared`), and the staff site can refuse
+everyone else. The claim is for clients only; nothing in the database reads
+it. The hook cannot refuse the first password sign-in, because the
+authenticator check needs that session, but it refuses to refresh a staff
+session that never completed the check, so one opened anywhere else ends
+within a token lifetime.
+
 Everyone's view of a person is `profile_record` (name, picture, staff badge).
 What only the person sees of their own profile (bio, the flair they chose) is
 `get_my_profile`. `update_my_settings` keeps every setting it is not given,
@@ -438,6 +447,15 @@ After the migrations are applied to a hosted project:
 5. **Realtime.** Private channels only. The current hosted project also has a
    hand-added policy `authenticated can receive broadcasts` with the condition
    `true`; it must be dropped, or anyone signed in may join any topic.
+6. **Signing keys.** Settings, JWT Keys. Tokens are trusted because only
+   Supabase can sign them. The hosted project signs with an ES256 key, but
+   (checked 2026-11-18) the legacy `anon` key is still enabled, so the old
+   shared JWT secret is still trusted, and anyone holding it can mint any
+   token. Close it: give the apps the `sb_publishable_` key and the functions
+   an `sb_secret_` key (they read `SUPABASE_SERVICE_ROLE_KEY` today, so that
+   part is a code change), disable the legacy `anon` and `service_role` keys,
+   wait at least 1 h 15 min, then revoke the legacy secret under
+   "Previously used".
 
 ## Tests
 

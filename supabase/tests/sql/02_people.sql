@@ -214,9 +214,51 @@ select test_support.assert_eq_text(
   ) -> 'claims' ->> 'sub',
   'a', 'everyone else gets their token unchanged');
 select test_support.assert_true(
+  public.auth_hook_access_token(
+    jsonb_build_object('user_id', test_support.user_id('member_a'), 'claims', '{"sub": "a"}'::jsonb)
+  ) -> 'claims' -> 'staff_account' is null,
+  'a person''s token does not say staff account');
+select test_support.assert_true(
+  public.auth_hook_access_token(
+    jsonb_build_object('user_id', test_support.user_id('staff_person'), 'claims', '{"sub": "p"}'::jsonb)
+  ) -> 'claims' -> 'staff_account' is null,
+  'nor does a staff member''s own account');
+select test_support.assert_eq_text(
+  public.auth_hook_access_token(
+    jsonb_build_object('user_id', test_support.user_id('staff_active'), 'authentication_method', 'password',
+      'claims', '{"sub": "s", "aal": "aal1"}'::jsonb)
+  ) -> 'claims' ->> 'staff_account',
+  'true', 'a staff account''s token says so, from the first password sign-in');
+insert into public.platform_staff (user_id, active) values (test_support.user_id('staff_inactive'), false);
+select test_support.assert_eq_text(
+  public.auth_hook_access_token(
+    jsonb_build_object('user_id', test_support.user_id('staff_inactive'), 'authentication_method', 'password',
+      'claims', '{"sub": "s", "aal": "aal1"}'::jsonb)
+  ) -> 'claims' ->> 'staff_account',
+  'true', 'an inactive staff account too');
+select test_support.assert_eq_text(
+  public.auth_hook_access_token(
+    jsonb_build_object('user_id', test_support.user_id('staff_active'), 'authentication_method', 'token_refresh',
+      'claims', '{"sub": "s", "aal": "aal1"}'::jsonb)
+  ) -> 'error' ->> 'http_code',
+  '403', 'a staff session without the second factor cannot be refreshed');
+select test_support.assert_eq_text(
+  public.auth_hook_access_token(
+    jsonb_build_object('user_id', test_support.user_id('staff_active'), 'authentication_method', 'token_refresh',
+      'claims', '{"sub": "s", "aal": "aal2"}'::jsonb)
+  ) -> 'claims' ->> 'staff_account',
+  'true', 'one with it can');
+select test_support.assert_eq_text(
+  public.auth_hook_access_token(
+    jsonb_build_object('user_id', test_support.user_id('member_a'), 'authentication_method', 'token_refresh',
+      'claims', '{"sub": "a", "aal": "aal1"}'::jsonb)
+  ) -> 'claims' ->> 'sub',
+  'a', 'a person refreshes without one');
+select test_support.assert_true(
   has_function_privilege('supabase_auth_admin', 'public.auth_hook_access_token(jsonb)', 'execute')
   and has_schema_privilege('supabase_auth_admin', 'private', 'usage')
-  and has_function_privilege('supabase_auth_admin', 'private.is_restricted(uuid)', 'execute'),
+  and has_function_privilege('supabase_auth_admin', 'private.is_restricted(uuid)', 'execute')
+  and has_function_privilege('supabase_auth_admin', 'private.is_staff_account(uuid)', 'execute'),
   'Supabase Auth is allowed to run the hook');
 select test_support.assert_false(
   has_function_privilege('authenticated', 'public.auth_hook_access_token(jsonb)', 'execute'),

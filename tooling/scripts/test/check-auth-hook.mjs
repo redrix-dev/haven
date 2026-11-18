@@ -1,6 +1,7 @@
 // Proves the access-token hook is switched on, by signing in through the real
-// Auth API: an ordinary account gets a token, a restricted one is refused, and
-// lifting the restriction lets it back in.
+// Auth API: a staff account's token says so and cannot be refreshed until the
+// authenticator check is done, an ordinary account gets a token, a restricted
+// one is refused, and lifting the restriction lets it back in.
 //
 // The SQL suites cannot show this. They call the hook function directly; only
 // Auth calling it proves supabase/config.toml (or, on a hosted project, the
@@ -57,8 +58,115 @@ const restricted = {
 };
 const restrictedId = `(select id from auth.users where email = '${restricted.email}')`;
 
+/** Reads a token's claims; the signature is Auth's own, so this only looks. */
+function claimsOf(accessToken) {
+  return JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url"));
+}
+
+/** The current RFC 6238 code for a base32 secret, as an authenticator app shows. */
+async function totp(secret) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const char of secret.replace(/=+$/, "").toUpperCase()) {
+    bits += alphabet.indexOf(char).toString(2).padStart(5, "0");
+  }
+  const key = new Uint8Array(Math.floor(bits.length / 8));
+  for (let i = 0; i < key.length; i++) {
+    key[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+  }
+  const counter = new DataView(new ArrayBuffer(8));
+  counter.setBigUint64(0, BigInt(Math.floor(Date.now() / 30000)));
+  const hmacKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"],
+  );
+  const mac = new Uint8Array(
+    await crypto.subtle.sign("HMAC", hmacKey, counter.buffer),
+  );
+  const offset = mac[mac.length - 1] & 0x0f;
+  const value =
+    ((mac[offset] & 0x7f) << 24) |
+    (mac[offset + 1] << 16) |
+    (mac[offset + 2] << 8) |
+    mac[offset + 3];
+  return String(value % 1_000_000).padStart(6, "0");
+}
+
+function client() {
+  return createClient(env.API_URL, env.ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+const staff = {
+  email: "rls-staff-active@example.test",
+  password: "HavenTest!StaffActive1",
+};
+const staffPerson = {
+  email: "rls-staff-person@example.test",
+  password: "HavenTest!StaffPerson1",
+};
+const staffId = `(select id from auth.users where email = '${staff.email}')`;
+
+/** What the token of a fresh password sign-in says about staff. */
+async function staffClaim(email, password) {
+  const { data, error } = await client().auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) return { ok: false, text: `refused: ${error.message}` };
+  const claim = claimsOf(data.session.access_token).staff_account;
+  return { ok: claim === true, text: `staff_account = ${claim}` };
+}
+
+/** Refreshes a staff session; `withFactor` completes the authenticator check first. */
+async function staffRefresh(withFactor) {
+  const auth = client().auth;
+  const signedIn = await auth.signInWithPassword(staff);
+  if (signedIn.error) return { ok: false, text: signedIn.error.message };
+  if (withFactor) {
+    const enrolled = await auth.mfa.enroll({ factorType: "totp" });
+    if (enrolled.error) return { ok: false, text: enrolled.error.message };
+    const verified = await auth.mfa.challengeAndVerify({
+      factorId: enrolled.data.id,
+      code: await totp(enrolled.data.totp.secret),
+    });
+    if (verified.error) return { ok: false, text: verified.error.message };
+  }
+  const { data: current } = await auth.getSession();
+  const aal = claimsOf(current.session.access_token).aal;
+  const refreshed = await auth.refreshSession();
+  return refreshed.error
+    ? { ok: false, text: `${aal} refresh refused: ${refreshed.error.message}` }
+    : { ok: true, text: `${aal} refresh issued a token` };
+}
+
 const results = [];
 try {
+  sql(`delete from auth.mfa_factors where user_id = ${staffId}`);
+  results.push([
+    "a staff account's token says staff_account",
+    true,
+    await staffClaim(staff.email, staff.password),
+  ]);
+  results.push([
+    "a staff member's own account's token does not",
+    false,
+    await staffClaim(staffPerson.email, staffPerson.password),
+  ]);
+  results.push([
+    "a password-only staff session cannot be refreshed",
+    false,
+    await staffRefresh(false),
+  ]);
+  results.push([
+    "after the authenticator check it can",
+    true,
+    await staffRefresh(true),
+  ]);
   results.push([
     "an ordinary account signs in",
     true,
@@ -81,6 +189,7 @@ try {
     await signIn(restricted.email, restricted.password),
   ]);
 } finally {
+  sql(`delete from auth.mfa_factors where user_id = ${staffId}`);
   sql(
     `delete from public.account_restrictions where user_id = ${restrictedId} and case_id is null`,
   );

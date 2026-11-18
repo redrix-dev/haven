@@ -34,8 +34,15 @@
 02 @@ a restricted person can still act @@ select pg_temp.mutate('private.require_account()', $m$if private.is_restricted(v_me) then$m$, $m$if false then$m$);
 02 @@ a restricted person is refused as "not found" @@ select pg_temp.mutate('private.require_account()', $m$perform private.fail('forbidden', 'account_restricted'$m$, $m$perform private.fail('not_found', 'account_restricted'$m$);
 02 @@ anyone reads the restrictions table @@ drop policy "staff read restrictions" on public.account_restrictions; create policy "staff read restrictions" on public.account_restrictions for select to authenticated using (true);
-02 @@ a restricted person is issued a token @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$if private.is_restricted((event ->> 'user_id')::uuid) then$m$, $m$if false then$m$);
-02 @@ the hook drops everyone's claims @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$return jsonb_build_object('claims', event -> 'claims');$m$, $m$return jsonb_build_object('claims', '{}'::jsonb);$m$);
+02 @@ a restricted person is issued a token @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$if private.is_restricted(v_user) then$m$, $m$if false then$m$);
+02 @@ the hook drops everyone's claims @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$  return jsonb_build_object('claims', event -> 'claims');$m$, $m$  return jsonb_build_object('claims', '{}'::jsonb);$m$);
+02 @@ a staff account's token does not say so @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$if private.is_staff_account(v_user) then$m$, $m$if false then$m$);
+02 @@ the own account's token says staff account @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$if private.is_staff_account(v_user) then$m$, $m$if private.is_staff_account(v_user) or exists (select 1 from public.platform_staff s where s.person_id = v_user) then$m$);
+02 @@ the staff claim is false @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$'{staff_account}', 'true'$m$, $m$'{staff_account}', 'false'$m$);
+02 @@ a password-only staff session refreshes @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$if event ->> 'authentication_method' = 'token_refresh'$m$, $m$if false$m$);
+02 @@ a staff session with the second factor cannot refresh @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$and coalesce(event -> 'claims' ->> 'aal', '') <> 'aal2' then$m$, $m$then$m$);
+02 @@ every staff sign-in is refused @@ select pg_temp.mutate('public.auth_hook_access_token(jsonb)', $m$if event ->> 'authentication_method' = 'token_refresh'$m$, $m$if true$m$);
+02 @@ Supabase Auth cannot check staff accounts @@ revoke execute on function private.is_staff_account(uuid) from supabase_auth_admin;
 02 @@ Supabase Auth cannot run the hook @@ revoke execute on function public.auth_hook_access_token(jsonb) from supabase_auth_admin;
 02 @@ a signed-in person can run the hook @@ grant execute on function public.auth_hook_access_token(jsonb) to authenticated;
 02 @@ a suspension never ends @@ select pg_temp.mutate('private.is_restricted(uuid)', $m$and (r.ends_at is null or r.ends_at > now())$m$, $m$$m$);

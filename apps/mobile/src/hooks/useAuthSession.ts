@@ -3,6 +3,10 @@ import { Alert } from "react-native";
 import type { Session } from "@supabase/supabase-js";
 import { requireHavenCore } from "@mobile-data";
 import { perfTrace } from "@shared/debug/perfTrace";
+import {
+  STAFF_ACCOUNT_MESSAGE,
+  isStaffAccountToken,
+} from "@shared/lib/backend/staffAccount";
 import { getMobileSupabase } from "../supabase/getMobileSupabase";
 import { clearAllChannelScrollExits } from "../storage/communityTimelinePrefs";
 import { useMobileThemePreferenceStore } from "@/stores/mobileThemePreferenceStore";
@@ -57,7 +61,22 @@ export function useAuthSession(): Session | null | undefined {
       void core.signIn(userId);
     };
 
+    // A staff account never opens the app: sign it out before anything loads.
+    // getSession and INITIAL_SESSION bring the same token, so say it once; a
+    // later sign-in has a new token and is told again.
+    let refusedToken: string | null = null;
+    const refuseStaffAccount = (accessToken: string) => {
+      if (refusedToken === accessToken) return;
+      refusedToken = accessToken;
+      Alert.alert("Staff account", STAFF_ACCOUNT_MESSAGE);
+      void signOutFromAuth();
+    };
+
     const apply = (next: Session | null) => {
+      if (next && isStaffAccountToken(next.access_token)) {
+        refuseStaffAccount(next.access_token);
+        next = null;
+      }
       const userId = next?.user?.id ?? null;
       if (userId) applySignIn(userId);
       else if (activeUserIdRef.current !== null || core.userId !== null) {

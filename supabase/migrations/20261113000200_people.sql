@@ -320,24 +320,45 @@ $$;
 -- (supabase/config.toml locally; the dashboard on a hosted project). Auth
 -- calls it before issuing or refreshing a token. If the hook is not switched
 -- on, require_user still stops every write.
+--
+-- A staff account's token says so (`staff_account: true`), so the apps can
+-- sign it out before loading anything and the staff site can refuse everyone
+-- else. The claim is for the clients only: no policy or RPC reads it, because
+-- platform_staff is the truth. A staff session that never completed the
+-- second factor cannot be refreshed, so it ends within one token lifetime in
+-- whatever app it was opened in. The hook cannot refuse that first password
+-- sign-in: the authenticator check needs it.
 create function public.auth_hook_access_token(event jsonb)
 returns jsonb
 language plpgsql
 stable
 set search_path = ''
 as $$
+declare
+  v_user uuid := (event ->> 'user_id')::uuid;
 begin
-  if private.is_restricted((event ->> 'user_id')::uuid) then
+  if private.is_restricted(v_user) then
     return jsonb_build_object(
       'error',
       jsonb_build_object('http_code', 403, 'message', 'This account is restricted. Check your email for details.')
     );
+  end if;
+  if private.is_staff_account(v_user) then
+    if event ->> 'authentication_method' = 'token_refresh'
+       and coalesce(event -> 'claims' ->> 'aal', '') <> 'aal2' then
+      return jsonb_build_object(
+        'error',
+        jsonb_build_object('http_code', 403, 'message', 'Sign in again with your authenticator app.')
+      );
+    end if;
+    return jsonb_build_object('claims', jsonb_set(event -> 'claims', '{staff_account}', 'true'));
   end if;
   return jsonb_build_object('claims', event -> 'claims');
 end;
 $$;
 grant usage on schema private to supabase_auth_admin;
 grant execute on function private.is_restricted(uuid) to supabase_auth_admin;
+grant execute on function private.is_staff_account(uuid) to supabase_auth_admin;
 grant execute on function public.auth_hook_access_token(jsonb) to supabase_auth_admin;
 
 -- ── Sign-up ─────────────────────────────────────────────────────────────────

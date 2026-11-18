@@ -7,6 +7,18 @@ import type { Session } from "@supabase/supabase-js";
 import type { CorePhase } from "@shared/collections/core/havenCore";
 import type { AccountRestriction } from "@shared/lib/backend/records";
 import {
+  STAFF_ACCOUNT_MESSAGE,
+  isStaffAccountToken,
+} from "@shared/lib/backend/staffAccount";
+
+function restrictionNotice(
+  restriction: Pick<AccountRestriction, "ends_at">,
+): string {
+  return restriction.ends_at
+    ? `Haven staff restricted this account until ${new Date(restriction.ends_at).toLocaleString()}.`
+    : "Haven staff restricted this account.";
+}
+import {
   SolidAuthResult,
   confirmAuthLink,
   requestPasswordReset,
@@ -19,8 +31,11 @@ type SessionValue = {
   session: Accessor<Session | null | undefined>;
   /** signed_out, loading (what the device kept is showing), or ready. */
   phase: Accessor<CorePhase>;
-  /** Set when Haven staff restricted the account and it was signed out. */
-  restriction: Accessor<Pick<AccountRestriction, "ends_at"> | null>;
+  /**
+   * Why the app signed the account out (restricted by staff, or a staff
+   * account), shown on the sign-in screen; null otherwise.
+   */
+  signedOutNotice: Accessor<string | null>;
   /** True while a recovery email link is establishing a set-new-password session. */
   passwordRecoveryRequired: Accessor<boolean>;
   signIn: (email: string, password: string) => Promise<SolidAuthResult>;
@@ -57,16 +72,15 @@ export function SessionProvider(props: { children: JSX.Element }) {
     createSignal(false);
 
   const phase = () => core.stores.core.phase;
-  const [restriction, setRestriction] = createSignal<Pick<
-    AccountRestriction,
-    "ends_at"
-  > | null>(null);
+  const [signedOutNotice, setSignedOutNotice] = createSignal<string | null>(
+    null,
+  );
 
   // Haven staff restricted the account: end the session, and say why on the
   // sign-in screen.
   core.listen({
     restricted: (next) => {
-      setRestriction(next);
+      setSignedOutNotice(restrictionNotice(next));
       void signOutFromAuth();
     },
   });
@@ -75,10 +89,16 @@ export function SessionProvider(props: { children: JSX.Element }) {
   // fires getSession, INITIAL_SESSION and SIGNED_IN with the same user;
   // signing in again as the same person is the same session.
   const sync = (next: Session | null) => {
+    // A staff account never opens the app: sign it out before anything loads.
+    if (next && isStaffAccountToken(next.access_token)) {
+      setSignedOutNotice(STAFF_ACCOUNT_MESSAGE);
+      void signOutFromAuth();
+      next = null;
+    }
     setSession(next);
     const userId = next?.user?.id ?? null;
     if (userId) {
-      setRestriction(null);
+      setSignedOutNotice(null);
       void core.signIn(userId);
     } else if (core.userId !== null) {
       core.signOut();
@@ -139,7 +159,7 @@ export function SessionProvider(props: { children: JSX.Element }) {
   const value: SessionValue = {
     session,
     phase,
-    restriction,
+    signedOutNotice,
     passwordRecoveryRequired,
     signIn,
     signOut,
