@@ -24,6 +24,16 @@ npm run devdb -- run -- npm run tauri:build
 npm run devdb -- run -- npm run mobile:run:ios:device
 ```
 
+An `ios/` folder made without `devdb run` (a production build, a plain
+prebuild) has no http exception for the dev host, and `expo run:ios` reuses it
+as is: every request fails with "App Transport Security policy requires the use
+of a secure connection". `devdb run` checks for this and stops. Regenerate it
+under the dev backend first, and again when going back to production:
+
+```bash
+npm run devdb -- run -- npm run mobile:native:prebuild
+```
+
 Sign in with the fixture users from
 `tooling/scripts/test/bootstrap-local-auth-users.mjs`, for example
 `rls-owner@example.test` / `HavenTest!Owner1`.

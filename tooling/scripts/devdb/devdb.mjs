@@ -385,6 +385,30 @@ async function status() {
   }
 }
 
+/**
+ * `expo run:ios` reuses an existing ios/ folder without applying app.config.js
+ * again. One generated without HAVEN_DEV_BACKEND has no http exception for the
+ * dev host, and every request fails with "App Transport Security policy
+ * requires the use of a secure connection". Stop before building it.
+ */
+function assertIosProjectAllowsDevBackend(command, env) {
+  const joined = command.join(" ");
+  if (!/run:ios|run-ios|expo run:ios/.test(joined)) return;
+  const iosDir = path.join(repoRoot, "apps/mobile/ios");
+  if (!existsSync(iosDir)) return; // expo run:ios prebuilds it under this env
+  const host = new URL(env.DEVDB_MOBILE_API_URL).hostname;
+  const plists = readdirSync(iosDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(iosDir, entry.name, "Info.plist"))
+    .filter(existsSync);
+  if (plists.some((file) => readFileSync(file, "utf8").includes(host))) return;
+  fail(
+    `apps/mobile/ios was generated without the dev backend, so iOS will refuse http to ${host}.\n` +
+      "  Regenerate it first, then run again:\n" +
+      "    npm run devdb -- run -- npm run mobile:native:prebuild",
+  );
+}
+
 /** Runs any command with every app's backend variables pointed at the dev backend. */
 function run(args) {
   const command = args[0] === "--" ? args.slice(1) : args;
@@ -392,6 +416,7 @@ function run(args) {
     fail("usage: npm run devdb -- run -- <command ...>");
   const env = loadEnvFile();
   log(`backend for this command: ${env.DEVDB_API_URL}`);
+  assertIosProjectAllowsDevBackend(command, env);
   // Windows needs a shell to start npm/npx (.cmd files), and a shell re-splits
   // arguments on spaces, so quote them there.
   const windows = process.platform === "win32";
