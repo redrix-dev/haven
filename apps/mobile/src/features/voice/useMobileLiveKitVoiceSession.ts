@@ -524,7 +524,10 @@ export function useMobileLiveKitVoiceSession({
     const cleanup = async () => {
       const room = roomRef.current;
       const wasJoined = core.voice.getSnapshot().joined;
-      // Before anything changes, so nothing reconfigures audio under it.
+      // Level sampling reads the mic track's stats; it must not outlive the
+      // track. Stopping it changes no audio.
+      stopInputLevelPolling();
+      // Before anything else changes, so nothing reconfigures audio under it.
       if (wasJoined) {
         pendingCueRef.current = null;
         await playMobileVoiceSound(
