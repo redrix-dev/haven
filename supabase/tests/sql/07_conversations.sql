@@ -52,7 +52,7 @@ select test_support.expect_error(
 select test_support.expect_error(
   $$ select * from public.list_messages((select id from dm)) $$, 'channel_not_found');
 -- Staff are not participants either.
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.expect_error(
   $$ select * from public.list_messages((select id from dm)) $$, 'channel_not_found');
 select test_support.become(null);

@@ -41,8 +41,12 @@ select test_support.become(null);                -- back to the superuser, to lo
 select test_support.assert_eq_int(test_support.sent('member_b', 'member.left'), 1, 'members hear it');
 ```
 
-The seven actors are `owner`, `member_a`, `member_b`, `non_member`,
-`server_mod`, `staff_active` and `staff_inactive`. `expect_error` matches the
+The nine actors are `owner`, `member_a`, `member_b`, `non_member`,
+`server_mod`, `stranger`, `staff_person`, and the two staff accounts
+`staff_active` (whose own account is `staff_person`) and `staff_inactive`.
+A staff account never acts as a person, so a suite that needs one more
+outsider uses `stranger` or `staff_person`. Staff work needs a second factor:
+`become('staff_active', 'aal2')`. `expect_error` matches the
 reason word (`details`) of a Haven refusal, or part of the message for an
 error Postgres raised itself. `sent` and `last_sent` read
 `realtime.messages`, where a broadcast made inside the transaction can be

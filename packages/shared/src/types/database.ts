@@ -1751,6 +1751,7 @@ export type Database = {
           can_review_csam: boolean
           created_at: string
           note: string | null
+          person_id: string | null
           updated_at: string
           user_id: string
         }
@@ -1759,6 +1760,7 @@ export type Database = {
           can_review_csam?: boolean
           created_at?: string
           note?: string | null
+          person_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1767,10 +1769,18 @@ export type Database = {
           can_review_csam?: boolean
           created_at?: string
           note?: string | null
+          person_id?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "platform_staff_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "platform_staff_user_id_fkey"
             columns: ["user_id"]

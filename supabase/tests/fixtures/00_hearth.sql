@@ -7,7 +7,9 @@
 --     #staff-room         hidden from everyone except the Moderator role
 --     voice: Lounge
 --   members: owner, member_a, member_b, server_mod (Moderator)
---   non_member is in nothing. staff_active is Haven staff; staff_inactive was.
+--   non_member and stranger are in nothing. staff_active is a Haven staff
+--   account and staff_person its staff member's own account; staff_inactive
+--   was a staff account.
 
 select test_support.become(null);
 
@@ -29,11 +31,12 @@ delete from private.rate_limit_hits where true;
 delete from public.account_restrictions r using auth.users u
   where u.email like 'rls-%@example.test' and u.id = r.user_id and r.case_id is null;
 
-insert into public.platform_staff (user_id, active, can_review_csam, note)
+insert into public.platform_staff (user_id, person_id, active, can_review_csam, note)
 values
-  (test_support.user_id('staff_active'), true, false, 'fixture'),
-  (test_support.user_id('staff_inactive'), false, false, 'fixture')
-on conflict (user_id) do update set active = excluded.active, can_review_csam = excluded.can_review_csam;
+  (test_support.user_id('staff_active'), test_support.user_id('staff_person'), true, false, 'fixture'),
+  (test_support.user_id('staff_inactive'), null, false, false, 'fixture')
+on conflict (user_id) do update
+  set person_id = excluded.person_id, active = excluded.active, can_review_csam = excluded.can_review_csam;
 
 do $$
 declare

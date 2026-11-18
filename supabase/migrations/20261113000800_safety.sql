@@ -209,7 +209,8 @@ security definer
 set search_path = ''
 as $$
   select private.is_staff(p_user_id) and exists (
-    select 1 from public.platform_cases c where c.id = p_case_id and c.subject_user_id <> p_user_id
+    select 1 from public.platform_cases c
+    where c.id = p_case_id and not private.staff_is(p_user_id, c.subject_user_id)
   );
 $$;
 grant execute on function private.can_read_report(uuid, uuid) to authenticated;
@@ -222,13 +223,16 @@ alter table public.case_media enable row level security;
 
 create policy "staff" on public.platform_cases
   for select to authenticated
-  using (private.is_staff((select auth.uid())) and subject_user_id <> (select auth.uid()));
+  using (private.is_staff_session() and not private.staff_is((select auth.uid()), subject_user_id));
 create policy "staff" on public.platform_case_events
-  for select to authenticated using (private.can_read_case(case_id, (select auth.uid())));
+  for select to authenticated
+  using (private.has_second_factor() and private.can_read_case(case_id, (select auth.uid())));
 create policy "staff" on public.platform_case_decisions
-  for select to authenticated using (private.can_read_case(case_id, (select auth.uid())));
+  for select to authenticated
+  using (private.has_second_factor() and private.can_read_case(case_id, (select auth.uid())));
 create policy "staff" on public.case_media
-  for select to authenticated using (private.can_read_case(case_id, (select auth.uid())));
+  for select to authenticated
+  using (private.has_second_factor() and private.can_read_case(case_id, (select auth.uid())));
 create policy "report managers" on public.community_report_notes
   for select to authenticated using (private.can_read_report(report_id, (select auth.uid())));
 
@@ -236,6 +240,8 @@ grant select on public.platform_cases, public.platform_case_events, public.platf
   public.case_media, public.community_report_notes to authenticated;
 
 -- ── Helpers ─────────────────────────────────────────────────────────────────
+-- The first line of every staff RPC: an active staff account, signed in with
+-- a second factor. A password alone does no staff work.
 create function private.require_staff()
 returns uuid
 language plpgsql
@@ -244,10 +250,14 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_me uuid := private.require_user();
+  v_me uuid := private.require_account();
 begin
   if not private.is_staff(v_me) then
     perform private.fail('forbidden', 'staff_only', 'Only Haven staff can do that.');
+  end if;
+  if not private.has_second_factor() then
+    perform private.fail('forbidden', 'second_factor_required',
+      'Sign in with your authenticator app to do staff work.');
   end if;
   return v_me;
 end;
@@ -294,7 +304,7 @@ declare
   v_row public.platform_cases;
 begin
   select * into v_row from public.platform_cases c where c.id = p_case_id for update;
-  if v_row.id is null or v_row.subject_user_id = p_user_id then
+  if v_row.id is null or private.staff_is(p_user_id, v_row.subject_user_id) then
     perform private.fail('not_found', 'case_not_found', 'That case could not be found.');
   end if;
   return v_row;
@@ -801,7 +811,7 @@ declare
   v_decision_id uuid;
   v_ends_at timestamptz;
 begin
-  if v_me = v_case.reporter_id then
+  if private.staff_is(v_me, v_case.reporter_id) then
     perform private.fail('forbidden', 'own_case', 'You cannot decide a case you reported.');
   end if;
   if exists (select 1 from public.platform_case_decisions d where d.case_id = p_case_id and d.reversed_at is null) then
@@ -993,7 +1003,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select exists (
+  select private.has_second_factor() and exists (
     select 1
     from public.media f
     join public.case_media cm on cm.media_id = f.id

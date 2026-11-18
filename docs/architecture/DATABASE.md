@@ -89,8 +89,19 @@ moves to 18.
 | `user_settings`        | RLS: own row                                                                                     | `update_my_settings`                                                      |
 | `terms_versions`       | RLS: anyone signed in                                                                            | operator                                                                  |
 | `terms_acceptances`    | RLS: own rows                                                                                    | sign-up trigger, `accept_terms`                                           |
-| `platform_staff`       | RLS: staff                                                                                       | operator (no RPC makes someone staff)                                     |
-| `account_restrictions` | RLS: staff. The person reads theirs through `list_decisions_about_me`                            | `staff_record_decision`, `staff_reverse_decision`                         |
+| `platform_staff`       | RLS: staff, with a second factor                                                                 | operator (no RPC makes someone staff)                                     |
+| `account_restrictions` | RLS: staff, with a second factor. The person reads theirs through `list_decisions_about_me`      | `staff_record_decision`, `staff_reverse_decision`                         |
+
+**Staff have two accounts.** A `platform_staff` row's `user_id` is a staff
+account: it does staff work and nothing else, because `require_user`, the
+first line of everything a person does, refuses it (`staff_account`), active
+or not. Its `person_id` is the staff member's own account: it carries the
+staff badge so people see staff in their communities, and gains no powers.
+An account is one or the other, never both (`private.check_staff_link`).
+Staff work needs a session signed in with a second factor (an authenticator
+app, `aal2`): `require_staff` refuses without one
+(`second_factor_required`), and every staff read checks it
+(`private.is_staff_session`, `private.has_second_factor`).
 
 Everyone's view of a person is `profile_record` (name, picture, staff badge).
 What only the person sees of their own profile (bio, the flair they chose) is
@@ -294,8 +305,10 @@ adds:
 
 - **Nobody handles a report about themselves.** A moderator does not see, hear
   about or act on a report about them; the same for a staff member and a case
-  about them. Two functions hold that rule (`private.can_read_report`,
-  `private.can_read_case`).
+  about their staff account or their own account. Two functions hold that rule
+  (`private.can_read_report`, `private.can_read_case`, which asks
+  `private.staff_is`). Staff also do not decide a case their own account
+  filed (`own_case`).
 - **The database writes the evidence.** The snapshot (the message, ten before
   and after, who and where) is taken when the report is filed, by the
   database. A case holds the message's files; while it does, nothing deletes
@@ -416,7 +429,11 @@ After the migrations are applied to a hosted project:
    functions the same secret as `HAVEN_WORKER_CRON_SECRET` (16 characters or
    more), plus their own keys (`supabase/functions/README.md`). Until both
    settings are set the database queues jobs and calls nobody.
-3. **Staff.** `insert into public.platform_staff (user_id, can_review_csam, note) values (...)`.
+3. **Staff.** Authentication, Multi-Factor: the authenticator app (TOTP) must
+   be on for enrolling and verifying (locally it is in `supabase/config.toml`).
+   Make a new account for the staff work, then
+   `insert into public.platform_staff (user_id, person_id, can_review_csam, note) values (<staff account>, <their own account>, ...)`.
+   The staff account enrolls an authenticator app before it can do anything.
 4. **Scanner (when there is one).** `select private.set_setting('media_scan', 'on');`
 5. **Realtime.** Private channels only. The current hosted project also has a
    hand-added policy `authenticated can receive broadcasts` with the condition

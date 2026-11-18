@@ -186,8 +186,10 @@ tables directly.
 | Other members        | Nothing, not even a broadcast             | Nothing                                    |
 | Haven staff          | Only through the case it was escalated to | Everything, except CSAM media: see below   |
 
-- The staff site signs in as a staff user and reads through RLS. The service
-  role is for jobs only.
+- The staff site signs in as a staff account, with a second factor, and reads
+  through RLS. The service role is for jobs only. A staff account does nothing
+  a person does; the staff member's own account, linked to it, carries the
+  staff badge and nothing more (DATABASE.md, "People").
 - CSAM-flagged media is viewable only by staff with `can_review_csam` set on
   their `platform_staff` row, and every view writes a case event.
 

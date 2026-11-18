@@ -1,7 +1,7 @@
 -- Friend requests, friend links, friendships, blocks, and who may ask.
 begin;
 
--- staff_active keeps the closed defaults, for "Who may ask" below.
+-- staff_person keeps the closed defaults, for "Who may ask" below.
 select test_support.take_friend_requests('owner', 'member_a', 'member_b', 'non_member', 'server_mod');
 delete from public.notifications where true;
 select test_support.clear_sent();
@@ -174,7 +174,7 @@ select test_support.assert_eq_text(
   'friends|friends|nobody', 'a new account starts closed');
 select test_support.become('member_b');
 select test_support.expect_error(
-  $$ select public.send_friend_request(test_support.user_id('staff_active')) $$, 'requests_closed');
+  $$ select public.send_friend_request(test_support.user_id('staff_person')) $$, 'requests_closed');
 
 select test_support.become('server_mod');
 select test_support.assert_eq_text(
@@ -190,16 +190,16 @@ select test_support.become('non_member');
 select test_support.expect_error(
   $$ select public.send_friend_request(test_support.user_id('server_mod')) $$, 'requests_closed');
 
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select public.send_friend_request(test_support.user_id('non_member'));
 select test_support.become('non_member');
-select public.send_friend_request(test_support.user_id('staff_active'));
+select public.send_friend_request(test_support.user_id('staff_person'));
 select test_support.become(null);
-select test_support.assert_true(pg_temp.friends('non_member', 'staff_active'),
+select test_support.assert_true(pg_temp.friends('non_member', 'staff_person'),
   'asking back accepts, whatever the rule of the person who asked first');
 update public.user_settings s set dms_from = 'community' where s.user_id = test_support.user_id('non_member');
 select test_support.assert_true(
-  private.can_message(test_support.user_id('non_member'), test_support.user_id('staff_active')),
+  private.can_message(test_support.user_id('non_member'), test_support.user_id('staff_person')),
   '"community" includes friends who share no community');
 
 -- ── Friend links ────────────────────────────────────────────────────────────

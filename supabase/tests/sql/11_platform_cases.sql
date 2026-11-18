@@ -97,25 +97,40 @@ select test_support.assert_query_count(
   'the mail worker is given the words');
 
 -- ── Who reads cases ─────────────────────────────────────────────────────────
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 select test_support.assert_query_count($$ select 1 from public.platform_cases $$, 1, 'staff read cases');
 select test_support.assert_query_count($$ select 1 from public.platform_case_events $$, 1, 'their log');
 select test_support.assert_query_count($$ select 1 from public.case_media $$, 1, 'and which files they hold');
+select test_support.become('staff_active');
+select test_support.assert_query_count(
+  $$ select 1 from public.platform_cases $$, 0, 'staff signed in with only a password read no cases');
+select test_support.assert_query_count($$ select 1 from public.platform_case_events $$, 0, 'nor the log');
+select test_support.assert_query_count($$ select 1 from public.case_media $$, 0, 'nor the files');
+select test_support.expect_error(
+  $$ select public.staff_add_case_note((select id from filed), 'x') $$, 'second_factor_required');
+select test_support.become('staff_person');
+select test_support.assert_query_count(
+  $$ select 1 from public.platform_cases $$, 0, 'a staff member''s own account reads no cases');
+select test_support.expect_error(
+  $$ select public.staff_add_case_note((select id from filed), 'x') $$, 'staff_only');
+select test_support.become('staff_active', 'aal2');
+select test_support.expect_error(
+  $$ select public.file_platform_case('profile', test_support.user_id('member_b'), 'x') $$, 'staff_account');
 select test_support.become('owner');
 select test_support.assert_query_count($$ select 1 from public.platform_cases $$, 0, 'a community owner does not');
 select test_support.assert_query_count($$ select 1 from public.platform_case_events $$, 0, 'nor the log');
 select test_support.assert_query_count($$ select 1 from public.case_media $$, 0, 'nor which files it holds');
 select test_support.become(null);
 
--- Staff do not handle a case about themselves.
+-- Staff do not handle a case about themselves: about their own account.
 select test_support.clear_sent();
 select test_support.become('member_a');
 create temp table about_staff as
-  select public.file_platform_case('profile', test_support.user_id('staff_active'), 'Abuse of position.') as id;
+  select public.file_platform_case('profile', test_support.user_id('staff_person'), 'Abuse of position.') as id;
 grant select on about_staff to public;
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 select test_support.assert_query_count(
-  $$ select 1 from public.platform_cases $$, 1, 'a staff member does not see the case about them');
+  $$ select 1 from public.platform_cases $$, 1, 'a staff member does not see the case about their own account');
 select test_support.assert_query_count(
   $$ select 1 from public.platform_case_events e where e.case_id = (select id from about_staff) $$, 0, 'or its log');
 select test_support.expect_error(
@@ -124,14 +139,14 @@ select test_support.expect_error(
   $$ select public.staff_record_decision((select id from about_staff), '{}') $$, 'case_not_found');
 select test_support.expect_error(
   $$ select public.staff_set_case_status((select id from about_staff), 'dismissed') $$, 'case_not_found');
-select test_support.become('staff_inactive');
+select test_support.become('staff_inactive', 'aal2');
 select test_support.assert_query_count($$ select 1 from public.platform_cases $$, 2, 'other staff do');
 select test_support.become(null);
 select test_support.assert_eq_int(test_support.sent('staff_active', 'case.changed'), 0, 'they do not hear it arrive');
 select test_support.assert_eq_int(test_support.sent('staff_inactive', 'case.changed'), 1, 'other staff do');
 
 -- ── Working a case ──────────────────────────────────────────────────────────
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 select public.staff_set_case_status((select id from filed), 'in_review');
 select test_support.expect_error(
   $$ select public.staff_set_case_status((select id from filed), 'actioned') $$, 'needs_decision');
@@ -159,16 +174,19 @@ select test_support.become(null);
 select test_support.fake_upload((select id from second_file));
 insert into public.case_media (case_id, media_id) values ((select id from filed), (select id from second_file));
 
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 select test_support.assert_eq_int(pg_temp.storage_sees('media'), 0, 'being staff does not open anyone''s files');
 select test_support.assert_eq_text(
   (select v.bucket || '/' || v.object_path from public.staff_view_case_media((select id from filed), (select media_id from bad)) v),
   'media/' || test_support.user_id('member_b')::text || '/' || (select media_id::text from bad),
   'staff ask to open one evidence file and are told where it is');
 select test_support.assert_eq_int(pg_temp.storage_sees('media'), 1, 'asking is what unlocks it, and only that file');
+select test_support.become('staff_active');
+select test_support.assert_eq_int(pg_temp.storage_sees('media'), 0, 'and only in a session with a second factor');
+select test_support.become('staff_active', 'aal2');
 select test_support.expect_error(
   $$ select * from public.staff_view_case_media((select id from filed), gen_random_uuid()) $$, 'media_not_found');
-select test_support.become('staff_inactive');
+select test_support.become('staff_inactive', 'aal2');
 select test_support.assert_eq_int(pg_temp.storage_sees('media'), 0, 'for the person who asked, not for all staff');
 select test_support.become(null);
 select test_support.assert_query_count(
@@ -178,15 +196,18 @@ select test_support.assert_query_count(
        and e.detail ->> 'media_id' = (select media_id::text from bad) $$, 1,
   'and every look is in the log');
 update public.platform_case_events set created_at = now() - interval '11 minutes' where kind = 'media_viewed';
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 select test_support.assert_eq_int(pg_temp.storage_sees('media'), 0, 'the file locks again after ten minutes');
 select test_support.become(null);
 
 -- ── Decisions ───────────────────────────────────────────────────────────────
-select test_support.become('staff_active');
+-- A staff member's own account may report, but its staff account does not
+-- decide that case.
+select test_support.become('staff_person');
 create temp table by_staff as
   select public.file_platform_case('profile', test_support.user_id('member_b'), 'That bio.') as id;
 grant select on by_staff to public;
+select test_support.become('staff_active', 'aal2');
 select test_support.expect_error(
   $$ select public.staff_record_decision((select id from by_staff), '{}') $$, 'own_case');
 select test_support.expect_error(
@@ -209,7 +230,7 @@ select test_support.become(null);
 select test_support.clear_sent();
 delete from public.notifications where true;
 delete from private.jobs where true;
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 create temp table decision as
   select public.staff_record_decision(
     (select id from filed), array['content_removed', 'user_suspended']::public.case_action[],
@@ -282,7 +303,7 @@ select test_support.assert_eq_text(
 select test_support.become(null);
 
 -- ── Reversing a decision ────────────────────────────────────────────────────
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 select test_support.expect_error(
   $$ select public.staff_reverse_decision((select id from decision), '   ') $$, 'reason_required');
 select public.staff_reverse_decision((select id from decision), '  Wrong person.  ');
@@ -310,7 +331,7 @@ select test_support.become(null);
 
 -- Looked at, no action.
 delete from public.notifications where true;
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 select public.staff_record_decision((select id from filed), null);
 select test_support.become(null);
 select test_support.assert_eq_text(
@@ -326,7 +347,7 @@ select test_support.assert_query_count(
 
 -- A profile report: remove the content and ban.
 select test_support.clear_sent();
-select test_support.become('staff_inactive');
+select test_support.become('staff_inactive', 'aal2');
 select public.staff_record_decision(
   (select id from by_staff), array['content_removed', 'user_banned']::public.case_action[], 'Profile rules', 'Bio.');
 select test_support.become(null);
@@ -357,7 +378,7 @@ grant select on member_report to public;
 select test_support.become('server_mod');
 create temp table escalated as select public.escalate_community_report((select id from member_report)) as id;
 grant select on escalated to public;
-select test_support.become('staff_inactive');
+select test_support.become('staff_inactive', 'aal2');
 select test_support.expect_error(
   $$ select public.staff_record_decision(
        (select id from escalated), array['content_removed']::public.case_action[], 'r', 'why') $$, 'nothing_to_remove');
@@ -376,7 +397,7 @@ grant select on flagged to public;
 select test_support.become(null);
 delete from private.jobs where true;
 
-select test_support.become('staff_active'); -- staff, but not a CSAM reviewer
+select test_support.become('staff_active', 'aal2'); -- staff, but not a CSAM reviewer
 select test_support.expect_error(
   $$ select public.staff_record_ncmec_report((select id from flagged), '98765') $$, 'not_flagged');
 select public.staff_flag_csam((select id from flagged));
@@ -412,7 +433,7 @@ select test_support.assert_false(
   'not even the person who uploaded it is served the file');
 select test_support.become(null);
 
-select test_support.become('staff_inactive'); -- the CSAM reviewer
+select test_support.become('staff_inactive', 'aal2'); -- the CSAM reviewer
 select test_support.assert_query_count(
   $$ select 1 from public.staff_view_case_media((select id from flagged), (select media_id from worse)) v
      where v.bucket = 'media' $$, 1, 'a CSAM reviewer can open it');
@@ -432,9 +453,9 @@ select test_support.assert_eq_text(
 select test_support.assert_query_count(
   $$ select 1 from public.worker_media_to_quarantine((select media_id from worse)) $$, 0, 'so there is nothing left to move');
 select test_support.assert_eq_int(pg_temp.events((select id from flagged), 'media_quarantined'), 1, 'and the log says so');
-select test_support.become('staff_inactive');
+select test_support.become('staff_inactive', 'aal2');
 select test_support.assert_eq_int(pg_temp.storage_sees('evidence'), 1, 'the reviewer who opened it still reads it there');
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 select test_support.assert_eq_int(pg_temp.storage_sees('evidence'), 0, 'other staff do not');
 select test_support.become(null);
 

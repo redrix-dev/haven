@@ -64,7 +64,7 @@ create temp table dm as select (public.open_dm(test_support.user_id('member_a'))
 grant select on dm to public;
 select public.block_user(test_support.user_id('non_member'));
 select public.create_friend_link();
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select public.send_friend_request(test_support.user_id('member_b'));
 create temp table staff_link as select * from public.create_friend_link();
 grant select on staff_link to public;

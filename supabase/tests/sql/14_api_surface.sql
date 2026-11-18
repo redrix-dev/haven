@@ -143,7 +143,7 @@ select test_support.assert_eq_text(
   pg_temp.differs(
     array(select p.proname::text from pg_proc p
           where p.pronamespace = 'private'::regnamespace and has_function_privilege('authenticated', p.oid, 'execute')),
-    array['is_staff', 'my_community_ids', 'has_permission', 'my_channel_ids', 'can_view_channel', 'voice_topic_channel',
+    array['is_staff_session', 'has_second_factor', 'staff_is', 'my_community_ids', 'has_permission', 'my_channel_ids', 'can_view_channel', 'voice_topic_channel',
           'can_upload', 'can_read_media', 'can_read_report', 'can_read_case', 'staff_can_read_evidence']),
   '', 'the private helpers a policy may call are exactly these');
 select test_support.assert_query_count(

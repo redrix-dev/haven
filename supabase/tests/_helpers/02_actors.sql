@@ -1,6 +1,9 @@
 -- Who is acting, what was refused, and what was broadcast.
 
--- The seven accounts made by tooling/scripts/test/bootstrap-local-auth-users.mjs.
+-- The nine accounts made by tooling/scripts/test/bootstrap-local-auth-users.mjs.
+-- staff_active and staff_inactive are staff accounts (they never act as a
+-- person); staff_person is staff_active's own account; stranger shares nothing
+-- with anyone.
 create or replace function test_support.user_id(p_key text)
 returns uuid
 language sql
@@ -18,13 +21,16 @@ as $$
     when 'server_mod' then 'rls-server-mod@example.test'
     when 'staff_active' then 'rls-staff-active@example.test'
     when 'staff_inactive' then 'rls-staff-inactive@example.test'
+    when 'staff_person' then 'rls-staff-person@example.test'
+    when 'stranger' then 'rls-stranger@example.test'
   end;
 $$;
 
 -- Act as one of them, through the same role and claims the API uses, so RLS
 -- and grants apply. become(null) goes back to the superuser to look at the
--- truth.
-create or replace function test_support.become(p_key text)
+-- truth. p_aal 'aal2' is a sign-in with a second factor, which staff work needs.
+drop function if exists test_support.become(text);
+create or replace function test_support.become(p_key text, p_aal text default 'aal1')
 returns void
 language plpgsql
 as $$
@@ -38,7 +44,7 @@ begin
     raise exception '[become] no fixture user "%". Run npm run test:db:users.', p_key;
   end if;
   perform set_config('role', 'postgres', true);
-  perform test_support.set_jwt_claims(test_support.user_id(p_key));
+  perform test_support.set_jwt_claims(test_support.user_id(p_key), 'authenticated', p_aal);
   perform set_config('role', 'authenticated', true);
 end;
 $$;

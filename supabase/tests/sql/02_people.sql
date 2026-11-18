@@ -126,28 +126,64 @@ select test_support.assert_query_count(
 select test_support.become(null);
 
 -- ── Haven staff ─────────────────────────────────────────────────────────────
-select test_support.assert_true(
-  (select p.is_staff from public.profiles p where p.id = test_support.user_id('staff_active')), 'staff carry the badge');
-select test_support.assert_false(
-  (select p.is_staff from public.profiles p where p.id = test_support.user_id('staff_inactive')), 'inactive staff do not');
+create function pg_temp.badge(p_key text) returns boolean language sql as $$
+  select p.is_staff from public.profiles p where p.id = test_support.user_id(p_key);
+$$;
+select test_support.assert_true(pg_temp.badge('staff_active'), 'staff carry the badge');
+select test_support.assert_true(pg_temp.badge('staff_person'),
+  'and so does their own account, so people see staff in their communities');
+select test_support.assert_false(pg_temp.badge('staff_inactive'), 'inactive staff do not');
+
+-- A staff account is never a person, active or not.
+select test_support.become('staff_active', 'aal2');
+select test_support.expect_error(
+  $$ select public.send_friend_request(test_support.user_id('member_a')) $$, 'staff_account');
 select test_support.become('staff_inactive');
+select test_support.expect_error($$ select public.update_my_profile('renamed') $$, 'staff_account');
+
+-- The staff list: staff read it, with a second factor.
+select test_support.become('staff_active', 'aal2');
+select test_support.assert_query_count($$ select 1 from public.platform_staff $$, 2, 'staff can read the staff list');
+select test_support.become('staff_active');
+select test_support.assert_query_count($$ select 1 from public.platform_staff $$, 0, 'not with only a password');
+select test_support.become('staff_inactive', 'aal2');
 select test_support.assert_query_count(
   $$ select 1 from public.platform_staff $$, 0, 'someone who was staff no longer reads the staff list');
-select test_support.become(null);
-update public.platform_staff set active = true where user_id = test_support.user_id('staff_inactive');
-select test_support.assert_true(
-  (select p.is_staff from public.profiles p where p.id = test_support.user_id('staff_inactive')),
-  'the badge follows the staff list');
-delete from public.platform_staff where user_id = test_support.user_id('staff_inactive');
-select test_support.assert_false(
-  (select p.is_staff from public.profiles p where p.id = test_support.user_id('staff_inactive')), 'both ways');
-select test_support.become('staff_active');
-select test_support.assert_query_count($$ select 1 from public.platform_staff $$, 1, 'staff can read the staff list');
+select test_support.become('staff_person');
+select test_support.assert_query_count(
+  $$ select 1 from public.platform_staff $$, 0, 'a staff member''s own account gains no powers');
 select test_support.become('member_a');
 select test_support.assert_query_count($$ select 1 from public.platform_staff $$, 0, 'nobody else can');
 select test_support.expect_error(
   $$ insert into public.platform_staff (user_id) values (test_support.user_id('member_a')) $$, 'permission denied');
 select test_support.become(null);
+
+-- The badge follows the staff list, on both accounts.
+update public.platform_staff set active = true where user_id = test_support.user_id('staff_inactive');
+select test_support.assert_true(pg_temp.badge('staff_inactive'), 'the badge follows the staff list');
+delete from public.platform_staff where user_id = test_support.user_id('staff_inactive');
+select test_support.assert_false(pg_temp.badge('staff_inactive'), 'both ways');
+update public.platform_staff set active = false where user_id = test_support.user_id('staff_active');
+select test_support.assert_false(pg_temp.badge('staff_person'), 'the own account loses it with the staff account');
+update public.platform_staff set active = true, person_id = null where user_id = test_support.user_id('staff_active');
+select test_support.assert_false(pg_temp.badge('staff_person'), 'and when the link goes');
+update public.platform_staff set person_id = test_support.user_id('staff_person')
+  where user_id = test_support.user_id('staff_active');
+select test_support.assert_true(pg_temp.badge('staff_person'), 'and gets it back with the link');
+
+-- An account is a staff account or a person, never both.
+select test_support.expect_error(
+  $$ insert into public.platform_staff (user_id, person_id)
+     values (test_support.user_id('member_a'), test_support.user_id('staff_active')) $$, 'staff_link_invalid');
+select test_support.expect_error(
+  $$ insert into public.platform_staff (user_id, person_id)
+     values (test_support.user_id('staff_person'), test_support.user_id('member_a')) $$, 'staff_link_invalid');
+select test_support.expect_error(
+  $$ insert into public.platform_staff (user_id, person_id)
+     values (test_support.user_id('member_a'), test_support.user_id('member_a')) $$, 'platform_staff_two_accounts');
+select test_support.expect_error(
+  $$ insert into public.platform_staff (user_id, person_id)
+     values (test_support.user_id('member_a'), test_support.user_id('staff_person')) $$, 'platform_staff_person_id_key');
 
 -- ── Restrictions ────────────────────────────────────────────────────────────
 insert into public.account_restrictions (user_id, ends_at)
@@ -160,8 +196,10 @@ select test_support.assert_eq_text(
   pg_temp.code_of($$ select public.update_my_settings('x') $$), '42501', 'a restricted account is refused as forbidden');
 select test_support.assert_query_count(
   $$ select 1 from public.account_restrictions $$, 0, 'a person cannot read the restrictions table');
-select test_support.become('staff_active');
+select test_support.become('staff_active', 'aal2');
 select test_support.assert_query_count($$ select 1 from public.account_restrictions $$, 1, 'staff can');
+select test_support.become('staff_active');
+select test_support.assert_query_count($$ select 1 from public.account_restrictions $$, 0, 'with a second factor');
 select test_support.become(null);
 
 -- Sign-in is refused by the same row.

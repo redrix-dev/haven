@@ -24,6 +24,6 @@
 12 @@ their read marks and mutes are kept @@ select pg_temp.mutate('private.erase_account(uuid)', $m$delete from public.channel_user_state s where s.user_id = p_user_id;$m$, $m$$m$);
 12 @@ the conversation is deleted for the person who stays @@ select pg_temp.mutate('private.erase_account(uuid)', $m$and not exists ($m$, $m$and exists ($m$);
 12 @@ a conversation nobody is left in is kept @@ select pg_temp.mutate('private.erase_account(uuid)', $m$where ch.kind = 'dm'$m$, $m$where false and ch.kind = 'dm'$m$);
-12 @@ an old token still works after deletion @@ select pg_temp.mutate('private.require_user()', $m$if not exists (select 1 from public.profiles p where p.id = v_me and p.deleted_at is null) then$m$, $m$if false then$m$);
+12 @@ an old token still works after deletion @@ select pg_temp.mutate('private.require_account()', $m$if not exists (select 1 from public.profiles p where p.id = v_me and p.deleted_at is null) then$m$, $m$if false then$m$);
 12 @@ a deleted name stays taken @@ select pg_temp.mutate('private.erase_account(uuid)', $m$set username = null, bio = null,$m$, $m$set username = 'gone_' || left(replace(p_user_id::text, '-', ''), 12), bio = null,$m$); alter table public.profiles drop constraint profiles_deleted_is_blank;
 12 @@ a deleted staff account stays staff @@ select pg_temp.mutate('private.erase_account(uuid)', $m$update public.platform_staff s set active = false where s.user_id = p_user_id;$m$, $m$$m$);

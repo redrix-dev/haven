@@ -312,7 +312,7 @@ async function seed(requested) {
   }
   await waitForAuth(env);
 
-  log("accounts: the seven fixture users");
+  log("accounts: the nine fixture users");
   const bootstrap = spawnSync(
     process.execPath,
     ["tooling/scripts/test/bootstrap-local-auth-users.mjs"],

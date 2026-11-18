@@ -39,6 +39,9 @@ const USERS = {
   staff_active: ["rls-staff-active@example.test", "HavenTest!StaffActive1"],
 } as const;
 
+/** Staff work needs a second factor, so these sign in with one. */
+const STAFF = new Set<string>(["staff_active"]);
+
 export type Actor = {
   db: SupabaseClient;
   id: string;
@@ -62,14 +65,72 @@ export async function actor(who: keyof typeof USERS): Promise<Actor> {
       `could not sign in ${email}: ${error?.message}. Run npm run test:db first.`,
     );
   }
-  const made = {
-    db,
-    id: data.user.id,
-    email,
-    token: data.session.access_token,
-  };
+  const token = STAFF.has(who)
+    ? await addSecondFactor(db, data.user.id)
+    : data.session.access_token;
+  const made = { db, id: data.user.id, email, token };
   signedIn.set(who, made);
   return made;
+}
+
+/**
+ * Enrolls a fresh authenticator-app factor and answers it, the way a staff
+ * member does at sign-in, so the session is 'aal2'. Factors left by earlier
+ * runs are removed first. Returns the new access token.
+ */
+async function addSecondFactor(
+  db: SupabaseClient,
+  userId: string,
+): Promise<string> {
+  const listed = await service.auth.admin.mfa.listFactors({ userId });
+  if (listed.error) throw listed.error;
+  for (const factor of listed.data.factors) {
+    const removed = await service.auth.admin.mfa.deleteFactor({
+      userId,
+      id: factor.id,
+    });
+    if (removed.error) throw removed.error;
+  }
+  const enrolled = await db.auth.mfa.enroll({ factorType: "totp" });
+  if (enrolled.error) throw enrolled.error;
+  const verified = await db.auth.mfa.challengeAndVerify({
+    factorId: enrolled.data.id,
+    code: await totp(enrolled.data.totp.secret),
+  });
+  if (verified.error) throw verified.error;
+  return verified.data.access_token;
+}
+
+/** The current six-digit code for a base32 secret (RFC 6238, SHA-1, 30 s). */
+async function totp(secret: string): Promise<string> {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const char of secret.replace(/=+$/, "").toUpperCase()) {
+    bits += alphabet.indexOf(char).toString(2).padStart(5, "0");
+  }
+  const key = new Uint8Array(Math.floor(bits.length / 8));
+  for (let i = 0; i < key.length; i++) {
+    key[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+  }
+  const counter = new DataView(new ArrayBuffer(8));
+  counter.setBigUint64(0, BigInt(Math.floor(Date.now() / 30000)));
+  const hmacKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"],
+  );
+  const mac = new Uint8Array(
+    await crypto.subtle.sign("HMAC", hmacKey, counter.buffer),
+  );
+  const offset = mac[mac.length - 1] & 0x0f;
+  const value =
+    ((mac[offset] & 0x7f) << 24) |
+    (mac[offset + 1] << 16) |
+    (mac[offset + 2] << 8) |
+    mac[offset + 3];
+  return String(value % 1_000_000).padStart(6, "0");
 }
 
 /** Calls an RPC as that person and returns the result; a refusal throws. */

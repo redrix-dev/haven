@@ -67,7 +67,7 @@ select test_support.assert_eq_text(
 select test_support.assert_query_count($$ select 1 from public.community_members $$, 4, 'its members');
 select test_support.assert_query_count($$ select 1 from public.roles $$, 3, 'its roles');
 select test_support.assert_true((select count(*) from public.role_permissions) > 0, 'and what the roles allow');
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.assert_query_count($$ select 1 from public.communities $$, 0, 'a stranger sees no community');
 select test_support.assert_query_count($$ select 1 from public.community_members $$, 0, 'no members');
 select test_support.assert_query_count($$ select 1 from public.roles $$, 0, 'no roles');
@@ -75,7 +75,7 @@ select test_support.assert_query_count($$ select 1 from public.role_permissions 
 select test_support.assert_query_count($$ select 1 from public.member_roles $$, 0, 'and not who holds what; staff are strangers here too');
 select test_support.expect_error(
   $$ insert into public.community_members (community_id, user_id)
-     values ((select id from hearth), test_support.user_id('staff_active')) $$, 'permission denied');
+     values ((select id from hearth), test_support.user_id('staff_person')) $$, 'permission denied');
 select test_support.become('owner');
 select test_support.expect_error($$ update public.communities set name = 'direct' $$, 'permission denied');
 select test_support.become(null);
@@ -229,7 +229,7 @@ select test_support.expect_error(
   $$ select public.set_member_roles((select id from hearth), test_support.user_id('member_b'), array[(select id from den_role)]) $$,
   'role_not_found');
 select test_support.expect_error(
-  $$ select public.set_member_roles((select id from hearth), test_support.user_id('staff_active'), array[(select id from helper)]) $$,
+  $$ select public.set_member_roles((select id from hearth), test_support.user_id('staff_person'), array[(select id from helper)]) $$,
   'member_not_found');
 select public.set_member_roles((select id from hearth), test_support.user_id('member_b'), array[(select id from helper)]);
 select test_support.become(null);
@@ -303,16 +303,16 @@ select test_support.assert_eq_int(
 select test_support.assert_eq_int(test_support.sent('member_b', 'member.joined'), 1, 'members hear someone arrive');
 select test_support.assert_eq_int(test_support.sent('non_member', 'member.joined'), 1, 'and so does the person arriving');
 
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.expect_error($$ select public.join_community((select code from once)) $$, 'invite_invalid');
 select test_support.become(null);
 update public.invites set max_uses = null, expires_at = now() - interval '1 minute' where id = (select id from once);
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.expect_error($$ select public.join_community((select code from once)) $$, 'invite_invalid');
 select test_support.become(null);
 update public.invites set expires_at = null where id = (select id from once);
 update public.communities set invites_enabled = false where id = (select id from hearth);
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.expect_error($$ select public.join_community((select code from once)) $$, 'invite_invalid');
 select test_support.become(null);
 update public.communities set invites_enabled = true where id = (select id from hearth);
@@ -322,10 +322,10 @@ select test_support.expect_error($$ select public.revoke_invite((select id from 
 select test_support.become('owner');
 select public.revoke_invite((select id from once));
 select public.revoke_invite((select id from once));
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.expect_error($$ select public.join_community((select code from once)) $$, 'invite_invalid');
 select test_support.become(null);
-select test_support.assert_false(pg_temp.is_member('staff_active'), 'none of those let anyone in');
+select test_support.assert_false(pg_temp.is_member('staff_person'), 'none of those let anyone in');
 
 -- ── Removing a member ───────────────────────────────────────────────────────
 select test_support.clear_sent();
@@ -336,7 +336,7 @@ select test_support.become('member_a');
 select test_support.expect_error(
   $$ select public.kick_member((select id from hearth), test_support.user_id('owner')) $$, 'outranked');
 select test_support.expect_error(
-  $$ select public.kick_member((select id from hearth), test_support.user_id('staff_active')) $$, 'member_not_found');
+  $$ select public.kick_member((select id from hearth), test_support.user_id('staff_person')) $$, 'member_not_found');
 select public.kick_member((select id from hearth), test_support.user_id('non_member'));
 select test_support.become(null);
 select test_support.assert_false(pg_temp.is_member('non_member'), 'a manager removes a member below them');
@@ -367,7 +367,7 @@ select test_support.expect_error(
 select public.ban_member((select id from hearth), test_support.user_id('non_member'), '  spam ');
 select test_support.expect_error(
   $$ select public.ban_member((select id from hearth), test_support.user_id('non_member'), 'again') $$, 'already_banned');
-select public.ban_member((select id from hearth), test_support.user_id('staff_inactive'), 'known troublemaker');
+select public.ban_member((select id from hearth), test_support.user_id('stranger'), 'known troublemaker');
 select test_support.assert_query_count($$ select 1 from public.community_bans $$, 2, 'ban managers see the bans');
 select test_support.become('server_mod');
 select test_support.assert_query_count($$ select 1 from public.community_bans $$, 0, 'other members do not');
@@ -430,7 +430,7 @@ select test_support.expect_error(
   $$ select public.transfer_ownership((select id from hearth), test_support.user_id('member_a')) $$, 'owner_only');
 select test_support.become('owner');
 select test_support.expect_error(
-  $$ select public.transfer_ownership((select id from hearth), test_support.user_id('staff_active')) $$, 'member_not_found');
+  $$ select public.transfer_ownership((select id from hearth), test_support.user_id('staff_person')) $$, 'member_not_found');
 select test_support.assert_eq_text(
   (public.transfer_ownership((select id from hearth), test_support.user_id('member_a'))).owner_id::text,
   test_support.user_id('member_a')::text, 'the owner hands the community to a member');
@@ -487,7 +487,7 @@ select test_support.assert_query_count($$ select 1 from public.collapsed_categor
 select test_support.become('member_b');
 select public.set_category_collapsed((select id from cat), false);
 select test_support.assert_query_count($$ select 1 from public.collapsed_categories $$, 0, 'and opens it again');
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.expect_error(
   $$ select public.set_category_collapsed((select id from cat), true) $$, 'category_not_found');
 select test_support.become(null);
@@ -495,7 +495,7 @@ select test_support.assert_eq_int(test_support.sent('member_b', 'category.create
 select test_support.assert_eq_int(test_support.sent('member_b', 'category.updated'), 1, 'and changed');
 select test_support.assert_eq_int(test_support.sent('member_b', 'channel.created'), 1, 'a channel made');
 select test_support.assert_eq_int(test_support.sent('member_b', 'channel.updated'), 2, 'and each change to it');
-select test_support.assert_eq_int(test_support.sent('staff_active', 'channel.created'), 0, 'strangers hear none of it');
+select test_support.assert_eq_int(test_support.sent('staff_person', 'channel.created'), 0, 'strangers hear none of it');
 
 select test_support.become('member_a');
 select public.delete_channel((select id from plans));
@@ -515,7 +515,7 @@ select test_support.become(null);
 select test_support.clear_sent();
 select test_support.become('server_mod');
 select test_support.expect_error($$ select public.delete_community((select id from hearth)) $$, 'owner_only');
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.expect_error($$ select public.delete_community((select id from hearth)) $$, 'community_not_found');
 select test_support.become('member_a');
 select public.delete_community((select id from hearth));

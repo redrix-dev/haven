@@ -97,19 +97,19 @@ select test_support.become('member_a');
 select public.update_my_settings(null, 'community');
 select test_support.become('owner');
 select test_support.assert_true((pg_temp.card('member_a')).details_visible, 'someone in Hearth sees them');
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.assert_false((pg_temp.card('member_a')).details_visible, 'someone who shares nothing does not');
 
 -- Everyone, except across a block.
 select test_support.become('member_a');
 select public.update_my_settings(null, 'everyone');
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select test_support.assert_eq_text(
   (select c.details_visible || '|' || c.bio || '|' || cardinality(c.mutual_community_names) from pg_temp.card('member_a') c),
   'true|About A|0', 'visible to everyone means a stranger sees the details too');
 select test_support.become('member_a');
-select public.block_user(test_support.user_id('staff_active'));
-select test_support.become('staff_active');
+select public.block_user(test_support.user_id('staff_person'));
+select test_support.become('staff_person');
 select test_support.assert_eq_text(
   (select c.username || '|' || c.details_visible || '|' || (c.bio is null) from pg_temp.card('member_a') c),
   'rls_member_a|false|true', 'but never across a block');
@@ -117,7 +117,7 @@ select test_support.assert_eq_text(
   (select c.can_message || '|' || c.can_friend_request from pg_temp.card('member_a') c),
   'false|false', 'and nothing is offered across one');
 select test_support.become('member_a');
-select public.unblock_user(test_support.user_id('staff_active'));
+select public.unblock_user(test_support.user_id('staff_person'));
 select test_support.become(null);
 
 -- A flair that ran out or was retired is no longer shown or selectable.
@@ -138,24 +138,24 @@ select test_support.assert_true(
   'and a person can show none');
 
 -- ── Who hears a profile change ──────────────────────────────────────────────
--- staff_active has a request waiting with member_a. staff_inactive has a
+-- staff_person has a request waiting with member_a. stranger has a
 -- conversation with them and nothing else. non_member has no connection.
-select test_support.become('staff_active');
+select test_support.become('staff_person');
 select public.send_friend_request(test_support.user_id('member_a'));
-select test_support.become('staff_inactive');
+select test_support.become('stranger');
 select public.send_friend_request(test_support.user_id('member_a'));
 select test_support.become('member_a');
-select public.send_friend_request(test_support.user_id('staff_inactive'));
-select public.open_dm(test_support.user_id('staff_inactive'));
-select public.remove_friend(test_support.user_id('staff_inactive'));
+select public.send_friend_request(test_support.user_id('stranger'));
+select public.open_dm(test_support.user_id('stranger'));
+select public.remove_friend(test_support.user_id('stranger'));
 select test_support.assert_eq_text(
-  (select c.can_message || '|' || c.can_friend_request from pg_temp.card('staff_active') c),
+  (select c.can_message || '|' || c.can_friend_request from pg_temp.card('staff_person') c),
   'false|true', 'asking back is offered while their request waits, whatever their rule');
 select test_support.assert_false(
-  (pg_temp.card('staff_inactive')).can_message, 'a conversation neither rule keeps open is not offered');
+  (pg_temp.card('stranger')).can_message, 'a conversation neither rule keeps open is not offered');
 select public.update_my_settings(null, null, 'everyone');
 select test_support.assert_true(
-  (pg_temp.card('staff_inactive')).can_message, 'one your own rule keeps open is: you can answer');
+  (pg_temp.card('stranger')).can_message, 'one your own rule keeps open is: you can answer');
 select public.update_my_settings(null, null, 'friends');
 select test_support.become(null);
 select test_support.clear_sent();
@@ -167,8 +167,8 @@ select test_support.assert_eq_text(
   test_support.last_sent('owner', 'profile.updated') ->> 'username', 'renamed_a', 'people in a shared community hear a new name');
 select test_support.assert_eq_int(test_support.sent('member_a', 'profile.updated'), 1, 'so do the person''s own devices');
 select test_support.assert_eq_int(test_support.sent('member_b', 'profile.updated'), 1, 'a friend, once, however many ways they are connected');
-select test_support.assert_eq_int(test_support.sent('staff_active', 'profile.updated'), 1, 'someone with a request waiting');
-select test_support.assert_eq_int(test_support.sent('staff_inactive', 'profile.updated'), 1, 'and the other side of a conversation');
+select test_support.assert_eq_int(test_support.sent('staff_person', 'profile.updated'), 1, 'someone with a request waiting');
+select test_support.assert_eq_int(test_support.sent('stranger', 'profile.updated'), 1, 'and the other side of a conversation');
 select test_support.assert_eq_int(test_support.sent('non_member', 'profile.updated'), 0, 'nobody else');
 
 -- Someone connected to nobody still hears their own change (their other devices).
@@ -270,19 +270,19 @@ select test_support.assert_eq_text(
   'ios_two:skipped,join_hearth:completed,must_read:completed', 'each answer is kept');
 
 -- Skipping does none of that.
-select test_support.become('staff_inactive');
+select test_support.become('stranger');
 select public.answer_onboarding('join_hearth', 'skipped', 'ios');
 select test_support.become(null);
 select test_support.assert_false(
-  private.is_member(test_support.hearth_id(), test_support.user_id('staff_inactive')), 'skipping one joins nothing');
+  private.is_member(test_support.hearth_id(), test_support.user_id('stranger')), 'skipping one joins nothing');
 select test_support.assert_query_count(
-  $$ select 1 from public.user_flairs uf where uf.user_id = test_support.user_id('staff_inactive') $$, 0,
+  $$ select 1 from public.user_flairs uf where uf.user_id = test_support.user_id('stranger') $$, 0,
   'and gives nothing');
 
 -- Not offered when it cannot be finished.
 select test_support.become('owner');
-select public.ban_member(test_support.hearth_id(), test_support.user_id('staff_active'), 'not welcome');
-select test_support.become('staff_active');
+select public.ban_member(test_support.hearth_id(), test_support.user_id('staff_person'), 'not welcome');
+select test_support.become('staff_person');
 select test_support.assert_eq_text(
   pg_temp.offered('ios', null), 'must_read', 'an introduction that joins a community is not shown to someone banned from it');
 select test_support.expect_error(

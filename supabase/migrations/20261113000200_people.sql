@@ -107,20 +107,47 @@ create policy "own acceptances" on public.terms_acceptances
 grant select on public.terms_acceptances to authenticated;
 
 -- ── Haven staff ─────────────────────────────────────────────────────────────
--- Separate from any community's moderators. Rows are added by the operator in
--- SQL; there is no RPC that makes someone staff.
+-- Separate from any community's moderators. A staff member has two accounts:
+-- the staff account (user_id), which does staff work and nothing else, and
+-- their own account (person_id), which carries the staff badge and gains no
+-- powers. Every action a person takes refuses a staff account
+-- (require_user), and staff work needs a second factor (require_staff).
+-- Rows are added by the operator in SQL; there is no RPC that makes someone
+-- staff.
 create table public.platform_staff (
   user_id uuid primary key references public.profiles (id),
+  person_id uuid unique references public.profiles (id),
   active boolean not null default true,
   -- Opening media on a CSAM-flagged case needs this as well as being staff.
   can_review_csam boolean not null default false,
   note text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint platform_staff_two_accounts check (person_id <> user_id)
 );
 create trigger platform_staff_touch before update on public.platform_staff
   for each row execute function private.touch_updated_at();
 
+-- An account is a staff account or a person, never both.
+create function private.check_staff_link()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if exists (select 1 from public.platform_staff s where s.person_id = new.user_id)
+     or exists (select 1 from public.platform_staff s where s.user_id = new.person_id) then
+    perform private.fail('invalid', 'staff_link_invalid',
+      'An account is either a staff account or a person, not both.');
+  end if;
+  return new;
+end;
+$$;
+create trigger platform_staff_link before insert or update on public.platform_staff
+  for each row execute function private.check_staff_link();
+
+-- Active staff.
 create function private.is_staff(p_user_id uuid)
 returns boolean
 language sql
@@ -130,25 +157,75 @@ set search_path = ''
 as $$
   select exists (select 1 from public.platform_staff s where s.user_id = p_user_id and s.active);
 $$;
-grant execute on function private.is_staff(uuid) to authenticated;
+
+-- A staff account, active or not. It never acts as a person.
+create function private.is_staff_account(p_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.platform_staff s where s.user_id = p_user_id);
+$$;
+
+-- Whether this staff member is that person: the staff account itself or the
+-- staff member's own account. Staff never see or act on their own cases.
+create function private.staff_is(p_staff_id uuid, p_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p_user_id is not null and (
+    p_user_id = p_staff_id
+    or exists (select 1 from public.platform_staff s where s.user_id = p_staff_id and s.person_id = p_user_id)
+  );
+$$;
+grant execute on function private.staff_is(uuid, uuid) to authenticated;
+
+-- This session was signed in with a second factor (an authenticator app).
+create function private.has_second_factor()
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(auth.jwt() ->> 'aal', '') = 'aal2';
+$$;
+grant execute on function private.has_second_factor() to authenticated;
+
+-- What every staff read checks: active staff, signed in with a second factor.
+create function private.is_staff_session()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select private.is_staff((select auth.uid())) and private.has_second_factor();
+$$;
+grant execute on function private.is_staff_session() to authenticated;
 
 alter table public.platform_staff enable row level security;
 create policy "staff see staff" on public.platform_staff
-  for select to authenticated using (private.is_staff((select auth.uid())));
+  for select to authenticated using (private.is_staff_session());
 grant select on public.platform_staff to authenticated;
 
+-- The badge: on an active staff account and on the staff member's own
+-- account, so people see staff in their communities.
 create function private.sync_profile_is_staff()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
-declare
-  v_user_id uuid := coalesce(new.user_id, old.user_id);
 begin
   update public.profiles p
-  set is_staff = private.is_staff(v_user_id)
-  where p.id = v_user_id and p.is_staff is distinct from private.is_staff(v_user_id);
+  set is_staff = exists (
+    select 1 from public.platform_staff s where s.active and p.id in (s.user_id, s.person_id))
+  where p.id in (old.user_id, old.person_id, new.user_id, new.person_id);
   return null;
 end;
 $$;
@@ -173,7 +250,7 @@ create table public.account_restrictions (
 create index account_restrictions_user on public.account_restrictions (user_id) where lifted_at is null;
 alter table public.account_restrictions enable row level security;
 create policy "staff read restrictions" on public.account_restrictions
-  for select to authenticated using (private.is_staff((select auth.uid())));
+  for select to authenticated using (private.is_staff_session());
 grant select on public.account_restrictions to authenticated;
 
 create function private.is_restricted(p_user_id uuid)
@@ -195,7 +272,8 @@ $$;
 -- ── The first line of every RPC ─────────────────────────────────────────────
 -- Returns the caller's id, or refuses: not signed in, account deleted, or
 -- restricted. One place, so no write path can forget one of the three.
-create function private.require_user()
+-- require_user (a person) and require_staff (8_safety) both start here.
+create function private.require_account()
 returns uuid
 language plpgsql
 stable
@@ -213,6 +291,26 @@ begin
   end if;
   if private.is_restricted(v_me) then
     perform private.fail('forbidden', 'account_restricted', 'This account is restricted.');
+  end if;
+  return v_me;
+end;
+$$;
+
+-- A person: everything a person does starts here, so a staff account can
+-- never join, post, befriend or report.
+create function private.require_user()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_me uuid := private.require_account();
+begin
+  if private.is_staff_account(v_me) then
+    perform private.fail('forbidden', 'staff_account',
+      'This is a Haven staff account. Use your own account for this.');
   end if;
   return v_me;
 end;

@@ -128,7 +128,7 @@ The demo keys are public knowledge, so reachability is the only lock.
 
 `seed` always runs three layers, in order. Every layer is safe to re-run.
 
-1. **Accounts** — the seven fixture users, created through the Auth admin API.
+1. **Accounts** — the nine fixture users, created through the Auth admin API.
 2. **Baseline** — `supabase/tests/_helpers` and `supabase/tests/fixtures`, the
    same files the SQL and backend suites use (`TEST: Hearth`, platform
    staff). This layer also clears the fixture users' friends, conversations
