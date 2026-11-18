@@ -74,6 +74,15 @@ session.
 
 Reconnecting loads everything again, since events sent while away are lost.
 
+**An open channel loads twice at sign-in, on purpose.** The screen asks for
+its messages at once, usually before the topic is listening, so they show
+early. When the topic connects, step 3 loads that channel's newest page again,
+since anything sent in between would otherwise be missed; the authors'
+profiles reload with it. The perf log shows two `messages:channel:<id>` spans
+(and two `profiles:ids`), both `inflight=new`. Holding the screen's load until
+the topic listens would save one request but leave the chat empty for up to
+`CONNECT_WAIT_MS` on a slow connection.
+
 ## Between sign-in and the app
 
 The account decides what stands in front of the app (desktop and web:
