@@ -38,6 +38,7 @@ import {
   AppearanceSettings,
   NotificationSettings,
   ProfileSettings,
+  ReportsSettings,
 } from "../features/settings";
 import { FriendLinkView, FriendsView } from "../features/friends";
 import { NotificationsView } from "../features/notifications";
@@ -360,6 +361,7 @@ export const routes: RouteDefinition[] = [
           },
           { path: "/settings/appearance", component: AppearanceSettings },
           { path: "/settings/profile", component: ProfileSettings },
+          { path: "/settings/reports", component: ReportsSettings },
           {
             path: "/settings/notifications",
             component: NotificationSettings,

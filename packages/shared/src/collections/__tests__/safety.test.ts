@@ -7,7 +7,13 @@ import { Cases, CASE_PAGE, createCasesState } from "../cases/cases";
 import { queuedCases } from "../cases/selectors";
 import { createPlainStatePort } from "../kit/statePort";
 import { createReportsState, Reports } from "../reports/reports";
-import { communityReports, waitingReportCount } from "../reports/selectors";
+import {
+  communityReports,
+  decisionActionsLabel,
+  reportAudienceLabel,
+  reportStatusLabel,
+  waitingReportCount,
+} from "../reports/selectors";
 import {
   communityReport,
   deferred,
@@ -85,6 +91,42 @@ describe("the person's own reports", () => {
       r.fileCommunityReport("hearth", { kind: "member", id: "zed" }),
     ).rejects.toThrow();
     expect(calls.listMyReports).not.toHaveBeenCalled();
+  });
+
+  it("says where each report stands, without what moderators decided", () => {
+    const mine = (audience: string, status: string) => ({
+      id: "x",
+      audience,
+      status,
+      created_at: "",
+      updated_at: "",
+    });
+    // Resolved and dismissed read the same: the reporter is told it was
+    // looked at, not the outcome (REPORTING.md, "Notices").
+    expect(reportStatusLabel(mine("community", "resolved"))).toBe("Reviewed");
+    expect(reportStatusLabel(mine("community", "dismissed"))).toBe("Reviewed");
+    expect(reportStatusLabel(mine("community", "escalated"))).toBe(
+      "Sent to Haven staff",
+    );
+    expect(reportAudienceLabel(mine("community", "open"))).toBe(
+      "Community moderators",
+    );
+    // A Haven case says its outcome.
+    expect(reportStatusLabel(mine("haven", "actioned"))).toBe("Action taken");
+    expect(reportStatusLabel(mine("haven", "no_action"))).toBe(
+      "No violation found",
+    );
+    expect(reportAudienceLabel(mine("haven", "open"))).toBe("Haven staff");
+    expect(
+      decisionActionsLabel({
+        case_id: "c",
+        actions: ["content_removed", "user_suspended"],
+        rule: "r",
+        reason: "why",
+        restricted_until: null,
+        decided_at: "",
+      }),
+    ).toBe("Content removed, Account suspended");
   });
 });
 

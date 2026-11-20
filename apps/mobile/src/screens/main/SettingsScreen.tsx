@@ -7,6 +7,7 @@ import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
 import { ThemeVisualPickerCard } from "@/features/user-profile/ThemeVisualPickerCard";
 import AppUpdatesCard from "@/features/user-profile/AppUpdatesCard";
+import YourReportsCard from "@/features/user-profile/YourReportsCard";
 import DeleteAccountConfirmationModal from "@/features/user-profile/DeleteAccountConfirmationModal";
 import type { MainStackParamList } from "@/navigation/types";
 
@@ -89,6 +90,8 @@ export function SettingsScreen({ navigation }: Props) {
         keyboardDismissMode="interactive"
       >
         <ThemeVisualPickerCard />
+
+        <YourReportsCard />
 
         <AppUpdatesCard />
 

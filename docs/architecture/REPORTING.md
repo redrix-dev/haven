@@ -195,15 +195,25 @@ tables directly.
 
 ### Notices
 
-Sent through the existing `notification_events` pipeline (new kinds):
+Written by `private.notify` as ordinary notifications. The database writes
+the title and body, and both apps show them as they are in the notifications
+inbox:
 
-- **Report received**: to the reporter, when a case is filed.
-- **Outcome**: to the reporter, when a decision is recorded (`actioned` or
-  `no_action`, no detail about the other user).
-- **Statement of reasons**: to the actioned user: what was actioned, which
-  rule, and how to contact staff.
+- **Report received** (`report_received`): to the reporter, when a case is
+  filed.
+- **Outcome** (`report_outcome`): to the reporter, when a decision is recorded
+  (`actioned` or `no_action`, no detail about the other user).
+- **Statement of reasons**: to the actioned user. The `moderation_decision`
+  notice gives the rule and the reason. The `statement_of_reasons` email adds
+  what was actioned, until when, and how to contact staff (reply to the
+  email). The email is sent even if the person can no longer sign in.
 
-Community reports send no notices beyond the moderators' modmail update.
+None of these can be turned off: `set_notification_preference` refuses every
+kind but the social ones.
+
+A community report has one notice: when its moderators resolve or dismiss it,
+the reporter gets an Outcome saying it was reviewed, not what was decided.
+Everything else about it goes only to the moderators, as `report.updated`.
 
 ### Alerts and realtime
 
