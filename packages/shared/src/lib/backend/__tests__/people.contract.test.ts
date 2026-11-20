@@ -3,14 +3,12 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   actor,
   eventually,
-  hearthChannelId,
-  hearthId,
   signOutAll,
 } from "@test-support/setup/supabaseLocal";
 import { friendOf, type HavenEvent } from "@shared/lib/backend";
 
 describe.sequential(
-  "people, friends, notifications and reports (contract)",
+  "people, friends and notifications (contract)",
   { timeout: 20_000 },
   () => {
     afterAll(signOutAll);
@@ -221,35 +219,6 @@ describe.sequential(
         await owner.backend.social.removeFriend(memberB.id);
         await owner.backend.social.revokeFriendLink(link.id);
       }
-    });
-
-    it("a report reaches the moderators without saying who filed it", async () => {
-      const memberA = await actor("member_a");
-      const memberB = await actor("member_b");
-      const owner = await actor("community_owner");
-      const sent = await memberA.backend.messages.sendMessage(
-        hearthChannelId("general"),
-        { nonce: randomUUID(), body: "something reportable" },
-      );
-      const reportId = await memberB.backend.safety.fileCommunityReport(
-        hearthId(),
-        { kind: "message", id: sent.id },
-        "contract test",
-      );
-      const reports =
-        await owner.backend.safety.listCommunityReports(hearthId());
-      const report = reports.find((r) => r.id === reportId);
-      expect(report?.snapshot.message?.body).toBe("something reportable");
-      expect(JSON.stringify(report)).not.toContain(memberB.id);
-
-      const mine = await memberB.backend.safety.listMyReports();
-      expect(mine.map((r) => r.id)).toContain(reportId);
-      await expect(
-        memberA.backend.safety.listCommunityReports(hearthId()),
-      ).rejects.toMatchObject({
-        kind: "forbidden",
-        reason: "missing_permission",
-      });
     });
   },
 );

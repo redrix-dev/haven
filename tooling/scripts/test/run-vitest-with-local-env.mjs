@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveSupabaseLocalEnv } from "./resolve-supabase-local-env.mjs";
+import { waitForRealtime } from "./wait-for-realtime.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../..");
@@ -86,6 +87,8 @@ try {
   if (mode === "backend") {
     const backendFiles =
       onlyFiles.length > 0 ? onlyFiles : listBackendContractTests();
+    const waited = await waitForRealtime(localEnv);
+    console.log(`[vitest-local-env] realtime delivering after ${waited}ms`);
     for (const file of backendFiles) {
       console.log(`[vitest-local-env] reloading fixtures before ${file}`);
       reloadFixtures();

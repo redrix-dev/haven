@@ -28,6 +28,13 @@ delete from public.blocks b using auth.users u
 delete from public.notifications n using auth.users u
   where u.email like 'rls-%@example.test' and u.id = n.recipient_id;
 delete from private.rate_limit_hits where true;
+-- Cases outlive this reset (some cannot be deleted at all). Close the ones the
+-- fixture people left open, or reporting the same thing again would hand back
+-- the open case instead of filing a new one.
+update public.platform_cases c set status = 'dismissed'
+  from auth.users u
+  where u.email like 'rls-%@example.test' and u.id = c.reporter_id
+    and c.status in ('open', 'in_review');
 delete from public.account_restrictions r using auth.users u
   where u.email like 'rls-%@example.test' and u.id = r.user_id and r.case_id is null;
 

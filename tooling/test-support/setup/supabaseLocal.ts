@@ -10,6 +10,7 @@ import { createBackend, type Backend } from "@shared/lib/backend";
 import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 import type { Database } from "@shared/types/database";
 import { loadBootstrappedTestUsers, type TestUserKey } from "../fixtures/users";
+import { totp } from "./totp";
 
 const requireEnv = (
   key:
@@ -49,6 +50,7 @@ export type Actor = {
 };
 
 const signedIn = new Map<TestUserKey, Actor>();
+let staffWithFactor: Actor | null = null;
 
 /**
  * One fixture person, signed in through the real Auth API with their own
@@ -57,6 +59,38 @@ const signedIn = new Map<TestUserKey, Actor>();
 export async function actor(key: TestUserKey): Promise<Actor> {
   const known = signedIn.get(key);
   if (known) return known;
+  const made = await signIn(key);
+  signedIn.set(key, made);
+  return made;
+}
+
+/**
+ * The active staff account, signed in with a second factor as staff work
+ * requires: it enrolls an authenticator and answers it, so the session is
+ * aal2. `actor("platform_staff_active")` is the same account with a password
+ * only, which the database refuses for staff work. The factor is deleted
+ * again by `signOutAll`.
+ */
+export async function staffActor(): Promise<Actor> {
+  if (staffWithFactor) return staffWithFactor;
+  const made = await signIn("platform_staff_active");
+  forgetFactors(made.id);
+  const enrolled = await made.client.auth.mfa.enroll({ factorType: "totp" });
+  if (enrolled.error) throw enrolled.error;
+  const verified = await made.client.auth.mfa.challengeAndVerify({
+    factorId: enrolled.data.id,
+    code: await totp(enrolled.data.totp.secret),
+  });
+  if (verified.error) throw verified.error;
+  staffWithFactor = made;
+  return made;
+}
+
+function forgetFactors(userId: string): void {
+  sql(`delete from auth.mfa_factors where user_id = '${userId}'`);
+}
+
+async function signIn(key: TestUserKey): Promise<Actor> {
   const user = loadBootstrappedTestUsers()[key];
   const client = createHavenSupabaseClient(
     localSupabaseEnv.url,
@@ -74,22 +108,24 @@ export async function actor(key: TestUserKey): Promise<Actor> {
     password: user.password,
   });
   if (error) throw error;
-  const made = {
+  return {
     id: user.id,
     username: user.username,
     client,
     backend: createBackend(client),
   };
-  signedIn.set(key, made);
-  return made;
 }
 
 /** Signs everyone out; call in afterAll. */
 export async function signOutAll(): Promise<void> {
-  for (const known of signedIn.values()) {
+  const everyone = [...signedIn.values()];
+  if (staffWithFactor) everyone.push(staffWithFactor);
+  for (const known of everyone) {
     known.client.realtime.disconnect();
     await known.client.auth.signOut();
   }
+  if (staffWithFactor) forgetFactors(staffWithFactor.id);
+  staffWithFactor = null;
   signedIn.clear();
 }
 

@@ -81,7 +81,13 @@ convenient. Shape the database for the product; the app follows it.
   rule (`supabase/functions/tests/mutations.txt`) and expects a test to fail.
 - `npm run test:backend` runs the `*.contract.test.ts` files in
   `packages/shared/src/lib/backend/__tests__/`: the backend clients signed in
-  as the fixture people, realtime included.
+  as the fixture people, realtime included. `actor(key)` signs in with a
+  password; `staffActor()` is the staff account with an authenticator enrolled
+  and answered (aal2), which every staff RPC and case table requires. The
+  runner waits until Realtime delivers a database broadcast before the first
+  file, because right after `db reset` it drops them for about a second.
+  Cases outlive the fixture reload, so assert on the case a test made, not on
+  "everything about this person".
 
 ## Where Things Go
 
