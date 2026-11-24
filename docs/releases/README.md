@@ -31,3 +31,31 @@ gitignored — never copy it into a release file:
 - the full `signoff.local.md` / JSON (raw logs, local paths, log links)
 
 See [../RELEASE_CADENCE.md](../RELEASE_CADENCE.md) § "Test signoff & release notes".
+
+## The site article
+
+The "What's new" page on haven-site is drafted from the same file:
+
+```
+npm run release:site-draft -- desktop-v2.1.0              # writes ../haven-site/content/releases/2-1-0.json
+npm run release:site-draft -- desktop-v2.1.0 --stdout     # print it instead
+```
+
+Options: `--site <path>` if haven-site is somewhere else, `--date YYYY-MM-DD`
+(defaults to the tag's commit date, else today), `--force` to replace a draft.
+
+How a release file becomes an article (`tooling/scripts/site/draft-site-release.mjs`):
+
+| In the markdown                   | On the site                                                  |
+| --------------------------------- | ------------------------------------------------------------ |
+| Paragraphs before the first `###` | Summary                                                      |
+| `### Known issues`                | The callout                                                  |
+| `### Install`                     | Dropped: installer names belong on the GitHub Release        |
+| Any other `###` section           | A domain module, picked from the heading (`SECTION_DOMAINS`) |
+| `- **Title** — body`              | One change                                                   |
+| First bold title of each section  | Highlights, one per section in turn, at most six             |
+
+So write the file to fit: an intro paragraph first, `###` sections, and bullets
+that start with a bold title. The tagline and "what's next" are left empty for
+a person to write. The draft is a branch on haven-site, never `master`: it goes
+live when its PR merges.

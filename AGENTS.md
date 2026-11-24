@@ -58,6 +58,28 @@ This file is the quick index. Load the relevant project skill under
 - `tooling` - repo checks, mobile wrappers, Supabase test runners, release
   signoff/report scripts, and shared test support.
 
+## Sister Repo: haven-site
+
+`haven-site` lives next to this repo at `../haven-site`
+(`redrix-dev/haven-site`). It is the public website and the staff tools:
+the home page, the dev log, the "What's new" release articles, the privacy and
+terms pages, and the staff report admin (`/admin/reports`). Next.js and
+Keystatic, deployed by Vercel from `master`. It has no `staging`: branch from
+`master` and open a PR to `master`. Its own `AGENTS.md` has its rules.
+
+Touch it when a change here needs one there:
+
+- **A release.** `npm run release:site-draft -- <tag>` turns
+  `docs/releases/<tag>.md` into a draft article in
+  `../haven-site/content/releases/`. See
+  [docs/releases/README.md](docs/releases/README.md).
+- **The database.** The staff admin reads the database as a signed-in staff
+  account. A change to the staff tables or RPCs breaks it until it is changed
+  to match.
+- **Legal text or brand.** `haven-site/lib/content/legal.ts` is the published
+  privacy policy and terms. A person reviews every change to it before it
+  merges.
+
 ## Guardrails That Matter
 
 - `npm run test:cleave` is the fast merge floor: lint, shared portability,
