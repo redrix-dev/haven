@@ -434,7 +434,8 @@ migrations, 21 accounts, buckets `message-media`, `link-preview-images`,
 old cron jobs, eight old Edge Functions, and the open realtime policy.
 
 1. **Back up**, outside every repo (the data holds account emails). The CLI
-   does not create the folder: `mkdir -p ~/haven-backups` first, then
+   does not create the folder, and `db dump` runs `pg_dump` in a container, so
+   Docker Desktop must be running: `mkdir -p ~/haven-backups` first, then
    `npx supabase db dump --linked -f ~/haven-backups/hosted-schema.sql`, and
    again with `--data-only -f ~/haven-backups/hosted-data.sql`. Download any
    stored files worth keeping from the dashboard.
