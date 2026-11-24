@@ -425,6 +425,53 @@ A new job wakes its worker over HTTP at once (at most once every two seconds
 per worker); a cron job wakes any worker with work waiting once a minute, as
 the fallback.
 
+## Replacing the hosted database
+
+The rebuild replaces the hosted project's schema and data (there were no real
+users; see 2026-11-24). Checked against the hosted project that day: 128 old
+migrations, 21 accounts, buckets `message-media`, `link-preview-images`,
+`dm-message-media`, `profile-avatars` and `ota-bundles` (827 objects), four
+old cron jobs, eight old Edge Functions, and the open realtime policy.
+
+1. **Back up**, outside every repo (the data holds account emails):
+   `npx supabase db dump --linked -f ~/haven-backups/hosted-schema.sql`, and
+   again with `--data-only -f ~/haven-backups/hosted-data.sql`. Download any
+   stored files worth keeping from the dashboard.
+2. **Stop the old cron jobs** (SQL editor): `select cron.unschedule(jobname) from cron.job;`
+3. **Empty and delete every old bucket** (Storage, each bucket: Empty, then
+   Delete). Required: the migrations create `ota-bundles` without
+   `on conflict`, so an existing one stops them. SQL cannot delete stored
+   files on the hosted project; use the dashboard.
+4. **Reset.** From a checkout of this branch, linked to the project:
+   `npx supabase db reset --linked --no-seed`. It drops the old schema and
+   applies `supabase/migrations/` from the start.
+5. **Check it took** (SQL editor). Expect 9 migrations, the two new cron jobs,
+   only the `haven_user_created`/`haven_user_deleted` triggers on
+   `auth.users`, and only the new realtime policies:
+   ```sql
+   select count(*) from supabase_migrations.schema_migrations;
+   select jobname from cron.job;
+   select tgname from pg_trigger where tgrelid = 'auth.users'::regclass and not tgisinternal;
+   select policyname from pg_policies where schemaname = 'realtime';
+   select id from storage.buckets;
+   ```
+   If an old realtime policy is still there, drop it:
+   `drop policy "authenticated can receive broadcasts" on realtime.messages;`
+   (and the same for `"authenticated can receive private_user broadcasts"`).
+6. **Delete the old accounts.** They have no rows in the new schema. In the
+   SQL editor: `delete from auth.users;` (the new delete trigger erases each
+   one). Everyone signs up again.
+7. **Edge Functions.** Delete the old ones:
+   `npx supabase functions delete voice-ice`, then `message-media-maintenance`,
+   `link-preview-backfill`, `report-alert`, `expo-push-worker`. Set the
+   secrets (`supabase/functions/README.md`):
+   `npx supabase secrets set HAVEN_WORKER_CRON_SECRET=… RESEND_API_KEY=… EXPO_ACCESS_TOKEN=… LIVEKIT_URL=… LIVEKIT_API_KEY=… LIVEKIT_API_SECRET=…`.
+   Deploy the new set: `npx supabase functions deploy push-worker mail-worker link-preview-worker media-worker voice-token voice-control update-manifest`.
+8. Then "Setting up a project" below, steps 1–3 and 5.
+
+The live web app (`main`) and installed builds stop working at step 4 until
+the rebuild is promoted and released.
+
 ## Setting up a project
 
 After the migrations are applied to a hosted project:
