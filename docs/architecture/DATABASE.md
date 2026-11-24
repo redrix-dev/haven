@@ -433,7 +433,8 @@ migrations, 21 accounts, buckets `message-media`, `link-preview-images`,
 `dm-message-media`, `profile-avatars` and `ota-bundles` (827 objects), four
 old cron jobs, eight old Edge Functions, and the open realtime policy.
 
-1. **Back up**, outside every repo (the data holds account emails):
+1. **Back up**, outside every repo (the data holds account emails). The CLI
+   does not create the folder: `mkdir -p ~/haven-backups` first, then
    `npx supabase db dump --linked -f ~/haven-backups/hosted-schema.sql`, and
    again with `--data-only -f ~/haven-backups/hosted-data.sql`. Download any
    stored files worth keeping from the dashboard.
