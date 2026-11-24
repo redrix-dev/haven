@@ -467,10 +467,13 @@ old cron jobs, eight old Edge Functions, and the open realtime policy.
    `delete from auth.users;` (the new delete trigger erases each one).
 7. **Edge Functions.** Delete the old ones:
    `npx supabase functions delete voice-ice`, then `message-media-maintenance`,
-   `link-preview-backfill`, `report-alert`, `expo-push-worker`. Set the
-   secrets (`supabase/functions/README.md`):
-   `npx supabase secrets set HAVEN_WORKER_CRON_SECRET=… RESEND_API_KEY=… EXPO_ACCESS_TOKEN=… LIVEKIT_URL=… LIVEKIT_API_KEY=… LIVEKIT_API_SECRET=…`.
-   Deploy the new set: `npx supabase functions deploy push-worker mail-worker link-preview-worker media-worker voice-token voice-control update-manifest`.
+   `link-preview-backfill`, `report-alert`, `expo-push-worker`. A reset
+   keeps function secrets; `npx supabase secrets list` shows which are set
+   (names and hashes only). `RESEND_API_KEY` and the `LIVEKIT_` three carried
+   over on 2026-11-24. `EXPO_ACCESS_TOKEN` is optional and was left unset;
+   the old `HAVEN_EXPO_ACCESS_TOKEN`, `HAVEN_WEB_PUSH_VAPID_*` and `XIRSYS_*`
+   are read by nothing now. The worker secret is step 2 below. Deploy the new
+   set: `npx supabase functions deploy push-worker mail-worker link-preview-worker media-worker voice-token voice-control update-manifest`.
 8. Then "Setting up a project" below, steps 1–3 and 5.
 
 The live web app (`main`) and installed builds stop working at step 4 until
@@ -483,12 +486,17 @@ After the migrations are applied to a hosted project:
 1. **Auth hook.** Dashboard, Authentication, Hooks, Customize Access Token:
    point it at `public.auth_hook_access_token`. Locally this is in
    `supabase/config.toml`. `npm run test:db:auth-hook` proves it is on.
-2. **Workers.** Tell the database where they live:
-   `select private.set_setting('edge_base_url', 'https://<ref>.supabase.co/functions/v1');`
-   and `select private.set_setting('worker_secret', '<secret>');`. Give the
-   functions the same secret as `HAVEN_WORKER_CRON_SECRET` (16 characters or
-   more), plus their own keys (`supabase/functions/README.md`). Until both
-   settings are set the database queues jobs and calls nobody.
+2. **Workers.** `node tooling/scripts/hosted/set-worker-secret.mjs` does
+   this for the linked project: it sets `edge_base_url` and a new random
+   `worker_secret` in the database and the same value as the functions'
+   `HAVEN_WORKER_CRON_SECRET`, without printing it. Run it again to rotate.
+   By hand it is
+   `select private.set_setting('edge_base_url', 'https://<ref>.supabase.co/functions/v1');`,
+   `select private.set_setting('worker_secret', '<secret>');` and the same
+   secret (16 characters or more) as `HAVEN_WORKER_CRON_SECRET`. Until both
+   settings are set the database queues jobs and calls nobody. To check both
+   sides match, compare the hash `npx supabase secrets list` shows with
+   `select encode(extensions.digest(decrypted_secret, 'sha256'), 'hex') from vault.decrypted_secrets where name = 'haven.worker_secret';`.
 3. **Staff.** Authentication, Multi-Factor: the authenticator app (TOTP) must
    be on for enrolling and verifying (locally it is in `supabase/config.toml`).
    Make a new account for the staff work, then
