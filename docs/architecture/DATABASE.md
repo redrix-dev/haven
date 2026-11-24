@@ -460,9 +460,11 @@ old cron jobs, eight old Edge Functions, and the open realtime policy.
    If an old realtime policy is still there, drop it:
    `drop policy "authenticated can receive broadcasts" on realtime.messages;`
    (and the same for `"authenticated can receive private_user broadcasts"`).
-6. **Delete the old accounts.** They have no rows in the new schema. In the
-   SQL editor: `delete from auth.users;` (the new delete trigger erases each
-   one). Everyone signs up again.
+   On 2026-11-24 the reset did all of this by itself: 9 migrations, the two
+   new cron jobs, the new triggers and policies, the five new buckets.
+6. **Old accounts.** The reset also emptied `auth.users` (0 rows on
+   2026-11-24), so everyone signs up again. If accounts are still there, run
+   `delete from auth.users;` (the new delete trigger erases each one).
 7. **Edge Functions.** Delete the old ones:
    `npx supabase functions delete voice-ice`, then `message-media-maintenance`,
    `link-preview-backfill`, `report-alert`, `expo-push-worker`. Set the
