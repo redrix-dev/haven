@@ -49,8 +49,8 @@ jobs:
     outputs:
       integration: ${{ steps.filter.outputs.integration }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - name: Lockfile discipline
         run: git diff --exit-code -- package-lock.json apps/mobile/package-lock.json
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm run mobile:ownership
       - run: npm run mobile:preflight
@@ -94,9 +94,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           # Must equal the `supabase` version in package-lock.json. The test
           # scripts reset the database with the lockfile's CLI; if `start` used
