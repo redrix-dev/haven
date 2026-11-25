@@ -115,7 +115,7 @@
     "react-native": "0.88.1",
     "react-native-callkeep": "4.3.16",
     "react-native-draggable-flatlist": "^4.0.3",
-    "react-native-enriched-markdown": "^0.5.0",
+    "react-native-enriched-markdown": "^1.2.0",
     "react-native-gesture-handler": "~3.3.0",
     "react-native-keyboard-controller": "1.22.9",
     "react-native-mmkv": "^4.3.1",
